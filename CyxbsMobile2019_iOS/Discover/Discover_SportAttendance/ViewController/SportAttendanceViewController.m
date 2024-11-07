@@ -31,12 +31,20 @@
 
 @implementation SportAttendanceViewController
 
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        self.IsLoad = false;
+    }
+    return self;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#FFFFFF"] darkColor:[UIColor colorWithHexString:@"#000000"]];
-    //默认为错误页
-    [self addWrongView];
+    // 默认为成功页
+    [self addSussesView];
     //判断是否假期
     [self judgeHoliday];
     self.IsLoad = false;
@@ -298,7 +306,7 @@
     }];
 }
 
-- (void) addNoRunImg{
+- (void)addNoRunImg {
     UIImageView *img = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"人在手机里"]];
     [self.view addSubview:img];
     [img mas_makeConstraints:^(MASConstraintMaker *make) {
