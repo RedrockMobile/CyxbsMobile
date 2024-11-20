@@ -13,6 +13,7 @@
 #import "DateModle.h"
 #import "RemindHUD.h"
 #import "MJRefresh.h"
+#import "掌上重邮-Swift.h"
 
 @interface SportAttendanceViewController ()<UITableViewDelegate, UITableViewDataSource>
 
@@ -213,7 +214,7 @@
 #pragma mark - Method
 - (void)judgeHoliday {
     //获取当前周数
-    int count = [getNowWeek_NSString.numberValue intValue] ;
+    int count = [SwiftToOC getNowWeek];
     if (count > 19) {
         _Isholiday = true;
     }else{
