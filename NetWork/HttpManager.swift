@@ -372,7 +372,7 @@ extension HttpManager {
         //这个接口奇奇怪怪的，必须将参数拼接到URL里，手动更改编码方式
     }
     
-    ///活动消息
+    /// 活动消息
     func magipoke_ufield_message_list(lower_id: Int?) ->DataRequest {
         let parameters: [String: Any?] = [
             "lower_id": lower_id
@@ -380,7 +380,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/message/list/"), method: .get, parameters: excludeOptionalParameter(parameters))
     }
     
-    ///活动详情
+    /// 活动详情
     func magipoke_ufield_activity(activity_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "activity_id": activity_id
@@ -388,7 +388,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/activity/"), method: .get, parameters: parameters)
     }
     
-    ///已读活动消息
+    /// 已读活动消息
     func magipoke_ufield_action_click(message_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "message_id": message_id
@@ -396,7 +396,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/message/action/click/"), method: .put, parameters: parameters, encoding: URLEncoding.queryString)
     }
     
-    ///完成任务接口
+    /// 完成任务接口
     func magipoke_intergral_integral_progress(title: String) -> DataRequest {
         let parameters: [String: Any] = [
             "title": title
@@ -404,6 +404,7 @@ extension HttpManager {
         return SessionManager.shared.ry_upload(APIConfig.current.api("/magipoke-intergral/Integral/progress"), method: .post, parameters: parameters)
     }
     
+    /// 活动&邮子清单联动
     func magipoke_ufield_activity_addTodo(activity_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "activity_id": activity_id
@@ -469,5 +470,10 @@ extension HttpManager {
     func magipoke_qa_search(q: String) -> DataRequest{
         let parameters : [String: Any] = ["q": q]
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/search"), method: .post, parameters: parameters, encoding: URLEncoding.queryString)
+    }
+    
+    /// 体育打卡信息说明
+    func magipoke_sport_notice() -> DataRequest {
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-sport/notice"), method: .get)
     }
 }
