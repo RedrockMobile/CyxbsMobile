@@ -62,7 +62,7 @@ extension HttpManager {
     
     /// 查询同学信息
     @discardableResult
-    func magipoke_text_search_people(stu: String) -> DataRequest {
+    func magipoke_jwzx_search_people(stu: String) -> DataRequest {
         let parameters: [String: Any] = [
             "stu": stu
         ]
