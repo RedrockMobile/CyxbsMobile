@@ -39,10 +39,10 @@ class SAAlertController: UIViewController {
         return button
     }()
     
-    private var completion: (() -> Void)?
+    private var completion: ((Bool) -> Void)?
 
     // MARK: - Life Cycle
-    init(noticeItems: [NoticeItem]?, completion: (() -> Void)?) {
+    init(noticeItems: [NoticeItem]?, completion: ((Bool) -> Void)?) {
         super.init(nibName: nil, bundle: nil)
         self.completion = completion
         self.noticeItems = noticeItems ?? []
@@ -132,13 +132,15 @@ class SAAlertController: UIViewController {
 
     // MARK: - Button Actions
     @objc private func handleConfirm() {
-        completion?()
-        dismiss(animated: true, completion: nil)
+        dismiss(animated: true) {
+            self.completion?(true)
+        }
     }
     
     @objc private func didTapView(_ tapGes: UITapGestureRecognizer) {
-        completion?()
-        dismiss(animated: true, completion: nil)
+        dismiss(animated: true) {
+            self.completion?(false)
+        }
     }
 }
 

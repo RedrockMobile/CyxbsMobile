@@ -128,20 +128,28 @@ extension TabBarController {
             } else {
                 self.reloadData()
                 if !(UserDefaultsManager.shared.hasReadSportsCheckInInfo ?? false) {
-                    self.showSANotice {
-                        UserDefaultsManager.shared.hasReadSportsCheckInInfo = true
+                    self.showSANotice { success in
+                        if success {
+                            UserDefaultsManager.shared.hasReadSportsCheckInInfo = true
+                        }
+                        self.checkPresentSchedule()
                     }
-                    return
-                }
-                if UserDefaultsManager.shared.presentScheduleWhenOpenApp {
-                    self.presentSchedule()
+                } else {
+                    self.checkPresentSchedule()
                 }
             }
         }
     }
     
+    /// 是否需要弹出课表
+    func checkPresentSchedule() {
+        if UserDefaultsManager.shared.presentScheduleWhenOpenApp {
+            self.presentSchedule()
+        }
+    }
+    
     /// 体育打卡信息说明
-    func showSANotice(completion: (() -> Void)?) {
+    func showSANotice(completion: ((Bool) -> Void)?) {
         HttpManager.shared.magipoke_sport_notice().ry_JSON { [weak self] response in
             guard let self = self else { return }
             switch response {
@@ -154,6 +162,7 @@ extension TabBarController {
                 }
             case .failure(let netError):
                 print(netError)
+                completion?(false)
             }
         }
     }
