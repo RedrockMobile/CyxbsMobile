@@ -220,7 +220,7 @@
     FinderToolViewItem *item4 = [[FinderToolViewItem alloc]initWithIconView:@"校历" Title:@"校历" Detail:@"学期安排一目了然"];
     FinderToolViewItem *item5 = [[FinderToolViewItem alloc]initWithIconView:@"重邮地图" Title:@"重邮地图" Detail:@"校园地图，尽收重邮风光"];
     FinderToolViewItem *item6 = [[FinderToolViewItem alloc] initWithIconView:@"邮子清单" Title:@"邮子清单" Detail:@"邮子清单"];
-    FinderToolViewItem *item7 = [[FinderToolViewItem alloc]initWithIconView:@"我的考试" Title:@"我的考试" Detail:@"考试安排、成绩学分轻松查询"];
+//    FinderToolViewItem *item7 = [[FinderToolViewItem alloc]initWithIconView:@"我的考试" Title:@"我的考试" Detail:@"考试安排、成绩学分轻松查询"];
     FinderToolViewItem *item8 = [[FinderToolViewItem alloc] initWithIconView:@"体育打卡" Title:@"体育打卡" Detail:@"体育打卡"];
     FinderToolViewItem *item9 = [[FinderToolViewItem alloc]initWithIconView:@"空教室" Title:@"空教室" Detail:@"空余教室及时查询"];
     FinderToolViewItem *item10 = [[FinderToolViewItem alloc]initWithIconView:@"更多功能" Title:@"更多功能" Detail:@"敬请期待"];
@@ -230,7 +230,7 @@
     [item4 addTarget:self action:@selector(chooseSchoolSchedule:) forControlEvents:UIControlEventTouchUpInside];
     [item5 addTarget:self action:@selector(chooseCQUPTMap:) forControlEvents:UIControlEventTouchUpInside];
     [item6 addTarget:self action:@selector(chooseToDo:) forControlEvents:UIControlEventTouchUpInside];
-    [item7 addTarget:self action:@selector(chooseTestArrange:) forControlEvents:UIControlEventTouchUpInside];
+//    [item7 addTarget:self action:@selector(chooseTestArrange:) forControlEvents:UIControlEventTouchUpInside];
     [item8 addTarget:self action:@selector(chooseSportAttendance:) forControlEvents:UIControlEventTouchUpInside];
     [item9 addTarget:self action:@selector(chooseEmptyClassRoom:) forControlEvents:UIControlEventTouchUpInside];
     
@@ -241,7 +241,7 @@
     [itemsArray addObject:item4];
     [itemsArray addObject:item5];
     [itemsArray addObject:item6];
-    [itemsArray addObject:item7];
+//    [itemsArray addObject:item7];
     [itemsArray addObject:item8];
     [itemsArray addObject:item9];
     [itemsArray addObject:item10];
