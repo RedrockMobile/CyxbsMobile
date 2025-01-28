@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.utils.BindView
 import com.mredrock.cyxbs.common.R
 import com.mredrock.cyxbs.common.utils.extensions.getDarkModeStatus
@@ -52,7 +52,7 @@ abstract class BaseActivity : AppCompatActivity() {
         }
     }
 
-    val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     protected fun JToolbar.initWithSplitLine(title: String,
                                              withSplitLine: Boolean = true,

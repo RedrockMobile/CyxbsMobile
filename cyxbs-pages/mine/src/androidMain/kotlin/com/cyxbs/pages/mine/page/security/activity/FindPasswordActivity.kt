@@ -13,7 +13,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.service.impl
@@ -76,7 +76,7 @@ class FindPasswordActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.mine_activity_find_password)
         //设置toolBar
-        findViewById<JToolbar>(com.cyxbs.components.config.R.id.toolbar).apply {
+        findViewById<JToolbar>(com.cyxbs.components.view.R.id.toolbar).apply {
             this.init(this@FindPasswordActivity, context.getString(R.string.mine_security_find_password))
         }
 

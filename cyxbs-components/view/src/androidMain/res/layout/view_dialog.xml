@@ -6,12 +6,12 @@
 
 
     <ImageView
-        android:id="@+id/config_dialog_background"
+        android:id="@+id/view_dialog_background"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginBottom="75dp"
         android:orientation="vertical"
-        android:src="@drawable/config_shape_round_corner_dialog"
+        android:src="@drawable/view_shape_round_corner_dialog"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -19,38 +19,38 @@
 
 
     <FrameLayout
-        android:id="@+id/config_dialog_container"
+        android:id="@+id/view_dialog_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintStart_toStartOf="@id/config_dialog_background"
-        app:layout_constraintEnd_toEndOf="@id/config_dialog_background"
-        app:layout_constraintTop_toTopOf="@id/config_dialog_background"/>
+        app:layout_constraintStart_toStartOf="@id/view_dialog_background"
+        app:layout_constraintEnd_toEndOf="@id/view_dialog_background"
+        app:layout_constraintTop_toTopOf="@id/view_dialog_background"/>
 
     <Button
-        android:id="@+id/config_dialog_btn_positive"
+        android:id="@+id/view_dialog_btn_positive"
         style="?android:attr/borderlessButtonStyle"
         android:layout_width="wrap_content"
         android:layout_height="34dp"
         android:paddingHorizontal="5dp"
         android:layout_marginTop="37dp"
         android:layout_marginBottom="53dp"
-        android:background="@drawable/config_ripple_dialog_btn_positive_blue"
+        android:background="@drawable/view_ripple_dialog_btn_positive_blue"
         android:textColor="@android:color/white"
         android:textSize="15sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/config_dialog_container"
-        app:layout_constraintBottom_toTopOf="@id/config_dialog_btn_negative"/>
+        app:layout_constraintTop_toBottomOf="@id/view_dialog_container"
+        app:layout_constraintBottom_toTopOf="@id/view_dialog_btn_negative"/>
 
     <ImageView
-        android:id="@+id/config_dialog_btn_negative"
+        android:id="@+id/view_dialog_btn_negative"
         android:layout_width="45dp"
         android:layout_height="45dp"
         android:src="@drawable/config_ic_dialog_negative"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/config_dialog_background"
+        app:layout_constraintTop_toBottomOf="@id/view_dialog_background"
         app:layout_constraintVertical_bias="1.0" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

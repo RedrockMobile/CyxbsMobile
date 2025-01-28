@@ -76,7 +76,7 @@
                             android:paddingBottom="7dp" />
 
                         <TextView
-                            android:textColor="@color/config_choose_dialog_btn_positive"
+                            android:textColor="@color/view_choose_dialog_btn_positive"
                             android:textSize="12sp"
                             android:text="批量添加"
                             android:layout_marginEnd="11dp"

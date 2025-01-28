@@ -19,7 +19,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.cyxbs.components.config.dir.DIR_PHOTO
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.discover.BuildConfig
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.network.RollerViewInfo
@@ -55,7 +55,7 @@ class RollerViewActivity : BaseActivity() {
     private var sensorEventListeners: ArrayList<SensorEventListener>? = null
     
     private val discover_web_view by R.id.discover_web_view.view<LiteJsWebView>()
-    private val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    private val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {

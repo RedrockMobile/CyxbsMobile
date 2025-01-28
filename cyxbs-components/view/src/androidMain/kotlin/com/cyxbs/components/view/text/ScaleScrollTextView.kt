@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.view
+package com.cyxbs.components.view.text
 
 import android.annotation.SuppressLint
 import android.content.Context

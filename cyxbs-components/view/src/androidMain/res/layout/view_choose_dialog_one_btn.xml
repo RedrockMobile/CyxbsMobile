@@ -6,14 +6,14 @@
     android:layout_height="wrap_content">
 
     <ImageView
-        android:id="@+id/config_iv_choose_dialog_one_btn_background"
+        android:id="@+id/view_iv_choose_dialog_one_btn_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         tools:ignore="ContentDescription"
-        tools:src="@drawable/config_shape_round_corner_dialog"/>
+        tools:src="@drawable/view_shape_round_corner_dialog"/>
 
     <FrameLayout
-        android:id="@+id/config_fl_choose_dialog_btn_content"
+        android:id="@+id/view_fl_choose_dialog_btn_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginBottom="64dp"
@@ -29,7 +29,7 @@
     </FrameLayout>
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/config_btn_choose_dialog_one_btn_positive"
+        android:id="@+id/view_btn_choose_dialog_one_btn_positive"
         android:layout_width="80dp"
         android:layout_height="34dp"
         android:layout_marginBottom="30dp"
@@ -45,10 +45,10 @@
         tools:text="💕"
         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
         tools:ignore="SpUsage"
-        tools:backgroundTint="@color/config_choose_dialog_btn_positive"/>
+        tools:backgroundTint="@color/view_choose_dialog_btn_positive"/>
 
     <FrameLayout
-        android:id="@+id/config_fl_choose_dialog_bottom"
+        android:id="@+id/view_fl_choose_dialog_bottom"
         android:layout_width="match_parent"
         android:layout_height="30dp"
         android:layout_gravity="bottom" >

@@ -7,7 +7,7 @@ import com.cyxbs.pages.volunteer.R
 import com.cyxbs.pages.volunteer.bean.VolunteerAffair
 import com.cyxbs.pages.volunteer.utils.DateUtils.stamp2Date
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.cyxbs.components.config.view.MarqueeTextView
+import com.cyxbs.components.view.text.MarqueeTextView
 
 /**
  * Created by yyfbe, Date on 2020/9/5.

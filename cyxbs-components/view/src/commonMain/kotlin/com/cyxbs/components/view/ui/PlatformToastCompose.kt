@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.compose.toast
+package com.cyxbs.components.view.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn

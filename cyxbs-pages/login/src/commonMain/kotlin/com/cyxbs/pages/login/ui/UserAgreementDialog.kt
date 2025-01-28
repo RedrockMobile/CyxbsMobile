@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.appName
-import com.cyxbs.components.config.compose.dialog.ChooseDialogCompose
+import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
 

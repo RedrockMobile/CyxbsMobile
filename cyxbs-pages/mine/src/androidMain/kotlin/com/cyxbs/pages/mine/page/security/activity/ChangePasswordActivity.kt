@@ -18,7 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.mine.R
@@ -44,7 +44,7 @@ class ChangePasswordActivity : BaseActivity() {
     private val mTvForgetPassword by R.id.mine_security_tv_forget_password.view<TextView>()
     private val mBtnSecurityChangePasswordConfirm by R.id.mine_bt_security_change_password_confirm.view<Button>()
     private val mPbSecurityChangePassword by R.id.mine_pb_security_change_password.view<ProgressBar>()
-    private val toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    private val toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     companion object {
         //下面的常量是转化页面形态的标识量

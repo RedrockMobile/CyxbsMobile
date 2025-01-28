@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.view
+package com.cyxbs.components.view.ui
 
 import android.content.Context
 import android.graphics.Canvas
@@ -39,7 +39,7 @@ import com.cyxbs.components.config.R
  * ```
  * 在 XML 中合适的位置引入
  * <include
- *     layout="@layout/config_toolbar" /> // 注意这里是 config_ 不是 common_ !
+ *     layout="@layout/view_toolbar" /> // 注意这里是 view_ 不是 common_ !
  *
  *
  * 在代码处：

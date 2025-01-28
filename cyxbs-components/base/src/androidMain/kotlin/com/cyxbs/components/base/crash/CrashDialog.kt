@@ -15,7 +15,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.cyxbs.components.init.appTopActivity
-import com.cyxbs.components.config.view.ScaleScrollTextView
+import com.cyxbs.components.view.text.ScaleScrollTextView
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.utils.extensions.collectUsefulStackTrace
 import com.cyxbs.components.utils.extensions.color

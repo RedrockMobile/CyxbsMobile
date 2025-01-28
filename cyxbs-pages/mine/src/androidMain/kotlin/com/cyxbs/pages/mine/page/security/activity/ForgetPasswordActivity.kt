@@ -10,7 +10,7 @@ import androidx.activity.viewModels
 import androidx.lifecycle.Observer
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.MINE_FORGET_PASSWORD
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.viewmodel.ForgetPasswordViewModel
@@ -42,7 +42,7 @@ class ForgetPasswordActivity : BaseActivity() {
         setContentView(R.layout.mine_activity_forget_password)
         mPbSecurityForget.visibility = View.GONE
         //配置toolBar
-        findViewById<JToolbar>(com.cyxbs.components.config.R.id.toolbar).init(
+        findViewById<JToolbar>(com.cyxbs.components.view.R.id.toolbar).init(
             activity = this,
             title = "忘记密码",
             withSplitLine = false,

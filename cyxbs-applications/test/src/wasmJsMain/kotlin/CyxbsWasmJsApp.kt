@@ -1,7 +1,7 @@
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.config.compose.toast.PlatformToastCompose
+import com.cyxbs.components.view.ui.PlatformToastCompose
 import com.cyxbs.pages.login.ui.LoginPage
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
 import kotlinx.browser.document

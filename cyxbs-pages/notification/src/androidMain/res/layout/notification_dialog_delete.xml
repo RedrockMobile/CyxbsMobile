@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="178dp"
         android:orientation="vertical"
-        android:src="@drawable/config_shape_round_corner_dialog"
+        android:src="@drawable/view_shape_round_corner_dialog"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         tools:ignore="ContentDescription" />

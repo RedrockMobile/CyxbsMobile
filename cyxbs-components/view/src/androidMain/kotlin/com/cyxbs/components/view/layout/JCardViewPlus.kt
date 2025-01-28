@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.view
+package com.cyxbs.components.view.layout
 
 import android.content.Context
 import android.content.res.TypedArray

@@ -9,7 +9,7 @@
 
     <include
         android:id="@+id/mine_toolbar_bind_email"
-        layout="@layout/config_toolbar" />
+        layout="@layout/view_toolbar" />
 
     <TextView
         android:id="@+id/tv_bind_email_top_tips"

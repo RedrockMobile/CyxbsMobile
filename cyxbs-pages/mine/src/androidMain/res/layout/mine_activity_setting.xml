@@ -13,7 +13,7 @@
         android:orientation="vertical">
 
         <include
-            layout="@layout/config_toolbar" />
+            layout="@layout/view_toolbar" />
 
         <FrameLayout
             android:layout_width="match_parent"

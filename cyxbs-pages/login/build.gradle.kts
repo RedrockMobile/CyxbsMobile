@@ -10,8 +10,9 @@ kotlin {
     commonMain.dependencies {
       subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
-      implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
+      implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsFunctions.update.api)
       implementation(projects.cyxbsComponents.account.api)
       implementation(libs.compose.lottie)

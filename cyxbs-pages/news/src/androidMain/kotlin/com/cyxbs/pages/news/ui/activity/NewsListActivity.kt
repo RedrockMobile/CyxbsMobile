@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_NEWS
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.news.R
 import com.cyxbs.pages.news.ui.adapter.NewsAdapter
 import com.cyxbs.pages.news.viewmodel.NewsListViewModel
@@ -26,7 +26,7 @@ class NewsListActivity : BaseActivity() {
 
     private val srl_list by R.id.srl_list.view<SwipeRefreshLayout>()
     private val rv_list by R.id.rv_list.view<RecyclerView>()
-    private val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    private val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     private lateinit var adapter: NewsAdapter
 

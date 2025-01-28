@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.view
+package com.cyxbs.components.view.text
 
 import android.content.Context
 import android.text.TextUtils

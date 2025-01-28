@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.compose.dialog
+package com.cyxbs.components.view.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
