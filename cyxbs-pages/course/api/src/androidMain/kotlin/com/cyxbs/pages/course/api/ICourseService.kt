@@ -4,7 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import androidx.core.content.edit
 import androidx.fragment.app.Fragment
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.affair.api.IAffairService
 

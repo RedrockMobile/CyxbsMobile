@@ -8,10 +8,10 @@ useKtProvider()
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.cyxbsComponents.init)
-      implementation(projects.cyxbsComponents.view)
+      api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.login.api)
     }

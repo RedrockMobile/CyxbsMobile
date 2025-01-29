@@ -1,7 +1,6 @@
-package com.cyxbs.components.utils.coroutine
+package com.cyxbs.components.init
 
 import androidx.lifecycle.coroutineScope
-import com.cyxbs.components.utils.extensions.appLifecycle
 import kotlinx.coroutines.CoroutineScope
 
 /**

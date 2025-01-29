@@ -4,7 +4,7 @@ import android.os.Parcelable
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.coroutine.EmptyCoroutineExceptionHandler
+import com.cyxbs.components.utils.extensions.EmptyCoroutineExceptionHandler
 import com.cyxbs.components.utils.extensions.setSchedulers
 import com.cyxbs.components.utils.network.ApiGenerator
 import com.cyxbs.components.utils.network.mapOrThrowApiException

@@ -1,7 +1,7 @@
 package com.cyxbs.components.account.provider
 
 import com.cyxbs.components.account.api.AccountState
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.init.appCoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

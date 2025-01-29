@@ -1,13 +1,7 @@
 package com.cyxbs.components.utils.extensions
 
 import android.content.res.Configuration
-import android.os.Handler
-import android.os.Looper
-
-/**
- * 默认的主线程 Handler
- */
-val defaultHandler = Handler(Looper.getMainLooper())
+import com.cyxbs.components.init.appContext
 
 /**
  * 是否是日间模式，否则为夜间模式

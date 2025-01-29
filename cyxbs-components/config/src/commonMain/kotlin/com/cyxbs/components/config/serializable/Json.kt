@@ -1,4 +1,4 @@
-package com.cyxbs.components.utils.extensions
+package com.cyxbs.components.config.serializable
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json

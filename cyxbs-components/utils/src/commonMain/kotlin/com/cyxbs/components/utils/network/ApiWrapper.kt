@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.network
 
 import com.cyxbs.components.account.api.ITokenService
-import com.cyxbs.components.utils.extensions.GsonDataBean
+import com.cyxbs.components.config.serializable.GsonDataBean
 import com.cyxbs.components.utils.service.impl
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

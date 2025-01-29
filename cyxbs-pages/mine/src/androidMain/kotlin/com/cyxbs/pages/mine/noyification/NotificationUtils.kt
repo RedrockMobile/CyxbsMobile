@@ -9,7 +9,7 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.work.*
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.pages.mine.page.sign.DailySignActivity
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -43,9 +43,9 @@ object NotificationUtils {
    */
   fun tryNotificationSign(isSign: Boolean) {
     //用户不允许提醒 直接返回
-    val notificationSp = appContext.getSharedPreferences(NOTIFICATION_SP_FILE_NAME, Context.MODE_PRIVATE)
+    val notificationSp = com.cyxbs.components.init.appContext.getSharedPreferences(NOTIFICATION_SP_FILE_NAME, Context.MODE_PRIVATE)
     if (!notificationSp.getBoolean(IS_SWITCH2_SELECT, true)) return
-    val workManager = WorkManager.getInstance(appContext)
+    val workManager = WorkManager.getInstance(com.cyxbs.components.init.appContext)
     val hour = Calendar.HOUR_OF_DAY
     val data: Data
     var dailySignWorkRequest: OneTimeWorkRequest by Delegates.notNull()

@@ -11,7 +11,7 @@ import android.content.Intent
 import android.os.Build
 import android.widget.RemoteViews
 import com.cyxbs.components.config.route.TODO_ADD_TODO_BY_WIDGET
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.service.implClass
 import com.cyxbs.pages.todo.R
 import com.cyxbs.pages.todo.service.TodoWidgetService
@@ -25,7 +25,7 @@ class TodoWidget : AppWidgetProvider() {
     companion object{
         fun sendAddTodoBroadcast(context: Context) {
             context.sendBroadcast(Intent("cyxbs.widget.todo.refresh").apply {
-                component = ComponentName(appContext, TodoWidget::class.java)
+                component = ComponentName(com.cyxbs.components.init.appContext, TodoWidget::class.java)
             })
         }
     }

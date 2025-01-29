@@ -5,25 +5,19 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
-import com.cyxbs.components.utils.extensions.appContext
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.init.appContext
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.IApi
-import com.cyxbs.components.utils.network.commonApi
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
 import retrofit2.http.GET
 import java.net.InetAddress
-import java.net.UnknownHostException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.TimeoutException
 import kotlin.coroutines.resume
 
 

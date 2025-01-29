@@ -7,7 +7,7 @@ import androidx.core.content.edit
 import com.cyxbs.components.config.config.SchoolCalendar
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.affair.api.IAffairService

@@ -2,7 +2,7 @@ package com.cyxbs.components.account.provider
 
 import com.cyxbs.components.account.bean.TokenBean
 import com.cyxbs.components.config.sp.defaultSettings
-import com.cyxbs.components.utils.extensions.defaultJson
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.utils.secret.secretDecrypt
 import com.cyxbs.components.utils.utils.secret.secretEncrypt
 import kotlinx.coroutines.flow.MutableStateFlow

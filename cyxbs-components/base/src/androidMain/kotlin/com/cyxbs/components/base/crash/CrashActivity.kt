@@ -20,7 +20,7 @@ import com.cyxbs.components.view.text.ScaleScrollTextView
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.R
 import com.cyxbs.components.base.pages.SecretActivity
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.collectUsefulStackTrace
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener

@@ -12,7 +12,7 @@ import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.route.MINE_FORGET_PASSWORD
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.functions.update.api.IAppUpdateService
@@ -54,15 +54,15 @@ class LoginActivity : BaseActivity() {
       successActivity: Class<out Activity>?,
       intent: (Intent.() -> Unit)?
     ) {
-      appContext.startActivity(
-        Intent(appContext, LoginActivity::class.java)
+      com.cyxbs.components.init.appContext.startActivity(
+        Intent(com.cyxbs.components.init.appContext, LoginActivity::class.java)
           .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // 因为使用 appContext，所以需要加
           .putExtra(LoginActivity::mIsReboot.name, isReboot)
           .apply {
             if (successActivity != null) {
               putExtra(
                 LoginActivity::mSuccessIntent.name,
-                Intent(appContext, successActivity)
+                Intent(com.cyxbs.components.init.appContext, successActivity)
                   .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // 因为使用 appContext，所以需要加
               )
             }
@@ -144,7 +144,7 @@ class LoginActivity : BaseActivity() {
   private fun onHideSoftInput() {
     //放下键盘
     val inputMethodManager =
-      appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+      com.cyxbs.components.init.appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     if (inputMethodManager.isActive) {
       inputMethodManager.hideSoftInputFromWindow(this.currentFocus?.windowToken, 0)
     }
@@ -155,8 +155,8 @@ class LoginActivity : BaseActivity() {
   }
 
   private fun rebootApp() {
-    val rebootIntent = appContext.packageManager
-      .getLaunchIntentForPackage(appContext.packageName)!!
+    val rebootIntent = com.cyxbs.components.init.appContext.packageManager
+      .getLaunchIntentForPackage(com.cyxbs.components.init.appContext.packageName)!!
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
     startActivity(rebootIntent)

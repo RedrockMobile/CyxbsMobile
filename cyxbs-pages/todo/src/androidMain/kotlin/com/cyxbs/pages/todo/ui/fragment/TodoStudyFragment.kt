@@ -15,7 +15,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.todo.R
 import com.cyxbs.pages.todo.adapter.DragAndDropCallback
@@ -94,7 +94,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
                 .setPositiveClick {
                     // 移除指定位置的 item
                     todoAllAdapter.deleteSelectedItems()
-                    val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                    val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                     mViewModel.delTodo(
                         DelPushWrapper(
                             todoAllAdapter.selectItems.map { it.todoId },
@@ -110,7 +110,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
 
         }
         acTopButton.setOnClickListener {
-            val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+            val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
             for (item in todoAllAdapter.selectItems) {
                 mViewModel.pinTodo(TodoPinData(1, 1, syncTime.toInt(), item.todoId.toInt()))
             }
@@ -183,7 +183,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
         if (position >= 0 && position < currentList.size) {
             DeleteTodoDialog.Builder(requireContext())
                 .setPositiveClick {
-                    val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                    val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                     mViewModel.delTodo(DelPushWrapper(listOf(item.todoId), syncTime))
                     // 移除指定位置的 item
                     currentList.removeAt(position)
@@ -208,7 +208,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
             // 将项添加到列表的顶部
             currentList.add(0, item)
 
-            val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+            val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
 
             mViewModel.pinTodo(TodoPinData(1, 1, syncTime.toInt(), item.todoId.toInt()))
 
@@ -219,7 +219,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
             }
         } else {
             item.isPinned = 0
-            val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+            val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
             mViewModel.pushTodo(TodoListPushWrapper(listOf(item), syncTime, 1, 0))
             currentList.removeAt(position)
             if (getTopItems() == 0) {
@@ -250,7 +250,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
             pendingUpdateTask?.let { handler.postDelayed(it, 1500) }
         } else {
             pendingUpdateTask = Runnable {
-                val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                 mViewModel.delTodo(DelPushWrapper(listOf(item.todoId), syncTime, 1))
                 val currentList = todoAllAdapter.currentList.toMutableList()
                 currentList.remove(item)
@@ -283,7 +283,7 @@ class TodoStudyFragment : BaseFragment(), TodoAllAdapter.OnItemClickListener {
             } else {
                 if (item.endTime != ""){
                     item.remindMode.notifyDateTime = item.endTime
-                    val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                    val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                     mViewModel.pushTodo(TodoListPushWrapper(listOf(item), syncTime, 1, 0))
                 }
             }

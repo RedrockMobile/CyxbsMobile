@@ -4,8 +4,8 @@ import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.account.bean.TokenBean
 import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.account.provider.UserInfoProvider
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
-import com.cyxbs.components.utils.coroutine.runCatchingCoroutine
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken

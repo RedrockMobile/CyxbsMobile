@@ -11,7 +11,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.visible
@@ -65,7 +65,7 @@ class TodoFeedFragment : BaseFragment() {
             adapter = mAdapter.apply {
                 onFinishCheck {
                     if (it in todoList.indices) {
-                        val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                        val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
 
                         if (todoList[it].remindMode.repeatMode != RemindMode.NONE) {
                             val notifyDateTime = getNextNoticeTime(todoList[it])

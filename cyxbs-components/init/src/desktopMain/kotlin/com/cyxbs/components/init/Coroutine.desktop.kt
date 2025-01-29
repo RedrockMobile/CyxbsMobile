@@ -1,4 +1,4 @@
-package com.cyxbs.components.utils.coroutine
+package com.cyxbs.components.init
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

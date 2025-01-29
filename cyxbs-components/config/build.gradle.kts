@@ -6,7 +6,7 @@ plugins {
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.cyxbsComponents.init)
+      api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.account.api)
     }
     androidMain.dependencies {

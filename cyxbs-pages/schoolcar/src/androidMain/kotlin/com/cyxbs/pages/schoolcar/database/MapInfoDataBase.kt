@@ -5,7 +5,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.cyxbs.pages.schoolcar.bean.Line
 import com.cyxbs.pages.schoolcar.bean.MapLines
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 
 /**
  *@Author:SnowOwlet
@@ -20,7 +20,7 @@ abstract class MapInfoDataBase : RoomDatabase() {
   companion object {
     val INSTANCE: MapInfoDataBase by lazy {
       Room.databaseBuilder(
-        appContext,
+        com.cyxbs.components.init.appContext,
         MapInfoDataBase::class.java, "map_info_database"
       ).fallbackToDestructiveMigration().build()
     }

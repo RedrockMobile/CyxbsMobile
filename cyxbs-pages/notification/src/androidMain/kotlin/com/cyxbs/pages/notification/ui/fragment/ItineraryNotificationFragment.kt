@@ -19,7 +19,7 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.base.ui.viewModelBy
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.pages.notification.R
@@ -165,7 +165,7 @@ class ItineraryNotificationFragment : BaseFragment(R.layout.notification_fragmen
             shadowCompatibilityMode = MaterialShapeDrawable.SHADOW_COMPAT_MODE_ALWAYS
             initializeElevationOverlay(myActivity)
             elevation = 12F.dp2pxF
-            setShadowColor(appContext.getColor(R.color.notification_itinerary_tl_shadow_source))
+            setShadowColor(com.cyxbs.components.init.appContext.getColor(R.color.notification_itinerary_tl_shadow_source))
 //            shadowVerticalOffset = 13F.dp2pxF.toInt()
         }
         (itineraryTypeTabShadow.parent as ViewGroup).clipChildren = false

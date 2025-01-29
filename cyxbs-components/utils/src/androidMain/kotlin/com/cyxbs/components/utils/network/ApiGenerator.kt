@@ -7,7 +7,7 @@ import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.utils.BuildConfig
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.service.allImpl
 import com.cyxbs.components.utils.service.impl

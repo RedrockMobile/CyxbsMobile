@@ -4,8 +4,8 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.launchApplication
 import androidx.compose.ui.window.rememberWindowState
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.view.ui.PlatformToastCompose
-import com.cyxbs.components.utils.coroutine.runApp
+import com.cyxbs.components.init.runApp
+import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.login.ui.LoginPage
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
 

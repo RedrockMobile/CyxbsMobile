@@ -8,7 +8,7 @@ import android.widget.TextView
 import androidx.activity.viewModels
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.pages.affair.R
@@ -24,8 +24,8 @@ class NoClassAffairActivity : BaseActivity() {
          *  @param noClassBean : 学号：是否空闲
          */
         fun startForNoClass(noClassBean: NoClassBean) {
-            appContext.startActivity(
-                Intent(appContext, NoClassAffairActivity::class.java)
+            com.cyxbs.components.init.appContext.startActivity(
+                Intent(com.cyxbs.components.init.appContext, NoClassAffairActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .putExtra(NoClassAffairActivity::mParams.name, noClassBean)
             )

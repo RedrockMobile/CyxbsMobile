@@ -1,6 +1,6 @@
 package com.cyxbs.components.utils.network
 
-import com.cyxbs.components.utils.extensions.defaultJson
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.network.plugin.BackupPlugin
 import com.cyxbs.components.utils.network.plugin.TokenPlugin
 import de.jensklingenberg.ktorfit.Ktorfit

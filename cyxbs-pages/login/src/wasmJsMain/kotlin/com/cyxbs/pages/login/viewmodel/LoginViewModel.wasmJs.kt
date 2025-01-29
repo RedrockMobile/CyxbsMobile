@@ -1,8 +1,5 @@
 package com.cyxbs.pages.login.viewmodel
 
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.seconds
-
 /**
  * .
  *

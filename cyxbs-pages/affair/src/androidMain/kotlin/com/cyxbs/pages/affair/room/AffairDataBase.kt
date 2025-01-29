@@ -6,7 +6,7 @@ import com.google.gson.reflect.TypeToken
 import com.cyxbs.pages.affair.ui.adapter.data.AffairAdapterData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairTimeData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairWeekData
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.core.Observable
 
@@ -36,7 +36,7 @@ abstract class AffairDataBase : RoomDatabase() {
   companion object {
     val INSTANCE by lazy {
       Room.databaseBuilder(
-        appContext,
+        com.cyxbs.components.init.appContext,
         AffairDataBase::class.java,
         "course_affair_db"
       ).fallbackToDestructiveMigration().build()
