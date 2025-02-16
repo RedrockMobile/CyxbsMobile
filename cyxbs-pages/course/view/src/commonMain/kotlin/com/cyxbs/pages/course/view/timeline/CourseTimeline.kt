@@ -117,7 +117,7 @@ fun CourseTimeline.Content(
   timelineWidth: Dp = 40.dp,
   enableDrawNowTimeLine: Boolean = false,
   verticalScrollState: ScrollState = rememberScrollState(),
-  scrollPaddingBottom: Dp = 0.dp,
+  scrollPaddingBottom: Dp = 12.dp,
   content: @Composable () -> Unit
 ) {
   CourseScrollCompose(

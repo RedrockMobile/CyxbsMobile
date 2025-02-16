@@ -82,6 +82,9 @@ fun HomeCourseCompose(modifier: Modifier = Modifier) {
       snapshotFlow { bottomSheetState.fraction }.onEach {
         service.headerAlpha = max(it * 2 - 1, 0F)
         service.contentAlpha = it
+        // 底部按钮跟随课表展开而变化
+        bottomNavViewModel.offsetYRadio.floatValue = it
+        bottomNavViewModel.alpha.floatValue = 1 - it
       }.launchIn(this)
     }
   }
