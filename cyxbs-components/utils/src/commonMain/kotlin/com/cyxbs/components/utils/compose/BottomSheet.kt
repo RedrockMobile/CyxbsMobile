@@ -196,6 +196,7 @@ private class BottomSheetSnapLayoutInfoProvider(
   private val bottomSheetState: BottomSheetState,
 ) : SnapLayoutInfoProvider {
   override fun calculateApproachOffset(velocity: Float, decayOffset: Float): Float {
+    if (velocity == 0F) return 0F
     // 返回衰减动画应该需要执行的偏移量，decayOffset 是根据衰减动画计算出来可以执行的最大偏移量
     val min = bottomSheetState.peekHeight
     val max = bottomSheetState.contentHeight.floatValue
@@ -326,8 +327,8 @@ private class BottomSheetNestedScrollConnection(
     val min = bottomSheetState.peekHeight
     val max = bottomSheetState.contentHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
-    // 再消耗手指向下的滑动
-    if (available.y > 0) {
+    // 再消耗手指向下的滑动，只有 手指拖动 或者 惯性滑动但已经不是完全展开时 才能消耗
+    if (available.y > 0 && (source == NestedScrollSource.UserInput || old != max)) {
       val new = (old - available.y).coerceIn(min, max)
       val diff = old - new
       bottomSheetState.scrollableState.dispatchRawDelta(diff)
@@ -337,12 +338,15 @@ private class BottomSheetNestedScrollConnection(
   }
 
   override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-    var remainVelocity = available.y
+    val max = bottomSheetState.contentHeight.floatValue
+    val old = bottomSheetState.showHeight.floatValue
+    if (old == max) return available.copy(x = 0F) // 完全展开时继续保持展开状态
+    var consumeVelocity = available.y
     bottomSheetState.scrollableState.scroll {
       with(flingBehavior) {
-        remainVelocity = available.y - performFling(available.y)
+        consumeVelocity = available.y - performFling(available.y)
       }
     }
-    return Velocity(x = 0F, y = remainVelocity)
+    return Velocity(x = 0F, y = consumeVelocity)
   }
 }
