@@ -114,8 +114,7 @@ fun BottomSheetCompose(
   bottomSheetState: BottomSheetState,
   modifier: Modifier = Modifier,
   peekHeight: Dp = 0.dp,
-  dismissOnBackPress: (() -> Boolean)? = null,
-  dismissOnClickOutside: (() -> Boolean)? = null,
+  dismissOnBackPress: (() -> Boolean)? = { true },
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   content: @Composable BottomSheetScope.() -> Unit
 ) {
@@ -125,7 +124,6 @@ fun BottomSheetCompose(
     scrimColor = scrimColor,
     bottomSheetState = bottomSheetState,
     dismissOnBackPress = dismissOnBackPress,
-    dismissOnClickOutside = dismissOnClickOutside,
   ) {
     BottomSheetContent(
       modifier = Modifier.align(Alignment.BottomCenter),
@@ -141,7 +139,6 @@ private fun BottomSheetBackgroundCompose(
   bottomSheetState: BottomSheetState,
   scrimColor: Color,
   dismissOnBackPress: (() -> Boolean)?,
-  dismissOnClickOutside: (() -> Boolean)?,
   content: @Composable BoxScope.() -> Unit,
 ) {
   val coroutineScope = rememberCoroutineScope()
@@ -157,6 +154,7 @@ private fun BottomSheetBackgroundCompose(
           onKeyEvent {
             if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()) {
               // 键盘按下 esc 后 dismiss
+              // todo 检查是否处于 collapse
               coroutineScope.launch {
                 bottomSheetState.collapse()
               }
@@ -169,18 +167,6 @@ private fun BottomSheetBackgroundCompose(
     Spacer(
       modifier = Modifier
         .fillMaxSize()
-        .plusDsl {
-          if (dismissOnClickOutside != null) {
-            clickableNoIndicator {
-              if (dismissOnClickOutside()) {
-                // 点击空白区域 dismiss
-                coroutineScope.launch {
-                  bottomSheetState.collapse()
-                }
-              }
-            }
-          }
-        }
         .graphicsLayer {
           if (scrimColor != Color.Transparent) {
             alpha = bottomSheetState.fraction
