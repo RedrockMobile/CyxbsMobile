@@ -43,6 +43,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -70,8 +71,9 @@ class BottomSheetState {
     }
 
   val fraction by derivedStateOfStructure {
-    if (contentHeight.floatValue == 0F) 0F
-    else (showHeight.floatValue - peekHeight) / (contentHeight.floatValue - peekHeight)
+    val showHeight = showHeight.floatValue
+    val contentHeight = contentHeight.floatValue
+    if (contentHeight == 0F) 0F else (showHeight - peekHeight) / (contentHeight - peekHeight)
   }
 
   internal val scrollableState = ScrollableState {
@@ -103,21 +105,21 @@ class BottomSheetState {
 }
 
 @Composable
-fun rememberBottomSheetState(peekHeight: Dp = 0.dp): BottomSheetState {
-  return remember { BottomSheetState() }.apply {
-    this.peekHeight = peekHeight.px
-  }
+fun rememberBottomSheetState(): BottomSheetState {
+  return remember { BottomSheetState() }
 }
 
 @Composable
 fun BottomSheetCompose(
   bottomSheetState: BottomSheetState,
   modifier: Modifier = Modifier,
-  dismissOnBackPress: () -> Boolean = { true },
-  dismissOnClickOutside: () -> Boolean = { true },
+  peekHeight: Dp = 0.dp,
+  dismissOnBackPress: (() -> Boolean)? = null,
+  dismissOnClickOutside: (() -> Boolean)? = null,
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   content: @Composable BottomSheetScope.() -> Unit
 ) {
+  bottomSheetState.peekHeight = peekHeight.px
   BottomSheetBackgroundCompose(
     modifier = modifier,
     scrimColor = scrimColor,
@@ -138,8 +140,8 @@ private fun BottomSheetBackgroundCompose(
   modifier: Modifier,
   bottomSheetState: BottomSheetState,
   scrimColor: Color,
-  dismissOnBackPress: () -> Boolean,
-  dismissOnClickOutside: () -> Boolean,
+  dismissOnBackPress: (() -> Boolean)?,
+  dismissOnClickOutside: (() -> Boolean)?,
   content: @Composable BoxScope.() -> Unit,
 ) {
   val coroutineScope = rememberCoroutineScope()
@@ -150,24 +152,32 @@ private fun BottomSheetBackgroundCompose(
       .fillMaxSize()
       .focusRequester(focusRequester)
       .focusable()
-      .onKeyEvent {
-        if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()) {
-          // 键盘按下 esc 后 dismiss
-          coroutineScope.launch {
-            bottomSheetState.collapse()
+      .plusDsl {
+        if (dismissOnBackPress != null) {
+          onKeyEvent {
+            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()) {
+              // 键盘按下 esc 后 dismiss
+              coroutineScope.launch {
+                bottomSheetState.collapse()
+              }
+              true
+            } else false
           }
-          true
-        } else false
+        }
       }
   ) {
     Spacer(
       modifier = Modifier
         .fillMaxSize()
-        .clickableNoIndicator {
-          if (dismissOnClickOutside()) {
-            // 点击空白区域 dismiss
-            coroutineScope.launch {
-              bottomSheetState.collapse()
+        .plusDsl {
+          if (dismissOnClickOutside != null) {
+            clickableNoIndicator {
+              if (dismissOnClickOutside()) {
+                // 点击空白区域 dismiss
+                coroutineScope.launch {
+                  bottomSheetState.collapse()
+                }
+              }
             }
           }
         }
@@ -326,15 +336,13 @@ private class BottomSheetNestedScrollConnection(
     return super.onPostScroll(consumed, available, source)
   }
 
-//  override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-//    android.util.Log.d("ggg", "(${Error().stackTrace[0].run { "$fileName:$lineNumber" }}) -> onPostFling")
-//    var remainVelocity = available.y
-//    bottomSheetState.scrollableState.scroll {
-//      with(flingBehavior) {
-//        remainVelocity = available.y - performFling(available.y)
-//        android.util.Log.d("ggg", "(${Error().stackTrace[0].run { "$fileName:$lineNumber" }}) -> showHeight = ${bottomSheetState.showHeight.floatValue}")
-//      }
-//    }
-//    return Velocity(x = 0F, y = remainVelocity)
-//  }
+  override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+    var remainVelocity = available.y
+    bottomSheetState.scrollableState.scroll {
+      with(flingBehavior) {
+        remainVelocity = available.y - performFling(available.y)
+      }
+    }
+    return Velocity(x = 0F, y = remainVelocity)
+  }
 }

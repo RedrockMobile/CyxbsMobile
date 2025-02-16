@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.ui.text.style.TextAlign
@@ -14,7 +13,10 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.CourseUtils
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineTextColor
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineTextDarkColor
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,7 +28,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class LessonTimelineData(
   val lesson: Int,
-  override val hasTomorrow: Boolean,
 ) : CourseTimelineData {
 
   override val optionText: String = "第${lesson}节"
@@ -38,17 +39,10 @@ data class LessonTimelineData(
   override val fontSize: TextUnit
     get() = 12.sp
 
-  override val color: Color
-    get() = Color.Unspecified
-
   override val nowWeight: Float
     get() = 1F
   override val initialWeight: Float
     get() = 1F
-
-  override fun copyData(): CourseTimelineData {
-    return copy()
-  }
 
   @Composable
   override fun ColumnScope.Content() {
@@ -59,7 +53,7 @@ data class LessonTimelineData(
           text = lesson.toString(),
           textAlign = TextAlign.Center,
           fontSize = fontSize,
-          color = color,
+          color = DefaultTimelineTextColor.dark(DefaultTimelineTextDarkColor),
           overflow = TextOverflow.Visible
         )
       },

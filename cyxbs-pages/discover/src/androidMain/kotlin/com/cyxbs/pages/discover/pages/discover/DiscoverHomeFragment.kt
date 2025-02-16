@@ -18,7 +18,6 @@ import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
-import androidx.core.view.setPadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -32,9 +31,9 @@ import com.cyxbs.components.config.route.DISCOVER_NEWS
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
@@ -122,9 +121,9 @@ class DiscoverHomeFragment : BaseFragment() {
                 val now = Calendar.getInstance()
                 tv_day.text = when {
                     nowWeek > 0 ->
-                        "第${Num2CN.number2ChineseNumber(nowWeek.toLong())}周 " +
+                        "第${Num2CN.number2ChineseNumber(nowWeek)}周 " +
                           "周${if (now[Calendar.DAY_OF_WEEK] != 1)
-                              Num2CN.number2ChineseNumber(now[Calendar.DAY_OF_WEEK] - 1.toLong())
+                              Num2CN.number2ChineseNumber(now[Calendar.DAY_OF_WEEK] - 1)
                               else "日"}"
                     //8，9月欢迎新同学
                     (now[Calendar.MONTH] + 1 == 8 || now[Calendar.MONTH] + 1 == 9) -> "欢迎新同学～"

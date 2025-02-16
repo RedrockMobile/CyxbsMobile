@@ -24,6 +24,9 @@ import com.cyxbs.components.config.serializable.FloatStateSerializable
 import com.cyxbs.components.config.serializable.TextUnitSerializable
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextColor
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextDarkColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,8 +51,13 @@ data class MutableTimelineData(
   @Serializable(TextUnitSerializable::class)
   override val fontSize: TextUnit = 12.sp,
   @Serializable(ColorSerializable::class)
-  override val color: Color = Color.Unspecified,
-  override val hasTomorrow: Boolean,
+  val textColor: Color = DefaultTimelineLightTextColor,
+  @Serializable(ColorSerializable::class)
+  val textDarkColor: Color = DefaultTimelineLightTextDarkColor,
+  @Serializable(ColorSerializable::class)
+  val expandTextColor: Color = DefaultTimelineLightTextColor,
+  @Serializable(ColorSerializable::class)
+  val expandTextDarkColor: Color = DefaultTimelineLightTextDarkColor,
 ) : CourseTimelineData {
 
   @Serializable(FloatStateSerializable::class)
@@ -57,10 +65,6 @@ data class MutableTimelineData(
 
   override val nowWeight: Float
     get() = nowWeightState.value
-
-  override fun copyData(): CourseTimelineData {
-    return copy()
-  }
 
   @Composable
   override fun ColumnScope.Content() {
@@ -111,7 +115,7 @@ private fun MutableTimelineData.MutableTimelineCompose(
         text = text,
         textAlign = TextAlign.Center,
         fontSize = fontSize,
-        color = color,
+        color = textColor.dark(textDarkColor),
         overflow = TextOverflow.Visible
       )
       val time = if (startTime.minute == 0) startTime else MinuteTime(startTime.hour + 1, 0)
@@ -122,7 +126,7 @@ private fun MutableTimelineData.MutableTimelineCompose(
           text = time.plusHours(it).toString(),
           textAlign = TextAlign.Center,
           fontSize = 9.sp,
-          color = color,
+          color = expandTextColor.dark(expandTextDarkColor),
           overflow = TextOverflow.Visible,
           maxLines = 1,
         )

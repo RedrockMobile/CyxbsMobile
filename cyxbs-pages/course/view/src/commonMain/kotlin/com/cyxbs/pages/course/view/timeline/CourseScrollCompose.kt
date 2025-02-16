@@ -34,14 +34,14 @@ internal fun CourseScrollCompose(
   modifier: Modifier = Modifier,
   verticalScrollState: ScrollState = rememberScrollState(),
   scrollPaddingBottom: Dp = 0.dp,
-  content: @Composable (ScrollState) -> Unit,
+  content: @Composable () -> Unit,
 ) {
   Layout(
     modifier = modifier
       .reflexScrollableForMouse()
       .verticalScroll(state = verticalScrollState)
       .padding(vertical = 4.dp),
-    content = { content(verticalScrollState) },
+    content = { content() },
     measurePolicy = remember(timeline) {
       { measurables, constraints ->
         var widthConsume = 0

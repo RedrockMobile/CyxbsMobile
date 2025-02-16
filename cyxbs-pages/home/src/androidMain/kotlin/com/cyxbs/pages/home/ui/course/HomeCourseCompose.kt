@@ -1,6 +1,5 @@
 package com.cyxbs.pages.home.ui.course
 
-import android.widget.FrameLayout
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
@@ -14,11 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -27,25 +27,22 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.viewinterop.NoOpUpdate
-import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.commit
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.base.crash.CrashDialog
 import com.cyxbs.components.base.utils.Umeng
 import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
 import com.cyxbs.components.config.route.DISCOVER_MAP
-import com.cyxbs.components.utils.compose.BottomSheetState
-import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.colorCompose
-import com.cyxbs.components.utils.extensions.drawable
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.pages.course.api.ICourseService
+import com.cyxbs.pages.course.api.IHomeCourseService
 import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.ui.course.utils.CourseHeaderHelper
-import kotlinx.coroutines.launch
+import com.cyxbs.pages.home.viewmodel.BottomNavViewModel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlin.math.max
 
 /**
@@ -69,69 +66,31 @@ import kotlin.math.max
 
 @Composable
 fun HomeCourseCompose(modifier: Modifier = Modifier) {
-//  val bottomSheetState = rememberBottomSheetState(
-//    peekHeight = BottomNavState.height + 70.dp
-//  )
-//  BottomSheetCompose(
-//    bottomSheetState = bottomSheetState,
-//    modifier = modifier
-//      .fillMaxSize()
-//      .statusBarsPadding(),
-//  ) {
-//    HomeCourseHeaderCompose(
-//      bottomSheetState = bottomSheetState,
-//      modifier = Modifier.bottomSheetDraggable()
-//    )
-//    HomeCourseContainerCompose(
-//      bottomSheetState = bottomSheetState
-//    )
-//  }
-  // Compose 与原生的嵌套滑动存在问题，OffsetInWindow 始终为 0，
-  // 导致 NestedScrollView ACTION_MOVE 中的 mLastMotionY = y - scrollOffset 不被正确计算
-  // 所以这里需要等到课表的 Scroll 变成 Compose 后再进行 BottomSheet 的迁移
-  AndroidView(
-    modifier = modifier.fillMaxSize().systemBarsPadding(),
-    factory = {
-      HomeCourseLayout(it, null)
-    }
-  )
-}
-
-@Composable
-fun HomeCourseContainerCompose(
-  bottomSheetState: BottomSheetState,
-  modifier: Modifier = Modifier,
-) {
-  val courseService = remember { ICourseService::class.impl() }
-  AndroidView(
-    modifier = modifier.fillMaxSize(),
-    factory = {
-      val activity = it as FragmentActivity
-      FrameLayout(it).apply {
-        id = R.id.home_course_container_id
-        activity.supportFragmentManager.commit {
-          replace(id, courseService.createHomeCourseFragment())
-        }
-        background = com.cyxbs.pages.course.widget.R.drawable.course_widget_layer_list_course_bg.drawable
-        isNestedScrollingEnabled = true
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val service = remember { IHomeCourseService::class.impl() }
+  service.Content(
+    modifier = modifier.statusBarsPadding(),
+    bottomBarHeight = bottomNavViewModel.height
+  ) { bottomSheetState ->
+    HomeCourseHeaderCompose(
+      modifier = Modifier.graphicsLayer {
+        val fraction = bottomSheetState.fraction
+        alpha = max(1 - fraction * 2, 0F)
       }
-    },
-    update = {
-      val fraction = bottomSheetState.fraction
-      courseService.setCourseVpAlpha(fraction)
-      courseService.setHeaderAlpha(max(fraction * 2 - 1, 0F))
-      courseService.setBottomSheetSlideOffset(fraction)
-    },
-    onReset = NoOpUpdate, // 开启复用
-  )
+    )
+    LaunchedEffect(Unit) {
+      snapshotFlow { bottomSheetState.fraction }.onEach {
+        service.headerAlpha = max(it * 2 - 1, 0F)
+        service.contentAlpha = it
+      }.launchIn(this)
+    }
+  }
 }
 
 @Composable
 private fun HomeCourseHeaderCompose(
-  bottomSheetState: BottomSheetState,
   modifier: Modifier = Modifier,
 ) {
-  val coroutineScope = rememberCoroutineScope()
 //  val header by CourseHeaderHelper.observeHeader()
 //    .distinctUntilChanged()
 //    .asFlow()
@@ -141,15 +100,6 @@ private fun HomeCourseHeaderCompose(
     modifier = modifier
       .fillMaxWidth()
       .height(70.dp)
-      .graphicsLayer {
-        val fraction = bottomSheetState.fraction
-        alpha = max(1 - fraction * 2, 0F)
-      }
-      .clickableNoIndicator {
-        coroutineScope.launch {
-          bottomSheetState.expand()
-        }
-      }
   ) {
     when (val tempHeader = header) {
       is CourseHeaderHelper.HintHeader -> CourseHintHeaderCompose(tempHeader)

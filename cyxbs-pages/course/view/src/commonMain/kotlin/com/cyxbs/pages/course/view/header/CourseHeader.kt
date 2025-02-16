@@ -2,20 +2,12 @@ package com.cyxbs.pages.course.view.header
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -29,7 +21,6 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintLayoutScope
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.compose.dark
 
 /**
  * .
@@ -37,7 +28,6 @@ import com.cyxbs.components.utils.compose.dark
  * @author 985892345
  * @date 2025/1/29
  */
-
 @Stable
 interface CourseHeaderController {
   val title: String
@@ -58,67 +48,17 @@ interface CourseHeaderController {
     title: ConstrainedLayoutReference,
     subtitle: ConstrainedLayoutReference,
     back: ConstrainedLayoutReference
-  ) {
+  ) {}
 
-  }
-
-  fun onClickTitle()
-  fun onClickSubtitle()
+  fun onClickTitle() {}
+  fun onClickSubtitle() {}
   fun onClickBack()
 }
 
 @Composable
-fun CourseHeaderCompose(
+fun CourseHeader(
   controller: CourseHeaderController,
   modifier: Modifier = Modifier,
-) {
-  CourseHeaderTipCompose(modifier = modifier) {
-    CourseHeaderContentCompose(
-      modifier = Modifier,
-      controller = controller,
-    )
-  }
-}
-
-/**
- * 课程头部 BottomSheet 背景
- */
-@Composable
-fun CourseHeaderTipCompose(
-  modifier: Modifier = Modifier,
-  content: @Composable BoxScope.() -> Unit,
-) {
-  Box(
-    modifier = modifier.fillMaxWidth().height(70.dp)
-  ) {
-    // 阴影
-    Spacer(
-      modifier = Modifier.fillMaxSize().background(
-        brush = Brush.verticalGradient(
-          colors = listOf(Color(0x00365789), Color(0x3D365789))
-        )
-      )
-    )
-    Box(
-      modifier = Modifier.padding(top = 15.dp)
-        .fillMaxSize()
-        .background(color = LocalAppColors.current.topBg, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-    ) {
-      Spacer(
-        modifier = Modifier.align(Alignment.TopCenter)
-          .padding(top = 10.dp)
-          .size(38.dp, 5.dp)
-          .background(color = 0xFFE2EDFB.dark(Color.Black), shape = RoundedCornerShape(6.dp))
-      )
-    }
-    content()
-  }
-}
-
-@Composable
-fun CourseHeaderContentCompose(
-  modifier: Modifier = Modifier,
-  controller: CourseHeaderController,
 ) {
   ConstraintLayout(modifier = modifier.fillMaxSize()) {
     val (title, subtitle, back) = createRefs()
@@ -158,7 +98,7 @@ fun CourseHeaderContentCompose(
         brush = Brush.horizontalGradient(
           colors = listOf(Color.Blue, Color(0xFF8686FF)),
         )
-      ).padding(vertical = 6.dp, horizontal = 14.dp)
+      ).padding(vertical = 10.dp, horizontal = 19.dp)
         .clickable { controller.onClickBack() },
       color = Color.White,
       fontSize = 13.sp,

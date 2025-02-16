@@ -34,11 +34,14 @@ import kotlin.time.Duration.Companion.minutes
  */
 @Stable
 @Serializable
-class CourseTimeline(
+data class CourseTimeline(
   val startMinuteTime: MinuteTime = DefaultTimelineStartMinuteTime,
   val data: ImmutableList<CourseTimelineData> = DefaultTimeline,
 ) {
 
+  /**
+   * 得到 [startTimeDate] 对应的日期，因为存在 [startMinuteTime] 导致今天会显示明天部分 item
+   */
   fun getItemWhichDate(startTimeDate: MinuteTimeDate): Date {
     return if (startTimeDate.time >= startMinuteTime) {
       startTimeDate.date
@@ -101,7 +104,7 @@ class CourseTimeline(
 }
 
 /**
- * 课程时间轴
+ * 课程时间轴布局
  * @param timelineWidth 时间轴宽度
  * @param enableDrawNowTimeLine 是否绘制当前时间线
  * @param verticalScrollState 垂直滚动状态
@@ -110,19 +113,19 @@ class CourseTimeline(
  */
 @Composable
 fun CourseTimeline.Content(
-  modifier: Modifier = Modifier.fillMaxSize(),
-  timelineWidth: Dp = 36.dp,
+  modifier: Modifier = Modifier,
+  timelineWidth: Dp = 40.dp,
   enableDrawNowTimeLine: Boolean = false,
   verticalScrollState: ScrollState = rememberScrollState(),
   scrollPaddingBottom: Dp = 0.dp,
-  content: @Composable (ScrollState) -> Unit
+  content: @Composable () -> Unit
 ) {
   CourseScrollCompose(
     timeline = this,
-    modifier = modifier,
+    modifier = modifier.fillMaxSize(),
     verticalScrollState = verticalScrollState,
     scrollPaddingBottom = scrollPaddingBottom,
-  ) { scrollState ->
+  ) {
     Column(
       modifier = Modifier.width(timelineWidth)
         .drawNowTimeLine(enable = enableDrawNowTimeLine, timeline = this)
@@ -131,7 +134,7 @@ fun CourseTimeline.Content(
         it.apply { Content() }
       }
     }
-    content(scrollState)
+    content()
   }
 }
 

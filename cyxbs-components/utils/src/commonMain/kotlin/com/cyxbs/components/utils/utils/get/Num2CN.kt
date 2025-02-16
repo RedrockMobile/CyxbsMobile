@@ -1,6 +1,4 @@
-package com.cyxbs.pages.widget.util
-
-import java.util.*
+package com.cyxbs.components.utils.utils.get
 
 /**
  * @author Jovines
@@ -30,13 +28,9 @@ object Num2CN {
      * @param isColloquial 是否口语化，例如12转换为'十二'而不是'一十二'，默认为true，进行口语化
      * @return
      */
-    fun number2ChineseNumber(num: Long, isColloquial: Boolean = true): String {
+    fun number2ChineseNumber(num: Int, isColloquial: Boolean = true): String {
         val result = convert(num, isColloquial)
-        val strB = StringBuffer(32)
-        for (str in result) {
-            strB.append(str)
-        }
-        return strB.toString()
+        return result.joinToString("")
     }
 
     /**
@@ -48,16 +42,16 @@ object Num2CN {
      * 是否口语化。例如12转换为'十二'而不是'一十二'。
      * @return
      */
-    private fun convert(num: Long, isColloquial: Boolean): Array<String> {
+    private fun convert(num: Int, isColloquial: Boolean): List<String> {
         if (num < 10) { // 10以下直接返回对应汉字
-            return arrayOf(CN_CHARS[num.toInt()]) // ASCII2int
+            return listOf(CN_CHARS[num]) // ASCII2int
         }
         val chars = num.toString().toCharArray()
         if (chars.size > CN_UNITS.size) { // 超过单位表示范围的返回空
-            return arrayOf()
+            return emptyList()
         }
         var isLastUnitStep = false // 记录上次单位进位
-        val cnChars = ArrayList<String?>(chars.size * 2) // 创建数组，将数字填入单位对应的位置
+        val cnChars = ArrayList<String>(chars.size * 2) // 创建数组，将数字填入单位对应的位置
         for (pos in chars.indices.reversed()) { // 从低位向高位循环
             val ch = chars[pos]
             val cnChar = CN_CHARS[ch - '0'] // ascii2int 汉字
@@ -94,10 +88,10 @@ object Num2CN {
         if (isColloquial) {
             val chFirst = cnChars[0]
             val chSecond = cnChars[1]
-            if (chFirst == CN_CHARS[1] && chSecond!!.startsWith(CN_UNITS[1])) { // 是否以'一'开头，紧跟'十'
+            if (chFirst == CN_CHARS[1] && chSecond.startsWith(CN_UNITS[1])) { // 是否以'一'开头，紧跟'十'
                 cnChars.removeAt(0)
             }
         }
-        return cnChars.toArray(arrayOf())
+        return cnChars
     }
 }

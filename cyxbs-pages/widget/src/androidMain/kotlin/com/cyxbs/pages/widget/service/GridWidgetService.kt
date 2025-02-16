@@ -5,11 +5,21 @@ import android.content.Intent
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
+import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.api.utils.parseClassRoom
 import com.cyxbs.pages.widget.R
 import com.cyxbs.pages.widget.repo.bean.AffairEntity
 import com.cyxbs.pages.widget.repo.bean.LessonEntity
-import com.cyxbs.pages.widget.util.*
+import com.cyxbs.pages.widget.util.CLICK_AFFAIR
+import com.cyxbs.pages.widget.util.CLICK_LESSON
+import com.cyxbs.pages.widget.util.ClassRoomParse
+import com.cyxbs.pages.widget.util.POSITION
+import com.cyxbs.pages.widget.util.SchoolCalendar
+import com.cyxbs.pages.widget.util.defaultSp
+import com.cyxbs.pages.widget.util.getAffairs
+import com.cyxbs.pages.widget.util.getMyLessons
+import com.cyxbs.pages.widget.util.getOthersStuNum
+import com.cyxbs.pages.widget.util.gson
 import kotlin.concurrent.thread
 
 /**
@@ -316,7 +326,7 @@ class GridWidgetService : RemoteViewsService() {
             //返回对应的item
             return RemoteViews(mContext.packageName, id).apply {
                 setTextViewText(R.id.tv_day_of_week, "周${
-                    if (position != 7) Num2CN.number2ChineseNumber((position).toLong()) else "日"
+                    if (position != 7) Num2CN.number2ChineseNumber(position) else "日"
                 }")
             }
         }

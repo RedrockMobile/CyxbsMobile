@@ -16,7 +16,6 @@ import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.launch
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.utils.service.impl
@@ -59,7 +58,6 @@ class MainActivity : BaseActivity() {
         launch {
           RedrockNetwork.tryPingNetWork()?.onFailure {
             toast("后端服务暂不可用")
-            logg("tryPingNetWork: ${it.stackTraceToString()}")
           }
         }
       }

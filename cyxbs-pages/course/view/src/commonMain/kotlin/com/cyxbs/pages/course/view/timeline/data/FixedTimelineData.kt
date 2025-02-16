@@ -16,6 +16,9 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.serializable.ColorSerializable
 import com.cyxbs.components.config.serializable.TextUnitSerializable
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextColor
+import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextDarkColor
 import kotlinx.serialization.Serializable
 
 /**
@@ -34,17 +37,14 @@ data class FixedTimelineData(
   @Serializable(TextUnitSerializable::class)
   override val fontSize: TextUnit = 12.sp,
   @Serializable(ColorSerializable::class)
-  override val color: Color = Color.Unspecified,
-  override val hasTomorrow: Boolean,
+  val textColor: Color = DefaultTimelineLightTextColor,
+  @Serializable(ColorSerializable::class)
+  val textDarkColor: Color = DefaultTimelineLightTextDarkColor,
 ) : CourseTimelineData {
   override val nowWeight: Float
     get() = weight
   override val initialWeight: Float
     get() = weight
-
-  override fun copyData(): CourseTimelineData {
-    return copy()
-  }
 
   @Composable
   override fun ColumnScope.Content() {
@@ -55,7 +55,7 @@ data class FixedTimelineData(
           text = text,
           textAlign = TextAlign.Center,
           fontSize = fontSize,
-          color = color,
+          color = textColor.dark(textDarkColor),
           overflow = TextOverflow.Visible
         )
       },

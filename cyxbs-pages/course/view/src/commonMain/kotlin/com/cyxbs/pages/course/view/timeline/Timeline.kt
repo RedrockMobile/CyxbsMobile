@@ -2,6 +2,8 @@ package com.cyxbs.pages.course.view.timeline
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.AppColor
+import com.cyxbs.components.config.compose.theme.AppDarkColor
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.course.view.timeline.data.FixedTimelineData
@@ -18,6 +20,11 @@ import kotlinx.collections.immutable.persistentListOf
 
 internal val DefaultTimelineStartMinuteTime = MinuteTime(4, 0)
 
+internal val DefaultTimelineTextColor = AppColor.tvLv1
+internal val DefaultTimelineTextDarkColor = AppDarkColor.tvLv1
+internal val DefaultTimelineLightTextColor = Color(0x66142C52)
+internal val DefaultTimelineLightTextDarkColor = Color(0x80F0F0F0)
+
 internal val DefaultTimeline = persistentListOf(
   MutableTimelineData(
     text = "···",
@@ -26,19 +33,16 @@ internal val DefaultTimeline = persistentListOf(
     endTime = MinuteTime(8, 0),
     maxWeight = 4F,
     initialWeight = 0.1F,
-    color = Color.DarkGray,
-    hasTomorrow = false,
   ),
-  LessonTimelineData(1, false),
+  LessonTimelineData(1),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(1),
     endTime = CourseUtils.getStartMinuteTime(2),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(2, false),
+  LessonTimelineData(2),
   FixedTimelineData(
     text = "大课间",
     optionText = "大课间",
@@ -46,19 +50,16 @@ internal val DefaultTimeline = persistentListOf(
     endTime = MinuteTime(10, 15),
     weight = 0.05F,
     fontSize = 8.sp,
-    color = Color.DarkGray,
-    hasTomorrow = false
   ),
-  LessonTimelineData(3, false),
+  LessonTimelineData(3),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(3),
     endTime = CourseUtils.getStartMinuteTime(4),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(4, false),
+  LessonTimelineData(4),
   MutableTimelineData(
     text = "中午",
     optionText = "中午",
@@ -67,19 +68,16 @@ internal val DefaultTimeline = persistentListOf(
     maxWeight = 2F,
     initialWeight = 0.1F,
     fontSize = 10.sp,
-    color = Color.DarkGray,
-    hasTomorrow = false,
   ),
-  LessonTimelineData(5, false),
+  LessonTimelineData(5),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(5),
     endTime = CourseUtils.getStartMinuteTime(6),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(6, false),
+  LessonTimelineData(6),
   FixedTimelineData(
     text = "大课间",
     optionText = "大课间",
@@ -87,19 +85,16 @@ internal val DefaultTimeline = persistentListOf(
     endTime = MinuteTime(16, 15),
     weight = 0.05F,
     fontSize = 8.sp,
-    color = Color.DarkGray,
-    hasTomorrow = false,
   ),
-  LessonTimelineData(7, false),
+  LessonTimelineData(7),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(7),
     endTime = CourseUtils.getStartMinuteTime(8),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(8, false),
+  LessonTimelineData(8),
   MutableTimelineData(
     text = "傍晚",
     optionText = "傍晚",
@@ -108,37 +103,32 @@ internal val DefaultTimeline = persistentListOf(
     maxWeight = 1F,
     initialWeight = 0.1F,
     fontSize = 10.sp,
-    color = Color.DarkGray,
-    hasTomorrow = false,
   ),
-  LessonTimelineData(9, false),
+  LessonTimelineData(9),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(9),
     endTime = CourseUtils.getStartMinuteTime(10),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(10, false),
+  LessonTimelineData(10),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(10),
     endTime = CourseUtils.getStartMinuteTime(11),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(11, false),
+  LessonTimelineData(11),
   FixedTimelineData(
     text = "",
     optionText = "课间",
     startTime = CourseUtils.getEndMinuteTime(11),
     endTime = CourseUtils.getStartMinuteTime(12),
     weight = 0.01F,
-    hasTomorrow = false
   ),
-  LessonTimelineData(12, false),
+  LessonTimelineData(12),
   MutableTimelineData(
     text = "···",
     optionText = "深夜",
@@ -146,7 +136,5 @@ internal val DefaultTimeline = persistentListOf(
     endTime = DefaultTimelineStartMinuteTime,
     maxWeight = 5.5F,
     initialWeight = 0.2F,
-    color = Color.DarkGray,
-    hasTomorrow = true,
   ),
 )

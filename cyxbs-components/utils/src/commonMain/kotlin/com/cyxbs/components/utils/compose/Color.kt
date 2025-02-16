@@ -43,3 +43,8 @@ fun Long.dark(darkColor: Color): Color {
 fun Color.dark(darkColor: Int): Color {
   return if (!LocalAppDark.current) this else Color(darkColor)
 }
+
+@Composable
+fun Color.dark(darkColor: Color): Color {
+  return if (!LocalAppDark.current) this else darkColor
+}
