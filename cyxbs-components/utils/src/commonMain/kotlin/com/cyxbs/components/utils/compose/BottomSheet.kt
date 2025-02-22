@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -70,6 +72,12 @@ class BottomSheetState {
       }
     }
 
+  internal val valueState = mutableStateOf(BottomSheetValueState.Collapsed)
+
+  val state: BottomSheetValueState
+    get() = valueState.value
+
+  // 小于 0 时表示处于 hide 状态
   val fraction by derivedStateOfStructure {
     val showHeight = showHeight.floatValue
     val contentHeight = contentHeight.floatValue
@@ -77,31 +85,49 @@ class BottomSheetState {
   }
 
   internal val scrollableState = ScrollableState {
-    val min = peekHeight
     val max = contentHeight.floatValue
     val now = showHeight.floatValue
-    val new = (now - it).coerceIn(min, max)
+    val new = (now - it).coerceIn(0F, max)
     showHeight.floatValue = new
     now - new
   }
 
   suspend fun expand() {
+    if (valueState.value == BottomSheetValueState.Expanded) return
     val now = showHeight.floatValue
     val target = contentHeight.floatValue
     if (now == target) return
     scrollableState.animateScrollBy(
       value = now - target,
     )
+    valueState.value = BottomSheetValueState.Expanded
   }
 
   suspend fun collapse() {
+    if (valueState.value == BottomSheetValueState.Collapsed) return
     val now = showHeight.floatValue
     val target = peekHeight
     if (now == target) return
     scrollableState.animateScrollBy(
       value = now - target,
     )
+    valueState.value = BottomSheetValueState.Collapsed
   }
+
+  suspend fun hide() {
+    if (valueState.value == BottomSheetValueState.Hide) return
+    val now = showHeight.floatValue
+    val target = 0F
+    if (now == target) return
+    scrollableState.animateScrollBy(
+      value = now - target,
+    )
+    valueState.value = BottomSheetValueState.Hide
+  }
+}
+
+enum class BottomSheetValueState {
+  Hide, Collapsed, Scrolling, Expanded
 }
 
 @Composable
@@ -111,7 +137,7 @@ fun rememberBottomSheetState(): BottomSheetState {
 
 @Composable
 fun BottomSheetCompose(
-  bottomSheetState: BottomSheetState,
+  bottomSheetState: BottomSheetState = rememberBottomSheetState(),
   modifier: Modifier = Modifier,
   peekHeight: Dp = 0.dp,
   dismissOnBackPress: (() -> Boolean)? = { true },
@@ -152,9 +178,9 @@ private fun BottomSheetBackgroundCompose(
       .plusDsl {
         if (dismissOnBackPress != null) {
           onKeyEvent {
-            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()) {
+            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()
+              && bottomSheetState.valueState.value == BottomSheetValueState.Collapsed) {
               // 键盘按下 esc 后 dismiss
-              // todo 检查是否处于 collapse
               coroutineScope.launch {
                 bottomSheetState.collapse()
               }
@@ -274,12 +300,20 @@ private class BottomSheetScopeImpl(
     state = rememberDraggableState {
       bottomSheetState.scrollableState.dispatchRawDelta(it)
     },
+    onDragStarted = {
+      bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
+        // 这里会打断惯性滑动
+        bottomSheetState.valueState.value = BottomSheetValueState.Scrolling
+      }
+    },
     onDragStopped = { velocity ->
       coroutineScope.launch {
         bottomSheetState.scrollableState.scroll {
           with(flingBehavior) {
             performFling(velocity)
           }
+          bottomSheetState.valueState.value = if (bottomSheetState.fraction == 0F)
+            BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
         }
       }
     }
@@ -297,6 +331,7 @@ private class BottomSheetNestedScrollConnection(
     val old = bottomSheetState.showHeight.floatValue
     // 先消耗手指向上的滑动
     if (available.y < 0) {
+      bottomSheetState.valueState.value = BottomSheetValueState.Scrolling
       val new = (old - available.y).coerceIn(min, max)
       val diff = old - new
       bottomSheetState.scrollableState.dispatchRawDelta(diff)
@@ -315,6 +350,7 @@ private class BottomSheetNestedScrollConnection(
     val old = bottomSheetState.showHeight.floatValue
     // 再消耗手指向下的滑动，只有 手指拖动 或者 惯性滑动但已经不是完全展开时 才能消耗
     if (available.y > 0 && (source == NestedScrollSource.UserInput || old != max)) {
+      bottomSheetState.valueState.value = BottomSheetValueState.Scrolling
       val new = (old - available.y).coerceIn(min, max)
       val diff = old - new
       bottomSheetState.scrollableState.dispatchRawDelta(diff)
@@ -328,10 +364,12 @@ private class BottomSheetNestedScrollConnection(
     val old = bottomSheetState.showHeight.floatValue
     if (old == max) return available.copy(x = 0F) // 完全展开时继续保持展开状态
     var consumeVelocity = available.y
-    bottomSheetState.scrollableState.scroll {
+    bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
       with(flingBehavior) {
         consumeVelocity = available.y - performFling(available.y)
       }
+      bottomSheetState.valueState.value = if (bottomSheetState.fraction == 0F)
+        BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
     }
     return Velocity(x = 0F, y = consumeVelocity)
   }

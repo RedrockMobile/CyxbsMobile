@@ -144,10 +144,10 @@ class CalendarState(
   }
 
   // 手势滚动中的上下滑状态，在滚动未结束时，即使当前显示状态是折叠/展开的，仍处于 Scrolling 状态
-  val verticalScrollState: MutableState<VerticalScrollState> =
+  internal val verticalScrollState: MutableState<VerticalScrollState> =
     mutableStateOf(VerticalScrollState.Collapsed)
 
-  val horizontalScrollState: MutableState<HorizontalScrollState> =
+  internal val horizontalScrollState: MutableState<HorizontalScrollState> =
     mutableStateOf(HorizontalScrollState.Idle)
 
   // 是否允许垂直嵌套滑动
