@@ -39,7 +39,7 @@ fun CoursePageCompose(
   items: (dayOfWeek: DayOfWeek) -> ImmutableList<CourseItem>,
 ) {
   timeline.Content(
-    modifier = modifier.background(LocalAppColors.current.topBg),
+    modifier = modifier,
     enableDrawNowTimeLine = enableDrawNowTimeLine,
     verticalScrollState = verticalScrollState,
   ) {

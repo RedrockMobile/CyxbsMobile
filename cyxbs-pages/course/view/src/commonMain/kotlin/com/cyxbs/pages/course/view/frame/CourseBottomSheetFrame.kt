@@ -91,6 +91,11 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
   @Composable
   override fun CourseHorizontalPager(pageContent: @Composable PagerScope.(page: Int) -> Unit) {
     super.CourseHorizontalPager(pageContent)
+    OnCourseHorizontalPager()
+  }
+
+  @Composable
+  open fun OnCourseHorizontalPager() {
     LaunchedEffect(pagerState) {
       snapshotFlow { pagerState.currentPage }.onEach {
         observeCurrentPage(it)

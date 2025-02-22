@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.view.frame
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerScope
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.pages.course.view.item.CourseItem
@@ -50,11 +52,6 @@ abstract class CourseFrame {
     PagerState(initialPage) { maxPage }
   }
 
-  // HorizontalPager Modifier
-  open val horizontalPagerModifier: Modifier
-    @Composable
-    get() = Modifier.fillMaxSize()
-
   @Composable
   open fun CourseCompose() {
     CourseHorizontalPager {
@@ -65,7 +62,7 @@ abstract class CourseFrame {
   @Composable
   open fun CourseHorizontalPager(pageContent: @Composable PagerScope.(page: Int) -> Unit) {
     HorizontalPager(
-      modifier = horizontalPagerModifier,
+      modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg),
       state = pagerState,
       pageContent = pageContent,
     )

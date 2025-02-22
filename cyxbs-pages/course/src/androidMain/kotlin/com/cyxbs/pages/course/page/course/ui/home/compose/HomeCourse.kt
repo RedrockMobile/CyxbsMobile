@@ -2,6 +2,9 @@ package com.cyxbs.pages.course.page.course.ui.home.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,14 +71,6 @@ private object HomeCourseFrame : CourseBottomSheetFrame() {
     return persistentListOf()
   }
 
-  override val horizontalPagerModifier: Modifier
-    @Composable
-    get() = Modifier
-      .background(LocalAppColors.current.topBg)
-      .graphicsLayer {
-        alpha = HomeCourseServiceImpl.contentAlpha
-      }
-
   @Composable
   override fun CourseBottomSheetHeader() {
     Box {
@@ -89,5 +84,17 @@ private object HomeCourseFrame : CourseBottomSheetFrame() {
         pagerState.animateScrollToPage(initialPage)
       }.launchIn(this)
     }
+  }
+
+  @Composable
+  override fun CourseHorizontalPager(pageContent: @Composable (PagerScope.(page: Int) -> Unit)) {
+    HorizontalPager(
+      modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg).graphicsLayer {
+        alpha = HomeCourseServiceImpl.contentAlpha
+      },
+      state = pagerState,
+      pageContent = pageContent,
+    )
+    OnCourseHorizontalPager()
   }
 }
