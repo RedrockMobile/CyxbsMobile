@@ -74,9 +74,11 @@ value class Date(
   val lastDate: Date
     get() = copy(dayOfMonth = lengthOfMonth)
 
+  // 获取星期一的日期
   val weekBeginDate: Date
     get() = minusDays(dayOfWeekOrdinal)
 
+  // 获取星期天的日期
   val weekFinalDate: Date
     get() = plusDays(6 - dayOfWeekOrdinal)
 

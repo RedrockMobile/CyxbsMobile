@@ -7,8 +7,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.cyxbs.components.utils.compose.BottomSheetState
-import com.cyxbs.pages.course.api.IHomeCourseService
-import com.cyxbs.pages.course.page.course.ui.home.compose.HomeCourseCompose
+import com.cyxbs.pages.course.api.IMobileHomeCourseService
+import com.cyxbs.pages.course.home.compose.HomeCourseCompose
 import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
@@ -18,7 +18,7 @@ import com.g985892345.provider.api.annotation.ImplProvider
  * @date 2025/2/15
  */
 @ImplProvider
-object HomeCourseServiceImpl : IHomeCourseService {
+object MobileHomeCourseServiceImpl : IMobileHomeCourseService {
 
   override var headerAlpha: Float by mutableFloatStateOf(1F)
 

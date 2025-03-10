@@ -23,6 +23,7 @@ import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
+import kotlinx.datetime.DayOfWeek
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.minutes
 
@@ -37,6 +38,7 @@ import kotlin.time.Duration.Companion.minutes
 data class CourseTimeline(
   val startMinuteTime: MinuteTime = DefaultTimelineStartMinuteTime,
   val data: ImmutableList<CourseTimelineData> = DefaultTimeline,
+  val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
 
   /**

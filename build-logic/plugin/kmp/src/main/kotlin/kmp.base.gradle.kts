@@ -70,5 +70,19 @@ kotlin {
         implementation(libsEx.`kotlinx-coroutines-swing`)
       }
     }
+
+    // 移动端，建议 mobileMain 里面只放 UI
+    val mobileMain = create("mobileMain") {
+      dependsOn(commonMain.get())
+    }
+    androidMain { dependsOn(mobileMain) }
+    if (Multiplatform.enableIOS(project)) {
+      val iosMain = create("iosMain") {
+        dependsOn(mobileMain)
+      }
+      iosX64Main { dependsOn(iosMain) }
+      iosArm64Main { dependsOn(iosMain) }
+      iosSimulatorArm64Main { dependsOn(iosMain) }
+    }
   }
 }

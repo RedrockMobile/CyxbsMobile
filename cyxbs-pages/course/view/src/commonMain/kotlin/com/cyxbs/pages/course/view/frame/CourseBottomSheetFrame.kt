@@ -37,9 +37,9 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
 
   override var title: String by mutableStateOf("")
 
-  override var subtitle: String by mutableStateOf("")
+  override val subtitle: String = "本周"
 
-  override var subtitleScale: Float by mutableFloatStateOf(1F)
+  override var subtitleScale: Float by mutableFloatStateOf(0F)
 
   override var backBtnOffsetRatio: Float by mutableFloatStateOf(0F)
 
@@ -71,9 +71,7 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
         ) {
           CourseBottomSheetHeader()
         }
-        CourseHorizontalPager {
-          CoursePageContent(it)
-        }
+        super.CourseCompose()
       }
     }
   }
@@ -109,7 +107,6 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
   // 观察 HorizontalPager 翻页
   open fun observeCurrentPage(page: Int) {
     title = if (page == 0) "整学期" else "第${Num2CN.number2ChineseNumber(page)}周"
-    subtitle = if (page == initialPage) "(本周)" else ""
   }
 
   // 观察 HorizontalPager 页面偏移

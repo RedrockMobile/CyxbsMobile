@@ -37,7 +37,7 @@ import com.cyxbs.components.utils.extensions.colorCompose
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.pages.course.api.ICourseService
-import com.cyxbs.pages.course.api.IHomeCourseService
+import com.cyxbs.pages.course.api.IMobileHomeCourseService
 import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.ui.course.utils.CourseHeaderHelper
 import com.cyxbs.pages.home.viewmodel.BottomNavViewModel
@@ -67,7 +67,7 @@ import kotlin.math.max
 @Composable
 fun HomeCourseCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val service = remember { IHomeCourseService::class.impl() }
+  val service = remember { IMobileHomeCourseService::class.impl() }
   service.Content(
     modifier = modifier.statusBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height

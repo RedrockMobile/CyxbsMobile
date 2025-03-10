@@ -11,7 +11,7 @@ import com.cyxbs.components.utils.compose.BottomSheetState
  * @author 985892345
  * @date 2025/2/15
  */
-interface IHomeCourseService {
+interface IMobileHomeCourseService {
 
   var headerAlpha: Float
 

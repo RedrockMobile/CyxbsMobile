@@ -5,18 +5,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.TodayNoEffect
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.datetime.DayOfWeek
 
 /**
  * 课表 UI 框架
@@ -30,15 +28,15 @@ abstract class CourseFrame {
   // 课表起始日期，如果为 null 则不会显示号数
   abstract val beginDate: Date?
 
-  // 获取单天的 items，如果 week 为 0 则表示是整学期的 item
-  abstract fun getDayItems(week: Int, dayOfWeek: DayOfWeek): ImmutableList<CourseItem>
+  // 课表数据，子类应该重写为一个常量
+  abstract val providerGroup: CourseDataProviderGroup
 
   // 课表时间轴
   open val timeline: CourseTimeline = CourseTimeline()
 
-  // 课表最大显示页数
+  // 课表能展示的最大页数
   open val maxPage: Int
-    get() = 21
+    get() = 22
 
   // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   open val initialPage: Int
@@ -48,14 +46,30 @@ abstract class CourseFrame {
     }
 
   // 课表 HorizontalPager 状态
-  val pagerState by lazy {
+  val pagerState: PagerState by lazy {
     PagerState(initialPage) { maxPage }
+  }
+
+  @Composable
+  fun Content() {
+    CourseCompose()
+    OnCourseCompose()
   }
 
   @Composable
   open fun CourseCompose() {
     CourseHorizontalPager {
-      CoursePageContent(it)
+      CoursePageContent(this, it)
+    }
+  }
+
+  @Composable
+  open fun OnCourseCompose() {
+    DisposableEffect(Unit) {
+      providerGroup.onBindCourseCompose(timeline)
+      onDispose {
+        providerGroup.onUnbindCourseCompose()
+      }
     }
   }
 
@@ -69,15 +83,10 @@ abstract class CourseFrame {
   }
 
   @Composable
-  open fun PagerScope.CoursePageContent(page: Int) {
-    val scrollState = rememberScrollState()
+  open fun CoursePageContent(pagerScope: PagerScope, page: Int) {
     CoursePageCompose(
       timeline = timeline,
-      beginDayOfWeek = beginDate?.dayOfWeek ?: DayOfWeek.MONDAY,
-      verticalScrollState = scrollState,
-      items = {
-        getDayItems(page, it)
-      }
+      weekDataPools = providerGroup.getWeekDataPool(page)
     )
   }
 }

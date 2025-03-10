@@ -15,9 +15,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cyxbs.components.config.time.MinuteTimeDate
-import com.cyxbs.pages.course.view.overlap.OverlayData
+import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.datetime.DayOfWeek
 
 /**
  * .
@@ -28,9 +29,13 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 @Stable
 interface CourseItem {
 
-  val beginTime: MinuteTimeDate
+  // 用于单天课程 item 的遍历定位
+  val key: String
 
-  val finalTime: MinuteTimeDate
+  val page: Int
+  val dayOfWeek: DayOfWeek
+  val beginTime: MinuteTime
+  val finalTime: MinuteTime // 如果 finalTime < beginTime 则表示跨了一天
 
   /**
    * 绘制 item 内容

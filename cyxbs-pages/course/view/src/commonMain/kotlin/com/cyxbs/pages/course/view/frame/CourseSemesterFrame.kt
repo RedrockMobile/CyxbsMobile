@@ -2,12 +2,10 @@ package com.cyxbs.pages.course.view.frame
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.pager.PagerScope
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import com.cyxbs.pages.course.view.page.CoursePageCompose
+import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
-import kotlinx.datetime.DayOfWeek
 
 /**
  * 带有整学期的课表 UI 框架
@@ -22,25 +20,22 @@ abstract class CourseSemesterFrame : CourseFrame() {
     get() = super.maxPage + 1 // 最大显示页数，添加整学期页
 
   override val initialPage: Int
-    get() = super.initialPage + 1
+    get() {
+      val page = beginDate?.daysUntil(TodayNoEffect)?.div(7)?.and(1)
+        ?.coerceAtLeast(0) ?: 0
+      return if (page >= maxPage) 0 else page
+    }
 
   @Composable
-  override fun PagerScope.CoursePageContent(page: Int) {
-    val scrollState = rememberScrollState()
+  override fun CoursePageContent(pagerScope: PagerScope, page: Int) {
     val date = beginDate?.plusWeeks(page - 1)
+      ?.weekFinalDate?.plusDays(timeline.beginDayOfWeek.ordinal)
     Column {
       CourseWeekCompose(
-        weekBeginDate = if (page == 0) null else date,
-        beginDayOfWeek = beginDate?.dayOfWeek ?: DayOfWeek.MONDAY,
+        weekBeginDate = if (page == 0) null else date, // 整学期页不显示日期
+        beginDayOfWeek = timeline.beginDayOfWeek,
       )
-      CoursePageCompose(
-        timeline = timeline,
-        beginDayOfWeek = beginDate?.dayOfWeek ?: DayOfWeek.MONDAY,
-        verticalScrollState = scrollState,
-        items = {
-          getDayItems(page, it)
-        }
-      )
+      super.CoursePageContent(pagerScope, page)
     }
   }
 }
