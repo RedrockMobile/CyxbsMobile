@@ -82,6 +82,7 @@ value class Date(
   val weekFinalDate: Date
     get() = plusDays(6 - dayOfWeekOrdinal)
 
+  // 返回两个日期之间的天数
   fun daysUntil(date: Date): Int {
     if (this.value == date.value) return 0
     if (this.year == date.year && this.month == date.month) {
@@ -116,6 +117,11 @@ value class Date(
       }
     }
     return total - DAYS_0000_TO_1970
+  }
+
+  // 时间戳
+  fun toEpochMillis(): Long {
+    return LocalDate(year, month, dayOfMonth).atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds()
   }
 
   fun copy(
@@ -180,7 +186,6 @@ value class Date(
 
   override fun toString(): String {
     return "${year}-" + toStringMonthDay()
-
   }
 
   fun toStringMonthDay(): String {

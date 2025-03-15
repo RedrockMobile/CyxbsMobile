@@ -8,7 +8,7 @@ import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.text.isDigitsOnly
 import androidx.recyclerview.widget.RecyclerView
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.pages.grades.R
 import com.cyxbs.pages.grades.bean.Exam
 import com.cyxbs.pages.grades.widget.DashGapLine
@@ -70,7 +70,9 @@ class ExamAdapter(val data: MutableList<Exam>) : RecyclerView.Adapter<ExamAdapte
                         var schoolCalendar: Calendar? = null
                         it.week?.let { week ->
                             it.weekday?.let { weekday ->
-                                schoolCalendar = SchoolCalendar.getFirstMonDayOfTerm()?.also {
+                                schoolCalendar = SchoolCalendar.getFirstMonDayTimestamp()?.let {
+                                    Calendar.getInstance().apply { timeInMillis = it }
+                                }?.also {
                                     it.add(Calendar.DATE, (week.toInt() - 1) * 7)
                                     it.add(Calendar.DATE, weekday.toInt() - 1 - (it.get(Calendar.DAY_OF_WEEK) + 5) % 7)
                                 }

@@ -2,7 +2,7 @@ package com.cyxbs.pages.home.ui.course.utils
 
 import android.util.Log
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.service.impl
@@ -49,6 +49,7 @@ object CourseHeaderHelper {
    */
   fun observeHeader(): Observable<Header> {
     return SchoolCalendar.observeWeekOfTerm()
+      .asObservable()
       .observeOn(Schedulers.io())
       .switchMap { week ->
         if (week !in 1..ICourseService.maxWeek) {

@@ -5,10 +5,10 @@ import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.annotation.CallSuper
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.course.widget.R
 import com.cyxbs.pages.course.widget.fragment.page.expose.IWeekWrapper
 import com.ndhzs.netlayout.view.NetLayout2
-import java.util.*
 
 /**
  * ...
@@ -67,12 +67,12 @@ abstract class WeekWrapperImpl : TodayImpl(), IWeekWrapper {
   }
   
   @SuppressLint("SetTextI18n")
-  override fun setMonth(monDay: Calendar) {
-    val calendar = monDay.clone() as Calendar
-    tvMonth.text = "${calendar.get(Calendar.MONTH) + 1}月"
+  override fun setMonth(monDay: Date) {
+    tvMonth.text = "${monDay.monthNumber}月"
+    var date = monDay
     forEachWeekView { _, month ->
-      month.text = "${calendar.get(Calendar.DATE)}日"
-      calendar.add(Calendar.DATE, 1) // 天数加 1
+      month.text = "${date.dayOfMonth}日"
+      date = date.plusDays( 1) // 天数加 1
     }
   }
   

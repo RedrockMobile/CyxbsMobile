@@ -4,7 +4,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import androidx.core.content.edit
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appContext
@@ -27,6 +27,7 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.rx3.asObservable
 
 /**
  * description ： IWidgetService接口的实现类，通过发送延时广播通知小组件刷新
@@ -119,6 +120,7 @@ object WidgetInitialService : InitialService {
         } else {
             // 只有第一次使用掌邮才会出现 weekOfTerm 为 null
             refreshDispose = SchoolCalendar.observeWeekOfTerm()
+                .asObservable()
                 .firstElement()
                 .observeOn(Schedulers.io())
                 .unsafeSubscribeBy {

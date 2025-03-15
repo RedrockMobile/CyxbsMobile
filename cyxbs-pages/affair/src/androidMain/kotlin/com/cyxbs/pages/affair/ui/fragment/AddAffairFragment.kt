@@ -27,7 +27,7 @@ import com.cyxbs.pages.affair.ui.viewmodel.fragment.AddAffairViewModel
 import com.cyxbs.pages.affair.ui.dialog.RemindSelectDialog
 import com.cyxbs.pages.course.api.utils.getStartRow
 import com.cyxbs.pages.course.api.utils.getStartTimeMinute
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.*
 import java.util.Calendar
@@ -184,11 +184,12 @@ class AddAffairFragment : BaseFragment(R.layout.affair_fragment_add_affair) {
 
     // 将时间转换为日历
     private fun translationToCalendar(): String {
-        val firstMonDay = SchoolCalendar.getFirstMonDayOfTerm() ?: return ""
+        val firstMonDay = SchoolCalendar.getFirstMonDayTimestamp() ?: return ""
         val whatTime = mRvDurationAdapter.currentList.toAtWhatTime()
         val startMinute = getStartTimeMinute(getStartRow(whatTime[0].beginLesson))
         val time = whatTime[0].week.map {
-            (firstMonDay.clone() as Calendar).apply {
+            (Calendar.getInstance()).apply {
+                timeInMillis = firstMonDay
                 add(Calendar.DATE, whatTime[0].day + (it - 1) * 7)
                 add(Calendar.MINUTE, startMinute)
             }

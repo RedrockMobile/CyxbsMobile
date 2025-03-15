@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.page.course.model
 import androidx.annotation.WorkerThread
 import androidx.core.content.edit
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.extensions.interceptException
 import com.cyxbs.components.utils.extensions.toast

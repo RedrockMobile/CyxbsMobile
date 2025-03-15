@@ -2,12 +2,13 @@ package com.cyxbs.pages.affair.model
 
 import android.annotation.SuppressLint
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.config.PhoneCalendar
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.affair.bean.TodoListPushWrapper
 import com.cyxbs.pages.affair.bean.toAffairDateBean
 import com.cyxbs.pages.affair.net.AffairApiService
@@ -25,7 +26,6 @@ import com.cyxbs.pages.course.api.utils.getEndRow
 import com.cyxbs.pages.course.api.utils.getEndTimeMinute
 import com.cyxbs.pages.course.api.utils.getStartRow
 import com.cyxbs.pages.course.api.utils.getStartTimeMinute
-import com.google.gson.Gson
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Observable
@@ -55,7 +55,7 @@ object AffairRepository {
   private val LocalUpdateDao = DB.getLocalUpdateAffairDao()
   private val LocalDeleteDao = DB.getLocalDeleteAffairDao()
 
-  private val mGson = Gson()
+  private val mGson = defaultGson
 
   private fun List<AffairEntity.AtWhatTime>.toPostDateJson(): String {
     // 不建议让 AtWhatTime 成为转 json 的类，应该转换成 AffairDateBean 转 json
@@ -381,7 +381,7 @@ object AffairRepository {
     AffairCalendarDao.remove(onlyId).forEach {
       PhoneCalendar.delete(it)
     }
-    val firstMonDay = SchoolCalendar.getFirstMonDayOfTerm() ?: return
+    val firstMonDay = SchoolCalendar.getFirstMonDayTimestamp() ?: return
     // 只有大于 0 才有提醒，只有需要提醒的才写进手机日历
     if (time > 0) {
       val eventIdList = arrayListOf<Long>()
@@ -398,7 +398,8 @@ object AffairRepository {
               duration = PhoneCalendar.Event.Duration(
                 minute = endMinute - startMinute
               ),
-              startTime = (firstMonDay.clone() as Calendar).apply {
+              startTime = (Calendar.getInstance()).apply {
+                timeInMillis = firstMonDay
                 add(Calendar.DATE, whatTime.day)
                 add(Calendar.MINUTE, startMinute)
               },
@@ -417,7 +418,8 @@ object AffairRepository {
                 minute = endMinute - startMinute
               ),
               startTime = whatTime.week.map {
-                (firstMonDay.clone() as Calendar).apply {
+                (Calendar.getInstance()).apply {
+                  timeInMillis = firstMonDay
                   add(Calendar.DATE, whatTime.day + (it - 1) * 7)
                   add(Calendar.MINUTE, startMinute)
                 }
