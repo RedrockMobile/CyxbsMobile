@@ -5,7 +5,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.config.SchoolCalendar
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.config.PhoneCalendar
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.bean.TodoListPushWrapper

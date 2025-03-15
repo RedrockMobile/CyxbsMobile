@@ -11,8 +11,7 @@ import android.content.Intent
 import android.os.Build
 import android.widget.RemoteViews
 import com.cyxbs.components.config.route.TODO_ADD_TODO_BY_WIDGET
-import com.cyxbs.components.init.appContext
-import com.cyxbs.components.utils.service.implClass
+import com.cyxbs.components.config.service.implClass
 import com.cyxbs.pages.todo.R
 import com.cyxbs.pages.todo.service.TodoWidgetService
 

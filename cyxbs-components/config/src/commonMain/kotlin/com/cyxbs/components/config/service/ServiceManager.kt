@@ -1,4 +1,4 @@
-package com.cyxbs.components.utils.service
+package com.cyxbs.components.config.service
 
 import com.g985892345.provider.api.init.wrapper.ImplProviderWrapper
 import com.g985892345.provider.manager.KtProvider

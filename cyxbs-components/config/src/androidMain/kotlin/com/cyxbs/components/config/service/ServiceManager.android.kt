@@ -1,4 +1,4 @@
-package com.cyxbs.components.utils.service
+package com.cyxbs.components.config.service
 
 import android.app.Activity
 import android.content.Intent

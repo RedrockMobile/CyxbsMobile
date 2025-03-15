@@ -8,7 +8,7 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
 import io.ktor.client.call.body

@@ -10,7 +10,7 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.api
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.course.page.course.bean.StuLessonBean

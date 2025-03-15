@@ -13,7 +13,7 @@ import com.cyxbs.components.config.route.DISCOVER_SPORT
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.discover.R
 import java.lang.ref.SoftReference
 

@@ -22,8 +22,8 @@ import com.cyxbs.components.utils.extensions.invisible
 import com.cyxbs.components.utils.extensions.lazyUnlock
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.ui.course.utils.CourseHeaderHelper

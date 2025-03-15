@@ -6,7 +6,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.volunteer.event.VolunteerLogoutEvent
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.launchIn

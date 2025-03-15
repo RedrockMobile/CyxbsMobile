@@ -14,7 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.cyxbs.components.config.route.MINE_CHECK_IN
-import com.cyxbs.components.utils.service.implClass
+import com.cyxbs.components.config.service.implClass
 import com.cyxbs.pages.notification.util.Constant.NOTIFY_TAG
 import java.util.Calendar
 import java.util.concurrent.TimeUnit

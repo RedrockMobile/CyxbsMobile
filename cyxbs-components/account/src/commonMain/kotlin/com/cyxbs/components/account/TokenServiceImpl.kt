@@ -9,7 +9,7 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.login.api.ILoginService
 import com.g985892345.provider.api.annotation.ImplProvider
 import io.ktor.client.call.body

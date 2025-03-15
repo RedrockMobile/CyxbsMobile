@@ -20,7 +20,7 @@ import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.noclass.R
 import com.cyxbs.pages.noclass.bean.Student
 import com.cyxbs.pages.noclass.page.adapter.NoClassTemporaryAdapter

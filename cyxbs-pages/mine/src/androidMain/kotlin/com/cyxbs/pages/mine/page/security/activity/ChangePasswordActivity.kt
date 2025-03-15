@@ -20,7 +20,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.viewmodel.ChangePasswordViewModel
 import com.cyxbs.pages.mine.util.ui.ChooseFindTypeDialog

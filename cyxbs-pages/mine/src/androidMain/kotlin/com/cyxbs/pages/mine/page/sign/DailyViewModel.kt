@@ -2,7 +2,7 @@ package com.cyxbs.pages.mine.page.sign
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.util.apiService
 import com.cyxbs.pages.mine.util.extension.normalWrapper

@@ -8,9 +8,8 @@ import android.widget.TextView
 import androidx.activity.viewModels
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
-import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.affair.R
 import com.cyxbs.pages.affair.api.NoClassBean
 import com.cyxbs.pages.affair.ui.fragment.NoClassAffairFragment

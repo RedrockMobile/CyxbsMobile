@@ -8,7 +8,7 @@ import com.cyxbs.components.config.route.FOOD_ENTRY
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.store.api.IStoreService.Task.DAILY_SIGN
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_DECLARE
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_FOOD

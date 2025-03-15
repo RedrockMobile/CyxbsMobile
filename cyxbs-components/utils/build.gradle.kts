@@ -12,7 +12,6 @@ kotlin {
       api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(libs.kmp.ktProvider.manager) // utils 私有，其他模块通过 ::class.impl() 获取
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

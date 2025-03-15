@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.service
 
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.course.page.course.model.StuLessonRepository

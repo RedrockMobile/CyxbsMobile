@@ -18,8 +18,8 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.viewmodel.BottomNavViewModel

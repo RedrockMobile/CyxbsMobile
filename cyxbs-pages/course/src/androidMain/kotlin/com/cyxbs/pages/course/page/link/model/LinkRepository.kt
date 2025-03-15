@@ -6,7 +6,7 @@ import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrThrowApiException
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.page.link.network.LinkApiServices
 import com.cyxbs.pages.course.page.link.room.LinkDataBase
 import com.cyxbs.pages.course.page.link.room.LinkStuEntity

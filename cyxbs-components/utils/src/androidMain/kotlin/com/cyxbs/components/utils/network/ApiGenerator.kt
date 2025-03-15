@@ -9,8 +9,8 @@ import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
-import com.cyxbs.components.utils.service.allImpl
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.allImpl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.google.gson.annotations.SerializedName

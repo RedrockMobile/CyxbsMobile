@@ -12,9 +12,8 @@ import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.route.MINE_FORGET_PASSWORD
-import com.cyxbs.components.init.appContext
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.login.ui.LoginPage

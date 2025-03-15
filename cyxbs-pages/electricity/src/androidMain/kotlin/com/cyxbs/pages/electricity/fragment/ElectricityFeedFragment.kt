@@ -20,7 +20,7 @@ import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.electricity.R
 import com.cyxbs.pages.electricity.bean.ElecInf
 import com.cyxbs.pages.electricity.config.BUILDING_NAMES

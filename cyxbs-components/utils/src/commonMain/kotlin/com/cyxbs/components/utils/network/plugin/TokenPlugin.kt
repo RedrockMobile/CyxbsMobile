@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.network.plugin
 
 import com.cyxbs.components.account.api.ITokenService
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.bearerAuth

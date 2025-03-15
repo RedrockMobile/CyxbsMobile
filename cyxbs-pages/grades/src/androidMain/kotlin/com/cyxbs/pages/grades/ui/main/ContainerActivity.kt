@@ -25,7 +25,7 @@ import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.grades.R
 import com.cyxbs.pages.grades.bean.Exam
 import com.cyxbs.pages.grades.bean.analyze.isSuccessful

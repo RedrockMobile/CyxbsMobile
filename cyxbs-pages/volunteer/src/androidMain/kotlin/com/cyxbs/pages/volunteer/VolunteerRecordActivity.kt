@@ -10,7 +10,7 @@ import androidx.lifecycle.Observer
 import androidx.viewpager.widget.ViewPager
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER_RECORD
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.volunteer.adapter.VolunteerMainFragmentAdapter
 import com.cyxbs.pages.volunteer.bean.VolunteerTime
 import com.cyxbs.pages.volunteer.event.VolunteerLogoutEvent

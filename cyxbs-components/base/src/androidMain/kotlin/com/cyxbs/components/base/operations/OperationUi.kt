@@ -4,7 +4,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.dailog.BaseChooseDialog
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.base.ui.BaseUi
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.login.api.ILoginService
 
 /**

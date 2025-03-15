@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.declare.R
 import com.cyxbs.pages.declare.detail.bean.VoteData
 import com.cyxbs.pages.declare.detail.page.adapter.DetailRvAdapter

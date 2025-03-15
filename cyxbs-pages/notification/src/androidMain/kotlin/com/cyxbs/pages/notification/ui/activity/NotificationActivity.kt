@@ -28,7 +28,7 @@ import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.utils.impl.defaultImpl
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.bean.ChangeReadStatusToBean

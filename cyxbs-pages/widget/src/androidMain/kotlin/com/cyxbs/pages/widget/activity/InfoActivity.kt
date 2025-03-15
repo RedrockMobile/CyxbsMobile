@@ -3,7 +3,7 @@ package com.cyxbs.pages.widget.activity
 import android.app.Dialog
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.widget.repo.bean.AffairEntity
 import com.cyxbs.pages.widget.repo.bean.AffairEntity.Companion.convertToApi

@@ -9,7 +9,7 @@ import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.course.api.utils.getStartRow

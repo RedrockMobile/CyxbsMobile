@@ -16,7 +16,7 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.Jump2QQHelper
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.util.AnswerTextWatcher

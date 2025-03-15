@@ -5,7 +5,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.config.SchoolCalendar
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ICourseService

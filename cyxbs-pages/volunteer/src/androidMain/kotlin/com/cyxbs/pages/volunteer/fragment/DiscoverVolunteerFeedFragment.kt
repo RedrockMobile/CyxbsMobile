@@ -9,8 +9,8 @@ import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER_RECORD
 import com.cyxbs.components.utils.extensions.defaultGson
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.volunteer.R
 import com.cyxbs.pages.volunteer.adapter.VolunteerFeedAdapter
 import com.cyxbs.pages.volunteer.adapter.VolunteerFeedUnbindAdapter

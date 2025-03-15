@@ -6,7 +6,7 @@ import androidx.core.content.edit
 import com.cyxbs.components.config.config.SchoolCalendar
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.launch
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ILessonService

@@ -18,7 +18,7 @@ import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.wrapByNoLeak
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.login.api.ILegalNoticeService
 
 /**

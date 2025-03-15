@@ -2,7 +2,7 @@ package com.cyxbs.pages.volunteer.viewmodel
 
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.utils.network.ApiGenerator
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.store.api.IStoreService
 import com.cyxbs.pages.volunteer.VolunteerLoginActivity
 import com.cyxbs.pages.volunteer.bean.VolunteerTime

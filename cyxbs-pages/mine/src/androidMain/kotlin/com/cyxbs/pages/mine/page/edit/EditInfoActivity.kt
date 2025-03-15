@@ -34,7 +34,7 @@ import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.doPermissionAction
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.util.ui.DynamicRVAdapter
 import com.yalantis.ucrop.UCrop

@@ -21,7 +21,7 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.NOTIFICATION_SETTING
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.implClass
+import com.cyxbs.components.config.service.implClass
 import com.cyxbs.pages.notification.BuildConfig
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.util.Constant.IS_SWITCH1_SELECT

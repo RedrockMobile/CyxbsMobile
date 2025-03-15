@@ -33,8 +33,8 @@ import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.mine.noyification.NotificationUtils
 import com.cyxbs.pages.mine.page.about.AboutActivity
 import com.cyxbs.pages.mine.page.edit.EditInfoActivity
@@ -42,7 +42,6 @@ import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity
 import com.cyxbs.pages.mine.page.sign.DailySignActivity
 import com.g985892345.provider.api.annotation.ImplProvider
-import com.mredrock.cyxbs.common.utils.extensions.loadAvatar
 import kotlinx.coroutines.launch
 
 /**

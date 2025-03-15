@@ -34,8 +34,8 @@ import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
 import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.colorCompose
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.course.api.IMobileHomeCourseService
 import com.cyxbs.pages.home.R

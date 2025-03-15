@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.AppCompatTextView
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.volunteer.R
 import com.mredrock.cyxbs.common.ui.BaseFeedFragment
 

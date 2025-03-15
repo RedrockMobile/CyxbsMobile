@@ -8,7 +8,7 @@ import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.electricity.config.SP_BUILDING_FOOT_KEY
 import com.cyxbs.pages.electricity.config.SP_BUILDING_HEAD_KEY
 import com.cyxbs.pages.electricity.config.SP_ROOM_KEY
