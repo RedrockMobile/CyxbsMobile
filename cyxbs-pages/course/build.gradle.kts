@@ -3,7 +3,8 @@ plugins {
   id("kmp.compose")
 }
 
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 useRoom(rxjava = true)
 
 kotlin {
@@ -20,7 +21,6 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
       implementation(libs.slideShow)
     }
   }

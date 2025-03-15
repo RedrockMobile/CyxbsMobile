@@ -2,8 +2,8 @@ plugins {
   id("manager.lib")
 }
 
-useKtorfit()
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
@@ -12,10 +12,8 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsPages.login.api)
-      implementation(libs.ktor.core)
     }
     androidMain.dependencies {
-      implementation(libs.bundles.network)
       implementation(libs.dialog)
     }
   }

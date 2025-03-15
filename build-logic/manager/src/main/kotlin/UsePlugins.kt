@@ -65,15 +65,23 @@ fun Project.useRoom(
 }
 
 /**
- * 使用 Ktorfit
+ * 使用网络请求
  */
-fun Project.useKtorfit() {
+fun Project.useNetwork() {
   // ksp 按需引入
   apply(plugin = "com.google.devtools.ksp")
   apply(plugin = libsEx.plugins.ktorfit)
   extensions.configure<KotlinMultiplatformExtension> {
     sourceSets.commonMain.dependencies {
+      implementation(libsEx.`ktor-core`)
       implementation(libsEx.`kmp-ktorfit`)
+    }
+    sourceSets.androidMain.dependencies {
+      implementation(libsEx.retrofit)
+      implementation(libsEx.okhttp)
+      implementation(libsEx.rxjava)
+      implementation(libsEx.`rxjava-android`)
+      implementation(libsEx.`rxjava-kotlin`)
     }
   }
 }

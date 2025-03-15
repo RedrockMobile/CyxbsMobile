@@ -362,15 +362,6 @@ views = [
     "flexbox",
 ]
 
-network = [
-    "okhttp",
-    "retrofit",
-    "gson",
-    "rxjava",
-    "rxjava-android",
-    "rxjava-kotlin",
-]
-
 # 比较出名的刷新控件 https://github.com/scwang90/SmartRefreshLayout
 # 但安卓自带的 Swiperefreshlayout 也能满足大部分需求
 smartRefreshLayouts = [

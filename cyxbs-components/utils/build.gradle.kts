@@ -3,8 +3,8 @@ plugins {
   id("kmp.compose")
 }
 
-useKtorfit()
-useKtProvider(false) // utils 模块不包含实现类，不需要处理注解
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
@@ -17,7 +17,6 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
       implementation(libs.glide)
       implementation(libs.rxpermissions)
       implementation(libs.okhttp.logging.interceptor)

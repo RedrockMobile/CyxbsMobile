@@ -3,7 +3,8 @@ plugins {
   id("kmp.compose")
 }
 
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
@@ -18,11 +19,9 @@ kotlin {
       implementation(projects.cyxbsPages.course.api)
       implementation(libs.kmp.ktorfit)
     }
-    // 依赖所有模块
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
     }
   }
 }
