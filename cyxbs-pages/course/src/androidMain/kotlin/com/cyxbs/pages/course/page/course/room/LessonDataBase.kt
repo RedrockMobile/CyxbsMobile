@@ -2,9 +2,8 @@ package com.cyxbs.pages.course.page.course.room
 
 import android.content.Context
 import androidx.core.content.edit
-import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.cyxbs.components.init.appContext
+import com.cyxbs.components.utils.extensions.defaultGson
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import java.util.concurrent.ConcurrentHashMap
@@ -79,7 +78,7 @@ data class StuLessonEntity(
     get() = stuNum
 }
 
-private val Gson = Gson()
+private val Gson = defaultGson
 
 class StuLessonDao {
 

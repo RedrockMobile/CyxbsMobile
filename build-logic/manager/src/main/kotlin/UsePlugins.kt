@@ -79,6 +79,7 @@ fun Project.useNetwork() {
     sourceSets.androidMain.dependencies {
       implementation(libsEx.retrofit)
       implementation(libsEx.okhttp)
+      implementation(libsEx.gson)
       implementation(libsEx.rxjava)
       implementation(libsEx.`rxjava-android`)
       implementation(libsEx.`rxjava-kotlin`)

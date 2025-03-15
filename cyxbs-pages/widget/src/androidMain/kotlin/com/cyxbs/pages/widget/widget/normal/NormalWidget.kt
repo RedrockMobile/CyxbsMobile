@@ -11,7 +11,7 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.IdRes
 import androidx.core.content.edit
-import com.google.gson.Gson
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.widget.R
 import com.cyxbs.pages.widget.repo.bean.LessonEntity
@@ -37,7 +37,7 @@ class NormalWidget : AppWidgetProvider() {
 
     //生成calendar
     private val calendar = Calendar.getInstance()
-    private var gson = Gson()
+    private var gson = defaultGson
     private var list = listOf<LessonEntity>()
 
     companion object {

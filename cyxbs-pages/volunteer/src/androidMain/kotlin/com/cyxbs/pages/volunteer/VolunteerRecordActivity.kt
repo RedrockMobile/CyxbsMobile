@@ -11,6 +11,7 @@ import androidx.viewpager.widget.ViewPager
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER_RECORD
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.volunteer.adapter.VolunteerMainFragmentAdapter
 import com.cyxbs.pages.volunteer.bean.VolunteerTime
 import com.cyxbs.pages.volunteer.event.VolunteerLogoutEvent
@@ -20,7 +21,6 @@ import com.cyxbs.pages.volunteer.viewmodel.VolunteerRecordViewModel
 import com.cyxbs.pages.volunteer.widget.LogoutDialog
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.tabs.TabLayout
-import com.google.gson.Gson
 import com.mredrock.cyxbs.common.ui.BaseViewModelActivity
 import org.greenrobot.eventbus.EventBus
 
@@ -39,7 +39,7 @@ class VolunteerRecordActivity : BaseViewModelActivity<VolunteerRecordViewModel>(
         fun startActivity(activity: Activity, volunteerTime: VolunteerTime) {
             activity.startActivity(
                 Intent(activity, VolunteerRecordActivity::class.java).apply {
-                    putExtra("volunteerTime", Gson().toJson(volunteerTime))
+                    putExtra("volunteerTime", defaultGson.toJson(volunteerTime))
                 }
             )
         }
@@ -55,7 +55,7 @@ class VolunteerRecordActivity : BaseViewModelActivity<VolunteerRecordViewModel>(
     private fun initView() {
         val vtJson = intent.getStringExtra("volunteerTime")
         viewModel.volunteerTime.value =
-            Gson().fromJson<VolunteerTime>(vtJson, VolunteerTime::class.java)
+            defaultGson.fromJson(vtJson, VolunteerTime::class.java)
         val volunteerRecordFragment = VolunteerRecordFragment().apply {
             arguments = Bundle().apply {
                 putString("volunteerTime", vtJson)

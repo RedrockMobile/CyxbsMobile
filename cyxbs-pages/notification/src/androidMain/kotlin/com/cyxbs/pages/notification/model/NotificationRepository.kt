@@ -1,7 +1,7 @@
 package com.cyxbs.pages.notification.model
 
 import androidx.lifecycle.MutableLiveData
-import com.google.gson.Gson
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
@@ -27,7 +27,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers
  */
 object NotificationRepository {
     private val api = ApiService.INSTANCE
-    private val mGson = Gson()
+    private val mGson = defaultGson
 
 
     private fun List<ItineraryDateBean>.toPostDateJson(): String {
