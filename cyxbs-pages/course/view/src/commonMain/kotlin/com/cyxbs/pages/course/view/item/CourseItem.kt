@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.view.item
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,14 +12,18 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.datetime.DayOfWeek
+import kotlin.math.roundToInt
 
 /**
  * .
@@ -38,7 +43,7 @@ interface CourseItem {
   val finalTime: MinuteTime // 如果 finalTime < beginTime 则表示跨了一天
 
   /**
-   * 绘制 item 内容
+   * 绘制 item 内容，建议使用 [DefaultContent]
    */
   @Composable
   fun Content(
@@ -50,23 +55,35 @@ interface CourseItem {
 
 @Composable
 fun CourseItem.DefaultContent(
+  modifier: Modifier,
+  timeline: CourseTimeline,
   topText: String,
   bottomText: String,
   textColor: Color,
   backgroundColor: Color,
-  modifier: Modifier = Modifier,
 ) {
   Card(
-    modifier = modifier.padding(1.6.dp).fillMaxSize(),
+    modifier = modifier.padding(1.6.dp).layout { measurable, constraints ->
+      val weight = timeline.calculateBeginFinalWeight(beginTime, finalTime)
+      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+      val placeable = measurable.measure(
+        Constraints.fixed(constraints.maxWidth, height)
+      )
+      layout(placeable.width, placeable.height) {
+        placeable.placeRelative(0, (constraints.maxHeight * weight.x).roundToInt())
+      }
+    },
     shape = RoundedCornerShape(8.dp),
     elevation = 0.5.dp,
-    backgroundColor = backgroundColor
+    contentColor = Color.Transparent,
+    backgroundColor = LocalAppColors.current.topBg, // 这里需要使用课表的背景颜色，在黑夜模式下遮挡 Card 的阴影
   ) {
     TopBottomText(
       top = topText,
       topColor = textColor,
       bottom = bottomText,
       bottomColor = textColor,
+      modifier = Modifier.background(backgroundColor)
     )
   }
 }
@@ -75,7 +92,7 @@ fun CourseItem.DefaultContent(
  * 添加统一样式的顶部和底部文字
  */
 @Composable
-private fun TopBottomText(
+fun CourseItem.TopBottomText(
   top: String,
   topColor: Color,
   bottom: String,
@@ -84,7 +101,7 @@ private fun TopBottomText(
 ) {
   Layout(
     modifier = modifier.fillMaxSize()
-      .padding(horizontal = 7.dp, vertical = 7.dp),
+      .padding(horizontal = 6.dp, vertical = 6.dp),
     content = {
       Text(
         text = top,

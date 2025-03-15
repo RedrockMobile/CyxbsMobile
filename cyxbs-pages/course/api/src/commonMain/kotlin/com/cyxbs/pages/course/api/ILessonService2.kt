@@ -14,14 +14,14 @@ interface ILessonService2 {
    * 获取课程
    * - 不存在缓存，则返回 null
    */
-  fun getLesson(stuNum: String): CacheLesson?
+  fun getLesson(stuNum: String?): CacheLesson?
 
   /**
    * 请求课程
    */
   suspend fun requestLesson(stuNum: String): Result<List<LessonByWeeks>>
 
-  class CacheLesson(
+  data class CacheLesson(
     val requestTime: Instant,
     val data: List<LessonByWeeks>,
   )

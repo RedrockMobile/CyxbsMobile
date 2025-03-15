@@ -5,10 +5,12 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.config.time.prev
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemContent
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
@@ -82,6 +84,12 @@ class CourseWeekDataPool(
     }
   }
 
+  fun clear() {
+    DayOfWeek.entries.forEach {
+      get(it).clear()
+    }
+  }
+
   init {
     if (page == 0) {
       // 整学期单独处理
@@ -124,6 +132,7 @@ class CourseDayDataPool(
 
   // 刷新数据的 Runnable，为避免频繁刷新，设计成在下一个消息队列中才会触发
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
+  private var runnableJob: Job? = null
 
   private val comparator = Comparator<CourseItem> { a, b ->
     weekDataPool.provider.compare(a, b)
@@ -132,7 +141,7 @@ class CourseDayDataPool(
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
     if (!allowRefreshByItemSet) return
-    val coveredList = oldTopCoveredList.toMutableList() // todo 这里需要主动拿上一层的 coveredList
+    val coveredList = oldTopCoveredList.toMutableList()
     state.value = OverlayManager.getOverlapData(
       input = itemSet,
       comparator = comparator,
@@ -148,7 +157,6 @@ class CourseDayDataPool(
 
   // topCoveredList 改变时触发的刷新
   private fun refreshByCoveredList(topCoveredList: MutableList<CoveredRange>) {
-    if (!allowRefreshByItemSet) return
     if (topCoveredList != oldTopCoveredList) {
       oldTopCoveredList = topCoveredList.toList() // 记录新的输入 coveredList
       state.value = OverlayManager.getOverlapData(
@@ -167,6 +175,7 @@ class CourseDayDataPool(
   }
 
   internal fun add(item: CourseItem) {
+    logg("add: dayOfWeek = $dayOfWeek, item.dayOfWeek = ${item.dayOfWeek}")
     // 当天并且结束时间 > timelineStart 或者 开始时间 < timelineStart 且在明天的 item
     val allow =
       (item.dayOfWeek == dayOfWeek && item.finalTime > weekDataPool.timeline.startMinuteTime)
@@ -194,16 +203,19 @@ class CourseDayDataPool(
     itemSet.clear()
     oldTopCoveredList = emptyList()
     allowRefreshByItemSet = false
+    runnableJob?.cancel()
     state.value = emptyList()
   }
 
   private fun tryOverlapRunnable() {
     if (!isPostRunnable) {
       isPostRunnable = true
-      appCoroutineScope.launch(Dispatchers.Main) {
+      runnableJob?.cancel()
+      runnableJob = appCoroutineScope.launch(Dispatchers.Main) {
         // 在下一个消息中才触发执行重叠处理
         isPostRunnable = false
         setStateRunnable.run()
+        runnableJob = null
       }
     }
   }

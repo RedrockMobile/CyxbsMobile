@@ -19,11 +19,23 @@ abstract class CourseDataProvider {
   // 课程数据监听
   private val itemListenerList = mutableListOf<ItemListener>()
 
-  // 比较两个课程的位置，越大则越显示在顶层
-  abstract fun compare(a: CourseItem, b: CourseItem): Int
-
-  // 获取整学期的课程（整学期课程为性能考虑，需单独实现）
-  open fun getSemesterDayDate(dayOfWeek: DayOfWeek): Set<CourseItem> = emptySet()
+  // 当天课程中比较两个课程的位置，越大则越显示在顶层
+  open fun compare(a: CourseItem, b: CourseItem): Int {
+    // page 越小越在上
+    val pageDiff = a.page - b.page
+    return if (pageDiff != 0) -pageDiff else {
+      // dayOfWeek 越小越在上
+      val dayOfWeekDiff = a.dayOfWeek.ordinal - b.dayOfWeek.ordinal
+      if (dayOfWeekDiff != 0) -dayOfWeekDiff else {
+        // beginTime 越大越在上
+        val beginTimeDiff = a.beginTime.compareTo(b.beginTime)
+        if (beginTimeDiff != 0) beginTimeDiff else {
+          // finalTime 越大越在上
+          a.finalTime.compareTo(b.finalTime)
+        }
+      }
+    }
+  }
 
   // 获取某一天的课程（week = 0 时则获取整学期课程）
   fun getDayData(week: Int, dayOfWeek: DayOfWeek): Set<CourseItem> {
@@ -35,10 +47,6 @@ abstract class CourseDataProvider {
   // 获取某一天的课程
   fun getDayData(dayDiff: Int): Set<CourseItem> {
     require(dayDiff >= 0) { "dayDiff 不能小于 0, dayDiff = $dayDiff" }
-    if (dayDiff < 7) {
-      // dayDiff 取 [0, 7) 时返回整学期的课程，整学期的课程需单独处理
-      return getSemesterDayDate(DayOfWeek(dayDiff + 1))
-    }
     return dayItemMap[dayDiff] ?: emptySet()
   }
 
@@ -63,6 +71,12 @@ abstract class CourseDataProvider {
     }
   }
 
+  // 清空课程
+  fun clear() {
+    dayItemMap.clear()
+    itemListenerList.fastForEachReversed { it.onClear() }
+  }
+
   // 添加课程监听
   fun addItemListener(listener: ItemListener) {
     itemListenerList.add(listener)
@@ -76,5 +90,6 @@ abstract class CourseDataProvider {
   interface ItemListener {
     fun onAdd(item: CourseItem)
     fun onRemove(item: CourseItem)
+    fun onClear()
   }
 }

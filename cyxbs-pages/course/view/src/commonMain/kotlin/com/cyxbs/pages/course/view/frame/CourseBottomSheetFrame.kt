@@ -37,7 +37,7 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
 
   override var title: String by mutableStateOf("")
 
-  override val subtitle: String = "本周"
+  override val subtitle: String = "(本周)"
 
   override var subtitleScale: Float by mutableFloatStateOf(0F)
 

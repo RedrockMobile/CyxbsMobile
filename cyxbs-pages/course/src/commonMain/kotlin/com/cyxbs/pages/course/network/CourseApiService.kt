@@ -13,7 +13,7 @@ import de.jensklingenberg.ktorfit.http.POST
  */
 interface CourseApiService {
 
-  @POST("/magipoke-jwzx/kebiao")
+  @POST("magipoke-jwzx/kebiao")
   @FormUrlEncoded
   suspend fun getStuLesson(
     @Field("stu_num")

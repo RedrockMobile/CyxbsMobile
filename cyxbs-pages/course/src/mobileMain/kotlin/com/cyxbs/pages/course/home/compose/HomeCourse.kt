@@ -15,8 +15,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.components.config.time.TodayNoEffect
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.compose.BottomSheetState
+import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
@@ -24,8 +25,10 @@ import com.cyxbs.pages.course.service.MobileHomeCourseServiceImpl
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
 import com.cyxbs.pages.course.view.header.CourseHeader
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 
 /**
  * .
@@ -52,7 +55,7 @@ private object HomeCourseFrame : CourseBottomSheetFrame() {
 
   private var outerHeader: @Composable (BottomSheetState) -> Unit by mutableStateOf({})
 
-  override val beginDate: Date = TodayNoEffect.weekBeginDate
+  override var beginDate: Date? by mutableStateOf(SchoolCalendar.getFirstMonDay())
 
   override val providerGroup: CourseDataProviderGroup = CourseDataProviderGroup(
     HomeSelfLessonDataProvider(),
@@ -82,6 +85,22 @@ private object HomeCourseFrame : CourseBottomSheetFrame() {
       clickBackFlow.onEach {
         pagerState.animateScrollToPage(initialPage)
       }.launchIn(this)
+    }
+    LaunchedEffect(Unit) {
+      if (beginDate == null) {
+        // beginDate 未初始化，则进行等待
+        val beginDateJob = launch {
+          beginDate = SchoolCalendar.observeFirstMonDay().first()
+        }
+        val selectPageJon = launch {
+          beginDateJob.join() // beginDate 初始化后跳到 initialPage
+          pagerState.scrollToPage(initialPage)
+        }
+        launch {
+          bottomSheetState.stateFlow.first { it == BottomSheetValueState.Expanded }
+          selectPageJon.cancel() // 如果触发一次展开，则取消回到 initialPage
+        }
+      }
     }
   }
 

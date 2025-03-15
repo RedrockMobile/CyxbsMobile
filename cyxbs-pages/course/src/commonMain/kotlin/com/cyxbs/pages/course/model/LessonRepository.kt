@@ -27,7 +27,8 @@ object LessonRepository {
 
   private val mLessonCache = mutableMapOf<String, ILessonService2.CacheLesson>()
 
-  fun getLesson(stuNum: String): ILessonService2.CacheLesson? {
+  fun getLesson(stuNum: String?): ILessonService2.CacheLesson? {
+    stuNum ?: return null
     // 先取内存级缓存
     val cache = mLessonCache[stuNum]
     if (cache != null) return cache

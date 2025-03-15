@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
 
@@ -16,20 +17,24 @@ import com.cyxbs.pages.course.view.week.CourseWeekCompose
 @Stable
 abstract class CourseSemesterFrame : CourseFrame() {
 
-  override val maxPage: Int
-    get() = super.maxPage + 1 // 最大显示页数，添加整学期页
+  // 课表起始日期，如果为 null 则不会显示号数
+  abstract val beginDate: Date?
 
+  override val maxPage: Int
+    get() = 22 // 最大显示页数，添加整学期页
+
+  // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   override val initialPage: Int
     get() {
-      val page = beginDate?.daysUntil(TodayNoEffect)?.div(7)?.and(1)
-        ?.coerceAtLeast(0) ?: 0
+      val beginDate = beginDate ?: return 0
+      val page = (beginDate.daysUntil(TodayNoEffect) / 7 + 1).coerceAtLeast(0)
       return if (page >= maxPage) 0 else page
     }
 
   @Composable
   override fun CoursePageContent(pagerScope: PagerScope, page: Int) {
     val date = beginDate?.plusWeeks(page - 1)
-      ?.weekFinalDate?.plusDays(timeline.beginDayOfWeek.ordinal)
+      ?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal)
     Column {
       CourseWeekCompose(
         weekBeginDate = if (page == 0) null else date, // 整学期页不显示日期

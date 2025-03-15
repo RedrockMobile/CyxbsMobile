@@ -79,6 +79,13 @@ object SchoolCalendar {
   }
 
   /**
+   * 得到开学第一天日期
+   */
+  fun getFirstMonDay(): Date? {
+    return firstDateState.value
+  }
+
+  /**
    * 得到开学第一天的时间戳
    */
   fun getFirstMonDayTimestamp(): Long? {

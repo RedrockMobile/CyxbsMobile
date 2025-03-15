@@ -12,9 +12,9 @@ import com.g985892345.provider.api.annotation.ImplProvider
  * @date 2025/3/15
  */
 @ImplProvider
-object LessonServiceImpl : ILessonService2 {
+object LessonServiceImpl2 : ILessonService2 {
 
-  override fun getLesson(stuNum: String): ILessonService2.CacheLesson? {
+  override fun getLesson(stuNum: String?): ILessonService2.CacheLesson? {
     return LessonRepository.getLesson(stuNum)
   }
 

@@ -17,6 +17,8 @@ class AccountSettings private constructor(val stuNum: String?) {
 
   companion object {
 
+    private val accountSettingsMap = mutableMapOf<String?, AccountSettings>()
+
     // 获取当前登录人的 AccountSettings
     var now: AccountSettings = get(IAccountService::class.impl().stuNum)
 
@@ -27,8 +29,6 @@ class AccountSettings private constructor(val stuNum: String?) {
         return AccountSettings(stuNum)
       }
     }
-
-    private val accountSettingsMap = mutableMapOf<String?, AccountSettings>()
 
     init {
       // 登录人改变时自动更新 AccountSettings#now

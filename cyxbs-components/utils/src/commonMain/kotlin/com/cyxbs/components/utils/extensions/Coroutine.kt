@@ -19,13 +19,3 @@ import kotlin.coroutines.cancellation.CancellationException
  * ```
  */
 val EmptyCoroutineExceptionHandler = CoroutineExceptionHandler { _, _ -> }
-
-inline fun <T, R> T.runCatchingCoroutine(block: T.() -> R): Result<R> {
-  return try {
-    Result.success(block())
-  } catch (e: CancellationException) {
-    throw e // 协程的取消需要抛出
-  } catch (e: Throwable) {
-    Result.failure(e)
-  }
-}

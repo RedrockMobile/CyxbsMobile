@@ -1,7 +1,6 @@
 package com.cyxbs.pages.course.home.data
 
 import com.cyxbs.pages.course.view.data.CourseDataProvider
-import com.cyxbs.pages.course.view.item.CourseItem
 
 /**
  * .
@@ -10,7 +9,4 @@ import com.cyxbs.pages.course.view.item.CourseItem
  * @date 2025/3/10
  */
 class HomeLinkLessonDataProvider : CourseDataProvider() {
-  override fun compare(a: CourseItem, b: CourseItem): Int {
-    TODO("Not yet implemented")
-  }
 }

@@ -37,6 +37,16 @@ class CourseDataProviderGroup(
           weekDataPoolByPage[item.page - 1]?.find { it.provider === provider }?.remove(item)
         }
       }
+
+      override fun onClear() {
+        weekDataPoolByPage.forEach { entry ->
+          entry.value.forEach {
+            if (it.provider === provider) {
+              it.clear()
+            }
+          }
+        }
+      }
     }
   }
 
