@@ -9,6 +9,7 @@ import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
 import io.ktor.client.call.body
@@ -81,7 +82,7 @@ abstract class CommonLoginViewModel : BaseViewModel() {
           put("idNum", password)
         }.toString())
       }.bodyAsText()
-    }.mapCatching {
+    }.mapCatchingCoroutine {
       val wrapper = try {
         defaultJson.decodeFromString<ApiWrapper<LoginBean>>(it)
       } catch (e: Exception) {
@@ -90,11 +91,11 @@ abstract class CommonLoginViewModel : BaseViewModel() {
       wrapper.throwApiExceptionIfFail() // 如果网络请求返回了异常，则直接抛出
       wrapper.data
     }.onFailure {
-      runCatching { onLoginFailure(it) }.onFailure {
+      runCatchingCoroutine { onLoginFailure(it) }.onFailure {
         // TODO 打开 CrashDialog
       }
     }.onSuccess {
-      runCatching { onLoginSuccess(stuNum, it) }.onFailure {
+      runCatchingCoroutine { onLoginSuccess(stuNum, it) }.onFailure {
         // TODO 打开 CrashDialog
       }
     }.isSuccess

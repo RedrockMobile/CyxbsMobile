@@ -5,7 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.config.time.prev
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemContent
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
@@ -175,7 +174,6 @@ class CourseDayDataPool(
   }
 
   internal fun add(item: CourseItem) {
-    logg("add: dayOfWeek = $dayOfWeek, item.dayOfWeek = ${item.dayOfWeek}")
     // 当天并且结束时间 > timelineStart 或者 开始时间 < timelineStart 且在明天的 item
     val allow =
       (item.dayOfWeek == dayOfWeek && item.finalTime > weekDataPool.timeline.startMinuteTime)

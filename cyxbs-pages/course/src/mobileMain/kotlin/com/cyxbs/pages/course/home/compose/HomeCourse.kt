@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -42,16 +43,16 @@ fun HomeCourseCompose(
   bottomBarHeight: Dp,
   outerHeader: @Composable (BottomSheetState) -> Unit,
 ) {
-  HomeCourseFrame.set(
+  val courseFrame = remember { HomeCourseFrame() }.set(
     bottomBarHeight = bottomBarHeight,
     outerHeader = outerHeader,
   )
   Box(modifier) {
-    HomeCourseFrame.Content()
+    courseFrame.Content()
   }
 }
 
-private object HomeCourseFrame : CourseBottomSheetFrame() {
+private class HomeCourseFrame : CourseBottomSheetFrame() {
 
   private var outerHeader: @Composable (BottomSheetState) -> Unit by mutableStateOf({})
 
@@ -68,9 +69,10 @@ private object HomeCourseFrame : CourseBottomSheetFrame() {
   fun set(
     bottomBarHeight: Dp,
     outerHeader: @Composable (BottomSheetState) -> Unit,
-  ) {
+  ): HomeCourseFrame {
     peekHeight = super.peekHeight + bottomBarHeight
-    HomeCourseFrame.outerHeader = outerHeader
+    this.outerHeader = outerHeader
+    return this
   }
 
   @Composable
