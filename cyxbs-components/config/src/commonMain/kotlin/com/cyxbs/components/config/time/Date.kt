@@ -323,25 +323,24 @@ fun DayOfWeek.toChinese(prefix: String = "周"): String {
   }
 }
 
+var TodayNoEffect: Date = Clock.System.todayIn(TimeZone.currentSystemDefault()).toDate()
+  private set
+
 /**
  * 获取当前时间
  *
  * 注意使用了 mutableStateOf，存在有副作用
  * 若想取消副作用，请使用 [TodayNoEffect]
  */
-val Today by mutableStateOf(
-  Clock.System.todayIn(TimeZone.currentSystemDefault()).toDate()
-).apply {
+val Today by mutableStateOf(TodayNoEffect).apply {
   appCoroutineScope.launch {
     while (true) {
       val now = Clock.System.now()
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .time.toMillisecondOfDay().milliseconds
       delay(1.days - now)
-      value = value.plusDays(1)
+      value = TodayNoEffect.plusDays(1)
+      TodayNoEffect = value
     }
   }
 }
-
-val TodayNoEffect: Date
-  get() = Snapshot.withoutReadObservation { Today }
