@@ -27,19 +27,3 @@ sealed interface CourseTimelineData {
   @Composable
   fun ColumnScope.Content()
 }
-
-fun CourseTimelineData.getStartTimeInt(timeline: CourseTimeline): Int {
-  return if (startTime >= timeline.startMinuteTime) {
-    startTime.hour * 60 + startTime.minute
-  } else {
-    startTime.hour * 60 + startTime.minute + 24 * 60
-  }
-}
-
-fun CourseTimelineData.getEndTimeInt(timeline: CourseTimeline): Int {
-  return if (endTime > timeline.startMinuteTime) {
-    endTime.hour * 60 + endTime.minute
-  } else {
-    endTime.hour * 60 + endTime.minute + 24 * 60
-  }
-}

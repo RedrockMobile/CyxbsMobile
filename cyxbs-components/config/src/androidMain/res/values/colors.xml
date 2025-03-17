@@ -11,6 +11,7 @@
     <color name="config_black_white">#000000</color>
 
     <!--视觉最常用的背景颜色，夜间为 2D2D2D-->
+    <!--Compose 中对应 LocalAppColors.current.topBg-->
     <color name="config_common_background_color">#FFFFFF</color>
 
     <!--    主要字体颜色分以下四种，下列按照蓝色由深到浅排序，要用自取-->

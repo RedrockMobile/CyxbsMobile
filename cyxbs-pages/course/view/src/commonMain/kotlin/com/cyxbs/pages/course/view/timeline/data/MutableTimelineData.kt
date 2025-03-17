@@ -131,6 +131,17 @@ private fun MutableTimelineData.MutableTimelineCompose(
           maxLines = 1,
         )
       }
+      if (endTime.minuteOfDay == 23 * 60 + 59) {
+        // 单独显示 24:00
+        Text(
+          text = "24:00",
+          textAlign = TextAlign.Center,
+          fontSize = 9.sp,
+          color = expandTextColor.dark(expandTextDarkColor),
+          overflow = TextOverflow.Visible,
+          maxLines = 1,
+        )
+      }
     },
     measurePolicy = remember {
       { measurables, constraints ->
@@ -146,13 +157,8 @@ private fun MutableTimelineData.MutableTimelineCompose(
         val layoutWidth = constraints.maxWidth
         val layoutHeight = constraints.maxHeight
         layout(layoutWidth, layoutHeight) {
-          val minHeight = placeables.fastSumBy { it.height } - placeables[0].height
-          val startHour = if (startTime.minute == 0) startTime.hour else startTime.hour + 1
-          val hourDiff =
-            if (startTime < endTime) endTime.hour - startHour else 24 - startHour + endTime.hour
-          val minuteHeight = layoutHeight.toFloat() / startTime.minutesUntil(endTime, true)
-          val hourDiffHeight = minuteHeight * hourDiff * 60
-          if (hourDiffHeight < minHeight) {
+          val minTimeHeight = placeables.fastSumBy { it.height } - placeables[0].height
+          if (layoutHeight < minTimeHeight) { // 说明展示时间的高度不够
             placeables[0].let {
               it.placeRelative(
                 x = (layoutWidth - it.width) / 2,
@@ -160,6 +166,7 @@ private fun MutableTimelineData.MutableTimelineCompose(
               )
             }
           } else {
+            val minuteHeight = layoutHeight.toFloat() / startTime.minutesUntil(endTime, true)
             placeables.fastForEachIndexed { i, placeable ->
               if (i == 0) return@fastForEachIndexed
               placeable.placeRelative(

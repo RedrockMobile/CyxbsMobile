@@ -39,21 +39,9 @@ import kotlin.time.Duration.Companion.minutes
 @Stable
 @Serializable
 data class CourseTimeline(
-  val startMinuteTime: MinuteTime = DefaultTimelineStartMinuteTime,
   val data: ImmutableList<CourseTimelineData> = DefaultTimeline,
   val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
-
-  /**
-   * 得到 [startTimeDate] 对应的日期，因为存在 [startMinuteTime] 导致今天会显示明天部分 item
-   */
-  fun getItemWhichDate(startTimeDate: MinuteTimeDate): Date {
-    return if (startTimeDate.time >= startMinuteTime) {
-      startTimeDate.date
-    } else {
-      startTimeDate.date.minusDays(1)
-    }
-  }
 
   /**
    * 计算 [beginTime] [finalTime] 在整个时间轴上的占比
@@ -63,33 +51,15 @@ data class CourseTimeline(
     beginTime: MinuteTime,
     finalTime: MinuteTime,
   ) : Offset {
-    return calculateBeginFinalWeightInternal(
-      beginTimeInt = beginTime.let {
-        if (it < startMinuteTime) (24 + it.hour) * 60 + it.minute
-        else it.hour * 60 + it.minute
-      },
-      finalTimeInt = finalTime.let {
-        if (it <= startMinuteTime) (24 + it.hour) * 60 + it.minute
-        else it.hour * 60 + it.minute
-      }
-    )
-  }
-
-  private fun calculateBeginFinalWeightInternal(
-    beginTimeInt: Int,
-    finalTimeInt: Int,
-  ): Offset {
+    val beginTimeInt = beginTime.minuteOfDay
+    val finalTimeInt = finalTime.minuteOfDay
     var startWeight = 0F
     var endWeight = 0F
     var allWeight = 0F
     data.fastForEach {
       allWeight += it.nowWeight
-      val startLine = if (it.startTime < startMinuteTime) {
-        (24 + it.startTime.hour) * 60 + it.startTime.minute
-      } else it.startTime.hour * 60 + it.startTime.minute
-      val endLine = if (it.endTime <= startMinuteTime) {
-        (24 + it.endTime.hour) * 60 + it.endTime.minute
-      } else it.endTime.hour * 60 + it.endTime.minute
+      val startLine = it.startTime.minuteOfDay
+      val endLine = it.endTime.minuteOfDay
       if (beginTimeInt >= endLine) {
         startWeight += it.nowWeight
       } else if (beginTimeInt >= startLine) {
@@ -165,18 +135,11 @@ private fun Modifier.drawNowTimeLine(
   return this then drawBehind {
     var allWeight = 0F
     var nowWeight = 0F
-    val now = nowTimeState.value.let {
-      if (it < timeline.startMinuteTime) (24 + it.hour) * 60 + it.minute
-      else it.hour * 60 + it.minute
-    }
+    val now = nowTimeState.value.minuteOfDay
     timeline.data.fastForEach {
       allWeight += it.nowWeight
-      val start = if (it.startTime < timeline.startMinuteTime) {
-        (24 + it.startTime.hour) * 60 + it.startTime.minute
-      } else it.startTime.hour * 60 + it.startTime.minute
-      val end = if (it.endTime <= timeline.startMinuteTime) {
-        (24 + it.endTime.hour) * 60 + it.endTime.minute
-      } else it.endTime.hour * 60 + it.endTime.minute
+      val start = it.startTime.minuteOfDay
+      val end = it.endTime.minuteOfDay
       if (now >= end) {
         nowWeight += it.nowWeight
       } else if (now >= start) {

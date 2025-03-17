@@ -6,13 +6,15 @@ import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
 /**
- * .
+ * 课表数据 ProviderGroup
+ * - 管理 CourseDataProvider
+ * - 转换 CourseDataProvider 数据，生成 CourseWeekDataPool
  *
  * @author 985892345
  * @date 2025/3/10
  */
 class CourseDataProviderGroup(
-  vararg val providers: CourseDataProvider
+  vararg val providers: CourseDataProvider, // 添加顺序即为显示的层级顺序，越靠前则越显示在顶层
 ) {
 
   private var timeline: CourseTimeline? = null
@@ -23,19 +25,11 @@ class CourseDataProviderGroup(
     object : CourseDataProvider.ItemListener {
       val provider = provider
       override fun onAdd(item: CourseItem) {
-        val timeline = timeline ?: return
         weekDataPoolByPage[item.page]?.find { it.provider === provider }?.add(item)
-        if (item.beginTime < timeline.startMinuteTime && item.dayOfWeek == timeline.beginDayOfWeek) {
-          weekDataPoolByPage[item.page - 1]?.find { it.provider === provider }?.add(item)
-        }
       }
 
       override fun onRemove(item: CourseItem) {
-        val timeline = timeline ?: return
         weekDataPoolByPage[item.page]?.find { it.provider === provider }?.remove(item)
-        if (item.beginTime < timeline.startMinuteTime && item.dayOfWeek == timeline.beginDayOfWeek) {
-          weekDataPoolByPage[item.page - 1]?.find { it.provider === provider }?.remove(item)
-        }
       }
 
       override fun onClear() {

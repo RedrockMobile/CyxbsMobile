@@ -1,0 +1,5 @@
+<resources>
+    <string name="home_nav_discover">発見</string>
+    <string name="home_nav_fairground">郵園地です</string>
+    <string name="home_nav_mine">自分</string>
+</resources>

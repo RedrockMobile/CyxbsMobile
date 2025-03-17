@@ -15,7 +15,7 @@ data class CourseItemContent(
   private val overlap: OverlayData,
 ) {
 
-  private val item: CourseItem = overlap.item
+  val item: CourseItem = overlap.item
 
   val key: String
     get() = item.key

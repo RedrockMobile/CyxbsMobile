@@ -18,8 +18,6 @@ import kotlinx.collections.immutable.persistentListOf
  * @date 2025/2/10
  */
 
-internal val DefaultTimelineStartMinuteTime = MinuteTime(4, 0)
-
 internal val DefaultTimelineTextColor = AppColor.tvLv1
 internal val DefaultTimelineTextDarkColor = AppDarkColor.tvLv1
 internal val DefaultTimelineLightTextColor = Color(0x66142C52)
@@ -28,11 +26,11 @@ internal val DefaultTimelineLightTextDarkColor = Color(0x80F0F0F0)
 internal val DefaultTimeline = persistentListOf(
   MutableTimelineData(
     text = "···",
-    optionText = "凌晨",
-    startTime = DefaultTimelineStartMinuteTime,
+    optionText = "早晨",
+    startTime = MinuteTime(0, 0),
     endTime = MinuteTime(8, 0),
-    maxWeight = 4F,
-    initialWeight = 0.1F,
+    maxWeight = 8F,
+    initialWeight = 0.2F,
   ),
   LessonTimelineData(1),
   FixedTimelineData(
@@ -131,10 +129,10 @@ internal val DefaultTimeline = persistentListOf(
   LessonTimelineData(12),
   MutableTimelineData(
     text = "···",
-    optionText = "深夜",
+    optionText = "夜晚",
     startTime = MinuteTime(22, 30),
-    endTime = DefaultTimelineStartMinuteTime,
-    maxWeight = 5.5F,
-    initialWeight = 0.2F,
+    endTime = MinuteTime(23, 59),
+    maxWeight = 1.5F,
+    initialWeight = 0.1F,
   ),
 )

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.utils.compose.BottomSheetCompose
 import com.cyxbs.components.utils.compose.BottomSheetState
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.view.header.CourseBottomSheetHeaderBackground
 import com.cyxbs.pages.course.view.header.CourseHeader
@@ -24,6 +25,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
@@ -67,7 +69,11 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
     ) {
       Column {
         CourseBottomSheetHeaderBackground(
-          modifier = Modifier.bottomSheetDraggable()
+          modifier = Modifier.bottomSheetDraggable().clickableNoIndicator {
+            coroutineScope?.launch {
+              bottomSheetState.expand()
+            }
+          }
         ) {
           CourseBottomSheetHeader()
         }

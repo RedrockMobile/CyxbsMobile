@@ -8,11 +8,13 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * 课表 UI 框架
@@ -41,8 +43,12 @@ abstract class CourseFrame {
     PagerState(initialPage) { maxPage }
   }
 
+  var coroutineScope: CoroutineScope? = null
+    private set
+
   @Composable
   fun Content() {
+    coroutineScope = rememberCoroutineScope()
     CourseCompose()
     OnCourseCompose()
   }

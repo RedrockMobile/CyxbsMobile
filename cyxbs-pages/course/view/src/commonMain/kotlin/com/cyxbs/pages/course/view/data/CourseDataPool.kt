@@ -3,7 +3,6 @@ package com.cyxbs.pages.course.view.data
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
-import com.cyxbs.components.config.time.prev
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemContent
@@ -55,31 +54,12 @@ class CourseWeekDataPool(
   fun add(item: CourseItem) {
     if (page == item.page) {
       get(item.dayOfWeek).add(item)
-      if (item.beginTime < timeline.startMinuteTime) {
-        // 小于时间轴的开始时间点，则会显示在前一天中
-        get(item.dayOfWeek.prev()).add(item)
-      }
-    } else if (
-      item.beginTime < timeline.startMinuteTime
-      && page == item.page - 1
-      && item.dayOfWeek == timeline.beginDayOfWeek
-    ) {
-      get(timeline.beginDayOfWeek.prev()).add(item)
     }
   }
 
   fun remove(item: CourseItem) {
     if (page == item.page) {
       get(item.dayOfWeek).remove(item)
-      if (item.beginTime < timeline.startMinuteTime) {
-        get(item.dayOfWeek.prev()).remove(item)
-      }
-    } else if (
-      item.beginTime < timeline.startMinuteTime
-      && page == item.page - 1
-      && item.dayOfWeek == timeline.beginDayOfWeek
-    ) {
-      get(timeline.beginDayOfWeek.prev()).remove(item)
     }
   }
 
@@ -94,20 +74,14 @@ class CourseWeekDataPool(
       // 整学期单独处理
       DayOfWeek.entries.forEach { dayOfWeek ->
         val nowDay = get(dayOfWeek)
-        val preDay  = get(dayOfWeek.prev())
         provider.getDayData(0, dayOfWeek).forEach {
           nowDay.add(it)
-          if (it.beginTime < timeline.startMinuteTime) {
-            preDay.add(it)
-          }
         }
       }
     } else {
       DayOfWeek.entries.forEach { dayOfWeek ->
         val dayPool = get(dayOfWeek)
         dayPool.addAll(provider.getDayData(page * 7 + dayOfWeek.ordinal))
-        // 因为 timelineStart 的存在，当天可能会显示第二天的课程
-        dayPool.addAll(provider.getDayData(page * 7 + dayOfWeek.ordinal + 1))
       }
     }
   }
@@ -174,11 +148,7 @@ class CourseDayDataPool(
   }
 
   internal fun add(item: CourseItem) {
-    // 当天并且结束时间 > timelineStart 或者 开始时间 < timelineStart 且在明天的 item
-    val allow =
-      (item.dayOfWeek == dayOfWeek && item.finalTime > weekDataPool.timeline.startMinuteTime)
-          || (item.beginTime < weekDataPool.timeline.startMinuteTime && item.dayOfWeek == dayOfWeek.prev())
-    if (allow) {
+    if (item.dayOfWeek == dayOfWeek) {
       if (itemSet.add(item)) {
         allowRefreshByItemSet = true
         tryOverlapRunnable()

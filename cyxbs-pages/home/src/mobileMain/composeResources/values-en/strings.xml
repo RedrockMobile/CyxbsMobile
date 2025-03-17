@@ -1,0 +1,5 @@
+<resources>
+    <string name="home_nav_discover">Explore</string>
+    <string name="home_nav_fairground">Fairground</string>
+    <string name="home_nav_mine">Profile</string>
+</resources>

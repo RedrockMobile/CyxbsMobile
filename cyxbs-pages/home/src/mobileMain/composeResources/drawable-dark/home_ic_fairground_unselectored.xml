@@ -12,7 +12,7 @@
       android:pathData="M3,1L9,1A2,2 0,0 1,11 3L11,22A2,2 0,0 1,9 24L3,24A2,2 0,0 1,1 22L1,3A2,2 0,0 1,3 1z"
       android:strokeLineJoin="round"
       android:strokeWidth="2"
-      android:fillColor="@color/config_common_background_color"
+      android:fillColor="#2D2D2D"
       android:strokeColor="#5b585c"/>
   <path
       android:pathData="M4,7L8,7A1,1 0,0 1,9 8L9,8A1,1 0,0 1,8 9L4,9A1,1 0,0 1,3 8L3,8A1,1 0,0 1,4 7z"

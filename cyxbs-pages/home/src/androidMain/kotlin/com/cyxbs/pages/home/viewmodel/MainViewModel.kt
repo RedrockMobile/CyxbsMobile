@@ -27,7 +27,6 @@ class MainViewModel : BaseViewModel() {
    * - null -> 隐藏
    */
   val courseBottomSheetExpand: MutableLiveData<Boolean?> = MutableLiveData(false)
-  val courseBottomSheetOffset = MutableLiveData<Float>()
 
   private val notificationApi = NotificationApiService::class.api
 

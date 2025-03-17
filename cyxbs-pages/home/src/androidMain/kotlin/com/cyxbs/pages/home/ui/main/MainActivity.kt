@@ -22,7 +22,8 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
-import com.cyxbs.pages.home.viewmodel.BottomNavViewModel
+import com.cyxbs.pages.home.mobile.ui.MobileHomePage
+import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.viewmodel.MainViewModel
 import com.cyxbs.pages.login.api.ILoginService
 import kotlinx.coroutines.launch
@@ -89,7 +90,7 @@ class MainActivity : BaseActivity() {
     initNotification()
     initUpdate()
     setContent {
-      MainPage()
+      MobileHomePage()
     }
   }
 
@@ -126,16 +127,11 @@ class MainActivity : BaseActivity() {
   }
   
   private fun initBottomNav() {
-    mViewModel.courseBottomSheetOffset.observe {
-      // 底部按钮跟随课表展开而变化
-      mBottomNavViewModel.offsetYRadio.floatValue = it
-      mBottomNavViewModel.alpha.floatValue = 1 - it
-    }
     mBottomNavViewModel.selectedItem.collectLaunch {
       when (it) {
         mBottomNavViewModel.discoverItem, mBottomNavViewModel.mineItem -> {
           if (mViewModel.courseBottomSheetExpand.value == null) {
-            mViewModel.courseBottomSheetExpand.value = false
+            mViewModel.courseBottomSheetExpand.value = false // todo 待实现 BottomSheet 的控制
           }
         }
         mBottomNavViewModel.fairgroundItem -> {

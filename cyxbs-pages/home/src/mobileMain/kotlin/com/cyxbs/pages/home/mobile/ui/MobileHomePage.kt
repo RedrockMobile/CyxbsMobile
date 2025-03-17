@@ -1,4 +1,4 @@
-package com.cyxbs.pages.home.ui.main
+package com.cyxbs.pages.home.mobile.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,42 +23,41 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.util.fastForEach
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.utils.extensions.color
-import com.cyxbs.pages.home.R
-import com.cyxbs.pages.home.adapter.MainAdapter
-import com.cyxbs.pages.home.ui.course.HomeCourseCompose
-import com.cyxbs.pages.home.viewmodel.BottomNavViewModel
+import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.course.api.IMobileHomeCourseService
+import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * .
  *
  * @author 985892345
- * @date 2024/12/15
+ * @date 2025/3/16
  */
+
 @Composable
-fun MainPage() {
+fun MobileHomePage() {
   AppTheme {
     Box(
       modifier = Modifier.fillMaxSize()
@@ -70,27 +70,24 @@ fun MainPage() {
 }
 
 @Composable
-private fun HomeViewPagerCompose(modifier: Modifier = Modifier) {
+internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)
+
+@Composable
+private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val coroutineScope = rememberCoroutineScope()
-  AndroidView(
-    modifier = modifier
-      .fillMaxSize()
-      .navigationBarsPadding()
-      .padding(bottom = bottomNavViewModel.height),
-    factory = { context ->
-      ViewPager2(context).apply {
-        id = R.id.home_view_pager_id // 这里需要赋值 id，否则 ViewPager2 不会使用系统重建的 Fragment
-        adapter = MainAdapter(context as FragmentActivity)
-        isUserInputEnabled = false
-        bottomNavViewModel.selectedItem.map {
-          bottomNavViewModel.items.indexOf(it)
-        }.onEach {
-          currentItem = it
-        }.launchIn(coroutineScope)
-      }
+  val service = remember { IMobileHomeCourseService::class.impl() }
+  service.Content(
+    modifier = modifier.statusBarsPadding(),
+    bottomBarHeight = bottomNavViewModel.height
+  ) { bottomSheetState ->
+    LaunchedEffect(Unit) {
+      snapshotFlow { bottomSheetState.fraction }.onEach {
+        // 底部按钮跟随课表展开而变化
+        bottomNavViewModel.offsetYRadio.floatValue = it
+        bottomNavViewModel.alpha.floatValue = 1 - it
+      }.launchIn(this)
     }
-  )
+  }
 }
 
 @Composable
@@ -114,7 +111,7 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
       .graphicsLayer {
         alpha = bottomNavViewModel.alpha.floatValue
       }
-      .background(Color(com.cyxbs.components.config.R.color.config_common_background_color.color)),
+      .background(LocalAppColors.current.topBg),
     horizontalArrangement = Arrangement.SpaceAround,
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -159,17 +156,16 @@ private fun HomeNavItemCompose(item: BottomNavViewModel.BottomNavItem, modifier:
     Image(
       modifier = Modifier.size(26.dp),
       painter = painterResource(
-        if (selected) item.selectedIconId
-        else if (hasRedDot) item.unselectedRedDotIconId
-        else item.unselectedIconId
+        if (selected) item.selectedIcon
+        else if (hasRedDot) item.unselectedRedDotIcon
+        else item.unselectedIcon
       ),
-      contentDescription = item.title,
+      contentDescription = stringResource(item.title),
     )
     Text(
       modifier = Modifier.padding(top = 2.dp),
-      text = item.title,
-      color = if (selected) Color(R.color.home_btn_bottom_focused.color)
-      else Color(R.color.home_btn_bottom_un_focused.color),
+      text = stringResource(item.title),
+      color = if (selected) 0xFF2923D2.dark(0xFF465FFF) else 0xFFAABCD8.dark(0xFF5B585C),
       fontSize = 10.sp,
     )
   }

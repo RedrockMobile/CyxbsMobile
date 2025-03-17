@@ -13,14 +13,10 @@ import com.cyxbs.components.utils.compose.BottomSheetState
  */
 interface IMobileHomeCourseService {
 
-  var headerAlpha: Float
-
-  var contentAlpha: Float
-
   @Composable
   fun Content(
     modifier: Modifier,
     bottomBarHeight: Dp,
-    outerHeader: @Composable (BottomSheetState) -> Unit,
+    coverContent: @Composable (BottomSheetState) -> Unit,
   )
 }
