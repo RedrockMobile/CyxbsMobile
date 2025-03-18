@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.add
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -59,10 +60,7 @@ fun CourseWeekCompose(
         ) {
           Text(
             modifier = Modifier,
-            text = getWeekStr(
-              weekIndex = it,
-              beginDayOfWeek = beginDayOfWeek
-            ),
+            text = getWeekStr(beginDayOfWeek.add(it)),
             fontSize = 12.sp,
             color = LocalAppColors.current.tvLv1,
             textAlign = TextAlign.Center,
@@ -82,15 +80,15 @@ fun CourseWeekCompose(
   }
 }
 
-private fun getWeekStr(weekIndex: Int, beginDayOfWeek: DayOfWeek): String {
-  return when ((weekIndex + beginDayOfWeek.ordinal) % 7) {
-    0 -> "周一"
-    1 -> "周二"
-    2 -> "周三"
-    3 -> "周四"
-    4 -> "周五"
-    5 -> "周六"
-    6 -> "周天"
-    else -> error("不存在的 weekIndex=$weekIndex")
+private fun getWeekStr(dayOfWeek: DayOfWeek): String {
+  return when (dayOfWeek) {
+    DayOfWeek.MONDAY -> "周一"
+    DayOfWeek.TUESDAY -> "周二"
+    DayOfWeek.WEDNESDAY -> "周三"
+    DayOfWeek.THURSDAY -> "周四"
+    DayOfWeek.FRIDAY -> "周五"
+    DayOfWeek.SATURDAY -> "周六"
+    DayOfWeek.SUNDAY -> "周天"
+    else -> error("???")
   }
 }

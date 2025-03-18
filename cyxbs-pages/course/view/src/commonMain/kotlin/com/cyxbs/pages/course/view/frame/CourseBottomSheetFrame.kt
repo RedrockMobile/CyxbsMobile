@@ -1,30 +1,33 @@
 package com.cyxbs.pages.course.view.frame
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.pager.PagerScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.BottomSheetCompose
 import com.cyxbs.components.utils.compose.BottomSheetState
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.view.header.CourseBottomSheetHeaderBackground
-import com.cyxbs.pages.course.view.header.CourseHeader
-import com.cyxbs.pages.course.view.header.CourseHeaderController
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -35,21 +38,7 @@ import kotlin.math.abs
  * @date 2025/2/16
  */
 @Stable
-abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderController {
-
-  override var title: String by mutableStateOf("")
-
-  override val subtitle: String = "(本周)"
-
-  override var subtitleScale: Float by mutableFloatStateOf(0F)
-
-  override var backBtnOffsetRatio: Float by mutableFloatStateOf(0F)
-
-  // 点击“回到本周”按钮
-  protected val clickBackFlow = MutableSharedFlow<Unit>(
-    extraBufferCapacity = 1,
-    onBufferOverflow = BufferOverflow.DROP_OLDEST,
-  )
+abstract class CourseBottomSheetFrame : CourseSemesterFrame() {
 
   // BottomSheetCompose State
   open val bottomSheetState by lazy {
@@ -75,7 +64,7 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
             }
           }
         ) {
-          CourseBottomSheetHeader()
+          CourseHeader(Modifier)
         }
         super.CourseCompose()
       }
@@ -83,47 +72,79 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame(), CourseHeaderContr
   }
 
   @Composable
-  open fun CourseBottomSheetHeader() {
-    CourseHeader(controller = this)
-    LaunchedEffect(Unit) {
-      clickBackFlow.onEach {
-        pagerState.animateScrollToPage(initialPage)
-      }.launchIn(this)
+  open fun CourseHeader(modifier: Modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
+      Row(modifier = Modifier.align(Alignment.BottomStart)) {
+        CourseHeaderTitle(
+          modifier = Modifier.align(Alignment.Bottom)
+            .padding(start = 16.dp, bottom = 4.dp)
+        )
+        CourseHeaderSubtitle(
+          modifier = Modifier.align(Alignment.Bottom)
+            .padding(start = 13.dp, bottom = 6.dp)
+        )
+      }
+      CourseHeaderBack(
+        modifier = Modifier.align(Alignment.BottomEnd)
+          .padding(end = 16.dp, bottom = 2.dp)
+      )
     }
   }
 
   @Composable
-  override fun CourseHorizontalPager(pageContent: @Composable PagerScope.(page: Int) -> Unit) {
-    super.CourseHorizontalPager(pageContent)
-    OnCourseHorizontalPager()
+  fun CourseHeaderTitle(modifier: Modifier) {
+    Text(
+      text = pagerState.currentPage.let {
+        if (it == 0) "整学期"
+        else "第${Num2CN.number2ChineseNumber(it)}周"
+      },
+      modifier = modifier,
+      color = LocalAppColors.current.tvLv2,
+      fontWeight = FontWeight.Bold,
+      fontSize = 22.sp
+    )
   }
 
   @Composable
-  open fun OnCourseHorizontalPager() {
-    LaunchedEffect(pagerState) {
-      snapshotFlow { pagerState.currentPage }.onEach {
-        observeCurrentPage(it)
-      }.launchIn(this)
-      snapshotFlow { pagerState.currentPageOffsetFraction }.onEach {
-        observeCurrentPageOffsetFraction(it)
-      }.launchIn(this)
+  fun CourseHeaderSubtitle(modifier: Modifier) {
+    val pageFraction by derivedStateOfStructure {
+      val fraction = pagerState.currentPageOffsetFraction
+      1 - minOf(abs(fraction + pagerState.currentPage - initialPage), 1F)
     }
+    Text(
+      text = "(本周)",
+      modifier = modifier.graphicsLayer {
+        alpha = pageFraction
+        scaleX = pageFraction
+        scaleY = pageFraction
+      },
+      fontSize = 15.sp,
+      color = LocalAppColors.current.tvLv2,
+    )
   }
 
-  // 观察 HorizontalPager 翻页
-  open fun observeCurrentPage(page: Int) {
-    title = if (page == 0) "整学期" else "第${Num2CN.number2ChineseNumber(page)}周"
-  }
-
-  // 观察 HorizontalPager 页面偏移
-  open fun observeCurrentPageOffsetFraction(fraction: Float) {
-    // 1 -> 0 -> 1
-    val pageFraction = minOf(abs(fraction + pagerState.currentPage - initialPage), 1F)
-    subtitleScale = 1F - pageFraction
-    backBtnOffsetRatio = 1F - pageFraction
-  }
-
-  override fun onClickBack() {
-    clickBackFlow.tryEmit(Unit)
+  @Composable
+  fun CourseHeaderBack(modifier: Modifier) {
+    val pageFraction by derivedStateOfStructure {
+      val fraction = pagerState.currentPageOffsetFraction
+      1 - minOf(abs(fraction + pagerState.currentPage - initialPage), 1F)
+    }
+    Text(
+      text = "回到本周",
+      modifier = modifier.graphicsLayer {
+        alpha = 1 - pageFraction
+        translationX = pageFraction * size.width
+      }.clip(CircleShape).background(
+        brush = Brush.horizontalGradient(
+          colors = listOf(Color.Blue, Color(0xFF8686FF)),
+        )
+      ).clickableNoIndicator {
+        coroutineScope?.launch {
+          pagerState.animateScrollToPage(initialPage)
+        }
+      }.padding(vertical = 8.dp, horizontal = 16.dp),
+      color = Color.White,
+      fontSize = 13.sp,
+    )
   }
 }

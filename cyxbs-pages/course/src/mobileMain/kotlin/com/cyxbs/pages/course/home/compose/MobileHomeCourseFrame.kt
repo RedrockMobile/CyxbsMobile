@@ -10,42 +10,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.config.time.next
-import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
-import com.cyxbs.pages.course.view.header.CourseHeader
-import com.cyxbs.pages.course.view.item.BottomSheetItemHeader
-import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.HintBottomSheetItemHeader
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.max
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * 移动端主页课表框架
@@ -82,10 +62,9 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
   }
 
   @Composable
-  override fun CourseBottomSheetHeader() {
+  override fun CourseHeader(modifier: Modifier) {
     Box {
-      CourseHeader(
-        controller = this@MobileHomeCourseFrame,
+      super.CourseHeader(
         modifier = Modifier.graphicsLayer {
           alpha = max(bottomSheetState.fraction * 2 - 1, 0F)
         }
@@ -95,13 +74,9 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
         frame = this@MobileHomeCourseFrame,
         modifier = Modifier.graphicsLayer {
           alpha = max(1 - bottomSheetState.fraction * 2, 0F)
+          scaleX = if (alpha == 0F) 0F else 1F // 通过这种方式来避免其响应点击事件
         },
       )
-    }
-    LaunchedEffect(Unit) {
-      clickBackFlow.onEach {
-        pagerState.animateScrollToPage(initialPage)
-      }.launchIn(this)
     }
     LaunchedEffect(Unit) {
       if (beginDate == null) {
@@ -130,6 +105,5 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
       state = pagerState,
       pageContent = pageContent,
     )
-    OnCourseHorizontalPager()
   }
 }
