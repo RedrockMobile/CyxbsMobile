@@ -67,7 +67,7 @@ class SelfLessonItem(
 
   @Composable
   override fun HeaderContent(modifier: Modifier) {
-    var state by remember { mutableStateOf("") }
+    var state = remember { mutableStateOf("") }
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -91,10 +91,16 @@ class SelfLessonItem(
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()
-      if (now.time < beginTime) {
-        state = "下节课"
-        delay((beginTime.minuteOfDay - now.minuteOfDay).minutes + localDateTime.second.seconds)
-        state = "进行中..."
+      if (now.date.dayOfWeek == dayOfWeek) {
+        if (now.time < beginTime) {
+          state.value = "下节课"
+          delay((beginTime.minuteOfDay - now.minuteOfDay).minutes + localDateTime.second.seconds)
+        }
+        state.value = "进行中..."
+        // 后续会显示下一节课，会重新触发重组，不用再 delay
+      } else {
+        // 只有明天课程才会进入改分支
+        state.value ="明天"
       }
     }
   }

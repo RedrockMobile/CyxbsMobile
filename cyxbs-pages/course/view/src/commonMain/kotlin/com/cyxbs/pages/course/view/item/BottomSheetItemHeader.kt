@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +70,7 @@ class HintBottomSheetItemHeader(
 @Composable
 fun CourseItemBottomSheetHeader(
   modifier: Modifier,
-  state: String,
+  state: State<String>,
   title: String,
   content: String,
   beginTime: MinuteTime,
@@ -83,12 +84,14 @@ fun CourseItemBottomSheetHeader(
       modifier = Modifier.weight(1F).padding(start = 16.dp, end = 8.dp, bottom = 2.dp)
     ) {
       Text(
-        text = state,
+        text = state.value,
         color = LocalAppColors.current.tvLv4,
         fontSize = 8.sp
       )
       Text(
-        modifier = Modifier.basicMarquee().clickable(
+        modifier = Modifier.basicMarquee(
+          iterations = Int.MAX_VALUE,
+        ).clickable(
           interactionSource = null,
           indication = null,
           onClick = { onClickTitle?.invoke() }
