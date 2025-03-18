@@ -30,7 +30,7 @@ internal val DefaultTimeline = persistentListOf(
     startTime = MinuteTime(0, 0),
     endTime = MinuteTime(8, 0),
     maxWeight = 8F,
-    initialWeight = 0.2F,
+    initialWeight = 0.1F,
   ),
   LessonTimelineData(1),
   FixedTimelineData(

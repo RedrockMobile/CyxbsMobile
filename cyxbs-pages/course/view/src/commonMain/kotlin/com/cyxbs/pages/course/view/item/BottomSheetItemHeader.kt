@@ -113,7 +113,7 @@ fun CourseItemBottomSheetHeader(
         text = "${beginTime.hour}:${beginTime.minute.toString().padStart(2, '0')}-" +
             "${finalTime.hour}:${finalTime.minute.toString().padStart(2, '0')}",
         fontSize = 14.sp,
-        color = LocalAppColors.current.tvLv2,
+        color = LocalAppColors.current.tvDefault,
       )
     }
     Box(
@@ -139,7 +139,7 @@ fun CourseItemBottomSheetHeader(
           text = content,
           overflow = TextOverflow.Ellipsis,
           fontSize = 14.sp,
-          color = LocalAppColors.current.tvLv2,
+          color = LocalAppColors.current.tvDefault,
         )
       }
     }

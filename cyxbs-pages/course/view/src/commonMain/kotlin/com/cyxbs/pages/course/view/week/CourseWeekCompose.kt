@@ -72,7 +72,7 @@ fun CourseWeekCompose(
               modifier = Modifier,
               text = "${weekBeginDate.plusDays(it).dayOfMonth}日",
               fontSize = 11.sp,
-              color = LocalAppColors.current.tvLv1,
+              color = LocalAppColors.current.tvDefault,
               textAlign = TextAlign.Center,
             )
           }

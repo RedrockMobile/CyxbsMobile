@@ -98,7 +98,7 @@ fun CourseHeader(
         brush = Brush.horizontalGradient(
           colors = listOf(Color.Blue, Color(0xFF8686FF)),
         )
-      ).padding(vertical = 10.dp, horizontal = 19.dp)
+      ).padding(vertical = 8.dp, horizontal = 16.dp)
         .clickable { controller.onClickBack() },
       color = Color.White,
       fontSize = 13.sp,
