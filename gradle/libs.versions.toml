@@ -157,7 +157,7 @@ glide = "4.16.0"
 lPhotoPicker = "2.7"
 # https://github.com/Yalantis/uCrop
 # 一个裁剪图片的库
-ucrop = "2.2.9-native"
+ucrop = "2.2.10"
 # https://github.com/square/retrofit
 retrofit = "2.11.0"
 # https://github.com/square/okhttp
@@ -171,10 +171,11 @@ rxjava-android = "3.0.2"
 # https://github.com/ReactiveX/RxKotlin
 rxjava-kotlin = "3.0.1"
 # https://github.com/tbruyelle/RxPermissions
-rxpermissions = "0.12" # 作者 20 年已停止维护
+rxpermissions = "v0.12" # 作者 20 年已停止维护
 # https://github.com/square/leakcanary
 leakcanary = "2.13"
 # https://www.wanandroid.com/blog/show/2526
+# https://github.com/whataa/pandora
 pandora = "androidx_v2.1.0"
 # 字节很好用调试工具 https://github.com/bytedance/CodeLocator
 codelocator = "2.0.4"
@@ -291,8 +292,8 @@ vasdolly = { module = "com.tencent.vasdolly:helper", version.ref = "vasdolly" }
 vasdolly-gradlePlugin = { module = "com.tencent.vasdolly:plugin", version.ref = "vasdolly" }
 bugly-crash = { module = "com.tencent.bugly:crashreport", version.ref = "bugly" }
 lPhotoPicker = { module = "com.github.limuyang2:LPhotoPicker", version.ref = "lPhotoPicker" }           # 本地图片选择
-ucrop = { module = "com.github.yalantis:ucrop", version.ref = "ucrop" }                                 # 图片裁剪
-rxpermissions = { module = "com.github.tbruyelle:rxpermissions", version.ref = "rxpermissions" }        # 权限申请
+ucrop = { module = "com.github.Yalantis:uCrop", version.ref = "ucrop" }                                 # 图片裁剪
+rxpermissions = { module = "com.github.tbruyelle:RxPermissions", version.ref = "rxpermissions" }        # 权限申请
 leakcanary = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }      # 内存泄漏
 pandora = { module = "com.github.whataa:pandora", version.ref = "pandora" }         # 很牛逼的 debug 检测工具，debug 模式下摇一摇手机或者按三次手机中间顶部区域触发
 codeLocator-core = { module = "com.bytedance.tools.codelocator:codelocator-core", version.ref = "codelocator" }

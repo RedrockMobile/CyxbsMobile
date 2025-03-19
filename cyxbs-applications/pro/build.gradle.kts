@@ -42,16 +42,18 @@ kotlin {
 }
 
 ////////////////////////////////////////  导出 iosMain  /////////////////////////////////////////////
-kotlin {
-  listOf(
-    iosX64(),
-    iosArm64(),
-    iosSimulatorArm64()
-  ).forEach { iosTarget ->
-    NativeBuildType.DEFAULT_BUILD_TYPES.forEach { type ->
-      iosTarget.binaries.getFramework(type).apply {
-        // 这里导出会导出很多东西，增加头文件体积，慎重选择导出的模块，能写在 pro iosMain 就尽量不导出
+if (Multiplatform.enableIOS(project)) {
+  kotlin {
+    listOf(
+      iosX64(),
+      iosArm64(),
+      iosSimulatorArm64()
+    ).forEach { iosTarget ->
+      NativeBuildType.DEFAULT_BUILD_TYPES.forEach { type ->
+        iosTarget.binaries.getFramework(type).apply {
+          // 这里导出会导出很多东西，增加头文件体积，慎重选择导出的模块，能写在 pro iosMain 就尽量不导出
 //        export(projects.)
+        }
       }
     }
   }
