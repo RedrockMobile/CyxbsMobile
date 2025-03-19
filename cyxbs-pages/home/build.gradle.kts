@@ -16,6 +16,7 @@ kotlin {
       implementation(projects.cyxbsPages.login.api)
       implementation(projects.cyxbsPages.affair.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.course.widget)
       implementation(libs.kmp.ktorfit)
     }
     // 依赖所有模块

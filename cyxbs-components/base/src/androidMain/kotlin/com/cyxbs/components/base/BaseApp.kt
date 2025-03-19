@@ -89,16 +89,16 @@ abstract class BaseApp : Application() {
   private fun initActivityManger() {
     registerActivityLifecycleCallbacks(
       object : ActivityLifecycleCallbacksImpl {
-        override fun onActivityPreCreated(activity: Activity, savedInstanceState: Bundle?) {
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
           appTopActivity = WeakReference(activity)
           appActivities[activity] = Unit
         }
-        override fun onActivityPreResumed(activity: Activity) {
+        override fun onActivityResumed(activity: Activity) {
           if (activity !== appTopActivity.get()) {
             appTopActivity = WeakReference(activity)
           }
         }
-        override fun onActivityPostDestroyed(activity: Activity) {
+        override fun onActivityDestroyed(activity: Activity) {
           appActivities[activity] = Unit
         }
       }
