@@ -1,12 +1,15 @@
 package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.components.config.time.add
@@ -26,28 +29,46 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
  * @param timeline 时间轴
  * @param enableDrawNowTimeLine 是否绘制当前时间线
  * @param verticalScrollState 垂直滚动状态
+ * @param decorations 绘制在课表上的装饰物，同时也能拦截触摸事件
  * @param weekDataPools 当周的数据，越靠前越展示在顶层
  */
 @Composable
 fun CoursePageCompose(
   timeline: CourseTimeline,
+  weekDataPools: List<CourseWeekDataPool>,
   modifier: Modifier = Modifier,
   enableDrawNowTimeLine: Boolean = true,
   verticalScrollState: ScrollState = rememberScrollState(),
-  weekDataPools: List<CourseWeekDataPool>,
+  decorations: List<CoursePageDecoration> = emptyList(),
 ) {
-  timeline.Content(
-    modifier = modifier,
-    enableDrawNowTimeLine = enableDrawNowTimeLine,
-    verticalScrollState = verticalScrollState,
-  ) {
-    weekDataPools.fastForEachReversed { weekDataPool ->
-      key(weekDataPool.hashCode()) {
-        CourseWeekDataContent(
-          weekDataPool = weekDataPool,
-          timeline = timeline,
-        )
+  val timelineWidth = 40.dp
+  val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
+  Box {
+    decorations.fastForEach {
+      key(it.hashCode()) { it.OuterCoursePageBottom(timeline, verticalScrollState, weekDataPools, scrollPaddingValues, timelineWidth) }
+    }
+    timeline.Content(
+      modifier = modifier,
+      enableDrawNowTimeLine = enableDrawNowTimeLine,
+      verticalScrollState = verticalScrollState,
+    ) {
+      decorations.fastForEach {
+        key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPools) }
       }
+      weekDataPools.fastForEachReversed { weekDataPool ->
+        key(weekDataPool.hashCode()) {
+          CourseWeekDataContent(
+            weekDataPool = weekDataPool,
+            timeline = timeline,
+          )
+        }
+      }
+      decorations.fastForEach {
+        key(it.hashCode() + 1) { it.InnerCoursePageTop(timeline, verticalScrollState, weekDataPools) }
+      }
+    }
+    decorations.fastForEach {
+      key(it.hashCode() + 1) { it.OuterCoursePageTop(timeline, verticalScrollState, weekDataPools, scrollPaddingValues, timelineWidth) }
     }
   }
 }

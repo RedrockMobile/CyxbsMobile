@@ -3,6 +3,7 @@ package com.cyxbs.pages.course.view.timeline
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -19,10 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.components.config.time.MinuteTimeDate
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -83,7 +81,7 @@ data class CourseTimeline(
  * @param timelineWidth 时间轴宽度
  * @param enableDrawNowTimeLine 是否绘制当前时间线
  * @param verticalScrollState 垂直滚动状态
- * @param scrollPaddingBottom 滚轴底部 padding
+ * @param scrollPaddingValues 滚轴内部 padding
  * @param content 时间轴内容
  */
 @Composable
@@ -92,14 +90,14 @@ fun CourseTimeline.Content(
   timelineWidth: Dp = 40.dp,
   enableDrawNowTimeLine: Boolean = false,
   verticalScrollState: ScrollState = rememberScrollState(),
-  scrollPaddingBottom: Dp = 12.dp,
+  scrollPaddingValues: PaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp),
   content: @Composable () -> Unit
 ) {
   CourseScrollCompose(
     timeline = this,
     modifier = modifier.fillMaxSize(),
     verticalScrollState = verticalScrollState,
-    scrollPaddingBottom = scrollPaddingBottom,
+    scrollPaddingValues = scrollPaddingValues,
   ) {
     Column(
       modifier = Modifier.width(timelineWidth).fillMaxHeight()

@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -19,7 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.add
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.components.utils.compose.plusDsl
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -51,18 +57,29 @@ fun CourseWeekCompose(
     )
     Row(modifier = Modifier.fillMaxSize()) {
       repeat(7) {
+        val showToday by derivedStateOfStructure {
+          if (weekBeginDate == null) beginDayOfWeek.add(it) == Today.dayOfWeek else {
+            weekBeginDate.plusDays(it) == Today
+          }
+        }
         Column(
           modifier = Modifier
             .weight(1F)
-            .fillMaxHeight(),
+            .fillMaxHeight()
+            .plusDsl {
+              if (showToday) {
+                background(0x93E8F0FC.dark(0x26000101), RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                background(LocalAppColors.current.tvLv4, RoundedCornerShape(8.dp))
+              }
+            },
           verticalArrangement = Arrangement.SpaceEvenly,
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
           Text(
             modifier = Modifier,
             text = getWeekStr(beginDayOfWeek.add(it)),
-            fontSize = 12.sp,
-            color = LocalAppColors.current.tvLv1,
+            fontSize = if (weekBeginDate != null) 12.sp else 13.sp,
+            color = if (showToday) LocalAppColors.current.whiteBlack else LocalAppColors.current.tvLv1,
             textAlign = TextAlign.Center,
           )
           if (weekBeginDate != null) {
@@ -70,7 +87,7 @@ fun CourseWeekCompose(
               modifier = Modifier,
               text = "${weekBeginDate.plusDays(it).dayOfMonth}日",
               fontSize = 11.sp,
-              color = LocalAppColors.current.tvDefault,
+              color = if (showToday) LocalAppColors.current.whiteBlack else LocalAppColors.current.tvDefault,
               textAlign = TextAlign.Center,
             )
           }

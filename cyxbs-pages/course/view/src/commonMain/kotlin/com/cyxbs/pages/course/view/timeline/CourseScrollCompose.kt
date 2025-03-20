@@ -4,7 +4,9 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -13,8 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastMapIndexed
 import com.cyxbs.components.utils.compose.reflexScrollableForMouse
@@ -33,14 +33,13 @@ internal fun CourseScrollCompose(
   timeline: CourseTimeline,
   modifier: Modifier = Modifier,
   verticalScrollState: ScrollState = rememberScrollState(),
-  scrollPaddingBottom: Dp = 0.dp,
+  scrollPaddingValues: PaddingValues,
   content: @Composable () -> Unit,
 ) {
   Layout(
     modifier = modifier
       .reflexScrollableForMouse()
-      .verticalScroll(state = verticalScrollState)
-      .padding(vertical = 4.dp),
+      .verticalScroll(state = verticalScrollState),
     content = { content() },
     measurePolicy = remember(timeline) {
       { measurables, constraints ->
@@ -51,23 +50,27 @@ internal fun CourseScrollCompose(
           initialWeight += it.initialWeight
           nowWeight += it.nowWeight
         }
-        val paddingBottomPx = scrollPaddingBottom.roundToPx()
+        val startPadding = scrollPaddingValues.calculateStartPadding(layoutDirection).roundToPx()
+        val endPadding = scrollPaddingValues.calculateEndPadding(layoutDirection).roundToPx()
+        val topPadding = scrollPaddingValues.calculateTopPadding().roundToPx()
+        val bottomPadding = scrollPaddingValues.calculateBottomPadding().roundToPx()
         // 因为有 verticalScroll，所以这里 minHeight 就是父布局的高度
-        val height = ((constraints.minHeight - paddingBottomPx) * (nowWeight / initialWeight))
+        val height = ((constraints.minHeight - topPadding - bottomPadding) * (nowWeight / initialWeight))
           .roundToInt()
+        val maxWidth = constraints.maxWidth - startPadding - endPadding
         val placeables = measurables.fastMapIndexed { index, measurable ->
           measurable.measure(
             Constraints(
-              minWidth = if (index != measurables.lastIndex || index == 0) 0 else constraints.maxWidth - widthConsume,
-              maxWidth = constraints.maxWidth - widthConsume,
+              minWidth = if (index != measurables.lastIndex || index == 0) 0 else maxWidth - widthConsume,
+              maxWidth = maxWidth - widthConsume,
               maxHeight = height,
             )
           ).apply { widthConsume += width }
         }
-        layout(constraints.maxWidth, height + paddingBottomPx) {
-          var start = 0
+        layout(constraints.maxWidth, height + topPadding + bottomPadding) {
+          var start = startPadding
           placeables.fastForEach {
-            it.placeRelative(x = start, y = 0)
+            it.placeRelative(x = start, y = topPadding)
             start += it.width
           }
         }
