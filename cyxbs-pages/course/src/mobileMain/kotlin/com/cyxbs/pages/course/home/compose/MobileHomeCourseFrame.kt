@@ -8,8 +8,10 @@ import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -23,7 +25,9 @@ import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -64,19 +68,34 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
   @Composable
   override fun CourseHeader(modifier: Modifier) {
     Box {
-      super.CourseHeader(
-        modifier = Modifier.graphicsLayer {
-          alpha = max(bottomSheetState.fraction * 2 - 1, 0F)
+      val headerVisibility by remember {
+        bottomSheetState.stateFlow.filter {
+          it != BottomSheetValueState.Hide
+        }.map {
+          when (it) {
+            BottomSheetValueState.Hide -> error("")
+            BottomSheetValueState.Expanded -> true
+            BottomSheetValueState.Scrolling -> null
+            BottomSheetValueState.Collapsed -> false
+          }
         }
-      )
-      // 主页课表外层 header
-      MobileHomeCourseHeader(
-        frame = this@MobileHomeCourseFrame,
-        modifier = Modifier.graphicsLayer {
-          alpha = max(1 - bottomSheetState.fraction * 2, 0F)
-          scaleX = if (alpha == 0F) 0F else 1F // 通过这种方式来避免其响应点击事件
-        },
-      )
+      }.collectAsState(false)
+      if (headerVisibility != false) { // 展开和滚动时显示
+        super.CourseHeader(
+          modifier = Modifier.graphicsLayer {
+            alpha = max(bottomSheetState.fraction * 2 - 1, 0F)
+          }
+        )
+      }
+      if (headerVisibility != true) { // 折叠和滚动时显示
+        // 主页课表外层 header
+        MobileHomeCourseHeader(
+          frame = this@MobileHomeCourseFrame,
+          modifier = Modifier.graphicsLayer {
+            alpha = max(1 - bottomSheetState.fraction * 2, 0F)
+          },
+        )
+      }
     }
     LaunchedEffect(Unit) {
       if (beginDate == null) {

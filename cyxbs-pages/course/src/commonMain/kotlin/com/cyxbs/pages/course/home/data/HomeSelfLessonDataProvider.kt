@@ -42,12 +42,10 @@ class HomeSelfLessonDataProvider : CourseDataProvider() {
       emit(null)
     } else {
       val cacheLesson = lessonService.getLesson(user.stuNum)
-      logg("cacheLesson = $cacheLesson")
       if (cacheLesson != null) {
         emit(cacheLesson.data)
       }
       lessonService.requestLesson(user.stuNum).onSuccess {
-        logg("requestLesson = $it")
         emit(it)
       }.onFailure {
         if (cacheLesson != null) {
