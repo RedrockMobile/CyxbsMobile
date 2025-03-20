@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -29,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
@@ -38,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.IMobileHomeCourseService
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
@@ -81,11 +80,22 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     bottomBarHeight = bottomNavViewModel.height
   ) { bottomSheetState ->
     LaunchedEffect(Unit) {
-      snapshotFlow { bottomSheetState.fraction }.onEach {
+      snapshotFlow {
+        bottomSheetState.fraction.coerceIn(0F, 1F)
+      }.onEach {
         // 底部按钮跟随课表展开而变化
         bottomNavViewModel.offsetYRadio.floatValue = it
         bottomNavViewModel.alpha.floatValue = 1 - it
       }.launchIn(this)
+    }
+    LaunchedEffect(Unit) {
+      bottomNavViewModel.selectedItem.collect {
+        if (it === bottomNavViewModel.fairgroundItem) {
+          bottomSheetState.hide()
+        } else if (bottomSheetState.state == BottomSheetValueState.Hide) {
+          bottomSheetState.collapse()
+        }
+      }
     }
   }
 }
@@ -102,14 +112,9 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
       .height(bottomNavViewModel.height)
       .fillMaxWidth()
       .shadow(shadowElevation)
-      .offset {
-        IntOffset(
-          x = 0,
-          y = (bottomNavViewModel.offsetYRadio.floatValue * bottomNavViewModel.height).roundToPx()
-        )
-      }
       .graphicsLayer {
         alpha = bottomNavViewModel.alpha.floatValue
+        translationY = (bottomNavViewModel.offsetYRadio.floatValue * bottomNavViewModel.height).toPx()
       }
       .background(LocalAppColors.current.topBg),
     horizontalArrangement = Arrangement.SpaceAround,

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -45,6 +46,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -69,9 +71,11 @@ class BottomSheetState {
 
   var peekHeight = 0F
     set(value) {
-      field = value
-      if (showHeight.floatValue < value) {
-        showHeight.floatValue = value
+      if (field != value) {
+        field = value
+        if (showHeight.floatValue < value) {
+          showHeight.floatValue = value
+        }
       }
     }
 
@@ -159,7 +163,6 @@ fun BottomSheetCompose(
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   content: @Composable BottomSheetScope.() -> Unit
 ) {
-  bottomSheetState.peekHeight = peekHeight.px
   BottomSheetBackgroundCompose(
     modifier = modifier,
     scrimColor = scrimColor,
@@ -171,6 +174,11 @@ fun BottomSheetCompose(
       bottomSheetState = bottomSheetState,
       content = content
     )
+  }
+  val density = LocalDensity.current
+  DisposableEffect(peekHeight, density) {
+    bottomSheetState.peekHeight = with(density) { peekHeight.toPx() }
+    onDispose {  }
   }
 }
 
