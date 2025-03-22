@@ -19,7 +19,7 @@ import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.page.CoursePageDecoration
@@ -77,7 +77,7 @@ abstract class CourseSemesterFrame : CourseFrame() {
       scrollPaddingValues: PaddingValues,
       timelineWidth: Dp,
     ) {
-      val todayIndex by derivedStateOfStructure {
+      val todayIndex by rememberDerivedStateOfStructure(weekDataPools) {
         weekBeginDate?.daysUntil(Today) ?: Today.dayOfWeek.ordinal
       }
       if (todayIndex in 0..6) {

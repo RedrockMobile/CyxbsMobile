@@ -4,6 +4,8 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
@@ -17,10 +19,14 @@ class AccountSettings private constructor(val stuNum: String?) {
 
   companion object {
 
+    private val accountService = IAccountService::class.impl()
     private val accountSettingsMap = mutableMapOf<String?, AccountSettings>()
 
     // 获取当前登录人的 AccountSettings
-    var now: AccountSettings = get(IAccountService::class.impl().stuNum)
+    var now: AccountSettings = get(accountService.stuNum)
+
+    val nowState: StateFlow<AccountSettings> get() = _nowState
+    private val _nowState = MutableStateFlow(now)
 
     // 获取指定学号的 AccountSettings
     // stuNum 为 null 表示未登录
@@ -32,9 +38,10 @@ class AccountSettings private constructor(val stuNum: String?) {
 
     init {
       // 登录人改变时自动更新 AccountSettings#now
-      IAccountService::class.impl().userInfo.onEach {
+      accountService.userInfo.onEach {
         if (it?.stuNum != now.stuNum) {
           now = get(it?.stuNum)
+          _nowState.emit(now)
         }
       }.launchIn(appCoroutineScope)
     }

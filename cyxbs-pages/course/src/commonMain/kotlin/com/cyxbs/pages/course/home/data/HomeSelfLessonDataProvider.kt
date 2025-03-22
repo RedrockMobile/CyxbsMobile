@@ -4,11 +4,10 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.toastLong
-import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.SelfLessonItem
+import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -24,7 +23,7 @@ import kotlin.time.Duration.Companion.days
  * @author 985892345
  * @date 2025/3/10
  */
-class HomeSelfLessonDataProvider : CourseDataProvider() {
+object HomeSelfLessonDataProvider : CourseDataProvider() {
 
   init {
     IAccountService::class.impl()
@@ -37,15 +36,14 @@ class HomeSelfLessonDataProvider : CourseDataProvider() {
   }
 
   private fun createLessonFlow(user: UserInfo?): Flow<List<LessonByWeeks>?> = flow {
-    val lessonService = ILessonService2::class.impl()
     if (user == null) {
       emit(null)
     } else {
-      val cacheLesson = lessonService.getLesson(user.stuNum)
+      val cacheLesson = LessonRepository.getLesson(user.stuNum)
       if (cacheLesson != null) {
         emit(cacheLesson.data)
       }
-      lessonService.requestLesson(user.stuNum).onSuccess {
+      LessonRepository.requestLesson(user.stuNum).onSuccess {
         emit(it)
       }.onFailure {
         if (cacheLesson != null) {

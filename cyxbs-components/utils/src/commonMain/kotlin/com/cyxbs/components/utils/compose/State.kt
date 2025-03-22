@@ -26,3 +26,22 @@ inline fun <T> rememberDerivedStateOfStructure(
 ): State<T> = remember(key) {
   derivedStateOf(structuralEqualityPolicy()) { calculation.invoke() }
 }
+
+@Composable
+inline fun <T> rememberDerivedStateOfStructure(
+  key1: Any? = null,
+  key2: Any? = null,
+  crossinline calculation: () -> T,
+): State<T> = remember(key1, key2) {
+  derivedStateOf(structuralEqualityPolicy()) { calculation.invoke() }
+}
+
+@Composable
+inline fun <T> rememberDerivedStateOfStructure(
+  key1: Any? = null,
+  key2: Any? = null,
+  key3: Any? = null,
+  crossinline calculation: () -> T,
+): State<T> = remember(key1, key2, key3) {
+  derivedStateOf(structuralEqualityPolicy()) { calculation.invoke() }
+}

@@ -1,17 +1,13 @@
 package com.cyxbs.pages.course.home.compose
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -19,17 +15,11 @@ import androidx.compose.ui.unit.Dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlin.math.max
 
 /**
  * 移动端主页课表框架
@@ -52,9 +42,9 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
   override var beginDate: Date? by mutableStateOf(SchoolCalendar.getFirstMonDay())
 
   override val providerGroup: CourseDataProviderGroup = CourseDataProviderGroup(
-    HomeSelfLessonDataProvider(),
+    HomeSelfLessonDataProvider,
     HomeAffairDataProvider(),
-    HomeLinkLessonDataProvider(),
+    HomeLinkLessonDataProvider,
   )
 
   override var peekHeight: Dp by mutableStateOf(super.peekHeight)
@@ -67,52 +57,7 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
 
   @Composable
   override fun CourseHeader(modifier: Modifier) {
-    Box {
-      val headerVisibility by remember {
-        bottomSheetState.stateFlow.filter {
-          it != BottomSheetValueState.Hide
-        }.map {
-          when (it) {
-            BottomSheetValueState.Hide -> error("")
-            BottomSheetValueState.Expanded -> true
-            BottomSheetValueState.Scrolling -> null
-            BottomSheetValueState.Collapsed -> false
-          }
-        }
-      }.collectAsState(false)
-      if (headerVisibility != false) { // 展开和滚动时显示
-        super.CourseHeader(
-          modifier = Modifier.graphicsLayer {
-            alpha = max(bottomSheetState.fraction * 2 - 1, 0F)
-          }
-        )
-      }
-      if (headerVisibility != true) { // 折叠和滚动时显示
-        // 主页课表外层 header
-        MobileHomeCourseHeader(
-          frame = this@MobileHomeCourseFrame,
-          modifier = Modifier.graphicsLayer {
-            alpha = max(1 - bottomSheetState.fraction * 2, 0F)
-          },
-        )
-      }
-    }
-    LaunchedEffect(Unit) {
-      if (beginDate == null) {
-        // beginDate 未初始化，则进行等待
-        val beginDateJob = launch {
-          beginDate = SchoolCalendar.observeFirstMonDay().first()
-        }
-        val selectPageJon = launch {
-          beginDateJob.join() // beginDate 初始化后跳到 initialPage
-          pagerState.scrollToPage(initialPage)
-        }
-        launch {
-          bottomSheetState.stateFlow.first { it == BottomSheetValueState.Expanded }
-          selectPageJon.cancel() // 如果触发一次展开，则取消回到 initialPage
-        }
-      }
-    }
+    MobileHomeCourseHeader(modifier= modifier, frame = this)
   }
 
   @Composable

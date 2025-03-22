@@ -26,7 +26,7 @@ import com.cyxbs.components.utils.compose.BottomSheetCompose
 import com.cyxbs.components.utils.compose.BottomSheetState
 import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.view.header.CourseBottomSheetHeaderBackground
 import kotlinx.coroutines.launch
@@ -108,7 +108,8 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame() {
 
   @Composable
   fun CourseHeaderSubtitle(modifier: Modifier) {
-    val pageFraction by derivedStateOfStructure {
+    // 0 -> 1 -> 0
+    val pageFraction by rememberDerivedStateOfStructure(this) {
       val fraction = pagerState.currentPageOffsetFraction
       1 - minOf(abs(fraction + pagerState.currentPage - initialPage), 1F)
     }
@@ -126,7 +127,8 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame() {
 
   @Composable
   fun CourseHeaderBack(modifier: Modifier) {
-    val pageFraction by derivedStateOfStructure {
+    // 0 -> 1 -> 0
+    val pageFraction by rememberDerivedStateOfStructure(this) {
       val fraction = pagerState.currentPageOffsetFraction
       1 - minOf(abs(fraction + pagerState.currentPage - initialPage), 1F)
     }

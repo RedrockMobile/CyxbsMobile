@@ -24,8 +24,8 @@ import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.add
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -57,7 +57,7 @@ fun CourseWeekCompose(
     )
     Row(modifier = Modifier.fillMaxSize()) {
       repeat(7) {
-        val showToday by derivedStateOfStructure {
+        val showToday by rememberDerivedStateOfStructure(weekBeginDate, beginDayOfWeek) {
           if (weekBeginDate == null) beginDayOfWeek.add(it) == Today.dayOfWeek else {
             weekBeginDate.plusDays(it) == Today
           }
