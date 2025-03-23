@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
@@ -26,6 +28,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.datetime.DayOfWeek
 import kotlinx.serialization.Serializable
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -40,6 +43,22 @@ data class CourseTimeline(
   val data: ImmutableList<CourseTimelineData> = DefaultTimeline,
   val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
+
+  fun createLayoutModifier(
+    beginTime: MinuteTime,
+    finalTime: MinuteTime,
+  ) : Modifier {
+    return Modifier.layout { measurable, constraints ->
+      val weight = calculateBeginFinalWeight(beginTime, finalTime)
+      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+      val placeable = measurable.measure(
+        Constraints.fixed(constraints.maxWidth, height)
+      )
+      layout(placeable.width, placeable.height) {
+        placeable.placeRelative(0, (constraints.maxHeight * weight.x).roundToInt())
+      }
+    }
+  }
 
   /**
    * 计算 [beginTime] [finalTime] 在整个时间轴上的占比
@@ -73,6 +92,28 @@ data class CourseTimeline(
       x = startWeight / allWeight,
       y = endWeight / allWeight,
     )
+  }
+
+  /**
+   * 计算 [time] 在整个时间轴上的占比
+   */
+  fun calculateWeight(
+    time: MinuteTime
+  ): Float {
+    var allWeight = 0F
+    var nowWeight = 0F
+    val now = time.minuteOfDay
+    data.fastForEach {
+      allWeight += it.nowWeight
+      val start = it.startTime.minuteOfDay
+      val end = it.endTime.minuteOfDay
+      if (now >= end) {
+        nowWeight += it.nowWeight
+      } else if (now >= start) {
+        nowWeight += (now - start) / (end - start).toFloat() * it.nowWeight
+      }
+    }
+    return nowWeight / allWeight
   }
 }
 
@@ -131,30 +172,19 @@ private fun Modifier.drawNowTimeLine(
     }
   }
   return this then drawBehind {
-    var allWeight = 0F
-    var nowWeight = 0F
-    val now = nowTimeState.value.minuteOfDay
-    timeline.data.fastForEach {
-      allWeight += it.nowWeight
-      val start = it.startTime.minuteOfDay
-      val end = it.endTime.minuteOfDay
-      if (now >= end) {
-        nowWeight += it.nowWeight
-      } else if (now >= start) {
-        nowWeight += (now - start) / (end - start).toFloat() * it.nowWeight
-      }
-    }
     val radius = 3.dp.toPx()
-    val y = nowWeight / allWeight * size.height
+    val start = 2.dp.toPx() + radius
+    val end = size.width - 2.dp.toPx()
+    val y = timeline.calculateWeight(nowTimeState.value) * size.height
     drawCircle(
       color = Color.Gray,
       radius = radius,
-      center = Offset(x = radius, y = y),
+      center = Offset(x = start, y = y),
     )
     drawLine(
       color = Color.Gray,
-      start = Offset(x = radius, y = y),
-      end = Offset(x = size.width, y = y),
+      start = Offset(x = start, y = y),
+      end = Offset(x = end, y = y),
       strokeWidth = 1.dp.toPx()
     )
   }

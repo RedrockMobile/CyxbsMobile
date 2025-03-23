@@ -43,11 +43,13 @@ abstract class CourseSemesterFrame : CourseFrame() {
 
   // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   override val initialPage: Int
-    get() {
-      val beginDate = beginDate ?: return 0
-      val page = (beginDate.daysUntil(TodayNoEffect) / 7 + 1).coerceAtLeast(0)
-      return if (page >= maxPage) 0 else page
-    }
+    get() = getPage(TodayNoEffect)
+
+  open fun getPage(date: Date): Int{
+    val realBeginDate = beginDate?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
+    val page = (realBeginDate.daysUntil(date) / 7 + 1).coerceAtLeast(0)
+    return if (page >= maxPage) 0 else page
+  }
 
   @Composable
   override fun CoursePageContent(pagerScope: PagerScope, page: Int) {
@@ -60,7 +62,7 @@ abstract class CourseSemesterFrame : CourseFrame() {
       )
       CoursePageCompose(
         timeline = timeline,
-        weekDataPools = providerGroup.getWeekDataPool(page),
+        weekDataPool = providerGroup.getWeekDataPool(page),
         decorations = listOf(TodayDecoration(weekBeginDate = if (page == 0) null else date)),
       )
     }
@@ -73,11 +75,11 @@ abstract class CourseSemesterFrame : CourseFrame() {
     override fun OuterCoursePageBottom(
       timeline: CourseTimeline,
       verticalScrollState: ScrollState,
-      weekDataPools: List<CourseWeekDataPool>,
+      weekDataPool: CourseWeekDataPool,
       scrollPaddingValues: PaddingValues,
       timelineWidth: Dp,
     ) {
-      val todayIndex by rememberDerivedStateOfStructure(weekDataPools) {
+      val todayIndex by rememberDerivedStateOfStructure(weekBeginDate) {
         weekBeginDate?.daysUntil(Today) ?: Today.dayOfWeek.ordinal
       }
       if (todayIndex in 0..6) {

@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.view.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
@@ -11,8 +12,9 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
  * @author 985892345
  * @date 2025/3/5
  */
+@Stable
 data class CourseItemContent(
-  private val overlap: OverlayData,
+  val overlap: OverlayData,
 ) {
 
   val item: CourseItem = overlap.item

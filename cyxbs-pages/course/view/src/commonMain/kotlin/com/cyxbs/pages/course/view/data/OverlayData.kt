@@ -2,10 +2,6 @@ package com.cyxbs.pages.course.view.data
 
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItem
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 
 /**
  * 重叠的数据
@@ -16,32 +12,25 @@ import kotlin.time.Duration.Companion.minutes
 data class OverlayData(
   val item: CourseItem,
   val showRangeList: List<CoveredRange>, // 未被覆盖的能够显示的区域，是 item 本身的子集
+  val coveredRangeList: List<CoveredRange>, // 被覆盖的区域，是 item 本身的子集
 )
 
 data class CoveredRange(
-  val begin: Duration,
-  val final: Duration,
-) {
-  val beginTime: MinuteTime = (begin.inWholeMinutes % 1.days.inWholeMinutes).let {
-    MinuteTime((it / 60).toInt(), (it % 60).toInt())
-  }
-  val duration: Duration = final - begin
-}
+  val begin: MinuteTime,
+  val final: MinuteTime,
+  var bottomCount: Int = 0, // 覆盖的 item 数量
+)
 
 object OverlayManager {
-  fun getOverlapData(
-    input: Collection<CourseItem>,
-    comparator: Comparator<CourseItem>,
+  // 计算当天的重叠数据
+  fun getSingleDayOverlapData(
+    input: List<CourseItem>,
     coveredList: MutableList<CoveredRange>,
   ): List<OverlayData> {
-    return input.sortedWith(comparator)
-      .asReversed() // 这里需要倒序遍历，因为越在后面的 item 越在顶层显示
+    return input.asReversed() // 这里需要倒序遍历，因为越在后面的 item 越在顶层显示
       .mapNotNull {
-        val begin = it.page.days * 7 + it.dayOfWeek.ordinal.days + it.beginTime.hour.hours + it.beginTime.minute.minutes
-        val final = it.page.days * 7 + it.dayOfWeek.ordinal.days + it.finalTime.hour.hours + it.finalTime.minute.minutes +
-            if (it.finalTime < it.beginTime) 1.days else 0.days
-        val rangeList = getShowRangeList(CoveredRange(begin, final), coveredList)
-        if (rangeList.isNotEmpty()) OverlayData(it, rangeList) else null // 过滤掉被完全覆盖的 item
+        val overlayData = getShowRangeList(it, coveredList)
+        if (overlayData.showRangeList.isNotEmpty()) overlayData else null // 过滤掉被完全覆盖的 item
       }.asReversed() // 反转回去
   }
 
@@ -49,61 +38,106 @@ object OverlayManager {
    * 计算 item 在 coveredList 覆盖后剩下的未被覆盖的区域
    */
   private fun getShowRangeList(
-    item: CoveredRange,
+    item: CourseItem,
     coveredList: MutableList<CoveredRange>,
-  ): List<CoveredRange> {
+  ): OverlayData {
     val showRangeList = mutableListOf<CoveredRange>()
+    val coveredRangeList = mutableListOf<CoveredRange>()
     var index = 0
-    while (index < coveredList.size && coveredList[index].final < item.begin) {
-      index++ // 找到第一个 [index].final >= item.begin 的位置
+    while (index < coveredList.size && coveredList[index].final <= item.beginTime) {
+      index++ // 找到第一个 [index].final > item.begin 的位置
     }
     if (index == coveredList.size) {
-      showRangeList.add(item)
-      coveredList.add(item)
+      val range = CoveredRange(item.beginTime, item.finalTime)
+      showRangeList.add(range)
+      coveredList.add(range)
     } else {
-      // item.begin ≤ now.final
+      // 此时 item.begin < now.final
+      //        ----- ｜     ----?????  ｜   -----??????  ｜
+      // ======       ｜  ==========    ｜      ======    ｜
       val now = coveredList[index]
-      if (now.begin <= item.begin) {
-        // now.begin ≤ begin ≤ now.final
-        opFinal(item.final, coveredList, index, showRangeList)
-      } else if (now.begin > item.final) {
-        // 不相交
-        showRangeList.add(item)
-        coveredList.add(index, item)
+      if (now.begin >= item.finalTime) {
+        // 完全不相交
+        //        -----
+        // ======
+        val range = CoveredRange(item.beginTime, item.finalTime)
+        showRangeList.add(range)
+        coveredList.add(index, range)
+      } else if (now.begin > item.beginTime) {
+        // 此时 item.begin < now.begin < item.final
+        //    ----?????
+        // ==========
+        val range = CoveredRange(item.beginTime, now.begin)
+        showRangeList.add(range)
+        coveredList.add(index, range)
+        // 剩下的部分为
+        // ----??????
+        // ========
+        opFinal(now.begin, item.finalTime, coveredList, index + 1, showRangeList, coveredRangeList)
       } else {
-        // begin < now.begin ≤ final
-        // 把 begin 到 now.final 可以组成一组新的覆盖区间 begin -> now.final
-        // 则仍然满足了 now.begin ≤ begin ≤ now.final 的条件，所以可以继续递归调用 opFinal
-        showRangeList.add(CoveredRange(item.begin, now.begin))
-        coveredList[index] = CoveredRange(item.begin, now.final)
-        opFinal(item.final, coveredList, index, showRangeList)
+        // 此时 now.begin ≤ item.begin < now.final
+        // -----??????
+        //    ======
+        opFinal(item.beginTime, item.finalTime, coveredList, index, showRangeList, coveredRangeList)
       }
     }
-    return showRangeList
+    return OverlayData(item, showRangeList, coveredRangeList)
   }
 
-  // 用于在 now.begin ≤ begin ≤ now.final 时调用
+  // 第一次进入的条件为： now.begin ≤ begin < now.final
   // 计算 final、now.final、next.begin 三者之间的关系
   private fun opFinal(
-    final: Duration,
+    begin: MinuteTime,
+    final: MinuteTime,
     coveredList: MutableList<CoveredRange>,
     index: Int,
-    showRangeList: MutableList<CoveredRange>
+    showRangeList: MutableList<CoveredRange>,
+    coveredRangeList: MutableList<CoveredRange>,
   ) {
+    // 此时与 now 在起始部分肯定存在交集
+    // -----??????
+    //    ======
     val now = coveredList[index]
-    // 与 now 在起始部分肯定存在交集
-    if (final <= now.final) return // 被完全包含
+    now.bottomCount++
+    if (final <= now.final) {
+      coveredRangeList.add(CoveredRange(begin, final))
+      return // 被完全包含
+    }
+    // 接下来是 now.begin ≤ begin < now.final < final
+    // -----
+    //    ======
     val next = coveredList.getOrNull(index + 1)
-    if (next == null || final < next.begin) {
-      // now.final < final < next.begin
-      showRangeList.add(CoveredRange(now.final, final))
-      coveredList[index] = CoveredRange(now.begin, final)
+    if (next == null || final <= next.begin) {
+      // 此时 now.final < final ≤ next.begin
+      // -----      +++++
+      //    ======
+      val coveredRange = CoveredRange(begin, now.final)
+      coveredRangeList.add(coveredRange)
+      val showRange = CoveredRange(now.final, final)
+      showRangeList.add(showRange)
+      coveredList.add(index + 1, showRange)
     } else {
-      // final ≥ next.begin
-      showRangeList.add(CoveredRange(now.final, next.begin))
-      coveredList[index] = CoveredRange(now.begin, next.final) // 合并两个区间
-      coveredList.removeAt(index + 1)
-      opFinal(final, coveredList, index, showRangeList) // 对于 final 与 next.final 又可以递归调用
+      // 此时 final > next.begin
+      // -----???+++++
+      //    =======
+      if (now.final < next.begin) {
+        // 此时如下，now.final 到 next.begin 构成一个单独的 range
+        // -----   +++++
+        //    =======
+        val coveredRange = CoveredRange(begin, now.final)
+        coveredRangeList.add(coveredRange)
+        val showRange = CoveredRange(now.final, next.begin)
+        showRangeList.add(showRange)
+        coveredList.add(index + 1, showRange)
+        opFinal(next.begin, final, coveredList, index + 2, showRangeList, coveredRangeList)
+      } else {
+        // 此时 now.final = next.begin
+        // -----+++++
+        //   ======
+        // 这里放入的 begin < next.begin，与 opFinal 调用条件不符
+        // 但是对于 begin 这个字段并不会进行判断，所以是允许这样使用的
+        opFinal(begin, final, coveredList, index + 1, showRangeList, coveredRangeList)
+      }
     }
   }
 }

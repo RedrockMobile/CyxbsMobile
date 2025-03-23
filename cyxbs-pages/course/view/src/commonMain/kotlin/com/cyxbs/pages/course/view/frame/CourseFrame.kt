@@ -62,7 +62,7 @@ abstract class CourseFrame {
 
   @Composable
   open fun OnCourseCompose() {
-    DisposableEffect(Unit) {
+    DisposableEffect(this) {
       providerGroup.onBindCourseCompose(timeline)
       onDispose {
         providerGroup.onUnbindCourseCompose()
@@ -83,7 +83,7 @@ abstract class CourseFrame {
   open fun CoursePageContent(pagerScope: PagerScope, page: Int) {
     CoursePageCompose(
       timeline = timeline,
-      weekDataPools = providerGroup.getWeekDataPool(page)
+      weekDataPool = providerGroup.getWeekDataPool(page)
     )
   }
 }

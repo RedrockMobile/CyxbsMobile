@@ -30,12 +30,12 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
  * @param enableDrawNowTimeLine 是否绘制当前时间线
  * @param verticalScrollState 垂直滚动状态
  * @param decorations 绘制在课表上的装饰物，同时也能拦截触摸事件
- * @param weekDataPools 当周的数据，越靠前越展示在顶层
+ * @param weekDataPool 当周的数据，越靠前越展示在顶层
  */
 @Composable
 fun CoursePageCompose(
   timeline: CourseTimeline,
-  weekDataPools: List<CourseWeekDataPool>,
+  weekDataPool: CourseWeekDataPool,
   modifier: Modifier = Modifier,
   enableDrawNowTimeLine: Boolean = true,
   verticalScrollState: ScrollState = rememberScrollState(),
@@ -45,7 +45,7 @@ fun CoursePageCompose(
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
   Box {
     decorations.fastForEach {
-      key(it.hashCode()) { it.OuterCoursePageBottom(timeline, verticalScrollState, weekDataPools, scrollPaddingValues, timelineWidth) }
+      key(it.hashCode()) { it.OuterCoursePageBottom(timeline, verticalScrollState, weekDataPool, scrollPaddingValues, timelineWidth) }
     }
     timeline.Content(
       modifier = modifier,
@@ -53,22 +53,18 @@ fun CoursePageCompose(
       verticalScrollState = verticalScrollState,
     ) {
       decorations.fastForEach {
-        key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPools) }
+        key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPool) }
       }
-      weekDataPools.fastForEachReversed { weekDataPool ->
-        key(weekDataPool.hashCode()) {
-          CourseWeekDataContent(
-            weekDataPool = weekDataPool,
-            timeline = timeline,
-          )
-        }
-      }
+      CourseWeekDataContent(
+        weekDataPool = weekDataPool,
+        timeline = timeline,
+      )
       decorations.fastForEach {
-        key(it.hashCode() + 1) { it.InnerCoursePageTop(timeline, verticalScrollState, weekDataPools) }
+        key(it.hashCode() + 1) { it.InnerCoursePageTop(timeline, verticalScrollState, weekDataPool) }
       }
     }
     decorations.fastForEach {
-      key(it.hashCode() + 1) { it.OuterCoursePageTop(timeline, verticalScrollState, weekDataPools, scrollPaddingValues, timelineWidth) }
+      key(it.hashCode() + 1) { it.OuterCoursePageTop(timeline, verticalScrollState, weekDataPool, scrollPaddingValues, timelineWidth) }
     }
   }
 }

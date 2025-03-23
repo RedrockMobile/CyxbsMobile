@@ -79,7 +79,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     modifier = modifier.statusBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
   ) { bottomSheetState ->
-    LaunchedEffect(Unit) {
+    LaunchedEffect(bottomSheetState) {
       snapshotFlow {
         bottomSheetState.fraction.coerceIn(0F, 1F)
       }.onEach {
@@ -88,7 +88,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
         bottomNavViewModel.alpha.floatValue = 1 - it
       }.launchIn(this)
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(bottomSheetState) {
       bottomNavViewModel.selectedItem.collect {
         if (it === bottomNavViewModel.fairgroundItem) {
           bottomSheetState.hide()

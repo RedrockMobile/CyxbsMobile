@@ -1,5 +1,6 @@
 package com.cyxbs.components.utils.compose
 
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 
 /**
@@ -18,6 +19,7 @@ inline fun Modifier.plusDsl(action: Modifier.() -> Unit): Modifier {
   return wrapper.thenModifier
 }
 
+@Stable
 class ModifierPlusWrapper(origin: Modifier) : Modifier by origin {
   var thenModifier: Modifier = origin
   override fun then(other: Modifier): Modifier {

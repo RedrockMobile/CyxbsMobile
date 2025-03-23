@@ -1,9 +1,9 @@
 package com.cyxbs.pages.course.view.data
 
 import androidx.compose.ui.util.fastForEach
-import androidx.compose.ui.util.fastForEachIndexed
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.datetime.DayOfWeek
 
 /**
  * 课表数据 ProviderGroup
@@ -19,25 +19,23 @@ class CourseDataProviderGroup(
 
   private var timeline: CourseTimeline? = null
 
-  private val weekDataPoolByPage = mutableMapOf<Int, List<CourseWeekDataPool>>()
+  private val weekDataPoolByPage = mutableMapOf<Int, CourseWeekDataPool>()
 
   private val itemListeners = providers.map { provider ->
     object : CourseDataProvider.ItemListener {
       val provider = provider
       override fun onAdd(item: CourseItem) {
-        weekDataPoolByPage[item.page]?.find { it.provider === provider }?.add(item)
+        weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 
       override fun onRemove(item: CourseItem) {
-        weekDataPoolByPage[item.page]?.find { it.provider === provider }?.remove(item)
+        weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 
       override fun onClear() {
         weekDataPoolByPage.forEach { entry ->
-          entry.value.forEach {
-            if (it.provider === provider) {
-              it.clear()
-            }
+          DayOfWeek.entries.forEach {
+            entry.value.get(it).tryRefresh()
           }
         }
       }
@@ -45,16 +43,9 @@ class CourseDataProviderGroup(
   }
 
   // 获取 page 对应的周数据，其中 page 为 0 时表示整学期
-  fun getWeekDataPool(page: Int): List<CourseWeekDataPool> {
+  fun getWeekDataPool(page: Int): CourseWeekDataPool {
     return weekDataPoolByPage.getOrPut(page) {
-      providers.map {
-        CourseWeekDataPool(it, timeline!!, page)
-      }.also { list ->
-        list.fastForEachIndexed { i, pool ->
-          pool.topWeekDataPool = list.getOrNull(i - 1)
-          pool.bottomWeekDataPool = list.getOrNull(i + 1)
-        }
-      }
+      CourseWeekDataPool(providers, timeline!!, page)
     }
   }
 

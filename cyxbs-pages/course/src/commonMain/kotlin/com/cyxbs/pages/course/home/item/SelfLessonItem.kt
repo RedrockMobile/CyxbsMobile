@@ -11,10 +11,9 @@ import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.data.OverlayData
-import com.cyxbs.pages.course.view.item.BottomSheetItemHeader
+import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemBottomSheetHeader
-import com.cyxbs.pages.course.view.item.DefaultContent
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
@@ -34,7 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 class SelfLessonItem(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   val lesson: LessonByWeeks,
-) : CourseItem, BottomSheetItemHeader {
+) : CourseItem {
   override val key: String = hashCode().toString()
   override val dayOfWeek: DayOfWeek
     get() = lesson.dayOfWeek
@@ -43,11 +42,17 @@ class SelfLessonItem(
   override val finalTime: MinuteTime
     get() = lesson.finalTime
 
+  override fun toString(): String {
+    return "SelfLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
+        "course=${lesson.course})"
+  }
+
   @Composable
   override fun Content(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
-    DefaultContent(
+    CourseDefaultItemContent(
       modifier = modifier,
       timeline = timeline,
+      overlap = overlap,
       topText = lesson.course,
       bottomText = lesson.classroomSimplify,
       textColor = when {

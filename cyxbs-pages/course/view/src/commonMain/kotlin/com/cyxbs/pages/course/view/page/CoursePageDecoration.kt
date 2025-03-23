@@ -19,7 +19,7 @@ interface CoursePageDecoration {
    * 绘制在课表外层底部
    * @param timeline 课表时间轴
    * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPools 当前周课程数据
+   * @param weekDataPool 当前周课程数据
    * @param scrollPaddingValues 滚轴内部 padding
    * @param timelineWidth 课表时间轴宽度
    */
@@ -27,7 +27,7 @@ interface CoursePageDecoration {
   fun OuterCoursePageBottom(
     timeline: CourseTimeline,
     verticalScrollState: ScrollState,
-    weekDataPools: List<CourseWeekDataPool>,
+    weekDataPool: CourseWeekDataPool,
     scrollPaddingValues: PaddingValues,
     timelineWidth: Dp,
   ) {
@@ -37,7 +37,7 @@ interface CoursePageDecoration {
    * 绘制在课表外层顶部
    * @param timeline 课表时间轴
    * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPools 当前周课程数据
+   * @param weekDataPool 当前周课程数据
    * @param scrollPaddingValues 滚轴内部 padding
    * @param timelineWidth 课表时间轴宽度
    */
@@ -45,7 +45,7 @@ interface CoursePageDecoration {
   fun OuterCoursePageTop(
     timeline: CourseTimeline,
     verticalScrollState: ScrollState,
-    weekDataPools: List<CourseWeekDataPool>,
+    weekDataPool: CourseWeekDataPool,
     scrollPaddingValues: PaddingValues,
     timelineWidth: Dp,
   ) {
@@ -55,13 +55,13 @@ interface CoursePageDecoration {
    * 绘制在课表内层底部
    * @param timeline 课表时间轴
    * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPools 当前周课程数据
+   * @param weekDataPool 当前周课程数据
    */
   @Composable
   fun InnerCoursePageBottom(
     timeline: CourseTimeline,
     verticalScrollState: ScrollState,
-    weekDataPools: List<CourseWeekDataPool>,
+    weekDataPool: CourseWeekDataPool,
   ) {
   }
 
@@ -69,13 +69,13 @@ interface CoursePageDecoration {
    * 绘制在课表内层顶部
    * @param timeline 课表时间轴
    * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPools 当前周课程数据
+   * @param weekDataPool 当前周课程数据
    */
   @Composable
   fun InnerCoursePageTop(
     timeline: CourseTimeline,
     verticalScrollState: ScrollState,
-    weekDataPools: List<CourseWeekDataPool>,
+    weekDataPool: CourseWeekDataPool,
   ) {
   }
 }

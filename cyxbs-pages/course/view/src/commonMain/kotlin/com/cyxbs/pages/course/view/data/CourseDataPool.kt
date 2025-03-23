@@ -22,7 +22,7 @@ import kotlinx.datetime.DayOfWeek
 // 课表一周的数据
 @Stable
 class CourseWeekDataPool(
-  val provider: CourseDataProvider,
+  val providers: Array<out CourseDataProvider>,
   val timeline: CourseTimeline,
   val page: Int,
 ) {
@@ -33,10 +33,6 @@ class CourseWeekDataPool(
   val fri: CourseDayDataPool = CourseDayDataPool(DayOfWeek.FRIDAY, this)
   val sat: CourseDayDataPool = CourseDayDataPool(DayOfWeek.SATURDAY, this)
   val sun: CourseDayDataPool = CourseDayDataPool(DayOfWeek.SUNDAY, this)
-
-  var topWeekDataPool: CourseWeekDataPool? = null
-
-  var bottomWeekDataPool: CourseWeekDataPool? = null
 
   fun get(dayOfWeek: DayOfWeek): CourseDayDataPool {
     return when (dayOfWeek) {
@@ -51,38 +47,9 @@ class CourseWeekDataPool(
     }
   }
 
-  fun add(item: CourseItem) {
-    if (page == item.page) {
-      get(item.dayOfWeek).add(item)
-    }
-  }
-
-  fun remove(item: CourseItem) {
-    if (page == item.page) {
-      get(item.dayOfWeek).remove(item)
-    }
-  }
-
-  fun clear() {
-    DayOfWeek.entries.forEach {
-      get(it).clear()
-    }
-  }
-
   init {
-    if (page == 0) {
-      // 整学期单独处理
-      DayOfWeek.entries.forEach { dayOfWeek ->
-        val nowDay = get(dayOfWeek)
-        provider.getDayData(0, dayOfWeek).forEach {
-          nowDay.add(it)
-        }
-      }
-    } else {
-      DayOfWeek.entries.forEach { dayOfWeek ->
-        val dayPool = get(dayOfWeek)
-        dayPool.addAll(provider.getDayData(page * 7 + dayOfWeek.ordinal))
-      }
+    DayOfWeek.entries.forEach {
+      get(it).tryRefresh()
     }
   }
 }
@@ -96,94 +63,38 @@ class CourseDayDataPool(
 
   val state: MutableState<List<CourseItemContent>> = mutableStateOf(emptyList())
 
-  private val itemSet = mutableSetOf<CourseItem>()
-  private var oldTopCoveredList = emptyList<CoveredRange>()
-  private var allowRefreshByItemSet = false
-
   // 是否已经发送了 setStateRunnable
   private var isPostRunnable = false
 
   // 刷新数据的 Runnable，为避免频繁刷新，设计成在下一个消息队列中才会触发
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
-  private var runnableJob: Job? = null
-
-  private val comparator = Comparator<CourseItem> { a, b ->
-    weekDataPool.provider.compare(a, b)
-  }
 
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
-    if (!allowRefreshByItemSet) return
-    val coveredList = oldTopCoveredList.toMutableList()
-    state.value = OverlayManager.getOverlapData(
-      input = itemSet,
-      comparator = comparator,
+    val coveredList = mutableListOf<CoveredRange>()
+    val itemList = weekDataPool.providers.map {
+      it.getDayData(weekDataPool.page, dayOfWeek).sortedWith(it::compare)
+    }.asReversed().flatten()
+    state.value = OverlayManager.getSingleDayOverlapData(
+      input = itemList,
       coveredList = coveredList,
     ).map {
       CourseItemContent(it)
     }
-    // 重叠区域触发了刷新，需要通知下层的 Pool 进行刷新
-    weekDataPool.bottomWeekDataPool
-      ?.get(dayOfWeek)
-      ?.refreshByCoveredList(coveredList)
   }
 
-  // topCoveredList 改变时触发的刷新
-  private fun refreshByCoveredList(topCoveredList: MutableList<CoveredRange>) {
-    if (topCoveredList != oldTopCoveredList) {
-      oldTopCoveredList = topCoveredList.toList() // 记录新的输入 coveredList
-      state.value = OverlayManager.getOverlapData(
-        input = itemSet,
-        comparator = comparator,
-        coveredList = topCoveredList,
-      ).map {
-        CourseItemContent(it)
-      }
-      allowRefreshByItemSet = false
-      // 递归通知下一层 Pool 进行刷新
-      weekDataPool.bottomWeekDataPool
-        ?.get(dayOfWeek)
-        ?.refreshByCoveredList(topCoveredList)
-    }
-  }
-
-  internal fun add(item: CourseItem) {
-    if (item.dayOfWeek == dayOfWeek) {
-      if (itemSet.add(item)) {
-        allowRefreshByItemSet = true
-        tryOverlapRunnable()
-      }
-    }
-  }
-
-  internal fun addAll(items: Collection<CourseItem>) {
-    items.forEach { add(it) }
-  }
-
-  internal fun remove(item: CourseItem) {
-    if (itemSet.remove(item)) {
-      allowRefreshByItemSet = true
-      tryOverlapRunnable()
-    }
-  }
-
-  internal fun clear() {
-    itemSet.clear()
-    oldTopCoveredList = emptyList()
-    allowRefreshByItemSet = false
-    runnableJob?.cancel()
-    state.value = emptyList()
+  // 尝试触发刷新，将在下一个消息进行执行
+  fun tryRefresh() {
+    tryOverlapRunnable()
   }
 
   private fun tryOverlapRunnable() {
     if (!isPostRunnable) {
       isPostRunnable = true
-      runnableJob?.cancel()
-      runnableJob = appCoroutineScope.launch(Dispatchers.Main) {
+      appCoroutineScope.launch(Dispatchers.Main) {
         // 在下一个消息中才触发执行重叠处理
         isPostRunnable = false
         setStateRunnable.run()
-        runnableJob = null
       }
     }
   }

@@ -3,6 +3,7 @@ package com.cyxbs.pages.course.service
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,7 +30,9 @@ object MobileHomeCourseServiceImpl : IMobileHomeCourseService {
   ) {
     val viewModel = viewModel { MobileHomeCourseViewModel() }
     Box(modifier) {
-      viewModel.frame.Content()
+      key(viewModel.frame) {
+        viewModel.frame.Content()
+      }
       coverContent(viewModel.frame.bottomSheetState)
     }
     DisposableEffect(bottomBarHeight) {
