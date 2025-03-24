@@ -26,10 +26,14 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * .
@@ -158,6 +162,7 @@ fun CourseTimeline.Content(
 
 
 // 绘制当前时间线
+@Stable
 @Composable
 private fun Modifier.drawNowTimeLine(
   enable: Boolean,
@@ -166,9 +171,11 @@ private fun Modifier.drawNowTimeLine(
   if (!enable) return this
   val nowTimeState = remember { mutableStateOf(MinuteTime.now()) }
   LaunchedEffect(Unit) {
+    val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+    delay(1.minutes - localDateTime.second.seconds)
     while (true) {
-      delay(1.minutes)
       nowTimeState.value = nowTimeState.value.plusMinutes(1)
+      delay(1.minutes)
     }
   }
   return this then drawBehind {
