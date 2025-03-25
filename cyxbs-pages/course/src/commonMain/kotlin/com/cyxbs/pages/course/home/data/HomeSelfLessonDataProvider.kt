@@ -6,7 +6,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.SelfLessonItem
+import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +24,8 @@ import kotlin.time.Duration.Companion.days
  * @date 2025/3/10
  */
 object HomeSelfLessonDataProvider : CourseDataProvider() {
+
+  private val itemFactory = SelfLessonItemFactory::class.impl()
 
   init {
     IAccountService::class.impl()
@@ -63,10 +65,10 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
     data ?: return
     data.forEach { lesson ->
       // 添加进整学期
-      add(SelfLessonItem(0, lesson))
+      add(itemFactory.createSelfLessonItem(0, lesson))
       // 添加进每周
       lesson.week.forEach { week ->
-        add(SelfLessonItem(week, lesson))
+        add(itemFactory.createSelfLessonItem(week, lesson))
       }
     }
   }

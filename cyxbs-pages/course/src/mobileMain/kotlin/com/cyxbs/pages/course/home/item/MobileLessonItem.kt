@@ -23,6 +23,7 @@ import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.components.utils.compose.rememberBottomSheetState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
 import com.cyxbs.pages.course.view.item.CourseItem
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.DayOfWeek
@@ -33,9 +34,10 @@ import kotlinx.datetime.DayOfWeek
  * @author 985892345
  * @date 2025/3/25
  */
-abstract class LessonItem(
+abstract class MobileLessonItem(
+  override val page: Int,
   val lesson: LessonByWeeks
-) : CourseItem {
+) : CourseItem, BottomSheetItemHeader {
   override val dayOfWeek: DayOfWeek
     get() = lesson.dayOfWeek
   override val beginTime: MinuteTime

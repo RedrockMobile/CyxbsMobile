@@ -1,10 +1,11 @@
 package com.cyxbs.pages.course.home.data
 
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.LinkLessonItem
+import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
@@ -30,7 +31,10 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
   val enableShow: StateFlow<Boolean?> get() = _enableShow
   private val _enableShow = MutableStateFlow<Boolean?>(null)
 
+  // 保存最后一次数据，用于改变关联人课表可见性后再展示
   private var lastData = emptyList<LessonByWeeks>()
+
+  private val itemFactory = LinkLessonItemFactory::class.impl()
 
   fun changeVisible() {
     if (LinkLessonRepository.state.value.isNull()) return
@@ -76,10 +80,10 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     if (enableShow.value != true) return
     data.forEach { lesson ->
       // 添加进整学期
-      add(LinkLessonItem(0, lesson))
+      add(itemFactory.createLinkLessonItem(0, lesson))
       // 添加进每周
       lesson.week.forEach { week ->
-        add(LinkLessonItem(week, lesson))
+        add(itemFactory.createLinkLessonItem(week, lesson))
       }
     }
   }

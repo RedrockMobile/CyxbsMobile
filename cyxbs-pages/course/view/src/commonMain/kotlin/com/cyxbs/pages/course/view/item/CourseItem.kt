@@ -35,7 +35,7 @@ import kotlinx.datetime.DayOfWeek
  * @date 2025/2/14
  */
 @Stable
-interface CourseItem : BottomSheetItemHeader {
+interface CourseItem {
 
   // 用于单天课程 item 的遍历定位
   val key: String

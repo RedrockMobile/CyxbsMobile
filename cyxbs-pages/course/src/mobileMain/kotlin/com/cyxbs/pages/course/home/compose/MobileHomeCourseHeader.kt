@@ -26,9 +26,9 @@ import com.cyxbs.components.utils.compose.BottomSheetValueState
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
-import com.cyxbs.pages.course.utils.NextItemUtils
-import com.cyxbs.pages.course.view.item.BottomSheetItemHeader
-import com.cyxbs.pages.course.view.item.HintBottomSheetItemHeader
+import com.cyxbs.pages.course.home.header.NextItemHeaderUtils
+import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
+import com.cyxbs.pages.course.home.header.HintBottomSheetItemHeader
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_single
@@ -126,14 +126,14 @@ private fun MobileHomeCourseOuterHeader(
   LaunchedEffect(frame) {
     val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     var now = localDateTime.toMinuteTimeDate()
-    snapshotFlow { NextItemUtils.find(now, frame) }
+    snapshotFlow { NextItemHeaderUtils.find(now, frame) }
       .flatMapLatest {
         if (it == null) flowOf<BottomSheetItemHeader?>(null) else flow {
           emit(it)
           delay(1.minutes - localDateTime.second.seconds)
           while (true) {
             now = now.plusMinutes(1)
-            val next = NextItemUtils.find(now, frame)
+            val next = NextItemHeaderUtils.find(now, frame)
             if (next != null) emit(next) else break // 如果为 null 则跳出循环
             delay(1.minutes)
           }

@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.item
+package com.cyxbs.pages.course.home.header
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,9 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
-import cyxbsmobile.cyxbs_pages.course.view.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.course.view.generated.resources.course_ic_course_header_landmark
-import cyxbsmobile.cyxbs_pages.course.view.generated.resources.course_ic_course_header_time
+import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_landmark
+import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_time
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -32,6 +33,7 @@ import org.jetbrains.compose.resources.painterResource
  * @author 985892345
  * @date 2025/3/16
  */
+@Stable
 interface BottomSheetItemHeader {
 
   @Composable
