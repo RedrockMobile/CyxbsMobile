@@ -6,18 +6,15 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.minutes
@@ -32,15 +29,9 @@ import kotlin.time.Duration.Companion.seconds
 @Stable
 class LinkLessonItem(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
-  val lesson: LessonByWeeks,
-) : CourseItem {
+  lesson: LessonByWeeks,
+) : LessonItem(lesson) {
   override val key: String = hashCode().toString()
-  override val dayOfWeek: DayOfWeek
-    get() = lesson.dayOfWeek
-  override val beginTime: MinuteTime
-    get() = lesson.beginTime
-  override val finalTime: MinuteTime
-    get() = lesson.finalTime
 
   override fun toString(): String {
     return "LinkLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +

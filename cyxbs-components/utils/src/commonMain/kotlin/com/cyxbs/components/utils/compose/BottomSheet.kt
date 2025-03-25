@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -45,16 +46,16 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.cyxbs.components.utils.extensions.logg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /**
  * 在底部显示的抽屉组件
@@ -64,16 +65,18 @@ import kotlin.math.roundToInt
  */
 
 @Stable
-class BottomSheetState {
+class BottomSheetState(
+  var onDismissRequest: suspend BottomSheetState.() -> Unit = { collapse() },
+) {
 
   internal val showHeight = mutableFloatStateOf(0F)
-  internal val contentHeight = mutableFloatStateOf(0F)
+  internal val showMaxHeight = mutableFloatStateOf(0F)
 
   var peekHeight = 0F
     set(value) {
       if (field != value) {
         field = value
-        if (showHeight.floatValue < value) {
+        if (stateFlow.value != BottomSheetValueState.Hide && showHeight.floatValue < value) {
           showHeight.floatValue = value
         }
       }
@@ -88,12 +91,12 @@ class BottomSheetState {
   // 小于 0 时表示处于 hide 状态
   val fraction by derivedStateOfStructure {
     val showHeight = showHeight.floatValue
-    val contentHeight = contentHeight.floatValue
-    if (contentHeight == 0F) 0F else (showHeight - peekHeight) / (contentHeight - peekHeight)
+    val showMaxHeight = showMaxHeight.floatValue
+    if (showMaxHeight == 0F) 0F else (showHeight - peekHeight) / (showMaxHeight - peekHeight)
   }
 
   internal val scrollableState = ScrollableState {
-    val max = contentHeight.floatValue
+    val max = showMaxHeight.floatValue
     val now = showHeight.floatValue
     val new = (now - it).coerceIn(0F, max)
     showHeight.floatValue = new
@@ -103,7 +106,7 @@ class BottomSheetState {
   suspend fun expand() {
     if (state == BottomSheetValueState.Expanded) return
     val now = showHeight.floatValue
-    val target = contentHeight.floatValue
+    val target = showMaxHeight.floatValue
     if (now != target) {
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
@@ -150,8 +153,12 @@ enum class BottomSheetValueState {
 }
 
 @Composable
-fun rememberBottomSheetState(): BottomSheetState {
-  return remember { BottomSheetState() }
+fun rememberBottomSheetState(
+  onDismissRequest: suspend BottomSheetState.() -> Unit = { collapse() }
+): BottomSheetState {
+  return remember { BottomSheetState(onDismissRequest) }.also {
+    it.onDismissRequest = onDismissRequest
+  }
 }
 
 @Composable
@@ -159,7 +166,8 @@ fun BottomSheetCompose(
   bottomSheetState: BottomSheetState = rememberBottomSheetState(),
   modifier: Modifier = Modifier,
   peekHeight: Dp = 0.dp,
-  dismissOnBackPress: (() -> Boolean)? = { true },
+  dismissOnBackPress: Boolean = true,
+  dismissOnClickOutside: Boolean = false,
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   content: @Composable BottomSheetScope.() -> Unit
 ) {
@@ -168,6 +176,7 @@ fun BottomSheetCompose(
     scrimColor = scrimColor,
     bottomSheetState = bottomSheetState,
     dismissOnBackPress = dismissOnBackPress,
+    dismissOnClickOutside = dismissOnClickOutside,
   ) {
     BottomSheetContent(
       modifier = Modifier.align(Alignment.BottomCenter),
@@ -178,7 +187,7 @@ fun BottomSheetCompose(
   val density = LocalDensity.current
   DisposableEffect(peekHeight, density) {
     bottomSheetState.peekHeight = with(density) { peekHeight.toPx() }
-    onDispose {  }
+    onDispose { }
   }
 }
 
@@ -187,7 +196,8 @@ private fun BottomSheetBackgroundCompose(
   modifier: Modifier,
   bottomSheetState: BottomSheetState,
   scrimColor: Color,
-  dismissOnBackPress: (() -> Boolean)?,
+  dismissOnBackPress: Boolean = true,
+  dismissOnClickOutside: Boolean = false,
   content: @Composable BoxScope.() -> Unit,
 ) {
   val coroutineScope = rememberCoroutineScope()
@@ -199,30 +209,37 @@ private fun BottomSheetBackgroundCompose(
       .focusRequester(focusRequester)
       .focusable()
       .plusDsl {
-        if (dismissOnBackPress != null) {
+        if (dismissOnBackPress) {
           onKeyEvent {
-            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && dismissOnBackPress()
-              && bottomSheetState.state == BottomSheetValueState.Collapsed) {
+            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) {
               // 键盘按下 esc 后 dismiss
               coroutineScope.launch {
-                bottomSheetState.collapse()
+                bottomSheetState.onDismissRequest.invoke(bottomSheetState)
               }
               true
             } else false
           }
         }
-      }
-  ) {
-    Spacer(
-      modifier = Modifier
-        .fillMaxSize()
-        .graphicsLayer {
-          if (scrimColor != Color.Transparent) {
-            alpha = bottomSheetState.fraction
+        if (dismissOnClickOutside) {
+          clickableNoIndicator { // 这里给背景设置点击事件默认会拦截后面的 XML 布局，所以只有需要时才设置
+            logg("click")
+            coroutineScope.launch {
+              bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+            }
           }
         }
-        .background(scrimColor)
-    )
+      }
+  ) {
+    if (scrimColor != Color.Transparent) {
+      Spacer(
+        modifier = Modifier
+          .fillMaxSize()
+          .graphicsLayer {
+            alpha = bottomSheetState.fraction
+          }
+          .background(scrimColor)
+      )
+    }
     content()
   }
 }
@@ -234,7 +251,7 @@ private class BottomSheetSnapLayoutInfoProvider(
     if (velocity == 0F) return 0F
     // 返回衰减动画应该需要执行的偏移量，decayOffset 是根据衰减动画计算出来可以执行的最大偏移量
     val min = bottomSheetState.peekHeight
-    val max = bottomSheetState.contentHeight.floatValue
+    val max = bottomSheetState.showMaxHeight.floatValue
     val now = bottomSheetState.showHeight.floatValue
     val new = now - decayOffset
     if (new < min) return now - min
@@ -246,7 +263,7 @@ private class BottomSheetSnapLayoutInfoProvider(
     // 衰减动画执行完 calculateApproachOffset 返回的偏移后，开启新动画需要偏移的量
     // 如果衰减动画的起始速度为 0，则就相当于松手后执行动画回到起点或终点
     val min = bottomSheetState.peekHeight
-    val max = bottomSheetState.contentHeight.floatValue
+    val max = bottomSheetState.showMaxHeight.floatValue
     val now = bottomSheetState.showHeight.floatValue
     if (now == min || now == max) return 0F
     val boundary = (min + max) / 2F
@@ -274,20 +291,20 @@ private fun BottomSheetContent(
     )
   }
   Box(
-    modifier = modifier
-      .fillMaxWidth()
-      .layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        layout(placeable.width, placeable.height) {
-          if (bottomSheetState.contentHeight.floatValue == 0F) {
-            bottomSheetState.contentHeight.floatValue = placeable.height.toFloat()
+    modifier = modifier.fillMaxWidth()
+      .onSizeChanged {
+        if (bottomSheetState.showMaxHeight.floatValue == 0F) { // 第一次测量
+          bottomSheetState.showMaxHeight.floatValue = it.height.toFloat()
+          if (bottomSheetState.stateFlow.value == BottomSheetValueState.Collapsed) {
             bottomSheetState.showHeight.floatValue = bottomSheetState.peekHeight
+          } else if (bottomSheetState.stateFlow.value == BottomSheetValueState.Expanded) {
+            bottomSheetState.showHeight.floatValue = it.height.toFloat()
+          } else if (bottomSheetState.stateFlow.value == BottomSheetValueState.Hide) {
+            bottomSheetState.showHeight.floatValue = 0F
           }
-          placeable.place(
-            x = 0,
-            y = (bottomSheetState.contentHeight.floatValue - bottomSheetState.showHeight.floatValue).roundToInt()
-          )
         }
+      }.graphicsLayer {
+        translationY = size.height - bottomSheetState.showHeight.floatValue
       }
       .nestedScroll(remember(bottomSheetState) {
         BottomSheetNestedScrollConnection(
@@ -307,9 +324,11 @@ private fun BottomSheetContent(
   }
 }
 
+@Stable
 interface BottomSheetScope {
-  @Composable
-  fun Modifier.bottomSheetDraggable(): Modifier
+  // 这里直接使用 Modifier.bottomSheetDraggable(): Modifier 会出问题，使用处会经历两次 layout，原因未知
+  @Stable
+  fun bottomSheetDraggable(): Modifier
 }
 
 private class BottomSheetScopeImpl(
@@ -317,32 +336,33 @@ private class BottomSheetScopeImpl(
   private val bottomSheetState: BottomSheetState,
   private val flingBehavior: TargetedFlingBehavior,
 ) : BottomSheetScope {
-  @Composable
-  override fun Modifier.bottomSheetDraggable(): Modifier = this then draggable(
-    orientation = Orientation.Vertical,
-    state = rememberDraggableState {
-      bottomSheetState.scrollableState.dispatchRawDelta(it)
-    },
-    onDragStarted = {
-      bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
-        // 这里会打断惯性滑动
-        bottomSheetState.setState(BottomSheetValueState.Scrolling)
-      }
-    },
-    onDragStopped = { velocity ->
-      coroutineScope.launch {
-        bottomSheetState.scrollableState.scroll {
-          with(flingBehavior) {
-            performFling(velocity)
+  override fun bottomSheetDraggable(): Modifier = Modifier.composed {
+    draggable(
+      orientation = Orientation.Vertical,
+      state = rememberDraggableState {
+        bottomSheetState.scrollableState.dispatchRawDelta(it)
+      },
+      onDragStarted = {
+        bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
+          // 这里会打断惯性滑动
+          bottomSheetState.setState(BottomSheetValueState.Scrolling)
+        }
+      },
+      onDragStopped = { velocity ->
+        coroutineScope.launch {
+          bottomSheetState.scrollableState.scroll {
+            with(flingBehavior) {
+              performFling(velocity)
+            }
+            bottomSheetState.setState(
+              if (bottomSheetState.fraction == 0F)
+                BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
+            )
           }
-          bottomSheetState.setState(
-            if (bottomSheetState.fraction == 0F)
-              BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
-          )
         }
       }
-    }
-  )
+    )
+  }
 }
 
 private class BottomSheetNestedScrollConnection(
@@ -352,7 +372,7 @@ private class BottomSheetNestedScrollConnection(
 
   override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
     val min = bottomSheetState.peekHeight
-    val max = bottomSheetState.contentHeight.floatValue
+    val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
     // 先消耗手指向上的滑动
     if (available.y < 0) {
@@ -371,7 +391,7 @@ private class BottomSheetNestedScrollConnection(
     source: NestedScrollSource
   ): Offset {
     val min = bottomSheetState.peekHeight
-    val max = bottomSheetState.contentHeight.floatValue
+    val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
     // 再消耗手指向下的滑动，只有 手指拖动 或者 惯性滑动但已经不是完全展开时 才能消耗
     if (available.y > 0 && (source == NestedScrollSource.UserInput || old != max)) {
@@ -385,7 +405,7 @@ private class BottomSheetNestedScrollConnection(
   }
 
   override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-    val max = bottomSheetState.contentHeight.floatValue
+    val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
     if (old == max) return available.copy(x = 0F) // 完全展开时继续保持展开状态
     var consumeVelocity = available.y

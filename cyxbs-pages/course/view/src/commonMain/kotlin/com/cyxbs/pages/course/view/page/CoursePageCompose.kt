@@ -11,7 +11,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
-import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
 import com.cyxbs.pages.course.view.item.CourseItemContent

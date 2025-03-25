@@ -59,7 +59,7 @@ abstract class CourseBottomSheetFrame : CourseSemesterFrame() {
     ) {
       Column {
         CourseBottomSheetHeaderBackground(
-          modifier = Modifier.bottomSheetDraggable().clickableNoIndicator {
+          modifier = Modifier.then(bottomSheetDraggable()).clickableNoIndicator {
             if (bottomSheetState.state == BottomSheetValueState.Collapsed) {
               coroutineScope?.launch { bottomSheetState.expand() }
             }
