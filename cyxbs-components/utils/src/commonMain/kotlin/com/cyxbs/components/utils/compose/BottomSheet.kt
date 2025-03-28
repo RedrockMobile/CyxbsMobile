@@ -222,7 +222,6 @@ private fun BottomSheetBackgroundCompose(
         }
         if (dismissOnClickOutside) {
           clickableNoIndicator { // 这里给背景设置点击事件默认会拦截后面的 XML 布局，所以只有需要时才设置
-            logg("click")
             coroutineScope.launch {
               bottomSheetState.onDismissRequest.invoke(bottomSheetState)
             }
@@ -306,6 +305,7 @@ private fun BottomSheetContent(
       }.graphicsLayer {
         translationY = size.height - bottomSheetState.showHeight.floatValue
       }
+      .clickableNoIndicator { /*防止点击穿透*/ }
       .nestedScroll(remember(bottomSheetState) {
         BottomSheetNestedScrollConnection(
           bottomSheetState = bottomSheetState,

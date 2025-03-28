@@ -1,17 +1,19 @@
 package com.cyxbs.pages.course.view.item
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Card
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -58,7 +60,8 @@ interface CourseItem {
 
 @Composable
 fun CourseDefaultItemContent(
-  modifier: Modifier,
+  modifier: Modifier = Modifier,
+  lastModifier: Modifier = Modifier,
   timeline: CourseTimeline,
   overlap: OverlayData,
   topText: String,
@@ -66,27 +69,32 @@ fun CourseDefaultItemContent(
   textColor: Color,
   backgroundColor: Color,
 ) {
-  Box(modifier = modifier) {
-    CourseCardItem(
-      timeline = timeline,
-      beginTime = overlap.item.beginTime,
-      finalTime = overlap.item.finalTime,
-      backgroundColor = backgroundColor,
-    )
+  CourseCardItem(
+    modifier = modifier,
+    lastModifier = lastModifier,
+    timeline = timeline,
+    beginTime = overlap.item.beginTime,
+    finalTime = overlap.item.finalTime,
+    backgroundColor = backgroundColor,
+  ) {
     overlap.showRangeList.fastForEach {
       CourseItemTopBottomText(
-        modifier = Modifier.then(timeline.createLayoutModifier(it.begin, it.final))
-          .drawWithContent {
-            drawContent()
-            if (it.bottomCount > 0) {
-              drawRoundRect(
-                color = textColor,
-                topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),
-                size = Size(width = 6.dp.toPx(), height = 2.dp.toPx()),
-                cornerRadius = CornerRadius(1.dp.toPx()),
-              )
-            }
-          },
+        modifier = Modifier.then(
+          timeline.createLayoutModifier(
+            it.begin, it.final,
+            overlap.item.beginTime to overlap.item.finalTime,
+          )
+        ).drawWithContent {
+          drawContent()
+          if (it.bottomCount > 0) {
+            drawRoundRect(
+              color = textColor,
+              topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),
+              size = Size(width = 6.dp.toPx(), height = 2.dp.toPx()),
+              cornerRadius = CornerRadius(1.dp.toPx()),
+            )
+          }
+        },
         topText = topText,
         bottomText = bottomText,
         textColor = textColor,
@@ -98,23 +106,25 @@ fun CourseDefaultItemContent(
 @Composable
 fun CourseCardItem(
   modifier: Modifier = Modifier,
+  lastModifier: Modifier = Modifier,
   timeline: CourseTimeline,
   beginTime: MinuteTime,
   finalTime: MinuteTime,
   backgroundColor: Color,
   content: @Composable (() -> Unit)? = null,
 ) {
-  Card(
-    modifier = modifier.padding(1.5.dp)
-      .then(timeline.createLayoutModifier(beginTime, finalTime)),
-    shape = RoundedCornerShape(8.dp),
-    elevation = 0.5.dp,
-    contentColor = Color.Transparent,
-    backgroundColor = LocalAppColors.current.topBg, // 这里需要使用课表的背景颜色，在黑夜模式下遮挡 Card 的阴影
+  Box(
+    modifier = modifier
+      .then(timeline.createLayoutModifier(beginTime, finalTime))
+      .padding(0.5.dp)
+      .border(BorderStroke(0.5.dp, LocalAppColors.current.topBg), RoundedCornerShape(8.dp))
+      .padding(1.dp)
+      .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))
+      .background(LocalAppColors.current.topBg) // 遮挡 shadow 阴影
+      .background(backgroundColor)
+      .then(lastModifier)
   ) {
-    Box(modifier = Modifier.background(backgroundColor)) {
-      content?.invoke()
-    }
+    content?.invoke()
   }
 }
 

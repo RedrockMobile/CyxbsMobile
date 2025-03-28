@@ -46,7 +46,7 @@ class MobileSelfLessonItem(
   override val key: String = hashCode().toString()
 
   override fun toString(): String {
-    return "SelfLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
+    return "MobileSelfLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
         "course=${lesson.course})"
   }
 
@@ -54,7 +54,8 @@ class MobileSelfLessonItem(
   override fun Content(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
     val showDialog = remember { mutableStateOf(false) }
     CourseDefaultItemContent(
-      modifier = modifier.clickableNoIndicator {
+      modifier = modifier,
+      lastModifier = Modifier.clickableNoIndicator {
         showDialog.value = true
       },
       timeline = timeline,
@@ -78,6 +79,7 @@ class MobileSelfLessonItem(
   @Composable
   override fun HeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
+    val showDialog = remember { mutableStateOf(false) }
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -87,9 +89,7 @@ class MobileSelfLessonItem(
       finalTime = lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        // todo 弹起 BottomSheet dialog
-        // Umeng 埋点统计
-//        Umeng.sendEvent(Umeng.Event.CourseDetail(true))
+        showDialog.value = true
       },
       onClickContent = {
         // todo 跳转到地图页
@@ -98,6 +98,7 @@ class MobileSelfLessonItem(
 //        }
       },
     )
+    CourseBottomSheetDialog(showDialog)
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
@@ -44,14 +45,18 @@ class MobileLinkLessonItem(
   override val key: String = hashCode().toString()
 
   override fun toString(): String {
-    return "LinkLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
+    return "MobileLinkLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
         "course=${lesson.course})"
   }
 
   @Composable
   override fun Content(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
+    val showDialog = remember { mutableStateOf(false) }
     CourseDefaultItemContent(
       modifier = modifier,
+      lastModifier = Modifier.clickableNoIndicator {
+        showDialog.value = true
+      },
       timeline = timeline,
       overlap = overlap,
       topText = lesson.course,
@@ -59,11 +64,13 @@ class MobileLinkLessonItem(
       textColor = 0xFF06A3FC.dark(0xFFF0F0F2),
       backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
     )
+    CourseBottomSheetDialog(showDialog, true)
   }
 
   @Composable
   override fun HeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
+    val showDialog = remember { mutableStateOf(false) }
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -73,7 +80,7 @@ class MobileLinkLessonItem(
       finalTime = lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        // todo 弹起 BottomSheet dialog
+        showDialog.value = true
       },
       onClickContent = {
         // todo 跳转到地图页
@@ -82,6 +89,7 @@ class MobileLinkLessonItem(
 //        }
       },
     )
+    CourseBottomSheetDialog(showDialog, true)
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()

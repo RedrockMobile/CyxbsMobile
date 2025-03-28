@@ -5,6 +5,7 @@ import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.sp.accountSettingsFlow
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.Network
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.bean.LinkStuBean
@@ -35,7 +36,7 @@ object LinkLessonRepository {
 
   fun changeLinkStu(linkStuNum: String) {
     appCoroutineScope.launch {
-      runCatching {
+      runCatchingCoroutine {
         Network.createCourseApiService().changeLinkStudent(linkStuNum)
       }.mapCatching {
         it.throwApiExceptionIfFail()
@@ -91,7 +92,7 @@ object LinkLessonRepository {
   }
 
   private suspend fun requestLinkStu(): Result<LinkStuBean> {
-    return runCatching {
+    return runCatchingCoroutine {
       Network.createCourseApiService().getLinkStudent()
     }.mapCatching {
       it.throwApiExceptionIfFail()

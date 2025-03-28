@@ -2,10 +2,14 @@ package com.cyxbs.components.view.ui
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.activity.addCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +42,7 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.cyxbs.components.view.R
+import com.google.android.material.internal.EdgeToEdgeUtils
 import java.util.UUID
 
 /**
@@ -132,6 +137,14 @@ private class WindowDialog(
 
     // Initial setup
     updateParameters(dismissOnBackPress, layoutDirection)
+  }
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    val window = window!!
+    window.statusBarColor = 0 // 仿照 BottomSheetDialog 代码设置状态栏透明，暂时未找到新版本的配置
+    window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+    window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
   }
 
   private fun setLayoutDirection(layoutDirection: LayoutDirection) {

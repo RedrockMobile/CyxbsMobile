@@ -48,12 +48,19 @@ data class CourseTimeline(
   val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
 
+  /**
+   * 根据开始和结束时间计算比例后进行布局的方法
+   * @param parent 父区域的开始和结束时间，如果为 null 则为整个时间轴
+   */
   fun createLayoutModifier(
     beginTime: MinuteTime,
     finalTime: MinuteTime,
+    parent: Pair<MinuteTime, MinuteTime>? = null,
   ) : Modifier {
     return Modifier.layout { measurable, constraints ->
-      val weight = calculateBeginFinalWeight(beginTime, finalTime)
+      val weight =
+        if (parent == null) calculateBeginFinalWeight(beginTime, finalTime)
+        else calculateRelativeWeight(beginTime, finalTime, parent.first, parent.second)
       val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
       val placeable = measurable.measure(
         Constraints.fixed(constraints.maxWidth, height)
@@ -72,24 +79,20 @@ data class CourseTimeline(
     beginTime: MinuteTime,
     finalTime: MinuteTime,
   ) : Offset {
-    val beginTimeInt = beginTime.minuteOfDay
-    val finalTimeInt = finalTime.minuteOfDay
     var startWeight = 0F
     var endWeight = 0F
     var allWeight = 0F
     data.fastForEach {
       allWeight += it.nowWeight
-      val startLine = it.startTime.minuteOfDay
-      val endLine = it.endTime.minuteOfDay
-      if (beginTimeInt >= endLine) {
+      if (beginTime >= it.endTime) {
         startWeight += it.nowWeight
-      } else if (beginTimeInt >= startLine) {
-        startWeight += (beginTimeInt - startLine) / (endLine - startLine).toFloat() * it.nowWeight
+      } else if (beginTime >= it.startTime) {
+        startWeight += it.startTime.minutesUntil(beginTime) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
       }
-      if (finalTimeInt >= endLine) {
+      if (finalTime >= it.endTime) {
         endWeight += it.nowWeight
-      } else if (finalTimeInt >= startLine) {
-        endWeight += (finalTimeInt - startLine) / (endLine - startLine).toFloat() * it.nowWeight
+      } else if (finalTime >= it.startTime) {
+        endWeight += it.startTime.minutesUntil(finalTime) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
       }
     }
     return Offset(
@@ -106,18 +109,57 @@ data class CourseTimeline(
   ): Float {
     var allWeight = 0F
     var nowWeight = 0F
-    val now = time.minuteOfDay
     data.fastForEach {
       allWeight += it.nowWeight
-      val start = it.startTime.minuteOfDay
-      val end = it.endTime.minuteOfDay
-      if (now >= end) {
+      if (time >= it.endTime) {
         nowWeight += it.nowWeight
-      } else if (now >= start) {
-        nowWeight += (now - start) / (end - start).toFloat() * it.nowWeight
+      } else if (time >= it.startTime) {
+        nowWeight += it.startTime.minutesUntil(time) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
       }
     }
     return nowWeight / allWeight
+  }
+
+  /**
+   * 计算 [beginTime1] [finalTime1] 在 [beginTime2] [finalTime2] 上的占比
+   * @return Offset(startWeight, endWeight)
+   */
+  fun calculateRelativeWeight(
+    beginTime1: MinuteTime,
+    finalTime1: MinuteTime,
+    beginTime2: MinuteTime,
+    finalTime2: MinuteTime,
+  ): Offset {
+    var startWeight1 = 0F
+    var endWeight1 = 0F
+    var startWeight2 = 0F
+    var endWeight2 = 0F
+    data.fastForEach {
+      if (beginTime1 >= it.endTime) {
+        startWeight1 += it.nowWeight
+      } else if (beginTime1 >= it.startTime) {
+        startWeight1 += it.startTime.minutesUntil(beginTime1) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
+      }
+      if (finalTime1 >= it.endTime) {
+        endWeight1 += it.nowWeight
+      } else if (finalTime1 >= it.startTime) {
+        endWeight1 += it.startTime.minutesUntil(finalTime1) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
+      }
+      if (beginTime2 >= it.endTime) {
+        startWeight2 += it.nowWeight
+      } else if (beginTime2 >= it.startTime) {
+        startWeight2 += it.startTime.minutesUntil(beginTime2) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
+      }
+      if (finalTime2 >= it.endTime) {
+        endWeight2 += it.nowWeight
+      } else if (finalTime2 >= it.startTime) {
+        endWeight2 += it.startTime.minutesUntil(finalTime2) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
+      }
+    }
+    return Offset(
+      x = (startWeight1 - startWeight2) / (endWeight2 - startWeight2),
+      y = (endWeight1 - startWeight2) / (endWeight2 - startWeight2),
+    )
   }
 }
 
