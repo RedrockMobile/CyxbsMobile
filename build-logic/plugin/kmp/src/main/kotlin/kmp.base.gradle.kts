@@ -32,7 +32,7 @@ kotlin {
   if (Multiplatform.enableWasm(project)) {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-      moduleName = Config.getBaseName(project)
+      outputModuleName.set(Config.getBaseName(project))
       browser {
         val rootDirPath = project.rootDir.path
         val projectDirPath = project.projectDir.path
