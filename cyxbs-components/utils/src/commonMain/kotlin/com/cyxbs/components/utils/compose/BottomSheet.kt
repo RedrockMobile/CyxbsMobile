@@ -210,14 +210,13 @@ private fun BottomSheetBackgroundCompose(
       .focusable()
       .plusDsl {
         if (dismissOnBackPress) {
-          onKeyEvent {
-            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) {
-              // 键盘按下 esc 后 dismiss
-              coroutineScope.launch {
-                bottomSheetState.onDismissRequest.invoke(bottomSheetState)
-              }
-              true
-            } else false
+          val enable by rememberDerivedStateOfStructure {
+            bottomSheetState.state == BottomSheetValueState.Expanded
+          }
+          backHandler(enabled = enable) {
+            coroutineScope.launch {
+              bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+            }
           }
         }
         if (dismissOnClickOutside) {
