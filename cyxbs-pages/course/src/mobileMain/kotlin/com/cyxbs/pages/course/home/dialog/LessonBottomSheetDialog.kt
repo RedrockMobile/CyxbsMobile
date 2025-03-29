@@ -1,9 +1,10 @@
-package com.cyxbs.pages.course.home.item
+package com.cyxbs.pages.course.home.dialog
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -12,7 +13,6 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -22,52 +22,23 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
-import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
-import com.cyxbs.pages.course.view.item.CourseItem
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
-import kotlinx.datetime.DayOfWeek
 import org.jetbrains.compose.resources.painterResource
 
 /**
  * .
  *
  * @author 985892345
- * @date 2025/3/25
+ * @date 2025/3/29
  */
-abstract class MobileLessonItem(
-  override val page: Int,
-  val lesson: LessonByWeeks
-) : CourseItem, BottomSheetItemHeader {
-  override val dayOfWeek: DayOfWeek
-    get() = lesson.dayOfWeek
-  override val beginTime: MinuteTime
-    get() = lesson.beginTime
-  override val finalTime: MinuteTime
-    get() = lesson.finalTime
-
-  @Composable
-  fun CourseBottomSheetDialog(
-    visibleState: MutableState<Boolean>,
-    enableShowLinkIcon: Boolean = false,
-  ) {
-    MobileCourseBottomSheetDialog(
-      visibleState = visibleState,
-    ) {
-      LessonBottomSheetDialog(lesson, enableShowLinkIcon)
-    }
-  }
-}
-
 @Composable
-private fun LessonBottomSheetDialog(lesson: LessonByWeeks, enableShowLinkIcon: Boolean) {
+fun LessonBottomSheetDialog(lesson: LessonByWeeks, enableShowLinkIcon: Boolean) {
   Column(
-    modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 24.dp)
+    modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
   ) {
     TitleWithLinkIcon(lesson.course, enableShowLinkIcon)
     ClassroomWithTeacher(lesson.classroom, lesson.teacher)
@@ -101,10 +72,12 @@ private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
       }
     },
     measurePolicy = { measurables, constraints ->
-      val icon = measurables.getOrNull(1)?.measure(Constraints(
-        maxWidth = constraints.maxWidth,
-        maxHeight = constraints.maxHeight,
-      ))
+      val icon = measurables.getOrNull(1)?.measure(
+        Constraints(
+          maxWidth = constraints.maxWidth,
+          maxHeight = constraints.maxHeight,
+        )
+      )
       val textTitle = measurables[0].measure(
         Constraints(
           maxWidth = constraints.maxWidth - (icon?.width?.plus(16.dp.roundToPx()) ?: 0),

@@ -8,9 +8,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.dialog.BottomSheetDialogContent
+import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
+import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
+import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
@@ -19,6 +22,7 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.minutes
@@ -32,9 +36,9 @@ import kotlin.time.Duration.Companion.seconds
  */
 @Stable
 class MobileSelfLessonItem(
-  page: Int, // 为 0 则表示整学期，否则表示第几周
-  lesson: LessonByWeeks,
-) : MobileLessonItem(page, lesson) {
+  override val page: Int, // 为 0 则表示整学期，否则表示第几周
+  val lesson: LessonByWeeks,
+) : CourseItem, BottomSheetItemHeader, BottomSheetDialogContent {
 
   @ImplProvider
   companion object : SelfLessonItemFactory {
@@ -45,19 +49,23 @@ class MobileSelfLessonItem(
 
   override val key: String = hashCode().toString()
 
+  override val dayOfWeek: DayOfWeek
+    get() = lesson.dayOfWeek
+  override val beginTime: MinuteTime
+    get() = lesson.beginTime
+  override val finalTime: MinuteTime
+    get() = lesson.finalTime
+
   override fun toString(): String {
     return "MobileSelfLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
         "course=${lesson.course})"
   }
 
   @Composable
-  override fun Content(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
-    val showDialog = remember { mutableStateOf(false) }
+  override fun CourseItemContent(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
+    val dialogContents = remember { mutableStateOf(emptyList<BottomSheetDialogContent>()) }
     CourseDefaultItemContent(
       modifier = modifier,
-      lastModifier = Modifier.clickableNoIndicator {
-        showDialog.value = true
-      },
       timeline = timeline,
       overlap = overlap,
       topText = lesson.course,
@@ -72,14 +80,18 @@ class MobileSelfLessonItem(
         beginTime < MinuteTime(18, 0) -> 0xFFF9E3E4.dark(0x26FF979B)
         else -> 0xFFDDE3F8.dark(0x269BB2FF)
       },
-    )
-    CourseBottomSheetDialog(showDialog)
+    ) { range ->
+      dialogContents.value = listOf(this) + range.coveredItems.mapNotNull {
+        it as? BottomSheetDialogContent
+      }
+    }
+    MobileCourseBottomSheetDialog(dialogContents = dialogContents)
   }
 
   @Composable
-  override fun HeaderContent(modifier: Modifier) {
+  override fun BottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
-    val showDialog = remember { mutableStateOf(false) }
+    val dialogContents = remember { mutableStateOf(emptyList<BottomSheetDialogContent>()) }
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -89,7 +101,7 @@ class MobileSelfLessonItem(
       finalTime = lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        showDialog.value = true
+        dialogContents.value = listOf(this)
       },
       onClickContent = {
         // todo 跳转到地图页
@@ -98,7 +110,7 @@ class MobileSelfLessonItem(
 //        }
       },
     )
-    CourseBottomSheetDialog(showDialog)
+    MobileCourseBottomSheetDialog(dialogContents = dialogContents)
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()
@@ -114,6 +126,11 @@ class MobileSelfLessonItem(
         state.value = "明天"
       }
     }
+  }
+
+  @Composable
+  override fun BottomSheetDialogContent() {
+    LessonBottomSheetDialog(lesson, false)
   }
 }
 

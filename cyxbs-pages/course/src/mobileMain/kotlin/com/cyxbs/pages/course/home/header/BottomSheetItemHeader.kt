@@ -37,7 +37,7 @@ import org.jetbrains.compose.resources.painterResource
 interface BottomSheetItemHeader {
 
   @Composable
-  fun HeaderContent(modifier: Modifier)
+  fun BottomSheetHeaderContent(modifier: Modifier)
 }
 
 // 只显示文本的 BottomSheet Header
@@ -49,7 +49,7 @@ class HintBottomSheetItemHeader(
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
-  override fun HeaderContent(modifier: Modifier) {
+  override fun BottomSheetHeaderContent(modifier: Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
       Text(
         modifier = Modifier

@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.pages.course.view.data.CoveredRange
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.datetime.DayOfWeek
@@ -51,7 +53,7 @@ interface CourseItem {
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
    */
   @Composable
-  fun Content(
+  fun CourseItemContent(
     modifier: Modifier,
     overlap: OverlayData,
     timeline: CourseTimeline,
@@ -68,6 +70,7 @@ fun CourseDefaultItemContent(
   bottomText: String,
   textColor: Color,
   backgroundColor: Color,
+  onClick: ((CoveredRange) -> Unit)? = null,
 ) {
   CourseCardItem(
     modifier = modifier,
@@ -86,7 +89,7 @@ fun CourseDefaultItemContent(
           )
         ).drawWithContent {
           drawContent()
-          if (it.bottomCount > 0) {
+          if (it.coveredItems.size > 0) {
             drawRoundRect(
               color = textColor,
               topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),
@@ -94,6 +97,8 @@ fun CourseDefaultItemContent(
               cornerRadius = CornerRadius(1.dp.toPx()),
             )
           }
+        }.clickableNoIndicator {
+          onClick?.invoke(it)
         },
         topText = topText,
         bottomText = bottomText,

@@ -36,7 +36,7 @@ class MobileAffairItem(
     get() = TODO("Not yet implemented")
 
   @Composable
-  override fun Content(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
+  override fun CourseItemContent(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
     TODO("Not yet implemented")
   }
 }

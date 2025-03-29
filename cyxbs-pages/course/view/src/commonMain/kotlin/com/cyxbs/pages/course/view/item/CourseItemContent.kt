@@ -24,7 +24,7 @@ data class CourseItemContent(
 
   @Composable
   fun Content(modifier: Modifier, timeline: CourseTimeline) {
-    item.Content(
+    item.CourseItemContent(
       modifier = modifier,
       overlap = overlap,
       timeline = timeline,

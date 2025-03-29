@@ -121,7 +121,7 @@ private fun MobileHomeCourseOuterHeader(
 ) {
   var header by remember(frame) { mutableStateOf<BottomSheetItemHeader>(EmptyHeader) }
   key(header) {
-    header.HeaderContent(modifier)
+    header.BottomSheetHeaderContent(modifier)
   }
   LaunchedEffect(frame) {
     val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())

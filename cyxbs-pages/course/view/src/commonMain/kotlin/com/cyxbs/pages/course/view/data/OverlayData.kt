@@ -18,7 +18,7 @@ data class OverlayData(
 data class CoveredRange(
   val begin: MinuteTime,
   val final: MinuteTime,
-  var bottomCount: Int = 0, // 覆盖的 item 数量
+  val coveredItems: MutableList<CourseItem> = mutableListOf(), // 被覆盖的 item
 )
 
 object OverlayManager {
@@ -73,12 +73,12 @@ object OverlayManager {
         // 剩下的部分为
         // ----??????
         // ========
-        opFinal(now.begin, item.finalTime, coveredList, index + 1, showRangeList, coveredRangeList)
+        opFinal(item, now.begin, item.finalTime, coveredList, index + 1, showRangeList, coveredRangeList)
       } else {
         // 此时 now.begin ≤ item.begin < now.final
         // -----??????
         //    ======
-        opFinal(item.beginTime, item.finalTime, coveredList, index, showRangeList, coveredRangeList)
+        opFinal(item, item.beginTime, item.finalTime, coveredList, index, showRangeList, coveredRangeList)
       }
     }
     return OverlayData(item, showRangeList, coveredRangeList)
@@ -87,9 +87,10 @@ object OverlayManager {
   // 第一次进入的条件为： now.begin ≤ begin < now.final
   // 计算 final、now.final、next.begin 三者之间的关系
   private fun opFinal(
+    item: CourseItem,
     begin: MinuteTime,
     final: MinuteTime,
-    coveredList: MutableList<CoveredRange>,
+    parentCoveredList: MutableList<CoveredRange>,
     index: Int,
     showRangeList: MutableList<CoveredRange>,
     coveredRangeList: MutableList<CoveredRange>,
@@ -97,8 +98,8 @@ object OverlayManager {
     // 此时与 now 在起始部分肯定存在交集
     // -----??????
     //    ======
-    val now = coveredList[index]
-    now.bottomCount++
+    val now = parentCoveredList[index]
+    now.coveredItems.add(item)
     if (final <= now.final) {
       coveredRangeList.add(CoveredRange(begin, final))
       return // 被完全包含
@@ -106,7 +107,7 @@ object OverlayManager {
     // 接下来是 now.begin ≤ begin < now.final < final
     // -----
     //    ======
-    val next = coveredList.getOrNull(index + 1)
+    val next = parentCoveredList.getOrNull(index + 1)
     if (next == null || final <= next.begin) {
       // 此时 now.final < final ≤ next.begin
       // -----      +++++
@@ -115,7 +116,7 @@ object OverlayManager {
       coveredRangeList.add(coveredRange)
       val showRange = CoveredRange(now.final, final)
       showRangeList.add(showRange)
-      coveredList.add(index + 1, showRange)
+      parentCoveredList.add(index + 1, showRange)
     } else {
       // 此时 final > next.begin
       // -----???+++++
@@ -128,15 +129,15 @@ object OverlayManager {
         coveredRangeList.add(coveredRange)
         val showRange = CoveredRange(now.final, next.begin)
         showRangeList.add(showRange)
-        coveredList.add(index + 1, showRange)
-        opFinal(next.begin, final, coveredList, index + 2, showRangeList, coveredRangeList)
+        parentCoveredList.add(index + 1, showRange)
+        opFinal(item, next.begin, final, parentCoveredList, index + 2, showRangeList, coveredRangeList)
       } else {
         // 此时 now.final = next.begin
         // -----+++++
         //   ======
         // 这里放入的 begin < next.begin，与 opFinal 调用条件不符
         // 但是对于 begin 这个字段并不会进行判断，所以是允许这样使用的
-        opFinal(begin, final, coveredList, index + 1, showRangeList, coveredRangeList)
+        opFinal(item, begin, final, parentCoveredList, index + 1, showRangeList, coveredRangeList)
       }
     }
   }
