@@ -1,8 +1,6 @@
 package com.cyxbs.pages.course.view.item
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -121,9 +119,9 @@ fun CourseCardItem(
   Box(
     modifier = modifier
       .then(timeline.createLayoutModifier(beginTime, finalTime))
-      .padding(0.5.dp)
-      .border(BorderStroke(0.5.dp, LocalAppColors.current.topBg), RoundedCornerShape(8.dp))
       .padding(1.dp)
+      .background(LocalAppColors.current.topBg, RoundedCornerShape(8.dp))
+      .padding(0.6.dp)
       .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))
       .background(LocalAppColors.current.topBg) // 遮挡 shadow 阴影
       .background(backgroundColor)

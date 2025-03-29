@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,7 +76,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val service = remember { IMobileHomeCourseService::class.impl() }
   service.Content(
-    modifier = modifier.statusBarsPadding(),
+    modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
   ) { bottomSheetState ->
     LaunchedEffect(bottomSheetState) {

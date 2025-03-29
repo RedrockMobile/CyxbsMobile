@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -55,9 +56,9 @@ fun MobileCourseBottomSheetDialog(
         modifier = Modifier,
         bottomSheetState = bottomSheetState,
         dismissOnClickOutside = true,
-//        scrimColor = Color.Transparent,
+        scrimColor = Color.Transparent,
       ) {
-        Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
+        Box(modifier = Modifier.navigationBarsPadding().fillMaxWidth().height(280.dp)) {
           Spacer(
             modifier = Modifier.fillMaxWidth().height(36.dp).background(
               brush = Brush.verticalGradient(
