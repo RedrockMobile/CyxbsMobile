@@ -2,18 +2,17 @@ package com.cyxbs.pages.course.model
 
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.network.Network
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.bean.StuLessonBean
-import com.cyxbs.pages.course.network.createCourseApiService
+import com.cyxbs.pages.course.network.CourseApiService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.encodeToString
 
 /**
  * .
@@ -55,7 +54,7 @@ object LessonRepository {
   suspend fun requestLesson(stuNum: String): Result<List<LessonByWeeks>> {
     val requestTime = Clock.System.now()
     return runCatchingCoroutine {
-      Network.createCourseApiService().getStuLesson(stuNum)
+      CourseApiService::class.impl().getStuLesson(stuNum)
     }.onSuccess {
       // 设置 nowWeek
       SchoolCalendar.updateFirstCalendar(it.nowWeek)

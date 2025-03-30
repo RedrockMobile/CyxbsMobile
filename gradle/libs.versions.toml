@@ -178,6 +178,8 @@ leakcanary = "2.13"
 pandora = "androidx_v2.1.0"
 # 字节很好用调试工具 https://github.com/bytedance/CodeLocator
 codelocator = "2.0.4"
+# https://github.com/square/kotlinpoet
+kotlinpoet = "2.1.0"
 
 [libraries]
 ####################################################################################################
@@ -296,6 +298,7 @@ rxpermissions = { module = "com.github.tbruyelle:rxpermissions", version.ref = "
 leakcanary = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }      # 内存泄漏
 pandora = { module = "com.github.whataa:pandora", version.ref = "pandora" }         # 很牛逼的 debug 检测工具，debug 模式下摇一摇手机或者按三次手机中间顶部区域触发
 codeLocator-core = { module = "com.bytedance.tools.codelocator:codelocator-core", version.ref = "codelocator" }
+kotlinpoet = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 
 ####################################### 公有依赖，大部分模块使用 #######################################
 eventBus = { module = "org.greenrobot:eventbus", version.ref = "eventBus" }

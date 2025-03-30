@@ -1,15 +1,15 @@
 package com.cyxbs.pages.course.model
 
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.sp.accountSettingsFlow
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
-import com.cyxbs.components.utils.network.Network
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.bean.LinkStuBean
-import com.cyxbs.pages.course.network.createCourseApiService
+import com.cyxbs.pages.course.network.CourseApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 
 /**
  * .
@@ -37,7 +36,7 @@ object LinkLessonRepository {
   fun changeLinkStu(linkStuNum: String) {
     appCoroutineScope.launch {
       runCatchingCoroutine {
-        Network.createCourseApiService().changeLinkStudent(linkStuNum)
+        CourseApiService::class.impl().changeLinkStudent(linkStuNum)
       }.mapCatching {
         it.throwApiExceptionIfFail()
         it.data
@@ -93,7 +92,7 @@ object LinkLessonRepository {
 
   private suspend fun requestLinkStu(): Result<LinkStuBean> {
     return runCatchingCoroutine {
-      Network.createCourseApiService().getLinkStudent()
+      CourseApiService::class.impl().getLinkStudent()
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it.data
