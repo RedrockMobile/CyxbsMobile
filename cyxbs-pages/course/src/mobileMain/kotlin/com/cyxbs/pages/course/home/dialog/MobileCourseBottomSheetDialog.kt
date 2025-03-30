@@ -29,8 +29,9 @@ import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
-import com.cyxbs.components.view.ui.rememberBottomSheetState
 import com.cyxbs.components.view.ui.Window
+import com.cyxbs.components.view.ui.rememberBottomSheetState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.math.hypot
 import kotlin.math.max
@@ -78,7 +79,11 @@ fun MobileCourseBottomSheetDialog(
         }
       }
       LaunchedEffect(Unit) {
-        bottomSheetState.expand()
+        try {
+          bottomSheetState.expand()
+        } catch (e: CancellationException) {
+          // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
+        }
         bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
         dialogContents.value = emptyList()
       }
