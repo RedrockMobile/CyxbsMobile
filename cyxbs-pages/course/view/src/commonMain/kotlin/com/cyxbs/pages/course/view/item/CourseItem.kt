@@ -37,8 +37,9 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.pages.course.view.data.CoveredRange
-import com.cyxbs.pages.course.view.data.OverlayData
+import com.cyxbs.pages.course.view.overlay.CoveredRange
+import com.cyxbs.pages.course.view.overlay.LocalOverlayController
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
@@ -87,8 +88,7 @@ fun CourseDefaultItemContent(
     modifier = modifier,
     lastModifier = lastModifier,
     timeline = timeline,
-    beginTime = overlap.item.beginTime,
-    finalTime = overlap.item.finalTime,
+    item = overlap.item,
     backgroundColor = backgroundColor,
   ) {
     overlap.showRangeList.fastForEach {
@@ -124,16 +124,15 @@ fun CourseCardItem(
   modifier: Modifier = Modifier,
   lastModifier: Modifier = Modifier,
   timeline: CourseTimeline,
-  beginTime: MinuteTime,
-  finalTime: MinuteTime,
+  item: CourseItem,
   backgroundColor: Color,
   content: @Composable (() -> Unit)? = null,
 ) {
   Box(
     modifier = modifier
-      .then(timeline.createLayoutModifier(beginTime, finalTime))
+      .then(timeline.createLayoutModifier(item.beginTime, item.finalTime))
       .padding(1.dp)
-      .pointerPressRation() // 点击后的 Q 弹动画
+      .pointerPressRation(item) // 点击后的 Q 弹动画
       .background(LocalAppColors.current.topBg, RoundedCornerShape(8.dp))
       .padding(0.6.dp)
       .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))
@@ -204,16 +203,19 @@ fun CourseItemTopBottomText(
 // 点击后的 Q 弹动画实现
 @Stable
 @Composable
-private fun Modifier.pointerPressRation(key: Any? = null): Modifier {
+private fun Modifier.pointerPressRation(item: CourseItem): Modifier {
   val pointerOffset = remember { Wrapper<Offset?>(null) }
   val scale = remember { Animatable(initialValue = 1F) }
   val coroutineScope = rememberCoroutineScope()
-  return pointerInput(key) {
+  val localOverlayController = LocalOverlayController.current
+  return pointerInput(item) {
     awaitEachGesture {
       val down = awaitFirstDown(pass = PointerEventPass.Initial)
       pointerOffset.value = down.position
       coroutineScope.launch {
-        scale.animateTo(0.85F)
+        // 点击后会缩小，这里让被覆盖的 item 显示出来
+        localOverlayController.ignoreCoverOther(item, true)
+        scale.animateTo(0.8F)
       }
       while (true) {
         val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -228,6 +230,7 @@ private fun Modifier.pointerPressRation(key: Any? = null): Modifier {
           pointerOffset.value = null
           coroutineScope.launch {
             scale.animateTo(1F)
+            localOverlayController.ignoreCoverOther(item, false)
           }
           break
         }

@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.view.item
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
-import com.cyxbs.pages.course.view.data.OverlayData
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
 /**

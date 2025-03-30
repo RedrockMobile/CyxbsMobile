@@ -15,7 +15,7 @@ import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
-import com.cyxbs.pages.course.view.data.OverlayData
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline

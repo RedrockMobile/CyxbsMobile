@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.data.OverlayData
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.g985892345.provider.api.annotation.ImplProvider

@@ -6,9 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemContent
+import com.cyxbs.pages.course.view.overlay.IOverlayController
+import com.cyxbs.pages.course.view.overlay.OverlayManager
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
@@ -59,7 +60,7 @@ class CourseWeekDataPool(
 class CourseDayDataPool(
   val dayOfWeek: DayOfWeek,
   val weekDataPool: CourseWeekDataPool,
-) {
+) : IOverlayController {
 
   val state: MutableState<List<CourseItemContent>> = mutableStateOf(emptyList())
 
@@ -69,15 +70,18 @@ class CourseDayDataPool(
   // 刷新数据的 Runnable，为避免频繁刷新，设计成在下一个消息队列中才会触发
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
 
+  // 将不参与覆盖其他 item 的计算
+  private val ignoreCoverOther = mutableSetOf<CourseItem>()
+
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
-    val coveredList = mutableListOf<CoveredRange>()
     val itemList = weekDataPool.providers.map {
       it.getDayData(weekDataPool.page, dayOfWeek).sortedWith(it::compare)
     }.asReversed().flatten()
     state.value = OverlayManager.getSingleDayOverlapData(
       input = itemList,
-      coveredList = coveredList,
+      coveredList = mutableListOf(),
+      ignoreCoverOther = ignoreCoverOther,
     ).map {
       CourseItemContent(it)
     }
@@ -96,6 +100,14 @@ class CourseDayDataPool(
         isPostRunnable = false
         setStateRunnable.run()
       }
+    }
+  }
+
+  override fun ignoreCoverOther(item: CourseItem, enable: Boolean) {
+    if (enable && ignoreCoverOther.add(item)) {
+      refreshByItemSet()
+    } else if (!enable && ignoreCoverOther.remove(item)) {
+      refreshByItemSet()
     }
   }
 }

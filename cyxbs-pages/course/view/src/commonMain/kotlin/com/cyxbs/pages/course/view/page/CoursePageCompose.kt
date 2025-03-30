@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
@@ -14,6 +15,7 @@ import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
 import com.cyxbs.pages.course.view.item.CourseItemContent
+import com.cyxbs.pages.course.view.overlay.LocalOverlayController
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
@@ -72,13 +74,18 @@ fun CoursePageCompose(
 private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: CourseTimeline) {
   repeat(7) { index ->
     val dayOfWeek = timeline.beginDayOfWeek.add(index)
-    weekDataPool.get(dayOfWeek).state.value.fastForEach { content ->
-      key(content.key) {
-        CourseItemContent(
-          content = content,
-          timeline = timeline,
-          index = index,
-        )
+    val dayDataPool = weekDataPool.get(dayOfWeek)
+    CompositionLocalProvider(
+      LocalOverlayController provides dayDataPool,
+    ) {
+      dayDataPool.state.value.fastForEach { content ->
+        key(content.key) {
+          CourseItemContent(
+            content = content,
+            timeline = timeline,
+            index = index,
+          )
+        }
       }
     }
   }
