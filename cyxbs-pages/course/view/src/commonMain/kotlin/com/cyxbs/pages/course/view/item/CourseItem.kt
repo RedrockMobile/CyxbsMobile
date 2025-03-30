@@ -1,6 +1,9 @@
 package com.cyxbs.pages.course.view.item
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
@@ -16,6 +21,12 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.isOutOfBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,10 +35,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.pages.course.view.data.CoveredRange
 import com.cyxbs.pages.course.view.data.OverlayData
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -120,6 +133,7 @@ fun CourseCardItem(
     modifier = modifier
       .then(timeline.createLayoutModifier(beginTime, finalTime))
       .padding(1.dp)
+      .pointerPressRation() // 点击后的 Q 弹动画
       .background(LocalAppColors.current.topBg, RoundedCornerShape(8.dp))
       .padding(0.6.dp)
       .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))
@@ -185,4 +199,49 @@ fun CourseItemTopBottomText(
       }
     }
   )
+}
+
+// 点击后的 Q 弹动画实现
+@Stable
+@Composable
+private fun Modifier.pointerPressRation(key: Any? = null): Modifier {
+  val pointerOffset = remember { Wrapper<Offset?>(null) }
+  val scale = remember { Animatable(initialValue = 1F) }
+  val coroutineScope = rememberCoroutineScope()
+  return pointerInput(key) {
+    awaitEachGesture {
+      val down = awaitFirstDown(pass = PointerEventPass.Initial)
+      pointerOffset.value = down.position
+      coroutineScope.launch {
+        scale.animateTo(0.85F)
+      }
+      while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val pointer = event.changes.firstOrNull { it.id == down.id }
+        if (
+          pointer == null ||
+          pointer.isConsumed || // 被消耗
+          pointer.changedToUp() || // 抬起
+          pointer.isOutOfBounds(size, Size.Zero) || // 越界
+          pointer.positionChange().getDistance() > viewConfiguration.touchSlop // 移动距离过大
+        ) {
+          pointerOffset.value = null
+          coroutineScope.launch {
+            scale.animateTo(1F)
+          }
+          break
+        }
+      }
+    }
+  }.graphicsLayer {
+    scaleX = scale.value
+    scaleY = scale.value
+    val pointer = pointerOffset.value
+    if (pointer != null) {
+      val centerX = size.width / 2F
+      val centerY = size.height / 2F
+      rotationX = -(pointer.y - centerY) / centerY * ((-0.0023F * size.height + 1.7F) * 16) // 上下翻转
+      rotationY = (pointer.x - centerX) / centerX * ((-0.0023F * size.width + 1.7F) * 10) // 左右翻转
+    }
+  }
 }
