@@ -24,6 +24,7 @@ import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.mobile.ui.MobileHomePage
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
+import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
 import com.cyxbs.pages.home.viewmodel.MainViewModel
 import com.cyxbs.pages.login.api.ILoginService
 import kotlinx.coroutines.launch
@@ -42,6 +43,7 @@ class MainActivity : BaseActivity() {
   
   private val mViewModel by viewModels<MainViewModel>()
   private val mBottomNavViewModel by viewModels<BottomNavViewModel>()
+  private val mCourseFrameViewModel by viewModels<CourseFrameViewModel>()
   
   private val mAccountService = IAccountService::class.impl()
 
@@ -102,7 +104,7 @@ class MainActivity : BaseActivity() {
     when (intent.action) {
       DESKTOP_SHORTCUT_COURSE -> {
         if (mIsLogin) {
-          mViewModel.courseBottomSheetExpand.value = true
+          launch { mCourseFrameViewModel.frame.bottomSheetState.expand() }
         }
       }
       // 因政策问题暂时关闭
@@ -120,7 +122,7 @@ class MainActivity : BaseActivity() {
       else -> {
         if (mIsLogin && defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
           // 打开应用优先显示课表的设置
-          mViewModel.courseBottomSheetExpand.value = true
+          launch { mCourseFrameViewModel.frame.bottomSheetState.expand() }
         }
       }
     }
@@ -129,13 +131,7 @@ class MainActivity : BaseActivity() {
   private fun initBottomNav() {
     mBottomNavViewModel.selectedItem.collectLaunch {
       when (it) {
-        mBottomNavViewModel.discoverItem, mBottomNavViewModel.mineItem -> {
-          if (mViewModel.courseBottomSheetExpand.value == null) {
-            mViewModel.courseBottomSheetExpand.value = false // todo 待实现 BottomSheet 的控制
-          }
-        }
         mBottomNavViewModel.fairgroundItem -> {
-          mViewModel.courseBottomSheetExpand.value = null
           if (mIsLogin) {
             // “邮乐园” 按钮点击事件埋点
             appCoroutineScope.launch {
@@ -171,8 +167,8 @@ class MainActivity : BaseActivity() {
   companion object {
     // 长按桌面图标的那个东西，对应 AndroidManifest.xml 中的设置
     const val DESKTOP_SHORTCUT_COURSE = "com.mredrock.cyxbs.action.COURSE"
-    const val DESKTOP_SHORTCUT_EXAM = "android.intent.action.EXAM"
-    const val DESKTOP_SHORTCUT_SCHOOL_CAR = "android.intent.action.SCHOOLCAR"
-    const val DESKTOP_SHORTCUT_EMPTY_ROOM = "android.intent.action.EMPTY_ROOM"
+    const val DESKTOP_SHORTCUT_EXAM = "com.mredrock.cyxbs.action.EXAM"
+    const val DESKTOP_SHORTCUT_SCHOOL_CAR = "com.mredrock.cyxbs.action.SCHOOLCAR"
+    const val DESKTOP_SHORTCUT_EMPTY_ROOM = "com.mredrock.cyxbs.action.EMPTY_ROOM"
   }
 }

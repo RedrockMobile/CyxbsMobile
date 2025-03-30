@@ -35,11 +35,10 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.pages.course.api.IMobileHomeCourseService
+import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
+import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -74,27 +73,28 @@ internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)
 @Composable
 private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val service = remember { IMobileHomeCourseService::class.impl() }
-  service.Content(
+  val courseFrameViewModel = viewModel(CourseFrameViewModel::class)
+  courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
-  ) { bottomSheetState ->
-    LaunchedEffect(bottomSheetState) {
-      snapshotFlow {
-        bottomSheetState.fraction.coerceIn(0F, 1F)
-      }.onEach {
-        // 底部按钮跟随课表展开而变化
-        bottomNavViewModel.offsetYRadio.floatValue = it
-        bottomNavViewModel.alpha.floatValue = 1 - it
-      }.launchIn(this)
-    }
-    LaunchedEffect(bottomSheetState) {
-      bottomNavViewModel.selectedItem.collect {
-        if (it === bottomNavViewModel.fairgroundItem) {
-          bottomSheetState.hide()
-        } else if (bottomSheetState.state == BottomSheetValueState.Hide) {
-          bottomSheetState.collapse()
-        }
+  )
+  LaunchedEffect(Unit) {
+    val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
+    snapshotFlow {
+      bottomSheetState.fraction.coerceIn(0F, 1F)
+    }.onEach {
+      // 底部按钮跟随课表展开而变化
+      bottomNavViewModel.offsetYRadio.floatValue = it
+      bottomNavViewModel.alpha.floatValue = 1 - it
+    }.launchIn(this)
+  }
+  LaunchedEffect(Unit) {
+    val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
+    bottomNavViewModel.selectedItem.collect {
+      if (it === bottomNavViewModel.fairgroundItem) {
+        bottomSheetState.hide()
+      } else if (bottomSheetState.state == BottomSheetValueState.Hide) {
+        bottomSheetState.collapse()
       }
     }
   }

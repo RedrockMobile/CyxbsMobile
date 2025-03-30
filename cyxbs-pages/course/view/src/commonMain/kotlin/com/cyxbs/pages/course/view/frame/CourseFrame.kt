@@ -47,7 +47,7 @@ abstract class CourseFrame {
     private set
 
   @Composable
-  fun Content() {
+  fun CourseFrameContent() {
     coroutineScope = rememberCoroutineScope()
     CourseCompose()
     OnCourseCompose()

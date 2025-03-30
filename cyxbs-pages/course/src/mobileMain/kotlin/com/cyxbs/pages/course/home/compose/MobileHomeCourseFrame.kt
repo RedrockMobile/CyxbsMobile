@@ -1,10 +1,12 @@
 package com.cyxbs.pages.course.home.compose
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,11 +17,13 @@ import androidx.compose.ui.unit.Dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
+import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
  * 移动端主页课表框架
@@ -37,7 +41,8 @@ import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
  * @date 2025/2/15
  */
 @Stable
-class MobileHomeCourseFrame : CourseBottomSheetFrame() {
+@ImplProvider(clazz = IMobileHomeCourseFrame::class)
+class MobileHomeCourseFrame : CourseBottomSheetFrame(), IMobileHomeCourseFrame {
 
   override var beginDate: Date? by mutableStateOf(SchoolCalendar.getFirstMonDay())
 
@@ -69,5 +74,15 @@ class MobileHomeCourseFrame : CourseBottomSheetFrame() {
       state = pagerState,
       pageContent = pageContent,
     )
+  }
+
+  @Composable
+  override fun HomeCourseContent(modifier: Modifier, bottomBarHeight: Dp) {
+    Box(modifier) {
+      CourseFrameContent()
+    }
+    SideEffect {
+      set(bottomBarHeight)
+    }
   }
 }

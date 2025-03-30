@@ -20,13 +20,6 @@ import kotlinx.coroutines.launch
  * @date 2022/9/14 20:50
  */
 class MainViewModel : BaseViewModel() {
-  /**
-   * 三个状态
-   * - true -> 展开
-   * - false -> 折叠
-   * - null -> 隐藏
-   */
-  val courseBottomSheetExpand: MutableLiveData<Boolean?> = MutableLiveData(false)
 
   private val notificationApi = NotificationApiService::class.api
 

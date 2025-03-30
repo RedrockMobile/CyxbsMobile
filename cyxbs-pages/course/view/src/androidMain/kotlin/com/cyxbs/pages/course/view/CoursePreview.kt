@@ -8,7 +8,6 @@ import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.pages.course.view.data.CourseDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
 import com.cyxbs.pages.course.view.frame.CourseBottomSheetFrame
-import com.cyxbs.pages.course.view.item.CourseItem
 
 /**
  * .
@@ -20,7 +19,7 @@ import com.cyxbs.pages.course.view.item.CourseItem
 @Composable
 fun PreviewCourseWeekCompose() {
   AppTheme {
-    CoursePreviewFrame.Content()
+    CoursePreviewFrame.CourseFrameContent()
   }
 }
 
