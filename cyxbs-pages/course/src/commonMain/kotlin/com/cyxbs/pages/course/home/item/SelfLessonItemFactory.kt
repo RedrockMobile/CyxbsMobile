@@ -17,5 +17,9 @@ interface SelfLessonItemFactory {
   fun createSelfLessonItem(
     page: Int,
     lesson: LessonByWeeks,
-  ): CourseItem
+  ): SelfLessonItem
+}
+
+interface SelfLessonItem : CourseItem {
+  val lesson: LessonByWeeks
 }

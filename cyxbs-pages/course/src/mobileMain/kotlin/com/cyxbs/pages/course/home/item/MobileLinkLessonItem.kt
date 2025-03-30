@@ -37,12 +37,12 @@ import kotlin.time.Duration.Companion.seconds
 @Stable
 class MobileLinkLessonItem(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
-  val lesson: LessonByWeeks,
-) : CourseItem, BottomSheetItemHeader, BottomSheetDialogContent {
+  override val lesson: LessonByWeeks,
+) : LinkLessonItem, BottomSheetItemHeader, BottomSheetDialogContent {
 
   @ImplProvider
   companion object : LinkLessonItemFactory {
-    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): CourseItem {
+    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
       return MobileLinkLessonItem(page, lesson)
     }
   }

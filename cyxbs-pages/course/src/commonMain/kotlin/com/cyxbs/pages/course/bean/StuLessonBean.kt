@@ -1,5 +1,7 @@
 package com.cyxbs.pages.course.bean
 
+import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.IApiWrapper
 import com.cyxbs.pages.course.api.LessonByWeeks
 import kotlinx.datetime.DayOfWeek
@@ -47,7 +49,31 @@ data class StuLessonBean(
     @SerialName("rawWeek")
     val rawWeek: String, // 周期，比如：1周,3-15周单周
   ) {
-    fun toLessonByWeeks(): LessonByWeeks {
+    fun toLessonByWeeks(): LessonByWeeks? {
+      if (week.isEmpty()) {
+        if (isDebug()) toast("课表数据错误(week.isEmpty())，$this")
+        return null
+      }
+      if (week.any { it <= 0 }) {
+        if (isDebug()) toast("课表数据错误(week.any { it <= 0 })，$this")
+        return null
+      }
+      if (hashDay !in 0..6) {
+        if (isDebug()) toast("课表数据错误(hashDay !in 0..6)，$this")
+        return null
+      }
+      if (beginLesson !in 1..12) {
+        if (isDebug()) toast("课表数据错误(beginLesson !in 1..12)，$this")
+        return null
+      }
+      if (period <= 0) {
+        if (isDebug()) toast("课表数据错误(period <= 0)，$this")
+        return null
+      }
+      if (beginLesson + period - 1 > 12) {
+        if (isDebug()) toast("课表数据错误(beginLesson + period - 1 > 12)，$this")
+        return null
+      }
       return LessonByWeeks(
         course = course,
         courseNum = courseNum,

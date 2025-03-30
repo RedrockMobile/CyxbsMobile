@@ -6,10 +6,13 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.item.SelfLessonItem
 import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
+import com.cyxbs.pages.course.view.item.CourseItem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
@@ -34,6 +37,8 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
         createLessonFlow(it)
       }.onEach {
         resetData(it)
+      }.catch {
+
       }.launchIn(appCoroutineScope)
   }
 
@@ -71,5 +76,15 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
         add(itemFactory.createSelfLessonItem(week, lesson))
       }
     }
+  }
+
+  override fun compare(a: CourseItem, b: CourseItem): Int {
+    a as SelfLessonItem
+    b as SelfLessonItem
+    if (a.page == 0 && b.page == 0) {
+      val weekDiff = a.lesson.week.first() - b.lesson.week.first()
+      return if (weekDiff != 0) -weekDiff else super.compare(a, b)
+    }
+    return super.compare(a, b)
   }
 }

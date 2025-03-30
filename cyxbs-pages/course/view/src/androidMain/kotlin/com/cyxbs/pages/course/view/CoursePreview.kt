@@ -33,7 +33,4 @@ private object CoursePreviewFrame : CourseBottomSheetFrame() {
 }
 
 private object CoursePreviewDataProvider : CourseDataProvider() {
-  override fun compare(a: CourseItem, b: CourseItem): Int {
-    return a.beginTime.compareTo(b.beginTime)
-  }
 }

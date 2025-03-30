@@ -16,5 +16,9 @@ interface LinkLessonItemFactory {
   fun createLinkLessonItem(
     page: Int,
     lesson: LessonByWeeks,
-  ): CourseItem
+  ): LinkLessonItem
+}
+
+interface LinkLessonItem : CourseItem {
+  val lesson: LessonByWeeks
 }

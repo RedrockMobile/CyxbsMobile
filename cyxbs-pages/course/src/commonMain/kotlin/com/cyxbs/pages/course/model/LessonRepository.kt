@@ -1,9 +1,11 @@
 package com.cyxbs.pages.course.model
 
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.Network
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
@@ -39,9 +41,10 @@ object LessonRepository {
         defaultJson.decodeFromString<List<StuLessonBean.StuLesson>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_LESSON)
+        if (isDebug()) toast("课表数据转换异常, ${it.message}")
       }.mapCatching { list ->
         val requestTime = Instant.fromEpochMilliseconds(accountSettings.getLongOrNull(SETTING_KEY_LESSON_REQUEST_TIME)!!)
-        val data = list.map { it.toLessonByWeeks() }
+        val data = list.mapNotNull { it.toLessonByWeeks() }
         ILessonService2.CacheLesson(requestTime, data)
       }.onSuccess {
         mLessonCache[stuNum] = it
@@ -66,7 +69,7 @@ object LessonRepository {
       )
     }.mapCatching { bean ->
       bean.throwApiExceptionIfFail()
-      bean.data.map { it.toLessonByWeeks() }
+      bean.data.mapNotNull { it.toLessonByWeeks() }
     }.onSuccess {
       // 保存进内存
       mLessonCache[stuNum] = ILessonService2.CacheLesson(requestTime, it)
