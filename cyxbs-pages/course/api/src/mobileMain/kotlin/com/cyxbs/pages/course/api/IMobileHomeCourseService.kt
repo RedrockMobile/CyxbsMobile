@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import com.cyxbs.components.utils.compose.BottomSheetState
+import com.cyxbs.components.view.ui.BottomSheetState
 
 /**
  * .

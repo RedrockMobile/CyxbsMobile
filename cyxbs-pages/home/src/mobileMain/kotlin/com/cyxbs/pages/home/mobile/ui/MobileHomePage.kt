@@ -36,7 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.compose.BottomSheetValueState
+import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.IMobileHomeCourseService
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel

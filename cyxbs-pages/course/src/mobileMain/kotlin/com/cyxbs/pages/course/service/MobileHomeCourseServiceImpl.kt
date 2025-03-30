@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.compose.BottomSheetState
+import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseService
 import com.cyxbs.pages.course.home.compose.MobileHomeCourseFrame
 import com.g985892345.provider.api.annotation.ImplProvider

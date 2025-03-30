@@ -22,7 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.components.utils.compose.BottomSheetValueState
+import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider

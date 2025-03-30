@@ -1,4 +1,4 @@
-package com.cyxbs.components.utils.compose
+package com.cyxbs.components.view.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
@@ -38,11 +38,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -51,7 +46,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.compose.backHandler
+import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -339,7 +338,11 @@ private class BottomSheetScopeImpl(
     draggable(
       orientation = Orientation.Vertical,
       state = rememberDraggableState {
-        bottomSheetState.scrollableState.dispatchRawDelta(it)
+        val min = bottomSheetState.peekHeight
+        val max = bottomSheetState.showMaxHeight.floatValue
+        val now = bottomSheetState.showHeight.floatValue
+        val new = (now - it).coerceIn(min, max)
+        bottomSheetState.scrollableState.dispatchRawDelta(now - new)
       },
       onDragStarted = {
         bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
