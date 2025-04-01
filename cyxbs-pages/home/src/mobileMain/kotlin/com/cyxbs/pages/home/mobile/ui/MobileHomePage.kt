@@ -145,9 +145,6 @@ private fun HomeNavItemCompose(item: BottomNavViewModel.BottomNavItem, modifier:
           onTap = {
             coroutineScope.launch { scale.animateTo(1.1F) }
             bottomNavViewModel.select(item)
-            if (hasRedDot) {
-              item.setRedDot(false)
-            }
           },
         )
       }

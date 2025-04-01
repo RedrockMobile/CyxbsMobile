@@ -18,8 +18,11 @@ import cyxbsmobile.cyxbs_pages.home.generated.resources.home_nav_discover
 import cyxbsmobile.cyxbs_pages.home.generated.resources.home_nav_fairground
 import cyxbsmobile.cyxbs_pages.home.generated.resources.home_nav_mine
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 
@@ -35,12 +38,10 @@ class BottomNavViewModel : BaseViewModel() {
     Res.string.home_nav_discover,
     Res.drawable.home_ic_explore_selected,
     Res.drawable.home_ic_explore_unselected,
-    Res.drawable.home_ic_explore_unselected,
   )
   val fairgroundItem = BottomNavItem(
     Res.string.home_nav_fairground,
     Res.drawable.home_ic_fairground_selectored,
-    Res.drawable.home_ic_fairground_unselectored,
     Res.drawable.home_ic_fairground_unselectored,
   )
   val mineItem = BottomNavItem(
@@ -48,6 +49,7 @@ class BottomNavViewModel : BaseViewModel() {
     Res.drawable.home_ic_mine_selected,
     Res.drawable.home_ic_mine_unselected,
     Res.drawable.home_ic_mine_red_dot_unselected,
+    redObserveFlow = emptyFlow(), // 之前通知页是有红点的，但是因为后端不提供红点接口，所以就把功能下掉了
   )
 
   val items = persistentListOf(discoverItem, fairgroundItem, mineItem)
@@ -61,21 +63,31 @@ class BottomNavViewModel : BaseViewModel() {
 
   fun select(item: BottomNavItem) {
     selectedItem.value = item
+    item.select()
   }
 
   @Stable
   inner class BottomNavItem(
     val title: StringResource,
-    val selectedIcon: DrawableResource,
-    val unselectedIcon: DrawableResource,
-    val unselectedRedDotIcon: DrawableResource,
+    val selectedIcon: DrawableResource, // 选中时图标
+    val unselectedIcon: DrawableResource, // 未选中时图标
+    val unselectedRedDotIcon: DrawableResource = unselectedIcon, // 未选中时存在红点的图标，
+    val redObserveFlow: Flow<Boolean> = emptyFlow(), // 监听红点状态的 Job
   ) {
+
+    private val redJob = redObserveFlow.distinctUntilChanged().collectLaunch {
+      if (it && selectedItem.value !== this) {
+        redDot.value = true
+      }
+    }
 
     private val redDot = MutableStateFlow(false)
 
-    fun setRedDot(has: Boolean) {
-      if (has && selectedItem.value === this) return // 如果已经处于选中状态，则不显示红点
-      redDot.value = has
+    fun select() {
+      if (redDot.value) {
+        redJob.cancel() // 底部导航栏按钮只观察一次红点
+        redDot.value = false
+      }
     }
 
     fun observerRedDot() = redDot.asStateFlow()

@@ -26,15 +26,14 @@ import com.cyxbs.components.config.route.MINE_ENTRY
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
 import com.cyxbs.components.config.route.STORE_ENTRY
 import com.cyxbs.components.config.route.UFIELD_CENTER_ENTRY
-import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
-import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.logger.TrackingUtils
-import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
+import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.mine.noyification.NotificationUtils
 import com.cyxbs.pages.mine.page.about.AboutActivity
 import com.cyxbs.pages.mine.page.edit.EditInfoActivity
@@ -241,21 +240,6 @@ class UserFragment : BaseFragment() {
                 }
             }
         }
-
-        // 消息中心的红点显示逻辑
-        viewModel.newNotificationCount.observe(viewLifecycleOwner) { value ->
-            if (value == 0) {
-                mine_user_tv_center_notification_count.gone()
-            } else {
-                mine_user_tv_center_notification_count.visible()
-                if (value > 99) {
-                    mine_user_tv_center_notification_count.text = "99+"
-                } else {
-                    mine_user_tv_center_notification_count.text = value.toString()
-                }
-            }
-        }
-
     }
 
     override fun onStart() {

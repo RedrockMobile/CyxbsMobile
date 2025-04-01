@@ -25,27 +25,24 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.route.DISCOVER_ENTRY
 import com.cyxbs.components.config.route.DISCOVER_NEWS
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.dp2px
-import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.pages.discover.adapter.DiscoverMoreFunctionRvAdapter
 import com.cyxbs.pages.discover.pages.discover.adapter.RollerViewInfoAdapter
-import com.cyxbs.pages.discover.utils.IS_SWITCH1_SELECT
 import com.cyxbs.pages.discover.utils.MoreFunctionProvider
-import com.cyxbs.pages.discover.utils.NotificationSp
 import com.cyxbs.pages.discover.utils.SpacesHorizontalItemDecoration
 import com.cyxbs.pages.discover.widget.IndicatorView
 import com.cyxbs.pages.electricity.api.IElectricityService
@@ -71,7 +68,6 @@ class DiscoverHomeFragment : BaseFragment() {
     private val fl_discover_home_jwnews by R.id.fl_discover_home_jwnews.view<FrameLayout>()
     private val tv_day by R.id.tv_day.view<AppCompatTextView>()
     private val iv_discover_msg by R.id.iv_discover_msg.view<ImageView>()
-    private val iv_discover_msg_red_dot by R.id.iv_discover_msg_red_dot.view<ImageView>()
     private val rv_discover_more_function by R.id.rv_discover_more_function.view<RecyclerView>()
     private val ll_discover_feeds by R.id.ll_discover_feeds.view<LinearLayoutCompat>()
     private val indicator_view_discover by R.id.indicator_view_discover.view<IndicatorView>()
@@ -143,28 +139,8 @@ class DiscoverHomeFragment : BaseFragment() {
                 startActivity(NOTIFICATION_HOME)
             }
         }
-        viewModel.hasUnread.observe {
-            val shouldShowRedDots = requireActivity().NotificationSp.getBoolean(IS_SWITCH1_SELECT,true)
-            if (it == true && shouldShowRedDots) {
-                //将msg View设置为有消息的状态
-                iv_discover_msg_red_dot.visible()
-                /*
-                iv_discover_msg.setBackgroundResource(R.drawable.discover_ic_home_has_msg)
-                */
-            } else {
-                //将msg View设置为没有消息的状态
-                iv_discover_msg_red_dot.gone()
-                /*
-                iv_discover_msg.setBackgroundResource(R.drawable.discover_ic_home_msg)
-                 */
-            }
-        }
     }
 
-    override fun onStart() {
-        super.onStart()
-        viewModel.getNotificationUnReadStatus()
-    }
     override fun onResume() {
         super.onResume()
         initFunctions()

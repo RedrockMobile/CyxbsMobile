@@ -3,7 +3,6 @@ package com.cyxbs.pages.notification.viewmodel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.components.utils.network.throwOrInterceptException
 import com.cyxbs.components.utils.utils.LogUtils
 import com.cyxbs.pages.notification.bean.ReceivedItineraryMsgBean
@@ -65,49 +64,26 @@ class ItineraryViewModel(val hostViewModel: NotificationViewModel) : BaseViewMod
     private val _currentPageIndex = MutableLiveData(0)
 
     /**
-     * 通过网络请求获取 已经发送的行程列表
+     * 获取已经发送的行程列表
      */
-    fun getSentItinerary(isForcedRefresh: Boolean = false) {
-        if (isForcedRefresh) {
-            NotificationRepository.getSentItinerary()
-                .mapOrInterceptException {
-                    _sentItineraryListIsSuccessfulState.postValue(false)
-                }
-                .safeSubscribeBy {
-                    _sentItineraryListIsSuccessfulState.postValue(true)
-                    _sentItineraryList.postValue(it)
-                }
+    fun getSentItinerary() {
+        if (hostViewModel.getItineraryIsSuccessful) {
+            _sentItineraryListIsSuccessfulState.postValue(true)
+            _sentItineraryList.postValue(hostViewModel.itineraryMsg.value!!.sentItineraryList)
         } else {
-            if (hostViewModel.getItineraryIsSuccessful) {
-                _sentItineraryListIsSuccessfulState.postValue(true)
-                _sentItineraryList.postValue(hostViewModel.itineraryMsg.value!!.sentItineraryList)
-            } else {
-                _sentItineraryListIsSuccessfulState.postValue(false)
-            }
+            _sentItineraryListIsSuccessfulState.postValue(false)
         }
     }
 
     /**
-     * 通过网络请求获取 被通知到的行程列表
+     * 获取被通知到的行程列表
      */
-    fun getReceivedItinerary(isForcedRefresh: Boolean = false) {
-        if (isForcedRefresh) {
-            NotificationRepository.getReceivedItinerary()
-                .mapOrInterceptException {
-                    _receivedItineraryListIsSuccessfulState.postValue(false)
-                }
-                .safeSubscribeBy {
-
-                    _receivedItineraryListIsSuccessfulState.postValue(true)
-                    _receivedItineraryList.postValue(it)
-                }
+    fun getReceivedItinerary() {
+        if (hostViewModel.getItineraryIsSuccessful) {
+            _receivedItineraryListIsSuccessfulState.postValue(true)
+            _receivedItineraryList.postValue(hostViewModel.itineraryMsg.value!!.receivedItineraryList)
         } else {
-            if (hostViewModel.getItineraryIsSuccessful) {
-                _receivedItineraryListIsSuccessfulState.postValue(true)
-                _receivedItineraryList.postValue(hostViewModel.itineraryMsg.value!!.receivedItineraryList)
-            } else {
-                _receivedItineraryListIsSuccessfulState.postValue(false)
-            }
+            _receivedItineraryListIsSuccessfulState.postValue(false)
         }
     }
 

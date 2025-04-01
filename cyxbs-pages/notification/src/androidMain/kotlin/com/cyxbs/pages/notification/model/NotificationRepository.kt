@@ -1,19 +1,11 @@
 package com.cyxbs.pages.notification.model
 
-import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.utils.extensions.defaultGson
-import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.ApiStatus
-import com.cyxbs.components.utils.network.ApiWrapper
-import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.pages.notification.bean.ItineraryDateBean
-import com.cyxbs.pages.notification.bean.MsgBeanData
 import com.cyxbs.pages.notification.bean.ReceivedItineraryMsgBean
-import com.cyxbs.pages.notification.bean.SentItineraryMsgBean
 import com.cyxbs.pages.notification.bean.toAffairDateBean
 import com.cyxbs.pages.notification.network.ApiService
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.schedulers.Schedulers
 
@@ -32,32 +24,6 @@ object NotificationRepository {
 
     private fun List<ItineraryDateBean>.toPostDateJson(): String {
         return mGson.toJson(toAffairDateBean())
-    }
-    /**
-     * 获取所有的活动消息和系统消息
-     */
-    fun getAllSysAndActMsg(): Observable<ApiWrapper<MsgBeanData>> {
-        return api.getAllMsg()
-            .observeOn(Schedulers.io())
-            .subscribeOn(AndroidSchedulers.mainThread())
-    }
-
-    /**
-     * 获取本用户已经发送的行程
-     */
-    fun getSentItinerary() : Single<ApiWrapper<List<SentItineraryMsgBean>>> {
-        return api.getSentItinerary()
-            .observeOn(Schedulers.io())
-            .subscribeOn(AndroidSchedulers.mainThread())
-    }
-
-    /**
-     * 获取通知到本用户的行程
-     */
-    fun getReceivedItinerary() : Single<ApiWrapper<List<ReceivedItineraryMsgBean>>> {
-        return api.getReceivedItinerary()
-            .observeOn(Schedulers.io())
-            .subscribeOn(AndroidSchedulers.mainThread())
     }
 
     /**
@@ -92,37 +58,11 @@ object NotificationRepository {
 
     /**
      * 添加行程到事务中
+     * todo 这里后续改成直接调用 affair 模块暴露的方法，否则需要下次打开课表才会生效
      */
     fun addAffair(remindTime: Int, info: ReceivedItineraryMsgBean) : Single<ApiStatus>{
         return api.addAffair(remindTime, info.title, info.content, listOf(info.dateJson).toPostDateJson())
             .observeOn(Schedulers.io())
             .subscribeOn(Schedulers.io())
-    }
-
-    /**
-     * 获取未读的行程（即hasRead字段为false的行程）有多少条
-     * 留着后续给api_notification模块填充
-     */
-    fun getNewItineraryCount(resultContainer: MutableLiveData<Int>) {
-        var result = 0
-        getSentItinerary()
-            .mapOrInterceptException {
-            }
-            .flatMap {list1->
-                result += list1.filter { !it.hasRead }.size
-                getReceivedItinerary()
-            }
-            .mapOrInterceptException {  }
-            .map {list2->
-                list2.filter { !it.hasRead }.size
-            }
-            .unsafeSubscribeBy(
-             onError = {
-                 resultContainer.value = result
-             },
-             onSuccess = {
-                 result += it
-                 resultContainer.value = result
-             })
     }
 }

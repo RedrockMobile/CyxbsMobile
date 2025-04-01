@@ -3,8 +3,6 @@ package com.cyxbs.pages.home.ui.main
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.base.ui.BaseActivity
@@ -12,20 +10,19 @@ import com.cyxbs.components.base.utils.Umeng
 import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.mobile.ui.MobileHomePage
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
-import com.cyxbs.pages.home.viewmodel.MainViewModel
 import com.cyxbs.pages.login.api.ILoginService
 import kotlinx.coroutines.launch
 
@@ -41,7 +38,6 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : BaseActivity() {
   
-  private val mViewModel by viewModels<MainViewModel>()
   private val mBottomNavViewModel by viewModels<BottomNavViewModel>()
   private val mCourseFrameViewModel by viewModels<CourseFrameViewModel>()
   
@@ -89,7 +85,6 @@ class MainActivity : BaseActivity() {
   private fun initUI() {
     initAction()
     initBottomNav()
-    initNotification()
     initUpdate()
     setContent {
       MobileHomePage()
@@ -144,20 +139,6 @@ class MainActivity : BaseActivity() {
       // Umeng 埋点统计
       Umeng.sendEvent(Umeng.Event.ClickBottomTab(mBottomNavViewModel.items.indexOf(it)))
     }
-  }
-
-  private fun initNotification() {
-    mViewModel.hasUnReadNotification.observe {
-      mBottomNavViewModel.mineItem.setRedDot(it)
-    }
-    lifecycle.addObserver(object : DefaultLifecycleObserver {
-      override fun onResume(owner: LifecycleOwner) {
-        if (mIsLogin){
-          // 获取（远端消息数据可能发生更新后）最新的未读消息数量，一般认为在从其他Activity返回后调用
-          mViewModel.getNotificationUnReadStatus()
-        }
-      }
-    })
   }
 
   private fun initUpdate() {
