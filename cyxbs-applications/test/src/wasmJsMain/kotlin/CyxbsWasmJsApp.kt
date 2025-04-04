@@ -1,8 +1,8 @@
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.cyxbs.components.config.compose.theme.AppTheme
+import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
-import com.cyxbs.pages.login.ui.LoginPage
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
 import kotlinx.browser.document
 
@@ -20,7 +20,7 @@ fun main() {
     viewportContainer = document.getElementById("compose")!!,
   ) {
     AppTheme {
-      LoginPage()
+      MainNavHost()
       PlatformToastCompose()
     }
   }

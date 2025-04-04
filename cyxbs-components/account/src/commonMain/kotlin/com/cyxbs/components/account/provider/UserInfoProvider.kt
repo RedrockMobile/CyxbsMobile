@@ -1,24 +1,21 @@
 package com.cyxbs.components.account.provider
 
 import com.cyxbs.components.account.api.UserInfo
+import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.runCatchingCoroutine
-import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClient
-import com.cyxbs.components.utils.utils.secret.secretDecrypt
-import com.cyxbs.components.utils.utils.secret.secretEncrypt
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 
 /**
  * 用户信息提供
@@ -33,7 +30,7 @@ internal object UserInfoProvider {
   private val _stateFlow = MutableStateFlow(
     defaultSettings.getStringOrNull(KEY)?.let {
       runCatching {
-        defaultJson.decodeFromString<UserInfo>(secretDecrypt(it))
+        defaultJson.decodeFromString<UserInfo>(SecretTransformer.impl.secretDecrypt(it))
       }.onFailure {
         defaultSettings.remove(KEY)
       }.getOrNull()
@@ -65,7 +62,7 @@ internal object UserInfoProvider {
         }
       }.onSuccess {
         _stateFlow.value = it
-        defaultSettings.putString(KEY, secretEncrypt(defaultJson.encodeToString(it)))
+        defaultSettings.putString(KEY, SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(it)))
       }
     }
   }

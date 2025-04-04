@@ -16,6 +16,7 @@ pluginManagement {
     google()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") // compose multiplatform
     maven("https://jitpack.io")
+    mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
   }
 }
 dependencyResolutionManagement {
@@ -28,6 +29,7 @@ dependencyResolutionManagement {
     maven("https://jitpack.io")
     maven("https://maven.aliyun.com/repository/public")
     maven("https://maven.aliyun.com/repository/google")
+    mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
   }
 }
 

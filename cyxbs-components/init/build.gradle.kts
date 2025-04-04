@@ -4,6 +4,9 @@ plugins {
 
 kotlin {
   sourceSets {
+    commonMain.dependencies {
+      implementation(libs.compose.navigation)
+    }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
     }

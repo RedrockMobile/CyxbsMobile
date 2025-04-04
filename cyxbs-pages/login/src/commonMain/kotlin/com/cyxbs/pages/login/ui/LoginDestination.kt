@@ -54,10 +54,14 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.appName
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.navigation.DestinationParcel
+import com.cyxbs.components.config.navigation.MainDestination
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.pages.login.api.LoginArgument
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
+import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.login.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.login.generated.resources.login_ic_password
 import cyxbsmobile.cyxbs_pages.login.generated.resources.login_ic_username
@@ -79,9 +83,16 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/30
  */
+@ImplProvider(clazz = MainDestination::class, name = "login")
+class LoginDestination : MainDestination<LoginArgument>(LoginArgument::class) {
+  override val content: @Composable (DestinationParcel<LoginArgument>) -> Unit = {
+    viewModel { LoginViewModel(it.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+    LoginPage()
+  }
+}
+
 @Composable
-fun LoginPage() {
-  viewModel { LoginViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
+private fun LoginPage() {
   ConstraintLayout(
     constraintSet = createConstraintSet(),
     modifier = Modifier.fillMaxSize()

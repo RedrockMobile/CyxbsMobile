@@ -4,12 +4,16 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.extensions.runCatchingCoroutine
+import com.cyxbs.components.config.navigation.HomeArgument
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
+import com.cyxbs.pages.login.api.LoginArgument
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
 import io.ktor.client.call.body
@@ -34,10 +38,10 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/31
  */
-expect class LoginViewModel() : CommonLoginViewModel
+expect class LoginViewModel(argument: LoginArgument) : CommonLoginViewModel
 
 @Stable
-abstract class CommonLoginViewModel : BaseViewModel() {
+abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel() {
 
   val stuNum = mutableStateOf("")
 
@@ -65,7 +69,18 @@ abstract class CommonLoginViewModel : BaseViewModel() {
         try {
           if (requestLogin(stuNum, password)) {
             delay(startTime + 2.seconds - Clock.System.now()) // 网络太快会闪一下，像bug，就让它最少待两秒吧
+            val targetRoute = argument.targetRoute
+            if (targetRoute != null) {
+              MainNavController.navigate(targetRoute) {
+                popUpTo(argument) { inclusive = true }
+                restoreState = false // 跳转不保留状态
+              }
+            } else {
+              MainNavController.popBackStack()
+            }
           }
+        } catch (e: Exception) {
+          logg("login error: ${e.stackTraceToString()}")
         } finally {
           isLoginAnim.value = false
         }
@@ -93,11 +108,11 @@ abstract class CommonLoginViewModel : BaseViewModel() {
     }.onFailure {
       runCatchingCoroutine { onLoginFailure(it) }.onFailure {
         // TODO 打开 CrashDialog
-      }
+      }.getOrThrow()
     }.onSuccess {
       runCatchingCoroutine { onLoginSuccess(stuNum, it) }.onFailure {
         // TODO 打开 CrashDialog
-      }
+      }.getOrThrow()
     }.isSuccess
   }
 
@@ -135,13 +150,13 @@ abstract class CommonLoginViewModel : BaseViewModel() {
   }
 
   // 点击忘记密码
-  abstract fun clickForgetPassword()
+  open fun clickForgetPassword() {}
 
   // 点击用户协议
-  abstract fun clickUserAgreement()
+  open fun clickUserAgreement() {}
 
   // 点击隐私政策
-  abstract fun clickPrivacyPolicy()
+  open fun clickPrivacyPolicy() {}
 
   // 点击游客模式
   fun clickTouristMode() {
@@ -153,8 +168,15 @@ abstract class CommonLoginViewModel : BaseViewModel() {
   }
 
   // 进入游客模式
-  abstract fun enterTouristMode()
+  open fun enterTouristMode() {
+    // 弹出所有页面，重新回到主页
+    MainNavController.navigate(HomeArgument) {
+      popUpTo(0) { inclusive = true }
+    }
+  }
 
   // 不同意用户协议
-  abstract fun clickDisagreeUserAgreement()
+  open fun clickDisagreeUserAgreement() {
+    MainNavController.navigateUp()
+  }
 }

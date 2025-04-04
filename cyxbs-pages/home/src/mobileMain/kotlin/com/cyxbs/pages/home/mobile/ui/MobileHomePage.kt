@@ -33,12 +33,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.navigation.DestinationParcel
+import com.cyxbs.components.config.navigation.HomeArgument
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
+import com.cyxbs.pages.home.ui.PlatformHomePage
+import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -53,19 +56,27 @@ import org.jetbrains.compose.resources.stringResource
  * @author 985892345
  * @date 2025/3/16
  */
-
-@Composable
-fun MobileHomePage() {
-  AppTheme {
-    Box(
-      modifier = Modifier.fillMaxSize()
-    ) {
-      HomeViewPagerCompose()
-      HomeCourseCompose()
-      HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
+@ImplProvider
+class MobileHomePage : PlatformHomePage {
+  override val content: @Composable (DestinationParcel<HomeArgument>) -> Unit = {
+    PlatformMobileHomePage(it) {
+      Box(
+        modifier = Modifier.fillMaxSize()
+      ) {
+        HomeViewPagerCompose()
+        HomeCourseCompose()
+        HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
+      }
     }
   }
 }
+
+// 提供给具体平台用于包裹 content，可以设置些特别的 LocalProvider 或者获取 ViewModel 啥的
+@Composable
+internal expect fun PlatformMobileHomePage(
+  parcel: DestinationParcel<HomeArgument>,
+  content: @Composable () -> Unit,
+)
 
 @Composable
 internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)

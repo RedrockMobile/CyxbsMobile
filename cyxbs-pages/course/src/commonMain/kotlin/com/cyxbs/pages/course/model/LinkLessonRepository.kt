@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -60,7 +61,9 @@ object LinkLessonRepository {
 
   init {
     accountSettingsFlow.flatMapLatest { settings ->
-      flow {
+      if (settings.stuNum == null) {
+        flowOf<LinkStuBean?>(null)
+      } else flow {
         emit(getCacheLinkStu(settings))
         requestLinkStu().onSuccess {
           emit(it)

@@ -15,6 +15,9 @@ package com.cyxbs.components.config.route
  * 其余配置：缺省页拦截在 [ActivityInterceptor]
  */
 
+// MainActivity
+const val MAIN_ENTRY = "/main/entry"
+
 const val DISCOVER_ENTRY = "/discover/entry"
 const val MINE_ENTRY = "/mine/entry"
 

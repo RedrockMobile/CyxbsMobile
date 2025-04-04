@@ -1,14 +1,11 @@
 package com.cyxbs.components.account.provider
 
 import com.cyxbs.components.account.bean.TokenBean
-import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.utils.utils.secret.secretDecrypt
-import com.cyxbs.components.utils.utils.secret.secretEncrypt
+import com.cyxbs.components.config.sp.defaultSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.Clock
-import kotlinx.serialization.encodeToString
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.days
 
@@ -27,7 +24,7 @@ internal object TokenProvider {
   private val _stateFlow = MutableStateFlow(
     defaultSettings.getStringOrNull(KEY)?.let {
       runCatching {
-        defaultJson.decodeFromString<TokenBean>(secretDecrypt(it))
+        defaultJson.decodeFromString<TokenBean>(SecretTransformer.impl.secretDecrypt(it))
       }.onFailure {
         defaultSettings.remove(KEY)
       }.getOrNull()
@@ -44,7 +41,7 @@ internal object TokenProvider {
   fun set(tokenBean: TokenBean) {
     _stateFlow.value = tokenBean
     val json = defaultJson.encodeToString(tokenBean)
-    defaultSettings.putString(KEY, secretEncrypt(json))
+    defaultSettings.putString(KEY, SecretTransformer.impl.secretEncrypt(json))
     val nowTime = Clock.System.now().toEpochMilliseconds()
     tokenExpiredTime = nowTime + 2.5.days.inWholeMilliseconds // 后端规定 3 天过期，客户端规定 2.5 天过期
     refreshTokenExpiredTime = nowTime + 44.days.inWholeMilliseconds // 后端规定 45 天过期，客户端规定 44 天过期

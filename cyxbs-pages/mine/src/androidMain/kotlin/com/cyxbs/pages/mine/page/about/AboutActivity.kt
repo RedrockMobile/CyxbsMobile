@@ -19,8 +19,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.BuildConfig
@@ -181,11 +181,11 @@ class AboutActivity : BaseViewModelActivity<AboutViewModel>() {
 
     //跳转到用户协议的activity
     private fun clickProtocol() {
-        ILegalNoticeService::class.impl().startUserAgreementActivity(this)
+        ILegalNoticeService::class.impl().startUserAgreementActivity()
     }
 
     private fun clickPrivacy() {
-        ILegalNoticeService::class.impl().startPrivacyPolicyActivity(this)
+        ILegalNoticeService::class.impl().startPrivacyPolicyActivity()
     }
 
 

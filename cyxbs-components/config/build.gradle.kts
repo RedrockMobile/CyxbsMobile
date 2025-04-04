@@ -10,6 +10,7 @@ kotlin {
     commonMain.dependencies {
       api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.account.api)
+      implementation(projects.cyxbsPages.login.api)
       implementation(libs.kmp.ktProvider.manager) // config 私有，其他模块通过 ::class.impl() 获取
     }
     androidMain.dependencies {

@@ -3,11 +3,6 @@
 
     <application>
         <activity
-            android:name=".login.ui.LoginActivity"
-            android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
-            />
-        <activity
             android:name=".ui.LegalNoticeActivity"
             android:exported="false" />
     </application>
