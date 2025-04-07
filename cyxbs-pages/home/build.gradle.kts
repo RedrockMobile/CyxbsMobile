@@ -18,6 +18,7 @@ kotlin {
       implementation(projects.cyxbsPages.login.api)
       implementation(projects.cyxbsPages.affair.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.notification.api)
       implementation(libs.kmp.ktorfit)
     }
     androidMain.dependencies {

@@ -72,18 +72,4 @@
             tools:ignore="HardcodedText" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <RelativeLayout
-        android:id="@+id/item_notification_rl_home_delete"
-        android:layout_width="88dp"
-        android:layout_height="match_parent"
-        android:background="@color/notification_home_delete">
-
-        <ImageView
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/notification_ic_home_delete"
-            tools:ignore="ContentDescription" />
-    </RelativeLayout>
 </LinearLayout>

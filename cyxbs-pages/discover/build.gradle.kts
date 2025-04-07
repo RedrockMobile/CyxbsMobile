@@ -18,6 +18,7 @@ kotlin {
       implementation(projects.cyxbsPages.sport.api)
       implementation(projects.cyxbsPages.volunteer.api)
       implementation(projects.cyxbsPages.electricity.api)
+      implementation(projects.cyxbsPages.notification.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

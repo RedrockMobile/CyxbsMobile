@@ -20,7 +20,8 @@
             android:layout_height="match_parent" />
     </com.cyxbs.pages.notification.widget.VerticalSwipeRefreshLayout>
 
-    <LinearLayout
+    <!--滑到行程通知页时用于遮挡 notification_main_column_container 的圆角-->
+    <View
         android:id="@+id/notification_main_column_container_background"
         android:layout_width="match_parent"
         android:layout_height="139dp"
@@ -30,7 +31,7 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <View
         android:id="@+id/notification_main_column_container"
         android:layout_width="match_parent"
         android:layout_height="139dp"
@@ -71,33 +72,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/notification_rl_home_back"
         tools:ignore="HardcodedText" />
-
-    <RelativeLayout
-        android:id="@+id/notification_rl_home_dots"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_marginTop="53dp"
-        android:layout_marginEnd="16dp"
-        android:background="@drawable/notification_ripple_back"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <ImageView
-            android:id="@+id/notification_home_red_dots"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:background="@drawable/notification_ic_home_reddots"
-            tools:ignore="ContentDescription" />
-
-        <ImageView
-            android:id="@+id/notification_home_dots"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:background="@drawable/notification_ic_home_dots"
-            tools:ignore="ContentDescription" />
-    </RelativeLayout>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/notification_home_tl"

@@ -7,13 +7,13 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.activity.viewModels
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.route.NOTIFICATION_HOME
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.affair.R
 import com.cyxbs.pages.affair.api.NoClassBean
 import com.cyxbs.pages.affair.ui.fragment.NoClassAffairFragment
 import com.cyxbs.pages.affair.ui.viewmodel.activity.NoClassAffairActivityViewModel
+import com.cyxbs.pages.notification.api.ILaunchNotificationService
 
 class NoClassAffairActivity : BaseActivity() {
 
@@ -69,9 +69,9 @@ class NoClassAffairActivity : BaseActivity() {
 
                 3 -> {
                     // 发送成功之后跳转到消息中心
-                    startActivity(NOTIFICATION_HOME) {
-                        putExtra("MsgType", 2)
-                    }
+                    ILaunchNotificationService::class.impl().start(
+                        ILaunchNotificationService.NotificationPage.ITINERARY
+                    )
                     finishAfterTransition()
                 }
 

@@ -29,7 +29,6 @@ import com.cyxbs.components.config.route.DISCOVER_ENTRY
 import com.cyxbs.components.config.route.DISCOVER_NEWS
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
 import com.cyxbs.components.config.route.MINE_CHECK_IN
-import com.cyxbs.components.config.route.NOTIFICATION_HOME
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.time.SchoolCalendar
@@ -46,6 +45,7 @@ import com.cyxbs.pages.discover.utils.MoreFunctionProvider
 import com.cyxbs.pages.discover.utils.SpacesHorizontalItemDecoration
 import com.cyxbs.pages.discover.widget.IndicatorView
 import com.cyxbs.pages.electricity.api.IElectricityService
+import com.cyxbs.pages.notification.api.ILaunchNotificationService
 import com.cyxbs.pages.sport.api.ISportService
 import com.cyxbs.pages.todo.api.ITodoService
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -136,7 +136,7 @@ class DiscoverHomeFragment : BaseFragment() {
         iv_discover_msg.setBackgroundResource(R.drawable.discover_ic_home_msg)
         doIfLogin {
             iv_discover_msg.setOnClickListener {
-                startActivity(NOTIFICATION_HOME)
+                ILaunchNotificationService::class.impl().start()
             }
         }
     }

@@ -43,12 +43,6 @@ const val DISCOVER_NEWS_ITEM = "/news/discover/item"
 //签到页
 const val MINE_CHECK_IN = "/check_in/mine/entry"
 
-//通知页主页
-const val NOTIFICATION_HOME = "/notification/entry"
-
-//通知设置页
-const val NOTIFICATION_SETTING = "/notification/setting"
-
 // 个人界面的确认密码模块
 const val MINE_FORGET_PASSWORD = "/forget_password/mine/entry"
 
