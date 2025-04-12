@@ -1,11 +1,14 @@
 package com.cyxbs.pages.course.home.compose
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,18 +16,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.header.NextItemHeaderUtils
 import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
@@ -152,11 +163,13 @@ private fun MobileHomeCourseInnerHeader(
 ) {
   Box(modifier = modifier.fillMaxSize()) {
     Row(modifier = Modifier.align(Alignment.BottomStart)) {
-      frame.CourseHeaderTitle(
+      CourseHeaderTitle(
+        frame = frame,
         modifier = Modifier.align(Alignment.Bottom)
-          .padding(start = 16.dp, bottom = 4.dp)
+          .padding(start = 16.dp, bottom = 4.dp),
       )
-      frame.CourseHeaderSubtitle(
+      CourseHeaderSubtitle(
+        frame = frame,
         modifier = Modifier.align(Alignment.Bottom)
           .padding(start = 13.dp, bottom = 6.dp)
       )
@@ -166,11 +179,78 @@ private fun MobileHomeCourseInnerHeader(
       modifier = Modifier.align(Alignment.BottomEnd)
         .padding(end = 110.dp, bottom = 2.dp),
     )
-    frame.CourseHeaderBack(
+    CourseHeaderBack(
+      frame = frame,
       modifier = Modifier.align(Alignment.BottomEnd)
         .padding(end = 16.dp, bottom = 2.dp)
     )
   }
+}
+
+@Composable
+private fun CourseHeaderTitle(
+  modifier: Modifier,
+  frame: MobileHomeCourseFrame,
+) {
+  Text(
+    text = frame.pagerState.currentPage.let {
+      if (it == 0) "整学期"
+      else "第${Num2CN.number2ChineseNumber(it)}周"
+    },
+    modifier = modifier,
+    color = LocalAppColors.current.tvLv2,
+    fontWeight = FontWeight.Bold,
+    fontSize = 22.sp
+  )
+}
+
+@Composable
+private fun CourseHeaderSubtitle(
+  modifier: Modifier,
+  frame: MobileHomeCourseFrame,
+) {
+  // 0 -> 1 -> 0
+  val pageFraction by rememberDerivedStateOfStructure(frame) {
+    val fraction = frame.pagerState.currentPageOffsetFraction
+    1 - minOf(abs(fraction + frame.pagerState.currentPage - frame.initialPage), 1F)
+  }
+  Text(
+    text = "(本周)",
+    modifier = modifier.graphicsLayer {
+      alpha = pageFraction
+      scaleX = pageFraction
+      scaleY = pageFraction
+    },
+    fontSize = 15.sp,
+    color = LocalAppColors.current.tvLv2,
+  )
+}
+
+@Composable
+private fun CourseHeaderBack(modifier: Modifier, frame: MobileHomeCourseFrame) {
+  val coroutineScope = rememberCoroutineScope()
+  // 0 -> 1 -> 0
+  val pageFraction by rememberDerivedStateOfStructure(frame) {
+    val fraction = frame.pagerState.currentPageOffsetFraction
+    1 - minOf(abs(fraction + frame.pagerState.currentPage - frame.initialPage), 1F)
+  }
+  Text(
+    text = "回到本周",
+    modifier = modifier.graphicsLayer {
+      alpha = 1 - pageFraction
+      translationX = pageFraction * size.width
+    }.clip(CircleShape).background(
+      brush = Brush.horizontalGradient(
+        colors = listOf(Color.Blue, Color(0xFF8686FF)),
+      )
+    ).clickableNoIndicator {
+      coroutineScope.launch {
+        frame.pagerState.animateScrollToPage(frame.initialPage)
+      }
+    }.padding(vertical = 8.dp, horizontal = 16.dp),
+    color = Color.White,
+    fontSize = 13.sp,
+  )
 }
 
 @Composable

@@ -47,7 +47,6 @@ class HintBottomSheetItemHeader(
   val onClick: (() -> Unit)? = null,
 ) : BottomSheetItemHeader {
 
-  @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun BottomSheetHeaderContent(modifier: Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
