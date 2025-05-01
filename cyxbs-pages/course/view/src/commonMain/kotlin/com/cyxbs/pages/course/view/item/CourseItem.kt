@@ -212,13 +212,16 @@ private fun Modifier.pointerPressRation(item: CourseItem): Modifier {
     awaitEachGesture {
       val down = awaitFirstDown(pass = PointerEventPass.Initial)
       pointerOffset.value = down.position
-      coroutineScope.launch {
-        // 点击后会缩小，这里让被覆盖的 item 显示出来
-        localOverlayController.ignoreCoverOther(item, true)
-        scale.animateTo(0.8F)
-      }
+      // 点击后会缩小，这里让被覆盖的 item 显示出来
+      val overlayLock = localOverlayController.ignoreCoverOther(item)
+      coroutineScope.launch { scale.animateTo(0.8F) }
       while (true) {
-        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val event = try {
+          awaitPointerEvent(PointerEventPass.Initial)
+        } catch (e: Exception) {
+          overlayLock.unlock()
+          throw e
+        }
         val pointer = event.changes.firstOrNull { it.id == down.id }
         if (
           pointer == null ||
@@ -229,8 +232,11 @@ private fun Modifier.pointerPressRation(item: CourseItem): Modifier {
         ) {
           pointerOffset.value = null
           coroutineScope.launch {
-            scale.animateTo(1F)
-            localOverlayController.ignoreCoverOther(item, false)
+            try {
+              scale.animateTo(1F)
+            } finally {
+              overlayLock.unlock()
+            }
           }
           break
         }

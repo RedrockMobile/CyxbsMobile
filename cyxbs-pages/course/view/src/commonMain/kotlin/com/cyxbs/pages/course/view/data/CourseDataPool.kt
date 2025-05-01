@@ -71,7 +71,7 @@ class CourseDayDataPool(
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
 
   // 将不参与覆盖其他 item 的计算
-  private val ignoreCoverOther = mutableSetOf<CourseItem>()
+  private val ignoreCoverOther = mutableMapOf<CourseItem, Int>()
 
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
@@ -81,7 +81,7 @@ class CourseDayDataPool(
     state.value = OverlayManager.getSingleDayOverlapData(
       input = itemList,
       coveredList = mutableListOf(),
-      ignoreCoverOther = ignoreCoverOther,
+      ignoreCoverOther = ignoreCoverOther.keys,
     ).map {
       CourseItemContent(it)
     }
@@ -103,11 +103,25 @@ class CourseDayDataPool(
     }
   }
 
-  override fun ignoreCoverOther(item: CourseItem, enable: Boolean) {
-    if (enable && ignoreCoverOther.add(item)) {
-      refreshByItemSet()
-    } else if (!enable && ignoreCoverOther.remove(item)) {
-      refreshByItemSet()
+  override fun ignoreCoverOther(item: CourseItem): IOverlayController.OverlayLock {
+    ignoreCoverOther[item] = (ignoreCoverOther[item] ?: 0) + 1
+    refreshByItemSet()
+    return object : IOverlayController.OverlayLock {
+      var hasUnlock = false
+      override fun unlock(): Boolean {
+        if (hasUnlock) return ignoreCoverOther.containsKey(item)
+        hasUnlock = true
+        val now = ignoreCoverOther[item] ?: error("未解锁时不应该会出现 ignoreCoverOther 不存在 item 的情况")
+        require(now > 0) { "状态存在问题，now = 0 时应该已经被 remove" }
+        if (now == 1) {
+          ignoreCoverOther.remove(item)
+          refreshByItemSet()
+          return true
+        } else {
+          ignoreCoverOther[item] = now - 1
+          return false
+        }
+      }
     }
   }
 }

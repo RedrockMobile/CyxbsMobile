@@ -20,6 +20,7 @@ kotlin {
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.login.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.notification.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
