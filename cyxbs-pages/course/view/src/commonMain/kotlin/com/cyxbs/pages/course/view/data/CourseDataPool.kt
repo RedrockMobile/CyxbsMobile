@@ -5,8 +5,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.CourseItemContent
 import com.cyxbs.pages.course.view.overlay.IOverlayController
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.overlay.OverlayManager
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +62,7 @@ class CourseDayDataPool(
   val weekDataPool: CourseWeekDataPool,
 ) : IOverlayController {
 
-  val state: MutableState<List<CourseItemContent>> = mutableStateOf(emptyList())
+  val state: MutableState<List<OverlayData>> = mutableStateOf(emptyList())
 
   // 是否已经发送了 setStateRunnable
   private var isPostRunnable = false
@@ -71,7 +71,10 @@ class CourseDayDataPool(
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
 
   // 将不参与覆盖其他 item 的计算
-  private val ignoreCoverOther = mutableMapOf<CourseItem, Int>()
+  private val ignoreCoverBottom = mutableMapOf<CourseItem, Int>()
+
+  // 允许被完全覆盖时仍然展示
+  private val allowNoShowRange = mutableMapOf<CourseItem, Int>()
 
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
@@ -81,10 +84,9 @@ class CourseDayDataPool(
     state.value = OverlayManager.getSingleDayOverlapData(
       input = itemList,
       coveredList = mutableListOf(),
-      ignoreCoverOther = ignoreCoverOther.keys,
-    ).map {
-      CourseItemContent(it)
-    }
+      ignoreCoverBottom = ignoreCoverBottom.keys,
+      allowNoShowRange = allowNoShowRange.keys,
+    )
   }
 
   // 尝试触发刷新，将在下一个消息进行执行
@@ -103,22 +105,34 @@ class CourseDayDataPool(
     }
   }
 
-  override fun ignoreCoverOther(item: CourseItem): IOverlayController.OverlayLock {
-    ignoreCoverOther[item] = (ignoreCoverOther[item] ?: 0) + 1
-    refreshByItemSet()
-    return object : IOverlayController.OverlayLock {
+  override fun ignoreCoverBottom(item: CourseItem): IOverlayController.Lock {
+    return createLock(item, ignoreCoverBottom) {
+      refreshByItemSet()
+    }
+  }
+
+  override fun allowNoShowRange(item: CourseItem): IOverlayController.Lock {
+    return createLock(item, allowNoShowRange) {
+      refreshByItemSet()
+    }
+  }
+
+  private fun createLock(item: CourseItem, map: MutableMap<CourseItem, Int>, action: (lock: Boolean) -> Unit): IOverlayController.Lock {
+    map[item] = (map[item] ?: 0) + 1
+    action.invoke(true)
+    return object : IOverlayController.Lock {
       var hasUnlock = false
       override fun unlock(): Boolean {
-        if (hasUnlock) return ignoreCoverOther.containsKey(item)
+        if (hasUnlock) return map.containsKey(item)
         hasUnlock = true
-        val now = ignoreCoverOther[item] ?: error("未解锁时不应该会出现 ignoreCoverOther 不存在 item 的情况")
-        require(now > 0) { "状态存在问题，now = 0 时应该已经被 remove" }
+        val now = map[item] ?: error("状态存在问题，未解锁时 item 应该会存在 map 中")
+        require(now > 0) { "状态存在问题，now($now) 为 0 时应该已经被 remove" }
         if (now == 1) {
-          ignoreCoverOther.remove(item)
-          refreshByItemSet()
+          map.remove(item)
+          action.invoke(false)
           return true
         } else {
-          ignoreCoverOther[item] = now - 1
+          map[item] = now - 1
           return false
         }
       }

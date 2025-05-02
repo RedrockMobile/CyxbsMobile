@@ -44,8 +44,8 @@ object NextItemHeaderUtils {
     dayDataPool: CourseDayDataPool,
   ): BottomSheetItemHeader? {
     var minItem: CourseItem? = null
-    for (itemContent in dayDataPool.state.value.asReversed()) {
-      val item = itemContent.item
+    for (overlayData in dayDataPool.state.value.asReversed()) {
+      val item = overlayData.item
       if (item !is BottomSheetItemHeader) continue
       if (nowTime.time in item.beginTime..item.finalTime) {
         return item

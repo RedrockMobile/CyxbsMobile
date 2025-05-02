@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
-import com.cyxbs.pages.course.view.item.CourseItemContent
 import com.cyxbs.pages.course.view.overlay.LocalOverlayController
+import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
@@ -78,10 +78,10 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
     CompositionLocalProvider(
       LocalOverlayController provides dayDataPool,
     ) {
-      dayDataPool.state.value.fastForEach { content ->
-        key(content.key) {
+      dayDataPool.state.value.fastForEach { overlay ->
+        key(overlay.item.key) {
           CourseItemContent(
-            content = content,
+            overlay = overlay,
             timeline = timeline,
             index = index,
           )
@@ -92,8 +92,8 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
 }
 
 @Composable
-private fun CourseItemContent(content: CourseItemContent, timeline: CourseTimeline, index: Int) {
-  content.Content(
+private fun CourseItemContent(overlay: OverlayData, timeline: CourseTimeline, index: Int) {
+  overlay.item.CourseItemContent(
     modifier = Modifier.layout { measurable, constraints ->
       val placeable = measurable.measure(
         Constraints(
@@ -105,6 +105,7 @@ private fun CourseItemContent(content: CourseItemContent, timeline: CourseTimeli
         placeable.placeRelative(index * placeable.width, 0)
       }
     },
+    overlap = overlay,
     timeline = timeline,
   )
 }

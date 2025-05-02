@@ -22,7 +22,7 @@ data class OverlayData(
 data class CoveredRange(
   val begin: MinuteTime,
   val final: MinuteTime,
-  val coveredItems: MutableList<CourseItem> = mutableListOf(), // 被覆盖的 item
+  val coveredItems: MutableList<CourseItem> = mutableListOf(), // 被覆盖的 item，只有 showRangeList 才存在值
 )
 
 object OverlayManager {
@@ -30,20 +30,22 @@ object OverlayManager {
   fun getSingleDayOverlapData(
     input: List<CourseItem>,
     coveredList: MutableList<CoveredRange>,
-    ignoreCoverOther: Set<CourseItem>, // 不会覆盖下层 item 的 item
+    ignoreCoverBottom: Set<CourseItem>, // 不会覆盖下层 item 的 item
+    allowNoShowRange: Set<CourseItem>, // 允许被完全覆盖时仍然展示
   ): List<OverlayData> {
     val ignoreShowRangeList = mutableListOf<CoveredRange>()
     return input.asReversed() // 这里需要倒序遍历，因为越在后面的 item 越在顶层显示
       .mapNotNull { item ->
-        val enableIgnoreCoverOther = ignoreCoverOther.contains(item)
+        val enableIgnoreCoverBottom = ignoreCoverBottom.contains(item)
         // 如果 item 在 ignore 中，则复制出一份全新的 coveredList，使 opFinal 中的 coveredList.add 失效
-        val fakeCoveredList = if (enableIgnoreCoverOther) coveredList.toMutableList() else coveredList
+        val fakeCoveredList = if (enableIgnoreCoverBottom) coveredList.toMutableList() else coveredList
         val overlayData = getShowRangeList(item, fakeCoveredList)
-        updateIgnoreShowRangeList(item, ignoreShowRangeList)
-        if (enableIgnoreCoverOther) {
+        updateIgnoreShowRangeList(item, ignoreShowRangeList) // 因为被忽略的 range 不会参与计算，所以要单独计算其 coveredItems
+        if (enableIgnoreCoverBottom) {
           ignoreShowRangeList.addAll(overlayData.showRangeList) // 保存起来用于单独计算其 coveredItems
         }
-        if (overlayData.showRangeList.isNotEmpty()) overlayData else null // 过滤掉被完全覆盖的 item
+        // 过滤掉被完全覆盖的 item
+        if (overlayData.showRangeList.isNotEmpty() || allowNoShowRange.contains(item)) overlayData else null
       }.asReversed() // 反转回去
   }
 

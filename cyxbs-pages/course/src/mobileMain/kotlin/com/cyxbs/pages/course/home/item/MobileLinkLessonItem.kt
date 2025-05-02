@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
@@ -17,7 +18,7 @@ import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.IMovableItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
@@ -38,13 +39,17 @@ import kotlin.time.Duration.Companion.seconds
 class MobileLinkLessonItem(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   override val lesson: LessonByWeeks,
-) : LinkLessonItem, BottomSheetItemHeader, BottomSheetDialogContent {
+) : LinkLessonItem, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItem {
 
   @ImplProvider
   companion object : LinkLessonItemFactory {
     override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
       return MobileLinkLessonItem(page, lesson)
     }
+  }
+
+  override fun getMoveToNewLocation(): Offset {
+    return Offset.Zero
   }
 
   override val key: String = hashCode().toString()
