@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -65,19 +65,8 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     }.launchIn(appCoroutineScope)
   }
 
-  private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>?> = flow {
-    if (linkStuNum.isEmpty()) {
-      emit(null)
-    } else {
-      val cacheLesson = LessonRepository.getLesson(linkStuNum)
-      if (cacheLesson != null) {
-        emit(cacheLesson.data)
-      }
-      LessonRepository.requestLesson(linkStuNum).onSuccess {
-        emit(it)
-      }
-    }
-  }
+  private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>?> =
+    if (linkStuNum.isEmpty()) flowOf(null) else LessonRepository.getAndRequestLesson(linkStuNum)
 
   private fun resetData(data: List<LessonByWeeks>?) {
     clear()

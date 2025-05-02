@@ -11,6 +11,8 @@ import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.bean.StuLessonBean
 import com.cyxbs.pages.course.network.CourseApiService
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -28,7 +30,29 @@ object LessonRepository {
 
   private val mLessonCache = mutableMapOf<String, ILessonService2.CacheLesson>()
 
-  fun getLesson(stuNum: String?): ILessonService2.CacheLesson? {
+  /**
+   * 有缓存则先回调获取缓存，然后触发网络请求
+   * 如果请求失败，则不回调
+   * 请求成功则与缓存进行比对，发生改变时才回调
+   */
+  fun getAndRequestLesson(stuNum: String): Flow<List<LessonByWeeks>> {
+    return flow {
+      val cache = getCacheLesson(stuNum)
+      if (cache != null) {
+        emit(cache.data)
+      }
+      requestLesson(stuNum).onSuccess {
+        if (it != cache?.data) {
+          emit(it)
+        }
+      }
+    }
+  }
+
+  /**
+   * 获取课程缓存
+   */
+  fun getCacheLesson(stuNum: String?): ILessonService2.CacheLesson? {
     stuNum ?: return null
     // 先取内存级缓存
     val cache = mLessonCache[stuNum]
@@ -51,6 +75,9 @@ object LessonRepository {
     }
   }
 
+  /**
+   * 请求课程
+   */
   suspend fun requestLesson(stuNum: String): Result<List<LessonByWeeks>> {
     val requestTime = Clock.System.now()
     return runCatchingCoroutine {

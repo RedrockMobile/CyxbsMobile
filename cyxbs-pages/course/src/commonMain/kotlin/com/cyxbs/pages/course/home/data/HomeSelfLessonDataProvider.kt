@@ -46,12 +46,14 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
     if (user == null) {
       emit(null)
     } else {
-      val cacheLesson = LessonRepository.getLesson(user.stuNum)
+      val cacheLesson = LessonRepository.getCacheLesson(user.stuNum)
       if (cacheLesson != null) {
         emit(cacheLesson.data)
       }
       LessonRepository.requestLesson(user.stuNum).onSuccess {
-        emit(it)
+        if (it != cacheLesson?.data) {
+          emit(it)
+        }
       }.onFailure {
         if (cacheLesson != null) {
           val diffDay = Clock.System.now() - cacheLesson.requestTime
