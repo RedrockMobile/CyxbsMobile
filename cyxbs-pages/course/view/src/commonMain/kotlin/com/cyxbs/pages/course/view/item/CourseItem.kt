@@ -59,7 +59,6 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
-import com.cyxbs.components.utils.compose.sharePointerInput
 import com.cyxbs.pages.course.view.overlay.CoveredRange
 import com.cyxbs.pages.course.view.overlay.IOverlayController
 import com.cyxbs.pages.course.view.overlay.LocalOverlayController
@@ -73,7 +72,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
@@ -303,8 +301,8 @@ private fun Modifier.pressScale(item: CourseItem): Modifier {
 
 sealed interface LongPressMoveState {
   data object Idle : LongPressMoveState
-  data class Touching(val offset: Offset) : LongPressMoveState
-  data class Animating(val beginOffset: Offset, val finalOffset: Offset) : LongPressMoveState
+  data object Touching : LongPressMoveState
+  data object Animating : LongPressMoveState
 }
 
 // 长按移动 item
@@ -320,41 +318,57 @@ private fun Modifier.longPressMove(
   val localOverlayController = LocalOverlayController.current
   var coverBottomLock: IOverlayController.Lock? = null
   var noShowRangeLock: IOverlayController.Lock? = null
-  var layoutCoordinate by rememberWrapper<LayoutCoordinates?>(null)
+  var originLayoutCoordinates by rememberWrapper<LayoutCoordinates?>(null)
+  var transitionLayoutCoordinate by rememberWrapper<LayoutCoordinates?>(null)
   val alphaState = remember { mutableFloatStateOf(1F) }
-  var screenPosition by rememberWrapper(Offset.Zero)
+  var screenPosition by remember { mutableStateOf(Offset.Zero) }
   val transition = remember { mutableStateOf(Offset.Zero) }
   val isMoving by rememberDerivedStateOfStructure { state.value !is LongPressMoveState.Idle }
   val edgeScrollWrapper = rememberUpdatedWrapper(edgeScroll)
   var edgePosition: EdgeScroll.EdgePosition? by rememberWrapper(null)
   // 移动结束时调用
-  val moveToNewLocationBlock: (Offset) -> Unit by rememberWrapper {
-    state.value = LongPressMoveState.Animating(transition.value, it)
+  val moveToNewLocationBlock: (Offset) -> Unit by rememberWrapper { newOffset ->
+    state.value = LongPressMoveState.Animating
+    edgePosition?.remove()
     if (coroutineScope.isActive) coroutineScope.launch {
       try {
         item.moveToNewLocation(
           alphaState = alphaState,
           offsetState = transition,
-          newOffset = it,
+          newOffset = newOffset,
         )
       } finally {
         coverBottomLock?.unlock()
         noShowRangeLock?.unlock()
-        transition.value = it
+        transition.value = newOffset
         alphaState.value = 1F
-        edgePosition?.remove()
         state.value = LongPressMoveState.Idle
       }
     } else {
       coverBottomLock?.unlock()
       noShowRangeLock?.unlock()
-      transition.value = it
-      edgePosition?.remove()
+      transition.value = newOffset
       state.value = LongPressMoveState.Idle
     }
   }
-  // 需要使用 sharePointerInput 允许触摸事件分发给兄弟节点
-  return sharePointerInput(true).pointerInput(item) {
+  return zIndex(
+    if (isMoving) 1F else 0F
+  ).onGloballyPositioned {
+    // 得到 translation 变换前的坐标系
+    originLayoutCoordinates = it
+    if (state.value is LongPressMoveState.Touching) {
+      // 当相对屏幕的位置发生改变时，则需要重新计算 transition（比如时间轴展开、滚轴上下滑动）
+      val offset = it.screenToLocal(screenPosition)
+      transition.value = offset
+    }
+  }.graphicsLayer {
+    translationX = transition.value.x
+    translationY = transition.value.y
+  }.onGloballyPositioned {
+    // 这里得到的是经过 translation 变换后的坐标系
+    // 后续 pointerInput 中的位置都是基于该坐标系的计算
+    transitionLayoutCoordinate = it
+  }.pointerInput(item) {
     // pointerInput 需要在 graphicsLayer 之后，否则下面的 item 无法处理事件
     awaitEachGesture {
       val down = awaitFirstDown(
@@ -382,34 +396,22 @@ private fun Modifier.longPressMove(
         pointer.consume()
         if (state.value == LongPressMoveState.Idle) {
           // 触发移动的起点
-          state.value = LongPressMoveState.Touching(Offset.Zero)
+          state.value = LongPressMoveState.Touching
           coverBottomLock = localOverlayController.ignoreCoverBottom(item)
           noShowRangeLock = localOverlayController.allowNoShowRange(item)
           edgePosition = edgeScrollWrapper.value.add()
         }
         // 记录相对于屏幕的位置
-        screenPosition =
-          layoutCoordinate!!.localToScreen(pointer.position) - longPressPointer.position
-        // item 当前的偏移量
-        val offset = pointer.position - longPressPointer.position
-        transition.value = offset
-        edgePosition?.update(screenPosition, size) // 触发边缘移动
-        state.value = LongPressMoveState.Touching(offset)
+        transitionLayoutCoordinate?.let { transitionLc ->
+          screenPosition = transitionLc.localToScreen(pointer.position) - longPressPointer.position
+          originLayoutCoordinates?.let { originLc ->
+            // 根据 translation 变换前的坐标系算出 transition 偏移量
+            transition.value = originLc.screenToLocal(screenPosition)
+          }
+          edgePosition?.update(screenPosition, size) // 触发边缘移动
+        }
       }
     }
-  }.onGloballyPositioned {
-    layoutCoordinate = it
-    if (state.value is LongPressMoveState.Touching) {
-      // 当相对屏幕的位置发生改变时，则需要重新计算 transition（比如时间轴展开、滚轴上下滑动）
-      val offset = it.screenToLocal(screenPosition)
-      transition.value = offset
-      state.value = LongPressMoveState.Touching(offset)
-    }
-  }.zIndex(
-    if (isMoving) 1F else 0F
-  ).graphicsLayer {
-    translationX = transition.value.x
-    translationY = transition.value.y
   }
 }
 
@@ -440,7 +442,8 @@ private class EdgeScroll {
     val scrollState = LocalCourseScroll.current.scrollState
     val moveBoundary = 40 // 移动的边界值
     LaunchedEffect(Unit) {
-      firstPosition.filterNotNull().collectLatest { position ->
+      firstPosition.collectLatest { position ->
+        if (position == null) return@collectLatest
         var changeFlag = true // 用于给 distinctUntilChanged 强制更新
         position.distanceFlow.distinctUntilChangedBy {
           it to changeFlag
