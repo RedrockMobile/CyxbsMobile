@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -37,6 +38,7 @@ import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 /**
@@ -170,6 +172,8 @@ private fun Modifier.multiPointerScroll(verticalScrollState: ScrollState): Modif
   return pointerInput(Unit) {
     awaitEachGesture {
       var main = awaitFirstDown(requireUnconsumed = false)
+      var totalPositionChange = 0F
+      var lastPointerId: PointerId? = null
       while (true) {
         val event = awaitPointerEvent()
         val mainPointer = event.changes.fastFirstOrNull { it.id == main.id }
@@ -188,9 +192,18 @@ private fun Modifier.multiPointerScroll(verticalScrollState: ScrollState): Modif
         val pointer =
           event.changes.fastFirstOrNull { it.id != main.id && !it.isConsumed && it.pressed }
         if (pointer != null) {
+          if (pointer.id != lastPointerId) {
+            // 说明之前用于滑动的手指已抬起或者已被消费，此时就重新计算 totalPositionChange
+            totalPositionChange = 0F
+            lastPointerId = pointer.id
+          }
           val positionChange = pointer.positionChange()
-          pointer.consume()
-          chanel.trySend(positionChange.y)
+          if (totalPositionChange.absoluteValue > viewConfiguration.touchSlop) {
+            pointer.consume()
+            chanel.trySend(positionChange.y)
+          } else {
+            totalPositionChange += positionChange.y
+          }
         }
       }
     }
