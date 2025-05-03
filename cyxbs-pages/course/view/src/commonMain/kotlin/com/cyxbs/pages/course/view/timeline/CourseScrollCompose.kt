@@ -7,27 +7,32 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastMapIndexed
 import com.cyxbs.components.utils.compose.reflexScrollableForMouse
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -40,6 +45,15 @@ import kotlin.math.roundToInt
  * @author 985892345
  * @date 2024/1/27 16:25
  */
+
+val LocalCourseScroll = staticCompositionLocalOf<LocalCourseScrollContext> { error("未实现") }
+
+class LocalCourseScrollContext(
+  val scrollState: State<ScrollState>,
+  val outerCoordinates: State<LayoutCoordinates?>, // scroll 外层布局
+  val innerCoordinates: State<LayoutCoordinates?>, // scroll 内层布局
+)
+
 @Composable
 internal fun CourseScrollCompose(
   timeline: CourseTimeline,
@@ -48,12 +62,34 @@ internal fun CourseScrollCompose(
   scrollPaddingValues: PaddingValues,
   content: @Composable () -> Unit,
 ) {
+  val scrollStateState = rememberUpdatedState(verticalScrollState)
+  val outerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
+  val innerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
   Layout(
     modifier = modifier
+      .onGloballyPositioned {
+        outerCoordinatesState.value = it
+      }
       .reflexScrollableForMouse()
       .verticalScroll(state = verticalScrollState)
-      .multiPointerScroll(verticalScrollState),
-    content = { content() },
+      .multiPointerScroll(verticalScrollState)
+      .onGloballyPositioned {
+        innerCoordinatesState.value = it
+      },
+    content = {
+      val context = remember {
+        LocalCourseScrollContext(
+          scrollState = scrollStateState,
+          outerCoordinates = outerCoordinatesState,
+          innerCoordinates = innerCoordinatesState,
+        )
+      }
+      CompositionLocalProvider(
+        LocalCourseScroll provides context
+      ) {
+        content()
+      }
+    },
     measurePolicy = remember(timeline) {
       { measurables, constraints ->
         var widthConsume = 0
@@ -83,6 +119,7 @@ internal fun CourseScrollCompose(
         }
         layout(constraints.maxWidth, height + topPadding + bottomPadding) {
           var start = startPadding
+          coordinates
           placeables.fastForEach {
             it.placeRelative(x = start, y = topPadding)
             start += it.width

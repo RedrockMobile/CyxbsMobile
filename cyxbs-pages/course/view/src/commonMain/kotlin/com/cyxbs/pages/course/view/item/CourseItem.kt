@@ -2,6 +2,9 @@ package com.cyxbs.pages.course.view.item
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -13,13 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
@@ -39,6 +45,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastFirstOrNull
@@ -48,8 +55,8 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.getValue
-import com.cyxbs.components.utils.compose.rememberBooleanWrapper
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
 import com.cyxbs.components.utils.compose.sharePointerInput
@@ -59,9 +66,20 @@ import com.cyxbs.pages.course.view.overlay.LocalOverlayController
 import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.overlay.OverlayManager
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
+import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.sign
 
 /**
  * .
@@ -103,12 +121,15 @@ fun CourseDefaultItemContent(
   backgroundColor: Color,
   onClick: ((CoveredRange) -> Unit)? = null,
 ) {
+  val edgeScroll = remember { EdgeScroll() } // 边缘滚动处理
+  edgeScroll.attachCompose()
   Box(
     modifier = modifier
       .then(timeline.createLayoutModifier(overlap.item.beginTime, overlap.item.finalTime))
-      .longPressMove( // 长按移动 item
+      .longPressMove(
+        // 长按移动 item
         item = overlap.item,
-        isCompleteCover = overlap.showRangeList.isEmpty(),
+        edgeScroll = edgeScroll,
       )
       .pressScale(overlap.item) // 点击后的 Q 弹动画
       .courseItemBackground(backgroundColor) // 通用背景
@@ -292,7 +313,7 @@ sealed interface LongPressMoveState {
 private fun Modifier.longPressMove(
   state: MutableState<LongPressMoveState> = remember { mutableStateOf(LongPressMoveState.Idle) },
   item: CourseItem,
-  isCompleteCover: Boolean, // 是否被完全覆盖
+  edgeScroll: EdgeScroll,
 ): Modifier {
   if (item !is IMovableItem) return this
   val coroutineScope = rememberCoroutineScope()
@@ -304,7 +325,8 @@ private fun Modifier.longPressMove(
   var screenPosition by rememberWrapper(Offset.Zero)
   val transition = remember { mutableStateOf(Offset.Zero) }
   val isMoving by rememberDerivedStateOfStructure { state.value !is LongPressMoveState.Idle }
-  val isCompleteCoverWrapper = rememberBooleanWrapper(isCompleteCover)
+  val edgeScrollWrapper = rememberUpdatedWrapper(edgeScroll)
+  var edgePosition: EdgeScroll.EdgePosition? by rememberWrapper(null)
   // 移动结束时调用
   val moveToNewLocationBlock: (Offset) -> Unit by rememberWrapper {
     state.value = LongPressMoveState.Animating(transition.value, it)
@@ -314,17 +336,20 @@ private fun Modifier.longPressMove(
           alphaState = alphaState,
           offsetState = transition,
           newOffset = it,
-          isCompleteCover = isCompleteCoverWrapper.value, // 这里需要使用包裹类以获取重组后的最新值
         )
       } finally {
         coverBottomLock?.unlock()
         noShowRangeLock?.unlock()
+        transition.value = it
         alphaState.value = 1F
+        edgePosition?.remove()
         state.value = LongPressMoveState.Idle
       }
     } else {
       coverBottomLock?.unlock()
       noShowRangeLock?.unlock()
+      transition.value = it
+      edgePosition?.remove()
       state.value = LongPressMoveState.Idle
     }
   }
@@ -360,6 +385,7 @@ private fun Modifier.longPressMove(
           state.value = LongPressMoveState.Touching(Offset.Zero)
           coverBottomLock = localOverlayController.ignoreCoverBottom(item)
           noShowRangeLock = localOverlayController.allowNoShowRange(item)
+          edgePosition = edgeScrollWrapper.value.add()
         }
         // 记录相对于屏幕的位置
         screenPosition =
@@ -367,6 +393,7 @@ private fun Modifier.longPressMove(
         // item 当前的偏移量
         val offset = pointer.position - longPressPointer.position
         transition.value = offset
+        edgePosition?.update(screenPosition, size) // 触发边缘移动
         state.value = LongPressMoveState.Touching(offset)
       }
     }
@@ -383,8 +410,133 @@ private fun Modifier.longPressMove(
   ).graphicsLayer {
     translationX = transition.value.x
     translationY = transition.value.y
-    alpha = alphaState.floatValue // 如果当前 item 被完全覆盖时，就会在动画期间从 1 -> 0
   }
 }
 
+// 边缘滚动
+// 比如长按移动 item 后，item 边缘靠近 scroll 边缘时，滚轴就会自动滚动
+@Stable
+private class EdgeScroll {
 
+  private var scrollOuterCoordinates: LayoutCoordinates? = null
+
+  private val list = mutableListOf<EdgePosition>()
+
+  private val firstPosition = MutableStateFlow<EdgePosition?>(null)
+
+  fun add(): EdgePosition {
+    val position = EdgePosition()
+    if (list.isEmpty()) {
+      firstPosition.value = position
+    }
+    list.add(position)
+    return position
+  }
+
+  @Composable
+  fun attachCompose() {
+    val outerCoordinates = LocalCourseScroll.current.outerCoordinates
+    SideEffect { scrollOuterCoordinates = outerCoordinates.value }
+    val scrollState = LocalCourseScroll.current.scrollState
+    val moveBoundary = 40 // 移动的边界值
+    LaunchedEffect(Unit) {
+      firstPosition.filterNotNull().collectLatest { position ->
+        var changeFlag = true // 用于给 distinctUntilChanged 强制更新
+        position.distanceFlow.distinctUntilChangedBy {
+          it to changeFlag
+        }.collectLatest {
+          if (
+            abs(it) < moveBoundary
+            && (it > 0 && scrollState.value.canScrollBackward || it < 0 && scrollState.value.canScrollForward)
+          ) {
+            val velocity = -it.sign * ((moveBoundary - abs(it)) / 4 + 2F)
+            try {
+              scrollState.value.scroll {
+                animate(
+                  initialValue = velocity,
+                  targetValue = velocity,
+                  animationSpec = infiniteRepeatable(tween(200))
+                ) { value, _ ->
+                  scrollBy(value)
+                }
+              }
+            } catch (e: CancellationException) {
+              if (e.message == "Mutation interrupted") {
+                // 被其他滚动打断时就锁住
+                position.lock = true
+                // 如果被锁住后，则下一次需要绕开 distinctUntilChanged 重新触发 collect
+                // 因为超出边界外后就只发送 ±0.1，此时就会被 distinctUntilChanged 拦截
+                changeFlag = !changeFlag
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Stable
+  inner class EdgePosition {
+
+    val distanceFlow =
+      MutableSharedFlow<Float>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    // 是否被锁住
+    // 当被锁住时需要移动一段距离才会解锁滚动
+    var lock = true
+
+    // 上一次的中心点位置
+    // 用于被锁时解锁需要的移动距离阈值判断
+    var lastCenterY = Float.NaN
+
+    /**
+     * @param screenPosition 相对于屏幕的坐标（组件左上角）
+     * @param size 组件的大小，如果不为组件而是一个触摸点时提供 IntSize.Zero 即可
+     */
+    fun update(screenPosition: Offset, size: IntSize) {
+      Snapshot.withoutReadObservation {
+        val outerCoordinates = scrollOuterCoordinates
+        if (outerCoordinates != null) {
+          val topY = outerCoordinates.screenToLocal(screenPosition).y
+          val bottomY = topY + size.height
+          val centerY = topY + size.height / 2F
+          val outerCenterY = outerCoordinates.size.height / 2F
+          if (lock) {
+            // 被锁住时
+            if (lastCenterY.isNaN()) lastCenterY = centerY // 第一次初始化
+            if (lastCenterY > outerCenterY) {
+              if (centerY < lastCenterY) {
+                // 在底部区域向上移动，则 lastCenterY 跟随 centerY，不进行解锁
+                lastCenterY = centerY
+              } else if (centerY > lastCenterY + 20) {
+                // 只有在底部区域向下移动超过 20 时才解锁
+                lock = false
+              }
+            } else {
+              if (centerY > lastCenterY) {
+                lastCenterY = centerY
+              } else if (centerY < lastCenterY - 20) {
+                lock = false
+              }
+            }
+          } else {
+            lastCenterY = centerY
+            // 正值表示距离上边界的距离，负值表示距离下边界的距离
+            val distance = if (centerY < outerCenterY) {
+              topY.coerceAtLeast(0.1F)
+            } else {
+              (bottomY - outerCoordinates.size.height).coerceAtMost(-0.1F)
+            }
+            distanceFlow.tryEmit(distance)
+          }
+        }
+      }
+    }
+
+    // 移除，与 add 要成对调用
+    fun remove() {
+      list.remove(this)
+      firstPosition.value = list.firstOrNull()
+    }
+  }
+}

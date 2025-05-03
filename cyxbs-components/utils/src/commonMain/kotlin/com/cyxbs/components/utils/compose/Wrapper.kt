@@ -39,7 +39,7 @@ operator fun <T> Wrapper<T>.setValue(thisRef: Any?, property: KProperty<*>, valu
 @Composable
 fun rememberIntWrapper(value: Int): IntWrapper = remember { IntWrapper(value) }
 @Composable
-fun <T> rememberUpdatedIntWrapper(value: Int): IntWrapper = remember { IntWrapper(value) }.also { it.value = value }
+fun rememberUpdatedIntWrapper(value: Int): IntWrapper = remember { IntWrapper(value) }.also { it.value = value }
 operator fun IntWrapper.getValue(thisRef: Any?, property: KProperty<*>): Int = value
 operator fun IntWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: Int) {
   this.value = value
@@ -48,7 +48,7 @@ operator fun IntWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: I
 @Composable
 fun rememberLongWrapper(value: Long): LongWrapper = remember { LongWrapper(value) }
 @Composable
-fun <T> rememberUpdatedLongWrapper(value: Long): LongWrapper = remember { LongWrapper(value) }.also { it.value = value }
+fun rememberUpdatedLongWrapper(value: Long): LongWrapper = remember { LongWrapper(value) }.also { it.value = value }
 operator fun LongWrapper.getValue(thisRef: Any?, property: KProperty<*>): Long = value
 operator fun LongWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: Long) {
   this.value = value
@@ -57,7 +57,7 @@ operator fun LongWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: 
 @Composable
 fun rememberFloatWrapper(value: Float): FloatWrapper = remember { FloatWrapper(value) }
 @Composable
-fun <T> rememberUpdatedFloatWrapper(value: Float): FloatWrapper = remember { FloatWrapper(value) }.also { it.value = value }
+fun rememberUpdatedFloatWrapper(value: Float): FloatWrapper = remember { FloatWrapper(value) }.also { it.value = value }
 operator fun FloatWrapper.getValue(thisRef: Any?, property: KProperty<*>): Float = value
 operator fun FloatWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: Float) {
   this.value = value
@@ -66,7 +66,7 @@ operator fun FloatWrapper.setValue(thisRef: Any?, property: KProperty<*>, value:
 @Composable
 fun rememberDoubleWrapper(value: Double): DoubleWrapper = remember { DoubleWrapper(value) }
 @Composable
-fun <T> rememberUpdatedDoubleWrapper(value: Double): DoubleWrapper = remember { DoubleWrapper(value) }.also { it.value = value }
+fun rememberUpdatedDoubleWrapper(value: Double): DoubleWrapper = remember { DoubleWrapper(value) }.also { it.value = value }
 operator fun DoubleWrapper.getValue(thisRef: Any?, property: KProperty<*>): Double = value
 operator fun DoubleWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: Double) {
   this.value = value
@@ -75,7 +75,7 @@ operator fun DoubleWrapper.setValue(thisRef: Any?, property: KProperty<*>, value
 @Composable
 fun rememberBooleanWrapper(value: Boolean): BooleanWrapper = remember { BooleanWrapper(value) }
 @Composable
-fun <T> rememberUpdatedBooleanWrapper(value: Boolean): BooleanWrapper = remember { BooleanWrapper(value) }.also { it.value = value }
+fun rememberUpdatedBooleanWrapper(value: Boolean): BooleanWrapper = remember { BooleanWrapper(value) }.also { it.value = value }
 operator fun BooleanWrapper.getValue(thisRef: Any?, property: KProperty<*>): Boolean = value
 operator fun BooleanWrapper.setValue(thisRef: Any?, property: KProperty<*>, value: Boolean) {
   this.value = value

@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.view.item
 
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
@@ -19,17 +20,13 @@ interface IMovableItem : CourseItem {
     alphaState: MutableFloatState,
     offsetState: MutableState<Offset>,
     newOffset: Offset,
-    isCompleteCover: Boolean,
   ) {
-    val beginOffset = offsetState.value
     animate(
-      initialValue = 0F,
-      targetValue = 1F,
+      typeConverter = Offset.VectorConverter,
+      initialValue = offsetState.value,
+      targetValue = newOffset,
     ) { value, _ ->
-      if (isCompleteCover) {
-        alphaState.floatValue = 1 - value
-      }
-      offsetState.value = (newOffset - beginOffset) * value + beginOffset
+      offsetState.value = value
     }
   }
 }
