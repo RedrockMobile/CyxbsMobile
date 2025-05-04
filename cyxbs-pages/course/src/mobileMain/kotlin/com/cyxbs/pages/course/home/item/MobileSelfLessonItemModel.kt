@@ -92,11 +92,11 @@ class MobileSelfLessonItemModel(
         data: CourseItemOverlap,
       ): Set<CourseItemModel> {
         data.coveredItemList.fastForEach {
-          val item = it.data.item
+          val item = it.itemOverlap.item
           if (item.beginTime < itemState.item.finalTime && item.finalTime > itemState.item.beginTime) {
             set.add(item)
           }
-          collectCoveredItems(set, it.data)
+          collectCoveredItems(set, it.itemOverlap)
         }
         return set
       }

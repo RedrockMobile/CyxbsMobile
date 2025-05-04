@@ -112,7 +112,7 @@ class PressScaleControllerImpl(
       // 如果 item 本身存在一些区域可以展示，那么它的背景是能完全展示的，也不需要单独取消覆盖区域
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
-          .filter { it.data.item === itemState.item }
+          .filter { it.itemOverlap.item === itemState.item }
           .map { it.range }
         (show + coveredRange).mergeOverlapRange()
       }

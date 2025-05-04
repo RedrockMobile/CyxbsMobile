@@ -94,7 +94,7 @@ class MobileHomeCourseFrame : IMobileHomeCourseFrame {
   val initialPage: Int
     get() = getPage(TodayNoEffect)
 
-  fun getPage(date: Date): Int{
+  fun getPage(date: Date): Int {
     val realBeginDate = beginDate?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
     val page = (realBeginDate.daysUntil(date) / 7 + 1).coerceAtLeast(0)
     return if (page >= maxPage) 0 else page

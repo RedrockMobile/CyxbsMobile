@@ -208,7 +208,7 @@ class LongPressMoveControllerImpl(
     CourseItemState.CoveredItemShowRangeTransformerTrigger(coursePageContext) { show, overlap ->
       // 解除被覆盖 item 的隐藏区域
       val coveredRange = overlap.coveredRangeList
-        .filter { it.data.item === itemState.item }
+        .filter { it.itemOverlap.item === itemState.item }
         .map { it.range }
       (show + coveredRange).mergeOverlapRange()
     }
@@ -219,7 +219,7 @@ class LongPressMoveControllerImpl(
       // 单独处理被全覆盖这类 item 的展示
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
-          .filter { it.data.item === itemState.item }
+          .filter { it.itemOverlap.item === itemState.item }
           .map { it.range }
         (show + coveredRange).mergeOverlapRange()
       }

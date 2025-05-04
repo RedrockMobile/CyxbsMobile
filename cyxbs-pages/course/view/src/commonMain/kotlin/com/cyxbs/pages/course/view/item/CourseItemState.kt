@@ -96,7 +96,7 @@ class CourseItemState(
     override fun onChangeOverlap(overlap: CourseItemOverlap): OverlapChangeTrigger.OnDisposable {
       val coveredItemStateList = mutableListOf<CourseItemState>()
       val findOnDisposables = overlap.coveredItemList.fastMapNotNull { cover ->
-        pageContext.findItemState(cover.data.item) {
+        pageContext.findItemState(cover.itemOverlap.item) {
           // 找到被覆盖的 item 添加 showRange 转换器
           it.addShowRangeTransformer(transformer)
           coveredItemStateList.add(it)
