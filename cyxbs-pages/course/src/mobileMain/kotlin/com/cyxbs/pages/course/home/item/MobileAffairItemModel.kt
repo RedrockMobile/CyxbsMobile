@@ -3,9 +3,8 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.overlay.OverlayData
-import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemState
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.datetime.DayOfWeek
 
@@ -15,14 +14,14 @@ import kotlinx.datetime.DayOfWeek
  * @author 985892345
  * @date 2025/3/25
  */
-class MobileAffairItem(
+class MobileAffairItemModel(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
-) : CourseItem {
+) : CourseItemModel {
 
   @ImplProvider
   companion object : AffairItemFactory {
-    override fun createAffairItem(page: Int): CourseItem {
-      return MobileAffairItem(page)
+    override fun createAffairItemModel(page: Int): CourseItemModel {
+      return MobileAffairItemModel(page)
     }
   }
 
@@ -36,7 +35,7 @@ class MobileAffairItem(
     get() = TODO("Not yet implemented")
 
   @Composable
-  override fun CourseItemContent(modifier: Modifier, overlap: OverlayData, timeline: CourseTimeline) {
+  override fun CourseItemContent(modifier: Modifier, itemState: CourseItemState) {
     TODO("Not yet implemented")
   }
 }

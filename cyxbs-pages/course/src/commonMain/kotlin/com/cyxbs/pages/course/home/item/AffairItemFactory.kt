@@ -1,6 +1,6 @@
 package com.cyxbs.pages.course.home.item
 
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -12,8 +12,8 @@ import com.cyxbs.pages.course.view.item.CourseItem
  */
 interface AffairItemFactory {
 
-  fun createAffairItem(
+  fun createAffairItemModel(
     page: Int,
 //    affair: Affair,
-  ): CourseItem
+  ): CourseItemModel
 }

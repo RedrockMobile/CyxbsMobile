@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.home.item
 
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -13,12 +13,12 @@ import com.cyxbs.pages.course.view.item.CourseItem
  */
 interface LinkLessonItemFactory {
 
-  fun createLinkLessonItem(
+  fun createLinkLessonItemModel(
     page: Int,
     lesson: LessonByWeeks,
-  ): LinkLessonItem
+  ): LinkLessonItemModel
 }
 
-interface LinkLessonItem : CourseItem {
+interface LinkLessonItemModel : CourseItemModel {
   val lesson: LessonByWeeks
 }

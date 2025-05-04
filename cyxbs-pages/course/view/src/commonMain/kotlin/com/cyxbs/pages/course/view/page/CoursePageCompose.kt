@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -14,8 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
-import com.cyxbs.pages.course.view.overlay.LocalOverlayController
-import com.cyxbs.pages.course.view.overlay.OverlayData
+import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext.OnDisposable
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
@@ -25,6 +30,9 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
  * @author 985892345
  * @date 2025/2/10
  */
+
+// CoursePageCompose 下的一些 context
+val LocalCoursePage = compositionLocalOf<LocalCoursePageContext> { error("未初始化") }
 
 /**
  * @param timeline 时间轴
@@ -44,46 +52,51 @@ fun CoursePageCompose(
 ) {
   val timelineWidth = 40.dp
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
-  Box {
-    decorations.fastForEach {
-      key(it.hashCode()) { it.OuterCoursePageBottom(timeline, verticalScrollState, weekDataPool, scrollPaddingValues, timelineWidth) }
-    }
-    timeline.Content(
-      modifier = modifier,
-      enableDrawNowTimeLine = enableDrawNowTimeLine,
-      verticalScrollState = verticalScrollState,
-    ) {
+  CompositionLocalProvider(
+    LocalCoursePage provides remember { LocalCoursePageContext() },
+  ) {
+    Box {
       decorations.fastForEach {
-        key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPool) }
+        key(it.hashCode()) {
+          it.OuterCoursePageBottom(
+            timeline,
+            verticalScrollState,
+            weekDataPool,
+            scrollPaddingValues,
+            timelineWidth
+          )
+        }
       }
-      CourseWeekDataContent(
-        weekDataPool = weekDataPool,
-        timeline = timeline,
-      )
+      timeline.Content(
+        modifier = modifier,
+        enableDrawNowTimeLine = enableDrawNowTimeLine,
+        verticalScrollState = verticalScrollState,
+      ) {
+        decorations.fastForEach {
+          key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPool) }
+        }
+        CourseWeekDataContent(
+          weekDataPool = weekDataPool,
+          timeline = timeline,
+        )
+        decorations.fastForEach {
+          key(it.hashCode() + 1) {
+            it.InnerCoursePageTop(
+              timeline,
+              verticalScrollState,
+              weekDataPool
+            )
+          }
+        }
+      }
       decorations.fastForEach {
-        key(it.hashCode() + 1) { it.InnerCoursePageTop(timeline, verticalScrollState, weekDataPool) }
-      }
-    }
-    decorations.fastForEach {
-      key(it.hashCode() + 1) { it.OuterCoursePageTop(timeline, verticalScrollState, weekDataPool, scrollPaddingValues, timelineWidth) }
-    }
-  }
-}
-
-@Composable
-private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: CourseTimeline) {
-  repeat(7) { index ->
-    val dayOfWeek = timeline.beginDayOfWeek.add(index)
-    val dayDataPool = weekDataPool.get(dayOfWeek)
-    CompositionLocalProvider(
-      LocalOverlayController provides dayDataPool,
-    ) {
-      dayDataPool.state.value.fastForEach { overlay ->
-        key(overlay.item.key) {
-          CourseItemContent(
-            overlay = overlay,
-            timeline = timeline,
-            index = index,
+        key(it.hashCode() + 1) {
+          it.OuterCoursePageTop(
+            timeline,
+            verticalScrollState,
+            weekDataPool,
+            scrollPaddingValues,
+            timelineWidth
           )
         }
       }
@@ -92,23 +105,80 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
 }
 
 @Composable
-private fun CourseItemContent(overlay: OverlayData, timeline: CourseTimeline, index: Int) {
-  overlay.item.CourseItemContent(
-    modifier = Modifier.layout { measurable, constraints ->
-      val placeable = measurable.measure(
-        Constraints(
-          maxWidth = constraints.maxWidth / 7,
-          maxHeight = constraints.maxHeight
+private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: CourseTimeline) {
+  val pageContext = LocalCoursePage.current
+  repeat(7) { index ->
+    val dayOfWeek = timeline.beginDayOfWeek.add(index)
+    val dayDataPool = weekDataPool.get(dayOfWeek)
+    dayDataPool.state.collectAsState().value.fastForEach { overlay ->
+      key(overlay.item.key) {
+        val itemState = remember {
+          CourseItemState(
+            timeline = timeline,
+            overlap = overlay,
+          )
+        }.apply {
+          update(
+            timeline = timeline,
+            overlap = overlay,
+          )
+        }
+        DisposableEffect(Unit) {
+          pageContext.putItemState(overlay.item, itemState)
+          onDispose { pageContext.putItemState(overlay.item, null) }
+        }
+        overlay.item.CourseItemContent(
+          itemState = itemState,
+          modifier = Modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(
+              Constraints(
+                maxWidth = constraints.maxWidth / 7,
+                maxHeight = constraints.maxHeight
+              )
+            )
+            layout(placeable.width, placeable.height) {
+              placeable.placeRelative(index * placeable.width, 0)
+            }
+          },
         )
-      )
-      layout(placeable.width, placeable.height) {
-        placeable.placeRelative(index * placeable.width, 0)
       }
-    },
-    overlap = overlay,
-    timeline = timeline,
-  )
+    }
+  }
 }
 
+class LocalCoursePageContext {
 
+  private val itemStateMap = mutableMapOf<CourseItemModel, CourseItemState>()
 
+  private val findActions = mutableMapOf<CourseItemModel, MutableList<(CourseItemState) -> Unit>>()
+
+  fun findItemState(item: CourseItemModel): CourseItemState? = itemStateMap[item]
+
+  // 用于延迟查找的方法
+  // 如果超时则需要调用 onDispose 进行移除保存的 action 操作
+  fun findItemState(item: CourseItemModel, action: (CourseItemState) -> Unit): OnDisposable? {
+    val state = itemStateMap[item]
+    if (state != null) {
+      action(state)
+      return null
+    } else {
+      findActions.getOrPut(item) { mutableListOf() }.add(action)
+      return OnDisposable {
+        findActions[item]?.remove(action)
+      }
+    }
+  }
+
+  fun putItemState(item: CourseItemModel, state: CourseItemState?) {
+    if (state == null) {
+      itemStateMap.remove(item)
+    } else {
+      itemStateMap[item] = state
+      findActions.remove(item)?.fastForEach { it(state) }
+    }
+  }
+
+  fun interface OnDisposable {
+    fun onDispose()
+  }
+}

@@ -1,16 +1,13 @@
 package com.cyxbs.pages.course.view.data
 
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.overlay.IOverlayController
-import com.cyxbs.pages.course.view.overlay.OverlayData
-import com.cyxbs.pages.course.view.overlay.OverlayManager
+import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 
@@ -60,9 +57,10 @@ class CourseWeekDataPool(
 class CourseDayDataPool(
   val dayOfWeek: DayOfWeek,
   val weekDataPool: CourseWeekDataPool,
-) : IOverlayController {
+) {
 
-  val state: MutableState<List<OverlayData>> = mutableStateOf(emptyList())
+  val state: StateFlow<List<CourseItemOverlap>> get() = _state
+  private val _state: MutableStateFlow<List<CourseItemOverlap>> = MutableStateFlow(emptyList())
 
   // 是否已经发送了 setStateRunnable
   private var isPostRunnable = false
@@ -70,23 +68,12 @@ class CourseDayDataPool(
   // 刷新数据的 Runnable，为避免频繁刷新，设计成在下一个消息队列中才会触发
   private val setStateRunnable: Runnable = Runnable { refreshByItemSet() }
 
-  // 将不参与覆盖其他 item 的计算
-  private val ignoreCoverBottom = mutableMapOf<CourseItem, Int>()
-
-  // 允许被完全覆盖时仍然展示
-  private val allowNoShowRange = mutableMapOf<CourseItem, Int>()
-
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
     val itemList = weekDataPool.providers.map {
       it.getDayData(weekDataPool.page, dayOfWeek).sortedWith(it::compare)
     }.asReversed().flatten()
-    state.value = OverlayManager.getSingleDayOverlapData(
-      input = itemList,
-      coveredList = mutableListOf(),
-      ignoreCoverBottom = ignoreCoverBottom.keys,
-      allowNoShowRange = allowNoShowRange.keys,
-    )
+    _state.value = CourseItemOverlap.transformOverlap(itemList)
   }
 
   // 尝试触发刷新，将在下一个消息进行执行
@@ -101,40 +88,6 @@ class CourseDayDataPool(
         // 在下一个消息中才触发执行重叠处理
         isPostRunnable = false
         setStateRunnable.run()
-      }
-    }
-  }
-
-  override fun ignoreCoverBottom(item: CourseItem): IOverlayController.Lock {
-    return createLock(item, ignoreCoverBottom) {
-      refreshByItemSet()
-    }
-  }
-
-  override fun allowNoShowRange(item: CourseItem): IOverlayController.Lock {
-    return createLock(item, allowNoShowRange) {
-      refreshByItemSet()
-    }
-  }
-
-  private fun createLock(item: CourseItem, map: MutableMap<CourseItem, Int>, action: (lock: Boolean) -> Unit): IOverlayController.Lock {
-    map[item] = (map[item] ?: 0) + 1
-    action.invoke(true)
-    return object : IOverlayController.Lock {
-      var hasUnlock = false
-      override fun unlock(): Boolean {
-        if (hasUnlock) return map.containsKey(item)
-        hasUnlock = true
-        val now = map[item] ?: error("状态存在问题，未解锁时 item 应该会存在 map 中")
-        require(now > 0) { "状态存在问题，now($now) 为 0 时应该已经被 remove" }
-        if (now == 1) {
-          map.remove(item)
-          action.invoke(false)
-          return true
-        } else {
-          map[item] = now - 1
-          return false
-        }
       }
     }
   }

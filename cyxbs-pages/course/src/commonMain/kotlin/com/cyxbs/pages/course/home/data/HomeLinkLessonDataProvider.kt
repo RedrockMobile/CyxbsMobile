@@ -5,12 +5,12 @@ import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.LinkLessonItem
 import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
+import com.cyxbs.pages.course.home.item.LinkLessonItemModel
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,17 +74,17 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     if (enableShow.value != true) return
     data.forEach { lesson ->
       // 添加进整学期
-      add(itemFactory.createLinkLessonItem(0, lesson))
+      add(itemFactory.createLinkLessonItemModel(0, lesson))
       // 添加进每周
       lesson.week.forEach { week ->
-        add(itemFactory.createLinkLessonItem(week, lesson))
+        add(itemFactory.createLinkLessonItemModel(week, lesson))
       }
     }
   }
 
-  override fun compare(a: CourseItem, b: CourseItem): Int {
-    a as LinkLessonItem
-    b as LinkLessonItem
+  override fun compare(a: CourseItemModel, b: CourseItemModel): Int {
+    a as LinkLessonItemModel
+    b as LinkLessonItemModel
     if (a.page == 0 && b.page == 0) {
       val weekDiff = a.lesson.week.first() - b.lesson.week.first()
       return if (weekDiff != 0) -weekDiff else super.compare(a, b)

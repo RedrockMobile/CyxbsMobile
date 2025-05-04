@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.view.data
 
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemModel
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.datetime.DayOfWeek
 
@@ -24,11 +24,11 @@ class CourseDataProviderGroup(
   private val itemListeners = providers.map { provider ->
     object : CourseDataProvider.ItemListener {
       val provider = provider
-      override fun onAdd(item: CourseItem) {
+      override fun onAdd(item: CourseItemModel) {
         weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 
-      override fun onRemove(item: CourseItem) {
+      override fun onRemove(item: CourseItemModel) {
         weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 

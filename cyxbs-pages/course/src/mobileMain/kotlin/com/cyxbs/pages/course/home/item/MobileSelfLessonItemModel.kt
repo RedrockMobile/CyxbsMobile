@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
@@ -16,10 +17,11 @@ import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
-import com.cyxbs.pages.course.view.overlay.OverlayData
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.IMovableItem
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.IMovableItemModel
+import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
@@ -33,18 +35,18 @@ import kotlin.time.Duration.Companion.seconds
  * .
  *
  * @author 985892345
- * @date 2025/3/22
+ * @date 2025/3/15
  */
 @Stable
-class MobileLinkLessonItem(
+class MobileSelfLessonItemModel(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   override val lesson: LessonByWeeks,
-) : LinkLessonItem, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItem {
+) : SelfLessonItemModel, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItemModel {
 
   @ImplProvider
-  companion object : LinkLessonItemFactory {
-    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
-      return MobileLinkLessonItem(page, lesson)
+  companion object : SelfLessonItemFactory {
+    override fun createSelfLessonItemModel(page: Int, lesson: LessonByWeeks): SelfLessonItemModel {
+      return MobileSelfLessonItemModel(page, lesson)
     }
   }
 
@@ -62,29 +64,44 @@ class MobileLinkLessonItem(
     get() = lesson.finalTime
 
   override fun toString(): String {
-    return "MobileLinkLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
+    return "MobileSelfLessonItem(page=$page, dayOfWeek=$dayOfWeek, begin=$beginTime, final=$finalTime, " +
         "course=${lesson.course})"
   }
 
   @Composable
-  override fun CourseItemContent(
-    modifier: Modifier,
-    overlap: OverlayData,
-    timeline: CourseTimeline
-  ) {
+  override fun CourseItemContent(modifier: Modifier, itemState: CourseItemState) {
     val dialogContents = remember { mutableStateOf(emptyList<BottomSheetDialogContent>()) }
     CourseDefaultItemContent(
       modifier = modifier,
-      timeline = timeline,
-      overlap = overlap,
+      itemState = itemState,
       topText = lesson.course,
       bottomText = lesson.classroomSimplify,
-      textColor = 0xFF06A3FC.dark(0xFFF0F0F2),
-      backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
-    ) { range ->
-      dialogContents.value = listOf(this) + range.coveredItems.mapNotNull {
-        it as? BottomSheetDialogContent
+      textColor = when {
+        beginTime < MinuteTime(12, 0) -> 0xFFFF8015.dark(0xFFF0F0F2)
+        beginTime < MinuteTime(18, 0) -> 0xFFFF6262.dark(0xFFF0F0F2)
+        else -> 0xFF4066EA.dark(0xFFF0F0F2)
+      },
+      backgroundColor = when {
+        beginTime < MinuteTime(12, 0) -> 0xFFF9E7D8.dark(0x26FFCCA1)
+        beginTime < MinuteTime(18, 0) -> 0xFFF9E3E4.dark(0x26FF979B)
+        else -> 0xFFDDE3F8.dark(0x269BB2FF)
+      },
+    ) {
+      fun collectCoveredItems(
+        set: MutableSet<CourseItemModel>,
+        data: CourseItemOverlap,
+      ): Set<CourseItemModel> {
+        data.coveredItemList.fastForEach {
+          val item = it.data.item
+          if (item.beginTime < itemState.item.finalTime && item.finalTime > itemState.item.beginTime) {
+            set.add(item)
+          }
+          collectCoveredItems(set, it.data)
+        }
+        return set
       }
+      dialogContents.value = collectCoveredItems(linkedSetOf(itemState.item), itemState.overlap)
+        .filterIsInstance<BottomSheetDialogContent>()
     }
     MobileCourseBottomSheetDialog(dialogContents = dialogContents)
   }
@@ -117,20 +134,21 @@ class MobileLinkLessonItem(
       val now = localDateTime.toMinuteTimeDate()
       if (now.date.dayOfWeek == dayOfWeek) {
         if (now.time < beginTime) {
-          state.value = "Ta的下节课"
+          state.value = "下节课"
           delay((beginTime.minuteOfDay - now.minuteOfDay).minutes + localDateTime.second.seconds)
         }
-        state.value = "Ta的课进行中..."
+        state.value = "进行中..."
         // 后续会显示下一节课，会重新触发重组，不用再 delay
       } else {
         // 只有明天课程才会进入改分支
-        state.value = "明天Ta的课"
+        state.value = "明天"
       }
     }
   }
 
   @Composable
   override fun BottomSheetDialogContent() {
-    LessonBottomSheetDialog(lesson, true)
+    LessonBottomSheetDialog(lesson, false)
   }
 }
+

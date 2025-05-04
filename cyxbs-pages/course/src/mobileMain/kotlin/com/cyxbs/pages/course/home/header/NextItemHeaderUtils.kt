@@ -4,7 +4,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.course.home.compose.MobileHomeCourseFrame
 import com.cyxbs.pages.course.view.data.CourseDayDataPool
-import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
  * .
@@ -43,7 +43,7 @@ object NextItemHeaderUtils {
     nowTime: MinuteTimeDate,
     dayDataPool: CourseDayDataPool,
   ): BottomSheetItemHeader? {
-    var minItem: CourseItem? = null
+    var minItem: CourseItemModel? = null
     for (overlayData in dayDataPool.state.value.asReversed()) {
       val item = overlayData.item
       if (item !is BottomSheetItemHeader) continue
