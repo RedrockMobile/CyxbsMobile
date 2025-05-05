@@ -1,11 +1,9 @@
 package com.cyxbs.pages.course.view.page
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
-import com.cyxbs.pages.course.view.data.CourseWeekDataPool
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 
 /**
  * 绘制在课表上的装饰物，同时也能拦截触摸事件
@@ -16,66 +14,29 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 interface CoursePageDecoration {
 
   /**
-   * 绘制在课表外层底部
-   * @param timeline 课表时间轴
-   * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPool 当前周课程数据
+   * 绘制在课表 scroll 外层
+   *
+   * 使用 [LocalCoursePage] 获取更多参数
+   *
    * @param scrollPaddingValues 滚轴内部 padding
    * @param timelineWidth 课表时间轴宽度
    */
   @Composable
-  fun OuterCoursePageBottom(
-    timeline: CourseTimeline,
-    verticalScrollState: ScrollState,
-    weekDataPool: CourseWeekDataPool,
+  fun OuterCoursePage(
     scrollPaddingValues: PaddingValues,
     timelineWidth: Dp,
+    content: @Composable () -> Unit,
   ) {
+    content.invoke()
   }
 
   /**
-   * 绘制在课表外层顶部
-   * @param timeline 课表时间轴
-   * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPool 当前周课程数据
-   * @param scrollPaddingValues 滚轴内部 padding
-   * @param timelineWidth 课表时间轴宽度
+   * 绘制在课表 scroll 内层
+   *
+   * 使用 [LocalCoursePage]、[LocalCourseScroll] 获取更多参数
    */
   @Composable
-  fun OuterCoursePageTop(
-    timeline: CourseTimeline,
-    verticalScrollState: ScrollState,
-    weekDataPool: CourseWeekDataPool,
-    scrollPaddingValues: PaddingValues,
-    timelineWidth: Dp,
-  ) {
-  }
-
-  /**
-   * 绘制在课表内层底部
-   * @param timeline 课表时间轴
-   * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPool 当前周课程数据
-   */
-  @Composable
-  fun InnerCoursePageBottom(
-    timeline: CourseTimeline,
-    verticalScrollState: ScrollState,
-    weekDataPool: CourseWeekDataPool,
-  ) {
-  }
-
-  /**
-   * 绘制在课表内层顶部
-   * @param timeline 课表时间轴
-   * @param verticalScrollState 垂直滚轴状态
-   * @param weekDataPool 当前周课程数据
-   */
-  @Composable
-  fun InnerCoursePageTop(
-    timeline: CourseTimeline,
-    verticalScrollState: ScrollState,
-    weekDataPool: CourseWeekDataPool,
-  ) {
+  fun InnerCoursePage(content: @Composable () -> Unit) {
+    content.invoke()
   }
 }

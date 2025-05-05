@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastFold
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
@@ -30,6 +31,8 @@ import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * .
@@ -55,7 +58,7 @@ fun CoursePageCompose(
   modifier: Modifier = Modifier,
   enableDrawNowTimeLine: Boolean = true,
   verticalScrollState: ScrollState = rememberScrollState(),
-  decorations: List<CoursePageDecoration> = emptyList(),
+  decorations: ImmutableList<CoursePageDecoration> = persistentListOf(),
 ) {
   val timelineWidth = 40.dp
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
@@ -76,57 +79,41 @@ fun CoursePageCompose(
     LocalCoursePage provides pageContext,
   ) {
     Box {
-      decorations.fastForEach {
-        key(it.hashCode()) {
-          it.OuterCoursePageBottom(
-            timeline,
-            verticalScrollState,
-            weekDataPool,
-            scrollPaddingValues,
-            timelineWidth
-          )
-        }
-      }
-      timeline.Content(
-        modifier = modifier,
-        enableDrawNowTimeLine = enableDrawNowTimeLine,
-        verticalScrollState = verticalScrollState,
-      ) {
-        scrollContext.value = LocalCourseScroll.current
-        decorations.fastForEach {
-          key(it.hashCode()) {
-            it.InnerCoursePageBottom(
-              timeline,
-              verticalScrollState,
-              weekDataPool
-            )
+      // 使用 fastFold 将 decorations 一层一层包裹起来
+      // 其实添加了 asReversed()，所以先添加的 decoration 会在最外层
+      decorations.asReversed().fastFold<CoursePageDecoration, @Composable () -> Unit>(
+        initial = @Composable {
+          // 课表时间轴的绘制
+          timeline.Content(
+            modifier = modifier,
+            enableDrawNowTimeLine = enableDrawNowTimeLine,
+            verticalScrollState = verticalScrollState,
+          ) {
+            scrollContext.value = LocalCourseScroll.current
+            decorations.asReversed().fastFold<CoursePageDecoration, @Composable () -> Unit>(
+              initial = @Composable {
+                // 课程的绘制
+                CourseWeekDataContent(
+                  weekDataPool = weekDataPool,
+                  timeline = timeline,
+                )
+              }
+            ) { content, decoration ->
+              @Composable {
+                decoration.InnerCoursePage(content)
+              }
+            }.invoke()
           }
         }
-        CourseWeekDataContent(
-          weekDataPool = weekDataPool,
-          timeline = timeline,
-        )
-        decorations.fastForEach {
-          key(it.hashCode() + 1) {
-            it.InnerCoursePageTop(
-              timeline,
-              verticalScrollState,
-              weekDataPool
-            )
-          }
-        }
-      }
-      decorations.fastForEach {
-        key(it.hashCode() + 1) {
-          it.OuterCoursePageTop(
-            timeline,
-            verticalScrollState,
-            weekDataPool,
-            scrollPaddingValues,
-            timelineWidth
+      ) { content, decoration ->
+        @Composable {
+          decoration.OuterCoursePage(
+            scrollPaddingValues = scrollPaddingValues,
+            timelineWidth = timelineWidth,
+            content = content
           )
         }
-      }
+      }.invoke()
     }
   }
 }
@@ -202,7 +189,11 @@ class LocalCoursePageContext(
     } else {
       findActions.getOrPut(item) { mutableListOf() }.add(action)
       return OnDisposable {
-        findActions[item]?.remove(action)
+        val list = findActions[item]
+        if (list != null) {
+          list.remove(action)
+          if (list.isEmpty()) findActions.remove(item)
+        }
       }
     }
   }
@@ -210,6 +201,7 @@ class LocalCoursePageContext(
   fun putItemState(item: CourseItemModel, state: CourseItemState?) {
     if (state == null) {
       itemStateMap.remove(item)
+      findActions.remove(item)
     } else {
       itemStateMap[item] = state
       findActions.remove(item)?.fastForEach { it(state) }

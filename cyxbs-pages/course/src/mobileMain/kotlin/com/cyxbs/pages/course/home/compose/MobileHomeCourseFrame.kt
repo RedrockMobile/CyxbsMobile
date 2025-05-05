@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.home.compose
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -36,12 +36,12 @@ import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
-import com.cyxbs.pages.course.view.data.CourseWeekDataPool
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.page.CoursePageDecoration
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * 移动端主页课表框架
@@ -164,7 +164,7 @@ private fun MobileHomeCoursePageContent(
     CoursePageCompose(
       timeline = frame.timeline,
       weekDataPool = frame.providerGroup.getWeekDataPool(page),
-      decorations = listOf(TodayDecoration(weekBeginDate = if (page == 0) null else date)),
+      decorations = persistentListOf(TodayDecoration(weekBeginDate = if (page == 0) null else date)),
     )
   }
 }
@@ -173,30 +173,31 @@ class TodayDecoration(
   val weekBeginDate: Date?,
 ) : CoursePageDecoration {
   @Composable
-  override fun OuterCoursePageBottom(
-    timeline: CourseTimeline,
-    verticalScrollState: ScrollState,
-    weekDataPool: CourseWeekDataPool,
+  override fun OuterCoursePage(
     scrollPaddingValues: PaddingValues,
     timelineWidth: Dp,
+    content: @Composable () -> Unit
   ) {
-    val todayIndex by rememberDerivedStateOfStructure(weekBeginDate) {
-      weekBeginDate?.daysUntil(Today) ?: Today.dayOfWeek.ordinal
-    }
-    if (todayIndex in 0..6) {
-      Spacer(modifier = Modifier.layout { measurable, constraints ->
-        val startPadding = timelineWidth.roundToPx() + scrollPaddingValues.calculateStartPadding(layoutDirection).roundToPx()
-        val endPadding = scrollPaddingValues.calculateEndPadding(layoutDirection).roundToPx()
-        val placeable = measurable.measure(
-          Constraints.fixed(
-            width = (constraints.maxWidth - startPadding - endPadding) / 7,
-            height = constraints.maxHeight,
+    Box(modifier = Modifier.fillMaxSize()) {
+      val todayIndex by rememberDerivedStateOfStructure(weekBeginDate) {
+        weekBeginDate?.daysUntil(Today) ?: Today.dayOfWeek.ordinal
+      }
+      if (todayIndex in 0..6) {
+        Spacer(modifier = Modifier.layout { measurable, constraints ->
+          val startPadding = timelineWidth.roundToPx() + scrollPaddingValues.calculateStartPadding(layoutDirection).roundToPx()
+          val endPadding = scrollPaddingValues.calculateEndPadding(layoutDirection).roundToPx()
+          val placeable = measurable.measure(
+            Constraints.fixed(
+              width = (constraints.maxWidth - startPadding - endPadding) / 7,
+              height = constraints.maxHeight,
+            )
           )
-        )
-        layout(placeable.width, placeable.height) {
-          placeable.placeRelative(todayIndex * placeable.width + startPadding, 0)
-        }
-      }.background(0x93E8F0FC.dark(0x26000101)))
+          layout(placeable.width, placeable.height) {
+            placeable.placeRelative(todayIndex * placeable.width + startPadding, 0)
+          }
+        }.background(0x93E8F0FC.dark(0x26000101)))
+      }
+      content()
     }
   }
 }
