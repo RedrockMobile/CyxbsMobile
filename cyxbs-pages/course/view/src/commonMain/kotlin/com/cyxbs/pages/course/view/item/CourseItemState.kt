@@ -38,16 +38,14 @@ class CourseItemState(
   fun update(timeline: CourseTimeline, overlap: CourseItemOverlap) {
     this.timeline = timeline
     this.overlap = overlap
-    Snapshot.withoutReadObservation {
-      // 调用 overlap 触发器
-      overlapChangeTriggers = overlapChangeTriggers.mapValues {
-        it.value.onDispose()
-        it.key.onChangeOverlap(overlap)
-      } as LinkedHashMap<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>
-      // 调用 showRange 转换器
-      realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, interceptor ->
-        interceptor.transform(prev, overlap)
-      }
+    // 调用 overlap 触发器
+    overlapChangeTriggers = overlapChangeTriggers.mapValues {
+      it.value.onDispose()
+      it.key.onChangeOverlap(overlap)
+    } as LinkedHashMap<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>
+    // 调用 showRange 转换器
+    realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, interceptor ->
+      interceptor.transform(prev, overlap)
     }
   }
 
@@ -70,15 +68,19 @@ class CourseItemState(
   // 在每次 overlap 更新时触发转换
   fun addShowRangeTransformer(interceptor: ShowRangeTransformer) {
     if (showRangeTransformers.add(interceptor)) {
-      realShowRange = interceptor.transform(realShowRange, overlap)
+      realShowRange = Snapshot.withoutReadObservation {
+        interceptor.transform(realShowRange, overlap)
+      }
     }
   }
 
   fun removeShowRangeTransformer(interceptor: ShowRangeTransformer) {
     if (showRangeTransformers.remove(interceptor)) {
       // 移除后使用转换器重新计算 realShowRange
-      realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, now ->
-        now.transform(prev, overlap)
+      realShowRange = Snapshot.withoutReadObservation {
+        showRangeTransformers.fold(overlap.showRangeList) { prev, now ->
+          now.transform(prev, overlap)
+        }
       }
     }
   }
@@ -89,7 +91,7 @@ class CourseItemState(
   // overlap 更新触发器，监听 overlap 的更新用于触发一些特定的操作
   // 在每次 overlap 更新时触发
   fun addOverlapChangeTrigger(trigger: OverlapChangeTrigger) {
-    val onDispose = trigger.onChangeOverlap(overlap)
+    val onDispose = trigger.onChangeOverlap(Snapshot.withoutReadObservation { overlap })
     overlapChangeTriggers.put(trigger, onDispose)?.onDispose()
   }
 

@@ -12,7 +12,7 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
  * @date 2025/2/15
  */
 @Stable
-data class CourseItemOverlap(
+class CourseItemOverlap(
   val item: CourseItemModel,
   val showRangeList: List<CourseItemRange>, // 能够展示区域
 ) {

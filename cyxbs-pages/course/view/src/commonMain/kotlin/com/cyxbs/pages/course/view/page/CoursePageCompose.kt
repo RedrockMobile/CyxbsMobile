@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
@@ -143,8 +144,9 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
             timeline = timeline,
             overlap = overlay,
           )
-        }.apply {
-          update(
+        }
+        SideEffect {
+          itemState.update(
             timeline = timeline,
             overlap = overlay,
           )
