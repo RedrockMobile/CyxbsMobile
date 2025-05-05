@@ -157,16 +157,16 @@ fun Modifier.longPressMove(
     // pointerInput 需要在 graphicsLayer 之后，否则下面的 item 无法处理事件
     awaitEachGesture {
       val down = awaitFirstDown(
+        // DOWN 事件会被点击消耗，但后续的 MOVE 事件是不会被点击消耗的（后续事件中点击会在 Final 流程中发现事件已被消耗就会取消点击）
         requireUnconsumed = false,
-        // 使用 Initial 会导致 awaitLongPressOrCancellation 中的 Main 拿到的 pointer 是已经被 consume 的
+        // 使用 Initial 会导致 awaitLongPressOrCancellation 中的 Main 拿到的 pointer 是已经被 consume 的（因为 DOWN 事件被点击消耗了）
         // 所以这里也设置成 Main，让 awaitLongPressOrCancellation 里面拿到的是下一次 Main 的
         pass = PointerEventPass.Main,
       )
       if (!controllerWrapper.enable(transition)) return@awaitEachGesture
       val longPressPointer = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
       while (true) {
-        val pointer =
-          awaitPointerEvent(pass = PointerEventPass.Initial).changes.fastFirstOrNull { it.id == longPressPointer.id }
+        val pointer = awaitPointerEvent().changes.fastFirstOrNull { it.id == longPressPointer.id }
         if (pointer == null || pointer.isConsumed) {
           // 如果当前 pointerInput 被卸载了，则会发送一个抬起且被消耗的事件
           // 但注意此时 coroutineScope 也即将被取消（虽然 isActive 为 true），launch 是无法执行的

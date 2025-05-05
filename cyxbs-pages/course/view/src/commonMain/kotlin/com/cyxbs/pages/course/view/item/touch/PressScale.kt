@@ -47,10 +47,7 @@ fun Modifier.pressScale(
   val coroutineScope = rememberCoroutineScope()
   return pointerInput(Unit) {
     awaitEachGesture {
-      val down = awaitFirstDown(
-        requireUnconsumed = false,
-        pass = PointerEventPass.Initial,
-      )
+      val down = awaitFirstDown(requireUnconsumed = false)
       pointerOffset.value = down.position
       controllerWrapper.onStartPress()
       coroutineScope.launch { scale.animateTo(0.8F) }
@@ -63,8 +60,7 @@ fun Modifier.pressScale(
         }
       }
       while (true) {
-        val pointer =
-          awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+        val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
         if (
           pointer == null
           || pointer.isConsumed // 被消耗
