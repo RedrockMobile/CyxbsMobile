@@ -32,13 +32,16 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.IMovableItemModel
 import com.cyxbs.pages.course.view.overlay.CourseItemRange
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
+import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.min
 
 /**
  * 长按移动 item
@@ -169,6 +172,7 @@ fun Modifier.longPressMove(
         val pointer = try {
           awaitPointerEvent(pass = PointerEventPass.Initial).changes.fastFirstOrNull { it.id == longPressPointer.id }
         } catch (e: Exception) {
+          logg("awaitPointerEvent, e.msg = ${e.message}")
           // 可能会存在 CancellationException
           if (controllerWrapper.state is LongPressMoveState.Touching) {
             if (coroutineScope.isActive) coroutineScope.launch {
@@ -216,6 +220,7 @@ fun Modifier.longPressMove(
         if (controllerWrapper.state == LongPressMoveState.Idle) {
           controllerWrapper.updateState(LongPressMoveState.Touching)
           controllerWrapper.onStartLongPress(pointer)
+          logg("longPress start")
         }
         // 记录相对于屏幕的位置
         transitionLayoutCoordinate?.let { transitionLc ->
@@ -243,7 +248,7 @@ fun Modifier.longPressMove(
 class LongPressMoveControllerImpl(
   val itemState: CourseItemState,
   val edgeScroll: EdgeScroll,
-  val coursePageContext: LocalCoursePageContext,
+  val pageContext: LocalCoursePageContext,
 ) : LongPressMoveController() {
 
   companion object : CourseItemState.DataStore<LongPressMoveControllerImpl>
@@ -268,7 +273,7 @@ class LongPressMoveControllerImpl(
 
   // 处理被覆盖 item 的 overlap 更新触发器
   private val overlapChangeTriggerForAllCovered =
-    CourseItemState.CoveredItemShowRangeTransformerTrigger(coursePageContext) { show, overlap ->
+    CourseItemState.CoveredItemShowRangeTransformerTrigger(pageContext) { show, overlap ->
       // 解除被覆盖 item 的隐藏区域
       val coveredRange = overlap.coveredRangeList
         .filter { it.itemOverlap.item === itemState.item }
@@ -278,7 +283,7 @@ class LongPressMoveControllerImpl(
 
   // 处理被全覆盖 item 的 overlap 更新触发器
   private val overlapChangeTriggerForEmptyCovered =
-    CourseItemState.CoveredItemShowRangeTransformerTrigger(coursePageContext) { show, overlap ->
+    CourseItemState.CoveredItemShowRangeTransformerTrigger(pageContext) { show, overlap ->
       // 单独处理被全覆盖这类 item 的展示
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
@@ -310,6 +315,40 @@ class LongPressMoveControllerImpl(
     if (isTouch) {
       edgePosition?.update(screenLeftTop.y, size.height)
     }
+    // 移动过程中判断是否需要展开时间轴折叠部分
+    tryExpandTimeline(screenLeftTop, size)
+  }
+
+  private val clickLock = mutableListOf<MutableTimelineData.ClickLock>()
+
+  // 移动过程中判断是否需要展开时间轴折叠部分
+  private fun tryExpandTimeline(screenLeftTop: Offset, size: IntSize) {
+    val item = itemState.item as IMovableItemModel
+    if (!item.enableExpandTimelineWhenMove()) return
+    val scrollContext = pageContext.scrollContext.value ?: return
+    itemState.timeline.data.asSequence()
+      .filterIsInstance<MutableTimelineData>()
+      .filter { it.state.value == MutableTimelineData.State.Collapse }
+      .mapNotNull { time ->
+        scrollContext.timelineCoordinatesMap[time]?.let { coor ->
+          coor.localToScreen(Offset.Zero).let {
+            val threshold = min(20, size.height / 2 - 10).coerceAtLeast(0)
+            if (time == itemState.timeline.data.first()) {
+              // 如果是开始的折叠时间，则需要超过一定距离才能触发展开
+              screenLeftTop.y + threshold * 6 < it.y
+            } else if (time == itemState.timeline.data.last()) {
+              // 如果是结束的折叠时间，则也需要超过一定距离才能触发展开
+              screenLeftTop.y + size.height - threshold * 6 > it.y + coor.size.height
+            } else {
+              // 中间的折叠时间存在相交区域即可展开
+              it.y < (screenLeftTop.y + size.height - threshold) && (it.y + coor.size.height) > screenLeftTop.y + threshold
+            }
+          }
+        }?.let { if (it) time else null }
+      }.forEach {
+        it.click()
+        clickLock.add(it.lockClick()) // 展开后就给点击上锁，直到移动解锁才允许点击
+      }
   }
 
   override suspend fun onUpLongPress(
@@ -322,7 +361,7 @@ class LongPressMoveControllerImpl(
       transition,
       item.getMoveDestinationOffset(
         itemState = itemState,
-        pageContext = coursePageContext,
+        pageContext = pageContext,
         transition = transition,
         screenTopLeft = screenLeftTop,
         size = size,
@@ -354,7 +393,7 @@ class LongPressMoveControllerImpl(
         itemState: CourseItemState
       ): MutableSet<LongPressMoveControllerImpl> {
         itemState.overlap.coveredRangeList.mapNotNull { cover ->
-          coursePageContext.findItemState(cover.itemOverlap.item)
+          pageContext.findItemState(cover.itemOverlap.item)
             ?.getData(LongPressMoveControllerImpl)
         }.fastForEach {
           set.add(it)
@@ -369,7 +408,7 @@ class LongPressMoveControllerImpl(
     }
     try {
       // 由 IMovableItemModel 实现最后动画的移动
-      item.animateMove(itemState, coursePageContext, transition, destinationOffset)
+      item.animateMove(itemState, pageContext, transition, destinationOffset)
     } finally {
       transition.value = destinationOffset
       if (destinationOffset == Offset.Zero) {
@@ -377,6 +416,7 @@ class LongPressMoveControllerImpl(
         itemState.removeShowRangeTransformer(selfShowRangeTransformerForEmpty)
         topControllers.forEach { it.zIndex = 0F }
       }
+      clickLock.fastForEach { it.unlock() }
     }
   }
 }

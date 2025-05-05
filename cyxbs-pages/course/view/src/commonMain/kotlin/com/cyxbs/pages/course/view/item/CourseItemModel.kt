@@ -100,7 +100,7 @@ fun CourseDefaultItemContent(
           LongPressMoveControllerImpl(
             itemState = itemState,
             edgeScroll = edgeScroll,
-            coursePageContext = coursePageContext,
+            pageContext = coursePageContext,
           )
         }
       ).pressScale( // 点击后的 Q 弹动画

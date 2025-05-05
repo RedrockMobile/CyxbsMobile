@@ -63,6 +63,11 @@ class MobileLinkLessonItemModel(
         "course=${lesson.course})"
   }
 
+  override fun enableExpandTimelineWhenMove(): Boolean {
+    return true
+//    return false
+  }
+
   @Composable
   override fun CourseItemContent(modifier: Modifier, itemState: CourseItemState) {
     val dialogContents = remember { mutableStateOf(emptyList<BottomSheetDialogContent>()) }

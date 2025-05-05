@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -17,6 +18,7 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.course.view.timeline.DefaultTimelineTextColor
 import com.cyxbs.pages.course.view.timeline.DefaultTimelineTextDarkColor
+import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import kotlinx.serialization.Serializable
 
 /**
@@ -46,8 +48,11 @@ data class LessonTimelineData(
 
   @Composable
   override fun ColumnScope.Content() {
+    val scrollContext = LocalCourseScroll.current
     Layout(
-      modifier = Modifier.weight(nowWeight).fillMaxWidth(),
+      modifier = Modifier.weight(nowWeight).fillMaxWidth().onGloballyPositioned {
+        scrollContext.timelineCoordinatesMap[this@LessonTimelineData] = it
+      },
       content = {
         Text(
           text = lesson.toString(),

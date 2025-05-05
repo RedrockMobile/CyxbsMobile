@@ -48,9 +48,8 @@ class EdgeScroll {
 
   @Composable
   fun attachCompose() {
-    val outerCoordinates = LocalCourseScroll.current.outerCoordinates
-    SideEffect { scrollOuterCoordinates = outerCoordinates.value }
-    val scrollState = LocalCourseScroll.current.scrollState
+    val scrollContext = LocalCourseScroll.current
+    SideEffect { scrollOuterCoordinates = scrollContext.outerCoordinates }
     val moveBoundary = 40 // 移动的边界值
     LaunchedEffect(Unit) {
       firstPosition.collectLatest { position ->
@@ -61,11 +60,12 @@ class EdgeScroll {
         }.collectLatest {
           if (
             abs(it) < moveBoundary
-            && (it > 0 && scrollState.value.canScrollBackward || it < 0 && scrollState.value.canScrollForward)
+            && (it > 0 && scrollContext.scrollState.canScrollBackward
+                || it < 0 && scrollContext.scrollState.canScrollForward)
           ) {
             val velocity = -it.sign * ((moveBoundary - abs(it)) / 4 + 2F)
             try {
-              scrollState.value.scroll {
+              scrollContext.scrollState.scroll {
                 animate(
                   initialValue = velocity,
                   targetValue = velocity,

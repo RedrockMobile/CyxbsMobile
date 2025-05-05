@@ -5,12 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -27,10 +28,15 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextColor
 import com.cyxbs.pages.course.view.timeline.DefaultTimelineLightTextDarkColor
+import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
+import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
@@ -76,32 +82,107 @@ data class MutableTimelineData(
 
   @Composable
   private fun LayoutContent() {
-    val coroutineScope = rememberCoroutineScope()
+    val scrollContext = LocalCourseScroll.current
     MutableTimelineCompose(modifier = Modifier.clickableNoIndicator {
-      onClick(coroutineScope)
+      click()
+    }.onGloballyPositioned {
+      scrollContext.timelineCoordinatesMap[this@MutableTimelineData] = it
     })
-  }
-
-  private fun onClick(coroutineScope: CoroutineScope) {
-    if (nowWeight == maxWeight || nowWeight == initialWeight) {
-      coroutineScope.launch {
+    LaunchedEffect(Unit) {
+      _state.filter {
+        it == State.ExpandToCollapseAnim || it == State.CollapseToExpandAnim
+      }.collectLatest {
+        val targetWeight = if (it == State.ExpandToCollapseAnim) initialWeight else maxWeight
         try {
-          _clickAnimateState.value = true
-          animate(
-            nowWeight,
-            if (nowWeight != maxWeight) maxWeight else initialWeight
-          ) { value, _ ->
-            nowWeightState.value = value
+          supervisorScope {
+            launch {
+              animate(nowWeight, targetWeight) { value, _ ->
+                nowWeightState.value = value
+              }
+            }
+            scrollExpand(scrollContext, targetWeight)
           }
         } finally {
-          _clickAnimateState.value = false
+          _state.value = if (it == State.ExpandToCollapseAnim) {
+            State.Collapse
+          } else {
+            State.Expand
+          }
         }
       }
     }
   }
 
-  private val _clickAnimateState = MutableStateFlow(false)
-  val clickAnimateState: StateFlow<Boolean> = _clickAnimateState
+  private fun CoroutineScope.scrollExpand(
+    scrollContext: LocalCourseScrollContext,
+    targetWeight: Float
+  ) {
+    val upOrDown = scrollUpOrDown ?: let {
+      // 最后一个展开时需要向上滚动
+      (scrollContext.timeline.data.last() === this@MutableTimelineData
+          && scrollContext.scrollState.value == scrollContext.scrollState.maxValue)
+    }
+    if (upOrDown) {
+      launch {
+        val initialBottomRemainValue =
+          scrollContext.scrollState.maxValue - scrollContext.scrollState.value
+        scrollContext.scrollState.scroll {
+          // 这里要使用跟展开一样的动画
+          animate(nowWeight, targetWeight) { _, _ ->
+            val scrollTo = scrollContext.scrollState.maxValue - initialBottomRemainValue
+            scrollBy((scrollTo - scrollContext.scrollState.value).toFloat())
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * @param scrollUpOrDown true：滚轴向上展开；false：滚轴向下展开；null：根据当前情况进行判断
+   */
+  fun click(scrollUpOrDown: Boolean? = null): Int {
+    if (clickLockCount > 0) return clickLockCount
+    if (_state.value == State.Expand) {
+      this.scrollUpOrDown = scrollUpOrDown
+      _state.value = State.ExpandToCollapseAnim
+    } else if (_state.value == State.Collapse) {
+      this.scrollUpOrDown = scrollUpOrDown
+      _state.value = State.CollapseToExpandAnim
+    }
+    return 0
+  }
+
+  // 给点击上锁
+  fun lockClick(): ClickLock {
+    clickLockCount++
+    return object : ClickLock {
+      var hasUnlock = false
+      override fun unlock(): Int {
+        if (hasUnlock) return clickLockCount
+        hasUnlock = true
+        clickLockCount--
+        return clickLockCount
+      }
+    }
+  }
+
+  private var clickLockCount = 0
+
+  private var scrollUpOrDown: Boolean? = null
+
+  private val _state =
+    MutableStateFlow(if (nowWeight == maxWeight) State.Expand else State.Collapse)
+  val state: StateFlow<State> = _state
+
+  enum class State {
+    Expand, Collapse, ExpandToCollapseAnim, CollapseToExpandAnim
+  }
+
+  interface ClickLock {
+    // 多次调用只有第一次调用有效
+    // 返回需要的剩余解锁次数，返回 0 时说明已经解锁
+    fun unlock(): Int
+  }
 }
 
 @Composable

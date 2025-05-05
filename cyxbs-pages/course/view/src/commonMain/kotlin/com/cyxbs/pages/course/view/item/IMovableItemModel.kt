@@ -39,4 +39,7 @@ interface IMovableItemModel : CourseItemModel {
       transition.value = value
     }
   }
+
+  // 在移动过程中是否允许展开时间轴
+  fun enableExpandTimelineWhenMove(): Boolean = false
 }

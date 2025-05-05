@@ -1,8 +1,5 @@
 package com.cyxbs.pages.course.view.timeline
 
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -17,9 +14,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerId
@@ -34,10 +32,9 @@ import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastMapIndexed
 import com.cyxbs.components.utils.compose.reflexScrollableForMouse
-import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
+import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
@@ -51,10 +48,34 @@ import kotlin.math.roundToInt
 val LocalCourseScroll = staticCompositionLocalOf<LocalCourseScrollContext> { error("未实现") }
 
 class LocalCourseScrollContext(
-  val scrollState: State<ScrollState>,
-  val outerCoordinates: State<LayoutCoordinates?>, // scroll 外层布局
-  val innerCoordinates: State<LayoutCoordinates?>, // scroll 内层布局
-)
+  timeline: CourseTimeline,
+  scrollState: ScrollState,
+  outerCoordinates: State<LayoutCoordinates?>,
+  innerCoordinates: State<LayoutCoordinates?>,
+) {
+  var timeline by mutableStateOf(timeline)
+    private set
+
+  var scrollState by mutableStateOf(scrollState)
+    private set
+
+  // scroll 外层布局
+  val outerCoordinates by outerCoordinates
+
+  // scroll 内层布局
+  val innerCoordinates by innerCoordinates
+
+  // 时间轴上单个 data 的坐标系，用于快速得到组件的高度占比
+  val timelineCoordinatesMap = mutableMapOf<CourseTimelineData, LayoutCoordinates?>()
+
+  fun update(
+    timeline: CourseTimeline,
+    scrollState: ScrollState
+  ) {
+    this.timeline = timeline
+    this.scrollState = scrollState
+  }
+}
 
 @Composable
 internal fun CourseScrollCompose(
@@ -64,7 +85,6 @@ internal fun CourseScrollCompose(
   scrollPaddingValues: PaddingValues,
   content: @Composable () -> Unit,
 ) {
-  val scrollStateState = rememberUpdatedState(verticalScrollState)
   val outerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
   val innerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
   Layout(
@@ -81,9 +101,15 @@ internal fun CourseScrollCompose(
     content = {
       val context = remember {
         LocalCourseScrollContext(
-          scrollState = scrollStateState,
+          timeline = timeline,
+          scrollState = verticalScrollState,
           outerCoordinates = outerCoordinatesState,
           innerCoordinates = innerCoordinatesState,
+        )
+      }.apply {
+        update(
+          timeline = timeline,
+          scrollState = verticalScrollState,
         )
       }
       CompositionLocalProvider(
@@ -130,24 +156,6 @@ internal fun CourseScrollCompose(
       }
     }
   )
-  LaunchedEffect(timeline, verticalScrollState) {
-    val lastTimeline = timeline.data.last()
-    if (lastTimeline is MutableTimelineData) {
-      // 最后一个展开时需要向上滚动
-      lastTimeline.clickAnimateState.collectLatest {
-        if (it && verticalScrollState.value == verticalScrollState.maxValue) {
-          verticalScrollState.scroll {
-            animate(
-              0F, 0F,
-              animationSpec = infiniteRepeatable(tween(1000))
-            ) { _, _ ->
-              scrollBy((verticalScrollState.maxValue - verticalScrollState.value).toFloat())
-            }
-          }
-        }
-      }
-    }
-  }
 }
 
 
