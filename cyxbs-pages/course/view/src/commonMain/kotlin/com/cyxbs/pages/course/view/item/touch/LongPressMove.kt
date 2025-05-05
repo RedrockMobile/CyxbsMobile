@@ -32,14 +32,12 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.IMovableItemModel
 import com.cyxbs.pages.course.view.overlay.CourseItemRange
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
@@ -83,7 +81,19 @@ abstract class LongPressMoveController {
     transition.value = changeTransition
   }
 
-  open suspend fun onUpLongPress(
+  open fun onEndLongPress(
+    upOrCancel: Boolean, // true：手指抬起；false：事件被取消
+    transition: MutableState<Offset>,
+    screenLeftTop: Offset,
+    size: IntSize,
+  ) {}
+
+  /**
+   * 执行最后移动 item 的动画
+   *
+   * 注意：单独分离出来是因为 suspend 函数不一定会成功执行，所以有些状态的取消需要写在 [onEndLongPress]
+   */
+  open suspend fun animateMove(
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
     size: IntSize,
@@ -101,21 +111,7 @@ abstract class LongPressMoveController {
     }
   }
 
-  open suspend fun onCancelLongPress(transition: MutableState<Offset>) {
-    try {
-      animate(
-        typeConverter = Offset.VectorConverter,
-        initialValue = transition.value,
-        targetValue = Offset.Zero,
-      ) { value, _ ->
-        transition.value = value
-      }
-    } finally {
-      transition.value = Offset.Zero
-    }
-  }
-
-  fun updateState(state: LongPressMoveState) {
+  open fun updateState(state: LongPressMoveState) {
     this.state = state
   }
 
@@ -169,49 +165,31 @@ fun Modifier.longPressMove(
       if (!controllerWrapper.enable(transition)) return@awaitEachGesture
       val longPressPointer = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
       while (true) {
-        val pointer = try {
+        val pointer =
           awaitPointerEvent(pass = PointerEventPass.Initial).changes.fastFirstOrNull { it.id == longPressPointer.id }
-        } catch (e: Exception) {
-          logg("awaitPointerEvent, e.msg = ${e.message}")
-          // 可能会存在 CancellationException
-          if (controllerWrapper.state is LongPressMoveState.Touching) {
-            if (coroutineScope.isActive) coroutineScope.launch {
-              try {
-                controllerWrapper.updateState(LongPressMoveState.Animating)
-                controllerWrapper.onCancelLongPress(transition)
-              } finally {
-                controllerWrapper.updateState(LongPressMoveState.Idle)
-              }
-            } else {
-              // 该分支说明该 Compose 函数已经被 dispose 掉了
-              transition.value = Offset.Zero
-              controllerWrapper.updateState(LongPressMoveState.Idle)
-            }
-          }
-          throw e
-        }
         if (pointer == null || pointer.isConsumed) {
+          // 如果当前 pointerInput 被卸载了，则会发送一个抬起且被消耗的事件
+          // 但注意此时 coroutineScope 也即将被取消（虽然 isActive 为 true），launch 是无法执行的
           if (controllerWrapper.state is LongPressMoveState.Touching) {
+            controllerWrapper.onEndLongPress(false, transition, screenPosition, size)
+            controllerWrapper.updateState(LongPressMoveState.Animating)
             coroutineScope.launch {
-              try {
-                controllerWrapper.updateState(LongPressMoveState.Animating)
-                controllerWrapper.onCancelLongPress(transition)
-              } finally {
-                controllerWrapper.updateState(LongPressMoveState.Idle)
-              }
+              controllerWrapper.animateMove(transition, screenPosition, size)
+            }.invokeOnCompletion {
+              // 如果 coroutineScope 在执行前被取消，则不会执行 launch 的内容，但仍会执行 invokeOnCompletion
+              controllerWrapper.updateState(LongPressMoveState.Idle)
             }
           }
           break
         }
         if (pointer.changedToUp()) {
           if (controllerWrapper.state is LongPressMoveState.Touching) {
+            controllerWrapper.onEndLongPress(true, transition, screenPosition, size)
+            controllerWrapper.updateState(LongPressMoveState.Animating)
             coroutineScope.launch {
-              try {
-                controllerWrapper.updateState(LongPressMoveState.Animating)
-                controllerWrapper.onUpLongPress(transition, screenPosition, size)
-              } finally {
-                controllerWrapper.updateState(LongPressMoveState.Idle)
-              }
+              controllerWrapper.animateMove(transition, screenPosition, size)
+            }.invokeOnCompletion {
+              controllerWrapper.updateState(LongPressMoveState.Idle)
             }
           }
           break
@@ -220,7 +198,6 @@ fun Modifier.longPressMove(
         if (controllerWrapper.state == LongPressMoveState.Idle) {
           controllerWrapper.updateState(LongPressMoveState.Touching)
           controllerWrapper.onStartLongPress(pointer)
-          logg("longPress start")
         }
         // 记录相对于屏幕的位置
         transitionLayoutCoordinate?.let { transitionLc ->
@@ -351,36 +328,35 @@ class LongPressMoveControllerImpl(
       }
   }
 
-  override suspend fun onUpLongPress(
+  override fun onEndLongPress(
+    upOrCancel: Boolean,
+    transition: MutableState<Offset>,
+    screenLeftTop: Offset,
+    size: IntSize
+  ) {
+    super.onEndLongPress(upOrCancel, transition, screenLeftTop, size)
+    edgePosition?.remove()
+    itemState.removeOverlapChangeTrigger(overlapChangeTriggerForAllCovered)
+    itemState.removeShowRangeTransformer(selfShowRangeTransformerForAll)
+    clickLock.fastForEach { it.unlock() }
+  }
+
+  override suspend fun animateMove(
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
     size: IntSize
   ) {
     val item = itemState.item as IMovableItemModel
-    animateMove(
-      transition,
-      item.getMoveDestinationOffset(
-        itemState = itemState,
-        pageContext = pageContext,
-        transition = transition,
-        screenTopLeft = screenLeftTop,
-        size = size,
-      )
+    val destinationOffset = item.getMoveDestinationOffset(
+      itemState = itemState,
+      pageContext = pageContext,
+      transition = transition,
+      screenTopLeft = screenLeftTop,
+      size = size,
     )
-  }
-
-  override suspend fun onCancelLongPress(transition: MutableState<Offset>) {
-    animateMove(transition, Offset.Zero)
-  }
-
-  private suspend fun animateMove(transition: MutableState<Offset>, destinationOffset: Offset) {
-    val item = itemState.item as IMovableItemModel
-    edgePosition?.remove()
-    itemState.removeOverlapChangeTrigger(overlapChangeTriggerForAllCovered)
-    itemState.removeShowRangeTransformer(selfShowRangeTransformerForAll)
     var topControllers = emptySet<LongPressMoveControllerImpl>()
     if (destinationOffset == Offset.Zero) {
-      // 在动画之前移除 overlapChangeTriggerForAllCovered 是为了让被部分覆盖的 item 能提前触发 text 位置还原动画
+      // 在 onEndLongPress 中移除了 overlapChangeTriggerForAllCovered 是为了让被部分覆盖的 item 能提前触发 text 位置还原动画
       // 但是这样会导致被全部覆盖的这类 item 也在动画前提前结束了，现象就是直接消失，体验起来很奇怪
       // 所以移除 overlapChangeTriggerForAllCovered 后再添加 overlapChangeTriggerForEmptyCovered 用于专门处理被全部覆盖的这类 item
       itemState.addOverlapChangeTrigger(overlapChangeTriggerForEmptyCovered)
@@ -416,7 +392,6 @@ class LongPressMoveControllerImpl(
         itemState.removeShowRangeTransformer(selfShowRangeTransformerForEmpty)
         topControllers.forEach { it.zIndex = 0F }
       }
-      clickLock.fastForEach { it.unlock() }
     }
   }
 }

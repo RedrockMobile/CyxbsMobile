@@ -22,7 +22,6 @@ import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -57,21 +56,15 @@ fun Modifier.pressScale(
       coroutineScope.launch { scale.animateTo(0.8F) }
       val endBlock: () -> Unit = {
         pointerOffset.value = null
-        if (coroutineScope.isActive) coroutineScope.launch {
-          try {
-            scale.animateTo(1F)
-          } finally {
-            controllerWrapper.onEndPress()
-          }
-        } else controllerWrapper.onEndPress()
+        coroutineScope.launch {
+          scale.animateTo(1F)
+        }.invokeOnCompletion {
+          controllerWrapper.onEndPress()
+        }
       }
       while (true) {
-        val pointer = try {
+        val pointer =
           awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
-        } catch (e: Exception) {
-          endBlock.invoke() // 可能会存在 CancellationException
-          throw e
-        }
         if (
           pointer == null
           || pointer.isConsumed // 被消耗
