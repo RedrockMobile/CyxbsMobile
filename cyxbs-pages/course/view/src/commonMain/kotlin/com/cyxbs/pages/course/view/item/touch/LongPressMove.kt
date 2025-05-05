@@ -324,7 +324,7 @@ class LongPressMoveControllerImpl(
         }?.let { if (it) time else null }
       }.forEach {
         it.click()
-        clickLock.add(it.lockClick()) // 展开后就给点击上锁，直到移动解锁才允许点击
+        clickLock.add(it.lockClick()) // 展开后就给点击上锁，直到结束解锁后才允许点击
       }
   }
 
@@ -339,6 +339,7 @@ class LongPressMoveControllerImpl(
     itemState.removeOverlapChangeTrigger(overlapChangeTriggerForAllCovered)
     itemState.removeShowRangeTransformer(selfShowRangeTransformerForAll)
     clickLock.fastForEach { it.unlock() }
+    clickLock.clear()
   }
 
   override suspend fun animateMove(
