@@ -7,10 +7,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -23,6 +27,8 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext.OnDisposable
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
+import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 
 /**
  * .
@@ -52,8 +58,21 @@ fun CoursePageCompose(
 ) {
   val timelineWidth = 40.dp
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
+  val scrollContext = remember { mutableStateOf<LocalCourseScrollContext?>(null) }
+  val pageContext = remember {
+    LocalCoursePageContext(
+      timeline = timeline,
+      weekDataPool = weekDataPool,
+      scrollContext = scrollContext,
+    )
+  }.apply {
+    update(
+      timeline = timeline,
+      weekDataPool = weekDataPool,
+    )
+  }
   CompositionLocalProvider(
-    LocalCoursePage provides remember { LocalCoursePageContext() },
+    LocalCoursePage provides pageContext,
   ) {
     Box {
       decorations.fastForEach {
@@ -72,8 +91,15 @@ fun CoursePageCompose(
         enableDrawNowTimeLine = enableDrawNowTimeLine,
         verticalScrollState = verticalScrollState,
       ) {
+        scrollContext.value = LocalCourseScroll.current
         decorations.fastForEach {
-          key(it.hashCode()) { it.InnerCoursePageBottom(timeline, verticalScrollState, weekDataPool) }
+          key(it.hashCode()) {
+            it.InnerCoursePageBottom(
+              timeline,
+              verticalScrollState,
+              weekDataPool
+            )
+          }
         }
         CourseWeekDataContent(
           weekDataPool = weekDataPool,
@@ -146,7 +172,17 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
   }
 }
 
-class LocalCoursePageContext {
+class LocalCoursePageContext(
+  timeline: CourseTimeline,
+  weekDataPool: CourseWeekDataPool,
+  val scrollContext: State<LocalCourseScrollContext?>, // 滚轴 context
+) {
+
+  var timeline: CourseTimeline by mutableStateOf(timeline)
+    private set
+
+  var weekDataPool: CourseWeekDataPool by mutableStateOf(weekDataPool)
+    private set
 
   private val itemStateMap = mutableMapOf<CourseItemModel, CourseItemState>()
 
@@ -176,6 +212,14 @@ class LocalCoursePageContext {
       itemStateMap[item] = state
       findActions.remove(item)?.fastForEach { it(state) }
     }
+  }
+
+  fun update(
+    timeline: CourseTimeline,
+    weekDataPool: CourseWeekDataPool,
+  ) {
+    this.timeline = timeline
+    this.weekDataPool = weekDataPool
   }
 
   fun interface OnDisposable {

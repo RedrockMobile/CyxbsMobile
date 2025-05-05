@@ -45,11 +45,23 @@ class CourseItemState(
         it.key.onChangeOverlap(overlap)
       } as LinkedHashMap<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>
       // 调用 showRange 转换器
-      realShowRange =
-        showRangeTransformers.fold<ShowRangeTransformer, List<CourseItemRange>>(overlap.showRangeList) { prev, interceptor ->
-          interceptor.transform(prev, overlap)
-        }
+      realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, interceptor ->
+        interceptor.transform(prev, overlap)
+      }
     }
+  }
+
+  private val dataStoreMap = mutableMapOf<DataStore<*>, Any?>()
+
+  // 用于保存特定的数据
+  fun <T> setData(key: DataStore<T>, data: T?): T? {
+    @Suppress("UNCHECKED_CAST")
+    return dataStoreMap.put(key, data) as T?
+  }
+
+  fun <T> getData(key: DataStore<T>): T? {
+    @Suppress("UNCHECKED_CAST")
+    return dataStoreMap[key] as T?
   }
 
   private val showRangeTransformers = linkedSetOf<ShowRangeTransformer>()
@@ -65,14 +77,14 @@ class CourseItemState(
   fun removeShowRangeTransformer(interceptor: ShowRangeTransformer) {
     if (showRangeTransformers.remove(interceptor)) {
       // 移除后使用转换器重新计算 realShowRange
-      realShowRange =
-        showRangeTransformers.fold<ShowRangeTransformer, List<CourseItemRange>>(overlap.showRangeList) { prev, now ->
-          now.transform(prev, overlap)
-        }
+      realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, now ->
+        now.transform(prev, overlap)
+      }
     }
   }
 
-  private var overlapChangeTriggers = linkedMapOf<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>()
+  private var overlapChangeTriggers =
+    linkedMapOf<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>()
 
   // overlap 更新触发器，监听 overlap 的更新用于触发一些特定的操作
   // 在每次 overlap 更新时触发
@@ -126,4 +138,7 @@ class CourseItemState(
       overlap: CourseItemOverlap,
     ): List<CourseItemRange>
   }
+
+  // 用于以 Key-Value 的形式保存数据
+  interface DataStore<T>
 }

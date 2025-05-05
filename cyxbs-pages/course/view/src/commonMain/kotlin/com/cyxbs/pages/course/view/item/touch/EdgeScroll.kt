@@ -10,8 +10,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.unit.IntSize
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
@@ -103,19 +101,19 @@ class EdgeScroll {
 
     // 上一次的中心点位置
     // 用于被锁时解锁需要的移动距离阈值判断
-    var lastCenterY = Float.NaN
+    private var lastCenterY = Float.NaN
 
     /**
-     * @param screenPosition 相对于屏幕的坐标（组件左上角）
-     * @param size 组件的大小，如果不为组件而是一个触摸点时提供 IntSize.Zero 即可
+     * @param screenTopY 相对于屏幕的坐标
+     * @param height 组件的高度，如果不为组件而是一个触摸点时传 0 即可
      */
-    fun update(screenPosition: Offset, size: IntSize) {
+    fun update(screenTopY: Float, height: Int) {
       Snapshot.withoutReadObservation {
         val outerCoordinates = scrollOuterCoordinates
         if (outerCoordinates != null) {
-          val topY = outerCoordinates.screenToLocal(screenPosition).y
-          val bottomY = topY + size.height
-          val centerY = topY + size.height / 2F
+          val topY = outerCoordinates.screenToLocal(Offset(0F, screenTopY)).y
+          val bottomY = topY + height
+          val centerY = topY + height / 2F
           val outerCenterY = outerCoordinates.size.height / 2F
           if (lock) {
             // 被锁住时
@@ -143,7 +141,6 @@ class EdgeScroll {
             } else {
               (bottomY - outerCoordinates.size.height).coerceAtMost(-0.1F)
             }
-            logg("distance = $distance")
             distanceFlow.tryEmit(distance)
           }
         }

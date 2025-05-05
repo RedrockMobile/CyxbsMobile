@@ -6,7 +6,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
@@ -48,10 +47,6 @@ class MobileLinkLessonItemModel(
     override fun createLinkLessonItemModel(page: Int, lesson: LessonByWeeks): LinkLessonItemModel {
       return MobileLinkLessonItemModel(page, lesson)
     }
-  }
-
-  override fun getMoveToNewLocation(): Offset {
-    return Offset.Zero
   }
 
   override val key: String = hashCode().toString()

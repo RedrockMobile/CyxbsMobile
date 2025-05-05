@@ -43,6 +43,7 @@ import com.cyxbs.pages.course.view.item.touch.longPressMove
 import com.cyxbs.pages.course.view.item.touch.pressScale
 import com.cyxbs.pages.course.view.overlay.CourseItemRange
 import com.cyxbs.pages.course.view.page.LocalCoursePage
+import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.datetime.DayOfWeek
 import kotlin.math.roundToInt
 
@@ -114,7 +115,9 @@ fun CourseDefaultItemContent(
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemState = itemState,
+        itemRange = CourseItemRange(itemState.item.beginTime, itemState.item.finalTime),
+        enableShowCoverTip = itemState.overlap.coveredItemList.isNotEmpty(),
+        timeline = itemState.timeline,
         topText = topText,
         bottomText = bottomText,
         textColor = textColor,
@@ -137,18 +140,20 @@ fun Modifier.courseItemBackground(backgroundColor: Color): Modifier = composed {
 @Composable
 private fun CourseShowRange(
   range: CourseItemRange,
-  itemState: CourseItemState,
+  itemRange: CourseItemRange,
+  enableShowCoverTip: Boolean,
+  timeline: CourseTimeline,
   topText: String,
   bottomText: String,
   textColor: Color,
   onClick: ((CourseItemRange) -> Unit)? = null,
 ) {
   val calculateWeight: (CourseItemRange) -> Offset = {
-    itemState.timeline.calculateRelativeWeight(
+    timeline.calculateRelativeWeight(
       beginTime1 = it.begin,
       finalTime1 = it.final,
-      beginTime2 = itemState.item.beginTime,
-      finalTime2 = itemState.item.finalTime
+      beginTime2 = itemRange.begin,
+      finalTime2 = itemRange.final,
     )
   }
   var lastRange by rememberWrapper(range)
@@ -182,7 +187,7 @@ private fun CourseShowRange(
       }
     }.drawWithContent {
       drawContent()
-      if (itemState.overlap.coveredItemList.size > 0) {
+      if (enableShowCoverTip) {
         drawRoundRect(
           color = textColor,
           topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),

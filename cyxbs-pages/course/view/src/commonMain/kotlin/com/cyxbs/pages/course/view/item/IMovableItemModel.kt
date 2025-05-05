@@ -4,27 +4,39 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 
 /**
- * .
+ * 支持长按移动的 item
  *
  * @author 985892345
  * @date 2025/5/1
  */
 interface IMovableItemModel : CourseItemModel {
 
-  fun getMoveToNewLocation(): Offset
+  // 得到抬手时目的地的偏移量
+  fun getMoveDestinationOffset(
+    itemState: CourseItemState,
+    pageContext: LocalCoursePageContext,
+    transition: MutableState<Offset>,
+    screenTopLeft: Offset,
+    size: IntSize,
+  ): Offset = Offset.Zero
 
-  suspend fun moveToNewLocation(
-    offsetState: MutableState<Offset>,
-    newOffset: Offset,
+  // 根据最终目的地的偏移量执行动画
+  suspend fun animateMove(
+    itemState: CourseItemState,
+    pageContext: LocalCoursePageContext,
+    transition: MutableState<Offset>,
+    destinationOffset: Offset,
   ) {
     animate(
       typeConverter = Offset.VectorConverter,
-      initialValue = offsetState.value,
-      targetValue = newOffset,
+      initialValue = transition.value,
+      targetValue = destinationOffset,
     ) { value, _ ->
-      offsetState.value = value
+      transition.value = value
     }
   }
 }

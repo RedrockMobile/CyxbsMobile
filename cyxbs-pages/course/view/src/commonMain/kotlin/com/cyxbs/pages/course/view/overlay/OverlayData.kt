@@ -18,7 +18,9 @@ data class CourseItemOverlap(
 ) {
   // ItemCover 类型会在判断 equal 时使父子构成循环引用，所以需要单独分离
   val coveredRangeList: MutableList<CourseItemCover> = mutableListOf() // 被覆盖的区域
-  val coveredItemList: MutableList<CourseItemCover> = mutableListOf() // 覆盖的 item 集合
+
+  // 覆盖的 item 集合，只保存了直接覆盖的子 item，如果需要查找所有覆盖的 item，需要进行递归收集
+  val coveredItemList: MutableList<CourseItemCover> = mutableListOf()
 
   companion object {
     fun transformOverlap(items: List<CourseItemModel>): List<CourseItemOverlap> {
