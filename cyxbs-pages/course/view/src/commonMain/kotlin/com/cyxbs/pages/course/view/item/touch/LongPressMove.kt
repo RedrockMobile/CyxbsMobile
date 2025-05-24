@@ -94,6 +94,7 @@ abstract class LongPressMoveController {
    * 注意：单独分离出来是因为 suspend 函数不一定会成功执行，所以有些状态的取消需要写在 [onEndLongPress]
    */
   open suspend fun animateMove(
+    upOrCancel: Boolean,
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
     size: IntSize,
@@ -174,7 +175,7 @@ fun Modifier.longPressMove(
             controllerWrapper.onEndLongPress(false, transition, screenPosition, size)
             controllerWrapper.updateState(LongPressMoveState.Animating)
             coroutineScope.launch {
-              controllerWrapper.animateMove(transition, screenPosition, size)
+              controllerWrapper.animateMove(false, transition, screenPosition, size)
             }.invokeOnCompletion {
               // 如果 coroutineScope 在执行前被取消，则不会执行 launch 的内容，但仍会执行 invokeOnCompletion
               controllerWrapper.updateState(LongPressMoveState.Idle)
@@ -187,7 +188,7 @@ fun Modifier.longPressMove(
             controllerWrapper.onEndLongPress(true, transition, screenPosition, size)
             controllerWrapper.updateState(LongPressMoveState.Animating)
             coroutineScope.launch {
-              controllerWrapper.animateMove(transition, screenPosition, size)
+              controllerWrapper.animateMove(true, transition, screenPosition, size)
             }.invokeOnCompletion {
               controllerWrapper.updateState(LongPressMoveState.Idle)
             }
@@ -343,12 +344,14 @@ class LongPressMoveControllerImpl(
   }
 
   override suspend fun animateMove(
+    upOrCancel: Boolean,
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
     size: IntSize
   ) {
     val item = itemState.item as IMovableItemModel
     val destinationOffset = item.getMoveDestinationOffset(
+      upOrCancel = upOrCancel,
       itemState = itemState,
       pageContext = pageContext,
       transition = transition,

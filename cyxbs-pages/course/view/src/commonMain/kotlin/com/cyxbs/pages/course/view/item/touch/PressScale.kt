@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
  * @date 2025/5/4
  */
 open class PressScaleController {
+  companion object : PressScaleController()
   open fun onStartPress() {}
   open fun onEndPress() {}
 }
@@ -39,7 +40,7 @@ open class PressScaleController {
 @Stable
 @Composable
 fun Modifier.pressScale(
-  controller: PressScaleController,
+  controller: PressScaleController = PressScaleController.Companion,
 ): Modifier {
   val controllerWrapper by rememberUpdatedWrapper(controller)
   val pointerOffset = rememberWrapper<Offset?>(null)

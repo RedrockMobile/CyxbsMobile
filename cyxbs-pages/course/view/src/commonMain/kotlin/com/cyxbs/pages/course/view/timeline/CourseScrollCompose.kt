@@ -50,8 +50,8 @@ val LocalCourseScroll = staticCompositionLocalOf<LocalCourseScrollContext> { err
 class LocalCourseScrollContext(
   timeline: CourseTimeline,
   scrollState: ScrollState,
-  outerCoordinates: State<LayoutCoordinates?>,
-  innerCoordinates: State<LayoutCoordinates?>,
+  val outerCoordinatesState: State<LayoutCoordinates?>,
+  val innerCoordinatesState: State<LayoutCoordinates?>,
 ) {
   var timeline by mutableStateOf(timeline)
     private set
@@ -60,10 +60,10 @@ class LocalCourseScrollContext(
     private set
 
   // scroll 外层布局
-  val outerCoordinates by outerCoordinates
+  val outerCoordinates by outerCoordinatesState
 
   // scroll 内层布局
-  val innerCoordinates by innerCoordinates
+  val innerCoordinates by innerCoordinatesState
 
   // 时间轴上单个 data 的坐标系，用于快速得到组件的高度占比
   val timelineCoordinatesMap = mutableMapOf<CourseTimelineData, LayoutCoordinates?>()
@@ -103,8 +103,8 @@ internal fun CourseScrollCompose(
         LocalCourseScrollContext(
           timeline = timeline,
           scrollState = verticalScrollState,
-          outerCoordinates = outerCoordinatesState,
-          innerCoordinates = innerCoordinatesState,
+          outerCoordinatesState = outerCoordinatesState,
+          innerCoordinatesState = innerCoordinatesState,
         )
       }.apply {
         update(

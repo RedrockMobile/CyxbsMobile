@@ -74,16 +74,8 @@ data class MutableTimelineData(
 
   @Composable
   override fun ColumnScope.Content() {
-    // 分离出 weight 配置以避免对子组件的重组
-    Box(modifier = Modifier.weight(nowWeight)) {
-      LayoutContent()
-    }
-  }
-
-  @Composable
-  private fun LayoutContent() {
     val scrollContext = LocalCourseScroll.current
-    MutableTimelineCompose(modifier = Modifier.clickableNoIndicator {
+    MutableTimelineCompose(modifier = Modifier.weight(nowWeight).clickableNoIndicator {
       click()
     }.onGloballyPositioned {
       scrollContext.timelineCoordinatesMap[this@MutableTimelineData] = it

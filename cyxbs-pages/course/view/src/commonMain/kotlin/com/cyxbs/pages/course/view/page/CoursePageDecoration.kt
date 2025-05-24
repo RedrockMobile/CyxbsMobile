@@ -2,6 +2,7 @@ package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.unit.Dp
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 
@@ -11,6 +12,7 @@ import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
  * @author 985892345
  * @date 2025/3/19
  */
+@Stable
 interface CoursePageDecoration {
 
   /**

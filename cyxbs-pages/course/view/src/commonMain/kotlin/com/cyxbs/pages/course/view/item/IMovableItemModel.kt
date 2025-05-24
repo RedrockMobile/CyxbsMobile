@@ -17,6 +17,7 @@ interface IMovableItemModel : CourseItemModel {
 
   // 得到抬手时目的地的偏移量
   fun getMoveDestinationOffset(
+    upOrCancel: Boolean,
     itemState: CourseItemState,
     pageContext: LocalCoursePageContext,
     transition: MutableState<Offset>,

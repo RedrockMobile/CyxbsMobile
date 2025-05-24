@@ -36,6 +36,7 @@ import com.cyxbs.pages.course.home.data.HomeAffairDataProvider
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
 import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
+import com.cyxbs.pages.course.view.item.touch.LongPressCreate
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.page.CoursePageDecoration
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
@@ -164,11 +165,15 @@ private fun MobileHomeCoursePageContent(
     CoursePageCompose(
       timeline = frame.timeline,
       weekDataPool = frame.providerGroup.getWeekDataPool(page),
-      decorations = persistentListOf(TodayDecoration(weekBeginDate = if (page == 0) null else date)),
+      decorations = persistentListOf(
+        TodayDecoration(weekBeginDate = if (page == 0) null else date),
+        LongPressCreate(),
+      ),
     )
   }
 }
 
+@Stable
 class TodayDecoration(
   val weekBeginDate: Date?,
 ) : CoursePageDecoration {

@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -160,6 +161,22 @@ data class CourseTimeline(
       x = (startWeight1 - startWeight2) / (endWeight2 - startWeight2),
       y = (endWeight1 - startWeight2) / (endWeight2 - startWeight2),
     )
+  }
+
+  /**
+   * 计算 [height] 在时间轴上的 [MinuteTime]
+   */
+  fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime? {
+    data.fastForEach {
+      scrollContext.timelineCoordinatesMap[it]?.let { coordinates ->
+        val y1 = coordinates.positionInParent().y
+        val y2 = y1 + coordinates.size.height
+        if (height in y1..y2) {
+          return it.startTime.plusMinutes(((it.startTime.minutesUntil(it.endTime)) * (height - y1) / (y2 - y1)).roundToInt())
+        }
+      }
+    }
+    return null
   }
 }
 

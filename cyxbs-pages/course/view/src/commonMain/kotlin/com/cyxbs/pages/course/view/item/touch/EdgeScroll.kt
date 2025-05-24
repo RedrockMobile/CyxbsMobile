@@ -5,8 +5,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -29,9 +29,12 @@ import kotlin.math.sign
  * @date 2025/5/4
  */
 @Stable
-class EdgeScroll {
+class EdgeScroll(
+  val topMoveBoundary: Float = 40F, // 可移动的上边界距离
+  val bottomMoveBoundary: Float = 40F, // 可移动的下边界距离
+) {
 
-  private var scrollOuterCoordinates: LayoutCoordinates? = null
+  private var scrollOuterCoordinates: State<LayoutCoordinates?>? = null
 
   private val list = mutableListOf<EdgePosition>()
 
@@ -49,8 +52,7 @@ class EdgeScroll {
   @Composable
   fun attachCompose() {
     val scrollContext = LocalCourseScroll.current
-    SideEffect { scrollOuterCoordinates = scrollContext.outerCoordinates }
-    val moveBoundary = 40 // 移动的边界值
+    scrollOuterCoordinates = scrollContext.outerCoordinatesState
     LaunchedEffect(Unit) {
       firstPosition.collectLatest { position ->
         if (position == null) return@collectLatest
@@ -59,11 +61,14 @@ class EdgeScroll {
           it to changeFlag
         }.collectLatest {
           if (
-            abs(it) < moveBoundary
-            && (it > 0 && scrollContext.scrollState.canScrollBackward
-                || it < 0 && scrollContext.scrollState.canScrollForward)
+            it in 0F..topMoveBoundary && scrollContext.scrollState.canScrollBackward
+            || it in -bottomMoveBoundary..0F && scrollContext.scrollState.canScrollForward
           ) {
-            val velocity = -it.sign * ((moveBoundary - abs(it)) / 4 + 2F)
+            val velocity = if (it > 0) {
+              -((topMoveBoundary - it) / 4 + 2F)
+            } else {
+              (bottomMoveBoundary + it) / 4 + 2F
+            }.coerceIn(-12F, 12F)
             try {
               scrollContext.scrollState.scroll {
                 animate(
@@ -109,7 +114,7 @@ class EdgeScroll {
      */
     fun update(screenTopY: Float, height: Int) {
       Snapshot.withoutReadObservation {
-        val outerCoordinates = scrollOuterCoordinates
+        val outerCoordinates = scrollOuterCoordinates?.value
         if (outerCoordinates != null) {
           val topY = outerCoordinates.screenToLocal(Offset(0F, screenTopY)).y
           val bottomY = topY + height
