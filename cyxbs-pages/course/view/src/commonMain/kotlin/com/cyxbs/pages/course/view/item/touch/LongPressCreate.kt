@@ -12,9 +12,15 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -30,12 +36,14 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.courseItemBackground
-import com.cyxbs.pages.course.view.item.touch.LongPressCreate.LongPressItem
+import com.cyxbs.pages.course.view.item.touch.LongPressCreate.TouchingItem
 import com.cyxbs.pages.course.view.page.CoursePageDecoration
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
@@ -44,6 +52,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.datetime.DayOfWeek
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -62,31 +73,15 @@ class LongPressCreate : CoursePageDecoration {
   }
 
   @Stable
-  class LongPressItem(
+  class TouchingItem(
     val initTime: MinuteTime,
     val initPosition: Offset,
     val nowPosition: MutableState<Offset>,
     val nowScreenY: MutableFloatState,
-    val nowTime: MutableState<MinuteTime?>, // 在抬起后才赋值，抬起前应以 nowScreenY 计算高度，抬起后以该时间计算高度
     val edgePosition: EdgeScroll.EdgePosition,
   ) {
 
-    val alphaState = mutableFloatStateOf(1F)
-
     private val clickLock = mutableListOf<MutableTimelineData.ClickLock>()
-
-    suspend fun clear() {
-      try {
-        animate(
-          initialValue = 1F,
-          targetValue = 0F,
-        ) { value, _ ->
-          alphaState.value = value
-        }
-      } finally {
-        alphaState.value = 0F
-      }
-    }
 
     fun onMoveEnd(upOrCancel: Boolean) {
       edgePosition.remove()
@@ -116,6 +111,30 @@ class LongPressCreate : CoursePageDecoration {
         }
     }
   }
+
+  @Serializable
+  class TouchedItem(
+    val id: Long,
+    val dayOfWeek: DayOfWeek,
+    val start: MinuteTime,
+    val end: MinuteTime,
+  ) {
+    @Transient
+    val alphaState = mutableFloatStateOf(1F)
+
+    suspend fun clear() {
+      try {
+        animate(
+          initialValue = 1F,
+          targetValue = 0F,
+        ) { value, _ ->
+          alphaState.value = value
+        }
+      } finally {
+        alphaState.value = 0F
+      }
+    }
+  }
 }
 
 @Composable
@@ -126,7 +145,22 @@ private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
   val edgeScroll = remember { EdgeScroll(bottomMoveBoundary = 80F) } // 扩大底部边界更容易触发滚动
   edgeScroll.attachCompose()
 
-  val items = mutableStateMapOf<PointerId, LongPressItem>()
+  // 触摸中的 item
+  val touchingItems = remember { mutableStateMapOf<PointerId, TouchingItem>() }
+
+  // 触摸抬起后的 item
+  // 使用 rememberSaveable 进行保存，即使页面滑走再滑回仍会显示
+  val touchedItems = rememberSaveable(
+    saver = Saver(
+      save = {
+        defaultJson.encodeToString<List<LongPressCreate.TouchedItem>>(it)
+      },
+      restore = {
+        defaultJson.decodeFromString<List<LongPressCreate.TouchedItem>>(it).toMutableStateList()
+      }
+    )) {
+    mutableStateListOf<LongPressCreate.TouchedItem>()
+  }
 
   // 创建出来的 item 能否允许点击，如果此时还处于触摸中，则是不允许点击的
   val enableClick = rememberWrapper(false)
@@ -135,27 +169,49 @@ private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
     modifier = Modifier.fillMaxSize().onGloballyPositioned {
       layoutCoordinates.value = it
     }.pointerInputCreateItem(
-      items = items,
+      touchingItems = touchingItems,
+      touchedItems = touchedItems,
       edgeScroll = edgeScroll,
       scrollContext = scrollContext,
       layoutCoordinates = layoutCoordinates,
     ).pointerInputClearItem(
-      items = items
+      touchedItems = touchedItems
     ).pointerInputAllUpEnableClick(
       enableClick = enableClick
     )
   ) {
     content()
-    items.forEach { (pointerId, item) ->
-      key(pointerId) {
+    touchedItems.forEach { item ->
+      key(item.id) {
+        Box(
+          modifier = Modifier.layout { measurable, constraints ->
+            val width = constraints.maxWidth / 7
+            val weight = timeline.calculateBeginFinalWeight(item.start, item.end)
+            val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+            val placeable = measurable.measure(Constraints.fixed(width, height))
+            layout(placeable.width, placeable.height) {
+              placeable.placeRelativeWithLayer(
+                x = item.dayOfWeek.ordinal * width,
+                y = (constraints.maxHeight * weight.x).roundToInt(),
+                layerBlock = {
+                  alpha = item.alphaState.floatValue
+                }
+              )
+            }
+          }.courseItemBackground(0xFFE9EDF2.dark(0xFF202223))
+            .pressScale() // 点击后的 Q 弹动画
+        )
+      }
+    }
+    touchingItems.forEach { (pointerId, item) ->
+      key(pointerId.value) {
         Box(
           modifier = Modifier.layout { measurable, constraints ->
             scrollContext.scrollState.value // 滚轴滚动时仍然触发布局
             val width = constraints.maxWidth / 7
             val y1 = timeline.calculateWeight(item.initTime) * constraints.maxHeight
-            val y2 = item.nowTime.value?.let {
-              timeline.calculateWeight(it) * constraints.maxHeight
-            } ?: layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
+            val y2 =
+              layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
             val height = abs(y2 - y1).roundToInt()
             val placeable = measurable.measure(Constraints.fixed(width, height))
             layout(placeable.width, placeable.height) {
@@ -164,10 +220,7 @@ private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
                 y = minOf(y1, y2).roundToInt()
               )
             }
-          }.graphicsLayer {
-            alpha = item.alphaState.floatValue
           }.courseItemBackground(0xFFE9EDF2.dark(0xFF202223))
-            .pressScale() // 点击后的 Q 弹动画
         )
       }
     }
@@ -176,7 +229,7 @@ private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
 
 // 手指点击时清理已有的 item
 private fun Modifier.pointerInputClearItem(
-  items: MutableMap<PointerId, LongPressItem>,
+  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
 ): Modifier = pointerInput(Unit) {
   supervisorScope {
     awaitEachGesture {
@@ -186,11 +239,14 @@ private fun Modifier.pointerInputClearItem(
         change = awaitPointerEvent().changes.first { it.id == down.id }
       } while (!change.changedToUpIgnoreConsumed())
       // 等待 down 手指抬起
-      if (change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis) {
+      if (
+        change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
+        && (change.position - down.position).getDistance() < viewConfiguration.touchSlop
+      ) {
         // 抬起时间较小时取消所有 items
-        items.forEach { entry ->
-          launch { entry.value.clear() }.invokeOnCompletion {
-            items.remove(entry.key)
+        touchedItems.forEach { item ->
+          launch { item.clear() }.invokeOnCompletion {
+            touchedItems.remove(item)
           }
         }
       }
@@ -215,7 +271,8 @@ private fun Modifier.pointerInputAllUpEnableClick(
 
 // 长按移动创建 item 逻辑
 private fun Modifier.pointerInputCreateItem(
-  items: MutableMap<PointerId, LongPressItem>,
+  touchingItems: SnapshotStateMap<PointerId, TouchingItem>,
+  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
   edgeScroll: EdgeScroll,
   scrollContext: LocalCourseScrollContext,
   layoutCoordinates: State<LayoutCoordinates?>,
@@ -232,12 +289,14 @@ private fun Modifier.pointerInputCreateItem(
             // 执行当前手指事件的对应倒计时
             delay(viewConfiguration.longPressTimeoutMillis)
             // 倒计时结束，添加 item 展示
-            items[change.id] = LongPressItem(
-              initTime = scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)!!,
+            touchingItems[change.id] = TouchingItem(
+              initTime = scrollContext.timeline.calculateMinuteTime(
+                scrollContext,
+                change.position.y
+              )!!,
               initPosition = change.position,
               nowPosition = mutableStateOf(change.position),
               nowScreenY = mutableFloatStateOf(layoutCoordinates.value!!.localToScreen(change.position).y),
-              nowTime = mutableStateOf(null),
               edgePosition = edgeScroll.add(),
             )
           }
@@ -247,15 +306,21 @@ private fun Modifier.pointerInputCreateItem(
           longPressMap.remove(change.id)?.let { job ->
             if (job.isActive) job.cancel() else {
               // 事件被其他消耗或者抬手
-              items[change.id]?.let { item ->
-                val nowTime = scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)!!
-                item.nowTime.value = nowTime
-                item.edgePosition.remove()
+              touchingItems.remove(change.id)?.let { item ->
                 item.onMoveEnd(!change.isConsumed)
+                val nowTime =
+                  scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)!!
+                val touchedItem = LongPressCreate.TouchedItem(
+                  id = change.id.value,
+                  dayOfWeek = DayOfWeek((item.initPosition.x / (size.width / 7)).toInt() + 1),
+                  start = minOf(item.initTime, nowTime),
+                  end = maxOf(item.initTime, nowTime),
+                )
+                touchedItems.add(touchedItem)
                 if (abs(item.initTime.minutesUntil(nowTime)) < 30) {
                   // 暂定小于 30 分钟的事务不支持
-                  launch { item.clear() }.invokeOnCompletion {
-                    items.remove(change.id)
+                  launch { touchedItem.clear() }.invokeOnCompletion {
+                    touchedItems.remove(touchedItem)
                   }
                 }
               }
@@ -273,7 +338,7 @@ private fun Modifier.pointerInputCreateItem(
           } else if (job.isCompleted) {
             // 当前手指事件倒计时已经完成，移动扩大缩小 item
             change.consume()
-            items[change.id]?.let { item ->
+            touchingItems[change.id]?.let { item ->
               item.nowPosition.value = change.position
               item.nowScreenY.floatValue =
                 layoutCoordinates.value!!.localToScreen(change.position).y
