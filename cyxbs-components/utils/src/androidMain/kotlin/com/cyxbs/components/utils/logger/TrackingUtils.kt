@@ -3,7 +3,8 @@ package com.cyxbs.components.utils.logger
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.logger.bean.TrackingResultBean
-import com.cyxbs.components.utils.logger.event.ClickEvent
+import com.cyxbs.components.utils.logger.event.NewClickEvent
+import com.cyxbs.components.utils.logger.event.OldClickEvent
 import com.cyxbs.components.utils.logger.network.TrackingApiService
 import com.cyxbs.components.utils.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,7 @@ import kotlinx.coroutines.withContext
  * 后端接口：POST /data-middle-office/stats
  * 必填参数：
  *   id         埋点 ID
- *   user_id    加密后的用户 ID
+ *   user_id    用户 ID
  *   time       次数或时长（秒）
  *   start_time 页面打开时间戳（毫秒）
  *
@@ -35,7 +36,7 @@ object TrackingUtils {
    * 点击 / 曝光类上报（time = 1）
    */
   suspend fun trackExposureEvent(
-    event: ClickEvent
+    event: NewClickEvent
   ): Result<TrackingResultBean?> =
     trackEventInternal(
       event           = event,
@@ -50,7 +51,7 @@ object TrackingUtils {
    * @param startTimeMillis    页面打开时间戳（毫秒）
    */
   suspend fun trackStayEvent(
-    event: ClickEvent,
+    event: NewClickEvent,
     stayDurationMillis: Long,
     startTimeMillis: Long
   ): Result<TrackingResultBean?> =
@@ -63,7 +64,7 @@ object TrackingUtils {
   /* ---------- 内部实现 ---------- */
 
   private suspend fun trackEventInternal(
-    event: ClickEvent,
+    event: NewClickEvent,
     timeValue: Int,
     startTimeMillis: Long
   ): Result<TrackingResultBean?> =
@@ -95,7 +96,60 @@ object TrackingUtils {
         toastWhenDebug(null)
       }
     }
+  /**
+   * 点击事件上报
+   * @return [TrackingResultBean] -> 即返回的对应状态
+   *
+   * null -> 异常状态，说明返回的状态未知
+   */
+  suspend fun trackClickEvent(clickEvent: OldClickEvent): Result<TrackingResultBean?> {
+    return trackEvent(clickEvent.mapParams)
+  }
 
+  /**
+   * 点击事件上报
+   * @return [TrackingResultBean] -> 即返回的对应状态
+   *
+   * null -> 异常状态，说明返回的状态未知
+   */
+  suspend fun trackEvent(params: Map<String, String>): Result<TrackingResultBean?> {
+    return runCatching {
+      TrackingApiService.INSTANCE.trackEvent(params)
+        .data.status.let { status ->
+          LogUtils.d(TAG, "(LoggerUtils.kt:46)-->> trackingEvent, status = $status")
+          TrackingResultBean.values().find { status == it.status }.also {
+            if (it != TrackingResultBean.SUCCESS) {
+              // 网络请求成功但参数异常
+              toastLoggerWhenDebug(it)
+            }
+            return Result.success(it)
+          }
+        }
+    }.onFailure {
+      // 异常
+      // 需求千万条，稳定第一条。错误catch住，debug模式下 toast弹窗 + 堆栈输出
+      it.printStackTrace()
+      toastLoggerWhenDebug(null)
+      return Result.failure(it)
+    }
+  }
+
+  fun toastLogger(trackingResultBean: TrackingResultBean?) {
+    val msg = trackingResultBean?.msg ?: "埋点上报失败，请查看网络请求日志！"
+    msg.toast()
+    LogUtils.d(TAG, "(LoggerUtils.kt:67)-->> toast text:$msg")
+  }
+
+  /**
+   * 1. `ID wrong` 没有与请求的id参数相同的埋点
+   * 2. `hash wrong` 请求对应的埋点的hash值不匹配
+   * 3. `null` 埋点网络请求异常
+   */
+  fun toastLoggerWhenDebug(trackingResultBean: TrackingResultBean? = null) {
+    if (BuildConfig.DEBUG) {
+      toastLogger(trackingResultBean)
+    }
+  }
   /* ---------- 辅助方法 ---------- */
 
   private fun toastWhenDebug(bean: TrackingResultBean?) {
