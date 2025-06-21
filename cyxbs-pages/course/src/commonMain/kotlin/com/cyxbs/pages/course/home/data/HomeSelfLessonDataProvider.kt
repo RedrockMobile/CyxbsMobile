@@ -1,7 +1,6 @@
 package com.cyxbs.pages.course.home.data
 
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.toastLong
@@ -32,7 +31,7 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
 
   init {
     IAccountService::class.impl()
-      .userInfo
+      .stuNumFlow
       .flatMapLatest {
         createLessonFlow(it)
       }.onEach {
@@ -42,16 +41,20 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
       }.launchIn(appCoroutineScope)
   }
 
-  private fun createLessonFlow(user: UserInfo?): Flow<List<LessonByWeeks>?> = flow {
-    if (user == null) {
+  private fun createLessonFlow(stuNum: String?): Flow<List<LessonByWeeks>?> = flow {
+    if (stuNum == null) {
       emit(null)
     } else {
-      val cacheLesson = LessonRepository.getCacheLesson(user.stuNum)
-      if (cacheLesson != null) {
-        emit(cacheLesson.data)
+      // 先获取缓存
+      val cacheLesson = LessonRepository.getCacheLesson(stuNum)
+      var nowLesson = cacheLesson?.data
+      if (nowLesson != null) {
+        emit(nowLesson)
       }
-      LessonRepository.requestLesson(user.stuNum).onSuccess {
-        if (it != cacheLesson?.data) {
+      // 进行一次请求
+      LessonRepository.requestLesson(stuNum).onSuccess {
+        if (it != nowLesson) {
+          nowLesson = it
           emit(it)
         }
       }.onFailure {
@@ -62,6 +65,17 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
           } else {
             toastLong("已 ${diffDay.inWholeDays} 天未更新课表\n建议联网更新")
           }
+        }
+      }
+      // 观察后续课程的更新
+      LessonRepository.observeLesson(
+        stuNum = stuNum,
+        needCache = false,
+        needRequest = false,
+      ).collect {
+        if (it != nowLesson) {
+          nowLesson = it
+          emit(it)
         }
       }
     }

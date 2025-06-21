@@ -49,7 +49,7 @@ class MobileSelfLessonItemModel(
     }
   }
 
-  override val key: String = hashCode().toString()
+  override val weekItemKey: String = lesson.hashCode().toString()
 
   override val dayOfWeek: DayOfWeek
     get() = lesson.dayOfWeek

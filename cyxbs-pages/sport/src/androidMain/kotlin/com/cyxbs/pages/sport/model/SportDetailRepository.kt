@@ -4,10 +4,10 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.mapOrInterceptException
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.sport.model.network.SportDetailApiService
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -57,8 +57,8 @@ object SportDetailRepository {
     IAccountService::class.impl().state
       .onEach {
         when (it) {
-          AccountState.Login -> refresh()
-          AccountState.Logout -> _sportData.postValue(null)
+          is AccountState.Login -> refresh()
+          is AccountState.Logout -> _sportData.postValue(null)
           else -> Unit
         }
       }.launchIn(appCoroutineScope)

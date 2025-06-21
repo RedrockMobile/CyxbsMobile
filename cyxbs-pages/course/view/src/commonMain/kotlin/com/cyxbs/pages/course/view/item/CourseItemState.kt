@@ -29,9 +29,12 @@ class CourseItemState(
   var timeline by mutableStateOf(timeline)
     private set
 
+  // item 重叠数据
   var overlap by mutableStateOf(overlap)
     private set
 
+  // item 真实展示区间
+  // 通过转换器最后才能确定
   var realShowRange: List<CourseItemRange> by mutableStateOf(overlap.showRangeList)
     private set
 
@@ -91,8 +94,8 @@ class CourseItemState(
   // overlap 更新触发器，监听 overlap 的更新用于触发一些特定的操作
   // 在每次 overlap 更新时触发
   fun addOverlapChangeTrigger(trigger: OverlapChangeTrigger) {
-    val onDispose = trigger.onChangeOverlap(Snapshot.withoutReadObservation { overlap })
-    overlapChangeTriggers.put(trigger, onDispose)?.onDispose()
+    overlapChangeTriggers[trigger]?.onDispose()
+    overlapChangeTriggers[trigger] = trigger.onChangeOverlap(Snapshot.withoutReadObservation { overlap })
   }
 
   fun removeOverlapChangeTrigger(trigger: OverlapChangeTrigger) {
@@ -127,6 +130,10 @@ class CourseItemState(
 
 
   fun interface OverlapChangeTrigger {
+
+    /**
+     * 监听 item 重叠数据的变化
+     */
     fun onChangeOverlap(overlap: CourseItemOverlap): OnDisposable
 
     fun interface OnDisposable {

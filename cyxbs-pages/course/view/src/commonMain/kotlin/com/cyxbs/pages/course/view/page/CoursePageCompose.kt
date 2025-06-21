@@ -125,7 +125,7 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
     val dayOfWeek = timeline.beginDayOfWeek.add(index)
     val dayDataPool = weekDataPool.get(dayOfWeek)
     dayDataPool.state.collectAsState().value.fastForEach { overlay ->
-      key(overlay.item.key) {
+      key(overlay.item.weekItemKey) {
         val itemState = remember {
           CourseItemState(
             timeline = timeline,

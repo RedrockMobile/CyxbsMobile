@@ -1,11 +1,10 @@
 package com.cyxbs.pages.course.model
 
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
-import com.cyxbs.components.config.sp.accountSettingsFlow
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.bean.LinkStuBean
@@ -60,7 +59,9 @@ object LinkLessonRepository {
   }
 
   init {
-    accountSettingsFlow.flatMapLatest { settings ->
+    IAccountService::class.impl().stuNumFlow.map {
+      AccountSettings.get(it)
+    }.flatMapLatest { settings ->
       if (settings.stuNum == null) {
         flowOf<LinkStuBean?>(null)
       } else flow {
@@ -68,6 +69,16 @@ object LinkLessonRepository {
         requestLinkStu().onSuccess {
           emit(it)
         }
+        // todo 测试，待删除
+//        toast("已 mock 关联人")
+//        emit(
+//          LinkStuBean(
+//            selfNum = settings.stuNum!!,
+//            linkNum = "2023214565",
+//            major = "软件工程",
+//            name = "测试",
+//          )
+//        )
       }
     }.map {
       if (it == null) EMPTY_LINK_STU else {
@@ -104,8 +115,6 @@ object LinkLessonRepository {
         SETTING_KEY_LINK_STU,
         defaultJson.encodeToString(it)
       )
-    }.onFailure {
-      logg(it.stackTraceToString())
     }
   }
 }

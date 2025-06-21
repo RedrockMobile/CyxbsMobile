@@ -3,10 +3,10 @@ package com.cyxbs.pages.volunteer.service
 import android.annotation.SuppressLint
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.volunteer.event.VolunteerLogoutEvent
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.launchIn
@@ -26,7 +26,7 @@ class VolunteerInitialService : InitialService {
         super.onMainProcess(manager)
         IAccountService::class.impl().state
             .onEach {
-                if (it == AccountState.Logout) {
+                if (it is AccountState.Logout) {
                     // 以前学长用的 EventBus，还是粘性的，我也不知道为什么要这样写
                     EventBus.getDefault().postSticky(VolunteerLogoutEvent())
                 }

@@ -87,7 +87,7 @@ private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
       layout(constraints.maxWidth, textTitle.height) {
         textTitle.placeRelative(0, 0)
         icon?.placeRelative(
-          constraints.maxWidth - textTitle.height,
+          constraints.maxWidth - icon.width,
           (textTitle.height - icon.height) / 2
         )
       }

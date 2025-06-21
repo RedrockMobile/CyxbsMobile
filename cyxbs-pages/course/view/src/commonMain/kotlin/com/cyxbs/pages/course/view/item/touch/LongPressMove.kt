@@ -383,7 +383,7 @@ class LongPressMoveControllerImpl(
       }
       topControllers = collectTopItems(mutableSetOf(), itemState).onEach {
         // 在回到原位置时自身的 zIndex 是为 1 的，会遮挡上方的 item，所以需要设置上方的 item zIndex 来避免这种情况
-        it.zIndex = 1F
+        it.zIndex += 1F
       }
     }
     try {
@@ -394,7 +394,7 @@ class LongPressMoveControllerImpl(
       if (destinationOffset == Offset.Zero) {
         itemState.removeOverlapChangeTrigger(overlapChangeTriggerForEmptyCovered)
         itemState.removeShowRangeTransformer(selfShowRangeTransformerForEmpty)
-        topControllers.forEach { it.zIndex = 0F }
+        topControllers.forEach { it.zIndex -= 1F }
       }
     }
   }

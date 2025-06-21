@@ -2,13 +2,13 @@ package com.cyxbs.pages.affair.model
 
 import android.annotation.SuppressLint
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.config.PhoneCalendar
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
-import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.affair.bean.TodoListPushWrapper
 import com.cyxbs.pages.affair.bean.toAffairDateBean
 import com.cyxbs.pages.affair.net.AffairApiService
@@ -70,8 +70,9 @@ object AffairRepository {
    * - 上游不会抛出错误到下游
    */
   fun observeAffair(): Observable<List<AffairEntity>> {
-    return IAccountService::class.impl().userInfo
-      .map { it?.stuNum.orEmpty() }
+    return IAccountService::class.impl()
+      .stuNumFlow
+      .map { it.orEmpty() }
       .asObservable()
       .observeOn(Schedulers.io())
       .switchMap {

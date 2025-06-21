@@ -17,10 +17,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseFragment
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.noclass.R
 import com.cyxbs.pages.noclass.bean.Student
 import com.cyxbs.pages.noclass.page.adapter.NoClassTemporaryAdapter
@@ -157,7 +157,7 @@ class NoClassTemporaryFragment : BaseFragment(R.layout.noclass_fragment_temporar
      * 初始化用户信息
      */
     private fun initUserInfo() {
-        IAccountService::class.impl().userInfo.value?.apply {
+        IAccountService::class.impl().userInfo?.apply {
             mUserName = username
             mUserId = stuNum
         }

@@ -56,8 +56,8 @@ import kotlin.math.roundToInt
 @Stable
 interface CourseItemModel {
 
-  // 用于单天课程 item 的遍历定位
-  val key: String
+  // 在一周课表中的 item key，用于 Compose 重组时进行定位
+  val weekItemKey: String
 
   val page: Int
   val dayOfWeek: DayOfWeek

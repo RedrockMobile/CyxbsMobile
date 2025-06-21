@@ -75,7 +75,7 @@ fun CourseItemBottomSheetHeader(
   content: String,
   beginTime: MinuteTime,
   finalTime: MinuteTime,
-  enableShowLandmark: Boolean = false,
+  enableShowLandmark: Boolean = false, // 显示地标 icon
   onClickTitle: (() -> Unit)? = null,
   onClickContent: (() -> Unit)? = null,
 ) {

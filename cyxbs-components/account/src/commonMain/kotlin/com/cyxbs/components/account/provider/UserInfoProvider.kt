@@ -1,5 +1,7 @@
 package com.cyxbs.components.account.provider
 
+import com.cyxbs.components.account.AccountService
+import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
@@ -13,8 +15,6 @@ import com.cyxbs.components.utils.network.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -27,22 +27,22 @@ internal object UserInfoProvider {
 
   private const val KEY = "cyxbsmobile_user_info"
 
-  private val _stateFlow = MutableStateFlow(
-    defaultSettings.getStringOrNull(KEY)?.let {
-      runCatching {
-        defaultJson.decodeFromString<UserInfo>(SecretTransformer.impl.secretDecrypt(it))
-      }.onFailure {
-        defaultSettings.remove(KEY)
-      }.getOrNull()
-    }
-  )
-  val stateFlow: StateFlow<UserInfo?> = _stateFlow
+  var value = defaultSettings.getStringOrNull(KEY)?.let {
+    runCatching {
+      defaultJson.decodeFromString<UserInfo>(SecretTransformer.impl.secretDecrypt(it))
+    }.onFailure {
+      defaultSettings.remove(KEY)
+    }.onFailure {
+      refresh() // 本地保存的数据有误时触发一次刷新
+    }.getOrNull()
+  }
+    private set
 
   fun clear() {
-    _stateFlow.value = null
     refreshJob?.cancel()
     refreshJob = null
     defaultSettings.remove(KEY)
+    value = null
   }
 
   private var refreshJob: Job? = null
@@ -61,9 +61,17 @@ internal object UserInfoProvider {
           logg("用户信息请求失败: " + it.stackTraceToString())
         }
       }.onSuccess {
-        _stateFlow.value = it
-        defaultSettings.putString(KEY, SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(it)))
+        defaultSettings.putString(
+          KEY,
+          SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(it))
+        )
+        value = it
+        val state = AccountService.state.value
+        if (state is AccountState.Login && state.stuNum == it.stuNum) {
+          state.userInfo.value = it
+        }
       }
+      refreshJob = null
     }
   }
 }

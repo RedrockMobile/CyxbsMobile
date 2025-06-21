@@ -27,11 +27,11 @@ object SystemMessageRepository {
 
   init {
     IAccountService::class.impl().state.mapLatest {
-      if (it == AccountState.Login) {
+      if (it is AccountState.Login) {
         supervisorScope {
           launch { requestSystemMessage() }
         }
-      } else if (it == AccountState.Logout) {
+      } else if (it is AccountState.Logout) {
         systemMessageFlow.emit(emptyList())
       } else Unit
     }.launchIn(appCoroutineScope)

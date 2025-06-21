@@ -65,8 +65,13 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     }.launchIn(appCoroutineScope)
   }
 
-  private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>?> =
-    if (linkStuNum.isEmpty()) flowOf(null) else LessonRepository.getAndRequestLesson(linkStuNum)
+  private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>?> {
+    return if (linkStuNum.isEmpty()) flowOf(null)
+    else LessonRepository.observeLesson(
+      stuNum = linkStuNum,
+      needCache = true,
+    )
+  }
 
   private fun resetData(data: List<LessonByWeeks>?) {
     clear()

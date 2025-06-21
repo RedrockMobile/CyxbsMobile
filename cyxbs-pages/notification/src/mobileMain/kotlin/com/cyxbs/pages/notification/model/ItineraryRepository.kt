@@ -37,12 +37,12 @@ object ItineraryRepository {
 
   init {
     IAccountService::class.impl().state.mapLatest {
-      if (it == AccountState.Login) {
+      if (it is AccountState.Login) {
         supervisorScope {
           launch { requestReceivedItinerary() }
           launch { requestSentItinerary() }
         }
-      } else if (it == AccountState.Logout) {
+      } else if (it is AccountState.Logout) {
         _sentItineraryFlow.emit(emptyList())
         _receivedItineraryFlow.emit(emptyList())
       } else Unit

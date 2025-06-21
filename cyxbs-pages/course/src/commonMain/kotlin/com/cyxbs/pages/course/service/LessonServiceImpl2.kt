@@ -15,8 +15,16 @@ import kotlinx.coroutines.flow.Flow
 @ImplProvider
 object LessonServiceImpl2 : ILessonService2 {
 
-  override fun getAndRequestLesson(stuNum: String): Flow<List<LessonByWeeks>> {
-    return LessonRepository.getAndRequestLesson(stuNum)
+  override fun observeLesson(
+    stuNum: String?,
+    needCache: Boolean,
+    needRequest: Boolean
+  ): Flow<List<LessonByWeeks>> {
+    return LessonRepository.observeLesson(
+      stuNum = stuNum,
+      needCache = needCache,
+      needRequest = needRequest,
+    )
   }
 
   override fun getCacheLesson(stuNum: String?): ILessonService2.CacheLesson? {

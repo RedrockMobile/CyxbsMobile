@@ -9,6 +9,7 @@ package com.cyxbs.components.account.api
 interface IAccountEditService {
 
   // 登录成功，由 login 模块调用
+  // 允许抛出异常，外界应主动 catch
   fun onLoginSuccess(stuNum: String, token: String, refreshToken: String)
 
   // 登出，由 mine 模块调用

@@ -78,6 +78,7 @@ interface IApiStatus {
       ITokenService::class.impl().tryTokenExpired()
     } else if (status == 20004) {
       // refreshToken 过期，这里只能让用户重新登录，正常情况下会在主界面就触发拦截跳转至登录页
+      ITokenService::class.impl().tryRefreshTokenExpired()
     }
     if (!isSuccess()) {
       throw ApiException(status, info)

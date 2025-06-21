@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
@@ -108,26 +109,30 @@ private fun CourseBottomSheetDialogContent(
       itemDialogContents[it % itemDialogContents.size].BottomSheetDialogContent()
     }
     // 底部的圆点指示器
-    Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).drawWithCache {
-      val radius = 4.dp.toPx()
-      val interval = 16.dp.toPx()
-      val beginX = size.width / 2 - (itemDialogContents.size - 1) * interval / 2
-      val beginY = size.height / 2
-      onDrawBehind {
-        val itemCount = itemDialogContents.size
-        val currentPage = pagerState.currentPage
-        val currentPageOffset = pagerState.currentPageOffsetFraction
-        val absoluteOffset = currentPage + currentPageOffset
-        val relativeOffset = if (absoluteOffset % itemCount > itemCount - 1) { // 当划出边界时
-          (1 - (absoluteOffset - absoluteOffset.toInt())) * (itemCount - 1) // 这里可以表示从右边界到左边界(或相反)经过的值
-        } else absoluteOffset % itemCount
-        repeat(itemCount) {
-          drawCircle(Color(0xFF888888), radius, Offset(beginX + it * interval, beginY))
+    Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {
+      if (itemDialogContents.size > 1) {
+        drawWithCache {
+          val radius = 4.dp.toPx()
+          val interval = 16.dp.toPx()
+          val beginX = size.width / 2 - (itemDialogContents.size - 1) * interval / 2
+          val beginY = size.height / 2
+          onDrawBehind {
+            val itemCount = itemDialogContents.size
+            val currentPage = pagerState.currentPage
+            val currentPageOffset = pagerState.currentPageOffsetFraction
+            val absoluteOffset = currentPage + currentPageOffset
+            val relativeOffset = if (absoluteOffset % itemCount > itemCount - 1) { // 当划出边界时
+              (1 - (absoluteOffset - absoluteOffset.toInt())) * (itemCount - 1) // 这里可以表示从右边界到左边界(或相反)经过的值
+            } else absoluteOffset % itemCount
+            repeat(itemCount) {
+              drawCircle(Color(0xFF888888), radius, Offset(beginX + it * interval, beginY))
+            }
+            val relativeOffsetInt = relativeOffset.toInt()
+            val path = getWaterDropIndicator(radius, relativeOffset - relativeOffsetInt, interval)
+            path.translate(Offset(beginX + relativeOffsetInt * interval, beginY))
+            drawPath(path, Color(0xFF788EFA))
+          }
         }
-        val relativeOffsetInt = relativeOffset.toInt()
-        val path = getWaterDropIndicator(radius, relativeOffset - relativeOffsetInt, interval)
-        path.translate(Offset(beginX + relativeOffsetInt * interval, beginY))
-        drawPath(path, Color(0xFF788EFA))
       }
     })
   }

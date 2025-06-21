@@ -3,6 +3,8 @@ package com.cyxbs.pages.course.view.data
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.pages.course.view.item.CourseItemModel
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -21,6 +23,8 @@ class CourseDataProviderGroup(
 
   private val weekDataPoolByPage = mutableMapOf<Int, CourseWeekDataPool>()
 
+  private val weekDataPoolByPageLock = SynchronizedObject()
+
   private val itemListeners = providers.map { provider ->
     object : CourseDataProvider.ItemListener {
       val provider = provider
@@ -33,9 +37,11 @@ class CourseDataProviderGroup(
       }
 
       override fun onClear() {
-        weekDataPoolByPage.forEach { entry ->
-          DayOfWeek.entries.forEach {
-            entry.value.get(it).tryRefresh()
+        synchronized(weekDataPoolByPageLock) {
+          weekDataPoolByPage.forEach { entry ->
+            DayOfWeek.entries.forEach {
+              entry.value.get(it).tryRefresh()
+            }
           }
         }
       }
@@ -44,8 +50,10 @@ class CourseDataProviderGroup(
 
   // 获取 page 对应的周数据，其中 page 为 0 时表示整学期
   fun getWeekDataPool(page: Int): CourseWeekDataPool {
-    return weekDataPoolByPage.getOrPut(page) {
-      CourseWeekDataPool(providers, timeline!!, page)
+    return synchronized(weekDataPoolByPageLock) {
+      weekDataPoolByPage.getOrPut(page) {
+        CourseWeekDataPool(providers, timeline!!, page)
+      }
     }
   }
 
@@ -62,7 +70,9 @@ class CourseDataProviderGroup(
     itemListeners.fastForEach {
       it.provider.removeItemListener(it)
     }
-    weekDataPoolByPage.clear()
+    synchronized(weekDataPoolByPageLock) {
+      weekDataPoolByPage.clear()
+    }
     timeline = null
   }
 }

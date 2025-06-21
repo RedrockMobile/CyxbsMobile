@@ -272,7 +272,7 @@ class UserFragment : BaseFragment() {
 
     //刷新和User信息有关的界面
     private fun refreshUserLayout() {
-        val userInfo = IAccountService::class.impl().userInfo.value ?: return
+        val userInfo = IAccountService::class.impl().userInfo ?: return
         mine_user_avatar.setAvatarImageFromUrl(userInfo.photoSrc)
         mine_user_username.text = userInfo.username
     }

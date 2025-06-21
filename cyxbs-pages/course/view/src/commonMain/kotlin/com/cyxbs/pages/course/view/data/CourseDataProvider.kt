@@ -2,6 +2,8 @@ package com.cyxbs.pages.course.view.data
 
 import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.pages.course.view.item.CourseItemModel
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -18,6 +20,9 @@ abstract class CourseDataProvider {
 
   // 课程数据监听
   private val itemListenerList = mutableListOf<ItemListener>()
+
+  private val dayItemMapLock = SynchronizedObject()
+  private val itemListenerListLock = SynchronizedObject()
 
   // 当天课程中比较两个课程的位置，越大则越显示在顶层
   open fun compare(a: CourseItemModel, b: CourseItemModel): Int {
@@ -53,8 +58,13 @@ abstract class CourseDataProvider {
   // 添加课程
   fun add(item: CourseItemModel) {
     val day = item.page * 7 + item.dayOfWeek.ordinal
-    if (dayItemMap.getOrPut(day) { mutableSetOf() }.add(item)) {
-      itemListenerList.fastForEachReversed { it.onAdd(item) }
+    val addSuccess = synchronized(dayItemMapLock) {
+      dayItemMap.getOrPut(day) { mutableSetOf() }.add(item)
+    }
+    if (addSuccess) {
+      synchronized(itemListenerListLock) {
+        itemListenerList.fastForEachReversed { it.onAdd(item) }
+      }
     }
   }
 
@@ -66,25 +76,38 @@ abstract class CourseDataProvider {
   // 移除课程
   fun remove(item: CourseItemModel) {
     val day = item.page * 7 + item.dayOfWeek.ordinal
-    if (dayItemMap[day]?.remove(item) == true) {
-      itemListenerList.fastForEachReversed { it.onRemove(item) }
+    val removeSuccess = synchronized(dayItemMapLock) {
+      dayItemMap[day]?.remove(item)
+    }
+    if (removeSuccess == true) {
+      synchronized(itemListenerListLock) {
+        itemListenerList.fastForEachReversed { it.onRemove(item) }
+      }
     }
   }
 
   // 清空课程
   fun clear() {
-    dayItemMap.clear()
-    itemListenerList.fastForEachReversed { it.onClear() }
+    synchronized(dayItemMapLock) {
+      dayItemMap.clear()
+    }
+    synchronized(itemListenerListLock) {
+      itemListenerList.fastForEachReversed { it.onClear() }
+    }
   }
 
   // 添加课程监听
   fun addItemListener(listener: ItemListener) {
-    itemListenerList.add(listener)
+    synchronized(itemListenerListLock) {
+      itemListenerList.add(listener)
+    }
   }
 
   // 移除课程监听
   fun removeItemListener(listener: ItemListener) {
-    itemListenerList.remove(listener)
+    synchronized(itemListenerListLock) {
+      itemListenerList.remove(listener)
+    }
   }
 
   interface ItemListener {
