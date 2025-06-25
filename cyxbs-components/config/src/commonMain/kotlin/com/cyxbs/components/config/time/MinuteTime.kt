@@ -13,7 +13,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * .
+ * 如果需要两个 [MinuteTime] 组合，可以使用 [MinuteTimePair]
  *
  * @author 985892345
  * 2024/3/9 15:30
@@ -89,7 +89,23 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
       val time = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
       return MinuteTime(time.hour, time.minute)
     }
+  }
+}
 
+@Stable
+@kotlin.jvm.JvmInline
+@Serializable(MinuteTimePairSerializer::class)
+value class MinuteTimePair(val value: Long) {
+
+  constructor(first: MinuteTime, second: MinuteTime) : this(first.value.toLong() shl 32 or second.value.toLong())
+
+  val first: MinuteTime
+    get() = MinuteTime((value shr 32).toInt())
+  val second: MinuteTime
+    get() = MinuteTime(value.toInt())
+
+  override fun toString(): String {
+    return "$first-$second"
   }
 }
 
@@ -98,10 +114,27 @@ object MinuteTimeSerializer : KSerializer<MinuteTime> {
 
   override fun deserialize(decoder: Decoder): MinuteTime = deserialize(decoder.decodeString())
 
-  override fun serialize(encoder: Encoder, value: MinuteTime) = encoder.encodeString(value.toString())
+  override fun serialize(encoder: Encoder, value: MinuteTime) = encoder.encodeString(serialize(value))
 
   fun deserialize(value: String): MinuteTime = value.split(":")
     .let { MinuteTime(it[0].toInt(), it[1].toInt()) }
 
   fun serialize(time: MinuteTime): String = time.toString()
+}
+
+object MinuteTimePairSerializer : KSerializer<MinuteTimePair> {
+  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("MinuteTimePair", PrimitiveKind.STRING)
+
+  override fun deserialize(decoder: Decoder): MinuteTimePair = deserialize(decoder.decodeString())
+
+  override fun serialize(encoder: Encoder, value: MinuteTimePair) = encoder.encodeString(serialize(value))
+
+  fun deserialize(value: String): MinuteTimePair = value.split("-").let {
+    MinuteTimePair(
+      MinuteTimeSerializer.deserialize(it[0]),
+      MinuteTimeSerializer.deserialize(it[1])
+    )
+  }
+
+  fun serialize(time: MinuteTimePair): String = time.toString()
 }

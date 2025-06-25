@@ -1,12 +1,12 @@
 package com.cyxbs.pages.affair.bean
 
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.components.utils.extensions.toastLong
+import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.network.IApiWrapper
-import com.cyxbs.pages.affair.api.IAffairService2
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -56,32 +56,50 @@ data class GetAffairBean(
      *   - 则 period 字段表示 事务持续时间，单位分钟
      *   - 则 week 字段表示该事务在哪几天，格式为 年份 * 10000 + 月份 * 100 + 日
      */
-    fun toAffair(): IAffairService2.Affair? {
+    fun toAffair(): AffairEntity? {
       val affair = runCatching {
-        IAffairService2.Affair(
+        AffairEntity(
           id = id,
           remindTime = remindTime,
           title = title,
           content = content,
           whatTime = oldDate.mapNotNull { bean ->
             if (bean.day == -1) {
+              // Compose 版事务
               val start = MinuteTime(hour = bean.beginLesson / 100, minute = bean.beginLesson % 100)
+              if (bean.period <= 0) throw IllegalArgumentException("period 不能小于等于 0")
               val end = start.plusMinutes(bean.period)
+              if (end <= start) throw IllegalArgumentException("结束时间不能小于等于开始时间")
               val date = bean.week.map {
                 Date(year = it / 10000, month = (it % 10000) / 100, dayOfMonth = it % 100)
               }
-              IAffairService2.AffairWhatTime(start, end, date)
-            } else null // 旧版事务将不再支持显示
+              if (date.isEmpty()) null else AffairWhatTime(MinuteTimePair(start, end), date)
+            } else if (bean.day >= 0) {
+              // 旧版事务
+              // 旧版事务中 day 为星期数，星期一为 0
+              val firstDate = SchoolCalendar.getFirstMonDay()
+              // 因为旧版本的事务需要开学第一天计算出日期，所以这里会存在没有开学第一天就没有日期的情况
+              // 但后续升级后旧版本事务会越来越少，暂时就保持这种逻辑吧
+              if (firstDate != null) {
+                val start = getStartTimeMinute(getStartRow(bean.beginLesson))
+                val end = getEndTimeMinute(getEndRow(bean.beginLesson, bean.period))
+                if (end <= start) throw IllegalArgumentException("结束时间不能小于等于开始时间")
+                val date = bean.week.map {
+                  firstDate.plusDays((it - 1) * 7 + bean.day)
+                }
+                if (date.isEmpty()) null else AffairWhatTime(MinuteTimePair(start, end), date)
+              } else null
+            } else null
           }
         )
       }.onFailure {
-        // 事务转换失败，这里尝试删除该事务
-        IAffairService2::class.impl().deleteAffair(id)
         if (isDebug()) {
-          toastLong("下方事务存在转换异常, ${it.message}")
+          showExceptionDialog(RuntimeException("下发事务存在转换异常, $this", it))
         }
       }.getOrNull()
-      return if (affair?.whatTime.isNullOrEmpty()) null else affair
+      if (affair == null) return null
+      if (affair.whatTime.isEmpty()) return null
+      return affair
     }
   }
 

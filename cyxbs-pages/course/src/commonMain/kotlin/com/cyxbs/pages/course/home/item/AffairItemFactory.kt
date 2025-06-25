@@ -1,7 +1,6 @@
 package com.cyxbs.pages.course.home.item
 
-import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.affair.api.IAffairService2
+import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
@@ -16,14 +15,10 @@ interface AffairItemFactory {
 
   fun createAffairItemModel(
     page: Int,
-    affair: IAffairService2.Affair,
-    whatTime: IAffairService2.AffairWhatTime,
-    date: Date,
+    affairDateModel: AffairDateModel,
   ): AffairItemModel
 }
 
 interface AffairItemModel : CourseItemModel {
-  val affair: IAffairService2.Affair
-  val whatTime: IAffairService2.AffairWhatTime
-  val date: Date
+  val affairDateModel: AffairDateModel
 }

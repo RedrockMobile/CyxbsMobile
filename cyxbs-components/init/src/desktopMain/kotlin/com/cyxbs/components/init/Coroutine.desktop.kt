@@ -1,5 +1,6 @@
 package com.cyxbs.components.init
 
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -12,6 +13,9 @@ import kotlin.system.exitProcess
  * @author 985892345
  * @date 2024/12/28
  */
+
+private val AppCoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> }
+
 actual val appCoroutineScope: CoroutineScope
   get() = appCoroutineScopeInternal
 
@@ -21,7 +25,7 @@ fun runApp(block: suspend CoroutineScope.() -> Unit) {
   runBlocking {
     // appCoroutineScopeInternal 使用 SupervisorJob 避免异常传播
     val supervisor = SupervisorJob(coroutineContext[Job])
-    val coroutineScope = CoroutineScope(supervisor)
+    val coroutineScope = CoroutineScope(supervisor + AppCoroutineExceptionHandler)
     appCoroutineScopeInternal = coroutineScope
     block()
   }

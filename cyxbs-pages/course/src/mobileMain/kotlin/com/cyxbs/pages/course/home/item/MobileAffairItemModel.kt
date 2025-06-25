@@ -1,14 +1,14 @@
 package com.cyxbs.pages.course.home.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.pages.affair.api.IAffairService2
+import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.home.dialog.BottomSheetDialogContent
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
@@ -29,32 +29,27 @@ import kotlinx.datetime.DayOfWeek
  */
 class MobileAffairItemModel(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
-  override val affair: IAffairService2.Affair,
-  override val whatTime: IAffairService2.AffairWhatTime,
-  override val date: Date,
+  override val affairDateModel: AffairDateModel,
 ) : AffairItemModel, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItemModel {
 
   @ImplProvider
   companion object : AffairItemFactory {
     override fun createAffairItemModel(
       page: Int,
-      affair: IAffairService2.Affair,
-      whatTime: IAffairService2.AffairWhatTime,
-      date: Date,
+      affairDateModel: AffairDateModel
     ): AffairItemModel {
-      return MobileAffairItemModel(page = page, affair = affair, whatTime = whatTime, date = date)
+      return MobileAffairItemModel(page = page, affairDateModel = affairDateModel)
     }
   }
 
-  override val weekItemKey: String =
-    affair.id.toString() + whatTime.start.toString() + whatTime.end.toString() + date.toString()
+  override val weekItemKey: String = affairDateModel.hashCode().toString()
 
   override val dayOfWeek: DayOfWeek
-    get() = date.dayOfWeek
+    get() = affairDateModel.date.value.dayOfWeek
   override val beginTime: MinuteTime
-    get() = whatTime.start
+    get() = affairDateModel.whatTime.value.timePair.value.first
   override val finalTime: MinuteTime
-    get() = whatTime.end
+    get() = affairDateModel.whatTime.value.timePair.value.second
 
   @Composable
   override fun CourseItemContent(modifier: Modifier, itemState: CourseItemState) {
@@ -62,8 +57,8 @@ class MobileAffairItemModel(
     CourseDefaultItemContent(
       modifier = modifier,
       itemState = itemState,
-      topText = affair.title,
-      bottomText = affair.content,
+      topText = affairDateModel.affair.title.collectAsState().value,
+      bottomText = affairDateModel.affair.content.collectAsState().value,
       textColor = when {
         beginTime < MinuteTime(12, 0) -> 0xFFFF8015.dark(0xFFF0F0F2)
         beginTime < MinuteTime(18, 0) -> 0xFFFF6262.dark(0xFFF0F0F2)
@@ -100,8 +95,8 @@ class MobileAffairItemModel(
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = remember(this) { mutableStateOf("下个事务") },
-      title = affair.title,
-      content = affair.content,
+      title = affairDateModel.affair.title.collectAsState().value,
+      content = affairDateModel.affair.content.collectAsState().value,
       beginTime = beginTime,
       finalTime = finalTime,
       onClickTitle = {
@@ -123,9 +118,9 @@ class MobileAffairItemModel(
         ", dayOfWeek=$dayOfWeek" +
         ", begin=$beginTime" +
         ", final=$finalTime" +
-        ", id=${affair.id}" +
-        ", title=${affair.title}" +
-        ", date=${date}" +
+        ", id=${affairDateModel.affair.id}" +
+        ", title=${affairDateModel.affair.title.value}" +
+        ", date=${affairDateModel.date.value}" +
         ")"
   }
 }

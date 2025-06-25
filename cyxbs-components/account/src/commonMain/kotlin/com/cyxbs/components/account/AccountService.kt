@@ -9,6 +9,7 @@ import com.cyxbs.components.account.provider.TouristProvider
 import com.cyxbs.components.account.provider.UserInfoProvider
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.EmptyCoroutineExceptionHandler
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -29,7 +30,7 @@ object AccountService : IAccountService, IAccountEditService {
   override val state = MutableStateFlow<AccountState>(AccountState.Logout(null))
 
   override var accountCoroutineScope: CoroutineScope =
-    CoroutineScope(SupervisorJob(appCoroutineScope.coroutineContext[Job]))
+    CoroutineScope(SupervisorJob(appCoroutineScope.coroutineContext[Job]) + EmptyCoroutineExceptionHandler)
 
   init {
     val tokenBean = TokenProvider.stateFlow.value

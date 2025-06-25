@@ -12,7 +12,7 @@ import kotlin.reflect.KClass
 
 fun showExceptionDialog(throwable: Throwable) {
   // todo 待实现
-  toast(throwable.message)
+  toastLong(throwable.message)
 }
 
 

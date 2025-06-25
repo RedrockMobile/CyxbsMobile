@@ -5,13 +5,12 @@ import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.pages.affair.api.IAffairService2
+import com.cyxbs.pages.affair.bean.AffairEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 
 /**
  * .
@@ -23,7 +22,7 @@ object LocalAddAffairRepository {
 
   private const val SETTING_KEY_AFFAIR_LOCAL_ADD = "setting_key_affair_local_add"
 
-  private val addAffairFlow = MutableStateFlow<Map<Int, IAffairService2.Affair>>(emptyMap())
+  private val addAffairFlow = MutableStateFlow<Map<Int, AffairEntity>>(emptyMap())
 
   init {
     IAccountService::class.impl()
@@ -33,17 +32,20 @@ object LocalAddAffairRepository {
       }.launchIn(appCoroutineScope)
   }
 
-  fun add(affair: IAffairService2.Affair) {
-    if (affair.id == 0) {
-      addAffairFlow.update { map ->
-        val id = (map.minOfOrNull { it.value.id } ?: 0) - 1
-        map.toMutableMap().apply { put(id, affair.copy(id = id)) }
+  fun add(affair: AffairEntity): AffairEntity {
+    while (true) {
+      val prevValue = addAffairFlow.value
+      val id = (prevValue.minOfOrNull { it.value.id } ?: 0) - 1
+      val newAffair = affair.copy(id = id)
+      val nextValue = prevValue.toMutableMap().apply { put(id, newAffair) }
+      if (addAffairFlow.compareAndSet(prevValue, nextValue)) {
+        saveAffair()
+        return newAffair
       }
-      saveAffair()
     }
   }
 
-  fun update(affair: IAffairService2.Affair) {
+  fun update(affair: AffairEntity) {
     if (affair.id < 0) {
       val old = addAffairFlow.getAndUpdate { map ->
         if (map.containsKey(affair.id)) {
@@ -69,16 +71,16 @@ object LocalAddAffairRepository {
     }
   }
 
-  fun getFlow(): StateFlow<Map<Int, IAffairService2.Affair>> {
+  fun getFlow(): StateFlow<Map<Int, AffairEntity>> {
     return addAffairFlow
   }
 
-  private fun loadLocalAddAffair(): Map<Int, IAffairService2.Affair> {
+  private fun loadLocalAddAffair(): Map<Int, AffairEntity> {
     // 读取磁盘
     val accountSettings = AccountSettings.now
     return accountSettings.getStringOrNull(SETTING_KEY_AFFAIR_LOCAL_ADD)?.let { json ->
       runCatching {
-        defaultJson.decodeFromString<Map<Int, IAffairService2.Affair>>(json)
+        defaultJson.decodeFromString<Map<Int, AffairEntity>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR_LOCAL_ADD)
       }.getOrNull()
@@ -89,7 +91,7 @@ object LocalAddAffairRepository {
     // 保存进磁盘
     AccountSettings.now.putString(
       SETTING_KEY_AFFAIR_LOCAL_ADD,
-      defaultJson.encodeToString<Map<Int, IAffairService2.Affair>>(addAffairFlow.value)
+      defaultJson.encodeToString<Map<Int, AffairEntity>>(addAffairFlow.value)
     )
   }
 }

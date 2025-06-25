@@ -10,19 +10,18 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiException
-import com.cyxbs.pages.affair.api.IAffairService2
+import com.cyxbs.pages.affair.api.AffairModel
+import com.cyxbs.pages.affair.bean.AffairEntity
+import com.cyxbs.pages.affair.bean.AffairWhatTime
 import com.cyxbs.pages.affair.bean.GetAffairBean
 import com.cyxbs.pages.affair.net.AffairApiService2
 import io.ktor.client.plugins.ClientRequestException
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * .
@@ -30,61 +29,62 @@ import kotlinx.coroutines.launch
  * @author 985892345
  * @date 2025/6/19
  */
-object AffairRepository2 : IAffairService2 {
+object AffairRepository2 {
 
   private const val SETTING_KEY_AFFAIR = "setting_key_affair"
 
-  private val affairFlow = MutableStateFlow<List<IAffairService2.Affair>?>(null)
+  private val affairFlow = MutableStateFlow<List<AffairEntity>?>(null)
+  private val affairItemModelFlow = MutableStateFlow<AffairModelImpl?>(null)
 
   init {
     IAccountService::class.impl()
       .stuNumFlow
-      .onEach {
-        affairFlow.value = if (it != null) loadCacheAffair() else null
+      .mapLatest { stuNum ->
+        if (stuNum != null) {
+          val cacheAffair = loadCacheAffair() ?: emptyList()
+          affairFlow.value = cacheAffair
+          affairItemModelFlow.value = AffairModelImpl(
+            stuNum = stuNum,
+            affairList = combineAffair(
+              origin = cacheAffair,
+              add = LocalAddAffairRepository.getFlow().value,
+              update = LocalUpdateAffairRepository.getFlow().value,
+              delete = LocalDeleteAffairRepository.getFlow().value
+            ),
+            addAction = {
+              addAffair(stuNum, it, allowLocal = true, needShowException = true)
+            },
+            updateAction = {
+              updateAffair(stuNum, it, allowLocal = true, needShowException = true)
+            },
+            deleteAction = {
+              deleteAffair(stuNum, it, allowLocal = true, needShowException = true)
+            },
+          )
+          requestAffair(stuNum)
+        } else {
+          affairFlow.value = null
+          affairItemModelFlow.value = null
+        }
       }.launchIn(appCoroutineScope)
   }
 
-  /**
-   * 观察登陆人的事务
-   * @param needRequest 订阅时是否需要请求新的数据，默认为 false，主页课表会自动请求
-   */
-  override fun observeAffair(
-    needRequest: Boolean,
-  ): Flow<List<IAffairService2.Affair>?> {
-    return combine(
-      affairFlow,
-      LocalAddAffairRepository.getFlow(),
-      LocalUpdateAffairRepository.getFlow(),
-      LocalDeleteAffairRepository.getFlow(),
-    ) { origin, add, update, delete ->
-      combineAffair(origin, add, update, delete)
-    }.onStart {
-      if (needRequest) {
-        IAccountService::class.impl()
-          .accountCoroutineScope
-          .launch { requestAffair() }
-      }
-    }
-  }
-
-  /**
-   * 获取课程缓存
-   */
-  override fun getCacheAffair(): List<IAffairService2.Affair>? {
-    return combineAffair(
-      origin = affairFlow.value,
-      add = LocalAddAffairRepository.getFlow().value,
-      update = LocalUpdateAffairRepository.getFlow().value,
-      delete = LocalDeleteAffairRepository.getFlow().value,
-    )
+  fun getAffairModelStateFlow(): StateFlow<AffairModel?> {
+    return affairItemModelFlow
   }
 
   /**
    * 请求课程
    */
-  private suspend fun requestAffair(): Result<List<IAffairService2.Affair>> {
+  private suspend fun requestAffair(
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
+  ): Result<List<AffairEntity>> {
+    val nowStuNum = IAccountService::class.impl().stuNum
+    if (stuNum != nowStuNum) {
+      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
+    }
     // 先上传所有本地临时事务才能拉取的远端事务
-    uploadLocalAffair().onFailure {
+    uploadLocalAffair(stuNum).onFailure {
       return Result.failure(it)
     }
     return runCatchingCoroutine {
@@ -92,30 +92,43 @@ object AffairRepository2 : IAffairService2 {
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it
+    }.mapCatching {
+      // 检查请求前后的学号一致性
+      checkStuNum(stuNum)
+      it
     }.mapCatching { bean ->
       bean.data.mapNotNull { it.toAffair() }
-    }.onSuccess {
-      affairFlow.tryEmit(it)
-      saveAffair()
+    }.onSuccess { entities ->
+      affairFlow.updateAndGet {
+        if (it != null) entities else null
+      }?.also {
+        saveAffair(it)
+      }
+    }.onSuccess { entities ->
+      val newAffair = combineAffair(
+        origin = entities,
+        add = LocalAddAffairRepository.getFlow().value,
+        update = LocalUpdateAffairRepository.getFlow().value,
+        delete = LocalDeleteAffairRepository.getFlow().value
+      )
+      // 同步远端事务到本地
+      affairItemModelFlow.value?.syncAffair(newAffair)
     }
   }
 
-  override fun addAffair(affair: IAffairService2.Affair) {
-    IAccountService::class.impl()
-      .accountCoroutineScope
-      .launch {
-        addAffair(affair, allowLocal = true, needShowException = true)
-      }
-  }
-
   /**
-   * 内部独用方法，请使用 [IAffairService2.addAffair] 代替
+   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
    */
   private suspend fun addAffair(
-    affair: IAffairService2.Affair,
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
+    affair: AffairEntity,
     allowLocal: Boolean,
     needShowException: Boolean,
-  ): Result<Any> {
+  ): Result<AffairEntity> {
+    val nowStuNum = IAccountService::class.impl().stuNum
+    if (stuNum != nowStuNum) {
+      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
+    }
     return runCatchingCoroutine {
       AffairApiService2::class.impl().addAffair(
         time = affair.remindTime,
@@ -126,44 +139,52 @@ object AffairRepository2 : IAffairService2 {
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it
-    }.onSuccess { bean ->
+    }.mapCatching {
+      // 检查请求前后的学号一致性
+      checkStuNum(stuNum)
+      affair.copy(id = it.id)
+    }.onSuccess { newAffair ->
       // 上传成功
-      affairFlow.update {
-        listOf(affair.copy(id = bean.id)) + it.orEmpty()
+      affairFlow.updateAndGet {
+        if (it == null) null else listOf(newAffair) + it
+      }?.also {
+        saveAffair(it)
       }
-      saveAffair()
-    }.onFailure {
+    }.recoverCatching {
       // 上传失败
       if (it is ClientRequestException) {
-        if (needShowException) {
-          showExceptionDialog(RuntimeException("添加失败, http 400, update affair = $affair", it))
-        }
+        if (needShowException) showExceptionDialog(
+          RuntimeException("添加失败, http 400, update affair = $affair", it)
+        )
+        throw it
       } else if (it is ApiException) {
-        if (needShowException) {
-          showExceptionDialog(RuntimeException("添加失败, update affair = $affair", it))
-        }
-      } else if (allowLocal) {
+        if (needShowException) showExceptionDialog(
+          RuntimeException("添加失败, update affair = $affair", it)
+        )
+        throw it
+      } else if (allowLocal && it !is StuNumNotMatchException) {
         // 添加进本地临时数据中
         LocalAddAffairRepository.add(affair)
+      } else {
+        if (needShowException) showExceptionDialog(it)
+        throw it
       }
     }
   }
 
-  override fun updateAffair(affair: IAffairService2.Affair) {
-    IAccountService::class.impl()
-      .accountCoroutineScope.launch {
-        updateAffair(affair, allowLocal = true, needShowException = true)
-      }
-  }
-
   /**
-   * 内部独用方法，请使用 [IAffairService2.updateAffair] 代替
+   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
    */
   private suspend fun updateAffair(
-    affair: IAffairService2.Affair,
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
+    affair: AffairEntity,
     allowLocal: Boolean,
     needShowException: Boolean,
   ): Result<Any> {
+    val nowStuNum = IAccountService::class.impl().stuNum
+    if (stuNum != nowStuNum) {
+      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
+    }
     if (affair.id < 0) {
       // id 小于 0 说明是本地临时事务
       LocalAddAffairRepository.update(affair)
@@ -180,9 +201,12 @@ object AffairRepository2 : IAffairService2 {
       }.mapCatching {
         it.throwApiExceptionIfFail()
         it
+      }.mapCatching {
+        // 检查请求前后的学号一致性
+        checkStuNum(stuNum)
       }.onSuccess {
         // 上传成功
-        affairFlow.update { list ->
+        affairFlow.updateAndGet { list ->
           if (list == null) {
             // 正常情况下不会为空，除非更新事务的接口返回太慢了
             null
@@ -195,41 +219,45 @@ object AffairRepository2 : IAffairService2 {
               list
             }
           }
+        }?.also {
+          saveAffair(it)
         }
-        saveAffair()
-      }.onFailure {
+      }.recoverCatching {
         // 上传失败
         if (it is ClientRequestException) {
-          if (needShowException) {
-            showExceptionDialog(RuntimeException("更新失败, http 400, update affair = $affair", it))
-          }
+          if (needShowException) showExceptionDialog(
+            RuntimeException("更新失败, http 400, update affair = $affair", it)
+          )
+          throw it
         } else if (it is ApiException) {
-          if (needShowException) {
-            showExceptionDialog(RuntimeException("更新失败, update affair = $affair", it))
-          }
-        } else if (allowLocal) {
+          if (needShowException) showExceptionDialog(
+            RuntimeException("更新失败, update affair = $affair", it)
+          )
+          throw it
+        } else if (allowLocal && it !is StuNumNotMatchException) {
           // 添加进本地临时数据中
           LocalUpdateAffairRepository.update(affair)
+        } else {
+          if (needShowException) showExceptionDialog(it)
+          throw it
         }
       }
     }
   }
 
-  override fun deleteAffair(id: Int) {
-    IAccountService::class.impl()
-      .accountCoroutineScope.launch {
-        deleteAffair(id, allowLocal = true, needShowException = true)
-      }
-  }
-
   /**
-   * 内部独用方法，请使用 [IAffairService2.deleteAffair] 代替
+   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
    */
   private suspend fun deleteAffair(
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
     id: Int,
     allowLocal: Boolean,
     needShowException: Boolean,
   ): Result<Any> {
+    val nowStuNum = IAccountService::class.impl().stuNum
+    if (stuNum != nowStuNum) {
+      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
+    }
     if (id < 0) {
       // id 小于 0 说明是本地临时事务
       LocalAddAffairRepository.delete(id)
@@ -240,32 +268,43 @@ object AffairRepository2 : IAffairService2 {
       }.mapCatching {
         it.throwApiExceptionIfFail()
         it
+      }.mapCatching {
+        // 检查请求前后的学号一致性
+        checkStuNum(stuNum)
       }.onSuccess {
-        affairFlow.update { list ->
+        affairFlow.updateAndGet { list ->
           list?.filter { it.id != id }
+        }?.also {
+          saveAffair(it)
         }
-        saveAffair()
-      }.onFailure { throwable ->
+      }.recoverCatching { throwable ->
         // 上传失败
         if (throwable is ClientRequestException) {
-          if (needShowException) {
-            showExceptionDialog(RuntimeException("删除失败, http 400, " +
+          if (needShowException) showExceptionDialog(
+            RuntimeException(
+              "删除失败, http 400, " +
                 "delete affair = ${affairFlow.value?.find { it.id == id } ?: id}", throwable))
-          }
+          throw throwable
         } else if (throwable is ApiException) {
-          if (needShowException) {
-            showExceptionDialog(RuntimeException("删除失败, " +
+          if (needShowException) showExceptionDialog(
+            RuntimeException(
+              "删除失败, " +
                 "delete affair = ${affairFlow.value?.find { it.id == id } ?: id}", throwable))
-          }
-        } else if (allowLocal) {
+          throw throwable
+        } else if (allowLocal && throwable !is StuNumNotMatchException) {
           // 添加进本地临时数据中
           LocalDeleteAffairRepository.delete(id)
+        } else {
+          if (needShowException) showExceptionDialog(throwable)
+          throw throwable
         }
       }
     }
   }
 
-  private suspend fun uploadLocalAffair(): Result<Unit> {
+  private suspend fun uploadLocalAffair(
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
+  ): Result<Unit> {
     return runCatchingCoroutine {
       coroutineScope {
         fun checkException(e: Throwable) {
@@ -275,21 +314,26 @@ object AffairRepository2 : IAffairService2 {
         }
         // 这里无需异步上传，同步即可
         LocalDeleteAffairRepository.getFlow().value.forEach { id ->
-          deleteAffair(id, allowLocal = false, needShowException = false).recoverCatching {
+          deleteAffair(stuNum, id, allowLocal = false, needShowException = false).recoverCatching {
             checkException(it)
           }.onSuccess {
             LocalDeleteAffairRepository.delete(id)
-          }.getOrNull()
+          }.getOrThrow()
         }
         LocalUpdateAffairRepository.getFlow().value.forEach { (_, affair) ->
-          updateAffair(affair, allowLocal = false, needShowException = false).recoverCatching {
+          updateAffair(
+            stuNum,
+            affair,
+            allowLocal = false,
+            needShowException = false
+          ).recoverCatching {
             checkException(it)
           }.onSuccess {
             LocalUpdateAffairRepository.delete(affair.id)
           }.getOrThrow()
         }
         LocalAddAffairRepository.getFlow().value.forEach { (_, affair) ->
-          addAffair(affair, allowLocal = false, needShowException = false).recoverCatching {
+          addAffair(stuNum, affair, allowLocal = false, needShowException = false).recoverCatching {
             checkException(it)
           }.onSuccess {
             LocalAddAffairRepository.delete(affair.id)
@@ -301,12 +345,11 @@ object AffairRepository2 : IAffairService2 {
 
   // 根据原始事务数据与本地临时添加、更新、删除操作计算而得出最终该显示的事务数据
   private fun combineAffair(
-    origin: List<IAffairService2.Affair>?,
-    add: Map<Int, IAffairService2.Affair>,
-    update: Map<Int, IAffairService2.Affair>,
+    origin: List<AffairEntity>,
+    add: Map<Int, AffairEntity>,
+    update: Map<Int, AffairEntity>,
     delete: Set<Int>,
-  ): List<IAffairService2.Affair>? {
-    if (origin == null) return null
+  ): List<AffairEntity> {
     val list = add.values.toMutableList()
     origin.forEach {
       if (!delete.contains(it.id)) {
@@ -317,12 +360,12 @@ object AffairRepository2 : IAffairService2 {
   }
 
   // 加载磁盘中的事务
-  private fun loadCacheAffair(): List<IAffairService2.Affair>? {
+  private fun loadCacheAffair(): List<AffairEntity>? {
     // 读取磁盘
     val accountSettings = AccountSettings.now
     return accountSettings.getStringOrNull(SETTING_KEY_AFFAIR)?.let { json ->
       runCatching {
-        defaultJson.decodeFromString<List<IAffairService2.Affair>>(json)
+        defaultJson.decodeFromString<List<AffairEntity>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR)
         if (isDebug()) toast("加载磁盘中的事务异常, ${it.message}")
@@ -331,10 +374,10 @@ object AffairRepository2 : IAffairService2 {
   }
 
   // 保存进磁盘
-  private fun saveAffair() {
+  private fun saveAffair(list: List<AffairEntity>) {
     AccountSettings.now.putString(
       SETTING_KEY_AFFAIR,
-      defaultJson.encodeToString<List<IAffairService2.Affair>>(affairFlow.value ?: emptyList())
+      defaultJson.encodeToString<List<AffairEntity>>(list)
     )
   }
 
@@ -348,12 +391,12 @@ object AffairRepository2 : IAffairService2 {
    *   - 则 period 字段表示 事务持续时间，单位分钟
    *   - 则 week 字段表示该事务在哪几天，格式为 年份 * 10000 + 月份 * 100 + 日
    */
-  private fun List<IAffairService2.AffairWhatTime>.toDateJson(): String {
+  private fun List<AffairWhatTime>.toDateJson(): String {
     return map { whatTime ->
       GetAffairBean.AffairDateBean(
         day = -1, // Compose 新课表标识
-        beginLesson = whatTime.start.hour * 100 + whatTime.start.minute,
-        period = whatTime.start.minutesUntil(whatTime.end),
+        beginLesson = whatTime.timePair.first.hour * 100 + whatTime.timePair.first.minute,
+        period = whatTime.timePair.first.minutesUntil(whatTime.timePair.second),
         week = whatTime.date.map {
           it.year * 10000 + it.monthNumber * 100 + it.dayOfMonth
         }
@@ -362,4 +405,16 @@ object AffairRepository2 : IAffairService2 {
       defaultJson.encodeToString(it)
     }
   }
+
+  private fun checkStuNum(oldStuNum: String?) {
+    val newStuNum = IAccountService::class.impl().stuNum
+    if (newStuNum != oldStuNum) {
+      throw StuNumNotMatchException(oldStuNum, newStuNum)
+    }
+  }
+
+  private class StuNumNotMatchException(
+    oldStuNum: String?,
+    newStuNum: String?
+  ) : IllegalStateException("旧学号 $oldStuNum 与新学号 $newStuNum 不匹配")
 }
