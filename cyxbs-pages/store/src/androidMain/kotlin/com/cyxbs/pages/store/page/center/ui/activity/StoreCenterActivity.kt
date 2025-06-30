@@ -13,9 +13,12 @@ import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.STORE_ENTRY
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.store.R
 import com.cyxbs.pages.store.page.center.ui.fragment.StampShopFragment
 import com.cyxbs.pages.store.page.center.ui.fragment.StampTaskFragment
@@ -27,6 +30,7 @@ import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.ndhzs.slideshow.viewpager.transformer.ScaleInTransformer
+import kotlinx.coroutines.launch
 
 /**
  * 邮票中心界面
@@ -47,6 +51,25 @@ class StoreCenterActivity : BaseActivity() {
   private lateinit var mViewPager2: ViewPager2 // 邮票中心首页下方管理邮票小店和邮票任务的 VP2
   private lateinit var mRefreshLayout: SwipeRefreshLayout // 邮票中心首页下滑刷新控件
   private lateinit var mSlideUpLayout: SlideUpLayout // 邮票中心首页掌控下方板块上下移动的自定义控件
+
+  private var enterTime: Long = 0
+
+  override fun onResume() {
+    super.onResume()
+    enterTime = System.currentTimeMillis()
+    appCoroutineScope.launch {
+      TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_YPZX_HOMEPAGE)
+    }
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    val exitTime = System.currentTimeMillis()
+    val duration = exitTime - enterTime
+    appCoroutineScope.launch {
+      TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_YPZX_HOMEPAGE,duration,enterTime)
+    }
+  }
   
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

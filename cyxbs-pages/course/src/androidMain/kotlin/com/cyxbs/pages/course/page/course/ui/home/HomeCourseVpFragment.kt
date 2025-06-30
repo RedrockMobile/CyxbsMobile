@@ -5,13 +5,17 @@ import android.view.View
 import androidx.fragment.app.viewModels
 import androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback
 import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.pages.course.page.course.ui.home.base.HomeCourseVpLinkFragment
 import com.cyxbs.pages.course.page.course.ui.home.viewmodel.HomeCourseViewModel
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
 import com.cyxbs.pages.course.widget.fragment.page.CoursePageFragment
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import kotlinx.coroutines.launch
 
 /**
  * ...
@@ -23,6 +27,24 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 class HomeCourseVpFragment : HomeCourseVpLinkFragment() {
   
   private val mViewModel by viewModels<HomeCourseViewModel>()
+
+  private var enterTime: Long = 0
+
+  override fun onResume() {
+    super.onResume()
+    enterTime = System.currentTimeMillis()
+    appCoroutineScope.launch {
+      TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_KBCX_HOMEPAGE)
+    }
+  }
+
+  override fun onPause() {
+    super.onPause()
+    val duration = System.currentTimeMillis() - enterTime
+    appCoroutineScope.launch {
+      TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_KBCX,duration,enterTime)
+    }
+  }
   
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)

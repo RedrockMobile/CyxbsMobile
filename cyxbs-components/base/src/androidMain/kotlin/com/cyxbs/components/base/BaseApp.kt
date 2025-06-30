@@ -13,7 +13,11 @@ import com.cyxbs.components.base.utils.InitialManagerImpl
 import com.cyxbs.components.init.appActivities
 import com.cyxbs.components.init.appApplication
 import com.cyxbs.components.init.appTopActivity
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.utils.impl.ActivityLifecycleCallbacksImpl
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 
 /**
@@ -51,12 +55,15 @@ abstract class BaseApp : Application() {
   
   private lateinit var mInitialManager: InitialManagerImpl
 
+  private var enterTime:Long=0
+
   override fun attachBaseContext(base: Context) {
     super.attachBaseContext(base)
     baseApp = this
     appApplication = this
     CrashMonitor.install()
     initProvider()
+    enterTime=System.currentTimeMillis()
   }
   
   @CallSuper
@@ -99,7 +106,14 @@ abstract class BaseApp : Application() {
           }
         }
         override fun onActivityDestroyed(activity: Activity) {
-          appActivities[activity] = Unit
+          appActivities.remove(activity)
+          appActivities.takeIf { it.isEmpty() }?.let {
+            val exitTime=System.currentTimeMillis()
+            val duration=exitTime-enterTime
+            appCoroutineScope.launch {
+              TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY,duration,enterTime)
+            }
+          }
         }
       }
     )

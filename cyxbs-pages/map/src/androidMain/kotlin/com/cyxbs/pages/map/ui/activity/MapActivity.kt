@@ -13,6 +13,9 @@ import androidx.lifecycle.Observer
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
 import com.cyxbs.components.config.route.DISCOVER_MAP
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.map.R
 import com.cyxbs.pages.map.model.DataSet
 import com.cyxbs.pages.map.ui.fragment.AllPictureFragment
@@ -23,6 +26,7 @@ import com.cyxbs.pages.map.viewmodel.MapViewModel
 import com.cyxbs.pages.map.widget.GlideProgressDialog
 import com.cyxbs.pages.map.widget.ProgressDialog
 import com.g985892345.provider.api.annotation.KClassProvider
+import kotlinx.coroutines.launch
 import top.limuyang2.photolibrary.LPhotoHelper
 
 /**
@@ -41,6 +45,25 @@ class MapActivity : BaseActivity() {
     private var mainFragment = MainFragment()
     private var favoriteEditFragment = FavoriteEditFragment()
     private var allPictureFragment = AllPictureFragment()
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_CYDT_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_CYDT,duration,enterTime)
+        }
+
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {

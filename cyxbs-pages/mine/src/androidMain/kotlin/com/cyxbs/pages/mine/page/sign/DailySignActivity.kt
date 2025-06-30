@@ -18,6 +18,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.lifecycle.Observer
 import com.cyxbs.components.config.route.MINE_CHECK_IN
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.util.widget.ColorState
@@ -28,6 +31,7 @@ import com.cyxbs.pages.mine.util.widget.WeekGenerator
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.mredrock.cyxbs.common.ui.BaseViewModelActivity
 import com.mredrock.cyxbs.common.utils.extensions.toast
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
@@ -81,6 +85,25 @@ class DailySignActivity : BaseViewModelActivity<DailyViewModel>() {
     //当为true时，表明用户点击了签到按钮导致的UI刷新，这时候需要动画，
     //当为false时，表明为正常的进入Activity刷新
     private var isChecking: Boolean = false
+
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_QD_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_QD,duration,enterTime)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

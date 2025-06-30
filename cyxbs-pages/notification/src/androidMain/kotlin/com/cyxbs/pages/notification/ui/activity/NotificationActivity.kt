@@ -22,12 +22,15 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.NOTIFICATION_HOME
 import com.cyxbs.components.config.route.NOTIFICATION_SETTING
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.components.utils.utils.impl.defaultImpl
 import com.cyxbs.pages.notification.R
@@ -50,6 +53,7 @@ import com.google.android.material.shape.RoundedCornerTreatment
 import com.google.android.material.shape.ShapeAppearanceModel
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import kotlinx.coroutines.launch
 import kotlin.properties.Delegates
 
 @KClassProvider(clazz = Activity::class, name = NOTIFICATION_HOME)
@@ -81,6 +85,25 @@ class NotificationActivity : BaseActivity() {
 
     //是否需要展示
     private var shouldShowRedDots by Delegates.notNull<Boolean>()
+
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_XXZX_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_XXZX,duration,enterTime)
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.notification_activity_main)

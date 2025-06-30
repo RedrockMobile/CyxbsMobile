@@ -21,10 +21,14 @@ import com.bumptech.glide.request.target.DrawableImageViewTarget
 import com.bumptech.glide.request.transition.Transition
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_CALENDAR
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.isDarkMode
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.network.getBaseUrl
 import com.cyxbs.pages.discover.R
 import com.g985892345.provider.api.annotation.KClassProvider
+import kotlinx.coroutines.launch
 
 @KClassProvider(clazz = Activity::class, name = DISCOVER_CALENDAR)
 class CalendarActivity : BaseActivity() {
@@ -33,6 +37,26 @@ class CalendarActivity : BaseActivity() {
     private val mImageView by R.id.iv_calendar.view<ImageView>()
     private val mImg404 by R.id.calendar_image_view.view<ImageView>()
     private val mTv404 by R.id.calendar_text_view_tip.view<TextView>()
+
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_XL_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_XL,duration,enterTime)
+        }
+
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

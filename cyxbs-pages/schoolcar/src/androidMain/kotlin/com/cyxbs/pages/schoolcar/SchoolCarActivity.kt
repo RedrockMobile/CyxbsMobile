@@ -31,8 +31,11 @@ import com.amap.api.maps.model.MyLocationStyle
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.sp.defaultSp
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.px2dp
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.pages.schoolcar.adapter.CarIconAdapter
 import com.cyxbs.pages.schoolcar.adapter.CarSiteAdapter
@@ -44,6 +47,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -94,6 +98,8 @@ class SchoolCarActivity: BaseActivity() {
   private val schoolCarCardChangeBts by R.id.school_car_card_change_bts.view<View>()
   private val schoolCarCardRunTypeBtsCard by R.id.school_car_card_run_type_bts_card.view<CardView>()
   private val schoolCarCardLineTypeBtsCard by R.id.school_car_card_line_type_bts_card.view<CardView>()
+
+  private var enterTime: Long = 0
 
   @Override
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -547,6 +553,11 @@ class SchoolCarActivity: BaseActivity() {
     if (smoothMoveData != null) {
       smoothMoveData!!.clearAllList()
     }
+    val exitTime = System.currentTimeMillis()
+    val duration = exitTime - enterTime
+    appCoroutineScope.launch {
+      TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_XCGJ,duration,enterTime)
+    }
   }
 
   override fun onResume() {
@@ -558,6 +569,7 @@ class SchoolCarActivity: BaseActivity() {
       smoothMoveData!!.clearAllList()
       smoothMoveData!!.loadCarLocation(ADD_TIMER_AND_SHOW_MAP)
     }
+    enterTime = System.currentTimeMillis()
   }
 
   override fun onStop() {

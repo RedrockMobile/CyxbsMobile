@@ -12,6 +12,9 @@ import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.ufield.R
 import com.cyxbs.pages.ufield.ui.fragment.ufieldfragment.AllFragment
 import com.cyxbs.pages.ufield.ui.fragment.ufieldfragment.CultureFragment
@@ -21,6 +24,7 @@ import com.cyxbs.pages.ufield.viewmodel.UFieldViewModel
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import kotlinx.coroutines.launch
 
 /**
  * description ：最初从中心模块跳转到这个activity
@@ -41,6 +45,24 @@ class UFieldActivity : BaseActivity() {
     private val mVp: ViewPager2 by R.id.uField_viewpager2.view()
     private val mViewModel by viewModels<UFieldViewModel>()
 
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_HDBGL_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_HDBGL,duration,enterTime)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

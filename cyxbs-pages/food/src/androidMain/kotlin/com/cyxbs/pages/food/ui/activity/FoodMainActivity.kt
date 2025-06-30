@@ -15,11 +15,14 @@ import com.cyxbs.components.base.dailog.BaseChooseDialog
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.FOOD_ENTRY
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.food.R
 import com.cyxbs.pages.food.ui.adapters.FoodMainRvAdapter
@@ -31,6 +34,7 @@ import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayoutManager
+import kotlinx.coroutines.launch
 
 @KClassProvider(clazz = Activity::class, name = FOOD_ENTRY)
 class FoodMainActivity : BaseActivity() {
@@ -108,6 +112,25 @@ class FoodMainActivity : BaseActivity() {
     private val foodFeatureRvAdapter = FoodMainRvAdapter() { state, position ->
         changeBtnState(state, position, mRvFeature)
         viewModel.apply { hashMapFeature.replace(dataFeature[position], state) }
+    }
+
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_MSZXC_HOMEPAGE)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_MSZXC,duration,enterTime)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

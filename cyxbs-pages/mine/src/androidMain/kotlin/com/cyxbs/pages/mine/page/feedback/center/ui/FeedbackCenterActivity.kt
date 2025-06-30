@@ -8,13 +8,17 @@ import androidx.activity.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.feedback.center.adapter.FeedbackCenterAdapter
 import com.cyxbs.pages.mine.page.feedback.center.viewmodel.FeedbackCenterViewModel
 import com.cyxbs.pages.mine.page.feedback.edit.ui.FeedbackEditActivity
 import com.cyxbs.pages.mine.page.feedback.history.list.HistoryListActivity
 import com.cyxbs.components.utils.utils.Jump2QQHelper
+import kotlinx.coroutines.launch
 
 /**
  * @Date : 2021/8/23   20:51
@@ -38,6 +42,25 @@ class FeedbackCenterActivity : BaseActivity() {
     private val btnQuestion by R.id.btn_question.view<View>()
     private val ivHistory by R.id.iv_history.view<View>()
     private val tvQqTwo by R.id.tv_qq_two.view<TextView>()
+
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_FKZX_HOMEPAGE)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_FKZX,duration,enterTime)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

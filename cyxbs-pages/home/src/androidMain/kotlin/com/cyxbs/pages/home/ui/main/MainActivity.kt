@@ -18,7 +18,8 @@ import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.logger.TrackingUtils
-import com.cyxbs.components.utils.logger.event.ClickEvent
+import com.cyxbs.components.utils.logger.event.NewClickEvent
+import com.cyxbs.components.utils.logger.event.OldClickEvent
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
@@ -46,6 +47,18 @@ class MainActivity : BaseActivity() {
   private val mAccountService = IAccountService::class.impl()
 
   private var mIsLogin = false
+  private var startTime:Long=0
+
+
+  override fun onStart() {
+    super.onStart()
+    startTime=System.currentTimeMillis()
+    appCoroutineScope.launch {
+      TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_LANDINGPAGE)
+    }
+  }
+
+
   
   override fun onCreate(savedInstanceState: Bundle?) {
     // 还原主题，因为 MainActivity 最开始在 AndroidManifest.xml 设置了闪屏页背景，所以这里需要还原
@@ -145,7 +158,7 @@ class MainActivity : BaseActivity() {
           if (mIsLogin) {
             // “邮乐园” 按钮点击事件埋点
             appCoroutineScope.launch {
-              TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_ENTRY)
+              TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_ENTRY)
             }
           }
         }

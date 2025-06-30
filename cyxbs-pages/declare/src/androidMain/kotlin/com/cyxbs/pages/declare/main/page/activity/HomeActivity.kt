@@ -11,14 +11,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DECLARE_ENTRY
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnDoubleClickListener
 import com.cyxbs.components.utils.extensions.visible
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.declare.R
 import com.cyxbs.pages.declare.detail.page.activity.DetailActivity
 import com.cyxbs.pages.declare.main.page.adapter.HomeRvAdapter
 import com.cyxbs.pages.declare.main.page.viewmodel.HomeViewModel
 import com.g985892345.provider.api.annotation.KClassProvider
+import kotlinx.coroutines.launch
 
 @KClassProvider(clazz = Activity::class, name = DECLARE_ENTRY)
 class HomeActivity : BaseActivity() {
@@ -40,6 +44,17 @@ class HomeActivity : BaseActivity() {
     private val declareHomeNoData by R.id.declare_home_no_data.view<View>()
     private val declareHomeCl by R.id.declare_home_cl.view<View>()
     private val declareHomeNoNet by R.id.declare_home_no_net.view<View>()
+
+    private var enterTime: Long = 0
+
+    override fun onPause() {
+        super.onPause()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_BTGC,duration,enterTime)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,5 +105,9 @@ class HomeActivity : BaseActivity() {
         super.onResume()
         mViewModel.hasPerm()
         mViewModel.getHomeData()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_BTGC_HOMEPAGE)
+        }
     }
 }

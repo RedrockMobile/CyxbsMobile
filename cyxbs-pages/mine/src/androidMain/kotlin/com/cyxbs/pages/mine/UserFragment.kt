@@ -32,7 +32,7 @@ import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
-import com.cyxbs.components.utils.logger.event.ClickEvent
+import com.cyxbs.components.utils.logger.event.OldClickEvent
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.pages.mine.noyification.NotificationUtils
@@ -88,7 +88,7 @@ class UserFragment : BaseFragment() {
                 doIfLogin {
                     // “邮票中心”点击埋点
                     appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_YPZX_ENTRY)
+                        TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_YPZX_ENTRY)
                     }
 
                     startActivity(STORE_ENTRY)
@@ -98,7 +98,7 @@ class UserFragment : BaseFragment() {
                 doIfLogin {
                     // “反馈中心”点击埋点
                     appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_FKZX_ENTRY)
+                        TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_FKZX_ENTRY)
                     }
 
                     startActivity(
@@ -170,7 +170,7 @@ class UserFragment : BaseFragment() {
                 if (IAccountService::class.impl().isLogin()) {
                     // 消息中心入口点击埋点
                     appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_XXZX_ENTRY)
+                        TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_XXZX_ENTRY)
                     }
                 }
 
@@ -182,7 +182,7 @@ class UserFragment : BaseFragment() {
                 doIfLogin {
                     // “活动中心”点击埋点
                     appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_HDZX_ENTRY)
+                        TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_HDZX_ENTRY)
                     }
                     startActivity(UFIELD_CENTER_ENTRY)
                 }

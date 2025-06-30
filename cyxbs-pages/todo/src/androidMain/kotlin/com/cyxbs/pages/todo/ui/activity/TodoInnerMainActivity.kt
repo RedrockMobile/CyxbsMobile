@@ -15,10 +15,13 @@ import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.appContext
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.lazyUnlock
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.pages.todo.R
 import com.cyxbs.pages.todo.model.bean.TodoListPushWrapper
 import com.cyxbs.pages.todo.ui.dialog.AddTodoDialog
@@ -31,6 +34,7 @@ import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import kotlinx.coroutines.launch
 import kotlin.properties.Delegates
 
 /**
@@ -64,6 +68,24 @@ class TodoInnerMainActivity : BaseActivity() {
     private val mBackPressedCallback by lazyUnlock {
         onBackPressedDispatcher.addCallback(this, enabled = changeManageButton.visibility == View.VISIBLE) {
             quitMange()
+        }
+    }
+    private var enterTime: Long = 0
+
+    override fun onResume() {
+        super.onResume()
+        enterTime = System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_YZQD_HOMEPAGE)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch {
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_YZQD,duration,enterTime)
         }
     }
 

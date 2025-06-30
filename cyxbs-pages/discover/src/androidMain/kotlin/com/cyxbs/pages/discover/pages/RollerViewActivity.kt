@@ -28,9 +28,13 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.webView.IAndroidWebView
 import com.cyxbs.components.base.webView.LiteJsWebView
 import com.cyxbs.components.base.webView.WebViewBaseCallBack
+import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.doPermissionAction
 import com.cyxbs.components.utils.extensions.loadBitmap
 import com.cyxbs.components.utils.extensions.saveImage
+import com.cyxbs.components.utils.logger.TrackingUtils
+import com.cyxbs.components.utils.logger.event.NewClickEvent
+import kotlinx.coroutines.launch
 
 
 class RollerViewActivity : BaseActivity() {
@@ -44,6 +48,8 @@ class RollerViewActivity : BaseActivity() {
             }
         }
     }
+
+    private var enterTime:Long=0
 
     //这里是拿到衍生的Web方法类
     private var webApi: IAndroidWebView? = null
@@ -262,6 +268,10 @@ class RollerViewActivity : BaseActivity() {
         super.onResume()
         discover_web_view.resumeTimers()
         callback?.webViewResume()
+        enterTime=System.currentTimeMillis()
+        appCoroutineScope.launch {
+            TrackingUtils.trackExposureEvent(NewClickEvent.EXPOSURE_MOBILE_ZSCY_BANNER_HOMEPAGE)
+        }
     }
 
     override fun onPause() {
@@ -280,6 +290,11 @@ class RollerViewActivity : BaseActivity() {
         callback?.webViewDestroy()
         discover_web_view.destroy()
         super.onDestroy()
+        val exitTime = System.currentTimeMillis()
+        val duration = exitTime - enterTime
+        appCoroutineScope.launch{
+            TrackingUtils.trackStayEvent(NewClickEvent.TIME_MOBILE_ZSCY_BANNER,duration,enterTime)
+        }
     }
 
     companion object {

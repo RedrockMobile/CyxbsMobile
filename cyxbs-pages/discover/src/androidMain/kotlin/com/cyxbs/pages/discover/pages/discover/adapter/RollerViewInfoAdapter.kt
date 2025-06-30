@@ -9,7 +9,7 @@ import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.logger.TrackingUtils
-import com.cyxbs.components.utils.logger.event.ClickEvent
+import com.cyxbs.components.utils.logger.event.OldClickEvent
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.network.RollerViewInfo
@@ -33,7 +33,7 @@ class RollerViewInfoAdapter(
         if (IAccountService::class.impl().isLogin()) {
           // banner位的点击埋点
           appCoroutineScope.launch {
-            TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_BANNER_ENTRY)
+            TrackingUtils.trackClickEvent(OldClickEvent.CLICK_YLC_BANNER_ENTRY)
           }
         }
 
