@@ -16,9 +16,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.config.route.DECLARE_ENTRY
 import com.cyxbs.components.config.route.FAIRGROUND_ENTRY
 import com.cyxbs.components.config.route.FOOD_ENTRY
+import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.service.startActivity
@@ -59,7 +59,7 @@ class FairgroundPageFragment : BaseFragment(R.layout.ufield_fragment_fairground)
         }
         startSquare.setOnClickListener {
             doIfLogin {
-                startActivity(DECLARE_ENTRY)
+                startActivity(QA_ENTRY)
             }
         }
         viewModel.days.observe(viewLifecycleOwner) {
