@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <application>
         <activity android:name=".detail.DetailActivity" />
-        <activity android:name=".home.HomeActivity"/>
-        <activity android:name=".publish.PublishActivity"/>
+        <activity android:name=".home.HomeActivity" />
+        <activity
+            android:name=".publish.ui.activity.PublishActivity"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
     </application>
 </manifest>

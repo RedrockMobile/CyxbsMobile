@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="qa_string_publish">发布</string>
+    <string name="qa_publish_edit_hint">请输入你的问题~</string>
+    <string name="qa_publish_question_card">你的问题已有答案~</string>
 </resources>

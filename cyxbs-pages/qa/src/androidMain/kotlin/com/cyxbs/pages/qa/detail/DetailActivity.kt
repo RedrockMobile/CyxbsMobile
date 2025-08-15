@@ -11,10 +11,10 @@ import com.cyxbs.pages.qa.R
  * author : wyf
  * date : 2025/8/11 23:23
  */
-class DetailActivity : BaseActivity(){
-    companion object{
-        fun startActivity(context: Context){
-            context.startActivity(Intent(context,DetailActivity::class.java))
+class DetailActivity : BaseActivity() {
+    companion object {
+        fun startActivity(context: Context) {
+            context.startActivity(Intent(context, DetailActivity::class.java))
         }
     }
 
