@@ -54,7 +54,6 @@ class PublishActivity : BaseActivity() {
     //搜索结果
     private val mRvSearch by R.id.qa_publish_rv_question_card.view<RecyclerView>()
 
-
     //标签选择器的RV
     private val mRvTagSelector by R.id.qa_publish_rv_tag_selector.view<RecyclerView>()
         .addInitialize {
@@ -96,7 +95,7 @@ class PublishActivity : BaseActivity() {
                 mEditText.gone()
                 //临时存储要加载的问题卡片数据的列表（问题 + 问题卡片）
                 val tempList =
-                    mutableListOf<QuestionCardUI>(QuestionCardUI.Header(mEditText.text.toString()))
+                    mutableListOf<QuestionCardUI>(QuestionCardUI.Header(viewModel.getCurrentQuestion()))
                 it.forEach {
                     tempList.add(QuestionCardUI.QuestionItem(it))
                 }
@@ -104,6 +103,7 @@ class PublishActivity : BaseActivity() {
                 //禁用选择Tag
                 tagSelectorAdapter.requestTagClickable(false)
             }
+
             publishSuccess.observe {
                 if (it) {
                     toastLong("我们已收到你的反馈")
@@ -159,6 +159,7 @@ class PublishActivity : BaseActivity() {
             if (tagSelectorAdapter.getSelectedTagString().isNotBlank()
                 && mEditText.text.toString().isNotBlank()
             ) {
+                viewModel.setCurrentQuestion(mEditText.text.toString())
                 viewModel.publishQuestion(
                     mEditText.text.toString(),
                     tagSelectorAdapter.getSelectedTagString()

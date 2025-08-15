@@ -36,6 +36,8 @@ class PublishViewModel : BaseViewModel() {
 
     private val likeInProgress = mutableSetOf<Long>() // 正在请求的 id
 
+    private var mQuestion: String = ""
+
     /**
      * 提出问题
      * 先search相关搜索项，如果没有已回答的问题相关搜索为空再提出问题
@@ -49,7 +51,7 @@ class PublishViewModel : BaseViewModel() {
                 _publishSuccess.postValue(false)
             }
             .flatMap { it ->
-                val answeredQuestions = it.items?.filter { it.status == 2L }
+                val answeredQuestions = it.items
 
                 if (answeredQuestions.isNullOrEmpty()) {
                     // 没有已回答的相关问题，直接提问
@@ -163,5 +165,11 @@ class PublishViewModel : BaseViewModel() {
         _searchData.value = currentList.toMutableList().apply { this[index] = oldItem }
         onPartialUpdate(id)
     }
+
+    fun setCurrentQuestion(q: String) {
+        mQuestion = q
+    }
+
+    fun getCurrentQuestion() = mQuestion
 
 }
