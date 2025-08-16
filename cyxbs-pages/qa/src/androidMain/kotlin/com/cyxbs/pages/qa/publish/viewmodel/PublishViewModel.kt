@@ -51,7 +51,7 @@ class PublishViewModel : BaseViewModel() {
                 _publishSuccess.postValue(false)
             }
             .flatMap { it ->
-                val answeredQuestions = it.items
+                val answeredQuestions = it.items?.filter { it.status == 2L }
 
                 if (answeredQuestions.isNullOrEmpty()) {
                     // 没有已回答的相关问题，直接提问
@@ -82,7 +82,7 @@ class PublishViewModel : BaseViewModel() {
     }
 
     //点赞
-    fun likeQuestion(id: Long, oldItem: SearchData, onPartialUpdate: (Long) -> Unit) {
+    fun likeQuestion(id: Long, oldItem: SearchData) {
         PublishApiService::class.api
             .likeQuestion(id)
             .subscribeOn(Schedulers.io())
@@ -90,7 +90,7 @@ class PublishViewModel : BaseViewModel() {
             .throwOrInterceptException {
                 _likeResult.postValue(false)
                 likeInProgress.remove(id)
-                rollback(id, oldItem, onPartialUpdate)
+                rollback(id, oldItem)
             }
             .safeSubscribeBy {
                 _likeResult.postValue(true)
@@ -103,7 +103,7 @@ class PublishViewModel : BaseViewModel() {
      * @param id 就是id
      * @param oldItem 因为有回滚设计，所以这里最好传入一个变化前的item实例，提供回滚时的数据
      */
-    fun unlikeQuestion(id: Long, oldItem: SearchData, onPartialUpdate: (Long) -> Unit) {
+    fun unlikeQuestion(id: Long, oldItem: SearchData) {
         PublishApiService::class.api
             .unLikeQuestion(id)
             .subscribeOn(Schedulers.io())
@@ -111,7 +111,7 @@ class PublishViewModel : BaseViewModel() {
             .throwOrInterceptException {
                 likeInProgress.remove(id)
                 _likeResult.postValue(false)
-                rollback(id, oldItem, onPartialUpdate)
+                rollback(id, oldItem)
             }
             .safeSubscribeBy {
                 likeInProgress.remove(id)
@@ -123,9 +123,8 @@ class PublishViewModel : BaseViewModel() {
     /**
      * 点赞/取消点赞的入口
      * 点赞功能，当传入isLike = true时候调用取消点赞，当传入isLike=false时候取消点赞
-     * @param onPartialUpdate 这是用于调用adapter的局部刷新的回调
      */
-    fun toggleLikeQuestion(id: Long, isLike: Boolean, onPartialUpdate: (Long) -> Unit) {
+    fun toggleLikeQuestion(id: Long, isLike: Boolean) {
         val currentList = _searchData.value ?: return
         val index = currentList.indexOfFirst { it.id == id }
         if (index < 0 || likeInProgress.contains(id)) {
@@ -140,15 +139,14 @@ class PublishViewModel : BaseViewModel() {
             likeCount = if (!oldItem.isLike) oldItem.likeCount + 1 else oldItem.likeCount - 1
         )
         // 本地 UI 立即更新
-        _searchData.value = currentList.toMutableList().apply { this[index] = updatedItem }
-        onPartialUpdate(id)
+        _searchData.postValue(currentList.toMutableList().apply { this[index] = updatedItem })
 
         likeInProgress.add(id)
 
         if (isLike) {
-            unlikeQuestion(id, oldItem, onPartialUpdate)
+            unlikeQuestion(id, oldItem)
         } else {
-            likeQuestion(id, oldItem, onPartialUpdate)
+            likeQuestion(id, oldItem)
         }
     }
 
@@ -157,13 +155,12 @@ class PublishViewModel : BaseViewModel() {
      * @param id 需要回滚的item的id
      * @param onPartialUpdate 这是用于调用adapter的局部刷新的回调
      */
-    private fun rollback(id: Long, oldItem: SearchData, onPartialUpdate: (Long) -> Unit) {
+    private fun rollback(id: Long, oldItem: SearchData) {
         val currentList = _searchData.value ?: return
         val index = currentList.indexOfFirst { it.id == id }
         if (index == -1) return
 
-        _searchData.value = currentList.toMutableList().apply { this[index] = oldItem }
-        onPartialUpdate(id)
+        _searchData.postValue(currentList.toMutableList().apply { this[index] = oldItem })
     }
 
     fun setCurrentQuestion(q: String) {

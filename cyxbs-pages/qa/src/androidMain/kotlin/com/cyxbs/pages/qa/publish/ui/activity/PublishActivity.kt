@@ -90,18 +90,19 @@ class PublishActivity : BaseActivity() {
     private fun observeData() {
         viewModel.apply {
             searchData.observe {
-                //展示现相似问题
-                mRvSearch.visible()
-                mEditText.gone()
-                //临时存储要加载的问题卡片数据的列表（问题 + 问题卡片）
-                val tempList =
-                    mutableListOf<QuestionCardUI>(QuestionCardUI.Header(viewModel.getCurrentQuestion()))
-                it.forEach {
-                    tempList.add(QuestionCardUI.QuestionItem(it))
+                if (mEditText.isVisible) {
+                    //展示现相似问题
+                    mRvSearch.visible()
+                    mEditText.gone()
+                    //禁用选择Tag
+                    tagSelectorAdapter.requestTagClickable(false)
                 }
-                questionCardAdapter.submitList(tempList)
-                //禁用选择Tag
-                tagSelectorAdapter.requestTagClickable(false)
+                //拼接的问题卡片数据的列表（问题 + 问题卡片）
+                questionCardAdapter.submitList(
+                    listOf(QuestionCardUI.Header(viewModel.getCurrentQuestion())) +
+                            it.map(QuestionCardUI::QuestionItem)
+                )
+
             }
 
             publishSuccess.observe {
@@ -124,14 +125,11 @@ class PublishActivity : BaseActivity() {
         //初始化RvTagSelector
         mRvTagSelector.adapter = tagSelectorAdapter
         tagSelectorAdapter.submitList(viewModel.dataTag)
-
         mRvSearch.adapter = questionCardAdapter
         mRvSearch.layoutManager = LinearLayoutManager(this)
 
         questionCardAdapter.setOnLikeClickListener { it ->
-            viewModel.toggleLikeQuestion(it.data.id, it.data.isLike) {
-                questionCardAdapter.refreshLike(it)
-            }
+            viewModel.toggleLikeQuestion(it.data.id, it.data.isLike)
         }
 
 

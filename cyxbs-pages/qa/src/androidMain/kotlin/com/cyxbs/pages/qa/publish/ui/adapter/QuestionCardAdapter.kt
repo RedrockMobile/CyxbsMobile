@@ -44,6 +44,17 @@ class QuestionCardAdapter :
             ): Boolean {
                 return oldItem == newItem
             }
+
+            //局部绑定
+            //当数据变化只是点赞状态时
+            override fun getChangePayload(oldItem: QuestionCardUI, newItem: QuestionCardUI): Any? {
+                if (oldItem is QuestionCardUI.QuestionItem && newItem is QuestionCardUI.QuestionItem) {
+                    if (oldItem.data.isLike != newItem.data.isLike || oldItem.data.likeCount != newItem.data.likeCount) {
+                        return PAYLOAD_LIKE
+                    }
+                }
+                return null
+            }
         }
     ) {
 
@@ -90,7 +101,7 @@ class QuestionCardAdapter :
         val item = getItem(position)
         if (payloads.isEmpty()) {
             //全量绑定
-            onBindViewHolder(holder, position)
+            onBindViewHolder(holder,position)
         } else {
             //局部刷新
             if (item is QuestionCardUI.QuestionItem && holder is QuestionCardViewHolder) {
@@ -143,8 +154,7 @@ class QuestionCardAdapter :
             }
 
             mTitle.text = data.q
-            //TODO span
-            mAnswer
+            mAnswer.text = data.a
             likeCount.text = data.likeCount.toString()
             mTime.text = data.aTime.substring(0, 10).replace("-", ".")
 
@@ -213,13 +223,5 @@ class QuestionCardAdapter :
         this.listener = listener
     }
 
-    /** 局部刷新点赞 */
-    fun refreshLike(id: Long) {
-        val index = currentList.indexOfFirst {
-            //是Question 而且id相同
-            it is QuestionCardUI.QuestionItem && it.data.id == id
-        }
-        //触发局部刷新
-        if (index != -1) notifyItemChanged(index, PAYLOAD_LIKE)
-    }
+
 }
