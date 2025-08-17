@@ -422,7 +422,7 @@ extension HttpManager {
     }
     
     ///QA板块列出问题
-    func magipoke_qa_listQuestion(tags: String, page: Int?, page_size: Int?) -> DataRequest{
+    func magipoke_qa_listQuestion(tags: String, page: Int? = nil, page_size: Int? = nil) -> DataRequest{
         var parameters : [String: Any] = [
             "tags": tags
         ]

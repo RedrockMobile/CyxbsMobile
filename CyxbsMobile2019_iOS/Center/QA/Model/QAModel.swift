@@ -13,13 +13,35 @@ class QAModel{
     
     var qa : [QAObject] = []
     
-    func requestQACenterObjects(QATag : String?, success: @escaping ([QAObject]) -> Void, failure: @escaping ([Error]) -> Void){
-        qa = []
-        
+    ///请求所有或限定页数的QA项目
+    func requestQACenterObjects(QATag : String, pageNum: Int?, pageSize: Int?,success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
+        HttpManager.shared.magipoke_qa_listQuestion(tags: QATag, page: pageNum, page_size: pageSize).ry_JSON { response in
+            switch response{
+            case .success(let jsonData):
+                let allQAResponse = AllQAResponse(from: jsonData)
+                self.qa = allQAResponse.data.items
+                success(self.qa)
+            case .failure(let error):
+                print("请求失败，错误：\(error)")
+                failure(error)
+            }
+        }
     }
     
-    func requestSearchObjects(keyword : String, QATag : String, success: @escaping ([QAObject]) -> Void, failure: @escaping ([Error]) -> Void){
-        qa = []
+    
+    ///请求搜索的QA项目
+    func requestSearchObjects(keyword : String, success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
+        HttpManager.shared.magipoke_qa_search(q: keyword).ry_JSON { response in
+            switch response{
+            case .success(let jsonData):
+                let searchQAResponse = SearchQAResponse(from: jsonData)
+                self.qa = searchQAResponse.data.items
+                success(self.qa)
+            case .failure(let error):
+                print("请求失败，错误：\(error)")
+                failure(error)
+            }
+        }
     }
     
 }
