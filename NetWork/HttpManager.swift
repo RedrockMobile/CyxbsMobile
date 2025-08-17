@@ -349,7 +349,7 @@ extension HttpManager {
             "activity_detail": activity_detail
         ]
         return SessionManager.shared.ry_upload(APIConfig.current.api("/magipoke-ufield/activity/publish/"), method: .post, parameters: parameters, fileData: activity_cover_file, withName: "activity_cover_file", fileName: "image.png", mimeType: "image/png")
-
+        
     }
     
     ///获取待审核活动
@@ -409,5 +409,56 @@ extension HttpManager {
             "activity_id": activity_id
         ]
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/activity/addTodo"), method: .put, parameters: parameters, encoding: URLEncoding.queryString)
+    }
+    
+    
+    ///QA板块发布问题
+    func magipoke_qa_publishQuestion(q: String, tags: String) -> DataRequest {
+        let parameters: [String: Any] = [
+            "q": q,
+            "tags": tags
+        ]
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/publish"), method: .post, parameters: parameters)
+    }
+    
+    ///QA板块列出问题
+    func magipoke_qa_listQuestion(tags: String, page: Int?, page_size: Int?) -> DataRequest{
+        var parameters : [String: Any] = [
+            "tags": tags
+        ]
+        
+        if let page = page {
+            parameters["page"] = page
+        }
+        
+        if let page_size = page_size{
+            parameters["page_size"] = page_size
+        }
+        
+        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters)
+    }
+    
+    ///QA请求问题详情
+    func magipoke_qa_getDetail(id: Int) -> DataRequest{
+        let parameters: [String: Any] = ["id": id]
+        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/detail"), method: .get, parameters: parameters)
+    }
+    
+    ///QA点赞
+    func magipoke_qa_like(id: Int) -> DataRequest{
+        let parameters: [String: Any] = ["id": id]
+        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/like"), method: .post, parameters: parameters)
+    }
+    
+    ///QA取消点赞
+    func magipoke_qa_unlike(id: Int) -> DataRequest{
+        let parameters: [String: Any] = ["id": id]
+        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/unlike"), method: .post, parameters: parameters)
+    }
+    
+    ///QA搜索
+    func magipoke_qa_search(q: String) -> DataRequest{
+        let parameters : [String: Any] = ["q": q]
+        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/search"), method: .post, parameters: parameters)
     }
 }
