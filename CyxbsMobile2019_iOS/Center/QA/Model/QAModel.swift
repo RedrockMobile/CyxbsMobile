@@ -1,0 +1,122 @@
+//
+//  QAModel.swift
+//  CyxbsMobile2019_iOS
+//
+//  Created by Holeon on 2025/8/14.
+//  Copyright © 2025 Redrock. All rights reserved.
+//
+
+import Foundation
+import SwiftyJSON
+
+class QAModel{
+    
+    var qa : [QAObject] = []
+    
+    func requestQACenterObjects(QATag : String?, success: @escaping ([QAObject]) -> Void, failure: @escaping ([Error]) -> Void){
+        qa = []
+        
+    }
+    
+    func requestSearchObjects(keyword : String, QATag : String, success: @escaping ([QAObject]) -> Void, failure: @escaping ([Error]) -> Void){
+        qa = []
+    }
+    
+}
+
+struct QAObject : Codable{
+    
+    var ID : Int
+    var createTime : String
+    var updateTime : String
+    var questionString : String
+    var answerString : String
+    var studentNum : String
+    var likeCount : Int
+    var viewCount : Int
+    var status : Int
+    var tags : String
+    var aTime : String
+    var isLike : Bool
+    
+    private enum CodingKeys: String, CodingKey {
+        case ID = "ID"
+        case createTime = "CreatedAt"
+        case updateTime = "UpdatedAt"
+        case questionString = "q"
+        case answerString = "a"
+        case studentNum = "stu_num"
+        case likeCount = "like_count"
+        case viewCount = "view_count"
+        case status = "status"
+        case tags = "tags"
+        case aTime = "a_time"
+        case isLike = "is_like"
+    }
+    
+}
+
+extension QAObject {
+    init(from json : JSON){
+        ID = json["ID"].intValue
+        createTime = json["CreatedAt"].stringValue
+        updateTime = json["UpdatedAt"].stringValue
+        questionString = json["q"].stringValue
+        answerString = json["a"].stringValue
+        studentNum = json["stu_num"].stringValue
+        likeCount = json["like_count"].intValue
+        viewCount = json["view_count"].intValue
+        status = json["status"].intValue
+        tags = json["tags"].stringValue
+        aTime = json["a_time"].stringValue
+        isLike = json["is_like"].boolValue
+    }
+}
+
+struct AllQAResponse : Codable{
+    var info : String
+    var status : String
+    var data : AllQAData
+}
+
+extension AllQAResponse {
+    init(from json : JSON){
+        info = json["info"].stringValue
+        status = json["status"].stringValue
+        data = AllQAData(from: json["data"])
+    }
+}
+
+struct AllQAData : Codable{
+    var items : [QAObject]
+}
+
+extension AllQAData{
+    init(from json: JSON){
+        items = json["items"].arrayValue.map { QAObject(from: $0)}
+    }
+}
+
+struct SearchQAResponse : Codable{
+    var info : String
+    var status : String
+    var data : AllQAData
+}
+
+extension SearchQAResponse{
+    init(from json : JSON){
+        info = json["info"].stringValue
+        status = json["status"].stringValue
+        data = AllQAData(from: json["data"])
+    }
+}
+
+struct SearchQAData : Codable{
+    var items : [QAObject]
+}
+
+extension SearchQAData{
+    init(from json: JSON){
+        items = json["items"].arrayValue.map { QAObject(from: $0)}
+    }
+}
