@@ -160,6 +160,7 @@
 		14FFFC082AF8C0FD005A7EBD /* TabBarPresentationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */; };
 		14FFFC092AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */; };
 		14FFFC0A2AF8C0FD005A7EBD /* TabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */; };
+		1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1851CEE12E53541300356C1A /* QAImage.xcassets */; };
 		187DF4BA260310DD000BCDE9 /* LYEmptyBaseView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */; };
 		187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B2260310DD000BCDE9 /* UIScrollView+Empty.m */; };
 		187DF4BD260310DD000BCDE9 /* LYEmptyView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B6260310DD000BCDE9 /* LYEmptyView.m */; };
@@ -936,6 +937,7 @@
 		14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarPresentationViewController.swift; sourceTree = "<group>"; };
 		14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UITabBarItem+TabBar.swift"; sourceTree = "<group>"; };
 		14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
+		1851CEE12E53541300356C1A /* QAImage.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = QAImage.xcassets; sourceTree = "<group>"; };
 		187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LYEmptyBaseView.m; sourceTree = "<group>"; };
 		187DF4B0260310DD000BCDE9 /* LYEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LYEmptyView.h; sourceTree = "<group>"; };
 		187DF4B1260310DD000BCDE9 /* FTEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FTEmptyView.h; sourceTree = "<group>"; };
@@ -3631,6 +3633,7 @@
 				AA4496F7260625B5004B4E1A /* PrefixHeader.pch */,
 				14F6F4FC2AFB81B9007C7CA6 /* LaunchScreen.storyboard */,
 				14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */,
+				1851CEE12E53541300356C1A /* QAImage.xcassets */,
 				B0C9F24B2B01270A006F4286 /* CyxbsMobileImage.xcassets */,
 			);
 			path = CyxbsMobile2019_iOS;
@@ -6592,6 +6595,7 @@
 				DB34EB27239BD4550052B65E /* AddRemindViewController.xib in Resources */,
 				B0C9F24C2B01270A006F4286 /* CyxbsMobileImage.xcassets in Resources */,
 				DB34EB2B239BD4550052B65E /* RemindTableViewCell.xib in Resources */,
+				1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */,
 				492C19AE26CE458000C485D9 /* Bauhaus-93.ttf in Resources */,
 				B047BF8A2AB3240F00616A5B /* AliyunEmasServices-Info.plist in Resources */,
 				AA0DEF6A2668C88D00284112 /* 掌邮工具类.md in Resources */,
