@@ -42,30 +42,30 @@
 
     <TextView
         android:id="@+id/qa_publish_tv_question_card_question"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
-        android:ellipsize="end"
-        android:maxLines="3"
+        android:singleLine="true"
         android:text="@string/qa_publish_edit_hint"
         android:textColor="@color/qa_text_title_color"
         android:textSize="16sp"
-        app:layout_constraintEnd_toStartOf="@id/qa_publish_flexbox_question_card_tag"
-        app:layout_constraintHorizontal_chainStyle="packed"
         app:layout_constraintStart_toEndOf="@id/qa_publish_iv_question_card_icon"
         app:layout_constraintTop_toTopOf="@id/qa_publish_iv_question_card_icon" />
 
-    <!--这是用来放tag的layout-->
-    <com.google.android.flexbox.FlexboxLayout
+    <TextView
         android:id="@+id/qa_publish_flexbox_question_card_tag"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:layout_marginEnd="16dp"
-        app:flexWrap="wrap"
-        app:justifyContent="flex_start"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_chainStyle="packed"
+        android:background="@drawable/qa_shape_publish_tag_selected_bg"
+        android:gravity="center"
+        android:paddingStart="10dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="1dp"
+        android:text="新生类"
+        android:textColor="@color/qa_publish_tag_selected_text_color"
+        android:textSize="14sp"
         app:layout_constraintStart_toEndOf="@id/qa_publish_tv_question_card_question"
         app:layout_constraintTop_toTopOf="@id/qa_publish_iv_question_card_icon" />
 
@@ -90,7 +90,7 @@
         android:maxLines="5"
         android:text="我是回答"
         android:textColor="@color/qa_text_content_color"
-        android:textSize="16dp"
+        android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/qa_publish_iv_question_card_point"
 

@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.publish.network.bean.response.SearchData
 import com.cyxbs.pages.qa.publish.ui.adapter.QuestionCardAdapter.QuestionCardUI
-import com.google.android.flexbox.FlexboxLayout
 
 /**
  * description ： 问题卡片的RVAdapter
@@ -101,7 +100,7 @@ class QuestionCardAdapter :
         val item = getItem(position)
         if (payloads.isEmpty()) {
             //全量绑定
-            onBindViewHolder(holder,position)
+            onBindViewHolder(holder, position)
         } else {
             //局部刷新
             if (item is QuestionCardUI.QuestionItem && holder is QuestionCardViewHolder) {
@@ -126,7 +125,7 @@ class QuestionCardAdapter :
 
     inner class QuestionCardViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val mTitle = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_question)
-        val mTag = view.findViewById<FlexboxLayout>(R.id.qa_publish_flexbox_question_card_tag)
+        val mTag = view.findViewById<TextView>(R.id.qa_publish_flexbox_question_card_tag)
         val mAnswer = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_answer)
         val mTime = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_time)
         val likeCount = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_like_count)
@@ -147,13 +146,9 @@ class QuestionCardAdapter :
         fun bind(data: SearchData) {
             //把Tag分割出来
             val tags = data.tags.split(" ").filter { it.isNotEmpty() }
+            mTag.text = "${tags[0]}类"
 
-            mTag.removeAllViews()
-            tags.forEach {
-                addTag(it)
-            }
-
-            mTitle.text = data.q
+            mTitle.text = data.q.truncateWithEllipsis()
             mAnswer.text = data.a
             likeCount.text = data.likeCount.toString()
             mTime.text = data.aTime.substring(0, 10).replace("-", ".")
@@ -189,16 +184,12 @@ class QuestionCardAdapter :
             }
         }
 
-        //用来向FlexBoxLayout中增加Item Tag项
-        fun addTag(tag: String) {
-            //构建出布局
-            val tagView = LayoutInflater.from(itemView.context)
-                .inflate(R.layout.qa_flexbox_item_question_card_tag, mTag, false)
-
-            tagView.findViewById<TextView>(R.id.qa_publish_tv_tag_item).apply {
-                text = tag
+        fun String.truncateWithEllipsis(maxLength: Int = 13): String {
+            return if (this.length > maxLength) {
+                this.substring(0, maxLength) + "…"
+            } else {
+                this
             }
-            mTag.addView(tagView)
         }
     }
 

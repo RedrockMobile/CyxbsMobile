@@ -153,7 +153,6 @@ class PublishViewModel : BaseViewModel() {
     /**
      * 用于回滚点赞状态的函数
      * @param id 需要回滚的item的id
-     * @param onPartialUpdate 这是用于调用adapter的局部刷新的回调
      */
     private fun rollback(id: Long, oldItem: SearchData) {
         val currentList = _searchData.value ?: return

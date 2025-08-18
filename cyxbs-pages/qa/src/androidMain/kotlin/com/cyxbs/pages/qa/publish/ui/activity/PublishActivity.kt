@@ -8,7 +8,11 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.activity.viewModels
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.compose.ui.util.fastForEachIndexed
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -54,6 +58,31 @@ class PublishActivity : BaseActivity() {
     //搜索结果
     private val mRvSearch by R.id.qa_publish_rv_question_card.view<RecyclerView>()
 
+    private val selectedBg by lazy {
+        AppCompatResources.getDrawable(
+            this,
+            R.drawable.qa_shape_publish_tag_selected_bg
+        )
+    }
+    private val defaultBg by lazy {
+        AppCompatResources.getDrawable(
+            this,
+            R.drawable.qa_shape_publish_tag_default_bg
+        )
+    }
+    private val selectedTextColor by lazy {
+        ContextCompat.getColor(
+            this,
+            R.color.qa_publish_tag_selected_text_color
+        )
+    }
+    private val defaultTextColor by lazy {
+        ContextCompat.getColor(
+            this,
+            R.color.qa_publish_tag_default_text_color
+        )
+    }
+
     //标签选择器的RV
     private val mRvTagSelector by R.id.qa_publish_rv_tag_selector.view<RecyclerView>()
         .addInitialize {
@@ -69,12 +98,25 @@ class PublishActivity : BaseActivity() {
             this.isNestedScrollingEnabled = false
         }
 
-    private val tagSelectorAdapter = TagSelectorAdapter(
-        R.drawable.qa_shape_publish_tag_selected_bg,
-        R.drawable.qa_shape_publish_tag_default_bg,
-        R.color.qa_publish_tag_selected_text_color,
-        R.color.qa_publish_tag_default_text_color
-    )
+    private val tagSelectorAdapter by lazy {
+        TagSelectorAdapter(
+            viewModel.dataTag,
+            R.drawable.qa_shape_publish_tag_selected_bg,
+            R.drawable.qa_shape_publish_tag_default_bg,
+            R.color.qa_publish_tag_selected_text_color,
+            R.color.qa_publish_tag_default_text_color
+        ).apply {
+            setOnTagClickListener { status, pos ->
+                //先将所有的style置为false
+                viewModel.dataTag.fastForEachIndexed { index, _ ->
+                    changeBtnStyle(false, index, mRvTagSelector)
+                }
+                //将特定位置设置为选中
+                changeBtnStyle(status, pos, mRvTagSelector)
+
+            }
+        }
+    }
 
     private val questionCardAdapter = QuestionCardAdapter()
 
@@ -124,7 +166,6 @@ class PublishActivity : BaseActivity() {
     private fun initView() {
         //初始化RvTagSelector
         mRvTagSelector.adapter = tagSelectorAdapter
-        tagSelectorAdapter.submitList(viewModel.dataTag)
         mRvSearch.adapter = questionCardAdapter
         mRvSearch.layoutManager = LinearLayoutManager(this)
 
@@ -174,7 +215,24 @@ class PublishActivity : BaseActivity() {
                 toast("问题和标签不能为空")
             }
         }
+    }
 
-
+    fun changeBtnStyle(
+        state: Boolean,
+        position: Int,
+        rv: RecyclerView,
+    ) {
+        rv.layoutManager?.findViewByPosition(position)?.let {
+            it.findViewById<TextView>(R.id.qa_publish_tv_tag_item)
+                ?.apply {
+                    if (state) {
+                        background = selectedBg
+                        setTextColor(selectedTextColor)
+                    } else {
+                        background = defaultBg
+                        setTextColor(defaultTextColor)
+                    }
+                }
+        }
     }
 }

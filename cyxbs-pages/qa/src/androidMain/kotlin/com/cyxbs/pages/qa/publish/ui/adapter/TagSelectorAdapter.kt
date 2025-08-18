@@ -6,10 +6,9 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.qa.R
+import com.cyxbs.pages.qa.publish.ui.adapter.TagSelectorAdapter.TagViewHolder
 
 /**
  * description ： 标签Tag选择Rv的Adapter
@@ -18,32 +17,25 @@ import com.cyxbs.pages.qa.R
  * date : 2025/8/12 13:02
  */
 class TagSelectorAdapter(
+    private val data: List<String>,
     private val selectedBgRes: Int,
     private val defaultBgRes: Int,
     private val selectedTextColorRes: Int,
     private val defaultTextColorRes: Int
-) :
-    ListAdapter<String, TagSelectorAdapter.TagViewHolder>(object : DiffUtil.ItemCallback<String>() {
-        override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
-            return oldItem == newItem
-        }
-
-        override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
-            return oldItem == newItem
-        }
-    }) {
+) : RecyclerView.Adapter<TagViewHolder>() {
     // 标签是否可以点击
     private var isTagClickable = true
 
-    // 存选中标签
-    private val selectedTags = mutableSetOf<String>()
+    // 存选中标签，单选
+    private var selectedTag: String? = null
+
 
     inner class TagViewHolder(private val view: View) : RecyclerView.ViewHolder(view) {
         val mTag = view.findViewById<TextView>(R.id.qa_publish_tv_tag_item)
 
         fun bind(tag: String) {
             mTag.text = tag
-            val isSelected = selectedTags.contains(tag)
+            val isSelected = selectedTag == tag
             applyStyle(isSelected)
 
         }
@@ -53,42 +45,39 @@ class TagSelectorAdapter(
             if (state) {
                 view.background = AppCompatResources.getDrawable(context, selectedBgRes)
                 mTag.setTextColor(ContextCompat.getColor(context, selectedTextColorRes))
-                view.isSelected = true
             } else {
                 view.background = AppCompatResources.getDrawable(context, defaultBgRes)
                 mTag.setTextColor(ContextCompat.getColor(context, defaultTextColorRes))
-                view.isSelected = false
             }
         }
 
         init {
             view.setOnClickListener {
-                if (isTagClickable) {
-                    val tag = mTag.text.toString()
-                    val newState = !selectedTags.contains(tag)
-                    //更新数据源
-                    if (newState) {
-                        selectedTags.add(tag)
-                    } else {
-                        selectedTags.remove(tag)
-                    }
-                    applyStyle(newState)
+                if (!isTagClickable) {
+                    return@setOnClickListener
                 }
+                //如果新选择的string和已经选择的不一样，则代表新点击的为选中
+                val isSelect = selectedTag != mTag.text.toString()
+                if (isSelect) {
+                    selectedTag = mTag.text.toString()
+                } else {
+                    //取消选择
+                    selectedTag = null
+                }
+                listener?.invoke(isSelect, absoluteAdapterPosition)
             }
         }
     }
 
-    //返回选中的Tag合辑
-    fun getSelectTag(): Set<String> {
-        return selectedTags.toSet()
+    //返回选中的Tag
+    fun getSelectedTagString(): String {
+        return selectedTag?.removeSuffix("类") ?: ""
     }
 
-    //返回选中的标签的字符串
-    //用 空格 分隔
-    fun getSelectedTagString() =
-        selectedTags
-            .joinToString(" ") { it.removeSuffix("类") }
-            .ifBlank { " " }
+    //是否有标签被选择
+    fun isSelected(): Boolean {
+        return !selectedTag.isNullOrEmpty()
+    }
 
     //Tag是否可以被选择
     fun requestTagClickable(clickable: Boolean) {
@@ -105,5 +94,17 @@ class TagSelectorAdapter(
 
     override fun onBindViewHolder(holder: TagViewHolder, position: Int) {
         holder.bind(getItem(position))
+    }
+
+    fun getItem(pos: Int) = data[pos]
+
+    override fun getItemCount(): Int {
+        return data.size
+    }
+
+    private var listener: ((state: Boolean, position: Int) -> Unit)? = null
+
+    fun setOnTagClickListener(listener: ((state: Boolean, position: Int) -> Unit)) {
+        this.listener = listener
     }
 }
