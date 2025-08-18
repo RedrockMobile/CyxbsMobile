@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="16dp">
+
+    <ImageView
+        android:id="@+id/qa_question_item_iv_message"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_marginStart="16dp"
+        android:src="@drawable/qa_ic_question_item_message"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_title" />
+
+    <TextView
+        android:id="@+id/qa_question_item_tv_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginBottom="10dp"
+        android:singleLine="true"
+        android:text="学校快递地址在哪里啊"
+        android:textColor="@color/qa_text_title_color"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toTopOf="@id/qa_question_item_tv_content"
+        app:layout_constraintStart_toEndOf="@id/qa_question_item_iv_message" />
+
+    <TextView
+        android:id="@+id/qa_question_item_tv_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:gravity="center"
+        android:paddingStart="10dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="1dp"
+        android:text="新生类"
+        android:textSize="14sp"
+        app:layout_constraintStart_toEndOf="@id/qa_question_item_tv_title"
+        app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_title" />
+
+    <ImageView
+        android:id="@+id/qa_question_item_iv_paragraph"
+        android:layout_width="6dp"
+        android:layout_height="6dp"
+        android:layout_marginTop="8dp"
+        android:src="@drawable/qa_ic_question_item_paragraph"
+        app:layout_constraintEnd_toEndOf="@id/qa_question_item_iv_message"
+        app:layout_constraintStart_toStartOf="@id/qa_question_item_iv_message"
+        app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_content" />
+
+    <TextView
+        android:id="@+id/qa_question_item_tv_content"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="16dp"
+        android:ellipsize="end"
+        android:maxLines="5"
+        android:scrollHorizontally="false"
+        android:text="重庆邮电大学崇文路2号"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toTopOf="@id/qa_question_item_iv_cyxb"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/qa_question_item_tv_title" />
+
+    <TextView
+        android:id="@+id/qa_question_item_tv_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="16dp"
+        android:text="2025.7.26"
+        android:textColor="@color/qa_search_content_color"
+        android:textSize="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <ImageView
+        android:id="@+id/qa_question_item_iv_cyxb"
+        android:layout_width="100dp"
+        android:layout_height="67dp"
+        android:src="@drawable/qa_ic_question_item_cyxb"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <ImageView
+        android:id="@+id/qa_question_item_iv_like"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginTop="11dp"
+        android:layout_marginEnd="16dp"
+        android:src="@drawable/qa_ic_question_item_dislike"
+        app:layout_constraintBottom_toBottomOf="@id/qa_question_item_iv_cyxb"
+        app:layout_constraintEnd_toEndOf="@id/qa_question_item_iv_cyxb"
+        app:layout_constraintStart_toStartOf="@id/qa_question_item_iv_cyxb"
+        app:layout_constraintTop_toTopOf="@id/qa_question_item_iv_cyxb" />
+
+    <TextView
+        android:id="@+id/qa_question_item_tv_likenumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="15dp"
+        android:layout_marginBottom="27.8dp"
+        android:text="1"
+        android:textColor="@color/qa_question_item_like_color"
+        android:textSize="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/qa_question_item_iv_like" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

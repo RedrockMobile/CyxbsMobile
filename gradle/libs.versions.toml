@@ -179,6 +179,8 @@ leakcanary = "2.13"
 pandora = "androidx_v2.1.0"
 # 字节很好用调试工具 https://github.com/bytedance/CodeLocator
 codelocator = "2.0.4"
+activity = "1.10.1"
+pagingCommonAndroid = "3.3.6"
 
 [libraries]
 ####################################################################################################
@@ -311,6 +313,8 @@ gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 rxjava = { module = "io.reactivex.rxjava3:rxjava", version.ref = "rxjava" }
 rxjava-android = { module = "io.reactivex.rxjava3:rxandroid", version.ref = "rxjava-android" }
 rxjava-kotlin = { module = "io.reactivex.rxjava3:rxkotlin", version.ref = "rxjava-kotlin" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-paging-common-android = { group = "androidx.paging", name = "paging-common-android", version.ref = "pagingCommonAndroid" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

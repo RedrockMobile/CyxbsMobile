@@ -6,6 +6,22 @@
     <!--标题字体颜色-->
     <color name="qa_text_title_color">#15315B</color>
 
-    <!--内容字体颜色-->
+    <!--回答内容字体颜色-->
     <color name="qa_text_content_color">#15315B66</color>
+
+    <!--搜索框颜色-->
+    <color name="qa_search_background_color">#E8F0FC</color>
+
+    <!--搜索字样颜色-->
+    <color name="qa_search_content_color">#8797AC</color>
+
+    <!--点赞以及点赞数未选中颜色-->
+    <color name="qa_question_item_unlike_color">#A7B6D1</color>
+
+    <!--点赞以及点赞数未选中颜色-->
+    <color name="qa_question_item_like_color">#4A44E4</color>
+
+
+
+
 </resources>

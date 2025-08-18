@@ -18,6 +18,9 @@ kotlin {
             implementation(libs.bundles.views)
             implementation(libs.bundles.network)
             implementation(libs.dialog)
+            implementation(libs.androidx.paging)
         }
     }
 }
+
+
