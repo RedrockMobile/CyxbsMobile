@@ -30,5 +30,6 @@
     <!--问答卡片的分割线的颜色-->
     <color name="qa_publish_question_card_divider_color">#313131</color>
 
-
+    <!-- card背景的颜色 -->
+    <color name="qa_de_card_background_color">#2D2D2D</color>
 </resources>

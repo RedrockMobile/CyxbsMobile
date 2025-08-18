@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.qa.R
+import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.model.bean.Item
 
 /**
@@ -108,7 +109,9 @@ class QaSearchRVAdapter(
                     }
                 }
             }
-            root_view.setOnClickListener {}
+            root_view.setOnClickListener {
+                DetailActivity.startActivity(itemView.context,getItem(absoluteAdapterPosition).ID.toLong())
+            }
         }
 
         fun bind(item: Item) {

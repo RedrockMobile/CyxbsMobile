@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.qa.R
+import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.publish.network.bean.response.SearchData
 import com.cyxbs.pages.qa.publish.ui.adapter.QuestionCardAdapter.QuestionCardUI
 
@@ -135,7 +136,7 @@ class QuestionCardAdapter :
 
         init {
             view.setOnClickListener {
-                //TODO 预留跳转
+                DetailActivity.startActivity(itemView.context,(getItem(absoluteAdapterPosition) as QuestionCardUI.QuestionItem).data.id)
             }
 
             mLike.setOnClickListener {

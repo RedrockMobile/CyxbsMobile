@@ -44,7 +44,10 @@
     <!--点赞以及点赞数未选中颜色-->
     <color name="qa_question_item_like_color">#4A44E4</color>
 
-
+    <!-- 按钮字体的颜色 -->
+    <color name="qa_btn_color">#FFFFFF</color>
+    <!-- card背景的颜色 -->
+    <color name="qa_de_card_background_color">#FFFFFF</color>
 
 
 </resources>

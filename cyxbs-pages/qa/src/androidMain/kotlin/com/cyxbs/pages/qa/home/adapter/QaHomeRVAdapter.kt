@@ -12,7 +12,9 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.qa.R
+import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.model.bean.Item
+import com.cyxbs.pages.qa.publish.ui.adapter.QuestionCardAdapter.QuestionCardUI
 
 /**
  * description ： Qa主页的adapter
@@ -104,7 +106,11 @@ class QaHomeRVAdapter(
                     }
                 }
             }
-            root_view.setOnClickListener {}
+            root_view.setOnClickListener {
+                currentData?.let {
+                    DetailActivity.startActivity(itemView.context,it.ID.toLong())
+                }
+            }
         }
 
         fun bind(item: Item) {
