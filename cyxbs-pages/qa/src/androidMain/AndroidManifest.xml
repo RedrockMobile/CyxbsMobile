@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
+
     <application>
         <activity android:name=".home.SearchActivity"
             android:windowSoftInputMode="adjustPan|stateHidden"/>
@@ -9,6 +10,9 @@
         <activity android:name=".home.HomeActivity"
             android:windowSoftInputMode="adjustPan|stateHidden"/>
         <activity android:name=".publish.PublishActivity" />
+        <activity
+            android:name=".publish.ui.activity.PublishActivity"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
     </application>
 
 </manifest>

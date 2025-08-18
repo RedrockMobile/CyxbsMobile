@@ -129,7 +129,7 @@ class HomeActivity : BaseActivity() {
 
     }
 
-    fun initClick() {
+    fun initClick(){
 
         qaHomeBtnReturn.setOnClickListener {
             finish()

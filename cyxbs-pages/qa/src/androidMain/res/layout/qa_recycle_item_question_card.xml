@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp"
+    android:background="@drawable/qa_shape_publish_question_card_bg">
+
+    <TextView
+        android:id="@+id/qa_publish_tv_question_card_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/qa_publish_question_card"
+        android:textColor="@color/qa_text_content_color"
+        android:textSize="14sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <View
+        android:id="@+id/qa_publish_view_divider"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="16dp"
+        android:background="@color/qa_publish_question_card_divider_color"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/qa_publish_tv_question_card_title" />
+
+    <ImageView
+        android:id="@+id/qa_publish_iv_question_card_icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="20dp"
+        android:src="@drawable/qa_ic_publish_question_card_icon"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/qa_publish_view_divider" />
+
+    <TextView
+        android:id="@+id/qa_publish_tv_question_card_question"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:singleLine="true"
+        android:text="@string/qa_publish_edit_hint"
+        android:textColor="@color/qa_text_title_color"
+        android:textSize="16sp"
+        app:layout_constraintStart_toEndOf="@id/qa_publish_iv_question_card_icon"
+        app:layout_constraintTop_toTopOf="@id/qa_publish_iv_question_card_icon" />
+
+    <TextView
+        android:id="@+id/qa_publish_flexbox_question_card_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/qa_shape_publish_tag_selected_bg"
+        android:gravity="center"
+        android:paddingStart="10dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="1dp"
+        android:text="新生类"
+        android:textColor="@color/qa_publish_tag_selected_text_color"
+        android:textSize="14sp"
+        app:layout_constraintStart_toEndOf="@id/qa_publish_tv_question_card_question"
+        app:layout_constraintTop_toTopOf="@id/qa_publish_iv_question_card_icon" />
+
+    <ImageView
+        android:id="@+id/qa_publish_iv_question_card_point"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="23dp"
+        android:src="@drawable/qa_ic_publish_question_card_point"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/qa_publish_tv_question_card_question" />
+
+    <TextView
+        android:id="@+id/qa_publish_tv_question_card_answer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="16dp"
+        android:ellipsize="end"
+        android:maxLines="5"
+        android:text="我是回答"
+        android:textColor="@color/qa_text_content_color"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/qa_publish_iv_question_card_point"
+
+        app:layout_constraintTop_toBottomOf="@id/qa_publish_tv_question_card_question" />
+
+    <TextView
+        android:id="@+id/qa_publish_tv_question_card_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="27dp"
+        android:layout_marginBottom="17dp"
+        android:text="2025.07.26"
+        android:textColor="@color/qa_text_content_color"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/qa_publish_tv_question_card_answer" />
+
+    <TextView
+        android:id="@+id/qa_publish_tv_question_card_like_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="13dp"
+        android:text="2000"
+        android:textColor="@color/qa_text_content_color"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="@id/qa_publish_iv_question_card_like"
+        app:layout_constraintStart_toEndOf="@id/qa_publish_iv_question_card_like" />
+
+    <ImageView
+        android:id="@+id/qa_publish_iv_question_card_like"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="30dp"
+        android:layout_marginTop="25dp"
+        android:layout_marginBottom="16dp"
+        android:src="@drawable/qa_ic_publish_question_card_like"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/qa_publish_question_card_bg"
+        app:layout_constraintTop_toTopOf="@+id/qa_publish_question_card_bg" />
+
+    <ImageView
+        android:id="@+id/qa_publish_question_card_bg"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/qa_ic_publish_question_card_bg"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
