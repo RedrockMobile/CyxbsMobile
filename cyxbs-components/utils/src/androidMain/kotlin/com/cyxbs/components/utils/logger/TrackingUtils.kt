@@ -1,10 +1,12 @@
 package com.cyxbs.components.utils.logger
 
+import android.os.SystemClock
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.logger.bean.TrackingResultBean
 import com.cyxbs.components.utils.logger.event.NewClickEvent
 import com.cyxbs.components.utils.logger.event.OldClickEvent
+import com.cyxbs.components.utils.logger.network.OldTrackingApiService
 import com.cyxbs.components.utils.logger.network.TrackingApiService
 import com.cyxbs.components.utils.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +19,7 @@ import kotlinx.coroutines.withContext
  * 1. trackExposureEvent   —— 点击 / 曝光即上报，time 固定为 1
  * 2. trackStayEvent       —— 页面停留上报，time = 停留秒数
  *
- * 后端接口：POST /data-middle-office/stats
+ * 后端接口：POST /magicchrist-statistic/trackingpoint/stats
  * 必填参数：
  *   id         埋点 ID
  *   user_id    用户 ID
@@ -103,7 +105,7 @@ object TrackingUtils {
    * null -> 异常状态，说明返回的状态未知
    */
   suspend fun trackClickEvent(clickEvent: OldClickEvent): Result<TrackingResultBean?> {
-    return trackEvent(clickEvent.mapParams)
+    return trackOldEvent(clickEvent.mapParams)
   }
 
   /**
@@ -112,9 +114,10 @@ object TrackingUtils {
    *
    * null -> 异常状态，说明返回的状态未知
    */
-  suspend fun trackEvent(params: Map<String, String>): Result<TrackingResultBean?> {
+
+  suspend fun trackOldEvent(params: Map<String, String>): Result<TrackingResultBean?> {
     return runCatching {
-      TrackingApiService.INSTANCE.trackEvent(params)
+      OldTrackingApiService.INSTANCE.trackEvent(params)
         .data.status.let { status ->
           LogUtils.d(TAG, "(LoggerUtils.kt:46)-->> trackingEvent, status = $status")
           TrackingResultBean.values().find { status == it.status }.also {
@@ -133,6 +136,7 @@ object TrackingUtils {
       return Result.failure(it)
     }
   }
+
 
   fun toastLogger(trackingResultBean: TrackingResultBean?) {
     val msg = trackingResultBean?.msg ?: "埋点上报失败，请查看网络请求日志！"
