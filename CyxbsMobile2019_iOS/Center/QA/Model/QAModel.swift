@@ -44,6 +44,19 @@ class QAModel{
         }
     }
     
+    ///将从服务器获取的日期格式化
+    func dateFormatter(dateString:String) -> String?{
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        guard let date = formatter.date(from: dateString)else{
+            return nil
+        }
+        let outputFormatter = DateFormatter()
+        outputFormatter.dateFormat = "yyyy.MM.dd"
+        outputFormatter.timeZone = TimeZone.current
+        return outputFormatter.string(from: date)
+    }
+    
 }
 
 struct QAObject : Codable{
