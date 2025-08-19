@@ -122,7 +122,7 @@ class QaHomeRVAdapter(
         }
 
 
-        private fun String.ellipsis(maxLength: Int = 14) =
+        private fun String.ellipsis(maxLength: Int = 12) =
             if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
 
         private fun checkLike(item: Item) {

@@ -81,7 +81,7 @@ class VolunteerLoginActivity : BaseViewModelActivity<VolunteerLoginViewModel>() 
             EncryptPassword.encrypt(et_volunteer_password.text.toString())
         ) {
 
-            Toast.makeText(this, "服务暂时不可使用~", Toast.LENGTH_SHORT).show()
+            CyxbsToast.makeText(this, "服务暂时不可使用~", Toast.LENGTH_SHORT).show()
             stopLottie()
         }
     }
