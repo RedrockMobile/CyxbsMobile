@@ -72,6 +72,7 @@ class AnswerDetailView : UIView {
     
     lazy var paraIcon : UIImageView = {
         let paraIcon = UIImageView()
+        paraIcon.image = UIImage(named: "Ellipse")
         return paraIcon
     }()
     
@@ -79,33 +80,42 @@ class AnswerDetailView : UIView {
         let contentLabel = UILabel()
         contentLabel.font = UIFont(name: PingFangSC, size: 14)
         contentLabel.textAlignment = .left
+        contentLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
         return contentLabel
     }()
     
     lazy var viewIcon : UIImageView = {
         let viewIcon = UIImageView()
+        viewIcon.image = UIImage(named: "View")
         return viewIcon
     }()
     
     lazy var viewCountLabel : UILabel = {
         let viewCountLabel = UILabel()
         viewCountLabel.font = UIFont(name: PingFangSC, size: 12)
+        viewCountLabel.textAlignment = .left
+        viewCountLabel.textColor = UIColor.ry(light: "#A7B6D1", dark: "#FFFFFF")
         return viewCountLabel
     }()
     
     lazy var likeButton : UIButton = {
         let likeButton = UIButton()
+        likeButton.setImage(UIImage(named: "Unlike"), for: .normal)
+        likeButton.setImage(UIImage(named: "Like"), for: .selected)
         return likeButton
     }()
     
     lazy var likeCountLabel : UILabel = {
         let likeCountLabel = UILabel()
         likeCountLabel.font = UIFont(name: PingFangSC, size: 12)
+        likeCountLabel.textAlignment = .left
+        likeCountLabel.textColor = UIColor.ry(light: "#A7B6D1", dark: "#FFFFFF")
         return likeCountLabel
     }()
     
     lazy var cyxbsIcon : UIImageView = {
         let cyxbsIcon = UIImageView()
+        cyxbsIcon.image = UIImage(named: "Cyxbs")
         return cyxbsIcon
     }()
     

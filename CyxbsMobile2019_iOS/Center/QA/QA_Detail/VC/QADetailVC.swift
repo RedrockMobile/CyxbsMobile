@@ -44,6 +44,7 @@ class QADetailVC : UIViewController {
     
     lazy var backButton : UIButton = {
         let backButton = UIButton()
+        backButton.setImage(UIImage(named: "Back"), for: .normal)
         backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
         return backButton
     }()
@@ -69,11 +70,19 @@ class QADetailVC : UIViewController {
         HttpManager.shared.magipoke_qa_like(id: qaObject.ID).ry_JSON{ response in
             switch response{
             case .success:
-                print("Like Succeed")
-                self.qaObject.isLike = true
-                self.qaObject.likeCount += 1
-                self.loadDataToView()
-                RemindHUD.shared().showDefaultHUD(withText: "点赞成功")
+                if(self.qaObject.isLike){
+                    print("Unlike Succeed")
+                    self.qaObject.isLike = false
+                    self.qaObject.likeCount -= 1
+                    self.loadDataToView()
+                    RemindHUD.shared().showDefaultHUD(withText: "取消点赞成功")
+                }else{
+                    print("Like Succeed")
+                    self.qaObject.isLike = true
+                    self.qaObject.likeCount += 1
+                    self.loadDataToView()
+                    RemindHUD.shared().showDefaultHUD(withText: "点赞成功")
+                }
             case .failure:
                 print("Like Failed")
                 RemindHUD.shared().showDefaultHUD(withText: "点赞失败，请检查网络")

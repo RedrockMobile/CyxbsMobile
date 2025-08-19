@@ -59,15 +59,16 @@ class QADetailView : UIView{
     
     lazy var hashTag : UIImageView = {
         let hashTag = UIImageView()
+        hashTag.image = UIImage(named: "HashTag")
         return hashTag
     }()
-    
-    
     
     lazy var categoryLabel : UILabel = {
         let categoryLabel = UILabel()
         categoryLabel.font = UIFont(name: PingFangSC, size: 10)
         categoryLabel.textAlignment = .center
+        categoryLabel.textColor = UIColor.ry(light: "#4A44E4", dark: "#D2D2D2")
+        categoryLabel.backgroundColor = UIColor.ry(light: "#D4DAFF", dark: "#5A5A5A")
         categoryLabel.layer.cornerRadius = 8
         return categoryLabel
     }()
@@ -75,6 +76,7 @@ class QADetailView : UIView{
     lazy var questionLabel : UILabel = {
         let questionLabel = UILabel()
         questionLabel.font = UIFont(name: PingFangSC, size: 16)
+        questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
         questionLabel.numberOfLines = 1
         return questionLabel
     }()
@@ -82,13 +84,16 @@ class QADetailView : UIView{
     lazy var dateLabel : UILabel = {
         let dateLabel = UILabel()
         dateLabel.font = UIFont(name: PingFangSC, size: 12)
+        dateLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
         return dateLabel
     }()
     
     lazy var answerDetailView : AnswerDetailView = {
         let answerDetailView = AnswerDetailView()
         answerDetailView.commonInit()
+        answerDetailView.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#2D2D2D")
         answerDetailView.layer.cornerRadius = 8
+        answerDetailView.layer.masksToBounds = true
         return answerDetailView
     }()
     
