@@ -1,6 +1,5 @@
 package com.cyxbs.pages.qa.home
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.content.res.Resources
@@ -23,12 +22,11 @@ import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.home.fragment.QaAllFragment
-import com.cyxbs.pages.qa.home.fragment.QaLifeFragment
 import com.cyxbs.pages.qa.home.fragment.QaFreshmanFragment
+import com.cyxbs.pages.qa.home.fragment.QaLifeFragment
 import com.cyxbs.pages.qa.home.fragment.QaOtherFragment
 import com.cyxbs.pages.qa.home.fragment.QaStudyFragment
-import com.cyxbs.pages.qa.home.interfaces.Refreshable
-import com.cyxbs.pages.qa.publish.PublishActivity
+import com.cyxbs.pages.qa.publish.ui.activity.PublishActivity
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
@@ -45,8 +43,8 @@ class HomeActivity : BaseActivity() {
     private val qaHomeBtnSearch by R.id.qa_home_btn_search.view<EditText>()
     private val qaHomeBtnPublish by R.id.qa_home_btn_publish.view<LinearLayout>()
     private val qaHomeBtnReturn by R.id.qa_home_iv_return.view<ImageView>()
-    private val mTabLayout: TabLayout by R.id.qa_tab_layout.view()
-    private val mVP: ViewPager2 by R.id.qa_vp2.view()
+    private val mTabLayout: TabLayout by R.id.qa_home_tab_layout.view()
+    private val mVP: ViewPager2 by R.id.qa_home_vp2.view()
     private var tab1View by Delegates.notNull<View>()
     private var tab2View by Delegates.notNull<View>()
     private var tab3View by Delegates.notNull<View>()
@@ -62,8 +60,7 @@ class HomeActivity : BaseActivity() {
         setTabIndicatorWidth(mTabLayout, 16)
     }
 
-    @SuppressLint("MissingInflatedId")
-    fun initTab() {
+    private fun initTab() {
         mVP.adapter = FragmentVpAdapter(this)
             .add { QaAllFragment() }
             .add { QaFreshmanFragment() }
@@ -74,10 +71,6 @@ class HomeActivity : BaseActivity() {
         mVP.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 hideOtherTabDots(position)
-                val fragment = supportFragmentManager.findFragmentByTag("f${mVP.adapter!!.getItemId(position)}")
-                if (fragment is Refreshable) {
-                    fragment.refreshUI()
-                }
             }
         })
         val tabs = arrayOf(
@@ -129,7 +122,7 @@ class HomeActivity : BaseActivity() {
 
     }
 
-    fun initClick(){
+    private fun initClick() {
 
         qaHomeBtnReturn.setOnClickListener {
             finish()
@@ -178,6 +171,7 @@ class HomeActivity : BaseActivity() {
     fun dp2px(dp: Float): Int {
         return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
     }
+
     fun updateTabDot(tabIndex: Int, count: Int) {
         val tab = mTabLayout.getTabAt(tabIndex)
         val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
@@ -186,17 +180,16 @@ class HomeActivity : BaseActivity() {
             visibility = if (count > 0) View.VISIBLE else View.GONE
         }
     }
+
     fun hideOtherTabDots(currentIndex: Int) {
         for (i in 0 until mTabLayout.tabCount) {
-            if (i != currentIndex) {
+            if (i == currentIndex) {
                 val tab = mTabLayout.getTabAt(i)
                 val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
                 dotView?.visibility = View.GONE
             }
         }
     }
-
-
 
 
 }

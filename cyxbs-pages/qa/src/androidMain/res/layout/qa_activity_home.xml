@@ -31,24 +31,24 @@
         app:layout_constraintTop_toTopOf="parent" />
 
 
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/qa_tab_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:backgroundTint="@android:color/transparent"
-            android:theme="@style/Theme.MaterialComponents"
-            app:tabIndicator="@drawable/qa_ic_tab_indicator"
-            app:tabIndicatorColor="@android:color/transparent"
-            app:tabIndicatorFullWidth="true"
-            app:tabIndicatorHeight="3dp"
-            app:tabRippleColor="@android:color/transparent"
-            app:tabTextAppearance="@style/qa_TabTextAppearance"
-            app:tabMinWidth="0dp"
-            app:tabPaddingBottom="0dp"
-            app:tabPaddingEnd="0dp"
-            app:tabPaddingStart="0dp"
-            app:tabPaddingTop="0dp"
-            app:layout_constraintTop_toBottomOf="@id/qa_home_tv_title"/>
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/qa_home_tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@android:color/transparent"
+        android:theme="@style/Theme.MaterialComponents"
+        app:tabIndicator="@drawable/qa_ic_tab_indicator"
+        app:tabIndicatorColor="@android:color/transparent"
+        app:tabIndicatorFullWidth="true"
+        app:tabIndicatorHeight="3dp"
+        app:tabRippleColor="@android:color/transparent"
+        app:tabTextAppearance="@style/qa_TabTextAppearance"
+        app:tabMinWidth="0dp"
+        app:tabPaddingBottom="0dp"
+        app:tabPaddingEnd="0dp"
+        app:tabPaddingStart="0dp"
+        app:tabPaddingTop="0dp"
+        app:layout_constraintTop_toBottomOf="@id/qa_home_tv_title"/>
 
     <EditText
         android:id="@+id/qa_home_btn_search"
@@ -65,10 +65,10 @@
         android:layout_marginTop="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/qa_tab_layout" />
+        app:layout_constraintTop_toBottomOf="@id/qa_home_tab_layout" />
 
     <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/qa_vp2"
+        android:id="@+id/qa_home_vp2"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="10dp"

@@ -13,14 +13,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.qa.R
-import com.cyxbs.pages.qa.home.adapter.QaHomeRVAdapter
-import com.cyxbs.pages.qa.home.adapter.QaSearchRVAdapter
 import com.cyxbs.pages.qa.home.HomeActivity
 import com.cyxbs.pages.qa.home.SearchActivity
-import com.cyxbs.pages.qa.home.interfaces.Refreshable
+import com.cyxbs.pages.qa.home.adapter.QaHomeRVAdapter
+import com.cyxbs.pages.qa.home.adapter.QaSearchRVAdapter
 import com.cyxbs.pages.qa.home.viewmodel.HomeViewModel
 import com.cyxbs.pages.qa.home.viewmodel.SearchViewModel
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -29,30 +28,17 @@ import kotlinx.coroutines.launch
  * email : 2992203079qq.com
  * date : 2025/8/13 20:32
  */
-class QaOtherFragment : BaseFragment(),Refreshable {
+class QaOtherFragment : BaseFragment() {
     private val searchViewModel: SearchViewModel by lazy { ViewModelProvider(requireActivity())[SearchViewModel::class.java] }
     private val homeViewModel: HomeViewModel by lazy { ViewModelProvider(requireActivity())[HomeViewModel::class.java] }
     private val mRecycleView by R.id.qa_other_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
-        QaHomeRVAdapter {item, callback ->
-            if (item.is_like) {
-                homeViewModel.getLike(item.ID) { success -> callback(success) }
-            } else {
-                homeViewModel.getUnlike(item.ID) { success -> callback(success) }
-            }
-        }
+        QaHomeRVAdapter(homeViewModel)
     }
     private val searchRVAdapter: QaSearchRVAdapter by lazy {
-        QaSearchRVAdapter { item, callback ->
-            if (item.is_like) {
-                homeViewModel.getLike(item.ID) { success -> callback(success) }
-            } else {
-                homeViewModel.getUnlike(item.ID) { success -> callback(success) }
-            }
-        }
+        QaSearchRVAdapter(searchViewModel)
 
     }
-    private var refreshJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -96,44 +82,33 @@ class QaOtherFragment : BaseFragment(),Refreshable {
     private fun initDefaultView() {
 
     }
+
     override fun onDestroyView() {
         super.onDestroyView()
 
-        refreshJob?.cancel()
-        refreshJob = null
-
         // 清理适配器
         mRecycleView.adapter = null
+        mRecycleView.layoutManager = null
 
         // 移除 LiveData 观察者
         searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
     }
 
-    override fun refreshUI() {
-        if(requireActivity() is HomeActivity){
-            initHomeUi()
-        }
-        if(requireActivity() is SearchActivity){
-            initSearchUi()
-        }
 
-    }
-
-    private fun initHomeUi(){
-        refreshJob?.cancel()
-        refreshJob =viewLifecycleScope.launch {
+    private fun initHomeUi() {
+        viewLifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                homeViewModel.getQaData().collect { pagingDatas ->
+                homeViewModel.pagingDataFlow.collectLatest { pagingData ->
                     val filteredPagingData =
-                        pagingDatas.filter { it.status == 2 && (it.tags.contains("其他") == true) }
+                        pagingData.filter { it.status == 2 && it.tags.contains("其他") }
                     homeRvAdapter.submitData(filteredPagingData)
                 }
+
             }
         }
-
-
     }
-    private fun initSearchUi(){
+
+    private fun initSearchUi() {
         searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
             // 确保 items 不为 null
             val filteredList =
@@ -143,9 +118,7 @@ class QaOtherFragment : BaseFragment(),Refreshable {
             val sp = context?.getSp("search_keyword")
             val str = sp?.getString("keyword", "默认值")
             searchRVAdapter.keyword = str.toString()
-            searchRVAdapter.submitList(filteredList) {
-                mRecycleView.scrollToPosition(0)
-            }
+            searchRVAdapter.submitList(filteredList)
 
         }
     }

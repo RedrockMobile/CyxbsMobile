@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:tools="http://schemas.android.com/tools"
     android:paddingTop="16dp">
 
     <ImageView
@@ -31,16 +32,20 @@
         android:id="@+id/qa_question_item_tv_tag"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
         android:gravity="center"
-        android:paddingStart="10dp"
-        android:paddingTop="1dp"
-        android:paddingEnd="10dp"
-        android:paddingBottom="1dp"
-        android:text="新生类"
-        android:textSize="14sp"
+        android:paddingStart="12dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="2dp"
+        android:background="@drawable/qa_shape_publish_tag_selected_bg"
+        android:textColor="@color/qa_publish_tag_selected_text_color"
+        android:textSize="10dp"
+        tools:ignore="SpUsage"
+        tools:text="新生类"
+        android:layout_marginStart="10dp"
         app:layout_constraintStart_toEndOf="@id/qa_question_item_tv_title"
-        app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_title" />
+        app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_title"
+        app:layout_constraintBottom_toBottomOf="@id/qa_question_item_tv_title" />
 
     <ImageView
         android:id="@+id/qa_question_item_iv_paragraph"
