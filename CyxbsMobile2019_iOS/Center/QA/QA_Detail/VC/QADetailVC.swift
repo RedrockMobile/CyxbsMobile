@@ -12,6 +12,11 @@ import MBProgressHUD
 
 class QADetailVC : UIViewController {
     
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    public var id : Int
     let qaModel = QAModel()
     var qaObject : QAObject!
     
@@ -20,7 +25,18 @@ class QADetailVC : UIViewController {
         view.addSubview(detailView)
         view.addSubview(backButton)
         view.addSubview(publishButton)
+        requestDetail()
         loadDataToView()
+    }
+    
+    //获取问题详情
+    @objc func requestDetail() {
+        qaModel.requestDetailObject(id: self.id) { qaObject in
+            print("获取问题详情成功")
+            
+        } failure: { error in
+            print("获取问题详情失败\(error)")
+        }
     }
     
     func loadDataToView() {

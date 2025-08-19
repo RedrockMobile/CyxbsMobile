@@ -44,6 +44,19 @@ class QAModel{
         }
     }
     
+    func requestDetailObject(id : Int, success: @escaping (QAObject) -> Void, failure: @escaping (Error) -> Void){
+        HttpManager.shared.magipoke_qa_getDetail(id: id).ry_JSON { response in
+            switch response{
+            case .success(let jsonData):
+                let detailQAResponse = DetailQAResponse(from: jsonData)
+                success(detailQAResponse.data.item)
+            case .failure(let error):
+                print("请求失败，错误：\(error)")
+                failure(error)
+            }
+        }
+    }
+    
     ///将从服务器获取的日期格式化
     func dateFormatter(dateString:String) -> String?{
         let formatter = ISO8601DateFormatter()
@@ -153,5 +166,29 @@ struct SearchQAData : Codable{
 extension SearchQAData{
     init(from json: JSON){
         items = json["items"].arrayValue.map { QAObject(from: $0)}
+    }
+}
+
+struct DetailQAResponse : Codable{
+    var info : String
+    var status : String
+    var data : DetailQAData
+}
+
+extension DetailQAResponse{
+    init(from json : JSON){
+        info = json["info"].stringValue
+        status = json["status"].stringValue
+        data = DetailQAData(from: json["data"])
+    }
+}
+
+struct DetailQAData : Codable{
+    var item : QAObject
+}
+
+extension DetailQAData{
+    init(from json : JSON){
+        item = QAObject(from: json["item"])
     }
 }
