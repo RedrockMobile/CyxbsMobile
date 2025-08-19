@@ -4,24 +4,21 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.filter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.qa.R
-import com.cyxbs.pages.qa.home.adapter.QaHomeRVAdapter
-import com.cyxbs.pages.qa.home.adapter.QaSearchRVAdapter
+import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.HomeActivity
 import com.cyxbs.pages.qa.home.SearchActivity
-import com.cyxbs.pages.qa.home.interfaces.Refreshable
+import com.cyxbs.pages.qa.home.adapter.QaHomeRVAdapter
+import com.cyxbs.pages.qa.home.adapter.QaSearchRVAdapter
 import com.cyxbs.pages.qa.home.viewmodel.HomeViewModel
 import com.cyxbs.pages.qa.home.viewmodel.SearchViewModel
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -30,30 +27,25 @@ import kotlinx.coroutines.launch
  * email : 2992203079qq.com
  * date : 2025/8/13 20:31
  */
-class QaFreshmanFragment : BaseFragment(),Refreshable {
+class QaFreshmanFragment : BaseFragment() {
     private val searchViewModel: SearchViewModel by lazy { ViewModelProvider(requireActivity())[SearchViewModel::class.java] }
     private val homeViewModel: HomeViewModel by lazy { ViewModelProvider(requireActivity())[HomeViewModel::class.java] }
     private val mRecycleView by R.id.qa_freshman_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
-        QaHomeRVAdapter { item, callback ->
-            if (item.is_like) {
-                homeViewModel.getLike(item.ID) { success -> callback(success) }
-            } else {
-                homeViewModel.getUnlike(item.ID) { success -> callback(success) }
+        QaHomeRVAdapter(homeViewModel).apply {
+            setOnItemClickListener {
+                DetailActivity.startActivity(requireContext(), it)
             }
         }
     }
     private val searchRVAdapter: QaSearchRVAdapter by lazy {
-        QaSearchRVAdapter { item, callback ->
-            if (item.is_like) {
-                homeViewModel.getLike(item.ID) { success -> callback(success) }
-            } else {
-                homeViewModel.getUnlike(item.ID) { success -> callback(success) }
+        QaSearchRVAdapter(searchViewModel).apply {
+            setOnItemClickListener {
+                DetailActivity.startActivity(requireContext(),it)
             }
         }
 
     }
-    private var refreshJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,8 +61,6 @@ class QaFreshmanFragment : BaseFragment(),Refreshable {
     }
 
     private fun initView() {
-        mRecycleView.adapter = homeRvAdapter
-        mRecycleView.layoutManager = LinearLayoutManager(context)
         when (requireActivity()) {
             is HomeActivity -> initHomeView()
             is SearchActivity -> initSearchView()
@@ -97,47 +87,32 @@ class QaFreshmanFragment : BaseFragment(),Refreshable {
     private fun initDefaultView() {
 
     }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        refreshJob?.cancel()
-        refreshJob = null
         // 清理适配器
         mRecycleView.adapter = null
+        mRecycleView.layoutManager = null
 
         // 移除 LiveData 观察者
         searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
-        refreshJob?.cancel()
-    }
-
-    override fun refreshUI() {
-       if(requireActivity() is HomeActivity){
-           initHomeUi()
-       }
-       if(requireActivity() is SearchActivity){
-           initSearchUi()
-       }
 
     }
 
 
     private fun initHomeUi() {
         // 取消上一次 Job 避免重复收集
-        refreshJob?.cancel()
-        refreshJob = viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                homeViewModel.getQaData().collect { pagingDatas ->
+        viewLifecycleScope.launch {
+            homeViewModel.pagingDataFlow.collectLatest { pagingData ->
+                val filteredPagingData =
+                    pagingData.filter { it.status == 2 && it.tags.contains("新生") }
+                homeRvAdapter.submitData(filteredPagingData)
 
-                    // 过滤数据
-                    val filteredPagingData =
-                        pagingDatas.filter { it.status == 2 && it.tags.contains("新生") }
-
-                    // 使用 adapter 的 submitData，但不要在 lambda 内捕获 Fragment
-                    homeRvAdapter.submitData(filteredPagingData)
-                }
             }
         }
     }
-    private fun initSearchUi(){
+
+    private fun initSearchUi() {
         searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
             // 确保 items 不为 null
             val filteredList =
@@ -147,9 +122,7 @@ class QaFreshmanFragment : BaseFragment(),Refreshable {
             val sp = context?.getSp("search_keyword")
             val str = sp?.getString("keyword", "默认值")
             searchRVAdapter.keyword = str.toString()
-            searchRVAdapter.submitList(filteredList) {
-                mRecycleView.scrollToPosition(0)
-            }
+            searchRVAdapter.submitList(filteredList)
 
         }
     }

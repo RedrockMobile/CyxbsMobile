@@ -11,7 +11,7 @@ import java.util.Locale
  * email : 2992203079qq.com
  * date : 2025/8/17 19:54
  */
-data class NewMessageCount(
+data class NewMessageCountData(
     val total: Int = 0,
     val updatedCount: Int = 0,
     val newStudentCount: Int = 0,
@@ -21,13 +21,23 @@ data class NewMessageCount(
 )
 
 class NewMessageAnalyzer(private val context: Context?) {
-    fun analyze(items: List<Item>?): NewMessageCount {
-        if (items.isNullOrEmpty()) return NewMessageCount()
+
+    fun analyze(items: List<Item>?): NewMessageCountData {
+        if (items.isNullOrEmpty()) return NewMessageCountData()
 
         val filteredList = items.filter { it.status == 2 }
         val sp = context?.getSp("qa_content")
-        val savedTime = sp?.getString("time", null)  // null 表示没保存过
+        val savedTime = sp?.getString("time", null)
 
+        // 第一次访问：没有保存过时间
+        if (savedTime.isNullOrBlank()) {
+            // 保存最新的 a_time（最新一条消息）
+            filteredList.maxByOrNull { parseTimestamp(it.a_time) }?.a_time?.let { latestTime ->
+                saveLastItemTime(latestTime)
+            }
+            // 返回全 0
+            return NewMessageCountData()
+        }
 
         var updatedCount = 0
         var newStudentCount = 0
@@ -40,25 +50,23 @@ class NewMessageAnalyzer(private val context: Context?) {
             isNewer(item.a_time, savedTime)
         }
 
-        // 计数
+        // 计数（单标签）
         newFilteredList.forEach { item ->
             updatedCount++
-            item.tags.trim().split("\\s+".toRegex()).forEach { tag ->
-                when (tag) {
-                    "新生" -> newStudentCount++
-                    "学习类" -> learningCount++
-                    "生活类" -> lifeCount++
-                    "其他" -> otherCount++
-                }
+            when (item.tags.trim()) {
+                "新生" -> newStudentCount++
+                "学习" -> learningCount++
+                "生活" -> lifeCount++
+                "其他" -> otherCount++
             }
         }
 
-        //  只保存一次：取最新的 a_time
+        // 保存最新时间戳
         newFilteredList.maxByOrNull { parseTimestamp(it.a_time) }?.a_time?.let { latestTime ->
             saveLastItemTime(latestTime)
         }
 
-        return NewMessageCount(
+        return NewMessageCountData(
             total = newFilteredList.size,
             updatedCount = updatedCount,
             newStudentCount = newStudentCount,
@@ -67,18 +75,13 @@ class NewMessageAnalyzer(private val context: Context?) {
             otherCount = otherCount
         )
     }
-    private fun isNewer(itemTime: String, savedTime: String?): Boolean {
-        if (savedTime.isNullOrBlank()) {
-            // 第一次进入，没有保存过时间 → 不提示任何新消息
-            return false
-        }
+
+    private fun isNewer(itemTime: String, savedTime: String): Boolean {
         val itemTimestamp = parseTimestamp(itemTime)
         val savedTimestamp = parseTimestamp(savedTime)
         return itemTimestamp > savedTimestamp
     }
 
-
-    // 将字符串时间转换为时间戳
     private fun parseTimestamp(time: String): Long {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.getDefault())
         return try {
@@ -88,15 +91,15 @@ class NewMessageAnalyzer(private val context: Context?) {
         }
     }
 
-    // 保存最新时间戳到 SharedPreferences
     private fun saveLastItemTime(time: String) {
         val sp = context?.getSp("qa_content")
         sp?.edit()?.apply {
-            putString("time", time)  // 存储时间戳
-            apply()  // 异步提交
+            putString("time", time)
+            apply()
         }
     }
 }
+
 
 
 
