@@ -28,17 +28,25 @@ class QaHomeRVAdapter(
 ) : PagingDataAdapter<Item, QaHomeRVAdapter.ViewHolder>(COMPARATOR) {
 
     companion object {
+        private const val PAYLOAD_LIKE = "payload_like"
+
         private val COMPARATOR = object : DiffUtil.ItemCallback<Item>() {
             override fun areItemsTheSame(oldItem: Item, newItem: Item) = oldItem.ID == newItem.ID
+
             override fun areContentsTheSame(oldItem: Item, newItem: Item) =
-                oldItem.ID == newItem.ID &&
-                        oldItem.q == newItem.q &&
-                        oldItem.a == newItem.a &&
-                        oldItem.a_time == newItem.a_time &&
-                        oldItem.is_like == newItem.is_like &&
-                        oldItem.like_count == newItem.like_count
+                oldItem == newItem
+
+            override fun getChangePayload(oldItem: Item, newItem: Item): Any? {
+                // 只关心点赞状态和数量的变化
+                return if (oldItem.is_like != newItem.is_like ||
+                    oldItem.like_count != newItem.like_count
+                ) {
+                    PAYLOAD_LIKE
+                } else null
+            }
         }
     }
+
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val root_view = itemView
@@ -86,11 +94,11 @@ class QaHomeRVAdapter(
                     }
                 }
 
-                // 根布局点击跳转
-                root_view.setOnClickListener {
-                    currentData?.let {
-                        listener?.invoke(it.ID.toLong())
-                    }
+            }
+            // 根布局点击跳转
+            root_view.setOnClickListener {
+                currentData?.let {
+                    listener?.invoke(it.ID.toLong())
                 }
             }
         }
@@ -107,6 +115,12 @@ class QaHomeRVAdapter(
             likeNumber.text = item.like_count.toString()
             checkLike(item)
         }
+        fun bindLike(item: Item) {
+            currentData = item
+            likeNumber.text = item.like_count.toString()
+            checkLike(item)
+        }
+
 
         private fun String.ellipsis(maxLength: Int = 14) =
             if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
@@ -135,6 +149,26 @@ class QaHomeRVAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         getItem(position)?.let { holder.bind(it) }
     }
+    override fun onBindViewHolder(
+        holder: ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        val item = getItem(position) ?: return
+
+        if (payloads.isEmpty()) {
+            // 全量刷新
+            holder.bind(item)
+        } else {
+            // 局部刷新
+            payloads.forEach {
+                if (it == PAYLOAD_LIKE) {
+                    holder.bindLike(item)
+                }
+            }
+        }
+    }
+
 
     private var listener: ((Long) -> Unit)? = null
 

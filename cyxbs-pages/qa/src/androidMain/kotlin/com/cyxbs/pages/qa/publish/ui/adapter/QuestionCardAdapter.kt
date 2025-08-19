@@ -126,7 +126,7 @@ class QuestionCardAdapter :
 
     inner class QuestionCardViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val mTitle = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_question)
-        val mTag = view.findViewById<TextView>(R.id.qa_publish_flexbox_question_card_tag)
+        val mTag = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_tag)
         val mAnswer = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_answer)
         val mTime = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_time)
         val likeCount = view.findViewById<TextView>(R.id.qa_publish_tv_question_card_like_count)
@@ -136,7 +136,10 @@ class QuestionCardAdapter :
 
         init {
             view.setOnClickListener {
-                DetailActivity.startActivity(itemView.context,(getItem(absoluteAdapterPosition) as QuestionCardUI.QuestionItem).data.id)
+                DetailActivity.startActivity(
+                    itemView.context,
+                    (getItem(absoluteAdapterPosition) as QuestionCardUI.QuestionItem).data.id
+                )
             }
 
             mLike.setOnClickListener {
@@ -185,7 +188,7 @@ class QuestionCardAdapter :
             }
         }
 
-        fun String.truncateWithEllipsis(maxLength: Int = 13): String {
+        fun String.truncateWithEllipsis(maxLength: Int = 12): String {
             return if (this.length > maxLength) {
                 this.substring(0, maxLength) + "…"
             } else {

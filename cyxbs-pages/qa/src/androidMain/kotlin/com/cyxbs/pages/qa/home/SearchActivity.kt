@@ -111,12 +111,12 @@ class SearchActivity : BaseActivity() {
         val onTabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 tab.customView?.findViewById<TextView>(R.id.qa_tv_tl_tab)
-                    ?.setTextColor(ColorStateList.valueOf(com.cyxbs.components.config.R.color.config_level_one_font_color.color))
+                    ?.setTextColor(ColorStateList.valueOf(R.color.qa_text_title_color.color))
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab) {
                 tab.customView?.findViewById<TextView>(R.id.qa_tv_tl_tab)
-                    ?.setTextColor(ColorStateList.valueOf(com.cyxbs.components.config.R.color.config_alpha_forty_level_two_font_color.color))
+                    ?.setTextColor(ColorStateList.valueOf(R.color.qa_text_title_color.color))
 
             }
 

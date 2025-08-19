@@ -43,6 +43,9 @@ class PublishActivity : BaseActivity() {
         }
     }
 
+    //防止快速点击publish按钮
+    private var isPublish = false
+
     private val viewModel by viewModels<PublishViewModel>()
 
 
@@ -193,6 +196,10 @@ class PublishActivity : BaseActivity() {
         mBtnPublish.setOnClickListener {
             if (!mEditText.isVisible) {
                 //如果编辑栏已经隐藏了，则说明搜索到了相似回答，禁用发布键
+                return@setOnClickListener
+            }
+            if (isPublish) {
+                //如果已经点击了发布按钮，则直接退出防抖
                 return@setOnClickListener
             }
             if (tagSelectorAdapter.getSelectedTagString().isNotBlank()

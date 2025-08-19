@@ -11,10 +11,11 @@
 
     <ImageView
         android:id="@+id/qa_search_iv_return"
-        android:layout_width="7dp"
-        android:layout_height="16dp"
+        android:layout_width="wrap_content"
+        android:padding="4dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="18dp"
-        android:layout_marginTop="27.5dp"
+        android:layout_marginTop="16dp"
         android:src="@drawable/qa_ic_arrow_back"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -23,7 +24,7 @@
         android:id="@+id/qa_search_tv_title"
         android:layout_width="85dp"
         android:layout_height="31dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="16dp"
         android:text="Q and A"
         android:textColor="@color/config_level_one_font_color"
         android:textSize="23dp"

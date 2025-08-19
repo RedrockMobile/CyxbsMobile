@@ -3,18 +3,19 @@ package com.cyxbs.pages.qa.detail.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.qa.R
+import com.cyxbs.pages.qa.detail.bean.QuestionItem
 import com.cyxbs.pages.qa.detail.viewmodel.QaDetailVm
 import com.cyxbs.pages.qa.publish.ui.activity.PublishActivity
-import com.google.android.flexbox.FlexboxLayout
 
 /**
  * description ： QA详情页
@@ -23,40 +24,45 @@ import com.google.android.flexbox.FlexboxLayout
  */
 class DetailActivity : BaseActivity() {
     companion object {
+        private const val EXTRA_QUESTION_ID = "id"
+
         fun startActivity(context: Context, id: Long) {
             context.startActivity(Intent(context, DetailActivity::class.java).apply {
-                putExtra(
-                    "id",
-                    id
-                )
+                putExtra(EXTRA_QUESTION_ID, id)
             })
         }
     }
 
     private val mViewModel by viewModels<QaDetailVm>()
+    private val qaDetailBack by R.id.qa_detail_btn_back.view<ImageView>()
+    private val qaDetailPublish by R.id.qa_detail_btn_publish.view<Button>()
+    private val qaDetailProblem by R.id.qa_detail_tv_question.view<TextView>()
+    private val qaDetailTime by R.id.qa_detail_tv_time.view<TextView>()
+    private val qaDetailContent by R.id.qa_detail_tv_answer.view<TextView>()
+    private val qaDetailLike by R.id.qa_detail_tv_like_count.view<TextView>()
+    private val qaDetailLook by R.id.qa_detail_tv_looked_count.view<TextView>()
+    private val qaDetailLikeIm by R.id.qa_detail_iv_like.view<ImageView>()
 
-    private var id: Long = -1L
-
-    private var isLiked: Boolean = false
-
-    private val qaDetailBack by R.id.qa_de_return.view<ImageView>()
-    private val qaDetailPublish by R.id.qa_de_btn.view<Button>()
-    private val qaDetailProblem by R.id.qa_de_tv.view<TextView>()
-    private val qaDetailTime by R.id.qa_de_time.view<TextView>()
-    private val qaDetailContent by R.id.qa_de_content.view<TextView>()
-    private val qaDetailLike by R.id.qa_de_likecount.view<TextView>()
-    private val qaDetailLook by R.id.qa_de_lookcount.view<TextView>()
-    private val qaDetailLikeIm by R.id.qa_de_like.view<ImageView>()
-
-    private val qaDetailTags by R.id.qa_de_tags.view<FlexboxLayout>()
+    private val qaDetailTags by R.id.qa_detail_tv_tag.view<TextView>()
+    private val qaIvNoNet by R.id.qa_detail_iv_no_net.view<ImageView>()
+    private val qaTvNoNet by R.id.qa_detail_tv_no_net.view<TextView>()
+    private val qaContent by R.id.qa_detail_sv_content.view<ScrollView>()
+    private var isInit = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.qa_activity_detail)
-        id = intent.getLongExtra("id", 1)
-        getDate()
+        val id = intent.getLongExtra(EXTRA_QUESTION_ID, 1L)
+        mViewModel.setId(id)
+
         initClick()
-        observeLike()
+        observerData()
+        getDate()
+
+    }
+
+    private fun getDate() {
+        mViewModel.getQaDetail()
     }
 
 
@@ -64,50 +70,57 @@ class DetailActivity : BaseActivity() {
         qaDetailBack.setOnClickListener {
             finish()
         }
+
         qaDetailPublish.setOnClickListener {
             PublishActivity.startActivity(this)
         }
+
         qaDetailLikeIm.setOnClickListener {
-            isLiked = !isLiked
-            applyStyle(isLiked)
-            if (!isLiked) {
-                mViewModel.cancelLike(id)
-            } else {
-                mViewModel.putLike(id)
-            }
+            mViewModel.toggleLikeQuestion()
         }
 
-
+        qaDetailBack.setOnClickListener {
+            finish()
+        }
     }
 
-    private fun getDate() {
-        Log.d("DetailDebug", "id: $id")
-        mViewModel.getQaDetail(id)
-        mViewModel.errorLiveData.observe {
-            if (it) {
-                toast("数据加载错误")
+    private fun observerData() {
+        mViewModel.apply {
+            questionData.observe {
+                bind(it)
             }
-        }
-        mViewModel.detailLiveData.observe {
-            qaDetailProblem.text = it.item.q
-            qaDetailContent.text = it.item.a
-            qaDetailLike.text = it.item.like_count.toString()
-            qaDetailLook.text = it.item.view_count.toString()
-            qaDetailTime.text = it.item.CreatedAt.substring(0, 10).replace("-", ".")
-            isLiked = it.item.is_like
-            applyStyle(isLiked)
-
-            val tags = it.item.tags.split(" ").filter { it.isNotEmpty() }
-            qaDetailTags.removeAllViews()
-            if (tags.isNotEmpty()) {
-                addTag(tags[0])
+            searchError.observe {
+                if (it) {
+                    qaContent.gone()
+                    qaIvNoNet.visible()
+                    qaTvNoNet.visible()
+                }
             }
-            /*tags.forEach {
-                addTag(it)
-            }*/
-        }
+            likeError.observe {
+                if (it) {
+                    toast("网络异常")
+                }
+            }
 
+
+        }
     }
+
+    private fun bind(data: QuestionItem) {
+        if (!isInit) {
+            qaDetailProblem.text = data.q
+            qaDetailContent.text = data.a
+            qaDetailLook.text = data.viewCount.toString()
+            qaDetailTime.text = data.createdAt.substring(0, 10).replace("-", ".")
+            val tags = data.tags.split(" ").filter { it.isNotEmpty() }
+            qaDetailTags.text = tags[0]
+            isInit = true//标记已经初始化
+        }
+        qaDetailLike.text = data.likeCount.toString()
+        val isLiked = data.isLike
+        applyStyle(isLiked)
+    }
+
 
     private fun applyStyle(isLike: Boolean) {
         if (isLike) {
@@ -130,31 +143,4 @@ class DetailActivity : BaseActivity() {
         }
     }
 
-    private fun observeLike() {
-        mViewModel.likestatus.observe {
-            if (it) {
-                updateLikeCount()
-            } else {
-                isLiked = !isLiked
-                applyStyle(isLiked)
-                toast("点赞失败，请重试")
-            }
-        }
-    }
-
-    private fun updateLikeCount() {
-        val likeCount = qaDetailLike.text.toString().toIntOrNull()
-        val newLikeCount = if (isLiked) likeCount?.plus(1) else likeCount?.minus(1)
-        qaDetailLike.text = newLikeCount.toString()
-    }
-
-    private fun addTag(tag: String) {
-        val tagView = LayoutInflater.from(this)
-            .inflate(R.layout.qa_flexbox_item_question_card_tag, qaDetailTags, false)
-
-        tagView.findViewById<TextView>(R.id.qa_publish_tv_tag_item).apply {
-            text = tag + "类"
-        }
-        qaDetailTags.addView(tagView)
-    }
 }

@@ -4,7 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     xmlns:tools="http://schemas.android.com/tools"
-    android:paddingTop="16dp">
+    android:paddingTop="16dp"
+    android:layout_marginBottom="16dp"
+    android:background="@drawable/qa_shape_publish_question_card_bg">
 
     <ImageView
         android:id="@+id/qa_question_item_iv_message"
@@ -52,7 +54,7 @@
         android:layout_width="6dp"
         android:layout_height="6dp"
         android:layout_marginTop="8dp"
-        android:src="@drawable/qa_ic_question_item_paragraph"
+        android:src="@drawable/qa_ic_publish_question_card_point"
         app:layout_constraintEnd_toEndOf="@id/qa_question_item_iv_message"
         app:layout_constraintStart_toStartOf="@id/qa_question_item_iv_message"
         app:layout_constraintTop_toTopOf="@id/qa_question_item_tv_content" />
@@ -88,7 +90,7 @@
         android:id="@+id/qa_question_item_iv_cyxb"
         android:layout_width="100dp"
         android:layout_height="67dp"
-        android:src="@drawable/qa_ic_question_item_cyxb"
+        android:src="@drawable/qa_ic_publish_question_card_bg"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

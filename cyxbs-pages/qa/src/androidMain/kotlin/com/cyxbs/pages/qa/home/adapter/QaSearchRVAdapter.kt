@@ -27,6 +27,8 @@ class QaSearchRVAdapter(
     var keyword: String = ""
 
     companion object {
+        private const val PAYLOAD_LIKE = "payload_like"
+
         private val COMPARATOR = object : DiffUtil.ItemCallback<Item>() {
             override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
                 oldItem.ID == newItem.ID
@@ -38,6 +40,14 @@ class QaSearchRVAdapter(
                         oldItem.a_time == newItem.a_time &&
                         oldItem.is_like == newItem.is_like &&
                         oldItem.like_count == newItem.like_count
+
+            override fun getChangePayload(oldItem: Item, newItem: Item): Any? {
+                return if (oldItem.is_like != newItem.is_like ||
+                    oldItem.like_count != newItem.like_count
+                ) {
+                    PAYLOAD_LIKE
+                } else null
+            }
         }
     }
 
@@ -60,7 +70,7 @@ class QaSearchRVAdapter(
         }
 
         private fun initClick() {
-            rootView.setOnClickListener{
+            rootView.setOnClickListener {
                 currentData?.let {
                     listener?.invoke(it.ID.toLong())
                 }
@@ -80,21 +90,20 @@ class QaSearchRVAdapter(
                     UpdatedAt = data.UpdatedAt ?: ""
                 )
                 currentData = updatedItem
-                bind(updatedItem)
+                bindLike(updatedItem)
 
                 // 调用 ViewModel 封装的方法处理点赞/取消
                 if (updatedItem.is_like) {
                     searchViewModel.likeItem(updatedItem) {
                         // 失败回滚
                         currentData = data
-                        bind(data)
-                        Toast.makeText(itemView.context, "点赞失败，请重试", Toast.LENGTH_SHORT)
-                            .show()
+                        bindLike(data)
+                        Toast.makeText(itemView.context, "点赞失败，请重试", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     searchViewModel.unlikeItem(updatedItem) {
                         currentData = data
-                        bind(data)
+                        bindLike(data)
                         Toast.makeText(itemView.context, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
                             .show()
                     }
@@ -111,6 +120,10 @@ class QaSearchRVAdapter(
             val filterQuestion = item.a.ellipsis()
             answer.text = highlightKeyword(filterQuestion, keyword)
             time.text = item.a_time.substring(0, 10).replace("-", ".")
+            bindLike(item) // 点赞部分单独抽出去
+        }
+
+        fun bindLike(item: Item) {
             likenumber.text = item.like_count.toString()
             checkLike(item)
         }
@@ -165,6 +178,14 @@ class QaSearchRVAdapter(
         getItem(position)?.let { holder.bind(it) }
     }
 
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.contains(PAYLOAD_LIKE)) {
+            getItem(position)?.let { holder.bindLike(it) }
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.qa_recycle_item_question_item, parent, false)
@@ -172,7 +193,7 @@ class QaSearchRVAdapter(
     }
 
     private var listener: ((Long) -> Unit)? = null
-    fun setOnItemClickListener(listener: (Long)-> Unit){
+    fun setOnItemClickListener(listener: (Long) -> Unit) {
         this.listener = listener
     }
 }

@@ -7,14 +7,19 @@
     <application>
         <activity
             android:name=".home.SearchActivity"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
-        <activity android:name=".detail.ui.DetailActivity" />
+            android:windowSoftInputMode="adjustPan|stateHidden"
+            android:launchMode="singleTop"/>
+
+        <activity android:name=".detail.ui.DetailActivity"
+            android:launchMode="singleTop"/>
         <activity
             android:name=".home.HomeActivity"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
+            android:windowSoftInputMode="adjustPan|stateHidden"
+            android:launchMode="singleTop"/>
         <activity
             android:name=".publish.ui.activity.PublishActivity"
-            android:windowSoftInputMode="stateVisible|adjustResize" />
+            android:windowSoftInputMode="stateVisible|adjustResize"
+            android:launchMode="singleTop"/>
     </application>
 
 </manifest>
