@@ -30,6 +30,12 @@
     <!--问答卡片的分割线的颜色-->
     <color name="qa_publish_question_card_divider_color">#313131</color>
 
+    <!--搜索框颜色-->
+    <color name="qa_search_background_color">#1A1A1A</color>
+
+    <!--搜索字样颜色-->
+    <color name="qa_search_content_color">#767677</color>
+
     <!-- card背景的颜色 -->
-    <color name="qa_de_card_background_color">#2D2D2D</color>
+    <color name="qa_home_btn_publish_color">#5F5AE7</color>
 </resources>

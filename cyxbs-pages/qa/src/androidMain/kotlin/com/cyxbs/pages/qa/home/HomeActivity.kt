@@ -38,8 +38,10 @@ import kotlin.properties.Delegates
  * email : 2992203079qq.com
  * date : 2025/8/11 23:07
  */
+
 @KClassProvider(clazz = Activity::class, name = QA_ENTRY)
 class HomeActivity : BaseActivity() {
+
     private val qaHomeBtnSearch by R.id.qa_home_btn_search.view<EditText>()
     private val qaHomeBtnPublish by R.id.qa_home_btn_publish.view<LinearLayout>()
     private val qaHomeBtnReturn by R.id.qa_home_iv_return.view<ImageView>()
@@ -51,6 +53,9 @@ class HomeActivity : BaseActivity() {
     private var tab4View by Delegates.notNull<View>()
     private var tab5View by Delegates.notNull<View>()
 
+    // 持有监听实例，方便 onDestroy 移除
+    private lateinit var pageChangeCallback: ViewPager2.OnPageChangeCallback
+    private lateinit var tabSelectedListener: TabLayout.OnTabSelectedListener
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,30 +72,26 @@ class HomeActivity : BaseActivity() {
             .add { QaLifeFragment() }
             .add { QaStudyFragment() }
             .add { QaOtherFragment() }
+
         // 切换回调
-        mVP.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+        pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 hideOtherTabDots(position)
             }
-        })
-        val tabs = arrayOf(
-            "全部",
-            "新生类",
-            "生活类",
-            "学习类",
-            "其他",
-        )
-        TabLayoutMediator(
-            mTabLayout, mVP
-        ) { tab,
-            position ->
+        }
+        mVP.registerOnPageChangeCallback(pageChangeCallback)
+
+        val tabs = arrayOf("全部", "新生类", "生活类", "学习类", "其他")
+        TabLayoutMediator(mTabLayout, mVP) { tab, position ->
             tab.text = tabs[position]
         }.attach()
+
         val tab1 = mTabLayout.getTabAt(0)
         val tab2 = mTabLayout.getTabAt(1)
         val tab3 = mTabLayout.getTabAt(2)
         val tab4 = mTabLayout.getTabAt(3)
         val tab5 = mTabLayout.getTabAt(4)
+
         tab1View = LayoutInflater.from(this).inflate(R.layout.qa_tablayout_item_all, null)
         tab1?.customView = tab1View
         tab2View = LayoutInflater.from(this).inflate(R.layout.qa_tablayout_item_freshman, null)
@@ -101,7 +102,8 @@ class HomeActivity : BaseActivity() {
         tab4?.customView = tab4View
         tab5View = LayoutInflater.from(this).inflate(R.layout.qa_tablayout_item_other, null)
         tab5?.customView = tab5View
-        val onTabSelectedListener = object : TabLayout.OnTabSelectedListener {
+
+        tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 tab.customView?.findViewById<TextView>(R.id.qa_tv_tl_tab)
                     ?.setTextColor(ColorStateList.valueOf(R.color.qa_text_title_color.color))
@@ -110,39 +112,30 @@ class HomeActivity : BaseActivity() {
             override fun onTabUnselected(tab: TabLayout.Tab) {
                 tab.customView?.findViewById<TextView>(R.id.qa_tv_tl_tab)
                     ?.setTextColor(ColorStateList.valueOf(R.color.qa_text_title_color.color))
-
             }
 
-            override fun onTabReselected(tab: TabLayout.Tab?) {
-            }
-
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
         }
-        mTabLayout.addOnTabSelectedListener(onTabSelectedListener)
-
-
+        mTabLayout.addOnTabSelectedListener(tabSelectedListener)
     }
 
     private fun initClick() {
-
         qaHomeBtnReturn.setOnClickListener {
             finish()
         }
-        qaHomeBtnSearch.setOnEditorActionListener { v, actionId, event ->
+        qaHomeBtnSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 SearchActivity.strartActivity(qaHomeBtnSearch.text.toString(), this)
                 val sp = this.getSp("search_keyword")
                 sp.edit().apply {
-                    putString("keyword", qaHomeBtnSearch.text.toString())   // 存字符串
-                    apply()                             // 提交异步生效（推荐）
+                    putString("keyword", qaHomeBtnSearch.text.toString())
+                    apply()
                 }
-                // 执行搜索逻辑
                 true
             } else {
                 false
             }
         }
-
-        //前往发布问题
         qaHomeBtnPublish.setOnClickListener {
             PublishActivity.startActivity(this)
         }
@@ -155,18 +148,19 @@ class HomeActivity : BaseActivity() {
                 val tabView = tabStrip.getChildAt(i)
                 val textView = tabView.findViewById<TextView>(R.id.qa_tv_tl_tab)
                 val textWidth = textView.width
-                val indicatorWidth = textWidth - dp2px(shortenDp.toFloat()) // 比文字短多少
+                val indicatorWidth = textWidth - dp2px(shortenDp.toFloat())
 
-                val drawable =
-                    ContextCompat.getDrawable(tabLayout.context, R.drawable.qa_ic_tab_indicator)!!
-                val leftInset = (textWidth - indicatorWidth) / 2
-                val rightInset = leftInset
-
-                val insetDrawable = InsetDrawable(drawable, leftInset, 0, rightInset, 0)
-                tabLayout.setSelectedTabIndicator(insetDrawable)
+                val drawable = ContextCompat.getDrawable(tabLayout.context, R.drawable.qa_ic_tab_indicator)
+                if (drawable != null) {
+                    val leftInset = (textWidth - indicatorWidth) / 2
+                    val rightInset = leftInset
+                    val insetDrawable = InsetDrawable(drawable, leftInset, 0, rightInset, 0)
+                    tabLayout.setSelectedTabIndicator(insetDrawable)
+                }
             }
         }
     }
+
 
     fun dp2px(dp: Float): Int {
         return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
@@ -176,10 +170,11 @@ class HomeActivity : BaseActivity() {
         val tab = mTabLayout.getTabAt(tabIndex)
         val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
         dotView?.apply {
-            text = count.toString()
+            text = if (count >= 10) "9+" else count.toString()
             visibility = if (count > 0) View.VISIBLE else View.GONE
         }
     }
+
 
     fun hideOtherTabDots(currentIndex: Int) {
         for (i in 0 until mTabLayout.tabCount) {
@@ -191,5 +186,10 @@ class HomeActivity : BaseActivity() {
         }
     }
 
-
+    override fun onDestroy() {
+        super.onDestroy()
+        // 解绑监听，避免内存泄漏
+        mVP.unregisterOnPageChangeCallback(pageChangeCallback)
+        mTabLayout.removeOnTabSelectedListener(tabSelectedListener)
+    }
 }

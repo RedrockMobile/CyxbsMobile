@@ -18,7 +18,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers
  * date : 2025/8/16 20:29
  */
 class SearchViewModel : BaseViewModel() {
-    val _mutableQaData = MutableLiveData<QaData>()
+    private val _mutableQaData = MutableLiveData<QaData>()
     val QaDataLiveData: LiveData<QaData>
         get() = _mutableQaData
 
@@ -26,10 +26,16 @@ class SearchViewModel : BaseViewModel() {
     val errorLiveData: LiveData<Boolean>
         get() = _mutableErrorLiveData
 
+    // 区分更新类型：true = 全量刷新，false = 局部刷新
+    private val _isFullRefresh = MutableLiveData<Boolean>()
+    val isFullRefresh: LiveData<Boolean> get() = _isFullRefresh
+
+
     /**
      * 获取Qa主页数据
      */
     fun getQaData(name: String) {
+        _isFullRefresh.postValue(true) // 搜索触发 → 全量刷新
         QaHomeApiService::class.api
             .getSearch(name)
             .subscribeOn(Schedulers.io())
@@ -43,6 +49,9 @@ class SearchViewModel : BaseViewModel() {
             }
     }
 
+    /**
+     * Qa点赞(网络请求)
+     */
     fun getLike(id: Int, callback: (Boolean) -> Unit) {
         QaHomeApiService::class.api
             .getLike(id)
@@ -53,7 +62,9 @@ class SearchViewModel : BaseViewModel() {
                 onError = { callback(false) }
             )
     }
-
+    /**
+     * Qa取消点赞(网络请求)
+     */
     fun getUnlike(id: Int, callback: (Boolean) -> Unit) {
         QaHomeApiService::class.api
             .getUnlike(id)
@@ -64,29 +75,29 @@ class SearchViewModel : BaseViewModel() {
                 onError = { callback(false) }
             )
     }
-
+    /**
+     * Qa本地点赞处理
+     */
     fun likeItem(item: Item, onFail: () -> Unit) {
+        _isFullRefresh.postValue(false) // 本地点赞 → 局部刷新
         getLike(item.ID) { success ->
             if (success) {
                 val oldValue = _mutableQaData.value ?: return@getLike
                 val newItems = oldValue.items.map {
                     if (it.ID == item.ID) item else it
                 }
-                // 使用安全 copy，info 可能为 null 时给默认值
-                val safeInfo = oldValue.info ?: "" // 或者你定义的默认 info
-                _mutableQaData.postValue(
-                    oldValue.copy(
-                        items = newItems,
-                        info = safeInfo.toString()
-                    )
-                )
+                val safeInfo = oldValue.info ?: ""
+                _mutableQaData.postValue(oldValue.copy(items = newItems, info = safeInfo))
             } else {
                 onFail()
             }
         }
     }
-
+    /**
+     * Qa本地取消点赞处理
+     */
     fun unlikeItem(item: Item, onFail: () -> Unit) {
+        _isFullRefresh.postValue(false) // 本地取消点赞 → 局部刷新
         getUnlike(item.ID) { success ->
             if (success) {
                 val oldValue = _mutableQaData.value ?: return@getUnlike
@@ -94,12 +105,7 @@ class SearchViewModel : BaseViewModel() {
                     if (it.ID == item.ID) item else it
                 }
                 val safeInfo = oldValue.info ?: ""
-                _mutableQaData.postValue(
-                    oldValue.copy(
-                        items = newItems,
-                        info = safeInfo.toString()
-                    )
-                )
+                _mutableQaData.postValue(oldValue.copy(items = newItems, info = safeInfo))
             } else {
                 onFail()
             }

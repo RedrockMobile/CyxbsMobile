@@ -19,7 +19,7 @@
         android:id="@+id/qa_dot_view"
         android:layout_width="16dp"
         android:layout_height="12dp"
-        android:text="20"
+        android:text="20+"
         android:textSize="9sp"
         android:textColor="#FFFFFF"
         android:gravity="center"

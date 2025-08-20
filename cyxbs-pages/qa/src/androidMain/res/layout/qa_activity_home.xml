@@ -24,7 +24,7 @@
         android:layout_height="31dp"
         android:layout_marginTop="16dp"
         android:text="Q and A"
-        android:textColor="@color/config_level_one_font_color"
+        android:textColor="@color/qa_text_title_color"
         android:textSize="23sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -102,7 +102,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:text="发布问题"
-            android:textColor="@color/cardview_light_background"
+            android:textColor="@color/qa_btn_color"
             android:textSize="18dp" />
 
     </LinearLayout>

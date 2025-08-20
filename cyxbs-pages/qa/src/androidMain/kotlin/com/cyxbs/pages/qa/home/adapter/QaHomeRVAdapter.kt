@@ -76,7 +76,7 @@ class QaHomeRVAdapter(
                 lastClickTime = now
 
                 if (!isNetworkAvailable()) {
-                    Toast.makeText(itemView.context, "网络不可用", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(itemView.context.applicationContext, "网络不可用", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
 
@@ -84,12 +84,12 @@ class QaHomeRVAdapter(
 
                 if (data.is_like) {
                     viewModel.unlikeItem(data) {
-                        Toast.makeText(itemView.context, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
+                        Toast.makeText(itemView.context.applicationContext, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
                             .show()
                     }
                 } else {
                     viewModel.likeItem(data) {
-                        Toast.makeText(itemView.context, "点赞失败，请重试", Toast.LENGTH_SHORT)
+                        Toast.makeText(itemView.context.applicationContext, "点赞失败，请重试", Toast.LENGTH_SHORT)
                             .show()
                     }
                 }
@@ -171,8 +171,7 @@ class QaHomeRVAdapter(
 
 
     private var listener: ((Long) -> Unit)? = null
-
-    fun setOnItemClickListener(listener: (Long)-> Unit){
+    fun setOnItemClickListener(listener: ((Long) -> Unit)?) {
         this.listener = listener
     }
 

@@ -24,10 +24,10 @@ class QaSearchRVAdapter(
     private val searchViewModel: SearchViewModel
 ) : ListAdapter<Item, QaSearchRVAdapter.ViewHolder>(COMPARATOR) {
 
-    var keyword: String = ""
+    var keyword: String = "" // 当前搜索关键字
 
     companion object {
-        private const val PAYLOAD_LIKE = "payload_like"
+        const val PAYLOAD_LIKE = "payload_like"
 
         private val COMPARATOR = object : DiffUtil.ItemCallback<Item>() {
             override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
@@ -52,7 +52,7 @@ class QaSearchRVAdapter(
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val rootView = itemView.rootView
+        private val rootView = itemView
         private val question = itemView.findViewById<TextView>(R.id.qa_question_item_tv_title)
         private val answer = itemView.findViewById<TextView>(R.id.qa_question_item_tv_content)
         private val time = itemView.findViewById<TextView>(R.id.qa_question_item_tv_time)
@@ -71,9 +71,7 @@ class QaSearchRVAdapter(
 
         private fun initClick() {
             rootView.setOnClickListener {
-                currentData?.let {
-                    listener?.invoke(it.ID.toLong())
-                }
+                currentData?.let { listener?.invoke(it.ID.toLong()) }
             }
 
             like.setOnClickListener {
@@ -92,19 +90,17 @@ class QaSearchRVAdapter(
                 currentData = updatedItem
                 bindLike(updatedItem)
 
-                // 调用 ViewModel 封装的方法处理点赞/取消
                 if (updatedItem.is_like) {
                     searchViewModel.likeItem(updatedItem) {
-                        // 失败回滚
                         currentData = data
                         bindLike(data)
-                        Toast.makeText(itemView.context, "点赞失败，请重试", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(itemView.context.applicationContext, "点赞失败，请重试", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     searchViewModel.unlikeItem(updatedItem) {
                         currentData = data
                         bindLike(data)
-                        Toast.makeText(itemView.context, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
+                        Toast.makeText(itemView.context.applicationContext, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
                             .show()
                     }
                 }
@@ -116,11 +112,13 @@ class QaSearchRVAdapter(
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags[0]}类"
 
-            question.text = highlightKeyword(item.q, keyword)
-            val filterQuestion = item.a.ellipsis()
-            answer.text = highlightKeyword(filterQuestion, keyword)
+            val filterquestion = item.q.ellipsis()
+            // 高亮使用 Adapter 的 keyword，每次绑定都刷新
+            question.text = highlightKeyword(filterquestion, this@QaSearchRVAdapter.keyword)
+            val filterAnswer = item.a
+            answer.text = highlightKeyword(filterAnswer, this@QaSearchRVAdapter.keyword)
             time.text = item.a_time.substring(0, 10).replace("-", ".")
-            bindLike(item) // 点赞部分单独抽出去
+            bindLike(item)
         }
 
         fun bindLike(item: Item) {
@@ -193,7 +191,7 @@ class QaSearchRVAdapter(
     }
 
     private var listener: ((Long) -> Unit)? = null
-    fun setOnItemClickListener(listener: (Long) -> Unit) {
+    fun setOnItemClickListener(listener: ((Long) -> Unit)?) {
         this.listener = listener
     }
 }

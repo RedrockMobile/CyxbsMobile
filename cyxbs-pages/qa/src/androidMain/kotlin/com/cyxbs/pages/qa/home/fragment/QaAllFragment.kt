@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
@@ -37,18 +38,19 @@ class QaAllFragment : BaseFragment() {
     private val mRecycleView by R.id.qa_all_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(),it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
     }
     private val searchRVAdapter: QaSearchRVAdapter by lazy {
         QaSearchRVAdapter(searchViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(),it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
     }
+    private var homeLoadStateListener: ((CombinedLoadStates) -> Unit)? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,11 +71,31 @@ class QaAllFragment : BaseFragment() {
             is SearchActivity -> initSearchView()
             else -> initDefaultView()
         }
+
     }
 
     private fun initHomeView() {
         mRecycleView.adapter = homeRvAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
+
+        var isDotUpdated = false
+
+        // 先赋值给变量
+        homeLoadStateListener = { loadStates ->
+            val refreshState = loadStates.refresh
+            if (!isDotUpdated && refreshState is LoadState.NotLoading && homeRvAdapter.itemCount > 0) {
+                val stats = newMessageAnalyzer.analyze(homeRvAdapter.snapshot().items)
+                (activity as? HomeActivity)?.apply {
+                    updateTabDot(1, stats.newStudentCount)
+                    updateTabDot(2, stats.lifeCount)
+                    updateTabDot(3, stats.learningCount)
+                    updateTabDot(4, stats.otherCount)
+                }
+                isDotUpdated = true
+            }
+        }
+        // 添加监听
+        homeLoadStateListener?.let { homeRvAdapter.addLoadStateListener(it) }
 
 
         viewLifecycleScope.launch {
@@ -83,25 +105,6 @@ class QaAllFragment : BaseFragment() {
 
             }
         }
-        homeRvAdapter.addLoadStateListener(object : (CombinedLoadStates) -> Unit {
-            override fun invoke(loadStates: CombinedLoadStates) {
-                val refreshState = loadStates.refresh
-                if (refreshState is LoadState.NotLoading && homeRvAdapter.itemCount > 0) {
-                    val currentList = homeRvAdapter.snapshot().items
-                    val stats = newMessageAnalyzer.analyze(currentList)
-                    // 更新 Tab 角标
-                    (activity as? HomeActivity)?.apply {
-                        //updateTabDot(0, stats.updatedCount)
-                        updateTabDot(1, stats.newStudentCount)
-                        updateTabDot(2, stats.lifeCount)
-                        updateTabDot(3, stats.learningCount)
-                        updateTabDot(4, stats.otherCount)
-                    }
-                    //  移除监听器，防止后续分页重复触发
-                    homeRvAdapter.removeLoadStateListener(this)
-                }
-            }
-        })
 
     }
 
@@ -123,28 +126,39 @@ class QaAllFragment : BaseFragment() {
         // 清理适配器
         mRecycleView.adapter = null
         mRecycleView.layoutManager = null
+        homeRvAdapter.setOnItemClickListener(null)
+        searchRVAdapter.setOnItemClickListener(null)
+        // 显式移除 LoadStateListener
+        homeLoadStateListener?.let { homeRvAdapter.removeLoadStateListener(it) }
+        homeLoadStateListener = null
 
-        // 移除 LiveData 观察者
+        // 移除观察者
         searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
+
 
     }
 
     private fun initSearchUi() {
         searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-
             val filteredList = qaData?.items?.filter { it.status == 2 } ?: emptyList()
 
-            // 使用 safe call 来避免空指针
-            context?.getSp("search_keyword")?.let { sp ->
-                val str = sp.getString("keyword", "默认值")
-                searchRVAdapter.keyword = str ?: "默认值"  // 确保 keyword 不为 null
+            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
+            if (isFullRefresh) {
+                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
+                    searchRVAdapter.keyword = str
+                }
+                //先清空然后赋值 更体现搜索的意义
+                searchRVAdapter.submitList(emptyList()) {
+                    searchRVAdapter.submitList(filteredList)
+                }
 
+            } else {
+                // 本地点赞/缓存更新 → 局部刷新
+                searchRVAdapter.submitList(filteredList)
             }
+        }
 
-
-            // 刷新列表并滚动到顶部
-            searchRVAdapter.submitList(filteredList)
         }
     }
-}
+
 

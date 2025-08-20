@@ -47,7 +47,7 @@
     <!-- 按钮字体的颜色 -->
     <color name="qa_btn_color">#FFFFFF</color>
     <!-- card背景的颜色 -->
-    <color name="qa_de_card_background_color">#FFFFFF</color>
+    <color name="qa_home_btn_publish_color">#4A44E4</color>
 
 
 </resources>

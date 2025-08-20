@@ -33,15 +33,15 @@ class QaFreshmanFragment : BaseFragment() {
     private val mRecycleView by R.id.qa_freshman_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(), it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
     }
     private val searchRVAdapter: QaSearchRVAdapter by lazy {
         QaSearchRVAdapter(searchViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(),it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
 
@@ -93,6 +93,8 @@ class QaFreshmanFragment : BaseFragment() {
         // 清理适配器
         mRecycleView.adapter = null
         mRecycleView.layoutManager = null
+        homeRvAdapter.setOnItemClickListener(null)
+        searchRVAdapter.setOnItemClickListener(null)
 
         // 移除 LiveData 观察者
         searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
@@ -114,17 +116,24 @@ class QaFreshmanFragment : BaseFragment() {
 
     private fun initSearchUi() {
         searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-            // 确保 items 不为 null
             val filteredList =
-                qaData?.items?.filter { it.status == 2 && (it.tags.contains("新生") == true) }
-                    ?: emptyList()
-            // 刷新列表并滚动到顶部
-            val sp = context?.getSp("search_keyword")
-            val str = sp?.getString("keyword", "默认值")
-            searchRVAdapter.keyword = str.toString()
-            searchRVAdapter.submitList(filteredList)
+                qaData?.items?.filter { it.status == 2 && it.tags.contains("新生") } ?: emptyList()
 
+            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
+            if (isFullRefresh) {
+                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
+                    searchRVAdapter.keyword = str
+                }
+                searchRVAdapter.submitList(emptyList()) {
+                    searchRVAdapter.submitList(filteredList)
+                }
+
+            } else {
+                // 本地点赞/缓存更新 → 局部刷新
+                searchRVAdapter.submitList(filteredList)
+            }
         }
+
     }
 
 }

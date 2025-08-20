@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/config_common_background_color"
+    android:background="@color/qa_publish_background_color"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
     tools:ignore="ResourceName">
@@ -26,7 +26,7 @@
         android:layout_height="31dp"
         android:layout_marginTop="16dp"
         android:text="Q and A"
-        android:textColor="@color/config_level_one_font_color"
+        android:textColor="@color/qa_text_title_color"
         android:textSize="23dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
