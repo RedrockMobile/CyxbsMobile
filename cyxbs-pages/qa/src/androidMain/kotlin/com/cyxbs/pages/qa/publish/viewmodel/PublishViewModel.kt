@@ -6,6 +6,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.components.utils.network.throwOrInterceptException
+import com.cyxbs.pages.qa.detail.LikeManager
 import com.cyxbs.pages.qa.publish.network.PublishApiService
 import com.cyxbs.pages.qa.publish.network.bean.request.PublishQuestionRequest
 import com.cyxbs.pages.qa.publish.network.bean.response.SearchData
@@ -37,6 +38,41 @@ class PublishViewModel : BaseViewModel() {
     private val likeInProgress = mutableSetOf<Long>() // 正在请求的 id
 
     private var mQuestion: String = ""
+
+    //这个是用来同步点赞数据的监听
+    private val likeStateListener = object : LikeManager.LikeStateListener{
+        override fun onLikeQuestion(id: Long) {
+            val currentList = _searchData.value ?: return
+            val index = currentList.indexOfFirst { it.id == id }
+
+            if (index == -1) return
+            val oldItem = currentList[index]
+            val newItem = oldItem.copy(
+                isLike = true,
+                likeCount = oldItem.likeCount + 1
+            )
+            _searchData.postValue(currentList.toMutableList().apply { this[index] = newItem })
+        }
+
+        override fun onUnLikeQuestion(id: Long) {
+            val currentList = _searchData.value ?: return
+            val index = currentList.indexOfFirst { it.id == id }
+
+            if (index == -1) return
+            val oldItem = currentList[index]
+            val newItem = oldItem.copy(
+                isLike = false,
+                likeCount = oldItem.likeCount - 1
+            )
+            _searchData.postValue(currentList.toMutableList().apply { this[index] = newItem })
+        }
+
+    }
+
+    init {
+        //注册点赞状态更新的监听
+        LikeManager.addLikeStateListener(likeStateListener)
+    }
 
     /**
      * 提出问题
@@ -167,5 +203,10 @@ class PublishViewModel : BaseViewModel() {
     }
 
     fun getCurrentQuestion() = mQuestion
+
+    override fun onCleared() {
+        super.onCleared()
+        LikeManager.removeLikeStateListener(likeStateListener)
+    }
 
 }

@@ -6,6 +6,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.components.utils.network.throwOrInterceptException
+import com.cyxbs.pages.qa.detail.LikeManager
 import com.cyxbs.pages.qa.detail.bean.QuestionItem
 import com.cyxbs.pages.qa.detail.network.DetailApiService
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
@@ -63,7 +64,7 @@ class QaDetailVm : BaseViewModel() {
                 isPerformRequest = false
             }
             .safeSubscribeBy {
-
+                LikeManager.notifyLikeQuestion(id)
                 isPerformRequest = false
             }
     }
@@ -79,6 +80,7 @@ class QaDetailVm : BaseViewModel() {
                 isPerformRequest = false
             }
             .safeSubscribeBy {
+                LikeManager.notifyUnLikeQuestion(id)
                 isPerformRequest = false
             }
     }
