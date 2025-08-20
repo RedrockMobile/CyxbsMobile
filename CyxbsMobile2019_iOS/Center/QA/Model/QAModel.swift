@@ -19,6 +19,7 @@ class QAModel{
         HttpManager.shared.magipoke_qa_listQuestion(tags: QATag, page: pageNum, page_size: pageSize).ry_JSON { response in
             switch response{
             case .success(let jsonData):
+                print("\(jsonData)")
                 let allQAResponse = AllQAResponse(from: jsonData)
                 self.qa = allQAResponse.data.items
                 success(self.qa)

@@ -32,6 +32,26 @@ class QATableViewCell : UITableViewCell {
     func setPosition(){
         //let questionLabelLength = calculateLabelWidth(labelText: questionLabel.text!)
         
+        hashTag.snp.makeConstraints{ make in
+            make.left.equalToSuperview().offset(12)
+            make.top.equalToSuperview().offset(16)
+            make.height.equalTo(22)
+            make.width.equalTo(22)
+        }
+        
+        paraIcon.snp.makeConstraints{ make in
+            make.left.equalToSuperview().offset(24)
+            make.top.equalToSuperview().offset(57)
+            make.height.equalTo(6)
+            make.width.equalTo(6)
+        }
+        
+        ansPrevLabel.snp.makeConstraints{ make in
+            make.left.equalToSuperview().offset(48)
+            make.top.equalToSuperview().offset(48)
+            make.right.equalToSuperview().offset(-16)
+        }
+        
         questionLabel.snp.makeConstraints{ make in
             make.top.equalToSuperview().offset(12)
             make.left.equalToSuperview().offset(48)
@@ -41,11 +61,38 @@ class QATableViewCell : UITableViewCell {
         
         categoryLabel.snp.makeConstraints{ make in
             make.top.equalToSuperview().offset(15)
-            make.left.equalTo(questionLabel).offset(200 + 12)
+            make.right.equalToSuperview().offset(16)
             make.height.equalTo(16)
             make.width.equalTo(48)
         }
         
+        dateLabel.snp.makeConstraints{ make in
+            make.top.equalToSuperview().offset(99)
+            make.left.equalToSuperview().offset(16)
+            make.width.equalTo(70)
+            make.height.equalTo(17)
+        }
+        
+        likeButton.snp.makeConstraints{ make in
+            make.bottom.equalToSuperview().offset(-15)
+            make.right.equalToSuperview().offset(-46)
+            make.height.equalTo(24)
+            make.width.equalTo(24)
+        }
+        
+        likeCountLabel.snp.makeConstraints{ make in
+            make.right.equalToSuperview().offset(-15.25)
+            make.bottom.equalToSuperview().offset(-28)
+            make.width.equalTo(30)
+            make.height.equalTo(18)
+        }
+        
+        cyxbsIcon.snp.makeConstraints{ make in
+            make.right.equalToSuperview()
+            make.bottom.equalToSuperview()
+            make.width.equalTo(100)
+            make.height.equalTo(67)
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -55,7 +102,6 @@ class QATableViewCell : UITableViewCell {
     lazy var hashTag : UIImageView = {
         let hashTag = UIImageView()
         hashTag.image = UIImage(named: "HashTag")
-        hashTag.frame = CGRectMake(16, 12, 22, 22)
         return hashTag
     }()
     
@@ -81,7 +127,6 @@ class QATableViewCell : UITableViewCell {
     lazy var paraIcon : UIImageView = {
         let paraIcon = UIImageView()
         paraIcon.image = UIImage(named: "Ellipse")
-        paraIcon.frame = CGRectMake(24, 57, 6, 6)
         return paraIcon
     }()
     
@@ -91,7 +136,6 @@ class QATableViewCell : UITableViewCell {
         ansPrevLabel.textAlignment = .left
         ansPrevLabel.backgroundColor = .clear
         ansPrevLabel.numberOfLines = 2
-        ansPrevLabel.frame = CGRectMake(48, 48, 280, 47)
         ansPrevLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677", alpha: 1))
         return categoryLabel
     }()
@@ -100,7 +144,6 @@ class QATableViewCell : UITableViewCell {
         let dateLabel = UILabel()
         dateLabel.font = UIFont(name: PingFangSC, size: 12)
         dateLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
-        dateLabel.frame = CGRectMake(16, 99, 70, 17)
         return dateLabel
     }()
     
@@ -108,7 +151,6 @@ class QATableViewCell : UITableViewCell {
         let likeButton = UIButton()
         likeButton.setImage(UIImage(named: "Unlike"), for: .normal)
         likeButton.setImage(UIImage(named: "Like"), for: .selected)
-        likeButton.frame = CGRectMake(273, 93, 24, 24)
         return likeButton
     }()
     
@@ -117,14 +159,12 @@ class QATableViewCell : UITableViewCell {
         likeCountLabel.font = UIFont(name: PingFangSC, size: 12)
         likeCountLabel.textAlignment = .left
         likeCountLabel.textColor = UIColor.ry(light: "#A7B6D1", dark: "#FFFFFF")
-        likeCountLabel.frame = CGRectMake(297.75, 86, 30, 18.7)
         return likeCountLabel
     }()
     
     lazy var cyxbsIcon : UIImageView = {
         let cyxbsIcon = UIImageView()
         cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
-        cyxbsIcon.frame = CGRectMake(243, 65, 100, 67)
         return cyxbsIcon
     }()
     
