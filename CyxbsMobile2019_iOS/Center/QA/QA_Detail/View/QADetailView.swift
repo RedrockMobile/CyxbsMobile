@@ -77,6 +77,7 @@ class QADetailView : UIView{
         let questionLabel = UILabel()
         questionLabel.font = UIFont(name: PingFangSC, size: 16)
         questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
+        questionLabel.backgroundColor = .clear
         questionLabel.numberOfLines = 1
         return questionLabel
     }()

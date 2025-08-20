@@ -15,6 +15,7 @@ class QAModel{
     
     ///请求所有或限定页数的QA项目
     func requestQACenterObjects(QATag : String, pageNum: Int?, pageSize: Int?,success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
+        qa = []
         HttpManager.shared.magipoke_qa_listQuestion(tags: QATag, page: pageNum, page_size: pageSize).ry_JSON { response in
             switch response{
             case .success(let jsonData):
@@ -31,6 +32,7 @@ class QAModel{
     
     ///请求搜索的QA项目
     func requestSearchObjects(keyword : String, success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
+        qa = []
         HttpManager.shared.magipoke_qa_search(q: keyword).ry_JSON { response in
             switch response{
             case .success(let jsonData):
@@ -191,4 +193,12 @@ extension DetailQAData{
     init(from json : JSON){
         item = QAObject(from: json["item"])
     }
+}
+
+enum QAType {
+    case all
+    case freshMen
+    case life
+    case study
+    case other
 }

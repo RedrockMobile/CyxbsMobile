@@ -435,30 +435,30 @@ extension HttpManager {
             parameters["page_size"] = page_size
         }
         
-        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters)
     }
     
     ///QA请求问题详情
     func magipoke_qa_getDetail(id: Int) -> DataRequest{
         let parameters: [String: Any] = ["id": id]
-        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/detail"), method: .get, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/detail"), method: .get, parameters: parameters)
     }
     
     ///QA点赞
     func magipoke_qa_like(id: Int) -> DataRequest{
         let parameters: [String: Any] = ["id": id]
-        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/like"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/like"), method: .post, parameters: parameters)
     }
     
     ///QA取消点赞
     func magipoke_qa_unlike(id: Int) -> DataRequest{
         let parameters: [String: Any] = ["id": id]
-        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/unlike"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/unlike"), method: .post, parameters: parameters)
     }
     
     ///QA搜索
     func magipoke_qa_search(q: String) -> DataRequest{
         let parameters : [String: Any] = ["q": q]
-        return SessionManager.shared.ry_request(APIConfig.current.api("magipoke-qa/api/v1/mobile/search"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/search"), method: .post, parameters: parameters)
     }
 }

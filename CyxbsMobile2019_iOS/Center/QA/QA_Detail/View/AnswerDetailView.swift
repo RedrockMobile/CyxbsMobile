@@ -115,7 +115,7 @@ class AnswerDetailView : UIView {
     
     lazy var cyxbsIcon : UIImageView = {
         let cyxbsIcon = UIImageView()
-        cyxbsIcon.image = UIImage(named: "Cyxbs")
+        cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
         return cyxbsIcon
     }()
     

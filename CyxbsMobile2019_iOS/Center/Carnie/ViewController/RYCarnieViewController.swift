@@ -141,7 +141,7 @@ extension RYCarnieViewController {
     func tapStatementEntry() {
         // 表态
 //        ProgressHUD.showError("正在加紧建设中...")
-        let vc = AttitudeMainPageVC()
+        let vc = QAMainVC()
         vc.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(vc, animated: true)
     }

@@ -7,3 +7,116 @@
 //
 
 import UIKit
+import JXSegmentedView
+
+
+class QAMainVC : UIViewController {
+    
+    private var qaViewControllers: [QAViewController] = []
+    private var segmentedDataSource: JXSegmentedActivityCustomDataSource!
+    private var segmentedView: JXSegmentedView!
+    private var listContainerView: JXSegmentedListContainerView!
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#000000")
+        view.addSubview(topView)
+        topView.commonInit()
+        addSegment()
+        initVCs()
+    }
+    
+    // MARK: - 加载视图
+    lazy var topView: QAMainTopView = {
+        let topView = QAMainTopView()
+        topView.backgroundColor = .clear
+        topView.frame = CGRectMake(0, 0, UIScreen.main.bounds.width, 100)
+        topView.backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
+        return topView
+    }()
+    
+    func addSegment() {
+        segmentedView = JXSegmentedView()
+        segmentedDataSource = JXSegmentedActivityCustomDataSource()
+        segmentedDataSource.titles = ["全部","新生类","生活类","学习类","其他"]
+        segmentedDataSource.titleNormalFont = UIFont(name: PingFangSC, size: 16)!
+        segmentedDataSource.titleNormalColor = UIColor.ry(light: "#15315B", dark: "#FFFFFF")
+        segmentedDataSource.titleSelectedColor = UIColor.ry(light: "#15315B", dark: "#FFFFFF")
+        segmentedDataSource.isTitleColorGradientEnabled = false
+        segmentedDataSource.isBackGroundColorGradientEnabled = false
+        segmentedDataSource.isItemSpacingAverageEnabled = true
+        segmentedDataSource.itemWidthIncrement = 34
+        segmentedDataSource.itemSpacing = 0
+        segmentedDataSource.backGroundNormalColor = .clear
+        segmentedDataSource.backGroundSelectedColor = .clear
+        segmentedView.delegate = self
+        segmentedView.dataSource = segmentedDataSource
+        view.addSubview(segmentedView)
+        listContainerView = JXSegmentedListContainerView(dataSource: self)
+        view.addSubview(listContainerView)
+        segmentedView.listContainer = listContainerView
+        //布局控件
+        segmentedView.snp.makeConstraints{ make in
+            make.width.equalToSuperview()
+            make.height.equalTo(30)
+            make.top.equalTo(100)
+        }
+        listContainerView.snp.makeConstraints{ make in
+            make.width.equalToSuperview()
+            make.top.equalTo(segmentedView.snp.bottom).offset(16)
+            make.bottom.equalToSuperview()
+        }
+    }
+    
+    func initVCs() {
+        let allVC = QAViewController(qaType: .all)
+        allVC.title = "全部"
+        addChild(allVC)
+        qaViewControllers.append(allVC)
+        
+        let freshManVC = QAViewController(qaType: .freshMen)
+        freshManVC.title = "新生类"
+        addChild(freshManVC)
+        qaViewControllers.append(freshManVC)
+        
+        let lifeVC = QAViewController(qaType: .life)
+        lifeVC.title = "生活类"
+        addChild(lifeVC)
+        qaViewControllers.append(lifeVC)
+        
+        let studyVC = QAViewController(qaType: .study)
+        studyVC.title = "学习类"
+        addChild(studyVC)
+        qaViewControllers.append(studyVC)
+        
+        let otherVC = QAViewController(qaType: .other)
+        otherVC.title = "其他"
+        addChild(otherVC)
+        qaViewControllers.append(otherVC)
+    }
+    
+    @objc func popVC(){
+        self.navigationController?.popViewController(animated: true)
+    }
+    
+}
+
+extension QAMainVC: JXSegmentedViewDelegate{
+    func segmentedView(_ segmentedView: JXSegmentedView, didSelectedItemAt index: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5){
+            if(self.qaViewControllers[index].qaModel.qa.count == 0){
+                ActivityHUD.shared.showNoMoreData()
+            }
+        }
+    }
+}
+
+extension QAMainVC: JXSegmentedListContainerViewDataSource{
+    func listContainerView(_ listContainerView: JXSegmentedListContainerView, initListAt index: Int) -> JXSegmentedListContainerViewListDelegate {
+        return qaViewControllers[index]
+    }
+    
+    func numberOfLists(in listContainerView: JXSegmentedListContainerView) -> Int {
+        return 5
+    }
+}
