@@ -37,15 +37,15 @@ class QaAllFragment : BaseFragment() {
     private val mRecycleView by R.id.qa_all_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(),it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
     }
     private val searchRVAdapter: QaSearchRVAdapter by lazy {
         QaSearchRVAdapter(searchViewModel).apply {
-            setOnItemClickListener {
-                DetailActivity.startActivity(requireContext(),it)
+            setOnItemClickListener { id ->
+                context?.let { ctx -> DetailActivity.startActivity(ctx, id) }
             }
         }
     }
@@ -83,6 +83,7 @@ class QaAllFragment : BaseFragment() {
 
             }
         }
+        // 注册
         homeRvAdapter.addLoadStateListener(object : (CombinedLoadStates) -> Unit {
             override fun invoke(loadStates: CombinedLoadStates) {
                 val refreshState = loadStates.refresh
@@ -91,6 +92,7 @@ class QaAllFragment : BaseFragment() {
                     val stats = newMessageAnalyzer.analyze(currentList)
                     // 更新 Tab 角标
                     (activity as? HomeActivity)?.apply {
+                        //全部显示数字不太符合规律这里先注释 如果需要这里可用
                         //updateTabDot(0, stats.updatedCount)
                         updateTabDot(1, stats.newStudentCount)
                         updateTabDot(2, stats.lifeCount)
@@ -123,28 +125,35 @@ class QaAllFragment : BaseFragment() {
         // 清理适配器
         mRecycleView.adapter = null
         mRecycleView.layoutManager = null
+        homeRvAdapter.setOnItemClickListener(null)
+        searchRVAdapter.setOnItemClickListener(null)
 
-        // 移除 LiveData 观察者
+        // 移除观察者
         searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
+
 
     }
 
     private fun initSearchUi() {
         searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-
             val filteredList = qaData?.items?.filter { it.status == 2 } ?: emptyList()
 
-            // 使用 safe call 来避免空指针
-            context?.getSp("search_keyword")?.let { sp ->
-                val str = sp.getString("keyword", "默认值")
-                searchRVAdapter.keyword = str ?: "默认值"  // 确保 keyword 不为 null
+            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
+            if (isFullRefresh) {
+                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
+                    searchRVAdapter.keyword = str
+                }
+                //先清空然后赋值 更体现搜索的意义
+                searchRVAdapter.submitList(emptyList()) {
+                    searchRVAdapter.submitList(filteredList)
+                }
 
+            } else {
+                // 本地点赞/缓存更新 → 局部刷新
+                searchRVAdapter.submitList(filteredList)
             }
-
-
-            // 刷新列表并滚动到顶部
-            searchRVAdapter.submitList(filteredList)
         }
+
     }
 }
 
