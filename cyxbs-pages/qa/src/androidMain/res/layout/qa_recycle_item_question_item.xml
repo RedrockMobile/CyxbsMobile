@@ -96,10 +96,11 @@
 
     <ImageView
         android:id="@+id/qa_question_item_iv_like"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginTop="11dp"
         android:layout_marginEnd="16dp"
+        android:padding="5dp"
         android:src="@drawable/qa_ic_question_item_dislike"
         app:layout_constraintBottom_toBottomOf="@id/qa_question_item_iv_cyxb"
         app:layout_constraintEnd_toEndOf="@id/qa_question_item_iv_cyxb"
@@ -111,6 +112,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="15dp"
+        android:layout_marginStart="-5dp"
         android:layout_marginBottom="27.8dp"
         android:text="1"
         android:textColor="@color/qa_question_item_like_color"

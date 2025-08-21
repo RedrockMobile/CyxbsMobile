@@ -27,8 +27,6 @@ data class Item(
     val DeletedAt: Any?,
     @SerializedName("ID")
     val ID: Int,
-    @SerializedName("UpdateAt")
-    val UpdatedAt: String,
     @SerializedName("a")
     val a: String,
     @SerializedName("a_time")

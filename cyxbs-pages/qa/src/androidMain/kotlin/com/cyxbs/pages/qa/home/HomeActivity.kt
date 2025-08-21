@@ -165,7 +165,7 @@ class HomeActivity : BaseActivity() {
     fun dp2px(dp: Float): Int {
         return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
     }
-
+    //更新角标这里给 QaAllFragment使用
     fun updateTabDot(tabIndex: Int, count: Int) {
         val tab = mTabLayout.getTabAt(tabIndex)
         val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)

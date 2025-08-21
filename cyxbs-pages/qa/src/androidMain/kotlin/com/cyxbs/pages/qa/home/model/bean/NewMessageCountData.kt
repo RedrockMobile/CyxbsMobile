@@ -10,6 +10,10 @@ import java.util.Locale
  * author : summer_palace2
  * email : 2992203079qq.com
  * date : 2025/8/17 19:54
+ *
+ * 用来处理新消息的条数，这里分多种消息根据tablayout上的名字来确定
+ *
+ * 机制:本地保存该次网络请求返回的最新时间，与下一次返回数据相比，下一次数据时间更新的item数就是新消息
  */
 data class NewMessageCountData(
     val total: Int = 0,
@@ -29,7 +33,7 @@ class NewMessageAnalyzer(private val context: Context?) {
         val sp = context?.getSp("qa_content")
         val savedTime = sp?.getString("time", null)
 
-        // 第一次访问：没有保存过时间
+        // 第一次访问：没有保存过时间直接返回0 更符合新消息的理念
         if (savedTime.isNullOrBlank()) {
             // 保存最新的 a_time（最新一条消息）
             filteredList.maxByOrNull { parseTimestamp(it.a_time) }?.a_time?.let { latestTime ->

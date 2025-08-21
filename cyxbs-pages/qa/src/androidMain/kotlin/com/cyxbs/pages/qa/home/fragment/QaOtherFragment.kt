@@ -76,37 +76,6 @@ class QaOtherFragment : BaseFragment() {
         mRecycleView.adapter = homeRvAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
 
-        initHomeUi()
-
-    }
-
-    private fun initSearchView() {
-        mRecycleView.adapter = searchRVAdapter
-        mRecycleView.layoutManager = LinearLayoutManager(context)
-
-        initSearchUi()
-
-    }
-
-    private fun initDefaultView() {
-
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-
-        // 清理适配器
-        mRecycleView.adapter = null
-        mRecycleView.layoutManager = null
-        homeRvAdapter.setOnItemClickListener(null)
-        searchRVAdapter.setOnItemClickListener(null)
-
-        // 移除 LiveData 观察者
-        searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
-    }
-
-
-    private fun initHomeUi() {
         viewLifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 homeViewModel.pagingDataFlow.collectLatest { pagingData ->
@@ -117,11 +86,16 @@ class QaOtherFragment : BaseFragment() {
 
             }
         }
+
     }
 
-    private fun initSearchUi() {
-        searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-            val filteredList = qaData?.items?.filter { it.status == 2&&it.tags.contains("生活") } ?: emptyList()
+    private fun initSearchView() {
+        mRecycleView.adapter = searchRVAdapter
+        mRecycleView.layoutManager = LinearLayoutManager(context)
+
+        searchViewModel.items.observe(viewLifecycleOwner) { qaData ->
+            val filteredList =
+                qaData?.filter { it.status == 2 && it.tags.contains("其他") } ?: emptyList()
 
             val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
             if (isFullRefresh) {
@@ -139,5 +113,24 @@ class QaOtherFragment : BaseFragment() {
         }
 
     }
+
+
+    private fun initDefaultView() {
+
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+
+        // 清理适配器
+        mRecycleView.adapter = null
+        mRecycleView.layoutManager = null
+        homeRvAdapter.setOnItemClickListener(null)
+        searchRVAdapter.setOnItemClickListener(null)
+
+        // 移除 LiveData 观察者
+        searchViewModel.items.removeObservers(viewLifecycleOwner)
+    }
+
 
 }

@@ -41,7 +41,11 @@ class PublishViewModel : BaseViewModel() {
 
     //这个是用来同步点赞数据的监听
     private val likeStateListener = object : LikeManager.LikeStateListener{
-        override fun onLikeQuestion(id: Long) {
+        override fun onLikeQuestion(id: Long,source:Int) {
+            if (source == LikeManager.SOURCE_PUBLISH){
+                //避免重复刷新
+                return
+            }
             val currentList = _searchData.value ?: return
             val index = currentList.indexOfFirst { it.id == id }
 
@@ -54,7 +58,11 @@ class PublishViewModel : BaseViewModel() {
             _searchData.postValue(currentList.toMutableList().apply { this[index] = newItem })
         }
 
-        override fun onUnLikeQuestion(id: Long) {
+        override fun onUnLikeQuestion(id: Long,source:Int) {
+            if (source == LikeManager.SOURCE_PUBLISH){
+                //避免重复刷新
+                return
+            }
             val currentList = _searchData.value ?: return
             val index = currentList.indexOfFirst { it.id == id }
 
@@ -130,6 +138,7 @@ class PublishViewModel : BaseViewModel() {
             }
             .safeSubscribeBy {
                 _likeResult.postValue(true)
+                LikeManager.notifyLikeQuestion(id,LikeManager.SOURCE_PUBLISH)
                 likeInProgress.remove(id)
             }
     }
@@ -151,6 +160,7 @@ class PublishViewModel : BaseViewModel() {
             }
             .safeSubscribeBy {
                 likeInProgress.remove(id)
+                LikeManager.notifyUnLikeQuestion(id,LikeManager.SOURCE_PUBLISH)
                 _likeResult.postValue(true)
             }
     }

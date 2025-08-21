@@ -72,14 +72,37 @@ class QaStudyFragment : BaseFragment() {
         mRecycleView.adapter = homeRvAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
 
-        initHomeUi()
+        viewLifecycleScope.launch {
+            homeViewModel.pagingDataFlow.collectLatest { pagingData ->
+                val filteredPagingData =
+                    pagingData.filter { it.status == 2 && it.tags.contains("学习") }
+                homeRvAdapter.submitData(filteredPagingData)
+            }
+        }
     }
 
     private fun initSearchView() {
         mRecycleView.adapter = searchRVAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
 
-        initSearchUi()
+        searchViewModel.items.observe(viewLifecycleOwner) { qaData ->
+            val filteredList =
+                qaData?.filter { it.status == 2 && it.tags.contains("学习") } ?: emptyList()
+
+            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
+            if (isFullRefresh) {
+                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
+                    searchRVAdapter.keyword = str
+                }
+                searchRVAdapter.submitList(emptyList()) {
+                    searchRVAdapter.submitList(filteredList)
+                }
+
+            } else {
+                // 本地点赞/缓存更新 → 局部刷新
+                searchRVAdapter.submitList(filteredList)
+            }
+        }
 
     }
 
@@ -100,40 +123,8 @@ class QaStudyFragment : BaseFragment() {
         //LiveData 在 Activity 中通常是绑定到整个 Activity 的生命周期的,Activity 销毁时，LiveData 观察者也会被自动清理所以不用管
         //防止重复更新：视图销毁后，LiveData 仍然会继续发送事件，这些事件将无法在已经销毁的视图上正确处理，造成不必要的 UI 更新。
         // 移除 LiveData 观察者
-        searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
+        searchViewModel.items.removeObservers(viewLifecycleOwner)
     }
 
-    private fun initHomeUi() {
-        viewLifecycleScope.launch {
-            homeViewModel.pagingDataFlow.collectLatest { pagingData ->
-                val filteredPagingData =
-                    pagingData.filter { it.status == 2 && it.tags.contains("学习") }
-                homeRvAdapter.submitData(filteredPagingData)
-            }
-        }
-
-    }
-
-    private fun initSearchUi() {
-        searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-            val filteredList =
-                qaData?.items?.filter { it.status == 2 && it.tags.contains("生活") } ?: emptyList()
-
-            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
-            if (isFullRefresh) {
-                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
-                    searchRVAdapter.keyword = str
-                }
-                searchRVAdapter.submitList(emptyList()) {
-                    searchRVAdapter.submitList(filteredList)
-                }
-
-            } else {
-                // 本地点赞/缓存更新 → 局部刷新
-                searchRVAdapter.submitList(filteredList)
-            }
-        }
-
-    }
 
 }

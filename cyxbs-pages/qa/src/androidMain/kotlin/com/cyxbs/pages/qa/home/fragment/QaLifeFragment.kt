@@ -73,12 +73,17 @@ class QaLifeFragment : BaseFragment() {
     private fun initHomeView() {
         mRecycleView.adapter = homeRvAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
-        val animator = mRecycleView.itemAnimator
-        if (animator is androidx.recyclerview.widget.SimpleItemAnimator) {
-            animator.supportsChangeAnimations = false
-        }
 
-        initHomeUi()
+        viewLifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                homeViewModel.pagingDataFlow.collectLatest { pagingData ->
+                    val filteredPagingData =
+                        pagingData.filter { it.status == 2 && it.tags.contains("生活") }
+                    homeRvAdapter.submitData(filteredPagingData)
+                }
+
+            }
+        }
 
     }
 
@@ -86,7 +91,24 @@ class QaLifeFragment : BaseFragment() {
         mRecycleView.adapter = searchRVAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
 
-        initSearchUi()
+        searchViewModel.items.observe(viewLifecycleOwner) { qaData ->
+            val filteredList =
+                qaData?.filter { it.status == 2 && it.tags.contains("生活") } ?: emptyList()
+
+            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
+            if (isFullRefresh) {
+                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
+                    searchRVAdapter.keyword = str
+                }
+                searchRVAdapter.submitList(emptyList()) {
+                    searchRVAdapter.submitList(filteredList)
+                }
+
+            } else {
+                // 本地点赞/缓存更新 → 局部刷新
+                searchRVAdapter.submitList(filteredList)
+            }
+        }
 
     }
 
@@ -104,42 +126,7 @@ class QaLifeFragment : BaseFragment() {
         searchRVAdapter.setOnItemClickListener(null)
 
         // 移除 LiveData 观察者
-        searchViewModel.QaDataLiveData.removeObservers(viewLifecycleOwner)
-    }
-
-    private fun initHomeUi() {
-        viewLifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                homeViewModel.pagingDataFlow.collectLatest { pagingData ->
-                    val filteredPagingData =
-                        pagingData.filter { it.status == 2 && it.tags.contains("生活") }
-                    homeRvAdapter.submitData(filteredPagingData)
-                }
-
-            }
-        }
-    }
-
-    private fun initSearchUi() {
-        searchViewModel.QaDataLiveData.observe(viewLifecycleOwner) { qaData ->
-            val filteredList =
-                qaData?.items?.filter { it.status == 2 && it.tags.contains("生活") } ?: emptyList()
-
-            val isFullRefresh = searchViewModel.isFullRefresh.value ?: true
-            if (isFullRefresh) {
-                context?.getSp("search_keyword")?.getString("keyword", "")?.let { str ->
-                    searchRVAdapter.keyword = str
-                }
-                searchRVAdapter.submitList(emptyList()) {
-                    searchRVAdapter.submitList(filteredList)
-                }
-
-            } else {
-                // 本地点赞/缓存更新 → 局部刷新
-                searchRVAdapter.submitList(filteredList)
-            }
-        }
-
+        searchViewModel.items.removeObservers(viewLifecycleOwner)
     }
 
 }

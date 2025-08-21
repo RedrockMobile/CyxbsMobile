@@ -20,13 +20,19 @@ import com.cyxbs.pages.qa.home.viewmodel.SearchViewModel
  * email : 2992203079qq.com
  * date : 2025/8/16 21:01
  */
+
 class QaSearchRVAdapter(
     private val searchViewModel: SearchViewModel
 ) : ListAdapter<Item, QaSearchRVAdapter.ViewHolder>(COMPARATOR) {
-
-    var keyword: String = "" // 当前搜索关键字
+    /*
+      当前搜索关键字,每次搜索按钮点击后
+       在观察者观察到数据后更新keyword
+       用来处理新的高亮(关键字变色)
+     */
+    var keyword: String = ""
 
     companion object {
+        //用来标志局部刷新
         const val PAYLOAD_LIKE = "payload_like"
 
         private val COMPARATOR = object : DiffUtil.ItemCallback<Item>() {
@@ -34,19 +40,12 @@ class QaSearchRVAdapter(
                 oldItem.ID == newItem.ID
 
             override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean =
-                oldItem.ID == newItem.ID &&
-                        oldItem.q == newItem.q &&
-                        oldItem.a == newItem.a &&
-                        oldItem.a_time == newItem.a_time &&
-                        oldItem.is_like == newItem.is_like &&
-                        oldItem.like_count == newItem.like_count
+                oldItem == newItem
 
             override fun getChangePayload(oldItem: Item, newItem: Item): Any? {
                 return if (oldItem.is_like != newItem.is_like ||
                     oldItem.like_count != newItem.like_count
-                ) {
-                    PAYLOAD_LIKE
-                } else null
+                ) PAYLOAD_LIKE else null
             }
         }
     }
@@ -56,14 +55,9 @@ class QaSearchRVAdapter(
         private val question = itemView.findViewById<TextView>(R.id.qa_question_item_tv_title)
         private val answer = itemView.findViewById<TextView>(R.id.qa_question_item_tv_content)
         private val time = itemView.findViewById<TextView>(R.id.qa_question_item_tv_time)
-        private val likenumber =
-            itemView.findViewById<TextView>(R.id.qa_question_item_tv_likenumber)
+        private val likenumber = itemView.findViewById<TextView>(R.id.qa_question_item_tv_likenumber)
         private val like = itemView.findViewById<ImageView>(R.id.qa_question_item_iv_like)
         private val mTag = itemView.findViewById<TextView>(R.id.qa_question_item_tv_tag)
-
-        private var currentData: Item? = null
-        private var lastClickTime = 0L
-        private val CLICK_INTERVAL = 100L
 
         init {
             initClick()
@@ -71,84 +65,43 @@ class QaSearchRVAdapter(
 
         private fun initClick() {
             rootView.setOnClickListener {
-                currentData?.let { listener?.invoke(it.ID.toLong()) }
+                getItem(bindingAdapterPosition)?.let { listener?.invoke(it.ID.toLong()) }
             }
 
             like.setOnClickListener {
-                val now = System.currentTimeMillis()
-                if (now - lastClickTime < CLICK_INTERVAL) return@setOnClickListener
-                lastClickTime = now
-
-                val data = currentData ?: return@setOnClickListener
-
-                // 乐观更新
-                val updatedItem = data.copy(
-                    is_like = !data.is_like,
-                    like_count = if (data.is_like) data.like_count - 1 else data.like_count + 1,
-                    UpdatedAt = data.UpdatedAt ?: ""
-                )
-                currentData = updatedItem
-                bindLike(updatedItem)
-
-                if (updatedItem.is_like) {
-                    searchViewModel.likeItem(updatedItem) {
-                        currentData = data
-                        bindLike(data)
-                        Toast.makeText(itemView.context.applicationContext, "点赞失败，请重试", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    searchViewModel.unlikeItem(updatedItem) {
-                        currentData = data
-                        bindLike(data)
-                        Toast.makeText(itemView.context.applicationContext, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                }
+                val data = getItem(bindingAdapterPosition) ?: return@setOnClickListener
+                searchViewModel.toggleLikeItem(data.ID, data.is_like)
             }
         }
 
         fun bind(item: Item) {
-            currentData = item
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags[0]}类"
 
-            val filterquestion = item.q.ellipsis()
-            // 高亮使用 Adapter 的 keyword，每次绑定都刷新
-            question.text = highlightKeyword(filterquestion, this@QaSearchRVAdapter.keyword)
-            val filterAnswer = item.a
-            answer.text = highlightKeyword(filterAnswer, this@QaSearchRVAdapter.keyword)
+            val filterQuestion = item.q.ellipsis()
+            question.text = highlightKeyword(filterQuestion, keyword)
+            answer.text = highlightKeyword(item.a, keyword)
             time.text = item.a_time.substring(0, 10).replace("-", ".")
             bindLike(item)
         }
 
         fun bindLike(item: Item) {
             likenumber.text = item.like_count.toString()
-            checkLike(item)
-        }
-
-        private fun String.ellipsis(maxLength: Int = 12): String =
-            if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
-
-        private fun checkLike(item: Item) {
             if (item.is_like) {
                 like.setImageResource(R.drawable.qa_ic_question_item_like)
-                likenumber.setTextColor(
-                    ContextCompat.getColor(
-                        itemView.context,
-                        R.color.qa_question_item_like_color
-                    )
-                )
+                likenumber.setTextColor(ContextCompat.getColor(itemView.context, R.color.qa_question_item_like_color))
             } else {
                 like.setImageResource(R.drawable.qa_ic_question_item_dislike)
-                likenumber.setTextColor(
-                    ContextCompat.getColor(
-                        itemView.context,
-                        R.color.qa_question_item_unlike_color
-                    )
-                )
+                likenumber.setTextColor(ContextCompat.getColor(itemView.context, R.color.qa_question_item_unlike_color))
             }
         }
-
+        /*
+        手动截断字段 为什么这么处理 因为textview是wrap_content并且不是从边缘开始
+        所以如果内容过多会导致部分无法显示
+         */
+        private fun String.ellipsis(maxLength: Int = 12): String =
+            if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
+        //用来处理高亮的方法
         private fun highlightKeyword(text: String, keyword: String): CharSequence {
             if (keyword.isEmpty()) return text
             val spannable = android.text.SpannableString(text)
@@ -157,10 +110,7 @@ class QaSearchRVAdapter(
                 val endIndex = startIndex + keyword.length
                 spannable.setSpan(
                     android.text.style.ForegroundColorSpan(
-                        ContextCompat.getColor(
-                            itemView.context,
-                            com.cyxbs.components.config.R.color.config_blue_button
-                        )
+                        ContextCompat.getColor(itemView.context, com.cyxbs.components.config.R.color.config_blue_button)
                     ),
                     startIndex,
                     endIndex,
@@ -172,22 +122,27 @@ class QaSearchRVAdapter(
         }
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        getItem(position)?.let { holder.bind(it) }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.qa_recycle_item_question_item, parent, false)
+        return ViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isNotEmpty() && payloads.contains(PAYLOAD_LIKE)) {
-            getItem(position)?.let { holder.bindLike(it) }
+        if (payloads.isEmpty()) {
+            getItem(position)?.let { holder.bind(it) }
         } else {
-            super.onBindViewHolder(holder, position, payloads)
+            getItem(position)?.let { item ->
+                payloads.forEach {
+                    if (it == PAYLOAD_LIKE) {
+                        holder.bindLike(item)
+                    }
+                }
+            }
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.qa_recycle_item_question_item, parent, false)
-        return ViewHolder(view)
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        getItem(position)?.let { holder.bind(it) }
     }
 
     private var listener: ((Long) -> Unit)? = null

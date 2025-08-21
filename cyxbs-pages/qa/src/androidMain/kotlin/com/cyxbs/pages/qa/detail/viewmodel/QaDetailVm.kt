@@ -64,7 +64,7 @@ class QaDetailVm : BaseViewModel() {
                 isPerformRequest = false
             }
             .safeSubscribeBy {
-                LikeManager.notifyLikeQuestion(id)
+                LikeManager.notifyLikeQuestion(id,LikeManager.SOURCE_DETAIL)
                 isPerformRequest = false
             }
     }
@@ -80,7 +80,7 @@ class QaDetailVm : BaseViewModel() {
                 isPerformRequest = false
             }
             .safeSubscribeBy {
-                LikeManager.notifyUnLikeQuestion(id)
+                LikeManager.notifyUnLikeQuestion(id,LikeManager.SOURCE_DETAIL)
                 isPerformRequest = false
             }
     }

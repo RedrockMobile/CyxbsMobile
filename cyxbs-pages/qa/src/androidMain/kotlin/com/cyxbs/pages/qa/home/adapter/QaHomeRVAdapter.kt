@@ -28,6 +28,7 @@ class QaHomeRVAdapter(
 ) : PagingDataAdapter<Item, QaHomeRVAdapter.ViewHolder>(COMPARATOR) {
 
     companion object {
+        //用来标志局部刷新
         private const val PAYLOAD_LIKE = "payload_like"
 
         private val COMPARATOR = object : DiffUtil.ItemCallback<Item>() {
@@ -66,6 +67,7 @@ class QaHomeRVAdapter(
             initClick()
         }
 
+        //这里使用掌邮封装的网络请求库判断网络是否有用
         private fun isNetworkAvailable(): Boolean = NetworkUtil.isAvailable ?: false
 
         private fun initClick() {
@@ -74,28 +76,22 @@ class QaHomeRVAdapter(
                 val now = System.currentTimeMillis()
                 if (now - lastClickTime < CLICK_INTERVAL) return@setOnClickListener
                 lastClickTime = now
-
+                //这里使用itemView.context.applicationContext防止内存泄漏
                 if (!isNetworkAvailable()) {
-                    Toast.makeText(itemView.context.applicationContext, "网络不可用", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        itemView.context.applicationContext,
+                        "网络不可用",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@setOnClickListener
                 }
 
                 val data = currentData ?: return@setOnClickListener
-
-                if (data.is_like) {
-                    viewModel.unlikeItem(data) {
-                        Toast.makeText(itemView.context.applicationContext, "取消点赞失败，请重试", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                } else {
-                    viewModel.likeItem(data) {
-                        Toast.makeText(itemView.context.applicationContext, "点赞失败，请重试", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                }
+                viewModel.toggleLike(data)
+                // 根布局点击跳转
 
             }
-            // 根布局点击跳转
+
             root_view.setOnClickListener {
                 currentData?.let {
                     listener?.invoke(it.ID.toLong())
@@ -115,13 +111,18 @@ class QaHomeRVAdapter(
             likeNumber.text = item.like_count.toString()
             checkLike(item)
         }
+
+        //用来做局部刷新
         fun bindLike(item: Item) {
             currentData = item
             likeNumber.text = item.like_count.toString()
             checkLike(item)
         }
 
-
+        /*
+      手动截断字段 为什么这么处理 因为textview是wrap_content并且不是从边缘开始
+      所以如果内容过多会导致部分无法显示
+       */
         private fun String.ellipsis(maxLength: Int = 12) =
             if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
 
@@ -140,6 +141,7 @@ class QaHomeRVAdapter(
         }
     }
 
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         ViewHolder(
             LayoutInflater.from(parent.context)
@@ -149,6 +151,7 @@ class QaHomeRVAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         getItem(position)?.let { holder.bind(it) }
     }
+
     override fun onBindViewHolder(
         holder: ViewHolder,
         position: Int,
@@ -169,7 +172,7 @@ class QaHomeRVAdapter(
         }
     }
 
-
+    //由外部传入的lambda
     private var listener: ((Long) -> Unit)? = null
     fun setOnItemClickListener(listener: ((Long) -> Unit)?) {
         this.listener = listener

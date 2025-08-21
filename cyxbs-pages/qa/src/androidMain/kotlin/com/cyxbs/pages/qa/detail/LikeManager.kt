@@ -9,6 +9,10 @@ package com.cyxbs.pages.qa.detail
 object LikeManager {
     private val listenerList = mutableListOf<LikeStateListener>()
 
+    //用来判定点赞状态发生的源头，避免重复刷新
+    const val SOURCE_DETAIL = 0
+    const val SOURCE_SEARCH = 1
+    const val SOURCE_PUBLISH = 2
 
     //添加监听
     fun addLikeStateListener(l: LikeStateListener) {
@@ -23,25 +27,25 @@ object LikeManager {
     }
 
     // 通知喜欢某个问题
-    fun notifyLikeQuestion(id: Long){
+    fun notifyLikeQuestion(id: Long,source:Int){
         listenerList.forEach {
-            it.onLikeQuestion(id)
+            it.onLikeQuestion(id,source)
         }
     }
 
     //通知不喜欢某个问题
-    fun notifyUnLikeQuestion(id: Long){
+    fun notifyUnLikeQuestion(id: Long,source: Int){
         listenerList.forEach {
-            it.onUnLikeQuestion(id)
+            it.onUnLikeQuestion(id,source)
         }
     }
 
 
     interface LikeStateListener{
         //当喜欢某个问题时回调
-        fun onLikeQuestion(id: Long)
+        fun onLikeQuestion(id: Long,source: Int)
 
         //当取消喜欢某个问题时回调
-        fun onUnLikeQuestion(id: Long)
+        fun onUnLikeQuestion(id: Long,source: Int)
     }
 }
