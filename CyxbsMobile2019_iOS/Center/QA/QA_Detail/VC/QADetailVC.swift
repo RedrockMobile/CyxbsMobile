@@ -33,24 +33,44 @@ class QADetailVC : UIViewController {
         view.addSubview(backButton)
         view.addSubview(publishButton)
         requestDetail()
-        loadDataToView()
     }
     
     //获取问题详情
     @objc func requestDetail() {
-        qaModel.requestDetailObject(id: self.objectId) { qaObject in
-            print("获取问题详情成功")
+        // 显示加载指示器
+        MBProgressHUD.showAdded(to: self.view, animated: true)
+        
+        qaModel.requestDetailObject(id: self.objectId) { [weak self] qaObject in
+            guard let self = self else { return }
             
-        } failure: { error in
+            // 隐藏加载指示器
+            MBProgressHUD.hide(for: self.view, animated: true)
+            
+            print("获取问题详情成功")
+            self.qaObject = qaObject
+            self.loadDataToView() // 在获取到数据后再加载到视图
+        } failure: { [weak self] error in
+            guard let self = self else { return }
+            
+            // 隐藏加载指示器
+            MBProgressHUD.hide(for: self.view, animated: true)
+            
             print("获取问题详情失败\(error)")
+            // 可以添加错误处理，比如显示错误提示
         }
     }
     
     func loadDataToView() {
-        //let dateString = qaModel.dateFormatter(dateString: qaObject.aTime)
+        // 添加安全解包
+        guard let qaObject = self.qaObject else {
+            print("qaObject is nil")
+            return
+        }
+        
+        let dateString = qaModel.dateFormatter(dateString: qaObject.aTime)
         detailView.questionLabel.text = qaObject.questionString
         detailView.categoryLabel.text = "\(qaObject.tags)类"
-        //detailView.dateLabel.text = dateString
+        detailView.dateLabel.text = dateString
         detailView.answerDetailView.contentLabel.text = qaObject.answerString
         self.detailView.answerDetailView.likeButton.isSelected = qaObject.isLike
         detailView.answerDetailView.viewCountLabel.text = "\(qaObject.viewCount)"

@@ -439,9 +439,12 @@ extension HttpManager {
     }
     
     ///QA请求问题详情
-    func magipoke_qa_getDetail(id: Int) -> DataRequest{
-        let parameters: [String: Any] = ["id": id]
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/detail"), method: .get, parameters: parameters)
+    func magipoke_qa_getDetail(identifier: Int) -> DataRequest {
+        let urlString = APIConfig.current.api("/magipoke-qa/api/v1/mobile/detail?id=\(identifier)")
+        return SessionManager.shared.ry_request(
+            urlString,
+            method: .get
+        )
     }
     
     ///QA点赞

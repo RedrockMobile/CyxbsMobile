@@ -48,7 +48,7 @@ class QAModel{
     }
     
     func requestDetailObject(id : Int, success: @escaping (QAObject) -> Void, failure: @escaping (Error) -> Void){
-        HttpManager.shared.magipoke_qa_getDetail(id: id).ry_JSON { response in
+        HttpManager.shared.magipoke_qa_getDetail(identifier: id).ry_JSON { response in
             switch response{
             case .success(let jsonData):
                 let detailQAResponse = DetailQAResponse(from: jsonData)
@@ -61,16 +61,33 @@ class QAModel{
     }
     
     ///将从服务器获取的日期格式化
-    func dateFormatter(dateString:String) -> String?{
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        guard let date = formatter.date(from: dateString)else{
-            return nil
+    func dateFormatter(dateString: String) -> String? {
+        // 检查是否为无效日期（未回答时服务器返回的默认值）
+        if #available(iOS 11.0, *) {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            guard let date = formatter.date(from: dateString) else {
+                return nil
+            }
+            
+            let outputFormatter = DateFormatter()
+            outputFormatter.dateFormat = "yyyy.MM.dd"
+            return outputFormatter.string(from: date)
+        } else {
+            // Fallback on earlier versions
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ"
+            
+            guard let date = formatter.date(from: dateString) else {
+                return nil
+            }
+            
+            let outputFormatter = DateFormatter()
+            outputFormatter.dateFormat = "yyyy.MM.dd"
+            return outputFormatter.string(from: date)
         }
-        let outputFormatter = DateFormatter()
-        outputFormatter.dateFormat = "yyyy.MM.dd"
-        outputFormatter.timeZone = TimeZone.current
-        return outputFormatter.string(from: date)
     }
     
 }

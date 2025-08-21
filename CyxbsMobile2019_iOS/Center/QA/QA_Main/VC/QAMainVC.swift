@@ -17,6 +17,8 @@ class QAMainVC : UIViewController {
     private var segmentedView: JXSegmentedView!
     private var listContainerView: JXSegmentedListContainerView!
     
+    private let sharedQAModel = QAModel()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#000000")

@@ -32,36 +32,37 @@ class AnswerDetailView : UIView {
         contentLabel.snp.makeConstraints { make in
             make.left.equalToSuperview().offset(32)
             make.top.equalToSuperview().offset(16)
-            make.width.equalTo(296)
-            make.height.equalTo(textHeightFromTextString(text: contentLabel.text!, textWidth: 296, fontSize: 14, isBold: false))
+            make.right.equalToSuperview().offset(-32)
+            //let text = contentLabel.text ?? ""
+            //make.height.equalTo(textHeightFromTextString(text: text, textWidth: UIScreen.main.bounds.width-96, fontSize: 14, isBold: false))
         }
         
         viewIcon.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(197)
             make.bottom.equalToSuperview().offset(-15)
+            make.right.equalToSuperview().offset(-106)
             make.height.equalTo(24)
             make.width.equalTo(24)
         }
         
         viewCountLabel.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(222)
-            make.bottom.equalToSuperview().offset(-29)
-            make.height.equalTo(18)
+            make.right.equalToSuperview().offset(-75.25)
+            make.bottom.equalToSuperview().offset(-28)
             make.width.equalTo(30)
+            make.height.equalTo(18)
         }
         
         likeButton.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(273)
             make.bottom.equalToSuperview().offset(-15)
+            make.right.equalToSuperview().offset(-46)
             make.height.equalTo(24)
             make.width.equalTo(24)
         }
         
         likeCountLabel.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(298)
-            make.bottom.equalToSuperview().offset(-29)
-            make.height.equalTo(18)
+            make.right.equalToSuperview().offset(-15.25)
+            make.bottom.equalToSuperview().offset(-28)
             make.width.equalTo(30)
+            make.height.equalTo(18)
         }
         
         cyxbsIcon.snp.makeConstraints { make in
@@ -80,8 +81,15 @@ class AnswerDetailView : UIView {
         let contentLabel = UILabel()
         contentLabel.font = UIFont(name: PingFangSC, size: 14)
         contentLabel.textAlignment = .left
+        contentLabel.numberOfLines = 0
         contentLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
         return contentLabel
+    }()
+    
+    lazy var cyxbsIcon : UIImageView = {
+        let cyxbsIcon = UIImageView()
+        cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
+        return cyxbsIcon
     }()
     
     lazy var viewIcon : UIImageView = {
@@ -113,11 +121,7 @@ class AnswerDetailView : UIView {
         return likeCountLabel
     }()
     
-    lazy var cyxbsIcon : UIImageView = {
-        let cyxbsIcon = UIImageView()
-        cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
-        return cyxbsIcon
-    }()
+    
     
     func textHeightFromTextString(text: String, textWidth: CGFloat, fontSize: CGFloat, isBold: Bool) -> CGFloat {
         var dict: NSDictionary = NSDictionary()

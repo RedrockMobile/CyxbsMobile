@@ -32,11 +32,11 @@ class QADetailView : UIView{
             make.left.equalToSuperview().offset(48)
             make.top.equalToSuperview().offset(105)
             make.height.equalTo(22)
-            make.width.equalTo(calculateLabelWidth(labelText: questionLabel.text!))
+            make.width.equalTo(calculateLabelWidth(labelText: questionLabel.text!)+20)
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.left.equalTo(questionLabel).offset(questionLabel.width+12)
+            make.left.equalTo(questionLabel.snp.right).offset(questionLabel.width+12)
             make.top.equalToSuperview().offset(108)
             make.height.equalTo(16)
             make.width.equalTo(48)
@@ -52,7 +52,7 @@ class QADetailView : UIView{
         answerDetailView.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(16)
             make.top.equalToSuperview().offset(172)
-            make.width.equalTo(343)
+            make.right.equalToSuperview().offset(-16)
             make.height.equalTo(answerDetailView.textHeightFromTextString(text: answerDetailView.contentLabel.text!, textWidth: 296, fontSize: 14, isBold: false)+16+71)
         }
     }

@@ -33,7 +33,7 @@ class QATableViewCell : UITableViewCell {
         //let questionLabelLength = calculateLabelWidth(labelText: questionLabel.text!)
         
         hashTag.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(12)
+            make.left.equalToSuperview().offset(20)
             make.top.equalToSuperview().offset(16)
             make.height.equalTo(22)
             make.width.equalTo(22)
@@ -49,21 +49,22 @@ class QATableViewCell : UITableViewCell {
         ansPrevLabel.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(48)
             make.top.equalToSuperview().offset(48)
-            make.right.equalToSuperview().offset(-16)
+            make.right.equalToSuperview().offset(-64)
         }
         
         questionLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(12)
-            make.left.equalToSuperview().offset(48)
+            make.top.equalToSuperview().offset(16)
+            make.left.equalToSuperview().offset(54)
             make.height.equalTo(22)
-            make.width.equalTo(200)
+            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(15)
-            make.right.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(18)
+            make.left.equalTo(questionLabel.snp.right).offset(20)
             make.height.equalTo(16)
             make.width.equalTo(48)
+            make.left.greaterThanOrEqualTo(questionLabel.snp.right).offset(8)
         }
         
         dateLabel.snp.makeConstraints{ make in
@@ -71,6 +72,13 @@ class QATableViewCell : UITableViewCell {
             make.left.equalToSuperview().offset(16)
             make.width.equalTo(70)
             make.height.equalTo(17)
+        }
+        
+        cyxbsIcon.snp.makeConstraints{ make in
+            make.right.equalToSuperview()
+            make.bottom.equalToSuperview()
+            make.width.equalTo(100)
+            make.height.equalTo(67)
         }
         
         likeButton.snp.makeConstraints{ make in
@@ -87,12 +95,11 @@ class QATableViewCell : UITableViewCell {
             make.height.equalTo(18)
         }
         
-        cyxbsIcon.snp.makeConstraints{ make in
-            make.right.equalToSuperview()
-            make.bottom.equalToSuperview()
-            make.width.equalTo(100)
-            make.height.equalTo(67)
-        }
+        questionLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        categoryLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        
+        questionLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        categoryLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
     }
     
     required init?(coder: NSCoder) {
@@ -121,6 +128,7 @@ class QATableViewCell : UITableViewCell {
         categoryLabel.textColor = UIColor.ry(light: "#4A44E4", dark: "#D2D2D2")
         categoryLabel.backgroundColor = UIColor.ry(light: "#D4DAFF", dark: "#5A5A5A")
         categoryLabel.layer.cornerRadius = 8
+        categoryLabel.layer.masksToBounds = true
         return categoryLabel
     }()
     
@@ -137,7 +145,7 @@ class QATableViewCell : UITableViewCell {
         ansPrevLabel.backgroundColor = .clear
         ansPrevLabel.numberOfLines = 2
         ansPrevLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677", alpha: 1))
-        return categoryLabel
+        return ansPrevLabel
     }()
     
     lazy var dateLabel : UILabel = {
@@ -145,6 +153,12 @@ class QATableViewCell : UITableViewCell {
         dateLabel.font = UIFont(name: PingFangSC, size: 12)
         dateLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
         return dateLabel
+    }()
+    
+    lazy var cyxbsIcon : UIImageView = {
+        let cyxbsIcon = UIImageView()
+        cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
+        return cyxbsIcon
     }()
     
     lazy var likeButton : UIButton = {
@@ -162,11 +176,6 @@ class QATableViewCell : UITableViewCell {
         return likeCountLabel
     }()
     
-    lazy var cyxbsIcon : UIImageView = {
-        let cyxbsIcon = UIImageView()
-        cyxbsIcon.image = UIImage(named: "CyxbsWaterMark")
-        return cyxbsIcon
-    }()
     
     func calculateLabelWidth(labelText:String) -> CGFloat {
         // 1. 创建临时标签
