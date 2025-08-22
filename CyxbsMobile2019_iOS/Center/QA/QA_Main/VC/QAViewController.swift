@@ -23,7 +23,6 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     private var qaTypeString: String?
     private var tableViewCount: Int = 0
     private var cellHeight: CGFloat = 132
-    private var cellWidth: CGFloat = 343
     private var currentPage = 1
     private var isLoadingMore = false
     private var hasMoreData = true
@@ -70,7 +69,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         requestQA()
     }
     
-    // MARK: - 重要函数
+    // MARK: - 重要方法
     
     // 初始化视图层次结构
     private func setupViews() {
@@ -81,7 +80,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     }
     
     @objc func requestQA() {
-        // 如果已经加载了所有数据，直接结束刷新
+        // 只有当hasLoadedAllData为false时才执行刷新
         if hasLoadedAllData {
             self.scrollView.mj_header?.endRefreshing()
             return
@@ -91,7 +90,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         hasMoreData = true
         isLoadingMore = false
         
-        qaModel.requestQACenterObjects(QATag: qaTypeString!, pageNum: currentPage, pageSize: refreshNum) { [weak self] qa in
+        qaModel.requestQACenterObjects(QATag: "", pageNum: currentPage, pageSize: refreshNum) { [weak self] qa in
             guard let self = self else { return }
             
             print("问答数量：\(qa.count)")
@@ -104,7 +103,9 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
             
             // 添加新数据
             self.qaModel.qa.append(contentsOf: qa)
-            self.tableViewCount = self.qaModel.qa.count
+            
+            // 应用过滤
+            self.filterQAItems()
             
             // 检查是否还有更多数据
             self.hasMoreData = qa.count >= self.refreshNum
@@ -128,6 +129,8 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
                     self.addMJFooter()
                 } else if let footer = self.scrollView.mj_footer {
                     footer.endRefreshingWithNoMoreData()
+                    // 如果没有更多数据，移除footer
+                    self.scrollView.mj_footer = nil
                 }
             }
         } failure: { error in
@@ -169,7 +172,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     
     // 更新内容视图高度
     private func updateContentViewHeight() {
-        let tableViewHeight = CGFloat(tableViewCount) * cellHeight + 32 // 32是section footer的高度
+        let tableViewHeight = CGFloat(tableViewCount) * (cellHeight + 16) + 32 // 32是section footer的高度
         let contentHeight = 20 + 38 + 16 + tableViewHeight + 16 // 搜索按钮上方间距 + 搜索按钮高度 + 间距 + 表格高度 + 底部间距
         
         // 更新约束
@@ -180,14 +183,23 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         self.view.layoutIfNeeded()
     }
     
+    // 过滤项目
+    private func filterQAItems() {
+        if let qaTypeString = qaTypeString, !qaTypeString.isEmpty {
+            // 过滤出匹配标签的QA项目
+            qaModel.qa = qaModel.qa.filter { $0.tags == qaTypeString }
+        }
+        // 如果qaTypeString为空，保持原样（显示所有项目）
+        tableViewCount = qaModel.qa.count
+    }
+    
     // MARK: - 懒加载
     
     lazy var searchButton: UIButton = {
         let searchButton = UIButton()
         searchButton.setTitle("搜索关键词", for: .normal)
-        searchButton.setTitleColor(UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4)), for: .normal)
+        searchButton.setTitleColor(UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677")), for: .normal)
         searchButton.titleLabel?.font = UIFont(name: PingFangSC, size: 16)
-        searchButton.titleLabel?.textAlignment = .left
         searchButton.setImage(UIImage(named: "search_icon"), for: .normal)
         searchButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 8)
         searchButton.semanticContentAttribute = .forceLeftToRight
@@ -199,7 +211,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     lazy var qaTableView: UITableView = {
         let qaTableView = UITableView()
         qaTableView.backgroundColor = .clear
-        qaTableView.separatorColor = .clear
+        qaTableView.separatorStyle = .none
         qaTableView.delegate = self
         qaTableView.dataSource = self
         qaTableView.layer.cornerRadius = 8
@@ -244,10 +256,11 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     
     @objc func refreshTableView() {
         // 防止重复加载或已加载所有数据
-        if isLoadingMore || !hasMoreData || hasLoadedAllData {
-            self.scrollView.mj_footer?.endRefreshing()
+        if isLoadingMore || hasLoadedAllData {
             if hasLoadedAllData {
                 self.scrollView.mj_footer?.endRefreshingWithNoMoreData()
+            } else {
+                self.scrollView.mj_footer?.endRefreshing()
             }
             return
         }
@@ -255,30 +268,31 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         isLoadingMore = true
         currentPage += 1
         
-        qaModel.requestQACenterObjects(QATag: qaTypeString!, pageNum: currentPage, pageSize: refreshNum) { [weak self] newQA in
+        qaModel.requestQACenterObjects(QATag: "", pageNum: currentPage, pageSize: refreshNum) { [weak self] newQA in
             guard let self = self else { return }
             
             self.isLoadingMore = false
             
             // 添加新数据
             self.qaModel.qa.append(contentsOf: newQA)
-            self.tableViewCount = self.qaModel.qa.count
             
-            // 检查是否还有更多数据
+            // 应用过滤
+            self.filterQAItems()
+            
+            // 关键修改：检查是否还有更多数据
             self.hasMoreData = newQA.count >= self.refreshNum
-            
-            // 如果没有更多数据，标记为已加载所有数据
-            if !self.hasMoreData {
-                self.hasLoadedAllData = true
-            }
+            self.hasLoadedAllData = !self.hasMoreData
             
             DispatchQueue.main.async {
                 self.qaTableView.reloadData()
                 self.updateContentViewHeight()
-                self.scrollView.mj_footer?.endRefreshing()
                 
-                if !self.hasMoreData {
+                if self.hasMoreData {
+                    self.scrollView.mj_footer?.endRefreshing()
+                } else {
                     self.scrollView.mj_footer?.endRefreshingWithNoMoreData()
+                    // 如果没有更多数据，移除footer
+                    self.scrollView.mj_footer = nil
                 }
             }
         } failure: { error in
@@ -289,7 +303,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return cellHeight
+        return cellHeight + 16
     }
     
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
@@ -333,6 +347,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         cell.likeCountLabel.text = "\(qaItem.likeCount)"
         cell.likeButton.isSelected = qaItem.isLike
         cell.likeButton.addTarget(self, action: #selector(like(_:)), for: .touchUpInside)
+        
         return cell
     }
     

@@ -108,7 +108,7 @@ class AnswerDetailView : UIView {
     
     lazy var likeButton : UIButton = {
         let likeButton = UIButton()
-        likeButton.setImage(UIImage(named: "Unlike"), for: .normal)
+        likeButton.setImage(UIImage(named: "UnLike"), for: .normal)
         likeButton.setImage(UIImage(named: "Like"), for: .selected)
         return likeButton
     }()

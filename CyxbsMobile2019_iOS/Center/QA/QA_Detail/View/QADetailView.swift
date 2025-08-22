@@ -36,7 +36,7 @@ class QADetailView : UIView{
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.left.equalTo(questionLabel.snp.right).offset(questionLabel.width+12)
+            make.left.equalTo(questionLabel.snp.right).offset(questionLabel.width)
             make.top.equalToSuperview().offset(108)
             make.height.equalTo(16)
             make.width.equalTo(48)
@@ -70,6 +70,7 @@ class QADetailView : UIView{
         categoryLabel.textColor = UIColor.ry(light: "#4A44E4", dark: "#D2D2D2")
         categoryLabel.backgroundColor = UIColor.ry(light: "#D4DAFF", dark: "#5A5A5A")
         categoryLabel.layer.cornerRadius = 8
+        categoryLabel.layer.masksToBounds = true
         return categoryLabel
     }()
     

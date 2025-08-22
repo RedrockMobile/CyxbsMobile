@@ -14,23 +14,32 @@ class QATableViewCell : UITableViewCell {
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#0D0D0D")
+        backgroundColor = .clear
         selectionStyle = .none
-        contentView.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#2D2D2D")
-        contentView.addSubview(hashTag)
-        contentView.addSubview(questionLabel)
-        contentView.addSubview(categoryLabel)
-        contentView.addSubview(paraIcon)
-        contentView.addSubview(ansPrevLabel)
-        contentView.addSubview(dateLabel)
-        contentView.addSubview(likeButton)
-        contentView.addSubview(likeCountLabel)
-        contentView.addSubview(cyxbsIcon)
+        contentView.backgroundColor = .clear
+        contentView.addSubview(containerView)
+        containerView.addSubview(hashTag)
+        containerView.addSubview(questionLabel)
+        containerView.addSubview(categoryLabel)
+        containerView.addSubview(paraIcon)
+        containerView.addSubview(ansPrevLabel)
+        containerView.addSubview(dateLabel)
+        containerView.addSubview(likeButton)
+        containerView.addSubview(likeCountLabel)
+        containerView.addSubview(cyxbsIcon)
+        
         setPosition()
     }
     
     func setPosition(){
         //let questionLabelLength = calculateLabelWidth(labelText: questionLabel.text!)
+        
+        containerView.snp.makeConstraints{ make in
+            make.top.equalToSuperview()
+            make.bottom.equalToSuperview().offset(-16)
+            make.left.right.equalToSuperview()
+            make.height.equalTo(132)
+        }
         
         hashTag.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(20)
@@ -100,11 +109,21 @@ class QATableViewCell : UITableViewCell {
         
         questionLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         categoryLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        
+        containerView.bringSubviewToFront(likeButton)
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+    
+    lazy var containerView : UIView = {
+        let containerView = UIView()
+        containerView.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#2A2A2A")
+        containerView.layer.cornerRadius = 8
+        containerView.layer.masksToBounds = true
+        return containerView
+    }()
     
     lazy var hashTag : UIImageView = {
         let hashTag = UIImageView()
@@ -163,7 +182,7 @@ class QATableViewCell : UITableViewCell {
     
     lazy var likeButton : UIButton = {
         let likeButton = UIButton()
-        likeButton.setImage(UIImage(named: "Unlike"), for: .normal)
+        likeButton.setImage(UIImage(named: "UnLike"), for: .normal)
         likeButton.setImage(UIImage(named: "Like"), for: .selected)
         return likeButton
     }()
@@ -197,3 +216,5 @@ class QATableViewCell : UITableViewCell {
     }
     
 }
+
+

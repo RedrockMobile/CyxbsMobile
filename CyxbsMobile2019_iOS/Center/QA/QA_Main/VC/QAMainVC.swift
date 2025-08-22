@@ -51,6 +51,17 @@ class QAMainVC : UIViewController {
         segmentedDataSource.itemSpacing = 0
         segmentedDataSource.backGroundNormalColor = .clear
         segmentedDataSource.backGroundSelectedColor = .clear
+        
+        //自定义指示器
+        let indicator = JXSegmentedIndicatorImageView()
+        indicator.indicatorWidth = 48
+        indicator.indicatorHeight = 4
+        
+        let indicatorImage = UIImage(named: "Selected")
+        indicator.image = indicatorImage
+        
+        segmentedView.indicators = [indicator]
+        
         segmentedView.delegate = self
         segmentedView.dataSource = segmentedDataSource
         view.addSubview(segmentedView)
@@ -60,14 +71,24 @@ class QAMainVC : UIViewController {
         //布局控件
         segmentedView.snp.makeConstraints{ make in
             make.width.equalToSuperview()
-            make.height.equalTo(30)
+            make.height.equalTo(40)
             make.top.equalTo(100)
         }
         listContainerView.snp.makeConstraints{ make in
             make.width.equalToSuperview()
-            make.top.equalTo(segmentedView.snp.bottom).offset(16)
+            make.top.equalTo(segmentedView.snp.bottom)
             make.bottom.equalToSuperview()
         }
+        
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+//            for subview in self.segmentedView.subviews {
+//                if let indicatorView = subview as? JXSegmentedIndicatorImageView {
+//                    var frame = indicatorView.frame
+//                    frame.origin.y += 10  // 向下移动10点
+//                    indicatorView.frame = frame
+//                }
+//            }
+//        }
     }
     
     func initVCs() {

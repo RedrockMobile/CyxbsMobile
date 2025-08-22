@@ -435,7 +435,7 @@ extension HttpManager {
             parameters["page_size"] = page_size
         }
         
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters, encoding: URLEncoding.httpBody)
     }
     
     ///QA请求问题详情
