@@ -103,6 +103,18 @@ class HomeActivity : BaseActivity() {
         tab5View = LayoutInflater.from(this).inflate(R.layout.qa_tablayout_item_other, null)
         tab5?.customView = tab5View
 
+        for (i in 1..4) {
+            val sp = getSp("tab_dot_cache")
+            val count = sp.getInt("tab_dot_$i", 0)
+            val tab = mTabLayout.getTabAt(i)
+            val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
+            dotView?.apply {
+                text = if (count >= 10) "9+" else count.toString()
+                visibility = if (count > 0) View.VISIBLE else View.GONE
+            }
+        }
+
+
         tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 tab.customView?.findViewById<TextView>(R.id.qa_tv_tl_tab)
@@ -118,6 +130,7 @@ class HomeActivity : BaseActivity() {
         }
         mTabLayout.addOnTabSelectedListener(tabSelectedListener)
     }
+
 
     private fun initClick() {
         qaHomeBtnReturn.setOnClickListener {
@@ -166,26 +179,40 @@ class HomeActivity : BaseActivity() {
         return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
     }
     //更新角标这里给 QaAllFragment使用
-    fun updateTabDot(tabIndex: Int, count: Int) {
+    fun updateTabDot(tabIndex: Int, newCount: Int) {
+        val sp = getSp("tab_dot_cache")
+        val key = "tab_dot_$tabIndex"
+
+        // 读取之前的缓存值
+        val oldCount = sp.getInt(key, 0)
+        val totalCount = oldCount + newCount
+
+        // 保存新的总数
+        sp.edit().putInt(key, totalCount).apply()
+
+        // 更新 UI
         val tab = mTabLayout.getTabAt(tabIndex)
         val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
         dotView?.apply {
-            text = if (count >= 10) "9+" else count.toString()
-            visibility = if (count > 0) View.VISIBLE else View.GONE
+            text = if (totalCount >= 10) "9+" else totalCount.toString()
+            visibility = if (totalCount > 0) View.VISIBLE else View.GONE
         }
     }
 
 
     fun hideOtherTabDots(currentIndex: Int) {
-        for (i in 0 until mTabLayout.tabCount) {
-            if (i == currentIndex) {
-                val tab = mTabLayout.getTabAt(i)
-                val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
-                dotView?.visibility = View.GONE
-            }
-        }
-    }
+        val sp = getSp("tab_dot_cache")
+        val key = "tab_dot_$currentIndex"
 
+        // 清空对应 tab 的缓存
+        sp.edit().putInt(key, 0).apply()
+
+        // 隐藏 UI
+        val tab = mTabLayout.getTabAt(currentIndex)
+        val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
+        dotView?.visibility = View.GONE
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
         // 解绑监听，避免内存泄漏

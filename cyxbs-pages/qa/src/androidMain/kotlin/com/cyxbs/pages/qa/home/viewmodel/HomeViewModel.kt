@@ -67,7 +67,7 @@ class HomeViewModel : BaseViewModel() {
      * fullCache会经常更新数据，特别是在加载时
      */
 
-    val fullCache = mutableMapOf<Int, Item>()
+    private val fullCache = mutableMapOf<Int, Item>()
 
     //点赞请求队列，避免重复请求
     private val likeInProgress = mutableSetOf<Int>()
