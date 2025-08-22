@@ -71,3 +71,5 @@ const val UFIELD_DETAIL_ENTRY = "/ufield/detail/entry"
 const val DECLARE_ENTRY = "/declare/entry"
 //美食页面
 const val FOOD_ENTRY = "/food/entry"
+//QA页面
+const val QA_ENTRY = "/qa/entry"
