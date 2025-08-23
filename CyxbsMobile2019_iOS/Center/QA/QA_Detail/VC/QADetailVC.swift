@@ -103,6 +103,7 @@ class QADetailVC : UIViewController {
         publishButton.layer.cornerRadius = 14
         publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
         publishButton.frame = CGRectMake(299, 53, 60, 28)
+        publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
         return publishButton
     }()
     
@@ -136,7 +137,7 @@ class QADetailVC : UIViewController {
     }
     
     @objc func publish(){
-        //打开发布页面，TBD
+        let newQuestionPage = NewQuestionVC()
+        self.navigationController?.pushViewController(newQuestionPage, animated: true)
     }
-    ///DarkMode和LightMode样式TBD
 }

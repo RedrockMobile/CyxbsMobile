@@ -1,74 +1,79 @@
 //
-//  QATableViewCell.swift
+//  RecommendedView.swift
 //  CyxbsMobile2019_iOS
 //
-//  Created by Holeon on 2025/8/19.
+//  Created by Holeon on 2025/8/23.
 //  Copyright © 2025 Redrock. All rights reserved.
 //
 
 import UIKit
 
-class QATableViewCell : UITableViewCell {
+class RecommendedView : UIView {
     
-    private let space: CGFloat = 16
+    var onTap: (() -> Void)?
     
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        backgroundColor = .clear
-        selectionStyle = .none
-        contentView.backgroundColor = .clear
-        contentView.addSubview(containerView)
-        containerView.addSubview(hashTag)
-        containerView.addSubview(questionLabel)
-        containerView.addSubview(categoryLabel)
-        containerView.addSubview(paraIcon)
-        containerView.addSubview(ansPrevLabel)
-        containerView.addSubview(dateLabel)
-        containerView.addSubview(likeButton)
-        containerView.addSubview(likeCountLabel)
-        containerView.addSubview(cyxbsIcon)
-        
+    func commonInit() {
+        addSubview(hintLabel)
+        addSubview(dividine)
+        addSubview(hashTag)
+        addSubview(questionLabel)
+        addSubview(categoryLabel)
+        addSubview(paraIcon)
+        addSubview(ansPrevLabel)
+        addSubview(dateLabel)
+        addSubview(cyxbsIcon)
+        addSubview(likeButton)
+        addSubview(likeCountLabel)
         setPosition()
     }
     
-    func setPosition(){
+    // MARK: - 设置视图布局
+    
+    func setPosition() {
         
-        containerView.snp.makeConstraints{ make in
-            make.top.equalToSuperview()
-            make.bottom.equalToSuperview().offset(-16)
-            make.left.right.equalToSuperview()
-            make.height.equalTo(132)
+        hintLabel.snp.makeConstraints{ make in
+            make.left.equalToSuperview().offset(32)
+            make.top.equalToSuperview().offset(12)
+            make.width.equalTo(114)
+            make.height.equalTo(24)
+        }
+        
+        dividine.snp.makeConstraints{ make in
+            make.left.equalToSuperview().offset(32)
+            make.right.equalToSuperview().offset(-32)
+            make.top.equalToSuperview().offset(42)
+            make.height.equalTo(0.5)
         }
         
         hashTag.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(20)
-            make.top.equalToSuperview().offset(16)
+            make.left.equalToSuperview().offset(32)
+            make.top.equalTo(dividine.snp.top).offset(20)
             make.height.equalTo(22)
             make.width.equalTo(22)
         }
         
         paraIcon.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(24)
-            make.top.equalToSuperview().offset(57)
+            make.left.equalToSuperview().offset(40)
+            make.top.equalTo(dividine.snp.top).offset(65)
             make.height.equalTo(6)
             make.width.equalTo(6)
         }
         
         ansPrevLabel.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(48)
-            make.top.equalToSuperview().offset(48)
+            make.left.equalToSuperview().offset(64)
+            make.top.equalTo(dividine.snp.top).offset(56)
             make.right.equalToSuperview().offset(-64)
         }
         
         questionLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(16)
-            make.left.equalToSuperview().offset(54)
+            make.top.equalTo(dividine.snp.top).offset(20)
+            make.left.equalToSuperview().offset(64)
             make.height.equalTo(22)
             make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(18)
+            make.top.equalTo(dividine.snp.top).offset(23)
             make.left.equalTo(questionLabel.snp.right).offset(20)
             make.height.equalTo(16)
             make.width.equalTo(48)
@@ -76,8 +81,8 @@ class QATableViewCell : UITableViewCell {
         }
         
         dateLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(99)
-            make.left.equalToSuperview().offset(16)
+            make.bottom.equalToSuperview().offset(-17)
+            make.left.equalToSuperview().offset(32)
             make.width.equalTo(70)
             make.height.equalTo(17)
         }
@@ -109,19 +114,25 @@ class QATableViewCell : UITableViewCell {
         questionLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         categoryLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         
-        containerView.bringSubviewToFront(likeButton)
     }
     
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    // MARK: - 懒加载
     
-    lazy var containerView : UIView = {
-        let containerView = UIView()
-        containerView.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#2A2A2A")
-        containerView.layer.cornerRadius = 8
-        containerView.layer.masksToBounds = true
-        return containerView
+    lazy var hintLabel : UILabel = {
+        let hintLabel = UILabel()
+        hintLabel.text = "你的问题已有答案"
+        hintLabel.font = UIFont(name: PingFangSC, size: 14)
+        hintLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#FFFFFF", alpha: 0.4))
+        hintLabel.textAlignment = .left
+        hintLabel.numberOfLines = 1
+        hintLabel.backgroundColor = .clear
+        return hintLabel
+    }()
+    
+    lazy var dividine : UIView = {
+        let dividine = UIView()
+        dividine.backgroundColor = UIColor(light: UIColor(hexString:"#F2F4FF"), dark: UIColor(hexString: "#818181", alpha: 0.4))
+        return dividine
     }()
     
     lazy var hashTag : UIImageView = {
@@ -194,5 +205,29 @@ class QATableViewCell : UITableViewCell {
         return likeCountLabel
     }()
     
+    // MARK: - 处理视图点击事件（闭包回掉）
+    
+    private func addTapGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+        addGestureRecognizer(tapGesture)
+        isUserInteractionEnabled = true
+    }
+    
+    @objc private func handleTap(_ sender: UITapGestureRecognizer) {
+        // 点击动画效果
+        UIView.animate(withDuration: 0.1, animations: {
+            self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            self.backgroundColor = .systemPurple
+        }) { _ in
+            UIView.animate(withDuration: 0.1) {
+                self.transform = .identity
+                self.backgroundColor = .systemBlue
+            }
+        }
+        
+        // 执行闭包回调
+        onTap?()
+    }
+    
+    
 }
-

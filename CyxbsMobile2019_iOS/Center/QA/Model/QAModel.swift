@@ -14,81 +14,141 @@ class QAModel{
     var qa : [QAObject] = []
     
     ///请求所有或限定页数的QA项目
-    func requestQACenterObjects(QATag : String, pageNum: Int?, pageSize: Int?,success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
-        qa = []
-        HttpManager.shared.magipoke_qa_listQuestion(tags: QATag, page: pageNum, page_size: pageSize).ry_JSON { response in
-            switch response{
-            case .success(let jsonData):
-                print("\(jsonData)")
-                let allQAResponse = AllQAResponse(from: jsonData)
-                self.qa = allQAResponse.data.items
-                success(self.qa)
-            case .failure(let error):
-                print("请求失败，错误：\(error)")
-                failure(error)
-            }
-        }
-    }
-    
-    
-    ///请求搜索的QA项目
-    func requestSearchObjects(keyword : String, success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void){
-        qa = []
-        HttpManager.shared.magipoke_qa_search(q: keyword).ry_JSON { response in
-            switch response{
-            case .success(let jsonData):
-                let searchQAResponse = SearchQAResponse(from: jsonData)
-                self.qa = searchQAResponse.data.items
-                success(self.qa)
-            case .failure(let error):
-                print("请求失败，错误：\(error)")
-                failure(error)
-            }
-        }
-    }
-    
-    func requestDetailObject(id : Int, success: @escaping (QAObject) -> Void, failure: @escaping (Error) -> Void){
-        HttpManager.shared.magipoke_qa_getDetail(identifier: id).ry_JSON { response in
-            switch response{
-            case .success(let jsonData):
-                let detailQAResponse = DetailQAResponse(from: jsonData)
-                success(detailQAResponse.data.item)
-            case .failure(let error):
-                print("请求失败，错误：\(error)")
-                failure(error)
-            }
-        }
-    }
-    
-    ///将从服务器获取的日期格式化
-    func dateFormatter(dateString: String) -> String? {
-        // 检查是否为无效日期（未回答时服务器返回的默认值）
-        if #available(iOS 11.0, *) {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    func requestQACenterObjects(QATag: String, pageNum: Int? = nil, pageSize: Int? = nil,
+                                  success: @escaping ([QAObject]) -> Void, failure: @escaping (Error) -> Void) {
+            qa = []
             
-            guard let date = formatter.date(from: dateString) else {
+            print("开始请求QA列表，标签: \(QATag), 页码: \(pageNum ?? 0), 页大小: \(pageSize ?? 0)")
+            
+            HttpManager.shared.magipoke_qa_listQuestion(tags: QATag, page: pageNum, page_size: pageSize).ry_JSON { response in
+                switch response {
+                case .success(let jsonData):
+                    print("QA列表响应: \(jsonData)")
+                    
+                    // 检查响应结构
+                    guard jsonData["status"].stringValue == "200" || jsonData["status"].stringValue == "10000" else {
+                        let error = NSError(domain: "API错误", code: -1,
+                                          userInfo: [NSLocalizedDescriptionKey: jsonData["info"].stringValue])
+                        failure(error)
+                        return
+                    }
+                    
+                    let allQAResponse = AllQAResponse(from: jsonData)
+                    self.qa = allQAResponse.data.items
+                    success(self.qa)
+                    
+                case .failure(let error):
+                    print("QA列表请求失败，错误: \(error)")
+                    failure(error)
+                }
+            }
+        }
+        
+        /// 请求搜索的QA项目
+        func requestSearchObjects(keyword: String,
+                                success: @escaping ([QAObject]) -> Void,
+                                failure: @escaping (Error) -> Void) {
+            qa = []
+            
+            print("开始搜索QA，关键词: \(keyword)")
+            
+            HttpManager.shared.magipoke_qa_search(q: keyword).ry_JSON { response in
+                switch response {
+                case .success(let jsonData):
+                    print("QA搜索响应: \(jsonData)")
+                    
+                    // 检查响应结构
+                    guard jsonData["status"].stringValue == "200" || jsonData["status"].stringValue == "10000" else {
+                        let error = NSError(domain: "API错误", code: -1,
+                                          userInfo: [NSLocalizedDescriptionKey: jsonData["info"].stringValue])
+                        failure(error)
+                        return
+                    }
+                    
+                    // 尝试不同的响应结构
+                    if jsonData["data"]["items"].exists() {
+                        let searchQAResponse = SearchQAResponse(from: jsonData)
+                        self.qa = searchQAResponse.data.items
+                        success(self.qa)
+                    } else if jsonData["data"].array != nil {
+                        // 如果data直接是数组
+                        let items = jsonData["data"].arrayValue.map { QAObject(from: $0) }
+                        self.qa = items
+                        success(self.qa)
+                    } else {
+                        let error = NSError(domain: "解析错误", code: -2,
+                                          userInfo: [NSLocalizedDescriptionKey: "无法解析响应数据"])
+                        failure(error)
+                    }
+                    
+                case .failure(let error):
+                    print("QA搜索请求失败，错误: \(error)")
+                    failure(error)
+                }
+            }
+        }
+        
+        func requestDetailObject(id: Int,
+                               success: @escaping (QAObject) -> Void,
+                               failure: @escaping (Error) -> Void) {
+            print("开始请求QA详情，ID: \(id)")
+            
+            HttpManager.shared.magipoke_qa_getDetail(identifier: id).ry_JSON { response in
+                switch response {
+                case .success(let jsonData):
+                    print("QA详情响应: \(jsonData)")
+                    
+                    // 检查响应结构
+                    guard jsonData["status"].stringValue == "200" || jsonData["status"].stringValue == "10000" else {
+                        let error = NSError(domain: "API错误", code: -1,
+                                          userInfo: [NSLocalizedDescriptionKey: jsonData["info"].stringValue])
+                        failure(error)
+                        return
+                    }
+                    
+                    let detailQAResponse = DetailQAResponse(from: jsonData)
+                    success(detailQAResponse.data.item)
+                    
+                case .failure(let error):
+                    print("QA详情请求失败，错误: \(error)")
+                    failure(error)
+                }
+            }
+        }
+        
+        /// 将从服务器获取的日期格式化
+        func dateFormatter(dateString: String) -> String? {
+            // 检查是否为无效日期（未回答时服务器返回的默认值）
+            if dateString.isEmpty || dateString == "0001-01-01T00:00:00Z" {
                 return nil
             }
             
-            let outputFormatter = DateFormatter()
-            outputFormatter.dateFormat = "yyyy.MM.dd"
-            return outputFormatter.string(from: date)
-        } else {
-            // Fallback on earlier versions
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ"
-            
-            guard let date = formatter.date(from: dateString) else {
-                return nil
+            if #available(iOS 11.0, *) {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                
+                guard let date = formatter.date(from: dateString) else {
+                    return nil
+                }
+                
+                let outputFormatter = DateFormatter()
+                outputFormatter.dateFormat = "yyyy.MM.dd"
+                return outputFormatter.string(from: date)
+            } else {
+                // Fallback on earlier versions
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ"
+                
+                guard let date = formatter.date(from: dateString) else {
+                    return nil
+                }
+                
+                let outputFormatter = DateFormatter()
+                outputFormatter.dateFormat = "yyyy.MM.dd"
+                return outputFormatter.string(from: date)
             }
-            
-            let outputFormatter = DateFormatter()
-            outputFormatter.dateFormat = "yyyy.MM.dd"
-            return outputFormatter.string(from: date)
         }
-    }
     
 }
 
