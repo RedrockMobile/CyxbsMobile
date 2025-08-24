@@ -52,7 +52,7 @@ class QADetailView : UIView{
         answerDetailView.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(16)
             make.top.equalToSuperview().offset(172)
-            make.right.equalToSuperview().offset(-16)
+            make.right.equalToSuperview().offset(-8)
             make.height.equalTo(answerDetailView.textHeightFromTextString(text: answerDetailView.contentLabel.text!, textWidth: 296, fontSize: 14, isBold: false)+16+71)
         }
     }

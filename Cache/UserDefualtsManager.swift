@@ -117,4 +117,10 @@ extension UserDefaultsManager {
         set { set(newValue, forKey: "LATEST_REQUEST_TOKEN") }
         get { get(key: "LATEST_REQUEST_TOKEN") as? Date }
     }
+    
+    /// 上一次进入QA时间
+    var latestRequestQA: Date? {
+        set { set(newValue, forKey: "LATEST_REQUEST_QA")}
+        get { get(key: "LATEST_REQUEST_QA") as? Date}
+    }
 }

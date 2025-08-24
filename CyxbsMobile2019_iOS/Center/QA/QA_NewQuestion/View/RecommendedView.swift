@@ -13,6 +13,7 @@ class RecommendedView : UIView {
     var onTap: (() -> Void)?
     
     func commonInit() {
+        self.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#2D2D2D")
         addSubview(hintLabel)
         addSubview(dividine)
         addSubview(hashTag)

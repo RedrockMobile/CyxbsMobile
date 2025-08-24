@@ -167,6 +167,9 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         recommendView.likeCountLabel.text = "\(qaObject.likeCount)"
         recommendView.likeButton.isSelected = qaObject.isLike
         recommendView.likeButton.addTarget(self, action: #selector(like(_:)), for: .touchUpInside)
+        recommendView.layer.cornerRadius = 8
+        recommendView.layer.masksToBounds = true
+        
         
         // 格式化日期
         let dateFormatter = QAModel()
