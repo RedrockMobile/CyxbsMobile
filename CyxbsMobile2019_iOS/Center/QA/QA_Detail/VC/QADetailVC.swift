@@ -32,7 +32,33 @@ class QADetailVC : UIViewController {
         view.addSubview(detailView)
         view.addSubview(backButton)
         view.addSubview(publishButton)
+        setPosition()
         requestDetail()
+    }
+    
+    func setPosition() {
+        
+        backButton.snp.makeConstraints{ make in
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.width.equalTo(9)
+            make.height.equalTo(18)
+        }
+        
+        publishButton.snp.makeConstraints{ make in
+            make.right.equalToSuperview().offset(-16)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.width.equalTo(60)
+            make.height.equalTo(28)
+        }
+        
+        detailView.snp.makeConstraints{ make in
+            make.left.equalToSuperview()
+            make.right.equalToSuperview()
+            make.height.equalToSuperview()
+            make.width.equalToSuperview()
+        }
+        
     }
     
     //获取问题详情
@@ -82,7 +108,6 @@ class QADetailVC : UIViewController {
     ///懒加载
     lazy var detailView : QADetailView = {
         let detailView = QADetailView()
-        detailView.frame = CGRectMake(0, 0, UIScreen.main.bounds.width, UIScreen.main.bounds.height)
         return detailView
     }()
     
@@ -90,7 +115,6 @@ class QADetailVC : UIViewController {
         let backButton = UIButton()
         backButton.setImage(UIImage(named: "Back"), for: .normal)
         backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
-        backButton.frame = CGRectMake(18, 59, 7, 16)
         return backButton
     }()
     
@@ -101,8 +125,6 @@ class QADetailVC : UIViewController {
         publishButton.titleLabel!.font = UIFont(name: PingFangSC, size: 14)
         publishButton.backgroundColor = UIColor(hexString: "#4841E2")
         publishButton.layer.cornerRadius = 14
-        publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
-        publishButton.frame = CGRectMake(299, 53, 60, 28)
         publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
         return publishButton
     }()

@@ -1,14 +1,14 @@
 //
-//  QATableViewCell.swift
+//  QASearchTableViewCell.swift
 //  CyxbsMobile2019_iOS
 //
-//  Created by Holeon on 2025/8/19.
+//  Created by Holeon on 2025/8/23.
 //  Copyright © 2025 Redrock. All rights reserved.
 //
 
 import UIKit
 
-class QATableViewCell : UITableViewCell {
+class QASearchTableViewCell : UITableViewCell {
     
     private let space: CGFloat = 16
     
@@ -24,9 +24,9 @@ class QATableViewCell : UITableViewCell {
         containerView.addSubview(paraIcon)
         containerView.addSubview(ansPrevLabel)
         containerView.addSubview(dateLabel)
-        containerView.addSubview(cyxbsIcon)
         containerView.addSubview(likeButton)
         containerView.addSubview(likeCountLabel)
+        containerView.addSubview(cyxbsIcon)
         
         setPosition()
     }
@@ -193,6 +193,4 @@ class QATableViewCell : UITableViewCell {
         likeCountLabel.textColor = UIColor.ry(light: "#A7B6D1", dark: "#FFFFFF")
         return likeCountLabel
     }()
-    
 }
-

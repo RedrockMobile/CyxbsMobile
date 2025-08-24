@@ -1,11 +1,8 @@
-//  说是TableView，实际上还包含了搜索框，希望你能看到这句话，诶嘿～
-//  本文件一定程度上参考了ActivityCollectionViewController.swift
-//  想要看注释的话建议去那份文档里
 //
-//  QATableView.swift
+//  QASearchViewController.swift
 //  CyxbsMobile2019_iOS
 //
-//  Created by Holeon on 2025/8/19.
+//  Created by Holeon on 2025/8/23.
 //  Copyright © 2025 Redrock. All rights reserved.
 //
 
@@ -14,32 +11,31 @@ import MJRefresh
 import JXSegmentedView
 import SnapKit
 
-class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate {
+class QASearchViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+    
+    // MARK: - 新增初始搜索词属性
+    private var initialSearchKeyword: String?
     
     // MARK: - 变量定义
     var qaType: QAType = .all
     let qaModel = QAModel()
-    let refreshNum = 10
     private var qaTypeString: String?
     private var tableViewCount: Int = 0
     private var cellHeight: CGFloat = 132
-    private var currentPage = 1
-    private var isLoadingMore = false
-    private var hasMoreData = true
+    
+    // 搜索相关属性
+    private var isSearching = false
+    private var searchKeyword = ""
     
     // 添加约束引用
     private var contentViewHeightConstraint: Constraint?
     private var tableViewHeightConstraint: Constraint?
     
-    // 添加时间戳记录最后刷新时间
-    private var lastRefreshTime: Date?
-    // 添加已加载所有数据的标记
-    private var hasLoadedAllData = false
-    
-    // MARK: - 初始化与生命周期
-    
-    init(qaType: QAType) {
+    // MARK: - 修改初始化方法
+    init(qaType: QAType, initialSearchKeyword: String? = nil) {
         self.qaType = qaType
+        self.initialSearchKeyword = initialSearchKeyword
+        
         switch qaType {
         case .all:
             qaTypeString = ""
@@ -65,8 +61,18 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         
         setupViews()
         setPosition()
-        self.addMJHeader()
-        requestQA()
+        
+        // 初始状态下不加载任何数据
+        updateContentViewHeight()
+        
+        // 如果有初始搜索词，自动执行搜索:cite[1]:cite[8]
+        if let initialKeyword = initialSearchKeyword, !initialKeyword.isEmpty {
+            // 延迟执行以确保视图加载完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.searchTextField.text = initialKeyword
+                self.searchQA(keyword: initialKeyword)
+            }
+        }
     }
     
     // MARK: - 重要方法
@@ -75,72 +81,62 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     private func setupViews() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-        contentView.addSubview(searchBar)
+        contentView.addSubview(searchTextField)
         contentView.addSubview(qaTableView)
+        contentView.addSubview(emptyStateLabel)
     }
     
-    @objc func requestQA() {
-        // 只有当hasLoadedAllData为false时才执行刷新
-        if hasLoadedAllData {
-            self.scrollView.mj_header?.endRefreshing()
+    // 搜索QA项目
+    private func searchQA(keyword: String) {
+        guard !keyword.isEmpty else {
+            // 如果关键词为空，清空搜索结果
+            isSearching = false
+            searchKeyword = ""
+            qaModel.qa.removeAll()
+            tableViewCount = 0
+            qaTableView.reloadData()
+            updateContentViewHeight()
+            emptyStateLabel.isHidden = false
+            emptyStateLabel.text = "请输入搜索关键词"
             return
         }
         
-        currentPage = 1
-        hasMoreData = true
-        isLoadingMore = false
+        isSearching = true
+        searchKeyword = keyword
+        emptyStateLabel.isHidden = true
         
-        qaModel.requestQACenterObjects(QATag: "", pageNum: currentPage, pageSize: refreshNum) { [weak self] qa in
+        qaModel.requestSearchObjects(keyword: keyword) { [weak self] qa in
             guard let self = self else { return }
             
-            print("问答数量：\(qa.count)")
-            if !qa.isEmpty {
-                print("请求标签: \(qa[0].tags)")
-            }
-            
-            // 清除旧数据，如果是刷新操作
+            // 清除旧数据
             self.qaModel.qa.removeAll()
             
-            // 添加新数据
+            // 添加搜索结果
             self.qaModel.qa.append(contentsOf: qa)
             
-            // 应用过滤
+            // 应用分类过滤
             self.filterQAItems()
-            
-            // 检查是否还有更多数据
-            self.hasMoreData = qa.count >= self.refreshNum
-            
-            // 如果没有更多数据，标记为已加载所有数据
-            if !self.hasMoreData {
-                self.hasLoadedAllData = true
-            }
-            
-            // 更新最后刷新时间
-            self.lastRefreshTime = Date()
             
             DispatchQueue.main.async {
                 self.qaTableView.reloadData()
                 self.updateContentViewHeight()
-                self.scrollView.mj_header?.endRefreshing()
-                self.scrollView.mj_footer?.endRefreshing()
                 
-                // 只有在有数据且可能有更多数据时才添加footer
-                if self.tableViewCount > 0 && self.hasMoreData {
-                    self.addMJFooter()
-                } else if let footer = self.scrollView.mj_footer {
-                    footer.endRefreshingWithNoMoreData()
-                    // 如果没有更多数据，移除footer
-                    self.scrollView.mj_footer = nil
+                // 显示空状态提示
+                if self.tableViewCount == 0 {
+                    self.emptyStateLabel.isHidden = false
+                    self.emptyStateLabel.text = "没有找到相关结果"
+                } else {
+                    self.emptyStateLabel.isHidden = true
                 }
             }
         } failure: { error in
             ActivityHUD.shared.showNetworkError()
-            self.scrollView.mj_header?.endRefreshing()
-            self.scrollView.mj_footer?.endRefreshing()
-            self.isLoadingMore = false
+            
+            // 显示错误状态
+            self.emptyStateLabel.isHidden = false
+            self.emptyStateLabel.text = "搜索失败，请重试"
         }
     }
-    
     private func setPosition() {
         scrollView.snp.makeConstraints { make in
             make.edges.equalTo(view.safeAreaLayoutGuide)
@@ -153,7 +149,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
             self.contentViewHeightConstraint = make.height.equalTo(UIScreen.main.bounds.height).constraint
         }
         
-        searchBar.snp.makeConstraints { make in
+        searchTextField.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(20)
             make.left.equalToSuperview().offset(16)
             make.right.equalToSuperview().offset(-16)
@@ -161,12 +157,18 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         }
         
         qaTableView.snp.makeConstraints { make in
-            make.top.equalTo(searchBar.snp.bottom).offset(16)
+            make.top.equalTo(searchTextField.snp.bottom).offset(16)
             make.left.equalToSuperview().offset(16)
             make.right.equalToSuperview().offset(-16)
             make.bottom.equalToSuperview().offset(-16)
             // 初始高度设置为0，后续会动态调整
             self.tableViewHeightConstraint = make.height.equalTo(0).constraint
+        }
+        
+        emptyStateLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(searchTextField.snp.bottom).offset(60)
+            make.left.right.equalToSuperview().inset(20)
         }
     }
     
@@ -193,14 +195,66 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         tableViewCount = qaModel.qa.count
     }
     
+    // 高亮显示关键字
+    private func highlightText(in string: String, with keyword: String) -> NSAttributedString {
+        let attributedString = NSMutableAttributedString(string: string)
+        let range = (string as NSString).range(of: keyword, options: .caseInsensitive)
+        
+        if range.location != NSNotFound {
+            attributedString.addAttribute(.backgroundColor, value: UIColor.yellow, range: range)
+            attributedString.addAttribute(.foregroundColor, value: UIColor.black, range: range)
+        }
+        
+        return attributedString
+    }
+    
     // MARK: - 懒加载
     
-    lazy var searchBar: SearchBar = {
-        let searchBar = SearchBar()
-        searchBar.placeholder = "搜索关键词"
-        searchBar.delegate = self
-        return searchBar
+    lazy var searchTextField: UITextField = {
+        let textField = UITextField()
+        textField.placeholder = "搜索关键词"
+        textField.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677"))
+        textField.font = UIFont(name: PingFangSC, size: 16)
+        
+        textField.backgroundColor = UIColor.ry(light: "#E8F0FC", dark: "#1A1A1A")
+        textField.layer.cornerRadius = 19
+        textField.delegate = self
+        
+        // 添加清除按钮
+        textField.clearButtonMode = .whileEditing
+        
+        // 添加键盘返回按钮类型
+        textField.returnKeyType = .search
+        
+        // 添加编辑改变事件
+        textField.addTarget(self, action: #selector(searchTextChanged(_:)), for: .editingChanged)
+        
+        return textField
     }()
+    
+    @objc private func searchTextChanged(_ textField: UITextField) {
+        guard let keyword = textField.text, !keyword.isEmpty else {
+            // 如果搜索框为空，清空搜索结果
+            isSearching = false
+            searchKeyword = ""
+            qaModel.qa.removeAll()
+            tableViewCount = 0
+            qaTableView.reloadData()
+            updateContentViewHeight()
+            emptyStateLabel.isHidden = false
+            emptyStateLabel.text = "请输入搜索关键词"
+            return
+        }
+        
+        // 延迟搜索，避免频繁请求
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(performSearch), object: nil)
+        self.perform(#selector(performSearch), with: nil, afterDelay: 0.5)
+    }
+    
+    @objc private func performSearch() {
+        guard let keyword = searchTextField.text, !keyword.isEmpty else { return }
+        searchQA(keyword: keyword)
+    }
     
     lazy var qaTableView: UITableView = {
         let qaTableView = UITableView()
@@ -211,7 +265,7 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         qaTableView.layer.cornerRadius = 8
         qaTableView.layer.masksToBounds = true
         qaTableView.isScrollEnabled = false // 禁用表格自身的滚动
-        qaTableView.register(QATableViewCell.self, forCellReuseIdentifier: "QACell")
+        qaTableView.register(QASearchTableViewCell.self, forCellReuseIdentifier: "QACell")
         return qaTableView
     }()
     
@@ -228,86 +282,17 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         return view
     }()
     
-    // MARK: - UITextFieldDelegate
-    
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        textField.resignFirstResponder()
-        // 在这里可以获取搜索栏的内容
-        if let searchText = textField.text, !searchText.isEmpty {
-            print("搜索内容: \(searchText)")
-            let searchPage = QASearchMainVC(initialSearchKeyword: searchText)
-            self.navigationController?.pushViewController(searchPage, animated: true)
-        }
-        return true
-    }
+    lazy var emptyStateLabel: UILabel = {
+        let label = UILabel()
+        label.text = "请输入搜索关键词"
+        label.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677"))
+        label.font = UIFont(name: PingFangSC, size: 16)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        return label
+    }()
     
     // MARK: - TableView代理和数据源
-    
-    func addMJHeader() {
-        let header = MJRefreshNormalHeader(refreshingTarget: self, refreshingAction: #selector(requestQA))
-        scrollView.mj_header = header
-    }
-    
-    func addMJFooter() {
-        if let _ = scrollView.mj_footer {
-            // 已经存在footer，不需要重复添加
-            return
-        }
-        
-        let footer = MJRefreshAutoNormalFooter(refreshingTarget: self, refreshingAction: #selector(refreshTableView))
-        footer.setTitle("上拉加载更多", for: .idle)
-        footer.setTitle("正在加载...", for: .refreshing)
-        footer.setTitle("没有更多数据了", for: .noMoreData)
-        scrollView.mj_footer = footer
-    }
-    
-    @objc func refreshTableView() {
-        // 防止重复加载或已加载所有数据
-        if isLoadingMore || hasLoadedAllData {
-            if hasLoadedAllData {
-                self.scrollView.mj_footer?.endRefreshingWithNoMoreData()
-            } else {
-                self.scrollView.mj_footer?.endRefreshing()
-            }
-            return
-        }
-        
-        isLoadingMore = true
-        currentPage += 1
-        
-        qaModel.requestQACenterObjects(QATag: "", pageNum: currentPage, pageSize: refreshNum) { [weak self] newQA in
-            guard let self = self else { return }
-            
-            self.isLoadingMore = false
-            
-            // 添加新数据
-            self.qaModel.qa.append(contentsOf: newQA)
-            
-            // 应用过滤
-            self.filterQAItems()
-            
-            // 关键修改：检查是否还有更多数据
-            self.hasMoreData = newQA.count >= self.refreshNum
-            self.hasLoadedAllData = !self.hasMoreData
-            
-            DispatchQueue.main.async {
-                self.qaTableView.reloadData()
-                self.updateContentViewHeight()
-                
-                if self.hasMoreData {
-                    self.scrollView.mj_footer?.endRefreshing()
-                } else {
-                    self.scrollView.mj_footer?.endRefreshingWithNoMoreData()
-                    // 如果没有更多数据，移除footer
-                    self.scrollView.mj_footer = nil
-                }
-            }
-        } failure: { error in
-            self.isLoadingMore = false
-            self.scrollView.mj_footer?.endRefreshing()
-            ActivityHUD.shared.showNetworkError()
-        }
-    }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return cellHeight + 16
@@ -328,16 +313,31 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = qaTableView.dequeueReusableCell(withIdentifier: "QACell", for: indexPath) as! QATableViewCell
-        
+        let cell = qaTableView.dequeueReusableCell(withIdentifier: "QACell", for: indexPath) as! QASearchTableViewCell
+        // 防止数组越界
         guard indexPath.item < qaModel.qa.count else {
             return cell
         }
         
         let qaItem = qaModel.qa[indexPath.item]
-        cell.questionLabel.text = qaItem.questionString
+        
+        // 设置问题文本，如果有搜索关键词则高亮显示
+        if isSearching && !searchKeyword.isEmpty {
+            cell.questionLabel.attributedText = highlightText(in: qaItem.questionString, with: searchKeyword)
+        } else {
+            cell.questionLabel.text = qaItem.questionString
+            cell.questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
+        }
+        
         cell.categoryLabel.text = "\(qaItem.tags)类"
-        cell.ansPrevLabel.text = qaItem.answerString
+        
+        // 设置答案预览文本，如果有搜索关键词则高亮显示
+        if isSearching && !searchKeyword.isEmpty {
+            cell.ansPrevLabel.attributedText = highlightText(in: qaItem.answerString, with: searchKeyword)
+        } else {
+            cell.ansPrevLabel.text = qaItem.answerString
+            cell.ansPrevLabel.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677", alpha: 1))
+        }
         
         // 设置日期
         if let formattedDate = qaModel.dateFormatter(dateString: qaItem.aTime) {
@@ -348,8 +348,6 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
         
         cell.likeCountLabel.text = "\(qaItem.likeCount)"
         cell.likeButton.isSelected = qaItem.isLike
-        
-        // 关键修改：设置按钮的tag为indexPath.item
         cell.likeButton.tag = indexPath.item
         cell.likeButton.addTarget(self, action: #selector(like(_:)), for: .touchUpInside)
         
@@ -422,39 +420,32 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     }
 }
 
-// MARK: - 自定义SearchBar类
-class SearchBar: UITextField {
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupView()
+// MARK: - UITextFieldDelegate
+extension QASearchViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        if let keyword = textField.text, !keyword.isEmpty {
+            searchQA(keyword: keyword)
+        }
+        return true
     }
     
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupView()
-    }
-    
-    private func setupView() {
-        self.placeholder = "搜索关键词"
-        self.textColor = UIColor(light: UIColor(hexString: "#15315B", alpha: 0.4), dark: UIColor(hexString: "#767677"))
-        self.font = UIFont(name: "PingFangSC", size: 16)
-        self.backgroundColor = UIColor.ry(light: "#E8F0FC", dark: "#1A1A1A")
-        self.layer.cornerRadius = 19
-        self.layer.masksToBounds = true
-        
-        // 设置文本内边距
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: self.frame.height))
-        self.leftView = paddingView
-        self.leftViewMode = .always
-        
-        // 设置返回键类型
-        self.returnKeyType = .search
+    func textFieldShouldClear(_ textField: UITextField) -> Bool {
+        // 清除搜索状态，清空搜索结果
+        isSearching = false
+        searchKeyword = ""
+        qaModel.qa.removeAll()
+        tableViewCount = 0
+        qaTableView.reloadData()
+        updateContentViewHeight()
+        emptyStateLabel.isHidden = false
+        emptyStateLabel.text = "请输入搜索关键词"
+        return true
     }
 }
 
 // MARK: - Segment返回containerView展示的视图
-extension QAViewController: JXSegmentedListContainerViewListDelegate {
+extension QASearchViewController: JXSegmentedListContainerViewListDelegate {
     func listView() -> UIView {
         return view
     }

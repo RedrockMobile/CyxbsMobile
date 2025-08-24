@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import SnapKit
 
 class NewQuestionVC : UIViewController, UITextFieldDelegate {
     
@@ -20,6 +21,10 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     private var searchTimer: Timer?
     private let searchDebounceInterval: TimeInterval = 0.5 // 500毫秒防抖
     
+    // 添加键盘相关属性
+    private var optionButtonSetBottomConstraint: Constraint?
+    private var originalOptionButtonSetBottomOffset: CGFloat = -64
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -30,12 +35,76 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         view.addSubview(questionInput)
         view.addSubview(optionButtonSet)
         setPosition()
+        
+        // 添加键盘监听
+        setupKeyboardObservers()
+        
+        // 添加文本变化监听
+        questionInput.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         print("Top view frame: \(topView.frame)")
         print("Option button set frame: \(optionButtonSet.frame)")
+        
+        // 自动弹出键盘
+        questionInput.becomeFirstResponder()
+    }
+    
+    deinit {
+        // 移除键盘监听和取消定时器
+        NotificationCenter.default.removeObserver(self)
+        searchTimer?.invalidate()
+    }
+    
+    // MARK: - 键盘监听
+    
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow(_:)),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide(_:)),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let animationDuration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
+            return
+        }
+        
+        let keyboardHeight = keyboardFrame.height
+        
+        // 更新optionButtonSet的位置到键盘上方
+        optionButtonSetBottomConstraint?.update(offset: -keyboardHeight - 16) // 16是间距
+        
+        UIView.animate(withDuration: animationDuration) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let animationDuration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
+            return
+        }
+        
+        // 恢复optionButtonSet的原始位置
+        optionButtonSetBottomConstraint?.update(offset: originalOptionButtonSetBottomOffset)
+        
+        UIView.animate(withDuration: animationDuration) {
+            self.view.layoutIfNeeded()
+        }
     }
     
     // MARK: - 重要方法
@@ -56,10 +125,11 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
             make.height.equalTo(80)
         }
         
+        // 修改optionButtonSet的约束，保存底部约束引用
         optionButtonSet.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(16)
             make.right.equalToSuperview().offset(-16)
-            make.bottom.equalToSuperview().offset(-64)
+            self.optionButtonSetBottomConstraint = make.bottom.equalToSuperview().offset(originalOptionButtonSetBottomOffset).constraint
             make.height.equalTo(28)
         }
         
@@ -135,6 +205,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     
     lazy var topView : NewQuestionTopView = {
         let topView = NewQuestionTopView()
+        topView.backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
         topView.publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
         return topView
     }()
@@ -166,7 +237,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     
     // MARK: - 按钮选项
     
-    func popVC(){
+    @objc func popVC(){
         self.navigationController?.popViewController(animated: true)
     }
     
@@ -253,10 +324,4 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
             }
         }
     }
-    
-    // 确保在视图销毁时取消定时器
-    deinit {
-        searchTimer?.invalidate()
-    }
-    
 }

@@ -19,17 +19,17 @@ class NewQuestionTopView: UIView{
     func setPosition(){
         
         backButton.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(60)
-            make.left.equalToSuperview().offset(20)
-            make.height.equalTo(16)
-            make.width.equalTo(7)
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.width.equalTo(9)
+            make.height.equalTo(18)
         }
         
         publishButton.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(55)
-            make.right.equalToSuperview().offset(-20)
-            make.height.equalTo(28)
+            make.right.equalToSuperview().offset(-16)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
             make.width.equalTo(60)
+            make.height.equalTo(28)
         }
         
     }

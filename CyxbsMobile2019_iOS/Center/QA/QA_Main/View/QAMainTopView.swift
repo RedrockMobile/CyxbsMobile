@@ -19,15 +19,15 @@ class QAMainTopView: UIView{
     func setPosition(){
         
         backButton.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(59.5)
-            make.left.equalToSuperview().offset(18)
-            make.height.equalTo(16)
-            make.width.equalTo(7)
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.width.equalTo(9)
+            make.height.equalTo(18)
         }
         
         titleLable.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(52)
-            make.left.equalToSuperview().offset(145)
+            make.top.equalToSuperview().offset(Constants.statusBarHeight + 5)
+            make.centerX.equalToSuperview()
             make.height.equalTo(31)
             make.width.equalTo(85)
         }
@@ -37,7 +37,7 @@ class QAMainTopView: UIView{
     let titleLable: UILabel = {
         let label = UILabel()
         label.text = "Q and A"
-        label.font = UIFont(name: PingFangSC, size: 22)
+        label.font = UIFont(name: PingFangSCMedium, size: 22)
         label.textColor = UIColor.ry(light: "#15315B", dark: "#FFFFFF")
         return label
     }()
