@@ -58,7 +58,6 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.ry(light: "#F5F7FB", dark: "#1A1A1A")
-        
         setupViews()
         setPosition()
         
@@ -191,6 +190,8 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
             // 过滤出匹配标签的QA项目
             qaModel.qa = qaModel.qa.filter { $0.tags == qaTypeString }
         }
+        //过滤未回答项目
+        qaModel.qa = qaModel.qa.filter { $0.status == 2 }
         // 如果qaTypeString为空，保持原样（显示所有项目）
         tableViewCount = qaModel.qa.count
     }
@@ -201,8 +202,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         let range = (string as NSString).range(of: keyword, options: .caseInsensitive)
         
         if range.location != NSNotFound {
-            attributedString.addAttribute(.backgroundColor, value: UIColor.yellow, range: range)
-            attributedString.addAttribute(.foregroundColor, value: UIColor.black, range: range)
+            attributedString.addAttribute(.foregroundColor, value: UIColor(hexString: "#5E5ADF")!, range: range)
         }
         
         return attributedString
@@ -219,6 +219,13 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         textField.backgroundColor = UIColor.ry(light: "#E8F0FC", dark: "#1A1A1A")
         textField.layer.cornerRadius = 19
         textField.delegate = self
+        
+        // 添加左右内边距
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 20, height: textField.frame.height))
+        textField.leftView = paddingView
+        textField.leftViewMode = .always
+        textField.rightView = paddingView
+        textField.rightViewMode = .always
         
         // 添加清除按钮
         textField.clearButtonMode = .whileEditing
@@ -323,6 +330,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         
         // 设置问题文本，如果有搜索关键词则高亮显示
         if isSearching && !searchKeyword.isEmpty {
+            // 修改：使用新的高亮方法（只改变文字颜色）
             cell.questionLabel.attributedText = highlightText(in: qaItem.questionString, with: searchKeyword)
         } else {
             cell.questionLabel.text = qaItem.questionString
@@ -333,6 +341,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         
         // 设置答案预览文本，如果有搜索关键词则高亮显示
         if isSearching && !searchKeyword.isEmpty {
+            // 修改：使用新的高亮方法（只改变文字颜色）
             cell.ansPrevLabel.attributedText = highlightText(in: qaItem.answerString, with: searchKeyword)
         } else {
             cell.ansPrevLabel.text = qaItem.answerString

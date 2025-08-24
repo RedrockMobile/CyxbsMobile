@@ -22,14 +22,14 @@ class QADetailView : UIView{
     func setPosition(){
         
         hashTag.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(16)
+            make.left.equalToSuperview().offset(32)
             make.top.equalToSuperview().offset(105)
             make.height.equalTo(22)
             make.width.equalTo(22)
         }
         
         questionLabel.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(48)
+            make.left.equalToSuperview().offset(64)
             make.top.equalToSuperview().offset(105)
             make.height.equalTo(22)
             make.width.equalTo(calculateLabelWidth(labelText: questionLabel.text!)+20)
@@ -43,7 +43,7 @@ class QADetailView : UIView{
         }
         
         dateLabel.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(48)
+            make.left.equalToSuperview().offset(64)
             make.top.equalToSuperview().offset(135)
             make.height.equalTo(17)
             make.width.equalTo(66)

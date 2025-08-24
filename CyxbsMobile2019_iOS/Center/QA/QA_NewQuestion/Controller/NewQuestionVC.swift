@@ -15,21 +15,20 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     
     var question : String?
     var tags : String?
-    var qaModel : QAModel?
-    var recommendObject : QAObject?
-    // 添加防抖相关属性
-    private var searchTimer: Timer?
-    private let searchDebounceInterval: TimeInterval = 0.5 // 500毫秒防抖
+    private var recommendedQA: QAObject? // 存储推荐的问题
     
     // 添加键盘相关属性
     private var optionButtonSetBottomConstraint: Constraint?
     private var originalOptionButtonSetBottomOffset: CGFloat = -64
     
+    // 推荐视图相关属性
+    private var recommendView: RecommendedView?
+    private var recommendViewHeightConstraint: Constraint?
+    private let recommendViewHeight: CGFloat = 183
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        qaModel = QAModel()
-        
+        view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#1A1A1A")
         view.addSubview(topView)
         topView.commonInit()
         view.addSubview(questionInput)
@@ -38,24 +37,18 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         
         // 添加键盘监听
         setupKeyboardObservers()
-        
-        // 添加文本变化监听
-        questionInput.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        print("Top view frame: \(topView.frame)")
-        print("Option button set frame: \(optionButtonSet.frame)")
         
         // 自动弹出键盘
         questionInput.becomeFirstResponder()
     }
     
     deinit {
-        // 移除键盘监听和取消定时器
+        // 移除键盘监听
         NotificationCenter.default.removeObserver(self)
-        searchTimer?.invalidate()
     }
     
     // MARK: - 键盘监听
@@ -135,70 +128,147 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         
     }
     
-    func loadRecommendData() {
+    // MARK: - 推荐视图相关方法
+    
+    private func setupRecommendView() {
+        // 移除现有的推荐视图
+        recommendView?.removeFromSuperview()
+        recommendView = nil
         
-        guard let model = qaModel, let questionText = question else {
-            print("qaModel or question is nil")
-            return
-        }
+        // 创建新的推荐视图
+        let recommendView = RecommendedView()
+        recommendView.commonInit()
+        recommendView.isHidden = true // 初始隐藏
         
-        if recommendObject != nil {
-            print("Already have recommend data, skipping request")
-            DispatchQueue.main.async {
-                self.setRecommendToView()
-            }
-            return
-        }
+        // 为整个推荐视图添加点击手势
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleRecommendationTap))
+        recommendView.addGestureRecognizer(tapGesture)
+        recommendView.isUserInteractionEnabled = true
         
-        qaModel!.requestSearchObjects(keyword: question!){ [weak self] qa in
-            guard let self = self else { return }
-            
-            self.recommendObject = qa[0]
-            
-            DispatchQueue.main.async {
-                self.setRecommendToView()
-            }
-            
-        }failure: { error in
-            ActivityHUD.shared.showNetworkError()
+        view.addSubview(recommendView)
+        self.recommendView = recommendView
+        
+        // 设置推荐视图约束
+        recommendView.snp.makeConstraints { make in
+            make.top.equalTo(questionInput.snp.bottom).offset(16)
+            make.left.equalToSuperview().offset(16)
+            make.right.equalToSuperview().offset(-16)
+            self.recommendViewHeightConstraint = make.height.equalTo(0).constraint // 初始高度为0
         }
     }
     
-    func setRecommendToView() {
+    private func showRecommendView(with qaObject: QAObject) {
+        guard let recommendView = recommendView else { return }
         
-        guard let object = recommendObject else {
-            print("Recommend object is nil")
+        // 更新推荐视图内容
+        recommendView.questionLabel.text = qaObject.questionString
+        recommendView.categoryLabel.text = qaObject.tags
+        recommendView.ansPrevLabel.text = qaObject.answerString
+        recommendView.likeCountLabel.text = "\(qaObject.likeCount)"
+        recommendView.likeButton.isSelected = qaObject.isLike
+        recommendView.likeButton.addTarget(self, action: #selector(like(_:)), for: .touchUpInside)
+        
+        // 格式化日期
+        let dateFormatter = QAModel()
+        if let formattedDate = dateFormatter.dateFormatter(dateString: qaObject.aTime) {
+            recommendView.dateLabel.text = formattedDate
+        } else {
+            recommendView.dateLabel.text = "暂无日期"
+        }
+        
+        // 显示推荐视图
+        recommendView.isHidden = false
+        recommendViewHeightConstraint?.update(offset: recommendViewHeight)
+        self.view.layoutIfNeeded()
+    }
+    
+    private func hideRecommendView() {
+        recommendViewHeightConstraint?.update(offset: 0)
+        self.recommendView?.isHidden = true
+        self.view.layoutIfNeeded()
+    }
+    
+    @objc private func handleRecommendationTap() {
+        // 处理推荐视图的点击事件
+        guard let recommendedQA = recommendedQA else { return }
+        
+        // 打开指定的视图控制器
+        let detailVC = QADetailVC(objectId: recommendedQA.ID) // 请替换为实际的视图控制器类名
+        self.navigationController?.pushViewController(detailVC, animated: true)
+    }
+    
+    // MARK: - 搜索和发布逻辑
+    
+    private func searchBeforePublish(completion: @escaping (Bool) -> Void) {
+        guard let questionText = questionInput.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !questionText.isEmpty else {
+            completion(false)
             return
         }
         
-        recommended.questionLabel.text = recommendObject?.questionString
-        recommended.categoryLabel.text = "\(recommendObject!.tags)类"
-        recommended.ansPrevLabel.text = recommendObject?.answerString
-        
-        if let model = qaModel {
-            let formattedDate = model.dateFormatter(dateString: object.aTime)
-            recommended.dateLabel.text = formattedDate
-        } else {
-            recommended.dateLabel.text = object.aTime // 或者显示原始日期
+        let model = QAModel()
+        model.requestSearchObjects(keyword: questionText) { [weak self] qaObjects in
+            guard let self = self else {
+                completion(false)
+                return
+            }
+            
+            // 查找第一个status为2的对象
+            if let recommended = qaObjects.first(where: { $0.status == 2 }) {
+                self.recommendedQA = recommended
+                DispatchQueue.main.async {
+                    // 确保推荐视图已设置
+                    if self.recommendView == nil {
+                        self.setupRecommendView()
+                    }
+                    self.showRecommendView(with: recommended)
+                    completion(true)
+                }
+            } else {
+                self.recommendedQA = nil
+                DispatchQueue.main.async {
+                    self.hideRecommendView()
+                    completion(false)
+                }
+            }
+        } failure: { error in
+            print("搜索失败: \(error)")
+            completion(false)
+        }
+    }
+    
+    private func performPublish() {
+        // 获取问题和标签
+        guard let questionText = questionInput.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !questionText.isEmpty else {
+            RemindHUD.shared().showDefaultHUD(withText: "请先输入问题")
+            return
         }
         
-        recommended.likeCountLabel.text = "\(recommendObject!.likeCount)"
-        recommended.likeButton.isSelected = recommendObject!.isLike
-        recommended.likeButton.addTarget(self, action: #selector(like(_:)), for: .touchUpInside)
+        self.question = questionText
         
-        self.view.addSubview(recommended)
-        
-        recommended.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(16)
-            make.right.equalToSuperview().offset(-16)
-            make.top.equalTo(questionInput.snp.bottom)
-            make.height.equalTo(183)
+        // 获取选中的标签
+        guard let selectedTag = optionButtonSet.getSelectedValue() else {
+            RemindHUD.shared().showDefaultHUD(withText: "请选择问题标签")
+            return
         }
         
-        recommended.onTap = { [weak self] in
-            self?.recommendDetail()
-        }
+        self.tags = selectedTag
         
+        // 直接发布
+        HttpManager.shared.magipoke_qa_publishQuestion(q: self.question!, tags: self.tags!).ry_JSON { [weak self] response in
+            guard let self = self else { return }
+            
+            switch response{
+            case .success:
+                print("Successfully Published!")
+                RemindHUD.shared().showDefaultHUD(withText: "发布成功")
+                self.navigationController?.popViewController(animated: true)
+            case .failure:
+                print("Publish Failed!")
+                RemindHUD.shared().showDefaultHUD(withText: "发布失败，请检查网络")
+            }
+        }
     }
     
     // MARK: - 懒加载
@@ -206,6 +276,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     lazy var topView : NewQuestionTopView = {
         let topView = NewQuestionTopView()
         topView.backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
+        // 直接绑定到发布方法
         topView.publishButton.addTarget(self, action: #selector(publish), for: .touchUpInside)
         return topView
     }()
@@ -217,11 +288,6 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         questionInput.font = UIFont(name: PingFangSC, size: 16)
         questionInput.delegate = self
         return questionInput
-    }()
-    
-    lazy var recommended : RecommendedView = {
-        let recommended = RecommendedView()
-        return recommended
     }()
     
     lazy var optionButtonSet : OptionButtonsView = {
@@ -242,53 +308,69 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     }
     
     @objc func publish(){
-        
-        guard let question = self.question, !question.isEmpty,
-              let tags = self.tags, !tags.isEmpty else {
-            RemindHUD.shared().showDefaultHUD(withText: "发布失败，请填写问题和选择标签")
-            return
-        }
-        
-        HttpManager.shared.magipoke_qa_publishQuestion(q: self.question!, tags: self.tags!).ry_JSON { [weak self] response in
+        // 先搜索相关内容
+        searchBeforePublish { [weak self] hasRecommendation in
             guard let self = self else { return }
             
-            switch response{
-            case .success:
-                print("Successfully Published!")
-                RemindHUD.shared().showDefaultHUD(withText: "发布成功")
-                self.navigationController?.popViewController(animated: true)
-            case .failure:
-                print("Publish Failed!")
-                RemindHUD.shared().showDefaultHUD(withText: "发布失败，请检查网络")
+            if hasRecommendation {
+                // 如果有推荐内容，显示推荐视图，不立即发布
+                print("找到相关问题，显示推荐视图")
+            } else {
+                // 如果没有推荐内容，直接发布
+                self.performPublish()
             }
         }
     }
     
-    func recommendDetail(){
-        let detailPage = QADetailVC(objectId: self.recommendObject!.ID)
-        self.navigationController?.pushViewController(detailPage, animated: true)
-    }
-    
-    @objc func like(_ sender: UIButton){
-        HttpManager.shared.magipoke_qa_like(id: recommendObject!.ID).ry_JSON { [weak self] response in
-            guard let self = self else { return }
-            
-            switch response{
-            case .success:
-                if recommendObject!.isLike{
+    @objc func like(_ sender: UIButton) {
+        // 使用tag获取对应的indexPath
+        
+        var qaObject = recommendedQA
+        
+        
+        if qaObject!.isLike{
+            HttpManager.shared.magipoke_qa_unlike(id: qaObject!.ID).ry_JSON{ [weak self] response in
+                guard let self = self else { return }
+                
+                switch response {
+                case .success:
                     print("Unlike Succeed")
-                    recommendObject!.isLike = false
-                    recommendObject!.likeCount -= 1
+                    qaObject!.isLike = false
+                    qaObject!.likeCount -= 1
                     RemindHUD.shared().showDefaultHUD(withText: "取消点赞成功")
-                }else{
-                    print("Like Succeed")
-                    recommendObject!.isLike = true
-                    recommendObject!.likeCount += 1
-                    RemindHUD.shared().showDefaultHUD(withText: "点赞成功")
+                    
+                    self.recommendedQA?.isLike = false
+                    self.recommendedQA?.likeCount -= 1
+                    
+                    DispatchQueue.main.async {
+                        self.recommendView!.likeCountLabel.text = "\(qaObject!.likeCount)"
+                        self.recommendView!.likeButton.isSelected = qaObject!.isLike
+                    }
+                case .failure:
+                    print("Unlike Failed")
+                    RemindHUD.shared().showDefaultHUD(withText: "取消点赞失败，请检查网络")
                 }
-            case .failure:
-                print("Like Failed")
-                RemindHUD.shared().showDefaultHUD(withText: "点赞失败，请检查网络")
+            }
+        }else{
+            HttpManager.shared.magipoke_qa_like(id: qaObject!.ID).ry_JSON { [weak self] response in
+                guard let self = self else { return }
+                
+                switch response {
+                case .success:
+                    print("Like Succeed")
+                    qaObject!.isLike = true
+                    qaObject!.likeCount += 1
+                    RemindHUD.shared().showDefaultHUD(withText: "点赞成功")
+                    
+                    DispatchQueue.main.async {
+                        self.recommendView!.likeCountLabel.text = "\(qaObject!.likeCount)"
+                        self.recommendView!.likeButton.isSelected = qaObject!.isLike
+                    }
+                    
+                case .failure:
+                    print("Like Failed")
+                    RemindHUD.shared().showDefaultHUD(withText: "点赞失败，请检查网络")
+                }
             }
         }
     }
@@ -296,31 +378,10 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     // MARK: - 代理
     func textFieldDidEndEditing(_ textField: UITextField) {
         if let text = questionInput.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-                self.question = text
-                // 确保有选中的标签
-                if let selectedTag = optionButtonSet.getSelectedValue() {
-                    self.tags = selectedTag
-                } else {
-                    // 如果没有选中标签，可以设置一个默认值或者提示用户选择
-                    self.tags = "其他" // 或者保持为nil，让publish方法处理
-                }
-                
-                // 只有在有有效问题时才加载推荐
-                loadRecommendData()
-            }
-    }
-    
-    @objc func textFieldDidChange(_ textField: UITextField) {
-        // 取消之前的定时器
-        searchTimer?.invalidate()
-        
-        // 设置新的定时器
-        searchTimer = Timer.scheduledTimer(withTimeInterval: searchDebounceInterval, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            
-            if let text = textField.text, !text.isEmpty {
-                self.question = text
-                self.loadRecommendData()
+            self.question = text
+            // 确保有选中的标签
+            if let selectedTag = optionButtonSet.getSelectedValue() {
+                self.tags = selectedTag
             }
         }
     }

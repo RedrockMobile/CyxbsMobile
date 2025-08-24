@@ -66,6 +66,7 @@ class OptionButtonsView: UIView {
     
     let buttonWidth: CGFloat = 74
     let buttonHeight: CGFloat = 28
+    let buttonSpacing: CGFloat = 10
     
     var cornerRadius: CGFloat = 14 {
         didSet {
@@ -106,6 +107,20 @@ class OptionButtonsView: UIView {
         }
         
         setupConstraints()
+        
+        // 默认选中第一个按钮
+        if !optionButtons.isEmpty {
+            DispatchQueue.main.async {
+                self.selectButton(at: 0)
+                self.selectedIndex = 0
+                
+                // 通过委托传递数据
+                if let selectedValue = self.getSelectedValue() {
+                    self.delegate?.optionSelected(selectedValue)
+                    self.onOptionSelected?(selectedValue)
+                }
+            }
+        }
     }
     
     // 设置布局约束
@@ -119,33 +134,45 @@ class OptionButtonsView: UIView {
         // 启用自动布局
         translatesAutoresizingMaskIntoConstraints = false
         
-        // 创建水平排列的约束
+        // 计算总宽度
+        let totalWidth = CGFloat(optionButtons.count) * buttonWidth + CGFloat(optionButtons.count - 1) * buttonSpacing
+        
+        // 创建容器视图
+        let containerView = UIView()
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(containerView)
+        
+        // 容器视图居中
+        containerView.centerXAnchor.constraint(equalTo: centerXAnchor).isActive = true
+        containerView.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
+        containerView.heightAnchor.constraint(equalToConstant: buttonHeight).isActive = true
+        containerView.widthAnchor.constraint(equalToConstant: totalWidth).isActive = true
+        
+        // 设置按钮约束
         var previousButton: UIButton?
         
         for button in optionButtons {
             button.translatesAutoresizingMaskIntoConstraints = false
             
-            // 高度约束
+            // 添加到容器视图
+            containerView.addSubview(button)
+            
+            // 高度和宽度约束
             button.heightAnchor.constraint(equalToConstant: buttonHeight).isActive = true
             button.widthAnchor.constraint(equalToConstant: buttonWidth).isActive = true
             
             // 垂直居中
-            button.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
+            button.centerYAnchor.constraint(equalTo: containerView.centerYAnchor).isActive = true
             
             if let previous = previousButton {
                 // 后续按钮与前一个按钮间隔
-                button.leadingAnchor.constraint(equalTo: previous.trailingAnchor, constant: 20).isActive = true
+                button.leadingAnchor.constraint(equalTo: previous.trailingAnchor, constant: buttonSpacing).isActive = true
             } else {
                 // 第一个按钮靠左
-                button.leadingAnchor.constraint(equalTo: leadingAnchor).isActive = true
+                button.leadingAnchor.constraint(equalTo: containerView.leadingAnchor).isActive = true
             }
             
             previousButton = button
-        }
-        
-        // 最后一个按钮靠右
-        if let lastButton = optionButtons.last {
-            lastButton.trailingAnchor.constraint(equalTo: trailingAnchor).isActive = true
         }
         
         // 设置自身高度约束

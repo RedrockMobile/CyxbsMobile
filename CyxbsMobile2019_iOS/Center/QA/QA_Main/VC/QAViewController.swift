@@ -189,6 +189,8 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
             // 过滤出匹配标签的QA项目
             qaModel.qa = qaModel.qa.filter { $0.tags == qaTypeString }
         }
+        //过滤未回答项目
+        qaModel.qa = qaModel.qa.filter { $0.status == 2 }
         // 如果qaTypeString为空，保持原样（显示所有项目）
         tableViewCount = qaModel.qa.count
     }

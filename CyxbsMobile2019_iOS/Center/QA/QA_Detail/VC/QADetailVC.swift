@@ -29,9 +29,11 @@ class QADetailVC : UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "1A1A1A")
         view.addSubview(detailView)
         view.addSubview(backButton)
         view.addSubview(publishButton)
+        
         setPosition()
         requestDetail()
     }

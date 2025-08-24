@@ -29,7 +29,7 @@ class QASearchMainVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#000000")
+        view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "#0E0E0E")
         view.addSubview(topView)
         topView.commonInit()
         addSegment()
