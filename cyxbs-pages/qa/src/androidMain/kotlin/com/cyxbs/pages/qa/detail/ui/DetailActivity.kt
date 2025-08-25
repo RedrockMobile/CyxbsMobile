@@ -16,6 +16,7 @@ import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.detail.bean.QuestionItem
 import com.cyxbs.pages.qa.detail.viewmodel.QaDetailVm
 import com.cyxbs.pages.qa.publish.ui.activity.PublishActivity
+import com.cyxbs.pages.qa.utils.longToWanString
 
 /**
  * description ： QA详情页
@@ -110,13 +111,13 @@ class DetailActivity : BaseActivity() {
         if (!isInit) {
             qaDetailProblem.text = data.q
             qaDetailContent.text = data.a
-            qaDetailLook.text = data.viewCount.toString()
+            qaDetailLook.text = longToWanString(data.viewCount)
             qaDetailTime.text = data.aTime.substring(0, 10).replace("-", ".")
             val tags = data.tags.split(" ").filter { it.isNotEmpty() }
             qaDetailTags.text = tags[0]
             isInit = true//标记已经初始化
         }
-        qaDetailLike.text = data.likeCount.toString()
+        qaDetailLike.text = longToWanString(data.likeCount)
         val isLiked = data.isLike
         applyStyle(isLiked)
     }

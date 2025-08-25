@@ -1,5 +1,7 @@
 package com.cyxbs.pages.qa.publish.network.bean.response
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * description ： 发布问题的Response的数据类
  * author : HI-IR
@@ -7,5 +9,6 @@ package com.cyxbs.pages.qa.publish.network.bean.response
  * date : 2025/8/12 18:42
  */
 data class PublishQuestionBean(
+    @SerializedName("id")
     val id: Long
 )

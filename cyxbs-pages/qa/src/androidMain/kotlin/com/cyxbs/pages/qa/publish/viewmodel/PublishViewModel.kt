@@ -6,10 +6,12 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.components.utils.network.throwOrInterceptException
+import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.qa.LikeManager
 import com.cyxbs.pages.qa.publish.network.PublishApiService
 import com.cyxbs.pages.qa.publish.network.bean.request.PublishQuestionRequest
 import com.cyxbs.pages.qa.publish.network.bean.response.SearchData
+import com.cyxbs.pages.store.api.IStoreService
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -40,9 +42,9 @@ class PublishViewModel : BaseViewModel() {
     private var mQuestion: String = ""
 
     //这个是用来同步点赞数据的监听
-    private val likeStateListener = object : LikeManager.LikeStateListener{
-        override fun onLikeQuestion(id: Long,source:Int) {
-            if (source == LikeManager.SOURCE_PUBLISH){
+    private val likeStateListener = object : LikeManager.LikeStateListener {
+        override fun onLikeQuestion(id: Long, source: Int) {
+            if (source == LikeManager.SOURCE_PUBLISH) {
                 //避免重复刷新
                 return
             }
@@ -58,8 +60,8 @@ class PublishViewModel : BaseViewModel() {
             _searchData.postValue(currentList.toMutableList().apply { this[index] = newItem })
         }
 
-        override fun onUnLikeQuestion(id: Long,source:Int) {
-            if (source == LikeManager.SOURCE_PUBLISH){
+        override fun onUnLikeQuestion(id: Long, source: Int) {
+            if (source == LikeManager.SOURCE_PUBLISH) {
                 //避免重复刷新
                 return
             }
@@ -118,6 +120,13 @@ class PublishViewModel : BaseViewModel() {
             .safeSubscribeBy {
                 if (it.isEmpty()) {
                     _publishSuccess.postValue(true)
+                    //更新任务中心数据
+                    IStoreService::class.impl().postTask(
+                        IStoreService.Task.JOIN_QA,
+                        "",
+                        "今日已完成提一个问题，获得10邮票"
+                    )
+
                 } else {
                     // 搜索有结果，更新 UI
                     _searchData.postValue(it)
@@ -138,7 +147,7 @@ class PublishViewModel : BaseViewModel() {
             }
             .safeSubscribeBy {
                 _likeResult.postValue(true)
-                LikeManager.notifyLikeQuestion(id,LikeManager.SOURCE_PUBLISH)
+                LikeManager.notifyLikeQuestion(id, LikeManager.SOURCE_PUBLISH)
                 likeInProgress.remove(id)
             }
     }
@@ -160,7 +169,7 @@ class PublishViewModel : BaseViewModel() {
             }
             .safeSubscribeBy {
                 likeInProgress.remove(id)
-                LikeManager.notifyUnLikeQuestion(id,LikeManager.SOURCE_PUBLISH)
+                LikeManager.notifyUnLikeQuestion(id, LikeManager.SOURCE_PUBLISH)
                 _likeResult.postValue(true)
             }
     }

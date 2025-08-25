@@ -181,8 +181,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="21dp"
-                    android:layout_marginStart="-5dp"
-                    android:layout_marginBottom="14dp"
+                    android:layout_marginStart="-9dp"
+                    android:layout_marginBottom="20dp"
                     android:text="2000"
                     android:textColor="@color/qa_text_content_color"
                     android:textSize="12sp"
@@ -195,6 +195,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="54dp"
                     android:src="@drawable/qa_ic_detail_looked"
+                    android:layout_marginBottom="7dp"
                     app:layout_constraintBottom_toBottomOf="@id/qa_detail_iv_like"
                     app:layout_constraintEnd_toStartOf="@id/qa_detail_iv_like" />
 

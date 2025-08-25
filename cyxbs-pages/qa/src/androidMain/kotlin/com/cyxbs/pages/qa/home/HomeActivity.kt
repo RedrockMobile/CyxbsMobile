@@ -163,7 +163,8 @@ class HomeActivity : BaseActivity() {
                 val textWidth = textView.width
                 val indicatorWidth = textWidth - dp2px(shortenDp.toFloat())
 
-                val drawable = ContextCompat.getDrawable(tabLayout.context, R.drawable.qa_ic_tab_indicator)
+                val drawable =
+                    ContextCompat.getDrawable(tabLayout.context, R.drawable.qa_ic_tab_indicator)
                 if (drawable != null) {
                     val leftInset = (textWidth - indicatorWidth) / 2
                     val rightInset = leftInset
@@ -178,6 +179,7 @@ class HomeActivity : BaseActivity() {
     fun dp2px(dp: Float): Int {
         return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
     }
+
     //更新角标这里给 QaAllFragment使用
     fun updateTabDot(tabIndex: Int, newCount: Int) {
         val sp = getSp("tab_dot_cache")
@@ -212,7 +214,7 @@ class HomeActivity : BaseActivity() {
         val dotView = tab?.customView?.findViewById<TextView>(R.id.qa_dot_view)
         dotView?.visibility = View.GONE
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         // 解绑监听，避免内存泄漏

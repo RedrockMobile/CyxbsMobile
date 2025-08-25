@@ -12,9 +12,10 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.qa.R
-import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.model.bean.Item
 import com.cyxbs.pages.qa.home.viewmodel.HomeViewModel
+import com.cyxbs.pages.qa.utils.longToWanString
+import com.cyxbs.pages.qa.utils.truncateWithEllipsis
 
 /**
  * description ： Qa主页的adapter
@@ -105,26 +106,19 @@ class QaHomeRVAdapter(
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags.getOrNull(0) ?: ""}类"
 
-            question.text = item.q.ellipsis()
+            question.text = item.q.truncateWithEllipsis()
             answer.text = item.a
             time.text = item.a_time.substring(0, 10).replace("-", ".")
-            likeNumber.text = item.like_count.toString()
+            likeNumber.text = longToWanString(item.like_count)
             checkLike(item)
         }
 
         //用来做局部刷新
         fun bindLike(item: Item) {
             currentData = item
-            likeNumber.text = item.like_count.toString()
+            likeNumber.text = longToWanString(item.like_count)
             checkLike(item)
         }
-
-        /*
-      手动截断字段 为什么这么处理 因为textview是wrap_content并且不是从边缘开始
-      所以如果内容过多会导致部分无法显示
-       */
-        private fun String.ellipsis(maxLength: Int = 12) =
-            if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
 
         private fun checkLike(item: Item) {
             if (item.is_like) {

@@ -1,7 +1,5 @@
 package com.cyxbs.pages.qa
 
-import kotlin.collections.forEach
-
 /**
  * description ： 用于向各个界面同步点赞数据更新
  * author : HI-IR
@@ -29,25 +27,25 @@ object LikeManager {
     }
 
     // 通知喜欢某个问题
-    fun notifyLikeQuestion(id: Long,source:Int){
+    fun notifyLikeQuestion(id: Long, source: Int) {
         listenerList.forEach {
-            it.onLikeQuestion(id,source)
+            it.onLikeQuestion(id, source)
         }
     }
 
     //通知不喜欢某个问题
-    fun notifyUnLikeQuestion(id: Long,source: Int){
+    fun notifyUnLikeQuestion(id: Long, source: Int) {
         listenerList.forEach {
-            it.onUnLikeQuestion(id,source)
+            it.onUnLikeQuestion(id, source)
         }
     }
 
 
-    interface LikeStateListener{
+    interface LikeStateListener {
         //当喜欢某个问题时回调
-        fun onLikeQuestion(id: Long,source: Int)
+        fun onLikeQuestion(id: Long, source: Int)
 
         //当取消喜欢某个问题时回调
-        fun onUnLikeQuestion(id: Long,source: Int)
+        fun onUnLikeQuestion(id: Long, source: Int)
     }
 }

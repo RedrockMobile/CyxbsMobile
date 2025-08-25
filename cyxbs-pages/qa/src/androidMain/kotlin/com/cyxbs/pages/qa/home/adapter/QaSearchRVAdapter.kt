@@ -5,7 +5,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -13,6 +12,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.home.model.bean.Item
 import com.cyxbs.pages.qa.home.viewmodel.SearchViewModel
+import com.cyxbs.pages.qa.utils.longToWanString
+import com.cyxbs.pages.qa.utils.truncateWithEllipsis
 
 /**
  * description ： 搜索界面的adapter
@@ -55,7 +56,8 @@ class QaSearchRVAdapter(
         private val question = itemView.findViewById<TextView>(R.id.qa_question_item_tv_title)
         private val answer = itemView.findViewById<TextView>(R.id.qa_question_item_tv_content)
         private val time = itemView.findViewById<TextView>(R.id.qa_question_item_tv_time)
-        private val likenumber = itemView.findViewById<TextView>(R.id.qa_question_item_tv_likenumber)
+        private val likenumber =
+            itemView.findViewById<TextView>(R.id.qa_question_item_tv_likenumber)
         private val like = itemView.findViewById<ImageView>(R.id.qa_question_item_iv_like)
         private val mTag = itemView.findViewById<TextView>(R.id.qa_question_item_tv_tag)
 
@@ -78,7 +80,7 @@ class QaSearchRVAdapter(
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags[0]}类"
 
-            val filterQuestion = item.q.ellipsis()
+            val filterQuestion = item.q.truncateWithEllipsis()
             question.text = highlightKeyword(filterQuestion, keyword)
             answer.text = highlightKeyword(item.a, keyword)
             time.text = item.a_time.substring(0, 10).replace("-", ".")
@@ -86,21 +88,26 @@ class QaSearchRVAdapter(
         }
 
         fun bindLike(item: Item) {
-            likenumber.text = item.like_count.toString()
+            likenumber.text = longToWanString(item.like_count)
             if (item.is_like) {
                 like.setImageResource(R.drawable.qa_ic_question_item_like)
-                likenumber.setTextColor(ContextCompat.getColor(itemView.context, R.color.qa_question_item_like_color))
+                likenumber.setTextColor(
+                    ContextCompat.getColor(
+                        itemView.context,
+                        R.color.qa_question_item_like_color
+                    )
+                )
             } else {
                 like.setImageResource(R.drawable.qa_ic_question_item_dislike)
-                likenumber.setTextColor(ContextCompat.getColor(itemView.context, R.color.qa_question_item_unlike_color))
+                likenumber.setTextColor(
+                    ContextCompat.getColor(
+                        itemView.context,
+                        R.color.qa_question_item_unlike_color
+                    )
+                )
             }
         }
-        /*
-        手动截断字段 为什么这么处理 因为textview是wrap_content并且不是从边缘开始
-        所以如果内容过多会导致部分无法显示
-         */
-        private fun String.ellipsis(maxLength: Int = 12): String =
-            if (this.length > maxLength) this.substring(0, maxLength) + "…" else this
+
         //用来处理高亮的方法
         private fun highlightKeyword(text: String, keyword: String): CharSequence {
             if (keyword.isEmpty()) return text
@@ -110,7 +117,10 @@ class QaSearchRVAdapter(
                 val endIndex = startIndex + keyword.length
                 spannable.setSpan(
                     android.text.style.ForegroundColorSpan(
-                        ContextCompat.getColor(itemView.context, com.cyxbs.components.config.R.color.config_blue_button)
+                        ContextCompat.getColor(
+                            itemView.context,
+                            com.cyxbs.components.config.R.color.config_blue_button
+                        )
                     ),
                     startIndex,
                     endIndex,
@@ -123,7 +133,8 @@ class QaSearchRVAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.qa_recycle_item_question_item, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.qa_recycle_item_question_item, parent, false)
         return ViewHolder(view)
     }
 

@@ -152,7 +152,7 @@ class PublishActivity : BaseActivity() {
 
             publishSuccess.observe {
                 if (it) {
-                    toastLong("我们已收到你的反馈")
+                    toast("我们已收到你的反馈")
                     finish()
                 } else {
                     toast("发布失败请检查网络连接~")

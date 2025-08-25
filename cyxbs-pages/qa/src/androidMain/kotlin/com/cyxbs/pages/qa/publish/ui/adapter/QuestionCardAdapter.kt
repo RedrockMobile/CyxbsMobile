@@ -13,6 +13,8 @@ import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.publish.network.bean.response.SearchData
 import com.cyxbs.pages.qa.publish.ui.adapter.QuestionCardAdapter.QuestionCardUI
+import com.cyxbs.pages.qa.utils.longToWanString
+import com.cyxbs.pages.qa.utils.truncateWithEllipsis
 
 /**
  * description ： 问题卡片的RVAdapter
@@ -154,7 +156,7 @@ class QuestionCardAdapter :
 
             mTitle.text = data.q.truncateWithEllipsis()
             mAnswer.text = data.a
-            likeCount.text = data.likeCount.toString()
+            likeCount.text = longToWanString(data.likeCount)
             mTime.text = data.aTime.substring(0, 10).replace("-", ".")
 
             applyStyle(data.isLike)
@@ -162,7 +164,7 @@ class QuestionCardAdapter :
 
         fun bindLike(item: SearchData) {
             //局部刷新
-            likeCount.text = item.likeCount.toString()
+            likeCount.text = longToWanString(item.likeCount)
             applyStyle(item.isLike)
         }
 
@@ -185,14 +187,6 @@ class QuestionCardAdapter :
                         R.color.qa_text_content_color
                     )
                 )
-            }
-        }
-
-        fun String.truncateWithEllipsis(maxLength: Int = 12): String {
-            return if (this.length > maxLength) {
-                this.substring(0, maxLength) + "…"
-            } else {
-                this
             }
         }
     }

@@ -48,11 +48,15 @@
         app:tabPaddingEnd="0dp"
         app:tabPaddingStart="0dp"
         app:tabPaddingTop="0dp"
+        app:tabMode="fixed"
+        app:tabGravity="fill"
         app:layout_constraintTop_toBottomOf="@id/qa_home_tv_title"/>
 
     <EditText
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:id="@+id/qa_home_btn_search"
-        android:layout_width="333dp"
+        android:layout_width="match_parent"
         android:layout_height="38dp"
         android:background="@drawable/qa_shape_search_background"
         android:hint="搜索关键词"

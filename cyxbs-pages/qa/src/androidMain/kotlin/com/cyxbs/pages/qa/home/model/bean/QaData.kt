@@ -34,7 +34,7 @@ data class Item(
     @SerializedName("is_like")
     var is_like : Boolean,
     @SerializedName("like_count")
-    var like_count: Int,
+    var like_count: Long,
     @SerializedName("q")
     val q: String,
     @SerializedName("status")
@@ -44,5 +44,5 @@ data class Item(
     @SerializedName("tags")
     val tags: String,
     @SerializedName("view_count")
-    val view_count: Int
+    val view_count: Long
 )

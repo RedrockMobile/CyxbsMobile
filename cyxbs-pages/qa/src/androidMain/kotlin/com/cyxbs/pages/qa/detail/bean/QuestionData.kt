@@ -21,7 +21,7 @@ data class QuestionItem(
     @SerializedName("is_like")
     val isLike: Boolean,
     @SerializedName("like_count")
-    val likeCount: Int,
+    val likeCount: Long,
     @SerializedName("q")
     val q: String,
     @SerializedName("status")
@@ -31,5 +31,5 @@ data class QuestionItem(
     @SerializedName("tags")
     val tags: String,
     @SerializedName("view_count")
-    val viewCount: Int
+    val viewCount: Long
 )
