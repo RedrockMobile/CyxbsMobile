@@ -34,6 +34,7 @@
 @property (nonatomic, weak) UIButton *shareButton;
 @property (nonatomic, weak) UILabel *aboutHereLabel;
 @property (nonatomic, weak) UICollectionView *tagsCollectionView;
+@property (nonatomic, strong) UIButton *navigationBtn;
 
 @end
 
@@ -147,6 +148,8 @@
         tagsCollectionView.dataSource = self;
         [self addSubview:tagsCollectionView];
         self.tagsCollectionView = tagsCollectionView;
+        
+        [self addSubview:self.navigationBtn];
     }
     return self;
 }
@@ -166,7 +169,7 @@
     
     [self.starButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(self).offset(-14);
-        make.top.equalTo(self).offset(54);
+        make.top.equalTo(self).offset(45);
         make.width.height.equalTo(@21);
     }];
     
@@ -261,6 +264,8 @@
         make.trailing.equalTo(self).offset(-15);
         make.height.equalTo(@56);
     }];
+    
+    self.navigationBtn.frame = CGRectMake(SCREEN_WIDTH - 15.6 - 54, self.placeNameLabel.bottom + 5, 54, 18);
 }
 
 - (void)loadDataWithPlaceDetailItem:(CQUPTMapPlaceDetailItem *)detailItem {
@@ -467,6 +472,37 @@
         [CQUPTMapModel starPlaceWithPlaceID:self.detailItem.placeID];
     }
     sender.selected = !sender.selected;
+}
+
+// 点击导航跳转百度地图
+- (void)clickNaviBtn {
+    NSString *destination = [@"重庆邮电大学" stringByAppendingString:self.placeNameLabel.labelText];
+    NSString *urlString = [NSString stringWithFormat:@"baidumap://map/direction?destination=name:%@&mode=walking", destination];
+    NSURL *url = [NSURL URLWithString:urlString];
+    
+    if ([[UIApplication sharedApplication] canOpenURL:url]) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    } else {
+        NSString *encodedStr = [NSString stringWithFormat:@"%@",
+                                [destination stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLQueryAllowedCharacterSet]];
+        NSString *webUrlStr = [NSString stringWithFormat:@"http://api.map.baidu.com/geocoder?address=$%@&output=html&src=webapp.baidu.openAPIdemo", encodedStr];
+        NSURL *webUrl = [NSURL URLWithString:webUrlStr];
+        [[UIApplication sharedApplication] openURL:webUrl options:@{} completionHandler:nil];
+    }
+}
+
+- (UIButton *)navigationBtn {
+    if (!_navigationBtn) {
+        _navigationBtn = [[UIButton alloc] init];
+        [_navigationBtn setTitle:@"导航" forState:UIControlStateNormal];
+        [_navigationBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        [_navigationBtn.titleLabel setFont:[UIFont systemFontOfSize:12]];
+        _navigationBtn.layer.cornerRadius = 8.8;
+        _navigationBtn.clipsToBounds = YES;
+        _navigationBtn.backgroundColor = [UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#3603EC" alpha:1] darkColor:[UIColor colorWithHexString:@"#3603EC" alpha:1]];
+        [_navigationBtn addTarget:self action:@selector(clickNaviBtn) forControlEvents:UIControlEventTouchUpInside];
+    }
+    return _navigationBtn;
 }
 
 @end
