@@ -19,6 +19,7 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
 import com.cyxbs.components.utils.extensions.color
+import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.home.fragment.QaAllFragment
@@ -161,7 +162,7 @@ class HomeActivity : BaseActivity() {
                 val tabView = tabStrip.getChildAt(i)
                 val textView = tabView.findViewById<TextView>(R.id.qa_tv_tl_tab)
                 val textWidth = textView.width
-                val indicatorWidth = textWidth - dp2px(shortenDp.toFloat())
+                val indicatorWidth = textWidth - shortenDp.toFloat().dp2px
 
                 val drawable =
                     ContextCompat.getDrawable(tabLayout.context, R.drawable.qa_ic_tab_indicator)
@@ -173,11 +174,6 @@ class HomeActivity : BaseActivity() {
                 }
             }
         }
-    }
-
-
-    fun dp2px(dp: Float): Int {
-        return (dp * Resources.getSystem().displayMetrics.density + 0.5f).toInt()
     }
 
     //更新角标这里给 QaAllFragment使用

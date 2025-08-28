@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.activityViewModels
 import androidx.paging.filter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
  * date : 2025/8/13 20:31
  */
 class QaFreshmanFragment : BaseFragment() {
-    private val searchViewModel: SearchViewModel by lazy { ViewModelProvider(requireActivity())[SearchViewModel::class.java] }
-    private val homeViewModel: HomeViewModel by lazy { ViewModelProvider(requireActivity())[HomeViewModel::class.java] }
+    private val searchViewModel: SearchViewModel by activityViewModels<SearchViewModel>()
+    private val homeViewModel: HomeViewModel by activityViewModels<HomeViewModel>()
     private val mRecycleView by R.id.qa_freshman_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
@@ -118,9 +118,6 @@ class QaFreshmanFragment : BaseFragment() {
         mRecycleView.layoutManager = null
         homeRvAdapter.setOnItemClickListener(null)
         searchRVAdapter.setOnItemClickListener(null)
-
-        // 移除 LiveData 观察者
-        searchViewModel.items.removeObservers(viewLifecycleOwner)
 
     }
 

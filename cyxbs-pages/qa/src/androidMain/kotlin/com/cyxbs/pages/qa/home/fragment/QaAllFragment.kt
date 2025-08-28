@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.activityViewModels
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.paging.filter
@@ -32,8 +32,8 @@ import kotlinx.coroutines.launch
  */
 class QaAllFragment : BaseFragment() {
     private val newMessageAnalyzer: NewMessageAnalyzer by lazy { NewMessageAnalyzer(requireContext()) }
-    private val homeViewModel: HomeViewModel by lazy { ViewModelProvider(requireActivity())[HomeViewModel::class.java] }
-    private val searchViewModel: SearchViewModel by lazy { ViewModelProvider(requireActivity())[SearchViewModel::class.java] }
+    private val homeViewModel: HomeViewModel by activityViewModels<HomeViewModel>()
+    private val searchViewModel: SearchViewModel by activityViewModels<SearchViewModel>()
     private val mRecycleView by R.id.qa_all_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
@@ -87,17 +87,13 @@ class QaAllFragment : BaseFragment() {
         mRecycleView.adapter = homeRvAdapter
         mRecycleView.layoutManager = LinearLayoutManager(context)
 
+        //保证只赋值一次，不然新消息显示会一闪而过
         var isDotUpdated = false
+        // 先赋值给变量
         homeLoadStateListener = { loadStates ->
             val refreshState = loadStates.refresh
-            val appendState = loadStates.append
-
-            // 判断首次加载完成，并且是第一页加载结束
-            if (!isDotUpdated &&
-                refreshState is LoadState.NotLoading &&
-                appendState is LoadState.NotLoading &&
-                homeRvAdapter.itemCount >= homeRvAdapter.snapshot().items.size // 或者 pageSize
-            ) {
+            if (!isDotUpdated && refreshState is LoadState.NotLoading && homeRvAdapter.itemCount > 0) {
+                //处理新消息数的类
                 val stats = newMessageAnalyzer.analyze(homeRvAdapter.snapshot().items)
                 (activity as? HomeActivity)?.apply {
                     updateTabDot(1, stats.newStudentCount)
@@ -108,7 +104,6 @@ class QaAllFragment : BaseFragment() {
                 isDotUpdated = true
             }
         }
-
         // 添加监听
         homeLoadStateListener?.let { homeRvAdapter.addLoadStateListener(it) }
 
@@ -161,12 +156,6 @@ class QaAllFragment : BaseFragment() {
         // 显式移除 LoadStateListener
         homeLoadStateListener?.let { homeRvAdapter.removeLoadStateListener(it) }
         homeLoadStateListener = null
-
-        /*
-        理论上：viewLifecycleOwner 已经能保证在 onDestroyView() 停止回调，不会触发 UI 更新。
-        实践中：手动移除观察者主要是为了：防止 Lambda 捕获的对象被 Adapter 或其他组件持有更明确释放资源，避免复杂场景下潜在泄漏
-         */
-        searchViewModel.items.removeObservers(viewLifecycleOwner)
 
 
     }

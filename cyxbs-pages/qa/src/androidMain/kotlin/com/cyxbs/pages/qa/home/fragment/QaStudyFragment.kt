@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.activityViewModels
 import androidx.paging.filter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
  * date : 2025/8/13 20:32
  */
 class QaStudyFragment : BaseFragment() {
-    private val searchViewModel: SearchViewModel by lazy { ViewModelProvider(requireActivity())[SearchViewModel::class.java] }
-    private val homeViewModel: HomeViewModel by lazy { ViewModelProvider(requireActivity())[HomeViewModel::class.java] }
+    private val searchViewModel: SearchViewModel by activityViewModels<SearchViewModel>()
+    private val homeViewModel: HomeViewModel by activityViewModels<HomeViewModel>()
     private val mRecycleView by R.id.qa_study_rv.view<RecyclerView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
@@ -120,10 +120,8 @@ class QaStudyFragment : BaseFragment() {
         // 清理适配器
         mRecycleView.adapter = null
         mRecycleView.layoutManager = null
-        //LiveData 在 Activity 中通常是绑定到整个 Activity 的生命周期的,Activity 销毁时，LiveData 观察者也会被自动清理所以不用管
-        //防止重复更新：视图销毁后，LiveData 仍然会继续发送事件，这些事件将无法在已经销毁的视图上正确处理，造成不必要的 UI 更新。
-        // 移除 LiveData 观察者
-        searchViewModel.items.removeObservers(viewLifecycleOwner)
+
+
     }
 
 
