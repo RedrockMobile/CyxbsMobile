@@ -477,7 +477,7 @@
 // 点击导航跳转百度地图
 - (void)clickNaviBtn {
     NSString *destination = [@"重庆邮电大学" stringByAppendingString:self.placeNameLabel.labelText];
-    NSString *urlString = [NSString stringWithFormat:@"baidumap://map/direction?destination=name:%@&mode=walking", destination];
+    NSString *urlString = [NSString stringWithFormat:@"baidumap://map/direction?destination=%@&mode=walking", destination];
     NSURL *url = [NSURL URLWithString:urlString];
     
     if ([[UIApplication sharedApplication] canOpenURL:url]) {
