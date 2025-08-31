@@ -75,8 +75,8 @@ class QAViewController: UIViewController, UITableViewDelegate, UITableViewDataSo
     private func setupViews() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-        contentView.addSubview(searchBar)
         contentView.addSubview(qaTableView)
+        contentView.addSubview(searchBar)
     }
     
     @objc func requestQA() {
