@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+
+    <application>
+        <activity
+            android:name=".home.SearchActivity"
+            android:windowSoftInputMode="adjustPan|stateHidden"
+            android:launchMode="singleTop"/>
+
+        <activity android:name=".detail.ui.DetailActivity"
+            android:launchMode="singleTop"/>
+        <activity
+            android:name=".home.HomeActivity"
+            android:windowSoftInputMode="adjustPan|stateHidden"
+            android:launchMode="singleTop"/>
+        <activity
+            android:name=".publish.ui.activity.PublishActivity"
+            android:windowSoftInputMode="stateVisible|adjustResize"
+            android:launchMode="singleTop"/>
+    </application>
+
+</manifest>

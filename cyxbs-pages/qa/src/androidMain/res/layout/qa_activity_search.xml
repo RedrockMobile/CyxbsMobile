@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/qa_publish_background_color"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    tools:ignore="ResourceName">
+
+    <ImageView
+        android:id="@+id/qa_search_iv_return"
+        android:layout_width="wrap_content"
+        android:padding="4dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="16dp"
+        android:src="@drawable/qa_ic_arrow_back"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/qa_search_tv_title"
+        android:layout_width="85dp"
+        android:layout_height="31dp"
+        android:layout_marginTop="16dp"
+        android:text="Q and A"
+        android:textColor="@color/qa_text_title_color"
+        android:textSize="23dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/qa_search_tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@android:color/transparent"
+        android:theme="@style/Theme.MaterialComponents"
+        app:layout_constraintTop_toBottomOf="@id/qa_search_tv_title"
+        app:tabIndicator="@drawable/qa_ic_tab_indicator"
+        app:tabIndicatorColor="@android:color/transparent"
+        app:tabIndicatorFullWidth="false"
+        app:tabIndicatorHeight="3dp"
+        app:tabRippleColor="@android:color/transparent"
+        app:tabTextAppearance="@style/qa_TabTextAppearance" />
+
+
+    <EditText
+        android:id="@+id/qa_search_btn_search"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="18dp"
+        android:background="@drawable/qa_shape_search_background"
+        android:hint="搜索关键词"
+        android:imeOptions="actionSearch"
+        android:inputType="text"
+        android:paddingLeft="16dp"
+        android:textColor="@color/qa_search_content_color"
+        android:textColorHint="@color/qa_search_content_color"
+        android:textSize="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/qa_search_tab_layout" />
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/qa_search_vp2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/qa_search_btn_publish"
+        app:layout_constraintTop_toBottomOf="@id/qa_search_btn_search" />
+
+    <LinearLayout
+        android:id="@+id/qa_search_btn_publish"
+        android:layout_width="163dp"
+        android:layout_height="41dp"
+        android:layout_marginBottom="44dp"
+        android:background="@drawable/qa_shape_home_btn_publish_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="30dp"
+        android:paddingEnd="15dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="21dp"
+            android:src="@drawable/qa_ic_publish_button" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="发布问题"
+            android:textColor="@color/cardview_light_background"
+            android:textSize="18dp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
