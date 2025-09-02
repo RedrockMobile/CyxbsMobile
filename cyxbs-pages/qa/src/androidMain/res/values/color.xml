@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--返回箭头的颜色-->
+    <color name="qa_arrow_back_color">#15315B</color>
+
+    <!--标题字体颜色-->
+    <color name="qa_text_title_color">#15315B</color>
+
+    <!--内容字体颜色-->
+    <color name="qa_text_content_color">#6815315B</color>
+
+    <!--发布页背景色-->
+    <color name="qa_publish_background_color">#FCFDFF</color>
+
+    <!--标签item的未选中的背景色-->
+    <color name="qa_publish_tag_default_bg_color">#E8F0FC</color>
+
+    <!--标签item的选中的背景色-->
+    <color name="qa_publish_tag_selected_bg_color">#D4DAFF</color>
+
+    <!--标签item的未选中的字体色-->
+    <color name="qa_publish_tag_default_text_color">#93A4BB</color>
+
+    <!--标签item的选中的字体色-->
+    <color name="qa_publish_tag_selected_text_color">#4A44E4</color>
+
+    <!--问答卡片的的背景色-->
+    <color name="qa_publish_question_card_bg_color">#FFFFFF</color>
+
+    <!--问答卡片的分割线的颜色-->
+    <color name="qa_publish_question_card_divider_color">#F2F4FF</color>
+
+    <!--问答卡片 已点赞的颜色-->
+    <color name="qa_publish_question_card_liked_color">#4A44E4</color>
+    <!--搜索框颜色-->
+    <color name="qa_search_background_color">#E8F0FC</color>
+
+    <!--搜索字样颜色-->
+    <color name="qa_search_content_color">#8797AC</color>
+
+    <!--点赞以及点赞数未选中颜色-->
+    <color name="qa_question_item_unlike_color">#A7B6D1</color>
+
+    <!--点赞以及点赞数未选中颜色-->
+    <color name="qa_question_item_like_color">#4A44E4</color>
+
+    <!-- 按钮字体的颜色 -->
+    <color name="qa_btn_color">#FFFFFF</color>
+    <!-- card背景的颜色 -->
+    <color name="qa_home_btn_publish_color">#4A44E4</color>
+
+
+</resources>
