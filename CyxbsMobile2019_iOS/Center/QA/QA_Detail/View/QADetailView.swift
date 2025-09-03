@@ -23,37 +23,35 @@ class QADetailView : UIView{
         
         hashTag.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(32)
-            make.top.equalToSuperview().offset(105)
+            make.top.equalToSuperview()
             make.height.equalTo(22)
             make.width.equalTo(22)
         }
         
         questionLabel.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(64)
-            make.top.equalToSuperview().offset(105)
-            make.height.equalTo(22)
-            make.width.equalTo(calculateLabelWidth(labelText: questionLabel.text!)+20)
+            make.left.equalTo(hashTag.snp.right).offset(10)
+            make.top.equalToSuperview()
+            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-10)
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.left.equalTo(questionLabel.snp.right).offset(questionLabel.width)
-            make.top.equalToSuperview().offset(108)
+            make.left.equalTo(questionLabel.snp.right).offset(10)
+            make.top.equalToSuperview().offset(3)
             make.height.equalTo(16)
             make.width.equalTo(48)
         }
         
         dateLabel.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(64)
-            make.top.equalToSuperview().offset(135)
-            make.height.equalTo(17)
-            make.width.equalTo(66)
+            make.left.equalTo(hashTag.snp.right).offset(10)
+            make.top.equalTo(questionLabel.snp.bottom).offset(8)
+            make.right.equalToSuperview().offset(-16)
         }
         
         answerDetailView.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(16)
-            make.top.equalToSuperview().offset(172)
-            make.right.equalToSuperview().offset(-8)
-            make.height.equalTo(answerDetailView.textHeightFromTextString(text: answerDetailView.contentLabel.text!, textWidth: 296, fontSize: 14, isBold: false)+16+71)
+            make.top.equalTo(dateLabel.snp.bottom).offset(20)
+            make.right.equalToSuperview().offset(-16)
+            make.bottom.equalToSuperview().offset(-20)
         }
     }
     
@@ -79,7 +77,7 @@ class QADetailView : UIView{
         questionLabel.font = UIFont(name: PingFangSC, size: 16)
         questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
         questionLabel.backgroundColor = .clear
-        questionLabel.numberOfLines = 1
+        questionLabel.numberOfLines = 0 // 允许多行显示
         return questionLabel
     }()
     
@@ -98,24 +96,4 @@ class QADetailView : UIView{
         answerDetailView.layer.masksToBounds = true
         return answerDetailView
     }()
-    
-    func calculateLabelWidth(labelText:String) -> CGFloat {
-        // 1. 创建临时标签
-        let tempLabel = UILabel()
-        tempLabel.numberOfLines = 1
-        tempLabel.font = UIFont.systemFont(ofSize: 16)
-        tempLabel.text = labelText
-        
-        // 3. 计算最大允许高度（考虑行间距）
-        let maxHeight : CGFloat = 22
-        
-        // 4. 计算自适应宽度
-        let calculatedSize = tempLabel.sizeThatFits(
-            CGSize(width: CGFloat.greatestFiniteMagnitude,
-                   height: maxHeight)
-        )
-        
-        return calculatedSize.width
-    }
-    
 }

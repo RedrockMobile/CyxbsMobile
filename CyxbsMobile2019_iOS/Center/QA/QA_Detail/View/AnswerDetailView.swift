@@ -25,49 +25,52 @@ class AnswerDetailView : UIView {
         
         paraIcon.snp.makeConstraints { make in
             make.left.equalToSuperview().offset(16)
-            make.top.equalToSuperview().offset(23)
+            make.top.equalToSuperview().offset(24)
+            make.width.equalTo(6)
             make.height.equalTo(6)
         }
         
         contentLabel.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(32)
+            make.left.equalTo(paraIcon.snp.right).offset(10)
             make.top.equalToSuperview().offset(16)
-            make.right.equalToSuperview().offset(-32)
-            //let text = contentLabel.text ?? ""
-            //make.height.equalTo(textHeightFromTextString(text: text, textWidth: UIScreen.main.bounds.width-96, fontSize: 14, isBold: false))
+            make.right.equalToSuperview().offset(-16)
+            // 不要设置高度约束，让内容自动决定高度
         }
         
         viewIcon.snp.makeConstraints { make in
-            make.bottom.equalToSuperview().offset(-15)
-            make.right.equalToSuperview().offset(-106)
+            make.top.equalTo(contentLabel.snp.bottom).offset(16)
+            make.right.equalTo(viewCountLabel.snp.left).offset(-4)
             make.height.equalTo(24)
             make.width.equalTo(24)
         }
         
         viewCountLabel.snp.makeConstraints { make in
-            make.right.equalToSuperview().offset(-75.25)
-            make.bottom.equalToSuperview().offset(-28)
-            make.width.equalTo(30)
-            make.height.equalTo(18)
+            make.right.equalTo(likeButton.snp.left).offset(-20)
+            make.centerY.equalTo(viewIcon).offset(-6)
         }
         
         likeButton.snp.makeConstraints { make in
-            make.bottom.equalToSuperview().offset(-15)
-            make.right.equalToSuperview().offset(-46)
+            make.right.equalToSuperview().offset(-45)
+            make.centerY.equalTo(viewIcon)
             make.height.equalTo(24)
             make.width.equalTo(24)
         }
         
         likeCountLabel.snp.makeConstraints { make in
-            make.right.equalToSuperview().offset(-15.25)
-            make.bottom.equalToSuperview().offset(-28)
-            make.width.equalTo(30)
-            make.height.equalTo(18)
+            make.right.equalTo(likeButton.snp.right).offset(8)
+            make.centerY.equalTo(viewIcon).offset(-6)
         }
         
         cyxbsIcon.snp.makeConstraints { make in
             make.right.equalToSuperview()
             make.bottom.equalToSuperview()
+            make.height.equalTo(67)
+            make.width.equalTo(100)
+        }
+        
+        // 设置底部约束，确保视图高度正确计算
+        self.snp.makeConstraints { make in
+            make.bottom.equalTo(viewIcon.snp.bottom).offset(16).priority(.high)
         }
     }
     
@@ -120,19 +123,4 @@ class AnswerDetailView : UIView {
         likeCountLabel.textColor = UIColor.ry(light: "#A7B6D1", dark: "#FFFFFF")
         return likeCountLabel
     }()
-    
-    
-    
-    func textHeightFromTextString(text: String, textWidth: CGFloat, fontSize: CGFloat, isBold: Bool) -> CGFloat {
-        var dict: NSDictionary = NSDictionary()
-        if (isBold) {
-            dict = NSDictionary(object: UIFont.boldSystemFont(ofSize: fontSize),forKey: NSAttributedString.Key.font as NSCopying)
-        } else {
-            dict = NSDictionary(object: UIFont.systemFont(ofSize: fontSize),forKey: NSAttributedString.Key.font as NSCopying)
-        }
-        
-        let rect: CGRect = (text as NSString).boundingRect(with: CGSize(width: textWidth,height: CGFloat(MAXFLOAT)), options: [NSStringDrawingOptions.truncatesLastVisibleLine, NSStringDrawingOptions.usesFontLeading,NSStringDrawingOptions.usesLineFragmentOrigin],attributes: dict as? [NSAttributedString.Key : Any] ,context: nil)
-        return rect.size.height
-    }
-    
 }

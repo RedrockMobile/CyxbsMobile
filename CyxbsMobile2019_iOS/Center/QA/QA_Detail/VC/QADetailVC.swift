@@ -10,9 +10,9 @@ import UIKit
 import Alamofire
 import MBProgressHUD
 
-class QADetailVC : UIViewController {
+class QADetailVC: UIViewController {
     
-    init(objectId: Int){
+    init(objectId: Int) {
         self.objectId = objectId
         super.init(nibName: nil, bundle: nil)
     }
@@ -21,16 +21,22 @@ class QADetailVC : UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
-    public var objectId : Int
+    public var objectId: Int
     let qaModel = QAModel()
-    var qaObject : QAObject!
-    
-    
+    var qaObject: QAObject!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.ry(light: "#FFFFFF", dark: "1A1A1A")
-        view.addSubview(detailView)
+        
+        // 添加滚动视图和内容视图
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
+        
+        // 将详细视图添加到内容视图
+        contentView.addSubview(detailView)
+        
+        // 添加顶部按钮（保持在视图层级顶部）
         view.addSubview(backButton)
         view.addSubview(publishButton)
         
@@ -40,30 +46,41 @@ class QADetailVC : UIViewController {
     
     func setPosition() {
         
-        backButton.snp.makeConstraints{ make in
+        backButton.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(16)
-            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(13)
             make.width.equalTo(9)
             make.height.equalTo(18)
         }
         
-        publishButton.snp.makeConstraints{ make in
+        publishButton.snp.makeConstraints { make in
             make.right.equalToSuperview().offset(-16)
-            make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(13)
             make.width.equalTo(60)
             make.height.equalTo(28)
         }
         
-        detailView.snp.makeConstraints{ make in
-            make.left.equalToSuperview()
-            make.right.equalToSuperview()
-            make.height.equalToSuperview()
-            make.width.equalToSuperview()
+        // 滚动视图约束
+        scrollView.snp.makeConstraints { make in
+            make.top.equalTo(backButton.snp.bottom).offset(20)
+            make.left.right.bottom.equalToSuperview()
         }
         
+        // 内容视图约束
+        contentView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.width.equalTo(scrollView)
+            // 高度将在数据加载后更新
+        }
+        
+        // 详细视图约束
+        detailView.snp.makeConstraints { make in
+            make.top.left.right.equalToSuperview()
+            make.bottom.equalToSuperview().priority(.low)
+        }
     }
     
-    //获取问题详情
+    // 获取问题详情
     @objc func requestDetail() {
         // 显示加载指示器
         MBProgressHUD.showAdded(to: self.view, animated: true)
@@ -104,23 +121,72 @@ class QADetailVC : UIViewController {
         detailView.answerDetailView.viewCountLabel.text = "\(qaObject.viewCount)"
         detailView.answerDetailView.likeCountLabel.text = "\(qaObject.likeCount)"
         detailView.answerDetailView.likeButton.addTarget(self, action: #selector(like), for: .touchUpInside)
+        
+        // 重新布局detailView
         detailView.commonInit()
+        
+        // 计算内容高度并更新约束
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // 强制布局更新
+            self.detailView.setNeedsLayout()
+            self.detailView.layoutIfNeeded()
+            
+            // 计算内容总高度
+            let contentHeight = self.detailView.systemLayoutSizeFitting(
+                UIView.layoutFittingCompressedSize
+            ).height
+            
+            print("Calculated content height: \(contentHeight)")
+            print("Screen height: \(UIScreen.main.bounds.height)")
+            
+            // 更新内容视图的高度约束
+            self.contentView.snp.remakeConstraints { make in
+                make.edges.equalToSuperview()
+                make.width.equalTo(self.scrollView)
+                make.height.equalTo(contentHeight)
+            }
+            
+            // 更新滚动视图的内容大小
+            self.scrollView.contentSize = CGSize(
+                width: self.view.frame.width,
+                height: contentHeight
+            )
+            
+            // 打印调试信息
+            print("ScrollView contentSize: \(self.scrollView.contentSize)")
+            print("ScrollView frame: \(self.scrollView.frame)")
+        }
     }
     
-    ///懒加载
-    lazy var detailView : QADetailView = {
+    /// 懒加载
+    lazy var scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = true
+        scrollView.alwaysBounceVertical = true
+        scrollView.backgroundColor = .clear
+        scrollView.isScrollEnabled = true
+        return scrollView
+    }()
+    
+    lazy var contentView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .clear
+        return view
+    }()
+    
+    lazy var detailView: QADetailView = {
         let detailView = QADetailView()
         return detailView
     }()
     
-    lazy var backButton : UIButton = {
+    lazy var backButton: UIButton = {
         let backButton = UIButton()
         backButton.setImage(UIImage(named: "Back"), for: .normal)
         backButton.addTarget(self, action: #selector(popVC), for: .touchUpInside)
         return backButton
     }()
     
-    lazy var publishButton : UIButton = {
+    lazy var publishButton: UIButton = {
         let publishButton = UIButton()
         publishButton.setTitle("发布", for: .normal)
         publishButton.setTitleColor(.white, for: .normal)
@@ -131,21 +197,21 @@ class QADetailVC : UIViewController {
         return publishButton
     }()
     
-    ///按钮点击事件
-    @objc func popVC(){
+    /// 按钮点击事件
+    @objc func popVC() {
         self.navigationController?.popViewController(animated: true)
     }
     
-    @objc func like(){
-        HttpManager.shared.magipoke_qa_like(id: qaObject.ID).ry_JSON{ response in
-            switch response{
+    @objc func like() {
+        HttpManager.shared.magipoke_qa_like(id: qaObject.ID).ry_JSON { response in
+            switch response {
             case .success:
-                if(self.qaObject.isLike){
+                if self.qaObject.isLike {
                     print("Unlike Succeed")
                     self.qaObject.isLike = false
                     self.qaObject.likeCount -= 1
                     RemindHUD.shared().showDefaultHUD(withText: "取消点赞成功")
-                }else{
+                } else {
                     print("Like Succeed")
                     self.qaObject.isLike = true
                     self.qaObject.likeCount += 1
@@ -160,7 +226,7 @@ class QADetailVC : UIViewController {
         }
     }
     
-    @objc func publish(){
+    @objc func publish() {
         let newQuestionPage = NewQuestionVC()
         self.navigationController?.pushViewController(newQuestionPage, animated: true)
     }
