@@ -59,7 +59,7 @@ class RYCarnieViewController: UIViewController {
         let height = size.height / size.width * width
         let left = 197.0 / UI_width * view.bounds.width
         let entryView = RYCarnieEntryView(frame: CGRect(x: left, y: headerView.frame.maxY + 72, width: width, height: height))
-        entryView.setupData(imgName: "carnie_statement", title: "表态广场")
+        entryView.setupData(imgName: "carnie_statement", title: "答疑广场")
         entryView.imgView.frame.size = entryView.bounds.size
         entryView.titleLab.center.x = entryView.bounds.width / 2
         entryView.titleLab.frame.origin.y = entryView.bounds.height - entryView.titleLab.bounds.height - 14
