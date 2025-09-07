@@ -110,7 +110,7 @@ class RollerViewActivity : BaseActivity() {
             ): Boolean {
                 val requestUrl = request.url
                 // 如果为http/https的链接则正常加载，如果为qq这种schema部分的则手动拦截进行外部跳转
-                if(URLUtil.isHttpsUrl(requestUrl.toString()) || URLUtil.isHttpsUrl(requestUrl.toString())) {
+                if (URLUtil.isHttpsUrl(requestUrl.toString()) || URLUtil.isHttpUrl(requestUrl.toString())) {
                     return super.shouldOverrideUrlLoading(view, request)
                 } else {
                     //使用隐式intent跳转qq
