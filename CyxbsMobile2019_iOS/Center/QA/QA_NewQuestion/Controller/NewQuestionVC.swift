@@ -179,16 +179,63 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
             recommendView.dateLabel.text = "暂无日期"
         }
         
+        // 计算推荐视图的高度
+        let height = calculateRecommendViewHeight(for: qaObject)
+        
         // 显示推荐视图
         recommendView.isHidden = false
         recommendViewHeightConstraint?.update(offset: recommendViewHeight)
-        self.view.layoutIfNeeded()
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
     }
     
     private func hideRecommendView() {
         recommendViewHeightConstraint?.update(offset: 0)
         self.recommendView?.isHidden = true
-        self.view.layoutIfNeeded()
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    private func calculateRecommendViewHeight(for qaObject: QAObject) -> CGFloat {
+        // 获取推荐视图的宽度（减去左右边距）
+        let viewWidth = UIScreen.main.bounds.width - 32 // 左右各16的边距
+        
+        // 安全地获取字体，提供回退方案
+        let questionFont = UIFont(name: "PingFangSC", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .regular)
+        let answerFont = UIFont(name: "PingFangSC", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .regular)
+        
+        // 计算问题标签所需高度
+        let questionHeight = calculateTextHeight(
+            text: qaObject.questionString,
+            font: questionFont,
+            width: viewWidth - 136 // 左边64 + 右边32+32+8
+        )
+        
+        // 计算回答预览所需高度（固定两行）
+        let answerHeight = answerFont.lineHeight * 2
+        
+        // 固定部分的高度
+        let fixedHeight: CGFloat = 42 + 40 + 5 + 33 + 16 // 顶部区域 + 问题与回答间距 + 底部区域 + 底部间距
+        
+        // 总高度
+        let totalHeight = fixedHeight + questionHeight + answerHeight
+        
+        // 确保高度不会太小
+        return totalHeight // 最小高度为120
+    }
+    
+    private func calculateTextHeight(text: String, font: UIFont, width: CGFloat) -> CGFloat {
+        let constraintRect = CGSize(width: width, height: .greatestFiniteMagnitude)
+        let boundingBox = text.boundingRect(
+            with: constraintRect,
+            options: .usesLineFragmentOrigin,
+            attributes: [.font: font],
+            context: nil
+        )
+        
+        return ceil(boundingBox.height)
     }
     
     @objc private func handleRecommendationTap() {

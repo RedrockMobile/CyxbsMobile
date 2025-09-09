@@ -53,32 +53,30 @@ class RecommendedView : UIView {
             make.width.equalTo(22)
         }
         
+        questionLabel.snp.makeConstraints{ make in
+            make.top.equalTo(dividine.snp.top).offset(20)
+            make.left.equalToSuperview().offset(64)
+            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
+        }
+        
+        categoryLabel.snp.makeConstraints{ make in
+            make.top.equalTo(dividine.snp.top).offset(23)
+            make.right.equalToSuperview().offset(-32)
+            make.height.equalTo(16)
+            make.width.equalTo(48)
+        }
+        
         paraIcon.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(40)
-            make.top.equalTo(dividine.snp.top).offset(65)
+            make.top.equalTo(questionLabel.snp.bottom).offset(5)
             make.height.equalTo(6)
             make.width.equalTo(6)
         }
         
         ansPrevLabel.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(64)
-            make.top.equalTo(dividine.snp.top).offset(56)
+            make.top.equalTo(questionLabel.snp.bottom).offset(5)
             make.right.equalToSuperview().offset(-64)
-        }
-        
-        questionLabel.snp.makeConstraints{ make in
-            make.top.equalTo(dividine.snp.top).offset(20)
-            make.left.equalToSuperview().offset(64)
-            make.height.equalTo(22)
-            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
-        }
-        
-        categoryLabel.snp.makeConstraints{ make in
-            make.top.equalTo(dividine.snp.top).offset(23)
-            make.left.equalTo(questionLabel.snp.right).offset(20)
-            make.height.equalTo(16)
-            make.width.equalTo(48)
-            make.left.greaterThanOrEqualTo(questionLabel.snp.right).offset(8)
         }
         
         dateLabel.snp.makeConstraints{ make in
@@ -147,7 +145,7 @@ class RecommendedView : UIView {
         questionLabel.font = UIFont(name: PingFangSC, size: 16)
         questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
         questionLabel.backgroundColor = .clear
-        questionLabel.numberOfLines = 1
+        questionLabel.numberOfLines = 0
         return questionLabel
     }()
     

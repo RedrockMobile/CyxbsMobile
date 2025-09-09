@@ -35,7 +35,7 @@ class QADetailView : UIView{
         }
         
         categoryLabel.snp.makeConstraints{ make in
-            make.left.equalTo(questionLabel.snp.right).offset(10)
+            make.right.equalToSuperview().offset(-32)
             make.top.equalToSuperview().offset(3)
             make.height.equalTo(16)
             make.width.equalTo(48)

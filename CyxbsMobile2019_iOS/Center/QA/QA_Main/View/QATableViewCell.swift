@@ -37,46 +37,43 @@ class QATableViewCell : UITableViewCell {
             make.top.equalToSuperview()
             make.bottom.equalToSuperview().offset(-16)
             make.left.right.equalToSuperview()
-            make.height.equalTo(132)
         }
         
         hashTag.snp.makeConstraints{ make in
-            make.left.equalToSuperview().offset(20)
-            make.top.equalToSuperview().offset(16)
+            make.left.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(14)
             make.height.equalTo(22)
             make.width.equalTo(22)
         }
         
+        questionLabel.snp.makeConstraints{ make in
+            make.top.equalToSuperview().offset(14)
+            make.left.equalToSuperview().offset(48)
+            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
+        }
+        
+        categoryLabel.snp.makeConstraints{ make in
+            make.top.equalToSuperview().offset(18)
+            make.right.equalToSuperview().offset(-32)
+            make.height.equalTo(16)
+            make.width.equalTo(48)
+        }
+        
         paraIcon.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(24)
-            make.top.equalToSuperview().offset(57)
+            make.top.equalTo(questionLabel.snp.bottom).offset(14)
             make.height.equalTo(6)
             make.width.equalTo(6)
         }
         
         ansPrevLabel.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(48)
-            make.top.equalToSuperview().offset(48)
+            make.top.equalTo(questionLabel.snp.bottom).offset(5)
             make.right.equalToSuperview().offset(-64)
         }
         
-        questionLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(16)
-            make.left.equalToSuperview().offset(54)
-            make.height.equalTo(22)
-            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
-        }
-        
-        categoryLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(18)
-            make.left.equalTo(questionLabel.snp.right).offset(20)
-            make.height.equalTo(16)
-            make.width.equalTo(48)
-            make.left.greaterThanOrEqualTo(questionLabel.snp.right).offset(8)
-        }
-        
         dateLabel.snp.makeConstraints{ make in
-            make.top.equalToSuperview().offset(99)
+            make.bottom.equalToSuperview().offset(-16)
             make.left.equalToSuperview().offset(16)
             make.width.equalTo(70)
             make.height.equalTo(17)
@@ -108,8 +105,6 @@ class QATableViewCell : UITableViewCell {
         
         questionLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         categoryLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        
-        containerView.bringSubviewToFront(likeButton)
     }
     
     required init?(coder: NSCoder) {
@@ -135,7 +130,7 @@ class QATableViewCell : UITableViewCell {
         questionLabel.font = UIFont(name: PingFangSC, size: 16)
         questionLabel.textColor = UIColor.ry(light: "#15315B", dark: "#767677")
         questionLabel.backgroundColor = .clear
-        questionLabel.numberOfLines = 1
+        questionLabel.numberOfLines = 0
         return questionLabel
     }()
     
