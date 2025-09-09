@@ -24,7 +24,6 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     // 推荐视图相关属性
     private var recommendView: RecommendedView?
     private var recommendViewHeightConstraint: Constraint?
-    private let recommendViewHeight: CGFloat = 183
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -184,7 +183,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         
         // 显示推荐视图
         recommendView.isHidden = false
-        recommendViewHeightConstraint?.update(offset: recommendViewHeight)
+        recommendViewHeightConstraint?.update(offset: height)
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
@@ -217,13 +216,13 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         let answerHeight = answerFont.lineHeight * 2
         
         // 固定部分的高度
-        let fixedHeight: CGFloat = 42 + 40 + 5 + 33 + 16 // 顶部区域 + 问题与回答间距 + 底部区域 + 底部间距
+        let fixedHeight: CGFloat = 42 + 20 + 5 + 33 + 16 // 顶部区域 + 问题与回答间距 + 底部区域 + 底部间距
         
         // 总高度
         let totalHeight = fixedHeight + questionHeight + answerHeight
         
         // 确保高度不会太小
-        return totalHeight // 最小高度为120
+        return max(totalHeight, 120)// 最小高度为120
     }
     
     private func calculateTextHeight(text: String, font: UIFont, width: CGFloat) -> CGFloat {

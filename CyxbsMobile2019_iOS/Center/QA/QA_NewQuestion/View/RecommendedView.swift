@@ -68,7 +68,7 @@ class RecommendedView : UIView {
         
         paraIcon.snp.makeConstraints{ make in
             make.left.equalToSuperview().offset(40)
-            make.top.equalTo(questionLabel.snp.bottom).offset(5)
+            make.top.equalTo(questionLabel.snp.bottom).offset(14)
             make.height.equalTo(6)
             make.width.equalTo(6)
         }
