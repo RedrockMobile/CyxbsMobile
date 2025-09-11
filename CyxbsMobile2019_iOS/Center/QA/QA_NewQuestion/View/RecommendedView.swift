@@ -54,9 +54,9 @@ class RecommendedView : UIView {
         }
         
         questionLabel.snp.makeConstraints{ make in
+            make.right.lessThanOrEqualTo(categoryLabel.snp.left)
             make.top.equalTo(dividine.snp.top).offset(20)
             make.left.equalToSuperview().offset(64)
-            make.right.lessThanOrEqualTo(categoryLabel.snp.left).offset(-8)
         }
         
         categoryLabel.snp.makeConstraints{ make in

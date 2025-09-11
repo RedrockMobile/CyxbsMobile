@@ -213,10 +213,11 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         let answerFont = UIFont(name: "PingFangSC", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .regular)
         
         // 计算问题标签所需高度
+        let questionWidth = viewWidth - 64 - 48 - 16 - 20 // 左边64 + 右边48(分类标签宽度) + 8(间距) + 20(调试)
         let questionHeight = calculateTextHeight(
             text: qaObject.questionString,
             font: questionFont,
-            width: viewWidth - 136 // 左边64 + 右边32+32+8
+            width: questionWidth
         )
         
         // 计算回答预览所需高度（固定两行）
@@ -229,7 +230,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         let totalHeight = fixedHeight + questionHeight + answerHeight
         
         // 确保高度不会太小
-        return max(totalHeight, 120)// 最小高度为120
+        return max(totalHeight, 120) // 最小高度为120
     }
     
     private func calculateTextHeight(text: String, font: UIFont, width: CGFloat) -> CGFloat {
