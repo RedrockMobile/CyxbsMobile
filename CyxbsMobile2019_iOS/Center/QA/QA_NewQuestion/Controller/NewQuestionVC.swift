@@ -16,6 +16,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     var question : String?
     var tags : String?
     private var recommendedQA: QAObject? // 存储推荐的问题
+    private var hasShownRecommendation = false // 新增：标记是否已显示推荐内容
     
     // 添加键盘相关属性
     private var optionButtonSetBottomConstraint: Constraint?
@@ -187,6 +188,9 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
+        
+        // 设置已显示推荐内容的标志
+        hasShownRecommendation = true
     }
     
     private func hideRecommendView() {
@@ -195,6 +199,9 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
+        
+        // 重置已显示推荐内容的标志
+        hasShownRecommendation = false
     }
     
     private func calculateRecommendViewHeight(for qaObject: QAObject) -> CGFloat {
@@ -336,6 +343,8 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
         questionInput.placeholder = "请输入你的问题~"
         questionInput.font = UIFont(name: PingFangSC, size: 16)
         questionInput.delegate = self
+        // 添加文本变化监听
+        questionInput.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
         return questionInput
     }()
     
@@ -357,7 +366,13 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
     }
     
     @objc func publish(){
-        // 先搜索相关内容
+        // 如果已经显示过推荐内容，则直接发布
+        if hasShownRecommendation {
+            performPublish()
+            return
+        }
+        
+        // 否则先搜索相关内容
         searchBeforePublish { [weak self] hasRecommendation in
             guard let self = self else { return }
             
@@ -369,6 +384,12 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
                 self.performPublish()
             }
         }
+    }
+    
+    @objc func textFieldDidChange(_ textField: UITextField) {
+        // 当输入框内容变化时，重置推荐状态
+        hasShownRecommendation = false
+        hideRecommendView()
     }
     
     @objc func like(_ sender: UIButton) {
