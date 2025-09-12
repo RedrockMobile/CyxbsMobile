@@ -2,7 +2,6 @@ package com.cyxbs.pages.qa.home
 
 import android.app.Activity
 import android.content.res.ColorStateList
-import android.content.res.Resources
 import android.graphics.drawable.InsetDrawable
 import android.os.Bundle
 import android.view.LayoutInflater

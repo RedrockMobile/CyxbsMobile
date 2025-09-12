@@ -15,7 +15,6 @@ import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.home.model.bean.Item
 import com.cyxbs.pages.qa.home.viewmodel.HomeViewModel
 import com.cyxbs.pages.qa.utils.longToWanString
-import com.cyxbs.pages.qa.utils.truncateWithEllipsis
 
 /**
  * description ： Qa主页的adapter
@@ -106,7 +105,7 @@ class QaHomeRVAdapter(
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags.getOrNull(0) ?: ""}类"
 
-            question.text = item.q.truncateWithEllipsis()
+            question.text = item.q
             answer.text = item.a
             time.text = item.a_time.substring(0, 10).replace("-", ".")
             likeNumber.text = longToWanString(item.like_count)

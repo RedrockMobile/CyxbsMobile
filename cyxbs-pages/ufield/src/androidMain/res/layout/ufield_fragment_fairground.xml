@@ -110,7 +110,7 @@
             android:layout_width="125dp"
             android:layout_height="50dp"
             android:background="@drawable/ufield_ic_fairgroundbutton"
-            android:text="表态广场"
+            android:text="答疑广场"
             android:textColor="#4A44E4"
             android:textSize="16sp"
             android:textStyle="bold"

@@ -49,5 +49,6 @@
     <!-- card背景的颜色 -->
     <color name="qa_home_btn_publish_color">#4A44E4</color>
 
+    <color name="qa_home_btn_publish_color_selected">#5C56F6</color>
 
 </resources>

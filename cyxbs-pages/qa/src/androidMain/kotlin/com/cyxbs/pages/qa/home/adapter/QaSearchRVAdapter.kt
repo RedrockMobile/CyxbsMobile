@@ -13,7 +13,6 @@ import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.home.model.bean.Item
 import com.cyxbs.pages.qa.home.viewmodel.SearchViewModel
 import com.cyxbs.pages.qa.utils.longToWanString
-import com.cyxbs.pages.qa.utils.truncateWithEllipsis
 
 /**
  * description ： 搜索界面的adapter
@@ -80,7 +79,7 @@ class QaSearchRVAdapter(
             val tags = item.tags.split(" ").filter { it.isNotEmpty() }
             mTag.text = "${tags[0]}类"
 
-            val filterQuestion = item.q.truncateWithEllipsis()
+            val filterQuestion = item.q
             question.text = highlightKeyword(filterQuestion, keyword)
             answer.text = highlightKeyword(item.a, keyword)
             time.text = item.a_time.substring(0, 10).replace("-", ".")

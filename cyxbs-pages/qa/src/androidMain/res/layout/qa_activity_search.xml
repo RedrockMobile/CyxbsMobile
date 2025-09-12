@@ -22,8 +22,8 @@
 
     <TextView
         android:id="@+id/qa_search_tv_title"
-        android:layout_width="85dp"
-        android:layout_height="31dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="Q and A"
         android:textColor="@color/qa_text_title_color"
@@ -78,10 +78,9 @@
         android:layout_width="163dp"
         android:layout_height="41dp"
         android:layout_marginBottom="44dp"
-        android:background="@drawable/qa_shape_home_btn_publish_background"
+        android:background="@drawable/qa_selector_home_publish_btn"
         android:clickable="true"
         android:focusable="true"
-        android:foreground="?attr/selectableItemBackground"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="30dp"

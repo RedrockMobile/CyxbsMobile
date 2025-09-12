@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.fragment.app.activityViewModels
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
@@ -12,6 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.getSp
+import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.HomeActivity
@@ -35,6 +39,8 @@ class QaAllFragment : BaseFragment() {
     private val homeViewModel: HomeViewModel by activityViewModels<HomeViewModel>()
     private val searchViewModel: SearchViewModel by activityViewModels<SearchViewModel>()
     private val mRecycleView by R.id.qa_all_rv.view<RecyclerView>()
+    private val mIvNoContent by R.id.qa_search_iv_no_content.view<ImageView>()
+    private val mTvNoContent by R.id.qa_search_tv_no_content.view<TextView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
             /*
@@ -56,6 +62,7 @@ class QaAllFragment : BaseFragment() {
             }
         }
     }
+
 
     //监听页面刷新状态 添加新消息的处理
     private var homeLoadStateListener: ((CombinedLoadStates) -> Unit)? = null
@@ -131,7 +138,12 @@ class QaAllFragment : BaseFragment() {
 
                 //先清空然后赋值 更体现搜索的意义
                 searchRVAdapter.submitList(emptyList()) {
-                    searchRVAdapter.submitList(filteredPagingData)
+                    if (filteredPagingData.isEmpty()){
+                        showNoContent()
+                    } else {
+											hideNoContent()
+											searchRVAdapter.submitList(filteredPagingData)
+                    }
                 }
 
             } else {
@@ -157,7 +169,17 @@ class QaAllFragment : BaseFragment() {
         homeLoadStateListener?.let { homeRvAdapter.removeLoadStateListener(it) }
         homeLoadStateListener = null
 
+    }
+    fun showNoContent(){
+        mIvNoContent.visible()
+        mTvNoContent.visible()
+        mRecycleView.gone()
+    }
 
+    fun hideNoContent(){
+        mIvNoContent.gone()
+        mTvNoContent.gone()
+        mRecycleView.visible()
     }
 }
 
