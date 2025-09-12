@@ -24,7 +24,7 @@ class NewQAItemCounter {
     /// 初始化最新请求时间
     @available(iOS 15, *)
     func initDate() {
-        let currentDate = Date.now
+        let currentDate = Date()
         UserDefaultsManager.shared.latestRequestQA = currentDate
         print("初始化最新请求时间: \(currentDate)")
     }
@@ -115,7 +115,7 @@ class NewQAItemCounter {
     /// 更新最新请求时间
     private func updateLatestRequestDate() {
         if #available(iOS 15, *) {
-            UserDefaultsManager.shared.latestRequestQA = Date.now
+            UserDefaultsManager.shared.latestRequestQA = Date()
         } else {
             UserDefaultsManager.shared.latestRequestQA = Date()
         }
