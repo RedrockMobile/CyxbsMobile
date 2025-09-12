@@ -21,7 +21,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
     let qaModel = QAModel()
     private var qaTypeString: String?
     private var tableViewCount: Int = 0
-    private var cellHeight: CGFloat = 132
+    private var hasMoreData = true
     
     // 搜索相关属性
     private var isSearching = false
@@ -30,6 +30,9 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
     // 添加约束引用
     private var contentViewHeightConstraint: Constraint?
     private var tableViewHeightConstraint: Constraint?
+    
+    // 高度缓存
+    private var heightCache: [Int: CGFloat] = [:]
     
     // MARK: - 修改初始化方法
     init(qaType: QAType, initialSearchKeyword: String? = nil) {
@@ -64,7 +67,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         // 初始状态下不加载任何数据
         updateContentViewHeight()
         
-        // 如果有初始搜索词，自动执行搜索:cite[1]:cite[8]
+        // 如果有初始搜索词，自动执行搜索
         if let initialKeyword = initialSearchKeyword, !initialKeyword.isEmpty {
             // 延迟执行以确保视图加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -116,6 +119,9 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
             // 应用分类过滤
             self.filterQAItems()
             
+            // 清除高度缓存
+            self.clearHeightCache()
+            
             DispatchQueue.main.async {
                 self.qaTableView.reloadData()
                 self.updateContentViewHeight()
@@ -136,6 +142,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
             self.emptyStateLabel.text = "搜索失败，请重试"
         }
     }
+    
     private func setPosition() {
         scrollView.snp.makeConstraints { make in
             make.edges.equalTo(view.safeAreaLayoutGuide)
@@ -173,15 +180,77 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
     
     // 更新内容视图高度
     private func updateContentViewHeight() {
-        let tableViewHeight = CGFloat(tableViewCount) * (cellHeight + 16) + 32 // 32是section footer的高度
-        let contentHeight = 20 + 38 + 16 + tableViewHeight + 16 // 搜索按钮上方间距 + 搜索按钮高度 + 间距 + 表格高度 + 底部间距
+        var totalHeight: CGFloat = 0
+        
+        // 计算所有cell的总高度
+        for i in 0..<tableViewCount {
+            let indexPath = IndexPath(row: i, section: 0)
+            totalHeight += self.tableView(qaTableView, heightForRowAt: indexPath)
+        }
+        
+        // 加上section footer的高度
+        totalHeight += 16
+        
+        let contentHeight = 20 + 38 + 16 + totalHeight + 16 // 搜索按钮上方间距 + 搜索按钮高度 + 间距 + 表格高度 + 底部间距
         
         // 更新约束
         self.contentViewHeightConstraint?.update(offset: contentHeight)
-        self.tableViewHeightConstraint?.update(offset: tableViewHeight)
+        self.tableViewHeightConstraint?.update(offset: totalHeight)
         
         // 立即布局
         self.view.layoutIfNeeded()
+    }
+    
+    // 计算cell高度
+    private func calculateCellHeight(for qaItem: QAObject) -> CGFloat {
+        // 获取tableView的宽度（减去左右边距）
+        let tableViewWidth = qaTableView.bounds.width
+        let contentWidth = tableViewWidth - 32 // 左右各16的边距
+        
+        // 计算问题标签所需高度
+        let questionFont = UIFont(name: "PingFangSC", size: 16) ?? UIFont.systemFont(ofSize: 15.5, weight: .regular)
+        let questionHeight = calculateTextHeight(
+            text: qaItem.questionString,
+            font: questionFont,
+            width: contentWidth - 136 // 左边48 + 右边48+32+8
+        )
+        
+        // 计算回答预览所需高度（最多2行）
+        let answerFont = UIFont(name: "PingFangSC", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .regular)
+        let answerHeight = answerFont.lineHeight * 2
+        
+        // 固定部分的高度
+        let fixedHeight: CGFloat = 14 + 5 + 33 + 16 // 顶部间距 + 问题与回答间距 + 底部区域 + 底部间距
+        
+        // 总高度
+        let totalHeight = fixedHeight + questionHeight + answerHeight
+        
+        return totalHeight
+    }
+    
+    // 计算文本高度的方法
+    private func calculateTextHeight(text: String, font: UIFont, width: CGFloat, maxLines: Int? = nil) -> CGFloat {
+        let constraintRect = CGSize(width: width, height: .greatestFiniteMagnitude)
+        let boundingBox = text.boundingRect(
+            with: constraintRect,
+            options: .usesLineFragmentOrigin,
+            attributes: [.font: font],
+            context: nil
+        )
+        
+        var height = ceil(boundingBox.height)
+        
+        // 如果指定了最大行数，则限制高度
+        if let maxLines = maxLines {
+            let maxHeight = font.lineHeight * CGFloat(maxLines)
+            height = min(height, maxHeight)
+        }
+        
+        return height
+    }
+    
+    private func clearHeightCache() {
+        heightCache.removeAll()
     }
     
     // 过滤项目
@@ -302,7 +371,25 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
     // MARK: - TableView代理和数据源
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return cellHeight + 16
+        if let cachedHeight = heightCache[indexPath.row] {
+            return cachedHeight + 16 // 加上cell之间的间距
+        }
+        
+        // 防止数组越界
+        guard indexPath.item < qaModel.qa.count else {
+            return 132 + 16 // 默认高度加上间距
+        }
+        
+        // 获取对应数据
+        let qaItem = qaModel.qa[indexPath.item]
+        
+        // 计算cell高度
+        let cellHeight = calculateCellHeight(for: qaItem)
+        
+        // 缓存高度
+        heightCache[indexPath.row] = cellHeight
+        
+        return cellHeight + 16 // 加上cell之间的间距
     }
     
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
@@ -373,7 +460,6 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
         
         var qaObject = qaModel.qa[indexPath.item]
         
-        
         if qaObject.isLike{
             HttpManager.shared.magipoke_qa_unlike(id: qaObject.ID).ry_JSON{ [weak self] response in
                 guard let self = self else { return }
@@ -389,7 +475,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
                     
                     DispatchQueue.main.async {
                         // 直接更新对应的cell，而不是遍历视图层级
-                        if let cell = self.qaTableView.cellForRow(at: indexPath) as? QATableViewCell {
+                        if let cell = self.qaTableView.cellForRow(at: indexPath) as? QASearchTableViewCell {
                             cell.likeCountLabel.text = "\(qaObject.likeCount)"
                             cell.likeButton.isSelected = qaObject.isLike
                         }
@@ -414,7 +500,7 @@ class QASearchViewController: UIViewController, UITableViewDelegate, UITableView
                     
                     DispatchQueue.main.async {
                         // 直接更新对应的cell，而不是遍历视图层级
-                        if let cell = self.qaTableView.cellForRow(at: indexPath) as? QATableViewCell {
+                        if let cell = self.qaTableView.cellForRow(at: indexPath) as? QASearchTableViewCell {
                             cell.likeCountLabel.text = "\(qaObject.likeCount)"
                             cell.likeButton.isSelected = qaObject.isLike
                         }
