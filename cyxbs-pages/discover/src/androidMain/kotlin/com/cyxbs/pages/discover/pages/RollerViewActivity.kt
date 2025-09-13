@@ -11,10 +11,14 @@ import android.hardware.SensorManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.*
+import android.util.Log
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_BACK
 import android.view.MotionEvent
+import android.webkit.URLUtil
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -100,9 +104,24 @@ class RollerViewActivity : BaseActivity() {
             }
         }
         discover_web_view.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                view.loadUrl(url)
-                return super.shouldOverrideUrlLoading(view, url)
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
+                val requestUrl = request.url
+                // 如果为http/https的链接则正常加载，如果为qq这种schema部分的则手动拦截进行外部跳转
+                if (URLUtil.isHttpsUrl(requestUrl.toString()) || URLUtil.isHttpUrl(requestUrl.toString())) {
+                    return super.shouldOverrideUrlLoading(view, request)
+                } else {
+                    //使用隐式intent跳转qq
+                    val intent = Intent(Intent.ACTION_VIEW, requestUrl)
+                    try {
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        toast("未安装qq客户端或版本不支持!")
+                    }
+                    return true
+                }
             }
 
             //这里是页面加载完之后调用
