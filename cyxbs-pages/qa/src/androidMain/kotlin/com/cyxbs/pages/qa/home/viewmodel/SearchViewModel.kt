@@ -89,7 +89,11 @@ class SearchViewModel : BaseViewModel() {
             .mapOrInterceptException { _error.postValue(true) }
             .safeSubscribeBy { response ->
                 _error.postValue(false)
-                response.items?.let { _items.postValue(it) }
+                if (response.items == null){
+                    _items.postValue(emptyList<Item>())
+                }else{
+                    _items.postValue(response.items)
+                }
 
             }
     }

@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -12,6 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.getSp
+import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.qa.R
 import com.cyxbs.pages.qa.detail.ui.DetailActivity
 import com.cyxbs.pages.qa.home.HomeActivity
@@ -33,6 +37,8 @@ class QaOtherFragment : BaseFragment() {
     private val searchViewModel: SearchViewModel by activityViewModels<SearchViewModel>()
     private val homeViewModel: HomeViewModel by activityViewModels<HomeViewModel>()
     private val mRecycleView by R.id.qa_other_rv.view<RecyclerView>()
+    private val mIvNoContent by R.id.qa_search_iv_no_content.view<ImageView>()
+    private val mTvNoContent by R.id.qa_search_tv_no_content.view<TextView>()
     private val homeRvAdapter: QaHomeRVAdapter by lazy {
         QaHomeRVAdapter(homeViewModel).apply {
             setOnItemClickListener { id ->
@@ -103,7 +109,12 @@ class QaOtherFragment : BaseFragment() {
                     searchRVAdapter.keyword = str
                 }
                 searchRVAdapter.submitList(emptyList()) {
-                    searchRVAdapter.submitList(filteredList)
+										if (filteredList.isEmpty()){
+											showNoContent()
+										} else {
+											hideNoContent()
+											searchRVAdapter.submitList(filteredList)
+										}
                 }
 
             } else {
@@ -129,6 +140,16 @@ class QaOtherFragment : BaseFragment() {
         searchRVAdapter.setOnItemClickListener(null)
 
     }
+    fun showNoContent(){
+        mIvNoContent.visible()
+        mTvNoContent.visible()
+        mRecycleView.gone()
+    }
 
+    fun hideNoContent(){
+        mIvNoContent.gone()
+        mTvNoContent.gone()
+        mRecycleView.visible()
+    }
 
 }

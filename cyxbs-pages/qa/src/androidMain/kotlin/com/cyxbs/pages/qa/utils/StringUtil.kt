@@ -17,10 +17,3 @@ fun longToWanString(num: Long): String{
     }
 }
 
-fun String.truncateWithEllipsis(maxLength: Int = 12): String {
-    return if (this.length > maxLength) {
-        this.substring(0, maxLength) + "…"
-    } else {
-        this
-    }
-}
