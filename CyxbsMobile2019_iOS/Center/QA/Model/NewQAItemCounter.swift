@@ -22,7 +22,6 @@ class NewQAItemCounter {
     var qaObjects: [QAObject] = []
     
     /// 初始化最新请求时间
-    @available(iOS 15, *)
     func initDate() {
         let currentDate = Date()
         UserDefaultsManager.shared.latestRequestQA = currentDate
