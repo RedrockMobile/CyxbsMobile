@@ -1,12 +1,15 @@
 package release
 
 import Config
+import com.android.build.gradle.options.Option
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.asRequestBody
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.TaskAction
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -29,7 +32,7 @@ import java.util.concurrent.TimeUnit
  *
  * 记得先修改 [Config] 中的版本信息 !!!!!!!!
  */
-open class CyxbsReleaseTask : DefaultTask() {
+abstract class CyxbsReleaseTask : DefaultTask() {
 
     // 发版的 token 由运维下发，只能由每届 Android 管理人持有 (移动副站或 Android 部长)
     private val okHttpClient = OkHttpClient.Builder().addInterceptor {
@@ -59,13 +62,12 @@ open class CyxbsReleaseTask : DefaultTask() {
 
     private val netService = retrofit.create(TaskService::class.java)
 
-    @Input
-    var getApkFile: (() -> File?)? = null // 由外界任务执行者设置
+    @get:InputFile
+    abstract val getApkFile: RegularFileProperty // 由外界任务执行者设置
 
     @TaskAction
     fun taskAction() {
-        val apk = getApkFile?.invoke() ?: throw RuntimeException(
-            "获取apk失败！请检查是否修改了腾讯打包工具的配置，请全局搜索 ChannelConfigExtension")
+        val apk = getApkFile.get().asFile
         val lastVersion = getUpdateContent()
         //忘记改updateContent和versionName的情况
         if (lastVersion.versionCode > Config.versionCode) {

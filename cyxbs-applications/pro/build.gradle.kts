@@ -125,12 +125,12 @@ if (secretGradleFile.exists()) {
    */
   tasks.register("cyxbsRelease", CyxbsReleaseTask::class) {
     group = "cyxbs"
-    getApkFile = {
+    getApkFile.set {
       channel.outputDir.listFiles()?.singleOrNull {
         it.name.matches(
           Regex("掌上重邮-${Config.versionName}-official-release-\\d+-\\d+\\.apk")
         )
-      }
+      }!!
     }
     dependsOn(project.tasks.getByName("channelRelease"))
   }
