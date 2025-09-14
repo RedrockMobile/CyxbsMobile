@@ -3,6 +3,7 @@ package com.cyxbs.pages.home.ui.main
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.core.os.postDelayed
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.cyxbs.components.account.api.IAccountService
@@ -15,6 +16,7 @@ import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.utils.extensions.defaultHandler
 import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.logger.TrackingUtils
@@ -103,7 +105,9 @@ class MainActivity : BaseActivity() {
     when (intent.action) {
       DESKTOP_SHORTCUT_COURSE -> {
         if (mIsLogin) {
-          mViewModel.courseBottomSheetExpand.value = true
+          defaultHandler.postDelayed(100) { // 延后打开课表，否则动画会闪
+            mViewModel.courseBottomSheetExpand.value = true
+          }
         }
       }
       // 因政策问题暂时关闭
@@ -121,7 +125,9 @@ class MainActivity : BaseActivity() {
       else -> {
         if (mIsLogin && defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
           // 打开应用优先显示课表的设置
-          mViewModel.courseBottomSheetExpand.value = true
+          defaultHandler.postDelayed(100) { // 延后打开课表，否则动画会闪
+            mViewModel.courseBottomSheetExpand.value = true
+          }
         }
       }
     }
