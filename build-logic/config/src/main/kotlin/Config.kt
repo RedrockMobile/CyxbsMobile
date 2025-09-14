@@ -11,8 +11,8 @@ import java.util.regex.Pattern
  */
 object Config {
   // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
-  const val versionCode = 88 // 线上87，开发88
-  const val versionName = "6.9.1-alpha" // 线上6.9.0，开发6.9.1-alpha，自己打包 -alpha，内测 -beta
+  const val versionCode = 89 // 线上88，开发89
+  const val versionName = "6.10.1-alpha" // 线上6.10.0，开发6.10.1-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
     get() = versionName.substringBeforeLast("-")
@@ -22,11 +22,9 @@ object Config {
 
   // 线上版本更新内容，注意缩进统一
   val updateContent = """
-    1.新增体育打卡功能，空教室功能，方便邮子们的校园生活
-    2.邮子清单全面升级，给邮子提供更全面的体验
-    3.邮票中心升级，邮票小店库存更新
-    4.重邮地图更新，新增南部校区明志苑
-    5.美食咨询处更新，新增滨湖餐厅
+    1.新增2025年招新banner，让更多邮子认识红岩工作室
+    2.全面升级表态广场，Q and A问答为邮子全面解决生活、学习等问题
+    3.新增重邮地图导航功能，为邮子探索校园提供全新助力
   """.trimIndent()
 
   val resourcesExclude = listOf(
