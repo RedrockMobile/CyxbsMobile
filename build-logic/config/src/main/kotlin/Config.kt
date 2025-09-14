@@ -11,8 +11,8 @@ import java.util.regex.Pattern
  */
 object Config {
   // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
-  const val versionCode = 88 // 线上88，开发89
-  const val versionName = "6.10.0" // 线上6.10.0，开发6.10.1-alpha，自己打包 -alpha，内测 -beta
+  const val versionCode = 89 // 线上88，开发89
+  const val versionName = "6.10.1-alpha" // 线上6.10.0，开发6.10.1-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
     get() = versionName.substringBeforeLast("-")
