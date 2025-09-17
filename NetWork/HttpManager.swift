@@ -418,7 +418,7 @@ extension HttpManager {
             "q": q,
             "tags": tags
         ]
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/publish"), method: .post, parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/publish"), method: .post, parameters: parameters, encoding: JSONEncoding())
     }
     
     ///QA板块列出问题
