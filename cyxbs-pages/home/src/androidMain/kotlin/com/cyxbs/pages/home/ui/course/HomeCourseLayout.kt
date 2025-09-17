@@ -94,15 +94,6 @@ class HomeCourseLayout(context: Context, attrs: AttributeSet?) : FrameLayout(con
       }
     }
 
-    val oldBottomSheetIsExpand = mActivityViewModel.courseBottomSheetExpand.value
-    if (oldBottomSheetIsExpand != true) {
-      // 如果 value 之前值为 true，则说明已经展开，只能在没有展开时才允许设置透明度
-      mCourseService.setCourseVpAlpha(0F)
-      mCourseService.setHeaderAlpha(0F)
-    } else {
-      mViewHeader.gone()
-    }
-  
     CourseHeaderHelper.observeHeader()
       .observeOn(AndroidSchedulers.mainThread())
       .safeSubscribeBy(mActivity) { header ->
@@ -197,28 +188,7 @@ class HomeCourseLayout(context: Context, attrs: AttributeSet?) : FrameLayout(con
         }
       
         override fun onSlide(bottomSheet: View, slideOffset: Float) {
-          if (slideOffset >= 0) {
-            /*
-            * 展开时：
-            * slideOffset：0.0 --------> 1.0
-            * 课表主体:     0.0 --------> 1.0
-            * 课表头部:     0.0 -> 0.0 -> 1.0
-            * 主界面头部:   1.0 -> 0.0 -> 0.0
-            *
-            * 折叠时：
-            * slideOffset：1.0 --------> 0.0
-            * 课表主体:     1.0 --------> 0.0
-            * 课表头部:     1.0 -> 0.0 -> 0.0
-            * 主界面头部:   0.0 -> 0.0 -> 1.0
-            * */
-            mCourseService.setCourseVpAlpha(slideOffset)
-            mCourseService.setHeaderAlpha(max(slideOffset * 2 - 1, 0F))
-            mViewHeader.alpha = max(1 - slideOffset * 2, 0F)
-            mViewHeader.visible()
-            mFcvCourse.visible()
-            mActivityViewModel.courseBottomSheetOffset.value = slideOffset
-            mCourseService.setBottomSheetSlideOffset(slideOffset)
-          }
+          onBottomSheetSlide(slideOffset)
         }
       }
     )
@@ -244,14 +214,21 @@ class HomeCourseLayout(context: Context, attrs: AttributeSet?) : FrameLayout(con
           mBottomSheet.isHideable = true
           mBottomSheet.state = BottomSheetBehavior.STATE_HIDDEN
         }
+        onBottomSheetSlide(0F)
       } else if (it) {
         if (mBottomSheet.state != BottomSheetBehavior.STATE_EXPANDED) {
           mBottomSheet.state = BottomSheetBehavior.STATE_EXPANDED
         }
+        onBottomSheetSlide(1F)
+        mViewHeader.gone()
+        mFcvCourse.visible()
       } else {
         if (mBottomSheet.state != BottomSheetBehavior.STATE_COLLAPSED) {
           mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
         }
+        onBottomSheetSlide(0F)
+        mViewHeader.visible()
+        mFcvCourse.gone()
       }
     }
     mAccountService.userInfo.onEach {
@@ -266,6 +243,31 @@ class HomeCourseLayout(context: Context, attrs: AttributeSet?) : FrameLayout(con
   private val mCollapsedBackPressedCallback by lazyUnlock {
     mActivity.onBackPressedDispatcher.addCallback(mActivity) {
       mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
+    }
+  }
+
+  private fun onBottomSheetSlide(slideOffset: Float) {
+    if (slideOffset >= 0) {
+      /*
+      * 展开时：
+      * slideOffset：0.0 --------> 1.0
+      * 课表主体:     0.0 --------> 1.0
+      * 课表头部:     0.0 -> 0.0 -> 1.0
+      * 主界面头部:   1.0 -> 0.0 -> 0.0
+      *
+      * 折叠时：
+      * slideOffset：1.0 --------> 0.0
+      * 课表主体:     1.0 --------> 0.0
+      * 课表头部:     1.0 -> 0.0 -> 0.0
+      * 主界面头部:   0.0 -> 0.0 -> 1.0
+      * */
+      mCourseService.setCourseVpAlpha(slideOffset)
+      mCourseService.setHeaderAlpha(max(slideOffset * 2 - 1, 0F))
+      mViewHeader.alpha = max(1 - slideOffset * 2, 0F)
+      mViewHeader.visible()
+      mFcvCourse.visible()
+      mActivityViewModel.courseBottomSheetOffset.value = slideOffset
+      mCourseService.setBottomSheetSlideOffset(slideOffset)
     }
   }
 }
