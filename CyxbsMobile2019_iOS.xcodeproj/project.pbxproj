@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -1934,7 +1934,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		187D2C3E2E4D7EDD00D8B45C /* QA */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = QA; sourceTree = "<group>"; };
+		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = QA;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -6541,7 +6545,6 @@
 				};
 			};
 			buildConfigurationList = 1A9B7662235F50A600725937 /* Build configuration list for PBXProject "CyxbsMobile2019_iOS" */;
-			compatibilityVersion = "Xcode 13.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -6553,6 +6556,7 @@
 				"tz-RU",
 			);
 			mainGroup = 1A9B765E235F50A600725937;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 1A9B7668235F50A600725937 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -7640,7 +7644,7 @@
 				CODE_SIGN_ENTITLEMENTS = "CyxbsMobile2019_iOS/掌上重邮.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 727CVV9PLJ;
 				EXCLUDED_ARCHS = "";
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "arm64 $(inherited)";
@@ -7695,7 +7699,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = "CyxbsMobile2019_iOS/掌上重邮.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 727CVV9PLJ;
 				EXCLUDED_ARCHS = "";
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "arm64 $(inherited)";

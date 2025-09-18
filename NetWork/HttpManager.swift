@@ -66,7 +66,7 @@ extension HttpManager {
         let parameters: [String: Any] = [
             "stu": stu
         ]
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-text/search/people"), parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-jwzx/search/people"), parameters: parameters)
     }
     
     /// 获取token
