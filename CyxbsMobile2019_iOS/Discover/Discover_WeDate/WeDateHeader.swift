@@ -39,7 +39,7 @@ let Discover_POST_sendNotification_API = CyxbsMobileBaseURL_1  + "magipoke-jwzx/
 /// 查询课表
 let Discover_POST_courseSchedule_API = CyxbsMobileBaseURL_1  + "magipoke-jwzx/kebiao"
 /// 查询同学
-let Discover_GET_searchStudent_API = CyxbsMobileBaseURL_1  + "magipoke-text/search/people"
+let Discover_GET_searchStudent_API = CyxbsMobileBaseURL_1  + "magipoke-jwzx/search/people"
 /// 批量添加信息验证
 let Discover_POST_checkData_API = CyxbsMobileBaseURL_1  + "magipoke-jwzx/no_class/member/check"
 /// 分组删除成员
