@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:id="@+id/main_view_course_bottom_sheet"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/course_widget_layer_list_course_bg"
+        app:behavior_peekHeight="130dp"
+        app:behavior_hideable="false"
+        app:behavior_draggable="false"
+        app:layout_behavior="@string/bottom_sheet_behavior">
+        <!--peekHeight 由课表头的 70 + 底部按钮的 60 组成-->
+
+        <!--主界面显示的课表头-->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/main_view_course_header"
+            android:layout_width="match_parent"
+            android:layout_height="70dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/main_tv_course_header_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/config_level_two_font_color"
+                android:textSize="8sp"
+                app:layout_constraintBottom_toTopOf="@+id/main_tv_course_header_title"
+                app:layout_constraintEnd_toEndOf="@+id/main_tv_course_header_title"
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="@+id/main_tv_course_header_title"
+                tools:ignore="SmallSp"
+                tools:text="下节课" />
+
+            <com.cyxbs.components.view.text.MarqueeTextView
+                android:id="@+id/main_tv_course_header_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:paddingStart="0dp"
+                android:paddingEnd="15dp"
+                android:textColor="@color/config_level_two_font_color"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/main_tv_course_header_time"
+                app:layout_constraintStart_toStartOf="parent"
+                tools:text="数据结构" />
+
+            <TextView
+                android:id="@+id/main_tv_course_header_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawablePadding="5dp"
+                android:visibility="gone"
+                app:drawableStartCompat="@drawable/home_ic_course_header_time"
+                app:layout_constraintTop_toTopOf="@+id/main_tv_course_header_hint"
+                app:layout_constraintBottom_toBottomOf="@+id/main_tv_course_header_hint"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                tools:text="8:00-9:40"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/main_tv_course_header_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="今天和明天都没课咯～"
+                android:textColor="@color/config_level_four_font_color"
+                app:layout_constraintTop_toTopOf="@+id/main_tv_course_header_title"
+                app:layout_constraintBottom_toBottomOf="@+id/main_tv_course_header_title"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                tools:ignore="HardcodedText"
+                tools:visibility="invisible"
+                app:layout_constraintVertical_bias="0.55" />
+
+            <com.cyxbs.components.view.text.MarqueeTextView
+                android:id="@+id/main_tv_course_header_place"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="120dp"
+                android:layout_marginEnd="16dp"
+                android:drawablePadding="5dp"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:visibility="invisible"
+                app:drawableStartCompat="@drawable/home_ic_course_header_landmark"
+                app:layout_constraintTop_toTopOf="@id/main_tv_course_header_content"
+                app:layout_constraintBottom_toBottomOf="@+id/main_tv_course_header_content"
+                app:layout_constraintEnd_toEndOf="parent"
+                tools:text="综合实验楼"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/main_tv_course_header_content"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:ellipsize="marquee"
+                android:singleLine="true"
+                app:layout_constraintTop_toTopOf="@id/main_tv_course_header_hint"
+                app:layout_constraintBottom_toBottomOf="@+id/main_tv_course_header_hint"
+                app:layout_constraintEnd_toEndOf="parent"
+                tools:text="显示事务的内容"
+                tools:visibility="invisible" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!--module_course 模块中的课表 Fragment-->
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/main_fcv_course"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

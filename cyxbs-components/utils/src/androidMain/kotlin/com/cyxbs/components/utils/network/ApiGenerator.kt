@@ -6,6 +6,7 @@ import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson

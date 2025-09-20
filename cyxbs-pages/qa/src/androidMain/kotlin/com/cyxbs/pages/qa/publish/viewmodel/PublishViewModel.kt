@@ -3,11 +3,10 @@ package com.cyxbs.pages.qa.publish.viewmodel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.base.utils.safeSubscribeBy
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrInterceptException
 import com.cyxbs.components.utils.network.throwOrInterceptException
-import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.qa.LikeManager
 import com.cyxbs.pages.qa.publish.network.PublishApiService
 import com.cyxbs.pages.qa.publish.network.bean.request.PublishQuestionRequest

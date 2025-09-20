@@ -5,6 +5,7 @@ import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.bean.LinkStuBean
@@ -100,7 +101,9 @@ object LinkLessonRepository {
         defaultJson.decodeFromString<LinkStuBean>(cache)
       }.onFailure {
         settings.remove(SETTING_KEY_LINK_STU)
-      }.getOrNull()
+      }.getOrNull().also {
+        logg("link = $it")
+      }
     }
   }
 
@@ -115,6 +118,8 @@ object LinkLessonRepository {
         SETTING_KEY_LINK_STU,
         defaultJson.encodeToString(it)
       )
+    }.onFailure {
+      logg(it.stackTraceToString())
     }
   }
 }

@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
  */
 
 /**
- * 主页的路由参数
+ * 主页的路由参数，对应的界面在 [HomeDestination]
  */
 @Serializable
 object HomeArgument

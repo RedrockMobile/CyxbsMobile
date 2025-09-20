@@ -36,13 +36,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
+import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
 import com.cyxbs.pages.home.ui.PlatformHomePage
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -81,10 +86,23 @@ internal expect fun PlatformMobileHomePage(
 @Composable
 internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)
 
+// 旧版课表
+interface IOldHomeCourse {
+  val enable: Boolean
+  val content: @Composable (modifier: Modifier) -> Unit
+}
+
 @Composable
 private fun HomeCourseCompose(modifier: Modifier = Modifier) {
+  val oldHomeCourse = IOldHomeCourse::class.impl()
+  if (oldHomeCourse.enable) {
+    // 使用旧版课表进行展示
+    oldHomeCourse.content.invoke(modifier)
+    return
+  }
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(CourseFrameViewModel::class)
+  val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
@@ -108,6 +126,42 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
         bottomSheetState.collapse()
       }
     }
+  }
+  LaunchedEffect(Unit) {
+    courseBottomSheetViewModel.state.collectLatest {
+      when (it) {
+        true -> courseFrameViewModel.frame.bottomSheetState.expand()
+        false -> courseFrameViewModel.frame.bottomSheetState.collapse()
+        null -> courseFrameViewModel.frame.bottomSheetState.hide()
+      }
+    }
+  }
+  LaunchedEffect(Unit) {
+    courseFrameViewModel.frame.bottomSheetState.stateFlow.collect {
+      when (it) {
+        BottomSheetValueState.Hide -> {
+          if (courseBottomSheetViewModel.state.value != null) {
+            courseBottomSheetViewModel.state.value = null
+          }
+        }
+        BottomSheetValueState.Collapsed -> {
+          if (courseBottomSheetViewModel.state.value != false) {
+            courseBottomSheetViewModel.state.value = false
+          }
+        }
+        BottomSheetValueState.Expanded -> {
+          if (courseBottomSheetViewModel.state.value != true) {
+            courseBottomSheetViewModel.state.value = true
+          }
+        }
+        BottomSheetValueState.Scrolling -> {}
+      }
+    }
+  }
+  LaunchedEffect(Unit) {
+    courseFrameViewModel.frame.bottomSheetState.stateFlow
+      .first { it == BottomSheetValueState.Expanded }
+    toastLong("注意：新版课表在开发中，很多功能还不完善，可以在设置中回退旧版课表")
   }
 }
 

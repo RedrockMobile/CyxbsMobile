@@ -31,6 +31,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -173,8 +174,11 @@ object TokenServiceImpl : ITokenService {
 
   @Serializable
   class RequestTokenFailureBean(
+    @SerialName("status")
     val status: Int = 0,
+    @SerialName("errcode")
     val errcode: Int = 0,
+    @SerialName("errmessage")
     val errmessage: String = "",
   )
 

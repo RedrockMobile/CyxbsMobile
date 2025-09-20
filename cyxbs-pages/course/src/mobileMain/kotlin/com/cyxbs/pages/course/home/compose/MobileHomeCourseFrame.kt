@@ -82,7 +82,7 @@ class MobileHomeCourseFrame : IMobileHomeCourseFrame {
   // 课表数据
   val providerGroup: CourseDataProviderGroup = CourseDataProviderGroup(
     HomeSelfLessonDataProvider,
-    HomeAffairDataProvider,
+//    HomeAffairDataProvider, // todo 课表事务还未完成
     HomeLinkLessonDataProvider,
   )
 

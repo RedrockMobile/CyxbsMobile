@@ -4,6 +4,7 @@ plugins {
 }
 
 useKtProvider()
+useNetwork()
 
 kotlin {
     sourceSets {
@@ -16,7 +17,6 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.bundles.projectBase)
             implementation(libs.bundles.views)
-            implementation(libs.bundles.network)
             implementation(libs.dialog)
             implementation(libs.androidx.paging)
         }
