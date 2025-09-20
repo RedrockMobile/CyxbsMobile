@@ -1,6 +1,6 @@
 package com.cyxbs.pages.noclass.bean
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 
 /**
@@ -11,32 +11,35 @@ import java.io.Serializable
  * @Description:
  *
  */
+@kotlinx.serialization.Serializable
 data class NoClassBatchResponseInfo(
-    @SerializedName("isWrong")
+    @SerialName("isWrong")
     val isWrong : Boolean,
-    @SerializedName("errList")
+    @SerialName("errList")
     val errList: List<String>,
-    @SerializedName("normal")
-    val normal: List<Normal>?,
-    @SerializedName("repeat")
-    val repeat: List<Student>?
+    @SerialName("normal")
+    val normal: List<Normal>? = null,
+    @SerialName("repeat")
+    val repeat: List<Student>? = null
 ): Serializable {
+    @kotlinx.serialization.Serializable
     data class Normal(
-        @SerializedName("stu_num")
+        @SerialName("stu_num")
         val id: String,
-        @SerializedName("real_name")
+        @SerialName("real_name")
         val name:String
     )
+    @kotlinx.serialization.Serializable
     data class Student(
-        @SerializedName("stunum")
+        @SerialName("stunum")
         val id: String,             // 学号
-        @SerializedName("name")
+        @SerialName("name")
         val name:String,            // 姓名
-        @SerializedName("major")
+        @SerialName("major")
         val major: String,          // 专业名称
-        @SerializedName("depart")
+        @SerialName("depart")
         val depart: String,         // 学院名称
-        @SerializedName("classnum")
+        @SerialName("classnum")
         val classNum: String,       // 班级号
         var isSelected: Boolean = false
     )

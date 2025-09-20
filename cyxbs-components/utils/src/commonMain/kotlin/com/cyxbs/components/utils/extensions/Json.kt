@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalSerializationApi::class)
 val defaultJson = Json {
+  explicitNulls = true // 显示编码 null 值，否则编码与解码将发生歧义，详细看注释
   encodeDefaults = false // 不需要编码默认值
   ignoreUnknownKeys = true // 忽略未知键
   isLenient = true // 宽松模式，允许键和字符串值不带引号

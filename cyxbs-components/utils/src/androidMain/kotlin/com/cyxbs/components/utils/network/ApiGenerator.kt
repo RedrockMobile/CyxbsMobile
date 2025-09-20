@@ -9,21 +9,29 @@ import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.extensions.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
+import com.cyxbs.components.utils.extensions.defaultJson
 import com.cyxbs.components.utils.service.allImpl
 import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Converter
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.lang.reflect.Type
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -221,8 +229,51 @@ object ApiGenerator {
                 })
             }
         }))
+            .addConverterFactory(KotlinXSerializationFactory()) // 需要放在 gson 之前
             .addConverterFactory(GsonConverterFactory.create())
             .addCallAdapterFactory(RxJava3CallAdapterFactory.createSynchronous())
+    }
+
+    private class KotlinXSerializationFactory : Converter.Factory() {
+
+        private val factory = defaultJson.asConverterFactory("application/json; charset=UTF8".toMediaType())
+
+        override fun responseBodyConverter(
+            type: Type,
+            annotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<ResponseBody?, *>? {
+            return try {
+                factory.responseBodyConverter(type, annotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
+
+        override fun requestBodyConverter(
+            type: Type,
+            parameterAnnotations: Array<out Annotation?>,
+            methodAnnotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<*, RequestBody?>? {
+            return try {
+                factory.requestBodyConverter(type, parameterAnnotations, methodAnnotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
+
+        override fun stringConverter(
+            type: Type,
+            annotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<*, String?>? {
+            return try {
+                factory.stringConverter(type, annotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
     }
 
     //默认配置

@@ -1,6 +1,6 @@
 package com.cyxbs.pages.noclass.bean
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 
 /**
@@ -21,22 +21,38 @@ import java.io.Serializable
  * 2：textView的text是可以为null的，所以下面你的major也不必担心
  * 3: alternate是可替代的映射，也就是前面的找不到就会往后找名称相同的
  */
-
+@kotlinx.serialization.Serializable
 data class Student(
-  @SerializedName("classnum")
-    val classNum: String?,
-  @SerializedName("gender")
-    val gender: String?,
-  @SerializedName("grade")
-    val grade: String?,
-  @SerializedName("major")
-    val major: String?,
-  @SerializedName("name",alternate = ["stu_name"])
-  val name: String,
-  @SerializedName("stunum",alternate = ["stu_num"])
-  override val id: String,
-  @SerializedName("depart")
-  val depart : String?,   //depart是学院
+  @SerialName("classnum")
+  val classNum: String? = null,
+  @SerialName("gender")
+  val gender: String? = null,
+  @SerialName("grade")
+  val grade: String? = null,
+  @SerialName("major")
+  val major: String? = null,
+  @SerialName("depart")
+  val depart: String? = null,   //depart是学院
 
-  var isOpen : Boolean = false,   //是否展开，默认为false
-  ) : Serializable,NoClassItem
+  // 因为 R8 生成了无参构造函数抛出异常，导致 gson 解析失败，所以替换成 kt 的反序列化
+  // 但没有 alternate 属性，暂时命名两个来解决
+  // 以前学弟写的，为什么不分成两个数据类呢？
+  @SerialName("name")
+  val name1: String? = null,
+  @SerialName("stu_name")
+  val name2: String? = null,
+
+  @SerialName("stunum")
+  val stunum1: String? = null,
+  @SerialName("stu_num")
+  val stunum2: String? = null,
+
+  var isOpen: Boolean = false,   //是否展开，默认为false
+) : Serializable, NoClassItem {
+
+  val name: String
+    get() = name1 ?: name2!!
+
+  override val id: String
+    get() = stunum1 ?: stunum2!!
+}

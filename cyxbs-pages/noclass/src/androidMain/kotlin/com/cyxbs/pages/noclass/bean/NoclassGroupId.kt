@@ -1,6 +1,6 @@
 package com.cyxbs.pages.noclass.bean
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 
 /**
@@ -14,7 +14,8 @@ import java.io.Serializable
  * @Version:        1.0
  * @Description:
  */
+@kotlinx.serialization.Serializable
 data class NoclassGroupId(
-    @SerializedName("group_id")
+    @SerialName("group_id")
     val id : Int
 ) : Serializable
