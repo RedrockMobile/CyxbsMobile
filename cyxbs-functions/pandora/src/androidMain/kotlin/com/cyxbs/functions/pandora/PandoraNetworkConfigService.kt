@@ -1,4 +1,4 @@
-package com.cyxbs.functions.debug.pandora
+package com.cyxbs.functions.pandora
 
 import com.cyxbs.components.utils.network.INetworkConfigService
 import com.g985892345.provider.api.annotation.ImplProvider
