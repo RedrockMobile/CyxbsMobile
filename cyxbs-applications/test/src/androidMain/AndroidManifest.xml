@@ -7,7 +7,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/config_ic_launcher"
         android:label="@string/config_app_name"
-        android:networkSecurityConfig="@xml/config_network_security"
+        android:networkSecurityConfig="@xml/test_network_security"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/config_ic_launcher_round"
         android:supportsRtl="true"

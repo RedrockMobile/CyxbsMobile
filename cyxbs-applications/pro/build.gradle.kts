@@ -105,7 +105,7 @@ if (secretGradleFile.exists()) {
    * 这个是因为打包时存在多个 application 模块导致
    * 跟单模块有关，请在 ModuleDebugManagerPlugin#isAllowDebugModule 中添加你的 task name
    */
-  // channel 闭包，这是腾讯的多渠道打包，输出文件在 module_app 模块的 build 文件夹下
+  // channel 闭包，这是腾讯的多渠道打包，输出文件在 pro 模块的 build/chanel 文件夹下
   // ./gradlew channelRelease
   channel {
     //指定渠道文件

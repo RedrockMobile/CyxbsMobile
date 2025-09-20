@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!--Bugly https://github.com/BuglyDevTeam/Bugly-Android-Demo-->
+        <domain includeSubdomains="true">android.bugly.qq.com</domain>
+    </domain-config>
+
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <base-config cleartextTrafficPermitted="true" >
+        <trust-anchors>
+            <certificates src="user" /><!--方便 test 模块打出的 release 包可以抓包-->
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+</network-security-config>
