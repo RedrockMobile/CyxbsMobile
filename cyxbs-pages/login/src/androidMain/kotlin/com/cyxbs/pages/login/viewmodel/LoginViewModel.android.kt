@@ -58,6 +58,7 @@ actual class LoginViewModel actual constructor(argument: LoginArgument) :
   override fun enterTouristMode() {
     BaseApp.baseApp.tryPrivacyAgree()
     IAccountEditService::class.impl().onTouristMode()
+    super.enterTouristMode()
   }
 
   override fun clickDisagreeUserAgreement() {
