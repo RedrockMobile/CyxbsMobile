@@ -15,8 +15,8 @@ import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.config.route.UFIELD_DETAIL_ENTRY
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setImageFromUrl
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.store.api.IStoreService
 import com.cyxbs.pages.ufield.R
 import com.cyxbs.pages.ufield.bean.RemindMode

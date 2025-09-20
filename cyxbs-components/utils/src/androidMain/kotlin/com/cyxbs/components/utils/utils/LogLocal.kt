@@ -3,7 +3,7 @@ package com.cyxbs.components.utils.utils
 import android.os.Process
 import com.cyxbs.components.config.dir.DIR_LOG
 import com.cyxbs.components.config.dir.OKHTTP_LOCAL_LOG
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.schedulers.Schedulers

@@ -3,12 +3,14 @@ plugins {
   id("kmp.compose")
 }
 
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
     commonMain.dependencies {
       implementation(projects.cyxbsComponents.base)
+      implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
@@ -16,11 +18,11 @@ kotlin {
       implementation(projects.cyxbsPages.sport.api)
       implementation(projects.cyxbsPages.volunteer.api)
       implementation(projects.cyxbsPages.electricity.api)
+      implementation(projects.cyxbsPages.notification.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
       implementation(libs.glide)
       implementation(libs.eventBus)
       implementation(libs.slideShow)

@@ -9,7 +9,7 @@
 
     <include
         android:id="@+id/app_bar_layout"
-        layout="@layout/config_toolbar" />
+        layout="@layout/view_toolbar" />
 
     <ScrollView
         android:id="@+id/scrollView"

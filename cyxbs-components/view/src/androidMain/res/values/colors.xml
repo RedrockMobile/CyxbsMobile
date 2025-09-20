@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--base 中公用的 BaseDialog 的按钮颜色-->
+    <color name="view_choose_dialog_btn_positive">#4A44E4</color>
+    <color name="view_choose_dialog_btn_negative">#C3D4EE</color>
+
+    <!--    按钮渐变起始颜色-->
+    <color name="view_button_gradient_start_color">#4841E2</color>
+    <!--    按钮渐变终止颜色-->
+    <color name="view_button_gradient_end_color">#5D5DF7</color>
+
+</resources>

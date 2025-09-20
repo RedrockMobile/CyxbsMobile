@@ -6,6 +6,8 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.autoSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,8 +19,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.config.compose.appName
-import com.cyxbs.components.config.compose.dialog.ChooseDialogCompose
+import com.cyxbs.components.config.appName
+import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
 
@@ -32,7 +34,9 @@ import com.cyxbs.pages.login.viewmodel.LoginViewModel
 @Composable
 fun UserAgreementDialog() {
   val viewModel = viewModel(LoginViewModel::class)
-  val showState = remember { mutableStateOf(true) }
+  val showState = rememberSaveable(stateSaver = autoSaver()) {
+    mutableStateOf(true)
+  }
   ChooseDialogCompose(
     showState = showState,
     positiveBtnText = "同意并继续",

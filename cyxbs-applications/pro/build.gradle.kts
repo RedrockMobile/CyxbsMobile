@@ -23,6 +23,7 @@ kotlin {
             && it != project
             && it.name != "debug" // lib_debug 单独依赖
             && !it.path.contains("cyxbs-applications")
+            && !it.path.contains("cyxbs-compiler")
             && !it.name.startsWith("cyxbs-")
       }.forEach {
         api(it)

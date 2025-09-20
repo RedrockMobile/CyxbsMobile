@@ -7,10 +7,8 @@ import android.os.Build
 import android.view.View
 import android.view.WindowManager
 import androidx.fragment.app.Fragment
-import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.toastLong
-import com.cyxbs.components.utils.service.impl
 import com.mredrock.cyxbs.common.utils.Internals
 
 /**

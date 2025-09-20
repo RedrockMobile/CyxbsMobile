@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.page.find.room
 import androidx.room.*
 import com.cyxbs.pages.course.page.find.bean.FindStuBean
 import com.cyxbs.pages.course.page.find.bean.FindTeaBean
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import io.reactivex.rxjava3.core.Observable
 import kotlinx.coroutines.flow.Flow
 
@@ -21,7 +21,7 @@ abstract class HistoryDataBase : RoomDatabase() {
   companion object {
     val INSTANCE by lazy {
       Room.databaseBuilder(
-        appContext,
+        com.cyxbs.components.init.appContext,
         HistoryDataBase::class.java,
         "course_find_course_history_db"
       ).fallbackToDestructiveMigration().build()

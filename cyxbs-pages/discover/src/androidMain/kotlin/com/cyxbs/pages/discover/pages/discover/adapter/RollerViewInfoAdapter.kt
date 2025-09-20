@@ -6,11 +6,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.utils.extensions.dp2pxF
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.network.RollerViewInfo
 import com.cyxbs.pages.discover.pages.RollerViewActivity

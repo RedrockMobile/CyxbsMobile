@@ -23,7 +23,7 @@ import com.afollestad.materialdialogs.list.listItemsSingleChoice
 import com.cyxbs.components.base.pages.PhotoViewerActivity
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.showFile
 import com.cyxbs.components.utils.extensions.toast
@@ -52,7 +52,7 @@ class NewsItemActivity : BaseActivity(), NewsItemViewModel.NewsDownloadListener 
     private val tv_time by R.id.tv_time.view<TextView>()
     private val tv_detail by R.id.tv_detail.view<TextView>()
     private val ll_content by R.id.ll_content.view<LinearLayout>()
-    private val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    private val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     private val permissionDialog by lazy {
         AlertDialog.Builder(this)

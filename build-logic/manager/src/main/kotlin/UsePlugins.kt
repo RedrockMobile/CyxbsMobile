@@ -65,17 +65,29 @@ fun Project.useRoom(
 }
 
 /**
- * 使用 Ktorfit
+ * 使用网络请求
  */
-fun Project.useKtorfit() {
+fun Project.useNetwork() {
   // ksp 按需引入
   apply(plugin = "com.google.devtools.ksp")
   apply(plugin = libsEx.plugins.ktorfit)
   extensions.configure<KotlinMultiplatformExtension> {
     sourceSets.commonMain.dependencies {
+      implementation(libsEx.`ktor-core`)
       implementation(libsEx.`kmp-ktorfit`)
     }
+    sourceSets.androidMain.dependencies {
+      implementation(libsEx.retrofit)
+      implementation(libsEx.okhttp)
+      implementation(libsEx.gson)
+      implementation(libsEx.rxjava)
+      implementation(libsEx.`rxjava-android`)
+      implementation(libsEx.`rxjava-kotlin`)
+    }
   }
+  // Ktorfit 每次使用都要先触发 KSP task 才会生成实现类
+  // 这里编译期关联上 KtProvider，以后只需要 XXXApi::class.impl() 就可以直接获取到实现类了
+  kspMultiplatform(project(":cyxbs-compiler:ksp-network"))
 }
 
 private fun Project.kspMultiplatform(dependencyNotation: Any) {

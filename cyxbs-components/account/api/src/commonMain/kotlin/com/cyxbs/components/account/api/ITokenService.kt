@@ -27,14 +27,12 @@ interface ITokenService {
   fun isRefreshTokenExpired(): Boolean
 
   /**
-   * 主动触发 token 过期，兜底方案
-   * 为防止多个请求触发了过期，内部将只允许触发一次 token 过期
+   * 主动触发 token 过期，1 分钟内只能触发一次
    */
   fun tryTokenExpired()
 
   /**
-   * 主动触发 refreshToken 过期，跳转到登录页
-   * 为防止多个请求触发了过期，内部将只允许触发一次 refreshToken 过期
+   * 主动触发 refreshToken 过期，跳转到登录页，30 分钟内只能触发一次
    */
   fun tryRefreshTokenExpired()
 }

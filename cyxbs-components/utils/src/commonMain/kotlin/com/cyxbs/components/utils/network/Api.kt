@@ -1,6 +1,6 @@
 package com.cyxbs.components.utils.network
 
-import com.cyxbs.components.utils.isDebug
+import com.cyxbs.components.config.isDebug
 
 /**
  * ...

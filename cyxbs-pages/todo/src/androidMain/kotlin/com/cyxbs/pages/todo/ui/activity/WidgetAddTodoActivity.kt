@@ -6,7 +6,7 @@ import android.view.KeyEvent
 import androidx.activity.viewModels
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.TODO_ADD_TODO_BY_WIDGET
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.todo.R
 import com.cyxbs.pages.todo.model.bean.TodoListPushWrapper
@@ -23,7 +23,7 @@ class WidgetAddTodoActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.todo_activity_add_widget)
         dialog = AddTodoDialog(this, R.style.BottomSheetDialogThemeNight) {
-            val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+            val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
             val firstPush = if (syncTime == 0L) 1 else 0
             mViewModel.apply {
                 pushTodo(

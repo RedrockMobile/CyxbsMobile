@@ -9,13 +9,9 @@ import com.cyxbs.pages.mine.network.model.ConfirmQuestion
 import com.cyxbs.pages.mine.network.model.Email
 import com.cyxbs.pages.mine.network.model.EmailCode
 import com.cyxbs.pages.mine.network.model.IdsGetCode
-import com.cyxbs.pages.mine.network.model.ItineraryMsgBean
 import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.network.model.SecurityQuestion
-import com.cyxbs.pages.mine.network.model.UfieldMsgBean
 import com.cyxbs.pages.mine.network.model.UploadImgResponse
-import com.cyxbs.pages.mine.network.model.UserCount
-import com.cyxbs.pages.mine.network.model.UserUncheckCount
 import com.mredrock.cyxbs.common.bean.RedrockApiStatus
 import com.mredrock.cyxbs.common.bean.RedrockApiWrapper
 import io.reactivex.rxjava3.core.Observable
@@ -30,7 +26,6 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
-import retrofit2.http.Query
 
 /**
  * Created by zia on 2018/8/15.
@@ -235,35 +230,5 @@ interface ApiService:IApi {
     @FormUrlEncoded
     @POST("/user-secret/user/judge/origin")
     fun checkDefaultPassword(@Field("stu_num") stu_num: String): Observable<RedrockApiStatus>
-
-    /**
-     * 获取用户的动态、评论、获赞数
-     */
-    @GET("/magipoke-loop/user/getUserCount")
-    fun getUserCount(): Observable<RedrockApiWrapper<UserCount>>
-
-    // 获取用户未读消息数-点赞
-    @GET("/magipoke-loop/user/uncheckedCount/praise")
-    fun getUncheckedPraiseCount(
-        @Query("time") timeStamp: Long
-    ): Observable<RedrockApiWrapper<UserUncheckCount>>
-
-    // 获取用户未读消息数-评论
-    @GET("/magipoke-loop/user/uncheckedCount/comment")
-    fun getUncheckedCommentCount(
-        @Query("time") timeStamp: Long
-    ): Observable<RedrockApiWrapper<UserUncheckCount>>
-
-    @GET("/magipoke-ufield/message/list/")
-    suspend fun getUFieldActivityList(): ApiWrapper<List<UfieldMsgBean>>
-
-    // 获取发送的行程的数量
-    @GET("/magipoke-jwzx/itinerary/allMsg")
-    suspend fun getSentItinerary(@Query("typ") type: String = "sent"): ApiWrapper<List<ItineraryMsgBean>?>
-
-    // 获取接收的行程的数量
-    @GET("/magipoke-jwzx/itinerary/allMsg")
-    suspend fun getReceivedItinerary(@Query("typ") type: String = "received"): ApiWrapper<List<ItineraryMsgBean>?>
-
 }
 

@@ -9,6 +9,8 @@ package com.cyxbs.components.utils.extensions
 
 expect fun log(msg: String)
 
+expect fun log(tag: String, msg: String)
+
 fun logg(msg: Any?) {
   log(msg.toString())
 }

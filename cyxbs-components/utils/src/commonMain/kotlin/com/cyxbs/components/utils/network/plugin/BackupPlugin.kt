@@ -1,6 +1,6 @@
 package com.cyxbs.components.utils.network.plugin
 
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.network.BASE_NORMAL_BACKUP_GET
 import com.cyxbs.components.utils.network.END_POINT_REDROCK_DEV
 import com.cyxbs.components.utils.network.HttpClientNoToken

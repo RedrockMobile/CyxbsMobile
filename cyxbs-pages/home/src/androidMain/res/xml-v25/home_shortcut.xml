@@ -9,10 +9,8 @@
         android:shortcutShortLabel="@string/home_course_short_name">
 
         <intent
-            android:action="com.mredrock.cyxbs.action.COURSE"
-            android:targetClass="com.cyxbs.pages.home.ui.main.MainActivity"
-            android:targetPackage="com.mredrock.cyxbs" />
-        <categories android:name="android.shortcut.conversation" />
+            android:action="com.mredrock.cyxbs.action.COURSE" />
+        <categories android:name="android.intent.category.DEFAULT" />
     </shortcut>
 
     <shortcut
@@ -23,10 +21,8 @@
         android:shortcutLongLabel="@string/home_grade_long_name"
         android:shortcutShortLabel="@string/home_grade_short_name">
         <intent
-            android:action="android.intent.action.EXAM"
-            android:targetClass="com.cyxbs.pages.home.ui.main.MainActivity"
-            android:targetPackage="com.mredrock.cyxbs" />
-        <categories android:name="android.shortcut.conversation" />
+            android:action="com.mredrock.cyxbs.action.EXAM" />
+        <categories android:name="android.intent.category.DEFAULT" />
     </shortcut>
 
     <shortcut
@@ -38,10 +34,8 @@
         android:shortcutShortLabel="@string/home_school_car_short_name">
 
         <intent
-            android:action="android.intent.action.SCHOOLCAR"
-            android:targetClass="com.cyxbs.pages.home.ui.main.MainActivity"
-            android:targetPackage="com.mredrock.cyxbs" />
-        <categories android:name="android.shortcut.conversation" />
+            android:action="com.mredrock.cyxbs.action.SCHOOLCAR" />
+        <categories android:name="android.intent.category.DEFAULT" />
     </shortcut>
 
     <shortcut
@@ -53,10 +47,8 @@
         android:shortcutShortLabel="@string/home_empty_room_short_name">
 
         <intent
-            android:action="android.intent.action.EMPTYROOM"
-            android:targetClass="com.cyxbs.pages.home.ui.main.MainActivity"
-            android:targetPackage="com.mredrock.cyxbs" />
-        <categories android:name="android.shortcut.conversation" />
+            android:action="com.mredrock.cyxbs.action.EMPTYROOM" />
+        <categories android:name="android.intent.category.DEFAULT" />
     </shortcut>
 
 </shortcuts>

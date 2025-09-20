@@ -11,3 +11,7 @@ import platform.Foundation.NSLog
 actual fun log(msg: String) {
   NSLog(msg)
 }
+
+actual fun log(tag: String, msg: String) {
+  NSLog("【$tag】$msg")
+}

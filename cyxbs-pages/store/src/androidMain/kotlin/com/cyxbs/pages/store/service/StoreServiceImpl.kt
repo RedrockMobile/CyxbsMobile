@@ -2,7 +2,7 @@ package com.cyxbs.pages.store.service
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
@@ -81,10 +81,10 @@ object StoreServiceImpl : IStoreService {
     set(value) {
       dateSp.edit { putString("last_save_date", value) }
     }
-  private val dateSp = appContext.getSp("StoreServiceImpl_date")
-  private val baseSp = appContext.getSp("StoreServiceImpl_base")
-  private val moreSp = appContext.getSp("StoreServiceImpl_more")
-  private val onlyTagSp = appContext.getSp("StoreServiceImpl_onlyTag")
+  private val dateSp = com.cyxbs.components.init.appContext.getSp("StoreServiceImpl_date")
+  private val baseSp = com.cyxbs.components.init.appContext.getSp("StoreServiceImpl_base")
+  private val moreSp = com.cyxbs.components.init.appContext.getSp("StoreServiceImpl_more")
+  private val onlyTagSp = com.cyxbs.components.init.appContext.getSp("StoreServiceImpl_onlyTag")
 
   init {
     // Base 任务是每天刷新的, 不相等时就先清空所有本地保存的 sharedPreferences

@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.affair.R
 import com.cyxbs.pages.affair.ui.adapter.data.AffairWeekData.Companion.WEEK_ARRAY
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 
 /**
@@ -64,9 +64,9 @@ class AffairWeekAdapter : ListAdapter<AffairWeekAdapter.AffairWeekSelectData, Af
   override fun onBindViewHolder(holder: VHolder, position: Int) {
     holder.textView.text = WEEK_ARRAY[getItem(position).week]
     if (getItem(position).isChoice) {
-      holder.textView.setTextColor(appContext.getColor(R.color.affair_edit_affair_select_week_tv))
+      holder.textView.setTextColor(com.cyxbs.components.init.appContext.getColor(R.color.affair_edit_affair_select_week_tv))
     } else {
-      holder.textView.setTextColor(appContext.getColor(com.cyxbs.components.config.R.color.config_level_two_font_color))
+      holder.textView.setTextColor(com.cyxbs.components.init.appContext.getColor(com.cyxbs.components.config.R.color.config_level_two_font_color))
     }
   }
   

@@ -1,5 +1,6 @@
 package com.cyxbs.components.config.sp
 
+import com.russhwolf.settings.NSUserDefaultsSettings
 import com.russhwolf.settings.Settings
 
 /**
@@ -9,5 +10,4 @@ import com.russhwolf.settings.Settings
  * @author 985892345
  * @date 2025/1/11
  */
-actual val defaultSettings: Settings
-  get() = TODO("Not yet implemented")
+actual val defaultSettings: Settings = NSUserDefaultsSettings.Factory().create("defaultSettings")

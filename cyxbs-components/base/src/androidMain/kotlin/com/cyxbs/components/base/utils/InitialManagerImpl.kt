@@ -7,7 +7,7 @@ import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appCurrentProcessName
-import com.cyxbs.components.utils.service.allImpl
+import com.cyxbs.components.config.service.allImpl
 
 /**
  * BaseApp 不能直接实现于 InitialManager，不然会导致其他模块缺失 app_init 依赖

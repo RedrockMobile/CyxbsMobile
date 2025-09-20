@@ -13,7 +13,7 @@ import com.cyxbs.pages.affair.ui.fragment.AddAffairFragment
 import com.cyxbs.pages.affair.ui.fragment.EditAffairFragment
 import com.cyxbs.pages.affair.ui.viewmodel.activity.AffairViewModel
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import java.io.Serializable
 import kotlin.math.PI
@@ -28,8 +28,8 @@ class AffairActivity : BaseActivity() {
       beginLesson: Int,
       period: Int
     ) {
-      appContext.startActivity(
-        Intent(appContext, AffairActivity::class.java)
+      com.cyxbs.components.init.appContext.startActivity(
+        Intent(com.cyxbs.components.init.appContext, AffairActivity::class.java)
           .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
           .putExtra(
             AffairActivity::mArguments.name,
@@ -39,8 +39,8 @@ class AffairActivity : BaseActivity() {
     }
     
     fun startForEdit(onlyId: Int) {
-      appContext.startActivity(
-        Intent(appContext, AffairActivity::class.java)
+      com.cyxbs.components.init.appContext.startActivity(
+        Intent(com.cyxbs.components.init.appContext, AffairActivity::class.java)
           .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
           .putExtra(AffairActivity::mArguments.name, EditAffairArgument(onlyId))
       )

@@ -1,9 +1,8 @@
 package com.cyxbs.pages.declare.post.net
 
-import com.google.gson.Gson
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.declare.post.bean.PostReqBean
 import com.cyxbs.components.utils.network.ApiStatus
-import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.IApi
 import com.cyxbs.components.utils.network.api
 import io.reactivex.rxjava3.core.Single
@@ -31,7 +30,7 @@ interface PostApiService : IApi {
 
     companion object : PostApiService by PostApiService::class.api {
 
-        private val gson = Gson()
+        private val gson = defaultGson
         private val json = "application/json".toMediaType()
 
         fun postVote(title: String, choices: List<String>): Single<ApiStatus> {

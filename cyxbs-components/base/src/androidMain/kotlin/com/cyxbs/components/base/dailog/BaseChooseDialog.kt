@@ -13,7 +13,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StyleRes
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
-import com.cyxbs.components.config.R
+import com.cyxbs.components.view.R
 import com.cyxbs.components.utils.extensions.dp2px
 
 /**
@@ -85,7 +85,7 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
     super.onCreate(savedInstanceState)
 
     val view = LayoutInflater.from(context).inflate(data.type.layoutId, null)
-    val parent = view.findViewById<FrameLayout>(R.id.config_fl_choose_dialog_btn_content)
+    val parent = view.findViewById<FrameLayout>(R.id.view_fl_choose_dialog_btn_content)
     val insertView = createContentView(parent)
     parent.addView(insertView)
     setContentView(
@@ -95,7 +95,7 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
         data.height.let { if (it > 0) it.dp2px else it }
       )
     )
-    val bottomParent = view.findViewById<FrameLayout>(R.id.config_fl_choose_dialog_bottom)
+    val bottomParent = view.findViewById<FrameLayout>(R.id.view_fl_choose_dialog_bottom)
     val bottomChild = createBottomView(bottomParent)
     if (bottomChild != null) {
       bottomParent.addView(bottomChild)
@@ -109,9 +109,9 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
     // 根据不同类型进行不同的设置
     when (data.type) {
       DialogType.ONE_BUT -> {
-        val ivBg: ImageView = view.findViewById(R.id.config_iv_choose_dialog_one_btn_background)
+        val ivBg: ImageView = view.findViewById(R.id.view_iv_choose_dialog_one_btn_background)
         val btnPositive: MaterialButton =
-          view.findViewById(R.id.config_btn_choose_dialog_one_btn_positive)
+          view.findViewById(R.id.view_btn_choose_dialog_one_btn_positive)
         ivBg.setImageResource(data.backgroundId)
         btnPositive.text = data.positiveButtonText
         btnPositive.layoutParams.apply {
@@ -126,11 +126,11 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
         }
       }
       DialogType.TWO_BUT -> {
-        val ivBg: ImageView = view.findViewById(R.id.config_iv_choose_dialog_two_btn_background)
+        val ivBg: ImageView = view.findViewById(R.id.view_iv_choose_dialog_two_btn_background)
         val btnPositive: MaterialButton =
-          view.findViewById(R.id.config_btn_choose_dialog_two_btn_positive)
+          view.findViewById(R.id.view_btn_choose_dialog_two_btn_positive)
         val btnNegative: MaterialButton =
-          view.findViewById(R.id.config_btn_choose_dialog_two_btn_negative)
+          view.findViewById(R.id.view_btn_choose_dialog_two_btn_negative)
         ivBg.setImageResource(data.backgroundId)
         btnPositive.text = data.positiveButtonText
         btnNegative.text = data.negativeButtonText
@@ -269,13 +269,13 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
      * 确定按钮颜色
      */
     val positiveButtonColor: Int
-      get() = R.color.config_choose_dialog_btn_positive
+      get() = R.color.view_choose_dialog_btn_positive
 
     /**
      * 取消按钮颜色
      */
     val negativeButtonColor: Int
-      get() = R.color.config_choose_dialog_btn_negative
+      get() = R.color.view_choose_dialog_btn_negative
 
     /**
      * button 的按钮宽
@@ -318,16 +318,16 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
      */
     @get:DrawableRes
     val backgroundId: Int
-      get() = R.drawable.config_shape_round_corner_dialog
+      get() = R.drawable.view_shape_round_corner_dialog
 
     companion object : Data
   }
 
   enum class DialogType(val layoutId: Int) {
     // 只有一个 Button
-    ONE_BUT(R.layout.config_choose_dialog_one_btn),
+    ONE_BUT(R.layout.view_choose_dialog_one_btn),
 
     // 有两个 Button
-    TWO_BUT(R.layout.config_choose_dialog_two_btn)
+    TWO_BUT(R.layout.view_choose_dialog_two_btn)
   }
 }

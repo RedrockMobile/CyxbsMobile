@@ -3,14 +3,14 @@ package com.cyxbs.pages.course.page.course.model
 import androidx.annotation.WorkerThread
 import androidx.core.content.edit
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.defaultSp
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.interceptException
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.api
-import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.course.page.course.bean.StuLessonBean
@@ -66,8 +66,9 @@ object StuLessonRepository {
   fun observeSelfLesson(
     isToast: Boolean = false,
   ): Observable<List<StuLessonEntity>> {
-    return IAccountService::class.impl().userInfo
-      .map { it?.stuNum.orEmpty() }
+    return IAccountService::class.impl()
+      .stuNumFlow
+      .map { it.orEmpty() }
       .asObservable()
       .observeOn(Schedulers.io())
       .switchMap { stuNum ->

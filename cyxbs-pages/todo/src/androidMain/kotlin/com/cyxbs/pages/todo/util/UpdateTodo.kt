@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.todo.adapter.SwipeDeleteRecyclerView
 import com.cyxbs.pages.todo.adapter.TodoAllAdapter
@@ -130,12 +130,12 @@ object TodoHelper {
         nextRemindTime?.let {
             if (todoItem.remindMode.notifyDateTime == "") {
                 todoItem.remindMode.notifyDateTime = formatDateTime(it)
-                val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                 viewModel.pushTodo(TodoListPushWrapper(listOf(todoItem), syncTime, 1, 0))
                 todoAllAdapter.notifyDataSetChanged()
             } else {
                 todoItem.remindMode.notifyDateTime = formatDateTime(it)
-                val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                 viewModel.pushTodo(TodoListPushWrapper(listOf(todoItem), syncTime, 1, 0))
                 val currentList = todoAllAdapter.currentList.toMutableList()
                 currentList.remove(todoItem)

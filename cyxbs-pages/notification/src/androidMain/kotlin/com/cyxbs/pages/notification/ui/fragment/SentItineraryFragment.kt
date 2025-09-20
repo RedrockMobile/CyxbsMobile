@@ -3,20 +3,18 @@ package com.cyxbs.pages.notification.ui.fragment
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AnimationUtils
-import android.widget.TextView
-import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.fragment.app.createViewModelLazy
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.adapter.SentItineraryNotificationRvAdapter
 import com.cyxbs.pages.notification.bean.SentItineraryMsgBean
 import com.cyxbs.pages.notification.ui.activity.NotificationActivity
 import com.cyxbs.pages.notification.ui.dialog.RevokeReminderDialog
 import com.cyxbs.pages.notification.viewmodel.ItineraryViewModel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlin.properties.Delegates
 
 /**
@@ -30,8 +28,6 @@ import kotlin.properties.Delegates
 class SentItineraryFragment : BaseFragment(R.layout.notification_fragment_itinerary_sent) {
 
     private val sentItineraryRv by R.id.notification_itinerary_rv_sent.view<RecyclerView>()
-    private val getItineraryFailureView by R.id.notification_ll_get_itinerary_fail.view<LinearLayoutCompat>()
-    private val autoClearHintView by R.id.notification_itinerary_auto_clear_hint.view<TextView>()
 
     // SentItineraryFragment页面的 rv数据
     private var data = listOf<SentItineraryMsgBean>()
@@ -51,12 +47,29 @@ class SentItineraryFragment : BaseFragment(R.layout.notification_fragment_itiner
         { requireParentFragment().viewModelStore }
     )
 
+    // 是否已经触发过 onResume()
+    private var hasResumed = false
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         parentFragment = getParentFragment() as ItineraryNotificationFragment
         myActivity = parentFragment.requireActivity() as NotificationActivity
         initObserver()
         initRv()
+    }
+
+    // ViewPager2 滑到当前页时才会触发 onResume()
+    override fun onResume() {
+        super.onResume()
+        if (!hasResumed) {
+            hasResumed = true
+            itineraryViewModel.changeItineraryReadStatus(
+                itineraryViewModel.sentItineraryList.value.mapNotNull {
+                    if (!it.hasRead) it.id else null
+                },
+                true
+            )
+        }
     }
 
 
@@ -72,27 +85,12 @@ class SentItineraryFragment : BaseFragment(R.layout.notification_fragment_itiner
     }
 
     private fun initObserver() {
-        itineraryViewModel.sentItineraryList.observe {
+        itineraryViewModel.sentItineraryList.onEach {
             data = it.reversed()
             adapter.submitList(data)
             //让数据更改有动画效果
             sentItineraryRv.scheduleLayoutAnimation()
-        }
-        itineraryViewModel.sentItineraryListIsSuccessfulState.observe {
-            if (it) {
-                sentItineraryRv.visible()
-                autoClearHintView.visible()
-                getItineraryFailureView.gone()
-            } else {
-                toast("获取最新发送的行程失败")
-                if (data.isEmpty()) {
-                    getItineraryFailureView.visible()
-                    sentItineraryRv.gone()
-                    autoClearHintView.gone()
-                }
-
-            }
-        }
+        }.launchIn(viewLifecycleScope)
 
         itineraryViewModel.cancelReminderIsSuccessfulEvent.collectLaunch {
             if (it.second) {  // 取消提醒成功

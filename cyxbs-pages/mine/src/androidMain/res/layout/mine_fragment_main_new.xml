@@ -119,7 +119,8 @@
                     android:visibility="gone"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    tools:text="83" />
+                    tools:text="99+"
+                    tools:visibility="visible"/>
 
                 <ImageView
                     android:id="@+id/mine_user_iv_center_stamp"

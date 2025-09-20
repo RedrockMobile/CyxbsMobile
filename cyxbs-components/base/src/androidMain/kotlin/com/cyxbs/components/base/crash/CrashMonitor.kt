@@ -6,6 +6,7 @@ import android.util.Log
 import com.cyxbs.components.base.BuildConfig
 import com.cyxbs.components.base.crash.CrashActivity.Companion.NetworkApiResult
 import com.cyxbs.components.base.pages.SecretActivity
+import com.cyxbs.components.utils.extensions.toastLong
 import com.g985892345.provider.api.annotation.ImplProvider
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
 import java.lang.Thread.UncaughtExceptionHandler
@@ -76,16 +77,7 @@ object CrashMonitor : UncaughtExceptionHandler {
       e.printStackTrace()
       if (SystemClock.elapsedRealtime() - lastThrowableTime < 1000) {
         // 短时间内再次崩溃，则直接打开 CrashActivity
-        CrashActivity.start(
-          throwable = originThrowable,
-          netWorkApiResults = if (SecretActivity.sSpPandoraIsOpen) {
-            // 如果当前用户值得信任，则可以传递 apiResultList
-            CrashNetworkConfigService.apiResultList.mapTo(ArrayList()) {
-              // 因为 CrashActivity 是在另一个进程中启动，所以只能以 String 的形式传过去
-              NetworkApiResult(it.request.toString(), it.response.toString(), it.throwable)
-            }
-          } else null
-        )
+        startCrashActivity(originThrowable)
       } else {
         CrashDialog.Builder(RuntimeException("触发了一次来自主线程的异常, ${e.message}", e)).show()
         lastThrowableTime = SystemClock.elapsedRealtime()
@@ -98,11 +90,25 @@ object CrashMonitor : UncaughtExceptionHandler {
     if (t === mainThread) {
       if (BuildConfig.DEBUG) {
         Log.d("crash", e.stackTraceToString())
+        toastLong("触发异常，日志筛选 tag:crash 查看")
       }
       handleMainThread(e)
       crashReport?.invoke(e)
     } else {
       handleOtherThread(e)
     }
+  }
+
+  private fun startCrashActivity(throwable: Throwable) {
+    CrashActivity.start(
+      throwable = throwable,
+      netWorkApiResults = if (SecretActivity.sSpPandoraIsOpen) {
+        // 如果当前用户值得信任，则可以传递 apiResultList
+        CrashNetworkConfigService.apiResultList.mapTo(ArrayList()) {
+          // 因为 CrashActivity 是在另一个进程中启动，所以只能以 String 的形式传过去
+          NetworkApiResult(it.request.toString(), it.response.toString(), it.throwable)
+        }
+      } else null
+    )
   }
 }

@@ -9,3 +9,7 @@ package com.cyxbs.components.utils.extensions
 actual fun log(msg: String) {
   println(".(${Exception().stackTrace[2].run { "$fileName:$lineNumber" }}) -> $msg")
 }
+
+actual fun log(tag: String, msg: String) {
+  println("【$tag】.(${Exception().stackTrace[2].run { "$fileName:$lineNumber" }}) -> $msg")
+}

@@ -1,11 +1,13 @@
 package com.cyxbs.components.utils.logger
 
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.logger.bean.TrackingResultBean
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.utils.logger.network.TrackingApiService
 import com.cyxbs.components.utils.utils.LogUtils
+import kotlinx.coroutines.launch
 
 /**
  * @author : why
@@ -26,8 +28,15 @@ object TrackingUtils {
    *
    * null -> 异常状态，说明返回的状态未知
    */
+  @Deprecated("使用 trackClickEvent2 替代，不在需要开启协程")
   suspend fun trackClickEvent(clickEvent: ClickEvent): Result<TrackingResultBean?> {
     return trackEvent(clickEvent.mapParams)
+  }
+
+  fun trackClickEvent2(clickEvent: ClickEvent) {
+    appCoroutineScope.launch {
+      trackEvent(clickEvent.mapParams)
+    }
   }
 
   /**
@@ -41,7 +50,7 @@ object TrackingUtils {
       TrackingApiService.INSTANCE.trackEvent(params)
         .data.status.let { status ->
           LogUtils.d(TAG, "(LoggerUtils.kt:46)-->> trackingEvent, status = $status")
-          TrackingResultBean.values().find { status == it.status }.also {
+          TrackingResultBean.entries.find { status == it.status }.also {
             if (it != TrackingResultBean.SUCCESS) {
               // 网络请求成功但参数异常
               toastLoggerWhenDebug(it)

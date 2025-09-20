@@ -15,6 +15,10 @@ val Int.px2dpCompose: Dp
   @Composable
   get() = LocalDensity.current.run { toDp() }
 
+val Float.px2dpCompose: Dp
+  @Composable
+  get() = LocalDensity.current.run { toDp() }
+
 val Dp.px: Float
   @Composable
   get() = LocalDensity.current.run { toPx() }

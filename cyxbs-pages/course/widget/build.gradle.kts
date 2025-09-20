@@ -2,6 +2,8 @@ plugins {
   id("manager.lib")
 }
 
+useNetwork()
+
 kotlin {
   sourceSets {
     commonMain.dependencies {
@@ -13,7 +15,6 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
 
       api(libs.netLayout)
     }

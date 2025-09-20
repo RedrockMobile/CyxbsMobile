@@ -27,17 +27,19 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.list.listItems
+import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.doPermissionAction
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.util.ui.DynamicRVAdapter
 import com.yalantis.ucrop.UCrop
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
@@ -61,7 +63,7 @@ class EditInfoActivity : BaseActivity() {
     private val mine_et_college by R.id.mine_et_college.view<TextView>()
     private val mine_edit_et_avatar by R.id.mine_edit_et_avatar.view<ImageView>()
     private val mine_edit_iv_agreement by R.id.mine_edit_iv_agreement.view<ImageView>()
-    val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
     private val viewModel by lazy { ViewModelProvider(this)[EditViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,7 +116,10 @@ class EditInfoActivity : BaseActivity() {
     }
 
     private fun observeUserInfo() {
-        IAccountService::class.impl().userInfo
+        IAccountService::class.impl()
+            .state
+            .mapNotNull { it as? AccountState.Login }
+            .flatMapLatest { it.userInfo }
             .mapNotNull { it }
             .onEach {
                 mine_edit_et_avatar.setAvatarImageFromUrl(it.photoSrc)

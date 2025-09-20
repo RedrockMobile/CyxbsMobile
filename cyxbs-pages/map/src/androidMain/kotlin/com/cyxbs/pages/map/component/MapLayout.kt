@@ -24,7 +24,7 @@ import com.cyxbs.pages.map.widget.MapDialogTips
 import com.cyxbs.pages.map.widget.OnSelectListenerTips
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.coroutine.runCatchingCoroutine
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.visible
 import kotlinx.coroutines.Dispatchers

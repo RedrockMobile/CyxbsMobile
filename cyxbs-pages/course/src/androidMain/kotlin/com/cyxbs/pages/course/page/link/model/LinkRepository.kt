@@ -1,12 +1,12 @@
 package com.cyxbs.pages.course.page.link.model
 
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.lazyUnlock
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.components.utils.network.api
 import com.cyxbs.components.utils.network.mapOrThrowApiException
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
-import com.cyxbs.components.utils.service.impl
 import com.cyxbs.pages.course.page.link.network.LinkApiServices
 import com.cyxbs.pages.course.page.link.room.LinkDataBase
 import com.cyxbs.pages.course.page.link.room.LinkStuEntity
@@ -39,8 +39,9 @@ object LinkRepository {
    * 只要开始订阅，就一定会发送数据下来，但是否有关联人请通过 [LinkStuEntity.isNull] 来判断
    */
   fun observeLinkStudent(): Observable<LinkStuEntity> {
-    return IAccountService::class.impl().userInfo
-      .map { it?.stuNum.orEmpty() }
+    return IAccountService::class.impl()
+      .stuNumFlow
+      .map { it.orEmpty() }
       .asObservable()
       .observeOn(Schedulers.io())
       .switchMap {

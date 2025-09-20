@@ -4,12 +4,14 @@ import android.os.Bundle
 import android.view.View
 import androidx.core.os.bundleOf
 import androidx.fragment.app.activityViewModels
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.course.widget.helper.show.CourseNowTimeHelper
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.pages.noclass.bean.NoClassSpareTime
 import com.cyxbs.pages.noclass.page.viewmodel.other.CourseViewModel
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import kotlinx.coroutines.flow.first
 import java.util.*
 
 /**
@@ -66,17 +68,13 @@ class NoClassWeekFragment : NoClassPageFragment(){
     if (nowWeek == null || nowWeek <= ICourseService.maxWeek + 1) {
       // 因为开学第一周的数据来自其他地方，存在此时没有被加载的情况，所以采用观察的形式
       // nowWeek 是可能返回负数的，这点需要额外注意一下
-      SchoolCalendar.observeFirstMonDayOfTerm()
-        .firstElement()
-        .observeOn(AndroidSchedulers.mainThread())
-        .safeSubscribeBy {
-          it.add(Calendar.DATE, (mWeek - 1) * 7)
-          val startTimestamp = it.timeInMillis
-          setMonth(it)
-          it.add(Calendar.DATE, 7)
-          val isInThisWeek = System.currentTimeMillis() in startTimestamp .. it.timeInMillis
-          onIsInThisWeek(isInThisWeek)
-        }
+      launch {
+        val firstDate = SchoolCalendar.observeFirstMonDay().first()
+        val date = firstDate.plusWeeks(mWeek - 1)
+        setMonth(date)
+        val isInThisWeek = Date.now() in date .. date.plusDays(6)
+        onIsInThisWeek(isInThisWeek)
+      }
     } else {
       // 这里说明 nowWeek 大于 ICourseService.maxWeek + 1
       // 此时处于放假期间，考虑到 jwzx 会在开学前更新课表，所以这里不显示日期

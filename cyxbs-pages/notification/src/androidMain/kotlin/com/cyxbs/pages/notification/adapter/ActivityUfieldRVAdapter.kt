@@ -12,18 +12,18 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.config.route.UFIELD_DETAIL_ENTRY
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.startActivity
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.bean.UfieldMsgBean
-import com.cyxbs.pages.notification.viewmodel.NotificationViewModel
+import com.cyxbs.pages.notification.viewmodel.UFieldMsgViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class ActivityUfieldRVAdapter(
     private val context: Fragment,
-    private var viewmodel: NotificationViewModel
+    private var viewmodel: UFieldMsgViewModel
 ) :
     ListAdapter<UfieldMsgBean, ActivityUfieldRVAdapter.ViewHolder>(
         object : DiffUtil.ItemCallback<UfieldMsgBean>() {

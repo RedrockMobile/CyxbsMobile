@@ -3,6 +3,6 @@
     <corners android:radius="100dp"/>
     <gradient
         android:gradientRadius="60"
-        android:endColor="@color/config_button_gradient_start_color"
-        android:startColor="@color/config_button_gradient_end_color" />
+        android:endColor="@color/view_button_gradient_start_color"
+        android:startColor="@color/view_button_gradient_end_color" />
 </shape>

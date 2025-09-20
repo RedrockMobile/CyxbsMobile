@@ -21,11 +21,11 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.webView.LiteJsWebView
 import com.cyxbs.components.config.route.DISCOVER_GRADES
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.grades.R
 import com.cyxbs.pages.grades.bean.Exam
 import com.cyxbs.pages.grades.bean.analyze.isSuccessful
@@ -143,7 +143,7 @@ class ContainerActivity : BaseActivity() {
     }
 
     private fun initHeader() {
-        val userInfo = IAccountService::class.impl().userInfo.value ?: return
+        val userInfo = IAccountService::class.impl().userInfo ?: return
         Glide.with(this).load(userInfo.photoSrc).into(mIvGradesAvatar)
         mTvGradesStuNum.text = userInfo.stuNum
         mTvGradesName.text = userInfo.username

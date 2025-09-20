@@ -6,7 +6,7 @@ import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.base.crash.CrashMonitor
 import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.tencent.bugly.crashreport.CrashReport
 import com.tencent.vasdolly.helper.ChannelReaderUtil

@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.network
 
 import com.cyxbs.components.utils.extensions.ExceptionResult
-import com.cyxbs.components.utils.extensions.defaultJson
+import com.cyxbs.components.config.serializable.defaultJson
 import io.ktor.client.plugins.ServerResponseException
 import kotlin.reflect.KClass
 

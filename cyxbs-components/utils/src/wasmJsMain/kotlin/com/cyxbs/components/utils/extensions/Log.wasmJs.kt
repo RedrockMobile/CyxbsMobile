@@ -9,3 +9,7 @@ package com.cyxbs.components.utils.extensions
 actual fun log(msg: String) {
   js("console.log(msg)")
 }
+
+actual fun log(tag: String, msg: String) {
+  log("【$tag】$msg")
+}

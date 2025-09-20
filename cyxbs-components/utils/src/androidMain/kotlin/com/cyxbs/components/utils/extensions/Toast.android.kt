@@ -1,7 +1,6 @@
 package com.cyxbs.components.utils.extensions
 
 import android.content.Context
-import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Gravity
@@ -10,6 +9,8 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
+import com.cyxbs.components.init.appContext
+import com.cyxbs.components.init.appHandler
 import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.R
 
@@ -55,7 +56,7 @@ private class CyxbsToast {
     ) {
       if (text == null) return
       if (Thread.currentThread() !== Looper.getMainLooper().thread) {
-        Handler(Looper.getMainLooper()).post { newInstance(context, text, duration).show() }
+        appHandler.post { newInstance(context, text, duration).show() }
       } else {
         newInstance(context, text, duration).show()
       }

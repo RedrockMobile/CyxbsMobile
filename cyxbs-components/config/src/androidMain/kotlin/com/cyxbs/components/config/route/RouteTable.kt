@@ -15,6 +15,9 @@ package com.cyxbs.components.config.route
  * 其余配置：缺省页拦截在 [ActivityInterceptor]
  */
 
+// MainActivity
+const val MAIN_ENTRY = "/main/entry"
+
 const val DISCOVER_ENTRY = "/discover/entry"
 const val MINE_ENTRY = "/mine/entry"
 
@@ -39,12 +42,6 @@ const val DISCOVER_NEWS_ITEM = "/news/discover/item"
 
 //签到页
 const val MINE_CHECK_IN = "/check_in/mine/entry"
-
-//通知页主页
-const val NOTIFICATION_HOME = "/notification/entry"
-
-//通知设置页
-const val NOTIFICATION_SETTING = "/notification/setting"
 
 // 个人界面的确认密码模块
 const val MINE_FORGET_PASSWORD = "/forget_password/mine/entry"

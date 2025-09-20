@@ -2,7 +2,7 @@ package com.cyxbs.pages.todo.util
 
 import androidx.core.content.ContextCompat
 import com.cyxbs.pages.todo.model.bean.RemindMode
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 
 val weekStringList = listOf(
     "一",
@@ -14,7 +14,7 @@ val weekStringList = listOf(
     "日"
 )
 
-fun getColor(id: Int): Int = ContextCompat.getColor(appContext, id)
+fun getColor(id: Int): Int = ContextCompat.getColor(com.cyxbs.components.init.appContext, id)
 
 fun <T> ArrayList<T>.addWithoutRepeat(pos: Int, t: T) {
     if (!contains(t)) {

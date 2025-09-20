@@ -4,10 +4,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application>
         <activity android:name=".ui.activity.NotificationActivity" />
-        <activity
-            android:name="com.cyxbs.pages.notification.ui.activity.SettingActivity"
-            android:launchMode="singleTask" />
-        <activity android:name=".ui.activity.WebActivity" />
     </application>
 
 </manifest>

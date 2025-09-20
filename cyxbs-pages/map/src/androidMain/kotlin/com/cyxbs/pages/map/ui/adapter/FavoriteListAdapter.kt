@@ -9,7 +9,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.cyxbs.pages.map.R
 import com.cyxbs.pages.map.bean.FavoritePlace
 import com.cyxbs.pages.map.viewmodel.MapViewModel
-import com.cyxbs.components.config.view.MarqueeTextView
+import com.cyxbs.components.view.text.MarqueeTextView
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
