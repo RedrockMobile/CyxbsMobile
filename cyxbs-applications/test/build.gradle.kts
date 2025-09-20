@@ -73,11 +73,14 @@ tasks.register("buildReleaseAndInstall") {
   group = "com.tencent.vasdolly"
   dependsOn("channelRelease")
   doLast {
+    channel.outputDir.listFiles().also {
+      println("buildReleaseAndInstall: ${it?.joinToString("\n")}")
+    }
     val installResult = exec {
       // adb install 安装
       commandLine(
         "adb", "install", "-r",
-        project.layout.buildDirectory.get().asFile.resolve("channel").listFiles()!!.first {
+        channel.outputDir.listFiles()!!.first {
           it.name.contains("official") // 找到第一个 official 的渠道包
         })
     }

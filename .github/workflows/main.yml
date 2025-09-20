@@ -92,13 +92,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleRelease
+        run: ./gradlew cyxbs-application:test:channelRelease
 
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
         with:
           name: CyxbsMobile-test
-          path: cyxbs-applications/test/build/outputs/apk/release/test-release-unsigned.apk
+          path: cyxbs-applications/test/build/channel/*official*.apk
           retention-days: 15
           
   send_message:
