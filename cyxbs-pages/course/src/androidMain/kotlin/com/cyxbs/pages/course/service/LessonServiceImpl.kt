@@ -78,8 +78,7 @@ object LessonServiceImpl : ILessonService {
             emit(Unit)
           }.asObservable()
             .flatMap {
-              // 在没有连接网络时 StuLessonRepository.getLesson() 方法会抛出异常
-              StuLessonRepository.getLesson(entity.linkNum).toObservable()
+              StuLessonRepository.observeLesson(entity.linkNum)
             }.onErrorReturn {
               emptyList()
             }

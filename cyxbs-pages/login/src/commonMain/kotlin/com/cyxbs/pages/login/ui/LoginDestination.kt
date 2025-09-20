@@ -37,8 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -175,7 +178,7 @@ private fun StuNumCompose(modifier: Modifier = Modifier) {
       contentDescription = null,
     )
     OutlinedTextField(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Username },
       value = viewModel.stuNum.value,
       singleLine = true,
       onValueChange = {
@@ -235,7 +238,7 @@ private fun PasswordCompose(modifier: Modifier = Modifier) {
       contentDescription = null,
     )
     OutlinedTextField(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
       value = viewModel.password.value,
       visualTransformation = visualTransformation.value,
       onValueChange = {
