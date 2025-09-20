@@ -117,7 +117,7 @@ if (secretGradleFile.exists()) {
     //快速模式：生成渠道包时不进行校验（速度可以提升10倍以上，默认为false）
     fastMode = false
     //buildTime的时间格式，默认格式：yyyyMMdd-HHmmss
-    buildTimeDateFormat = "yyyyMMdd-HH"
+    buildTimeDateFormat = "yyyyMMdd-HHmmss"
     //低内存模式（仅针对V2签名，默认为false）：只把签名块、中央目录和EOCD读取到内存，不把最大头的内容块读取到内存，在手机上合成APK时，可以使用该模式
     lowMemory = false
   }

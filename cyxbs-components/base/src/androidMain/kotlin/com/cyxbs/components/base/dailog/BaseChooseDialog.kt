@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.cyxbs.components.view.R
 import com.cyxbs.components.utils.extensions.dp2px
+import androidx.core.graphics.drawable.toDrawable
 
 /**
  * 封装了只有单按钮和双按钮的 dialog，自带圆角，符合大部分视觉需要的场景
@@ -81,7 +82,7 @@ abstract class BaseChooseDialog<T : BaseChooseDialog<T, D>, D: BaseChooseDialog.
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // 取消 dialog 默认背景
-    window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+    window?.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
     super.onCreate(savedInstanceState)
 
     val view = LayoutInflater.from(context).inflate(data.type.layoutId, null)

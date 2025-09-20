@@ -9,7 +9,6 @@ import com.cyxbs.components.utils.network.mapOrThrowApiException
 import com.cyxbs.pages.discover.bean.NewsListItem
 import com.cyxbs.pages.discover.network.ApiServices
 import com.cyxbs.pages.discover.network.RollerViewInfo
-import java.util.concurrent.TimeUnit
 
 /**
  * @author zixuan
@@ -20,14 +19,7 @@ class DiscoverHomeViewModel : BaseViewModel() {
   val jwNews = MutableLiveData<List<NewsListItem>>()
   var functionRvState: Parcelable? = null
   private val apiServices: ApiServices by lazy {
-    ApiGenerator.createSelfRetrofit(okHttpClientConfig = {
-      it.apply {
-        callTimeout(10, TimeUnit.SECONDS)
-        readTimeout(2, TimeUnit.SECONDS)
-        writeTimeout(2, TimeUnit.SECONDS)
-        retryOnConnectionFailure(true)
-      }
-    }, tokenNeeded = true).create(ApiServices::class.java)
+    ApiGenerator.getApiService(ApiServices::class.java)
   }
   
   init {
