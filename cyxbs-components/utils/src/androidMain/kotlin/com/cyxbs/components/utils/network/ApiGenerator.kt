@@ -42,14 +42,69 @@ import kotlin.reflect.KClass
  * ## 命名规则
  * XXXApiService 接口，命名规则，以 ApiService 结尾
  *
+ * ## 多平台推荐
+ * 掌邮已开始适配多平台构建，部分第三方库将被替代
+ * - Retrofit -> Ktorfit
+ * - Gson -> kotlinx-serialization
+ *
+ * ## 数据类
+ * 数据类可以使用 JSON To Kotlin Class 插件，但⚠️注意一定要打上序列化注解
+ * ```
+ * // (推荐) 使用 kotlinx-serialization
+ * @Serializable                // ⚠️注意：这里需要打上类注解
+ * data class Bean(
+ *     @SerialName("name")      // ⚠️注意：必须打上变量注解
+ *     val name: String
+ * )
+ *
+ * // 使用 Gson (建议使用 kotlinx-serialization)
+ * data class Bean(
+ *     @SerializedName("name")  // ⚠️注意：必须打上注解
+ *     val name: String
+ * )
+ * ```
+ *
  * ## 接口模板
  * ```
+ * // (推荐) 使用 Ktorfit，导入 import de.jensklingenberg.ktorfit.http.*
  * interface XXXApiService {
+ *     @GET("aaa/bbb")              // ⚠️注意：请求路径不能有前置斜杠 /
+ *     fun getXXX(): Single<ApiWrapper<Bean>>
+ *     // ⚠️统一使用 ApiWrapper 或 ApiStatus 包装，注意 Bean 类要去掉 data 字段，不然会报 json 错误
+ * }
+ *
+ * // 示例代码：
+ * runCatchingCoroutine {           // ⚠️注意：这里需要使用 runCatchingCoroutine，不拦截协程的 Cancel 异常
+ *     XXXApiService::class.impl()
+ *         .getXXX(stuNum)          // 直接使用 XXXApi::class.impl() 就可以直接获取到实现类
+ * }.mapCatching {
+ *     it.throwApiExceptionIfFail() // ⚠️注意：这里需要使用 throwApiExceptionIfFail()
+ *     it
+ * }.onSuccess {
+ *     // 网络请求返回结果
+ * }
+ *
+ *
+ * ////////////////////////////////////////////
+ * //   以下为 Retrofit + ApiGenerator 的用法
+ * ////////////////////////////////////////////
+ *
+ * // 使用 Retrofit + ApiGenerator
+ * interface XXXApiService : IApi { // 可选择性实现 IApi 注解便于获取实现类
  *
  *     @GET("/aaa/bbb")
  *     fun getXXX(): Single<ApiWrapper<Bean>>
  *     // 统一使用 ApiWrapper 或 ApiStatus 包装，注意 Bean 类要去掉 data 字段，不然会报 json 错误
+ * }
  *
+ * // 获取方式 1:
+ * // 如果实现了 IApi 注解，则直接使用 XXXApi::class.impl 获取实现类
+ * XXXApiService::class.impl
+ *     .getXXX()
+ *
+ * // 获取方式 2:
+ * // 或者在 XXXApiService 中添加单例
+ * object XXXApiService : IApi {
  *     companion object {
  *         val INSTANCE by lazy {
  *             ApiGenerator.getXXXApiService(XXXApiService::class)
@@ -57,19 +112,14 @@ import kotlin.reflect.KClass
  *     }
  * }
  *
- * 或者：
- * interface XXXApiService : IApi
- *
- * 使用：
  * XXXApiService::class.impl
  *     .getXXX()
- * ```
  *
- * ## 示例代码
- * ```
+ *
+ * // 示例代码
  * ApiService.INSTANCE.getXXX()
- *     .subscribeOn(Schedulers.io())  // 线程切换
- *     .observeOn(AndroidSchedulers.mainThread())
+ *     .subscribeOn(Schedulers.io())  // 上游切换到 io 线程
+ *     .observeOn(AndroidSchedulers.mainThread()) // 下游切换到主线程
  *     .mapOrInterceptException {     // 当 errorCode 的值不为成功时抛错，并拦截异常
  *         // 这里面可以使用 DSL 写法，更多详细用法请看该方法注释
  *     }

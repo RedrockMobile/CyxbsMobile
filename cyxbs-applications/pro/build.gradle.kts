@@ -136,3 +136,28 @@ if (secretGradleFile.exists()) {
     dependsOn(project.tasks.getByName("channelRelease"))
   }
 }
+
+// 一键打包并安装 release 包的任务 releaseAndInstall
+tasks.register("buildReleaseAndInstall") {
+  group = "com.tencent.vasdolly"
+  dependsOn("channelRelease")
+  doLast {
+    val installResult = exec {
+      // adb install 安装
+      commandLine(
+        "adb", "install", "-r",
+        project.layout.buildDirectory.get().asFile.resolve("channel").listFiles()!!.first {
+          it.name.contains("official") // 找到第一个 official 的渠道包
+        })
+    }
+    if (installResult.exitValue == 0) {
+      exec {
+        // adb shell am start 打开 app
+        commandLine(
+          "adb", "shell", "am", "start", "-n",
+          "${android.defaultConfig.applicationId}/com.cyxbs.pages.home.ui.main.MainActivity"
+        )
+      }
+    }
+  }
+}
