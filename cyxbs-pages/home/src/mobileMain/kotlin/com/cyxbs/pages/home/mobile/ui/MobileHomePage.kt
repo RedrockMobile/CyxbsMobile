@@ -161,7 +161,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     courseFrameViewModel.frame.bottomSheetState.stateFlow
       .first { it == BottomSheetValueState.Expanded }
-    toastLong("注意：新版课表在开发中，很多功能还不完善，可以在设置中回退旧版课表")
+    toastLong("注意：新版课表在开发中，目前还不会显示事务。设置中可回退旧版课表")
   }
 }
 

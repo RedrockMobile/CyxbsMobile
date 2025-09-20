@@ -239,8 +239,10 @@ class HomeCourseLayout(
     bottomNavViewModel.selectedItem.onEach {
       if (it === bottomNavViewModel.fairgroundItem) {
         mBottomSheet.isHideable = true
+        mBottomSheet.state = BottomSheetBehavior.STATE_HIDDEN
       } else if (mBottomSheet.state == BottomSheetBehavior.STATE_HIDDEN) {
         mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
+        mBottomSheet.isHideable = false
       }
     }.launchIn(mActivity.lifecycleScope)
 
