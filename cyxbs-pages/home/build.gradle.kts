@@ -19,9 +19,9 @@ kotlin {
       implementation(projects.cyxbsPages.affair.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.notification.api)
-      implementation(libs.kmp.ktorfit)
     }
     androidMain.dependencies {
+      implementation(projects.cyxbsPages.course.widget)
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
     }

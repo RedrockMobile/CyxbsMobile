@@ -7,18 +7,19 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.addCallback
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commit
-import androidx.lifecycle.lifecycleScope
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.crash.CrashDialog
 import com.cyxbs.components.base.utils.Umeng
-import com.cyxbs.components.base.utils.safeSubscribeBy
 import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
 import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.utils.extensions.asFlow
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.invisible
 import com.cyxbs.components.utils.extensions.lazyUnlock
@@ -29,9 +30,9 @@ import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import com.cyxbs.pages.home.ui.course.utils.CourseHeaderHelper
-import com.cyxbs.pages.home.ui.main.MainActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlin.math.max
@@ -49,11 +50,10 @@ import kotlin.math.max
 @SuppressLint("ViewConstructor")
 class HomeCourseLayout(
   context: Context,
+  val lifecycleScope: CoroutineScope,
   val bottomNavViewModel: BottomNavViewModel,
   val courseBottomSheetViewModel: CourseBottomSheetViewModel,
 ) : FrameLayout(context) {
-
-  private val mActivity = context as MainActivity
 
   private val mCourseService = ICourseService::class.impl()
   private val mAccountService = IAccountService::class.impl()
@@ -82,6 +82,13 @@ class HomeCourseLayout(
     initCourse()
     initBottomSheet()
   }
+
+  /**
+   * 当外层 Compose 容器释放时，需要移除监听，该 View 对象也不会再被重复使用
+   */
+  fun onRelease() {
+    mCollapsedBackPressedCallback?.remove()
+  }
   
   private fun initCourse() {
     mViewHeader.setOnClickListener {
@@ -92,15 +99,15 @@ class HomeCourseLayout(
       }
     }
 
-    if (mActivity.supportFragmentManager.findFragmentById(mFcvCourse.id) == null) {
-      mActivity.supportFragmentManager.commit(true) {
-        replace(mFcvCourse.id, mCourseService.createHomeCourseFragment())
-      }
+    // 这里只能重复 replace，因为在 Compose 中 FragmentManager.findFragmentById() 将不为 null，但是 fragment 却会不显示
+    (context as FragmentActivity).supportFragmentManager.commit(true) {
+      replace(mFcvCourse.id, mCourseService.createHomeCourseFragment())
     }
 
     CourseHeaderHelper.observeHeader()
       .observeOn(AndroidSchedulers.mainThread())
-      .safeSubscribeBy(mActivity) { header ->
+      .asFlow()
+      .onEach { header ->
         when (header) {
           is CourseHeaderHelper.HintHeader -> {
             mTvHeaderState.invisible()
@@ -159,7 +166,7 @@ class HomeCourseLayout(
             }
           }
         }
-      }
+      }.launchIn(lifecycleScope)
   }
   
   private fun initBottomSheet() {
@@ -172,20 +179,20 @@ class HomeCourseLayout(
               if (courseBottomSheetViewModel.state.value != true) {
                 courseBottomSheetViewModel.state.value = true
               }
-              mCollapsedBackPressedCallback.isEnabled = true
+              mCollapsedBackPressedCallback?.isEnabled = true
             }
             BottomSheetBehavior.STATE_COLLAPSED -> {
               mFcvCourse.gone()
               if (courseBottomSheetViewModel.state.value != false) {
                 courseBottomSheetViewModel.state.value = false
               }
-              mCollapsedBackPressedCallback.isEnabled = false
+              mCollapsedBackPressedCallback?.isEnabled = false
             }
             BottomSheetBehavior.STATE_HIDDEN -> {
               if (courseBottomSheetViewModel.state.value != null) {
                 courseBottomSheetViewModel.state.value = null
               }
-              mCollapsedBackPressedCallback.isEnabled = false
+              mCollapsedBackPressedCallback?.isEnabled = false
             }
             else -> {}
           }
@@ -234,7 +241,7 @@ class HomeCourseLayout(
         mViewHeader.visible()
         mFcvCourse.gone()
       }
-    }.launchIn(mActivity.lifecycleScope)
+    }.launchIn(lifecycleScope)
 
     bottomNavViewModel.selectedItem.onEach {
       if (it === bottomNavViewModel.fairgroundItem) {
@@ -244,20 +251,22 @@ class HomeCourseLayout(
         mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
         mBottomSheet.isHideable = false
       }
-    }.launchIn(mActivity.lifecycleScope)
+    }.launchIn(lifecycleScope)
 
     mAccountService.state.onEach {
       // 只有登录了才允许拖动课表
       mBottomSheet.isDraggable = it is AccountState.Login
-    }.launchIn(mActivity.lifecycleScope)
+    }.launchIn(lifecycleScope)
   }
   
   /**
    * 用于拦截返回键，在 BottomSheet 未折叠时先折叠
    */
   private val mCollapsedBackPressedCallback by lazyUnlock {
-    mActivity.onBackPressedDispatcher.addCallback(mActivity) {
-      mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
+    findViewTreeOnBackPressedDispatcherOwner()?.let {
+      it.onBackPressedDispatcher.addCallback(it) {
+        mBottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
+      }
     }
   }
 
