@@ -81,12 +81,12 @@ PODS:
   - MJRefresh (3.7.9)
   - NudeIn (1.2.8)
   - ProgressHUD (13.7.2)
-  - RxCocoa (6.7.1):
-    - RxRelay (= 6.7.1)
-    - RxSwift (= 6.7.1)
-  - RxRelay (6.7.1):
-    - RxSwift (= 6.7.1)
-  - RxSwift (6.7.1)
+  - RxCocoa (6.8.0):
+    - RxRelay (= 6.8.0)
+    - RxSwift (= 6.8.0)
+  - RxRelay (6.8.0):
+    - RxSwift (= 6.8.0)
+  - RxSwift (6.8.0)
   - RYAngelWalker (0.2.2)
   - RYTransitioningDelegateSwift (0.2.3)
   - SDCycleScrollView (1.82):
@@ -258,9 +258,9 @@ SPEC CHECKSUMS:
   MJRefresh: ff9e531227924c84ce459338414550a05d2aea78
   NudeIn: e428b516a60a241d47c9d8882a8a00d0f42cfcb4
   ProgressHUD: 093d24ca970f191744017bee2649e37d0cd1c5b9
-  RxCocoa: f5609cb4637587a7faa99c5d5787e3ad582b75a4
-  RxRelay: 4151ba01152436b08271e08410135e099880eae5
-  RxSwift: b9a93a26031785159e11abd40d1a55bcb8057e52
+  RxCocoa: 2d33c1e1e5d66492052ad46b11024ae287572880
+  RxRelay: 335c78b926a2aea8d863a6d25f1ed3b5ad8e8705
+  RxSwift: 4e28be97cbcfeee614af26d83415febbf2bf6f45
   RYAngelWalker: e5314ea021ca43de12bc4f86d086936caf4b7bdf
   RYTransitioningDelegateSwift: 72dee49a78fa4c2747b4d92ba3ed6b2e493e1df7
   SDCycleScrollView: a0d74c3384caa72bdfc81470bdbc8c14b3e1fbcf
