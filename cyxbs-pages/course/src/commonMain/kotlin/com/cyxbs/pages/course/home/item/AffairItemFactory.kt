@@ -1,6 +1,9 @@
 package com.cyxbs.pages.course.home.item
 
+import androidx.compose.runtime.Stable
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.affair.api.AffairDateModel
+import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
 import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
@@ -17,8 +20,15 @@ interface AffairItemFactory {
     page: Int,
     affairDateModel: AffairDateModel,
   ): AffairItemModel
+
+  companion object {
+    fun get(): AffairItemFactory {
+      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItemModel
+    }
+  }
 }
 
+@Stable
 interface AffairItemModel : CourseItemModel {
   val affairDateModel: AffairDateModel
 }

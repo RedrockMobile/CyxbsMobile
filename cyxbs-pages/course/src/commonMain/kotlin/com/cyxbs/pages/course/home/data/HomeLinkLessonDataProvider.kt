@@ -37,7 +37,7 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
   // 保存最后一次数据，用于改变关联人课表可见性后再展示
   private var lastData = emptyList<LessonByWeeks>()
 
-  private val itemFactory = LinkLessonItemFactory::class.impl()
+  private val itemFactory = LinkLessonItemFactory.get()
 
   fun changeVisible() {
     if (LinkLessonRepository.state.value.isNull()) return

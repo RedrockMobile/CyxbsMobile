@@ -10,7 +10,7 @@ import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
  * @author 985892345
  * @date 2025/3/30
  */
-class CourseFrameViewModel : BaseViewModel() {
+class MobileCourseFrameViewModel : BaseViewModel() {
   // 由 course 模块实现
   val frame = IMobileHomeCourseFrame::class.impl()
 }

@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.home.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,12 +28,12 @@ import kotlinx.datetime.DayOfWeek
  * @author 985892345
  * @date 2025/3/25
  */
+@Stable
 class MobileAffairItemModel(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   override val affairDateModel: AffairDateModel,
 ) : AffairItemModel, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItemModel {
 
-  @ImplProvider
   companion object : AffairItemFactory {
     override fun createAffairItemModel(
       page: Int,

@@ -24,10 +24,10 @@ import kotlin.reflect.KType
  * class XXXDestination : MainDestination<XXXArgument>(XXXArgument::Class) {}
  *
  * // 后续使用以下方式进行跳转
- * LocalMainNavController.current.navigate(argument, ...)
+ * MainNavController.current.navigate(argument, ...)
  *
  * // 对于 name = "xxx" 也会同时注册 cyxbs://xxx/... 的 deeplink，其末尾的 ... 由跳转类的 argumentClass 的字段解析决定
- * LocalMainNavController.current.navigate("cyxbs://xxx/...", ...)
+ * MainNavController.current.navigate("cyxbs://xxx/...", ...)
  * ```
  *
  *
