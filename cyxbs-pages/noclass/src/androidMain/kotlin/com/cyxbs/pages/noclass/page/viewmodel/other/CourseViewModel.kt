@@ -3,7 +3,7 @@ package com.cyxbs.pages.noclass.page.viewmodel.other
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.noclass.bean.NoClassSpareTime
 import com.cyxbs.pages.noclass.bean.Student

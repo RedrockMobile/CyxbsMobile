@@ -51,16 +51,6 @@
             app:layout_constraintEnd_toStartOf="@+id/iv_check_in"
             app:layout_constraintTop_toTopOf="@+id/tv_dis" />
 
-        <ImageView
-            android:id="@+id/iv_discover_msg_red_dot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/discover_ic_red_dot"
-            android:layout_marginBottom="19dp"
-            android:visibility="invisible"
-            app:layout_constraintBottom_toBottomOf="@+id/iv_discover_msg"
-            app:layout_constraintStart_toEndOf="@+id/iv_discover_msg" />
-
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/iv_check_in"
             android:layout_width="wrap_content"

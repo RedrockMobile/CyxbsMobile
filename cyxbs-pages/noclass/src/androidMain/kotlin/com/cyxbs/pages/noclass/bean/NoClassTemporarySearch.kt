@@ -1,15 +1,21 @@
 package com.cyxbs.pages.noclass.bean
 
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 
 
 /**
  * 没课约临时分组搜索结果
  */
+@kotlinx.serialization.Serializable
 data class NoClassTemporarySearch(
+    @SerialName("class")
     val `class`: Cls,
+    @SerialName("group")
     val group: NoClassGroup,
-    val students: List<Student>,
+    @SerialName("students")
+    val students: List<Student>? = null,
+    @SerialName("types")
     val types: List<String>?
 ) : Serializable
 
@@ -21,13 +27,13 @@ interface NoClassItem {
     val id: String
 }
 
-interface Group : NoClassItem {
-    val members: List<Student>
-}
-
+@kotlinx.serialization.Serializable
 data class Cls(
+    @SerialName("id")
     override val id: String,
-    override val members: List<Student>,
-    val name: String,
-) : Group,Serializable
+    @SerialName("members")
+    val members: List<Student>?,
+    @SerialName("name")
+    val name: String? = null,
+) : Serializable, NoClassItem
 

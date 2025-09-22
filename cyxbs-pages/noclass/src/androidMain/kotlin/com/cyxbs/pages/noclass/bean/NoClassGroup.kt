@@ -1,6 +1,6 @@
 package com.cyxbs.pages.noclass.bean
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 
 /**
@@ -15,15 +15,16 @@ import java.io.Serializable
  * @Description:    每个分组的bean类
  */
 
+@kotlinx.serialization.Serializable
 data class NoClassGroup(
-    @SerializedName("id")
+    @SerialName("id")
     override val id: String,
-    @SerializedName("is_top")
-    val isTop: Boolean,
-    @SerializedName("members")
-    override var members: List<Student>,
-    @SerializedName("name")
+    @SerialName("is_top")
+    val isTop: Boolean = false,
+    @SerialName("members")
+    var members: List<Student>? = null,
+    @SerialName("name")
     val name: String,
 
     var isOpen : Boolean = false
-) : Serializable, Group
+) : Serializable, NoClassItem

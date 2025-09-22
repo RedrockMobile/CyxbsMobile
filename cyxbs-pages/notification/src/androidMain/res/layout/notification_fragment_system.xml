@@ -1,86 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/notification_ll_no_internet"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-
-        android:layout_gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:layout_width="157dp"
-            android:layout_height="96dp"
-            android:layout_gravity="center"
-            android:src="@drawable/notification_ic_no_internet"
-            tools:ignore="ContentDescription" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="10dp"
-            android:text="最遥远的距离不是天各一方，而是断网了 TAT"
-            android:textColor="@color/notification_base_tv"
-            android:textSize="12sp"
-            tools:ignore="HardcodedText" />
-    </androidx.appcompat.widget.LinearLayoutCompat>
-
-    <com.cyxbs.pages.notification.widget.SwipeDeleteRecyclerView
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/notification_rv_sys"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="10dp"
         android:overScrollMode="never"
         tools:listitem="@layout/notification_item_sys" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/notification_system_btn_negative"
-        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-        android:layout_width="120dp"
-        android:layout_height="40dp"
-        android:layout_gravity="bottom"
-        android:layout_marginStart="45dp"
-        android:layout_marginBottom="57dp"
-        android:insetTop="0dp"
-        android:insetBottom="0dp"
-        android:padding="0dp"
-        android:text="取消"
-        android:textColor="@android:color/white"
-        android:textSize="15sp"
-        android:theme="@style/Theme.MaterialComponents"
-        android:visibility="invisible"
-        app:backgroundTint="@color/notification_delete_dialog_btn_negative"
-        app:cornerRadius="26dp"
-        app:rippleColor="@android:color/transparent"
-        tools:ignore="HardcodedText"
-        tools:text="取消" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/notification_system_btn_positive"
-        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-        android:layout_width="120dp"
-        android:layout_height="40dp"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="45dp"
-        android:layout_marginBottom="57dp"
-        android:insetTop="0dp"
-        android:insetBottom="0dp"
-        android:padding="0dp"
-        android:text="删除"
-        android:textColor="@android:color/white"
-        android:textSize="14sp"
-        android:theme="@style/Theme.MaterialComponents"
-        android:visibility="invisible"
-        app:backgroundTint="@color/notification_delete_dialog_btn_positive"
-        app:cornerRadius="26dp"
-        app:rippleColor="@android:color/transparent"
-        tools:ignore="HardcodedText"
-        tools:text="删除" />
 
 </FrameLayout>

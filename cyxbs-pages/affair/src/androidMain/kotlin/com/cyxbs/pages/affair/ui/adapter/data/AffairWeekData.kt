@@ -4,7 +4,7 @@ import com.cyxbs.pages.affair.room.AffairEntity
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.course.api.utils.getEndRow
 import com.cyxbs.pages.course.api.utils.getStartRow
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.lazyUnlock
 
 /**
@@ -36,7 +36,7 @@ data class AffairWeekData(
      * 这里面的个数跟 [ICourseService.maxWeek] 挂钩
      */
     val WEEK_ARRAY: Array<String> by lazyUnlock {
-      appContext.resources.getStringArray(
+      com.cyxbs.components.init.appContext.resources.getStringArray(
         com.cyxbs.pages.course.api.R.array.course_api_course_weeks_strings)
     }
   }
@@ -83,7 +83,7 @@ data class AffairTimeData(
     )
 
     val DAY_ARRAY by lazyUnlock {
-      val resources = appContext.resources
+      val resources = com.cyxbs.components.init.appContext.resources
       arrayOf(
         resources.getString(com.cyxbs.pages.course.api.R.string.course_api_week_mon),
         resources.getString(com.cyxbs.pages.course.api.R.string.course_api_week_tue),

@@ -1,6 +1,6 @@
 package com.cyxbs.pages.map.model
 
-import com.google.gson.Gson
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.google.gson.reflect.TypeToken
 import com.cyxbs.pages.map.bean.ButtonInfo
 import com.cyxbs.pages.map.bean.FavoritePlace
@@ -21,7 +21,7 @@ object TestData {
      * 地图基本信息接口
      * 目前只返回 中心食堂id2 和 腾飞门id1
      */
-    private val gson = Gson()
+    private val gson = defaultGson
     fun getMapInfo() = Observable.create<ApiWrapper<MapInfo>> {
         it.onNext(gson.fromJson(mapInfoString, object : TypeToken<ApiWrapper<MapInfo>>() {}.type))
     }

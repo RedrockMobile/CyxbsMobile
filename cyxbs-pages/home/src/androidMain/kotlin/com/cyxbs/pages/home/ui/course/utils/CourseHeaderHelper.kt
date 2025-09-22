@@ -1,11 +1,12 @@
 package com.cyxbs.pages.home.ui.course.utils
 
 import android.util.Log
+import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.isDebug
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ICourseService
@@ -49,6 +50,7 @@ object CourseHeaderHelper {
    */
   fun observeHeader(): Observable<Header> {
     return SchoolCalendar.observeWeekOfTerm()
+      .asObservable()
       .observeOn(Schedulers.io())
       .switchMap { week ->
         if (week !in 1..ICourseService.maxWeek) {
@@ -72,8 +74,8 @@ object CourseHeaderHelper {
    */
   private fun observeHeaderOnVacation(): Observable<Header> {
     val textOnVacation = "享受假期吧～"
-    return IAccountService::class.impl().userInfo
-      .map { it?.stuNum.orEmpty() }
+    return IAccountService::class.impl().state
+      .map { (it as? AccountState.Login)?.stuNum.orEmpty() }
       .asObservable()
       .switchMap {
         if (it.isEmpty()) Observable.empty() else {
@@ -148,17 +150,17 @@ object CourseHeaderHelper {
     linkNum: String,
   ): Observable<Header> {
     // 这里不需要调用 observeSelfLesson()，因为外面的 observeSelfLinkStu() 有观察 self 的作用
-    val selfSingle = lessonService.getStuLesson(selfNum)
+    val selfSingle = lessonService.observeSelfLesson()
     val linkSingle =
-      if (linkNum.isNotBlank()) lessonService.getStuLesson(linkNum)
-      else Single.just(emptyList())
+      if (linkNum.isNotBlank()) lessonService.observeLinkLesson()
+      else Observable.just(emptyList())
     val affairObservable = affairService.observeSelfAffair()
     // combineLast 可以同时观察任一个 Observable，
     // 只要收到一个新的，他就会整和数据发给下游，不同于 zip 操作符，
     // zip 操作符需要三个都发送新的才会整合发给下游
     return Observable.combineLatest(
-      selfSingle.toObservable(),
-      linkSingle.toObservable(),
+      selfSingle,
+      linkSingle,
       affairObservable
     ) { self, link, affair ->
       Triple(self, link, affair)

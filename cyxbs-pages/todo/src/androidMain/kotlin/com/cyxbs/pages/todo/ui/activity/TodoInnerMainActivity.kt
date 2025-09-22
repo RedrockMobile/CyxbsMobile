@@ -15,7 +15,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.lazyUnlock
@@ -93,7 +93,7 @@ class TodoInnerMainActivity : BaseActivity() {
         }
         todo_inner_home_bar_add.setOnClickListener {
             AddTodoDialog(this, R.style.BottomSheetDialogThemeNight) {
-                val syncTime = appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
+                val syncTime = com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_SYNC_TIME", 0L)
                 val firstPush = if (syncTime == 0L) 1 else 0
                 todoViewModel.apply {
                     pushTodo(

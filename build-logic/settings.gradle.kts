@@ -13,6 +13,7 @@ pluginManagement {
         maven("https://maven.aliyun.com/repository/public")
         maven("https://maven.aliyun.com/repository/google")
         maven("https://jitpack.io")
+        mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
     }
 }
 
@@ -24,6 +25,7 @@ dependencyResolutionManagement {
         maven("https://maven.aliyun.com/repository/public")
         maven("https://maven.aliyun.com/repository/google")
         maven("https://jitpack.io")
+        mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
     }
     // 开启 versionCatalogs 功能
     versionCatalogs {

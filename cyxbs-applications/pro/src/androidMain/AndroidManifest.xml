@@ -15,7 +15,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/config_ic_launcher"
         android:label="@string/config_app_name"
-        android:networkSecurityConfig="@xml/config_network_security"
+        android:networkSecurityConfig="@xml/pro_network_security"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/config_ic_launcher_round"
         android:supportsRtl="true"
@@ -75,22 +75,5 @@
         <meta-data
             android:name="com.amap.api.v2.apikey"
             android:value="${amap_apikey}"/>
-
-        <activity
-            android:name="com.cyxbs.pages.home.ui.main.MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:screenOrientation="portrait"
-            android:theme="@style/SplashTheme">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-            </intent-filter>
-        </activity>
     </application>
 </manifest>

@@ -10,6 +10,11 @@ import kotlin.reflect.KClass
  * @date 2022/8/28 14:31
  */
 
+fun showExceptionDialog(throwable: Throwable) {
+  // todo 待实现
+  toastLong(throwable.message)
+}
+
 
 open class ExceptionResult<Emitter>(
   val throwable: Throwable,

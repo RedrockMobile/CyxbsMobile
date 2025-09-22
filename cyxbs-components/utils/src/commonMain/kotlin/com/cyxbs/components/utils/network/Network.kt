@@ -1,6 +1,6 @@
 package com.cyxbs.components.utils.network
 
-import com.cyxbs.components.utils.extensions.defaultJson
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.network.plugin.BackupPlugin
 import com.cyxbs.components.utils.network.plugin.TokenPlugin
 import de.jensklingenberg.ktorfit.Ktorfit
@@ -21,6 +21,33 @@ import kotlin.time.Duration.Companion.seconds
  * @date 2025/1/5
  */
 
+/**
+ * 网络请求 Ktorfit
+ *
+ * # 使用方式
+ * - 模块 build.gradle.kts 添加以下内容
+ * ```
+ * useNetwork() // 网络请求
+ * ```
+ *
+ * - 在 network 文件夹下创建网络请求接口，注意返回类型应为 ApiWrapper<> 或者 ApiStatue
+ * ```
+ * interface ApiService {
+ *   // 注意 @GET 接口中路径不能以 斜杆/ 开头
+ *   @GET("magipoke-jwzx/kebiao/relevance/")
+ *   suspend fun getLinkStudent(): ApiWrapper<LinkStuBean>
+ * }
+ * ```
+ * 
+ * - 使用处，推荐使用 .impl() 进行获取
+ * ```
+ * // 推荐使用 .impl() 进行获取
+ * val apiService = ApiService::class.impl()
+ *
+ * // Ktorfit 官方用法 (需要手动触发 KSP 才能引用，不推荐)
+ * val apiService = Network.createApiService()
+ * ```
+ */
 val Network by lazy {
   Ktorfit.Builder()
     .httpClient(HttpClient)

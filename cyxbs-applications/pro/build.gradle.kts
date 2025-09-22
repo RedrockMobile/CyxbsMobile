@@ -23,6 +23,7 @@ kotlin {
             && it != project
             && it.name != "debug" // lib_debug 单独依赖
             && !it.path.contains("cyxbs-applications")
+            && !it.path.contains("cyxbs-compiler")
             && !it.name.startsWith("cyxbs-")
       }.forEach {
         api(it)
@@ -104,7 +105,7 @@ if (secretGradleFile.exists()) {
    * 这个是因为打包时存在多个 application 模块导致
    * 跟单模块有关，请在 ModuleDebugManagerPlugin#isAllowDebugModule 中添加你的 task name
    */
-  // channel 闭包，这是腾讯的多渠道打包，输出文件在 module_app 模块的 build 文件夹下
+  // channel 闭包，这是腾讯的多渠道打包，输出文件在 pro 模块的 build/chanel 文件夹下
   // ./gradlew channelRelease
   channel {
     //指定渠道文件
@@ -116,22 +117,64 @@ if (secretGradleFile.exists()) {
     //快速模式：生成渠道包时不进行校验（速度可以提升10倍以上，默认为false）
     fastMode = false
     //buildTime的时间格式，默认格式：yyyyMMdd-HHmmss
-    buildTimeDateFormat = "yyyyMMdd-HH"
+    buildTimeDateFormat = "yyyyMMdd-HHmm"
     //低内存模式（仅针对V2签名，默认为false）：只把签名块、中央目录和EOCD读取到内存，不把最大头的内容块读取到内存，在手机上合成APK时，可以使用该模式
     lowMemory = false
   }
+
   /**
-   * 发新版 task
+   * 发新版 task，同时触发打包
    */
-  tasks.register("cyxbsRelease", CyxbsReleaseTask::class) {
+  tasks.register("cyxbsRelease") {
     group = "cyxbs"
+    dependsOn("channelRelease", "cyxbsReleaseExistApk")
+  }
+
+  // 仅发布 apk，不打包
+  tasks.register("cyxbsReleaseExistApk", CyxbsReleaseTask::class) {
+    group = "cyxbs"
+    mustRunAfter("channelRelease")
     getApkFile.set {
-      channel.outputDir.listFiles()?.singleOrNull {
+      channel.outputDir.listFiles()!!.single {
         it.name.matches(
           Regex("掌上重邮-${Config.versionName}-official-release-\\d+-\\d+\\.apk")
         )
-      }!!
+      }
     }
-    dependsOn(project.tasks.getByName("channelRelease"))
+  }
+}
+
+// 一键打包并安装 release 包的任务 releaseAndInstall
+tasks.register("buildReleaseAndInstall") {
+  group = "com.tencent.vasdolly"
+  dependsOn("channelRelease")
+  doLast {
+    channel.outputDir.listFiles().also {
+      println("buildReleaseAndInstall: ${it?.joinToString("\n")}")
+    }
+    val apkFile = channel.outputDir.listFiles()!!.first {
+      it.name.contains("official") // 找到第一个 official 的渠道包
+    }
+    val installResult = exec {
+      // adb install 安装
+      commandLine(
+        "adb", "install", "-r",
+        apkFile
+      )
+    }
+    if (installResult.exitValue == 0) {
+      exec {
+        // adb shell am start 打开 app
+        commandLine(
+          "adb", "shell", "am", "start",
+          "-c", "android.intent.category.LAUNCHER",
+          "-p", android.defaultConfig.applicationId,
+        )
+      }
+    }
+    if (apkFile.name.endsWith(".apk")) {
+      // 改名为 .Apk 后缀，方便发到 QQ
+      apkFile.renameTo(apkFile.parentFile.resolve(apkFile.name.replace(".apk", ".Apk")))
+    }
   }
 }

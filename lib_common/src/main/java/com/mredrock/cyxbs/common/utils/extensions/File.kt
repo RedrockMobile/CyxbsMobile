@@ -3,10 +3,7 @@ package com.mredrock.cyxbs.common.utils.extensions
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
-import com.cyxbs.components.utils.extensions.appContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.asRequestBody
+import com.cyxbs.components.init.appContext
 import java.io.File
 
 /**

@@ -9,7 +9,7 @@
 #原因：实体类数据，一定不能混淆，忽略了Serializable接口和Parcelable接口,实体类必须实现这两个接口
 -keepclassmembers class * implements java.io.Serializable { <fields>; }
 -keepclassmembers class * implements android.os.Parcelable { <fields>; }
--keepclassmembers class * implements com.cyxbs.components.utils.extensions.GsonDataBean { <fields>; }
+-keepclassmembers class * implements com.cyxbs.components.config.serializable.GsonDataBean { <fields>; }
 #-------------------------------------------------------------------------
 
 #---------------------------------2.第三方包-------------------------------

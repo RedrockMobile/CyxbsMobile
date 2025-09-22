@@ -21,7 +21,7 @@ import com.cyxbs.components.config.route.FOOD_ENTRY
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.ufield.R
 import com.cyxbs.pages.ufield.viewmodel.FairgroundViewModel
 import com.g985892345.provider.api.annotation.ImplProvider

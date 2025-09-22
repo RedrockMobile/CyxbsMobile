@@ -8,7 +8,7 @@ import android.widget.TextView
 import com.cyxbs.components.base.utils.safeSubscribeBy
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.R
 import com.cyxbs.pages.course.page.course.data.AffairData

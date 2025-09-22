@@ -12,7 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.pages.declare.R
 import com.cyxbs.pages.declare.detail.bean.VoteData
 import com.cyxbs.pages.declare.detail.widget.IncreaseCardView
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 
 /**

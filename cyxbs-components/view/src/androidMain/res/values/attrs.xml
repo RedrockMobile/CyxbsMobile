@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" >
+    <declare-styleable name="JCardViewPlus">
+        <attr name="cardBackgroundColor" format="color" />
+        <attr name="shadowColor" format="color" />
+        <attr name="shadowRadius" format="dimension" />
+        <attr name="shadowFlags">
+            <flag name="left" value="1" />
+            <flag name="top" value="2" />
+            <flag name="right" value="4" />
+            <flag name="bottom" value="8" />
+        </attr>
+
+        <attr name="cardCornerRadius" />
+        <attr name="cardCornerRadiusUpperLeft" format="dimension" />
+        <attr name="cardCornerRadiusUpperRight" format="dimension" />
+        <attr name="cardCornerRadiusLowerLeft" format="dimension" />
+        <attr name="cardCornerRadiusLowerRight" format="dimension" />
+
+        <attr name="contentPadding" />
+        <attr name="verticalContentPadding" format="dimension" />
+        <attr name="horizontalContentPadding" format="dimension" />
+        <attr name="contentPaddingLeft" />
+        <attr name="contentPaddingTop" />
+        <attr name="contentPaddingRight" />
+        <attr name="contentPaddingBottom" />
+    </declare-styleable>
+</resources>

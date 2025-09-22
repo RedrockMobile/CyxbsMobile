@@ -5,10 +5,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.cyxbs.pages.todo.model.bean.RemindMode
 import com.cyxbs.pages.todo.model.bean.RemindMode.Companion.generateDefaultRemindMode
 import com.cyxbs.pages.todo.model.bean.Todo
-import com.google.gson.Gson
-import com.cyxbs.components.utils.extensions.appContext
 import com.cyxbs.components.utils.extensions.getSp
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.defaultGson
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.launch
@@ -30,7 +29,7 @@ abstract class TodoDatabase : RoomDatabase() {
         val instance: TodoDatabase
             get() = INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
-                    appContext,
+                    com.cyxbs.components.init.appContext,
                     TodoDatabase::class.java,
                     "todo_db"
                 )
@@ -51,7 +50,7 @@ abstract class TodoDatabase : RoomDatabase() {
         }
 
         private fun insertDefaultTodosIfNeeded() {
-            if (appContext.getSp("todo").getLong("TODO_LAST_MODIFY_TIME", 0L) == 0L) {
+            if (com.cyxbs.components.init.appContext.getSp("todo").getLong("TODO_LAST_MODIFY_TIME", 0L) == 0L) {
                 val database = INSTANCE ?: return
                 val defaultTodos = listOf(
                     Todo(1, "长按可以拖动我哟", "", 0, generateDefaultRemindMode(), System.currentTimeMillis(), "", "", 0, 0),
@@ -69,11 +68,11 @@ abstract class TodoDatabase : RoomDatabase() {
 class Convert {
     @TypeConverter
     fun remindMode2String(value: RemindMode): String {
-        return Gson().toJson(value)
+        return defaultGson.toJson(value)
     }
 
     @TypeConverter
     fun string2RemindMode(value: String): RemindMode {
-        return Gson().fromJson(value, RemindMode::class.java)
+        return defaultGson.fromJson(value, RemindMode::class.java)
     }
 }

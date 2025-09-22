@@ -2,7 +2,8 @@ plugins {
   id("manager.lib")
 }
 
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
@@ -12,7 +13,6 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
     }
     androidMain.dependencies {
-      implementation(libs.bundles.network)
       implementation(libs.dialog)
       implementation(libs.rxpermissions)
     }

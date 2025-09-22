@@ -1,12 +1,11 @@
 package com.cyxbs.pages.affair.room
 
 import androidx.room.*
-import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.cyxbs.pages.affair.ui.adapter.data.AffairAdapterData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairTimeData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairWeekData
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.utils.extensions.defaultGson
 import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.core.Observable
 
@@ -36,7 +35,7 @@ abstract class AffairDataBase : RoomDatabase() {
   companion object {
     val INSTANCE by lazy {
       Room.databaseBuilder(
-        appContext,
+        com.cyxbs.components.init.appContext,
         AffairDataBase::class.java,
         "course_affair_db"
       ).fallbackToDestructiveMigration().build()
@@ -90,7 +89,7 @@ data class AffairEntity(
 
   class AtWhatTimeConverter {
     companion object {
-      private val GSON = Gson()
+      private val GSON = defaultGson
     }
 
     @TypeConverter

@@ -23,26 +23,27 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.config.route.MINE_ENTRY
-import com.cyxbs.components.config.route.NOTIFICATION_HOME
 import com.cyxbs.components.config.route.STORE_ENTRY
 import com.cyxbs.components.config.route.UFIELD_CENTER_ENTRY
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.coroutine.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
-import com.cyxbs.pages.mine.noyification.NotificationUtils
 import com.cyxbs.pages.mine.page.about.AboutActivity
 import com.cyxbs.pages.mine.page.edit.EditInfoActivity
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity
 import com.cyxbs.pages.mine.page.sign.DailySignActivity
+import com.cyxbs.pages.notification.api.ILaunchNotificationService
+import com.cyxbs.pages.notification.api.INotificationService
 import com.g985892345.provider.api.annotation.ImplProvider
-import com.mredrock.cyxbs.common.utils.extensions.loadAvatar
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
@@ -173,8 +174,7 @@ class UserFragment : BaseFragment() {
                         TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_XXZX_ENTRY)
                     }
                 }
-
-                startActivity(NOTIFICATION_HOME)
+                ILaunchNotificationService::class.impl().start()
                 // 进入消息中心，移除红点
                 mine_user_tv_center_notification_count.gone()
             }
@@ -242,29 +242,20 @@ class UserFragment : BaseFragment() {
                 }
             }
         }
-
-        // 消息中心的红点显示逻辑
-        viewModel.newNotificationCount.observe(viewLifecycleOwner) { value ->
-            if (value == 0) {
+        INotificationService::class.impl().unreadCount.onEach {
+            if (it == 0) {
                 mine_user_tv_center_notification_count.gone()
             } else {
                 mine_user_tv_center_notification_count.visible()
-                if (value > 99) {
+                if (it > 99) {
+                    mine_user_tv_center_notification_count.textSize = 8F
                     mine_user_tv_center_notification_count.text = "99+"
                 } else {
-                    mine_user_tv_center_notification_count.text = value.toString()
+                    mine_user_tv_center_notification_count.textSize = 10F
+                    mine_user_tv_center_notification_count.text = it.toString()
                 }
             }
-        }
-
-    }
-
-    override fun onStart() {
-        super.onStart()
-        // 发送签到的通知
-        NotificationUtils.tryNotificationSign(viewModel.status.value?.isChecked ?: false)
-        // 更新最新未读消息数量
-//        viewModel.getNewNotificationCount()
+        }.launchIn(viewLifecycleScope)
     }
 
     override fun onResume() {
@@ -281,7 +272,7 @@ class UserFragment : BaseFragment() {
 
     //刷新和User信息有关的界面
     private fun refreshUserLayout() {
-        val userInfo = IAccountService::class.impl().userInfo.value ?: return
+        val userInfo = IAccountService::class.impl().userInfo ?: return
         mine_user_avatar.setAvatarImageFromUrl(userInfo.photoSrc)
         mine_user_username.text = userInfo.username
     }

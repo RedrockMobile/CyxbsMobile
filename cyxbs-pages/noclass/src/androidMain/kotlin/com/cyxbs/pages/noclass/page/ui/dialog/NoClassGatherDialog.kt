@@ -12,7 +12,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.DateJson
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.affair.api.NoClassBean

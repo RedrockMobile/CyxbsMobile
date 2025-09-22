@@ -2,9 +2,8 @@ package com.cyxbs.pages.course.page.course.room
 
 import android.content.Context
 import androidx.core.content.edit
-import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.utils.extensions.defaultGson
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import java.util.concurrent.ConcurrentHashMap
@@ -79,11 +78,11 @@ data class StuLessonEntity(
     get() = stuNum
 }
 
-private val Gson = Gson()
+private val Gson = defaultGson
 
 class StuLessonDao {
 
-  private val stuLessonSp = appContext.getSharedPreferences("stu_lesson", Context.MODE_PRIVATE)
+  private val stuLessonSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_lesson", Context.MODE_PRIVATE)
 
   private val observerMap = ConcurrentHashMap<String, BehaviorSubject<List<StuLessonEntity>>>()
   
@@ -134,7 +133,7 @@ data class TeaLessonEntity(
 
 class TeaLessonDao {
 
-  private val teaLessonSp = appContext.getSharedPreferences("tea_lesson", Context.MODE_PRIVATE)
+  private val teaLessonSp = com.cyxbs.components.init.appContext.getSharedPreferences("tea_lesson", Context.MODE_PRIVATE)
 
   fun getLesson(teaNum: String): List<TeaLessonEntity> {
     return teaLessonSp.getString(teaNum, null)?.let {
@@ -152,7 +151,7 @@ class TeaLessonDao {
 
 class LessonVerDao {
 
-  private val lessonVersionSp = appContext.getSharedPreferences("lesson_version", Context.MODE_PRIVATE)
+  private val lessonVersionSp = com.cyxbs.components.init.appContext.getSharedPreferences("lesson_version", Context.MODE_PRIVATE)
 
   fun findVersion(num: String): String? {
     return lessonVersionSp.getString(num, null)

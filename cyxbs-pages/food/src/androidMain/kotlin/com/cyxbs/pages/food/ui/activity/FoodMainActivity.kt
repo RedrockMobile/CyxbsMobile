@@ -20,7 +20,7 @@ import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.food.R
 import com.cyxbs.pages.food.ui.adapters.FoodMainRvAdapter
 import com.cyxbs.pages.food.ui.view.FoodDetailDialog

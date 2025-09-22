@@ -1,8 +1,8 @@
 package com.cyxbs.pages.course.widget.fragment.page.expose
 
 import android.widget.TextView
+import com.cyxbs.components.config.time.Date
 import com.ndhzs.netlayout.view.NetLayout2
-import java.util.*
 
 /**
  * ...
@@ -48,7 +48,7 @@ interface IWeekWrapper {
    * 设置月份
    * @param monDay 当前页星期一的 Calendar
    */
-  fun setMonth(monDay: Calendar)
+  fun setMonth(monDay: Date)
   
   /**
    * 得到当前星期数开始的距离(距离课表控件左边缘的距离)

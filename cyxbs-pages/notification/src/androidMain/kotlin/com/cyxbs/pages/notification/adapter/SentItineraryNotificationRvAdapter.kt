@@ -12,16 +12,16 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2px
+import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.extensions.drawable
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.extensions.sp2dpF
 import com.cyxbs.components.utils.extensions.string
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.bean.SentItineraryMsgBean
 import com.cyxbs.pages.notification.util.Date
-import com.cyxbs.components.utils.extensions.dp2pxF
-import com.cyxbs.components.utils.extensions.sp2dpF
 
 /**
  * ...
@@ -39,13 +39,13 @@ class SentItineraryNotificationRvAdapter(
         private val sentItineraryDiffUtil: DiffUtil.ItemCallback<SentItineraryMsgBean> =
             object : DiffUtil.ItemCallback<SentItineraryMsgBean>() {
                 override fun areItemsTheSame(
-                    oldItem: SentItineraryMsgBean, newItem: SentItineraryMsgBean
+                  oldItem: SentItineraryMsgBean, newItem: SentItineraryMsgBean
                 ): Boolean {
                     return oldItem.id == newItem.id
                 }
 
                 override fun areContentsTheSame(
-                    oldItem: SentItineraryMsgBean, newItem: SentItineraryMsgBean
+                  oldItem: SentItineraryMsgBean, newItem: SentItineraryMsgBean
                 ): Boolean {
                     return oldItem.title == newItem.title &&
                             oldItem.content == newItem.content &&

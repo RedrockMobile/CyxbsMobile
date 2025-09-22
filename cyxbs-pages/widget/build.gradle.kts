@@ -2,7 +2,8 @@ plugins {
   id("manager.lib")
 }
 
-useKtProvider()
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 useRoom(rxjava = true)
 
 kotlin {
@@ -19,7 +20,6 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
 
       // 985892345 写的桌面小组件 https://github.com/985892345/CQUPTCourseWidget
       // 目前只实现了单个透明的小组件，后续没精力维护了，让学弟重构吧

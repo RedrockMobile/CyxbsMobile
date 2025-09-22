@@ -14,14 +14,13 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.cyxbs.components.init.appTopActivity
-import com.cyxbs.components.config.view.ScaleScrollTextView
 import com.cyxbs.components.base.dailog.ChooseDialog
-import com.cyxbs.components.utils.extensions.collectUsefulStackTrace
+import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.utils.Jump2QQHelper
+import com.cyxbs.components.view.text.ScaleScrollTextView
 
 /**
  * 用于展示崩溃日志的 dialog
@@ -35,13 +34,20 @@ import com.cyxbs.components.utils.utils.Jump2QQHelper
 class CrashDialog private constructor(
   context: Context
 ) : ChooseDialog(context) {
+
+  companion object {
+    fun show(throwable: Throwable) {
+      Builder(throwable).show()
+    }
+  }
   
   class Builder(
     throwable: Throwable
   ) : ChooseDialog.Builder(
     context = appTopActivity.get()!!,
     DataImpl(
-      content = throwable.collectUsefulStackTrace(),
+      content = throwable.stackTraceToString()
+          + Error().stackTrace.joinToString("\n", "\n\nDialog 触发来源：\n") { "(${it.fileName}:${it.lineNumber})" },
       positiveButtonText = "复制信息",
       negativeButtonText = "关闭",
       buttonWidth = 110,
@@ -116,7 +122,7 @@ class CrashDialog private constructor(
   override fun initContentView(view: View) {
     // 给 .kt 标红
     val builder = SpannableStringBuilder(data.content)
-    val regex = Regex("(?<=.{1,999})\\(\\w+\\.kt:\\d+\\)")
+    val regex = Regex("(?<=.{0,999})\\(\\w+\\.kt:\\d+\\)")
     val result = regex.findAll(builder)
     result.forEach {
       builder.setSpan(

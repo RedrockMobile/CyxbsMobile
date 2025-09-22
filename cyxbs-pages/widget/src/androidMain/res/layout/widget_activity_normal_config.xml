@@ -6,7 +6,7 @@
     android:orientation="vertical"
     tools:context=".widget.page.normal.NormalConfigActivity">
 
-    <include layout="@layout/config_toolbar" />
+    <include layout="@layout/view_toolbar" />
 
     <TextView
         android:layout_width="match_parent"

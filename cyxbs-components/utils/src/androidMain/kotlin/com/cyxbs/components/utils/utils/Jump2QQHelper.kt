@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import com.cyxbs.components.init.appTopActivity
-import com.cyxbs.components.utils.extensions.appContext
 import com.cyxbs.components.utils.extensions.toast
 
 /**

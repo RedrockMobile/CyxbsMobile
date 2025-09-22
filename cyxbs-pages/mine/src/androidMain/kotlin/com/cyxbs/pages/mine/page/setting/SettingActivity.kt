@@ -12,25 +12,27 @@ import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.sp.SP_COURSE_COMPOSE
+import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.config.view.JToolbar
 import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.service.impl
 import com.cyxbs.components.utils.utils.config.PhoneCalendar
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.login.api.ILoginService
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.activity.SecurityActivity
 import com.cyxbs.pages.mine.util.ui.CourseMaxWeekDialog
 import com.cyxbs.pages.mine.util.ui.WarningDialog
 import com.cyxbs.pages.mine.util.widget.SwitchPlus
-import com.mredrock.cyxbs.common.config.COURSE_SHOW_STATE
 import com.mredrock.cyxbs.common.config.SP_WIDGET_NEED_FRESH
 import com.mredrock.cyxbs.common.config.WIDGET_COURSE
 
 class SettingActivity : BaseActivity() {
     private val mSwitch by R.id.mine_setting_switch.view<SwitchPlus>()
+    private val mComposeCourseSwitch by R.id.mine_setting_compose_course.view<SwitchPlus>()
     private val mFmSecurity by R.id.mine_setting_fm_security.view<FrameLayout>()
     private val mFmClear by R.id.mine_setting_fm_clear.view<FrameLayout>()
     private val mFmCourseMaxWeek by R.id.mine_setting_fm_course_max_week.view<FrameLayout>()
@@ -60,13 +62,20 @@ class SettingActivity : BaseActivity() {
         mSwitch.setOnCheckedChangeListener { _, isChecked ->
             defaultSp.edit {
                 if (isChecked) {
-                    putBoolean(COURSE_SHOW_STATE, true)
+                    putBoolean(SP_COURSE_SHOW_STATE, true)
                 } else {
-                    putBoolean(COURSE_SHOW_STATE, false)
+                    putBoolean(SP_COURSE_SHOW_STATE, false)
                 }
             }
         }
-        mSwitch.isChecked = defaultSp.getBoolean(COURSE_SHOW_STATE, false)
+        mSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)
+
+        // 使用 Compose 课表
+        mComposeCourseSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
+        mComposeCourseSwitch.setOnCheckedChangeListener { _, isChecked ->
+            defaultSp.edit { putBoolean(SP_COURSE_COMPOSE, isChecked) }
+            toast("新课表重启生效")
+        }
 
         //账号安全
         mFmSecurity.setOnSingleClickListener {

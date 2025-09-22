@@ -2,7 +2,7 @@ package com.cyxbs.pages.course.page.link.room
 
 import androidx.room.*
 import com.cyxbs.pages.course.page.link.bean.LinkStudent
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import io.reactivex.rxjava3.core.Observable
 import java.io.Serializable
 
@@ -19,7 +19,7 @@ abstract class LinkDataBase : RoomDatabase() {
   companion object {
     val INSTANCE by lazy {
       Room.databaseBuilder(
-        appContext,
+        com.cyxbs.components.init.appContext,
         LinkDataBase::class.java,
         "course_link_student_db"
       ).fallbackToDestructiveMigration().build()

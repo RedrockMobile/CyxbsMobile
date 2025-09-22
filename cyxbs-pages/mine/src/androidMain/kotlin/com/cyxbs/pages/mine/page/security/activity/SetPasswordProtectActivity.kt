@@ -10,7 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.viewModels
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.util.AnswerTextWatcher
@@ -46,7 +46,7 @@ class SetPasswordProtectActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.mine_activity_set_password_protect)
 
-        findViewById<JToolbar>(com.cyxbs.components.config.R.id.toolbar).init(
+        findViewById<JToolbar>(com.cyxbs.components.view.R.id.toolbar).init(
             activity = this,
             title = getString(R.string.mine_security_set_password_protect),
             withSplitLine = true,

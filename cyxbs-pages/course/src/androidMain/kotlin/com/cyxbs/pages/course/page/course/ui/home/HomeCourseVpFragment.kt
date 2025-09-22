@@ -4,14 +4,15 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.viewModels
 import androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.pages.course.page.course.ui.home.base.HomeCourseVpLinkFragment
 import com.cyxbs.pages.course.page.course.ui.home.viewmodel.HomeCourseViewModel
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
 import com.cyxbs.pages.course.widget.fragment.page.CoursePageFragment
 import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import kotlinx.coroutines.flow.first
 
 /**
  * ...
@@ -68,14 +69,12 @@ class HomeCourseVpFragment : HomeCourseVpLinkFragment() {
      * 观察第几周，因为如果是初次进入应用，会因为得不到周数而不主动翻页，所以只能观察该数据
      * 但这是因为主页课表比较特殊而采取观察，其他界面可以直接使用 [mNowWeek] 变量
      */
-    SchoolCalendar.observeWeekOfTerm()
-      .firstElement()
-      .observeOn(AndroidSchedulers.mainThread())
-      .safeSubscribeBy {
-        // 初次加载时移到对应的周数
-        // 这里课表的翻页不建议带有动画，因为数据过多会较卡
-        mViewPager.setCurrentItem(if (it >= mVpAdapter.itemCount) 0 else it, false)
-      }
+    launch {
+      val nowWeek = SchoolCalendar.observeWeekOfTerm().first()
+      // 初次加载时移到对应的周数
+      // 这里课表的翻页不建议带有动画，因为数据过多会较卡
+      mViewPager.setCurrentItem(if (nowWeek >= mVpAdapter.itemCount) 0 else nowWeek, false)
+    }
     
     mViewPager.registerOnPageChangeCallback(
       object : OnPageChangeCallback() {

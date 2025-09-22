@@ -3,10 +3,10 @@ package com.cyxbs.pages.course.page.course.ui.home.utils
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.edit
-import com.cyxbs.components.config.config.SchoolCalendar
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.launch
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ILessonService
@@ -24,7 +24,7 @@ import com.cyxbs.pages.course.widget.internal.item.IItem
 import com.cyxbs.pages.course.widget.internal.item.IItemContainer
 import com.cyxbs.pages.course.widget.internal.view.course.ICourseViewGroup
 import com.ndhzs.netlayout.touch.multiple.event.IPointerEvent
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import kotlinx.coroutines.flow.first
 
 /**
  * 为了整合 [HomeSemesterFragment] 和 [HomeWeekFragment] 高度相似方法的帮助类
@@ -54,15 +54,13 @@ class PageFragmentHelper<T> where T: IHomePageFragment, T: CoursePageFragment {
        * 观察第几周，因为如果是初次进入应用，会因为得不到周数而不主动翻页，所以只能观察该数据
        * 但这是因为主页课表比较特殊而采取观察，其他界面可以直接使用 *VpFragment 的 mNowWeek 变量
        */
-      SchoolCalendar.observeWeekOfTerm()
-        .firstElement()
-        .observeOn(AndroidSchedulers.mainThread())
-        .safeSubscribeBy {
-          if (it == week) {
-            // 判断周数，只对当前周进行动画
-            EnterAnimUtils.startEnterAnim(course, parentViewModel, viewLifecycleOwner)
-          }
+      launch {
+        val nowWeek = SchoolCalendar.observeWeekOfTerm().first()
+        if (nowWeek == week) {
+          // 判断周数，只对当前周进行动画
+          EnterAnimUtils.startEnterAnim(course, parentViewModel, viewLifecycleOwner)
         }
+      }
     }
   }
   

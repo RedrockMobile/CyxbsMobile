@@ -16,6 +16,7 @@ val LocalAppColors: ProvidableCompositionLocal<AppColor> = staticCompositionLoca
 }
 
 open class AppColor(
+  val tvDefault: Color = Color(0x8A000000),   // TextView 的默认颜色
   val tvLv1: Color = Color(0xFF112C54),       // 1号字体颜色，常用于页面顶部标题栏
   val tvLv2: Color = Color(0xFF112C57),       // 2号字体颜色，常用于页面普通字体
   val tvLv3: Color = Color(0xFF15315B),
@@ -31,6 +32,7 @@ open class AppColor(
 }
 
 object AppDarkColor : AppColor(
+  tvDefault = Color(0xB3FFFFFF),
   tvLv1 = Color.White,
   tvLv2 = Color.White,
   tvLv3 = Color.White,

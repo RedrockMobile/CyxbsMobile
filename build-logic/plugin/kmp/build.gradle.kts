@@ -9,4 +9,5 @@ dependencies {
   api(libs.compose.gradlePlugin)
   api(libs.compose.compiler.gradlePlugin)
   api(libs.kotlinx.serialization.gradlePlugin)
+  api(libs.kotlinx.atomicfu.gradlePlugin)
 }

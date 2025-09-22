@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.utils
 
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream

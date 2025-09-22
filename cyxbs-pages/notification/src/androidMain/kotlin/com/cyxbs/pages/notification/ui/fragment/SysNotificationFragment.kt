@@ -3,25 +3,17 @@ package com.cyxbs.pages.notification.ui.fragment
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AnimationUtils
-import androidx.appcompat.widget.LinearLayoutCompat
-import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.button.MaterialButton
-import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.extensions.invisible
-import com.cyxbs.components.utils.extensions.setOnSingleClickListener
-import com.cyxbs.components.utils.extensions.visible
+import androidx.recyclerview.widget.RecyclerView
+import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.pages.notification.R
 import com.cyxbs.pages.notification.adapter.SystemNotificationRvAdapter
-import com.cyxbs.pages.notification.adapter.SystemNotificationRvAdapter.Companion.CHANGE_DOT_STATUS
-import com.cyxbs.pages.notification.bean.DeleteMsgToBean
-import com.cyxbs.pages.notification.bean.SystemMsgBean
-import com.cyxbs.pages.notification.ui.activity.NotificationActivity
-import com.cyxbs.pages.notification.viewmodel.NotificationViewModel
-import com.cyxbs.pages.notification.widget.DeleteDialog
-import com.cyxbs.pages.notification.widget.SwipeDeleteRecyclerView
-import com.cyxbs.components.base.ui.BaseFragment
-import kotlin.properties.Delegates
+import com.cyxbs.pages.notification.bean.ChangeReadStatusToBean
+import com.cyxbs.pages.notification.ui.activity.WebActivity
+import com.cyxbs.pages.notification.viewmodel.SystemMsgViewModel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 /**
  * Author by OkAndGreat
@@ -29,149 +21,36 @@ import kotlin.properties.Delegates
  *
  */
 class SysNotificationFragment : BaseFragment(R.layout.notification_fragment_system) {
-    private val notification_system_btn_positive by R.id.notification_system_btn_positive.view<MaterialButton>()
-    private val notification_system_btn_negative by R.id.notification_system_btn_negative.view<MaterialButton>()
-    private val notification_ll_no_internet by R.id.notification_ll_no_internet.view<LinearLayoutCompat>()
-    private val notification_rv_sys by R.id.notification_rv_sys.view<SwipeDeleteRecyclerView>()
-    //页面数据
-    private var data = ArrayList<SystemMsgBean>()
+    private val notification_rv_sys by R.id.notification_rv_sys.view<RecyclerView>()
 
     //rv的适配器
     private lateinit var adapter: SystemNotificationRvAdapter
 
-    //fragment对应的activity
-    private var myActivity by Delegates.notNull<NotificationActivity>()
-
-    //所有已读的系统通知的消息的bean 用来给删除已读使用
-    private var allReadSysMsg = ArrayList<SystemMsgBean>()
-
-    //使用和Activity同一个Viewmodel来与activity通信
-    private val viewModel: NotificationViewModel by activityViewModels()
+    private val viewModel: SystemMsgViewModel by viewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        myActivity = requireActivity() as NotificationActivity
         initRv()
         initObserver()
-        initViewClickListener()
     }
 
     private fun initRv() {
         adapter =
-            SystemNotificationRvAdapter(
-                data,
-                viewModel,
-                requireContext(),
-                requireActivity(),
-                notification_rv_sys
-            ) {
-                myActivity.removeUnreadSysMsgId(data[it].id.toString())
-                viewModel.deleteMsg(DeleteMsgToBean(listOf(data[it].id.toString())))
-                data.removeAt(it)
-                adapter.setNewList(data)
-                adapter.notifyItemRemoved(it)
-                notification_rv_sys.closeMenu()
+            SystemNotificationRvAdapter {
+                viewModel.changeMsgStatus(ChangeReadStatusToBean(listOf(it.id.toString())))
+                WebActivity.startWebViewActivity(it.redirect_url, requireContext())
             }
         notification_rv_sys.adapter = adapter
 
         val resId = R.anim.notification_layout_animation_fall_down
-        val anim = AnimationUtils.loadLayoutAnimation(myActivity, resId)
+        val anim = AnimationUtils.loadLayoutAnimation(requireContext(), resId)
         notification_rv_sys.layoutAnimation = anim
         notification_rv_sys.layoutManager = LinearLayoutManager(this.context)
     }
 
     private fun initObserver() {
-        viewModel.systemMsg.observe(viewLifecycleOwner) {
-            it?.let {
-                for (value in it) {
-                    if (value.has_read)
-                        allReadSysMsg.add(value)
-                }
-            }
-            if (it.isNotEmpty())
-                data = it as ArrayList<SystemMsgBean>
-            data.addAll(it)
-            adapter.changeAllData(data)
-            notification_rv_sys.scheduleLayoutAnimation()
-        }
-
-        viewModel.sysDotStatus.observe(viewLifecycleOwner) {
-            if (!it) {
-                for ((index, _) in data.withIndex()) {
-                    data[index].has_read = true
-                }
-                adapter.changeAllData(data)
-            }
-        }
-
-        viewModel.changeMsgReadStatus.observe(viewLifecycleOwner) {
-            if (it < 0) return@observe
-            data[it].has_read = true
-            adapter.setNewList(data)
-            adapter.notifyItemChanged(it, CHANGE_DOT_STATUS)
-            myActivity.removeUnreadSysMsgId(data[it].id.toString())
-        }
-
-        viewModel.getMsgSuccessful.observe(viewLifecycleOwner) {
-            if (it == false) {
-                notification_ll_no_internet.visible()
-                notification_rv_sys.gone()
-            } else {
-                notification_ll_no_internet.gone()
-                notification_rv_sys.visible()
-            }
-        }
-    }
-
-    fun deleteAllReadMsg() {
-        for (value in allReadSysMsg) {
-            data.remove(value)
-            viewModel.deleteMsg(DeleteMsgToBean(listOf(value.id.toString())))
-            adapter.changeAllData(data)
-        }
-
-        //清空
-        allReadSysMsg = ArrayList()
-    }
-
-
-    private fun initViewClickListener() {
-        notification_system_btn_negative.setOnSingleClickListener {
-            it.invisible()
-            notification_system_btn_positive.invisible()
-            //控制LoadMoreWindow是否可以打开
-            viewModel.changePopUpWindowClickableStatus(true)
-            notification_rv_sys.adapter = adapter
-        }
-        notification_system_btn_positive.setOnSingleClickListener {
-            val selectedItemInfos = adapter.getSelectedItemInfos()
-            selectedItemInfos?.let {
-                DeleteDialog.show(
-                    requireActivity().supportFragmentManager,
-                    tips = "确认要删除选中${it.ids.size}条消息吗",
-                    topTipsCnt = it.reads.size,
-                    onNegativeClick = { dismiss() },
-                    onPositiveClick = {
-                        viewModel.deleteMsg(DeleteMsgToBean(selectedItemInfos.ids))
-                        notification_system_btn_negative?.invisible()
-                        notification_system_btn_positive?.invisible()
-                        notification_rv_sys.adapter = adapter
-
-                        val deleteItems = ArrayList<SystemMsgBean>()
-                        for (position in selectedItemInfos.position) {
-                            deleteItems.add(data[position])
-                            myActivity.removeUnreadSysMsgId(data[position].id.toString())
-                        }
-                        for (value in deleteItems) {
-                            val position = data.indexOf(value)
-                            data.removeAt(position)
-                            adapter.notifyItemRemoved(position)
-                        }
-
-                        dismiss()
-                    }
-                )
-            }
-        }
+        viewModel.systemMsgFlow.onEach { list ->
+            adapter.submitList(list)
+        }.launchIn(viewLifecycleScope)
     }
 }

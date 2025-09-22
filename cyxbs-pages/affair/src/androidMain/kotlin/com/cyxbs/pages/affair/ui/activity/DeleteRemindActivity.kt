@@ -3,7 +3,7 @@ package com.cyxbs.pages.affair.ui.activity
 import android.content.Intent
 import android.os.Bundle
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 
 /**
  * .
@@ -14,8 +14,8 @@ import com.cyxbs.components.utils.extensions.appContext
 class DeleteRemindActivity : BaseActivity() {
   companion object {
     fun start(affairId: Int) {
-      appContext.startActivity(
-        Intent(appContext, DeleteRemindActivity::class.java)
+      com.cyxbs.components.init.appContext.startActivity(
+        Intent(com.cyxbs.components.init.appContext, DeleteRemindActivity::class.java)
           .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
           .putExtra(DeleteRemindActivity::mAffairId.name, affairId)
       )

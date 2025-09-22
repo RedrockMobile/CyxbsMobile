@@ -1,7 +1,6 @@
 package com.cyxbs.pages.login.viewmodel
 
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.seconds
+import com.cyxbs.pages.login.api.LoginArgument
 
 /**
  * .
@@ -9,21 +8,6 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/31
  */
-actual class LoginViewModel : CommonLoginViewModel() {
-
-  override fun clickForgetPassword() {
-  }
-
-  override fun clickUserAgreement() {
-  }
-
-  override fun clickPrivacyPolicy() {
-  }
-
-  override fun enterTouristMode() {
-  }
-
-  override fun clickDisagreeUserAgreement() {
-
-  }
+actual class LoginViewModel actual constructor(argument: LoginArgument) :
+  CommonLoginViewModel(argument) {
 }

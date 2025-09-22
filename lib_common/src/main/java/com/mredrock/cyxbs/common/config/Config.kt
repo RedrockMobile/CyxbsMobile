@@ -59,9 +59,6 @@ const val STU_NAME_LIST = "stuNameList"
 //传递给CourseFragment页数的key
 const val WEEK_NUM = "week_num"
 
-//启动App时最先显示课表界面的Key
-const val COURSE_SHOW_STATE = "course_show_state"
-
 //通知课表是否直接加载的key
 const val COURSE_DIRECT_LOAD = "direct_load"
 

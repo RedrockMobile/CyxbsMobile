@@ -3,7 +3,7 @@ package com.cyxbs.pages.widget.repo.database
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.pages.widget.repo.bean.AffairEntity
 
 /**

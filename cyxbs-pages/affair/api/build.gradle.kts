@@ -4,6 +4,9 @@ plugins {
 
 kotlin {
   sourceSets {
+    commonMain.dependencies {
+      implementation(projects.cyxbsComponents.config)
+    }
     androidMain.dependencies {
       implementation(libs.rxjava)
     }

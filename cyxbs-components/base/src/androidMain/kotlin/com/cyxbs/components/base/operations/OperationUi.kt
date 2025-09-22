@@ -4,7 +4,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.dailog.BaseChooseDialog
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.base.ui.BaseUi
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.login.api.ILoginService
 
 /**
@@ -34,6 +34,7 @@ fun BaseUi.doIfLogin(msg: String? = "此功能", next: (() -> Unit)? = null): Bo
       )
     ).setPositiveClick {
       ILoginService::class.impl().jumpToLoginPage()
+      dismiss()
     }.show()
     return false
   }

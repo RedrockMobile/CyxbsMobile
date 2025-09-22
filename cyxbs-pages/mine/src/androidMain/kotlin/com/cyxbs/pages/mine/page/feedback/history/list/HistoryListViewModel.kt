@@ -3,8 +3,7 @@ package com.cyxbs.pages.mine.page.feedback.history.list
 import androidx.core.content.edit
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.map
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.setSchedulers
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
 import com.cyxbs.pages.mine.page.feedback.api
@@ -136,7 +135,7 @@ class HistoryListViewModel : BaseViewModel() {
     //数据保存工具类
     fun savedState(data: History) {
         if (data.replyOrNot) {
-            val pointSP = appContext.getPointStateSharedPreference()
+            val pointSP = com.cyxbs.components.init.appContext.getPointStateSharedPreference()
             pointSP?.edit {
                 putString(data.id.toString(), data.updateTime)
             }
@@ -146,7 +145,7 @@ class HistoryListViewModel : BaseViewModel() {
 
     private fun getState(replyOrNot: Boolean, id: Long, updateTime: String): Boolean {
         return if (replyOrNot) {
-            val pointSP = appContext.getPointStateSharedPreference()
+            val pointSP = com.cyxbs.components.init.appContext.getPointStateSharedPreference()
             pointSP?.getString(id.toString(), "") == updateTime
         } else {
             true

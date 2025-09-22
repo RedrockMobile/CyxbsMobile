@@ -10,4 +10,9 @@ import com.russhwolf.settings.Settings
  * @date 2025/1/11
  */
 
+// 设备维度的 Key-Value 对象本地存储
 expect val defaultSettings: Settings
+
+// 当前登录人的 Key-Value 对象本地存储
+val accountSettings: AccountSettings
+  get() = AccountSettings.now

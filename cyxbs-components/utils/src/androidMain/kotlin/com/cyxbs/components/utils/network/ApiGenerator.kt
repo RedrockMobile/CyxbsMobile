@@ -6,24 +6,32 @@ import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.BuildConfig
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
-import com.cyxbs.components.utils.service.allImpl
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.allImpl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Converter
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.lang.reflect.Type
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -34,14 +42,69 @@ import kotlin.reflect.KClass
  * ## 命名规则
  * XXXApiService 接口，命名规则，以 ApiService 结尾
  *
+ * ## 多平台推荐
+ * 掌邮已开始适配多平台构建，部分第三方库将被替代
+ * - Retrofit -> Ktorfit
+ * - Gson -> kotlinx-serialization
+ *
+ * ## 数据类
+ * 数据类可以使用 JSON To Kotlin Class 插件，但⚠️注意一定要打上序列化注解
+ * ```
+ * // (推荐) 使用 kotlinx-serialization
+ * @Serializable                // ⚠️注意：这里需要打上类注解
+ * data class Bean(
+ *     @SerialName("name")      // ⚠️注意：必须打上变量注解
+ *     val name: String
+ * )
+ *
+ * // 使用 Gson (建议使用 kotlinx-serialization)
+ * data class Bean(
+ *     @SerializedName("name")  // ⚠️注意：必须打上注解
+ *     val name: String
+ * )
+ * ```
+ *
  * ## 接口模板
  * ```
+ * // (推荐) 使用 Ktorfit，导入 import de.jensklingenberg.ktorfit.http.*
  * interface XXXApiService {
+ *     @GET("aaa/bbb")              // ⚠️注意：请求路径不能有前置斜杠 /
+ *     fun getXXX(): Single<ApiWrapper<Bean>>
+ *     // ⚠️统一使用 ApiWrapper 或 ApiStatus 包装，注意 Bean 类要去掉 data 字段，不然会报 json 错误
+ * }
+ *
+ * // 示例代码：
+ * runCatchingCoroutine {           // ⚠️注意：这里需要使用 runCatchingCoroutine，不拦截协程的 Cancel 异常
+ *     XXXApiService::class.impl()
+ *         .getXXX(stuNum)          // 直接使用 XXXApi::class.impl() 就可以直接获取到实现类
+ * }.mapCatching {
+ *     it.throwApiExceptionIfFail() // ⚠️注意：这里需要使用 throwApiExceptionIfFail()
+ *     it
+ * }.onSuccess {
+ *     // 网络请求返回结果
+ * }
+ *
+ *
+ * ////////////////////////////////////////////
+ * //   以下为 Retrofit + ApiGenerator 的用法
+ * ////////////////////////////////////////////
+ *
+ * // 使用 Retrofit + ApiGenerator
+ * interface XXXApiService : IApi { // 可选择性实现 IApi 注解便于获取实现类
  *
  *     @GET("/aaa/bbb")
  *     fun getXXX(): Single<ApiWrapper<Bean>>
  *     // 统一使用 ApiWrapper 或 ApiStatus 包装，注意 Bean 类要去掉 data 字段，不然会报 json 错误
+ * }
  *
+ * // 获取方式 1:
+ * // 如果实现了 IApi 注解，则直接使用 XXXApi::class.impl 获取实现类
+ * XXXApiService::class.impl
+ *     .getXXX()
+ *
+ * // 获取方式 2:
+ * // 或者在 XXXApiService 中添加单例
+ * object XXXApiService : IApi {
  *     companion object {
  *         val INSTANCE by lazy {
  *             ApiGenerator.getXXXApiService(XXXApiService::class)
@@ -49,19 +112,14 @@ import kotlin.reflect.KClass
  *     }
  * }
  *
- * 或者：
- * interface XXXApiService : IApi
- *
- * 使用：
  * XXXApiService::class.impl
  *     .getXXX()
- * ```
  *
- * ## 示例代码
- * ```
+ *
+ * // 示例代码
  * ApiService.INSTANCE.getXXX()
- *     .subscribeOn(Schedulers.io())  // 线程切换
- *     .observeOn(AndroidSchedulers.mainThread())
+ *     .subscribeOn(Schedulers.io())  // 上游切换到 io 线程
+ *     .observeOn(AndroidSchedulers.mainThread()) // 下游切换到主线程
  *     .mapOrInterceptException {     // 当 errorCode 的值不为成功时抛错，并拦截异常
  *         // 这里面可以使用 DSL 写法，更多详细用法请看该方法注释
  *     }
@@ -221,8 +279,51 @@ object ApiGenerator {
                 })
             }
         }))
+            .addConverterFactory(KotlinXSerializationFactory()) // 需要放在 gson 之前
             .addConverterFactory(GsonConverterFactory.create())
             .addCallAdapterFactory(RxJava3CallAdapterFactory.createSynchronous())
+    }
+
+    private class KotlinXSerializationFactory : Converter.Factory() {
+
+        private val factory = defaultJson.asConverterFactory("application/json; charset=UTF8".toMediaType())
+
+        override fun responseBodyConverter(
+            type: Type,
+            annotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<ResponseBody?, *>? {
+            return try {
+                factory.responseBodyConverter(type, annotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
+
+        override fun requestBodyConverter(
+            type: Type,
+            parameterAnnotations: Array<out Annotation?>,
+            methodAnnotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<*, RequestBody?>? {
+            return try {
+                factory.requestBodyConverter(type, parameterAnnotations, methodAnnotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
+
+        override fun stringConverter(
+            type: Type,
+            annotations: Array<out Annotation?>,
+            retrofit: Retrofit
+        ): Converter<*, String?>? {
+            return try {
+                factory.stringConverter(type, annotations, retrofit)
+            } catch (e: SerializationException) {
+                null // 说明不支持 Kotlinx-Serialization
+            }
+        }
     }
 
     //默认配置

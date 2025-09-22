@@ -7,7 +7,7 @@ import com.cyxbs.pages.course.api.utils.getStartRow
 import com.cyxbs.pages.course.api.R
 import com.cyxbs.pages.course.page.course.data.expose.IWeek
 import com.cyxbs.pages.course.widget.item.single.ISingleDayData
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.lazyUnlock
 
 /**
@@ -39,11 +39,11 @@ sealed interface ICourseItemData : IWeek, ISingleDayData {
   
   companion object {
     private val WeekStr by lazyUnlock {
-      appContext.resources.getStringArray(R.array.course_api_course_weeks_strings)
+      com.cyxbs.components.init.appContext.resources.getStringArray(R.array.course_api_course_weeks_strings)
     }
     
     private val WeekdayStr by lazyUnlock {
-      val resources = appContext.resources
+      val resources = com.cyxbs.components.init.appContext.resources
       arrayOf(
         resources.getString(R.string.course_api_week_mon),
         resources.getString(R.string.course_api_week_tue),

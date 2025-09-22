@@ -2,7 +2,7 @@ package com.cyxbs.pages.news.network.download
 
 import android.os.Environment
 import com.cyxbs.pages.news.network.ApiService
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.saveFile
 import com.cyxbs.components.utils.network.getBaseUrl
 import okhttp3.OkHttpClient
@@ -43,7 +43,7 @@ object DownloadManager {
                             return
                         }
                         try {
-                            val uri = appContext.saveFile(body.byteStream().readBytes(),"$fileName.${splitFileType(response.headers()["Content-Disposition"])}")
+                            val uri = com.cyxbs.components.init.appContext.saveFile(body.byteStream().readBytes(),"$fileName.${splitFileType(response.headers()["Content-Disposition"])}")
                           println("AAAAA ${uri?.path}")
                           listener.onSuccess(uri)
                         } catch (e: Exception) {

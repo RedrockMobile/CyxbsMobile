@@ -2,7 +2,7 @@ package com.cyxbs.pages.course.page.course.ui.home.utils
 
 import android.view.View
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.page.course.data.AffairData
 import com.cyxbs.pages.course.page.course.data.toAffair

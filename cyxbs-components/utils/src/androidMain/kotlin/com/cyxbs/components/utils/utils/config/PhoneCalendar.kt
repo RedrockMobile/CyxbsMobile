@@ -16,7 +16,7 @@ import androidx.fragment.app.FragmentActivity
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.init.appApplication
 import com.cyxbs.components.utils.extensions.doPermissionAction
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.config.PhoneCalendar.Event
 import io.reactivex.rxjava3.core.Completable
 import kotlinx.coroutines.suspendCancellableCoroutine

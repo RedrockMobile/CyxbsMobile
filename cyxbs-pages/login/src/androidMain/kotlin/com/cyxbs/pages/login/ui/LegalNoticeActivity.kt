@@ -1,7 +1,5 @@
 package com.cyxbs.pages.login.ui
 
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
@@ -9,6 +7,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.webView.LiteJsWebView
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.login.R
 
 /**
@@ -29,14 +28,10 @@ import com.cyxbs.pages.login.R
 class LegalNoticeActivity : BaseActivity() {
 
     companion object {
-        fun start(context: Context, url: String) {
-            context.startActivity(
-                Intent(
-                    context,
-                    LegalNoticeActivity::class.java
-                ).apply {
-                    putExtra("url", url)
-                })
+        fun start(url: String) {
+            startActivity(LegalNoticeActivity::class) {
+                putExtra("url", url)
+            }
         }
     }
 

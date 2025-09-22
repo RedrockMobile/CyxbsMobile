@@ -9,15 +9,15 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.IdRes
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.widget.activity.InfoActivity
 import com.cyxbs.pages.widget.repo.bean.AffairEntity
 import com.cyxbs.pages.widget.repo.bean.LessonEntity
 import com.cyxbs.pages.widget.repo.database.AffairDatabase
 import com.cyxbs.pages.widget.repo.database.LessonDatabase
-import com.google.gson.Gson
 import java.util.Calendar
 
 
@@ -61,7 +61,7 @@ fun getLessonClickPendingIntent(
     return PendingIntent.getBroadcast(context, 0, intent, getPendingIntentFlags())
 }
 
-val gson by lazy { Gson() }
+val gson = defaultGson
 
 //给按钮返回PendingIntent
 fun getClickIntent(

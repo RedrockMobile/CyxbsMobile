@@ -11,3 +11,7 @@ import android.util.Log
 actual fun log(msg: String) {
   Log.d("ggg", "(${Exception().stackTrace[2].run { "$fileName:$lineNumber" }}) -> $msg")
 }
+
+actual fun log(tag: String, msg: String) {
+  Log.d(tag, "(${Exception().stackTrace[2].run { "$fileName:$lineNumber" }}) -> $msg")
+}

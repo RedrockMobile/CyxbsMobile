@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 plugins {
   kotlin("multiplatform")
   id(libsEx.plugins.kotlinSerialization)
+  id(libsEx.plugins.kotlinAtomicfu)
 }
 
 kotlin {
@@ -32,7 +33,7 @@ kotlin {
   if (Multiplatform.enableWasm(project)) {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-      moduleName = Config.getBaseName(project)
+      outputModuleName.set(Config.getBaseName(project))
       browser {
         val rootDirPath = project.rootDir.path
         val projectDirPath = project.projectDir.path
@@ -68,6 +69,41 @@ kotlin {
       val desktopMain by getting
       desktopMain.dependencies {
         implementation(libsEx.`kotlinx-coroutines-swing`)
+      }
+    }
+
+    // 移动端，建议 mobileMain 里面只放 UI
+    // mobileMain 目前只用来兼容竖屏的手机端，如果后续需要全尺寸的话，放到 commonMain 即可
+    val mobileMain = create("mobileMain") {
+      dependsOn(commonMain.get())
+    }
+    androidMain { dependsOn(mobileMain) }
+    if (Multiplatform.enableIOS(project)) {
+      val iosMain = create("iosMain") {
+        dependsOn(mobileMain)
+      }
+      iosX64Main { dependsOn(iosMain) }
+      iosArm64Main { dependsOn(iosMain) }
+      iosSimulatorArm64Main { dependsOn(iosMain) }
+    }
+
+    // 单独为 jb Compose 添加一个源集，区分安卓的 jetpack Compose
+    val jbComposeMain = create("jbComposeMain") {
+      dependsOn(commonMain.get())
+    }
+    if (Multiplatform.enableIOS(project)) {
+      val iosMain by getting {
+        dependsOn(jbComposeMain)
+      }
+    }
+    if (Multiplatform.enableDesktop(project)) {
+      val desktopMain by getting {
+        dependsOn(jbComposeMain)
+      }
+    }
+    if (Multiplatform.enableWasm(project)) {
+      val wasmJsMain by getting {
+        dependsOn(jbComposeMain)
       }
     }
   }

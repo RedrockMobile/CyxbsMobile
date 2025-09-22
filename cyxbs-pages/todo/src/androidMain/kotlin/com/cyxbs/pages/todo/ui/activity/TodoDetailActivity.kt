@@ -19,6 +19,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.todo.R
@@ -62,7 +63,7 @@ class TodoDetailActivity : BaseActivity() {
         fun startActivity(todo: Todo, context: Context) {
             context.startActivity(
                 Intent(context, TodoDetailActivity::class.java).apply {
-                    putExtra("todo", Gson().toJson(todo))
+                    putExtra("todo", defaultGson.toJson(todo))
                 }
             )
         }
@@ -79,7 +80,7 @@ class TodoDetailActivity : BaseActivity() {
         //下面的逻辑是为了处理端内跳转
         fun initTodo() {
             //这里反序列化两次是为了防止内外拿到同一个引用
-            viewModel.rawTodo = Gson().fromJson(intent.getStringExtra("todo"), Todo::class.java)
+            viewModel.rawTodo = defaultGson.fromJson(intent.getStringExtra("todo"), Todo::class.java)
 
             initView()
 
@@ -106,7 +107,7 @@ class TodoDetailActivity : BaseActivity() {
             }
 
         } else {
-            todo = Gson().fromJson(intent.getStringExtra("todo"), Todo::class.java)
+            todo = defaultGson.fromJson(intent.getStringExtra("todo"), Todo::class.java)
 
             initTodo()
         }

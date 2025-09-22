@@ -4,7 +4,8 @@
     <application>
         <activity android:name=".pages.PhotoViewerActivity"/>
         <activity android:name=".crash.CrashActivity" />
-        <activity android:name=".pages.SecretActivity" />
+        <activity android:name=".pages.SecretActivity"
+            android:launchMode="singleInstance"/>
         <activity android:name=".crash.NetworkApiResultActivity" />
     </application>
 </manifest>

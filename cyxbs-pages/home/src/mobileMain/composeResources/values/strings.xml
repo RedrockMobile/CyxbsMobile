@@ -1,0 +1,5 @@
+<resources>
+    <string name="home_nav_discover">发现</string>
+    <string name="home_nav_fairground">邮乐园</string>
+    <string name="home_nav_mine">我的</string>
+</resources>

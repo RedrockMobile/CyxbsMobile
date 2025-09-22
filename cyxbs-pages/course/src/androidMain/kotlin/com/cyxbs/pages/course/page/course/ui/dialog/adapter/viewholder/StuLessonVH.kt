@@ -10,8 +10,8 @@ import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.utils.service.impl
-import com.cyxbs.components.utils.service.startActivity
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.course.R
 import com.cyxbs.pages.course.page.course.data.StuLessonData
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity

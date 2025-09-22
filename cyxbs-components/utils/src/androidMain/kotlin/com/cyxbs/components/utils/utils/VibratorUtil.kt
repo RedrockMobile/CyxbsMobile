@@ -3,7 +3,7 @@ package com.cyxbs.components.utils.utils
 import android.content.Context
 import android.os.*
 import android.os.Vibrator
-import com.cyxbs.components.utils.extensions.appContext
+import com.cyxbs.components.init.appContext
 
 /**
  * 用于触发震动的工具类

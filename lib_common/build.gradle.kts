@@ -2,11 +2,14 @@ plugins {
   id("manager.lib")
 }
 
+useNetwork() // 网络请求
+
 kotlin {
   sourceSets {
     commonMain.dependencies {
       implementation(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.base)
+      implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
@@ -15,7 +18,6 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
       implementation(libs.glide)
       implementation(libs.rxpermissions)
       implementation(libs.lPhotoPicker)

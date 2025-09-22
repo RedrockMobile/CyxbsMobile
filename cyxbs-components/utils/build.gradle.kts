@@ -3,21 +3,19 @@ plugins {
   id("kmp.compose")
 }
 
-useKtorfit()
-useKtProvider(false) // utils 模块不包含实现类，不需要处理注解
+useNetwork() // 网络请求
+useKtProvider() // api 模块服务提供
 
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.cyxbsComponents.init)
+      api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(libs.kmp.ktProvider.manager) // utils 私有，其他模块通过 ::class.impl() 获取
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
-      implementation(libs.bundles.network)
       implementation(libs.glide)
       implementation(libs.rxpermissions)
       implementation(libs.okhttp.logging.interceptor)

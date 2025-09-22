@@ -8,7 +8,7 @@ import android.widget.TextView
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.view.JToolbar
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
@@ -32,7 +32,7 @@ class BindEmailActivity : BaseActivity() {
     private val et_bind_email by R.id.et_bind_email.view<EditText>()
     private val tv_bind_email_top_tips by R.id.tv_bind_email_top_tips.view<TextView>()
     private val tv_bind_email_tips by R.id.tv_bind_email_tips.view<TextView>()
-    private val common_toolbar by com.cyxbs.components.config.R.id.toolbar.view<JToolbar>()
+    private val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

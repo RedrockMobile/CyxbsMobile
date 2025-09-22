@@ -11,8 +11,8 @@ import java.util.regex.Pattern
  */
 object Config {
   // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
-  const val versionCode = 90 // 线上89，开发90
-  const val versionName = "6.10.2-alpha" // 线上6.10.1，开发6.10.2-alpha，自己打包 -alpha，内测 -beta
+  const val versionCode = 91 // 线上90，开发91
+  const val versionName = "6.10.3-alpha" // 线上6.10.2，开发6.10.3-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
     get() = versionName.substringBeforeLast("-")
@@ -22,13 +22,13 @@ object Config {
 
   // 线上版本更新内容，注意缩进统一
   val updateContent = """
-    [bugfix]
-    1.修复 6.10.0 初次打开课表白屏问题
-    
     [feature]
-    1.新增2025年招新banner，让更多邮子认识红岩工作室
-    2.全面升级表态广场，Q and A问答为邮子全面解决生活、学习等问题
-    3.新增重邮地图导航功能，为邮子探索校园提供全新助力
+    1. 课表首屏数据加快，不用再怕学校网卡了
+    2. 添加新版多平台课表测试开关，设置中可手动开启
+    
+    [bugfix]
+    1. 修护没课约分组不展示
+    2. 修护长期未登陆网络失败问题，现在将主动跳到登陆页
   """.trimIndent()
 
   val resourcesExclude = listOf(

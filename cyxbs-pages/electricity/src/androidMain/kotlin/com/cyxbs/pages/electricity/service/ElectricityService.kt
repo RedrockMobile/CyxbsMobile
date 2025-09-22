@@ -2,7 +2,7 @@ package com.cyxbs.pages.electricity.service
 
 import androidx.fragment.app.Fragment
 import com.cyxbs.components.config.route.DISCOVER_ELECTRICITY_FEED
-import com.cyxbs.components.utils.service.impl
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.electricity.api.IElectricityService
 import com.g985892345.provider.api.annotation.ImplProvider
 
