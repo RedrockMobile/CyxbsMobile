@@ -117,23 +117,30 @@ if (secretGradleFile.exists()) {
     //快速模式：生成渠道包时不进行校验（速度可以提升10倍以上，默认为false）
     fastMode = false
     //buildTime的时间格式，默认格式：yyyyMMdd-HHmmss
-    buildTimeDateFormat = "yyyyMMdd-HHmmss"
+    buildTimeDateFormat = "yyyyMMdd-HHmm"
     //低内存模式（仅针对V2签名，默认为false）：只把签名块、中央目录和EOCD读取到内存，不把最大头的内容块读取到内存，在手机上合成APK时，可以使用该模式
     lowMemory = false
   }
+
   /**
-   * 发新版 task
+   * 发新版 task，同时触发打包
    */
-  tasks.register("cyxbsRelease", CyxbsReleaseTask::class) {
+  tasks.register("cyxbsRelease") {
     group = "cyxbs"
+    dependsOn("channelRelease", "cyxbsReleaseExistApk")
+  }
+
+  // 仅发布 apk，不打包
+  tasks.register("cyxbsReleaseExistApk", CyxbsReleaseTask::class) {
+    group = "cyxbs"
+    mustRunAfter("channelRelease")
     getApkFile.set {
-      channel.outputDir.listFiles()?.singleOrNull {
+      channel.outputDir.listFiles()!!.single {
         it.name.matches(
           Regex("掌上重邮-${Config.versionName}-official-release-\\d+-\\d+\\.apk")
         )
-      }!!
+      }
     }
-    dependsOn(project.tasks.getByName("channelRelease"))
   }
 }
 
@@ -145,22 +152,29 @@ tasks.register("buildReleaseAndInstall") {
     channel.outputDir.listFiles().also {
       println("buildReleaseAndInstall: ${it?.joinToString("\n")}")
     }
+    val apkFile = channel.outputDir.listFiles()!!.first {
+      it.name.contains("official") // 找到第一个 official 的渠道包
+    }
     val installResult = exec {
       // adb install 安装
       commandLine(
         "adb", "install", "-r",
-        channel.outputDir.listFiles()!!.first {
-          it.name.contains("official") // 找到第一个 official 的渠道包
-        })
+        apkFile
+      )
     }
     if (installResult.exitValue == 0) {
       exec {
         // adb shell am start 打开 app
         commandLine(
-          "adb", "shell", "am", "start", "-n",
-          "${android.defaultConfig.applicationId}/com.cyxbs.pages.home.ui.main.MainActivity"
+          "adb", "shell", "am", "start",
+          "-c", "android.intent.category.LAUNCHER",
+          "-p", android.defaultConfig.applicationId,
         )
       }
+    }
+    if (apkFile.name.endsWith(".apk")) {
+      // 改名为 .Apk 后缀，方便发到 QQ
+      apkFile.renameTo(apkFile.parentFile.resolve(apkFile.name.replace(".apk", ".Apk")))
     }
   }
 }

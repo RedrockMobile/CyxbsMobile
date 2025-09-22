@@ -14,11 +14,11 @@ data class ReleaseData(
   @SerializedName("apk_url")
     val apkUrl: String,
   @SerializedName("update_content")
-    val updateContent: String = Config.updateContent,
+    val updateContent: String,
   @SerializedName("version_code")
-    val versionCode: Int = Config.versionCode,
+    val versionCode: Int,
   @SerializedName("version_name")
-    val versionName: String = Config.versionName
+    val versionName: String
 )
 
 data class ApkUploadData(
