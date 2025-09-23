@@ -42,7 +42,7 @@ import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
-import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
+import com.cyxbs.pages.home.mobile.viewmodel.MobileCourseFrameViewModel
 import com.cyxbs.pages.home.ui.PlatformHomePage
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.collectLatest
@@ -101,7 +101,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     return
   }
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val courseFrameViewModel = viewModel(CourseFrameViewModel::class)
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),

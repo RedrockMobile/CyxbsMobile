@@ -27,7 +27,7 @@ import kotlin.time.Duration.Companion.days
  */
 object HomeSelfLessonDataProvider : CourseDataProvider() {
 
-  private val itemFactory = SelfLessonItemFactory::class.impl()
+  private val itemFactory = SelfLessonItemFactory.get()
 
   init {
     IAccountService::class.impl()

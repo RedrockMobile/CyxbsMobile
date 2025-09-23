@@ -1,6 +1,9 @@
 package com.cyxbs.pages.course.home.item
 
+import androidx.compose.runtime.Stable
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItemModel
 import com.cyxbs.pages.course.view.item.CourseItemModel
 
 /**
@@ -18,8 +21,16 @@ interface SelfLessonItemFactory {
     page: Int,
     lesson: LessonByWeeks,
   ): SelfLessonItemModel
+
+
+  companion object {
+    fun get(): SelfLessonItemFactory {
+      return SelfLessonItemFactory::class.implOrNull() ?: DefaultSelfLessonItemModel
+    }
+  }
 }
 
+@Stable
 interface SelfLessonItemModel : CourseItemModel {
   val lesson: LessonByWeeks
 }

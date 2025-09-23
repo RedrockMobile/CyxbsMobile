@@ -42,7 +42,6 @@ class MobileLinkLessonItemModel(
   override val lesson: LessonByWeeks,
 ) : LinkLessonItemModel, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItemModel {
 
-  @ImplProvider
   companion object : LinkLessonItemFactory {
     override fun createLinkLessonItemModel(page: Int, lesson: LessonByWeeks): LinkLessonItemModel {
       return MobileLinkLessonItemModel(page, lesson)

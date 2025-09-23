@@ -105,7 +105,7 @@ abstract class CyxbsReleaseTask : DefaultTask() {
         // 发布新版本信息
         UploadNewVersionInfoStep(netService).execute(apkUrl) ?: return
         println()
-        println("版本已发布，请及时更新 github 的 tag !!!".red())
+        println("版本已发布，请及时发布 github release !!!".red())
         println()
         println("已改名为 .Apk 后缀".bold() + ", 请及时发布到掌邮反馈群".yellow())
         apk.renameTo(apk.parentFile.resolve(apk.name.replace(".apk", ".Apk")))

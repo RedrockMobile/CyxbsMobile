@@ -42,7 +42,6 @@ class MobileSelfLessonItemModel(
   override val lesson: LessonByWeeks,
 ) : SelfLessonItemModel, BottomSheetItemHeader, BottomSheetDialogContent, IMovableItemModel {
 
-  @ImplProvider
   companion object : SelfLessonItemFactory {
     override fun createSelfLessonItemModel(page: Int, lesson: LessonByWeeks): SelfLessonItemModel {
       return MobileSelfLessonItemModel(page, lesson)
