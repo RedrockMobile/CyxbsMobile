@@ -9,18 +9,17 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ProgressBar
 import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.utils.get.getAppUpdateContent
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.BuildConfig
@@ -28,7 +27,6 @@ import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.util.ui.DebugUpdateDialog
-import com.cyxbs.pages.mine.util.ui.DynamicRVAdapter
 import com.mredrock.cyxbs.common.config.APP_WEBSITE
 import com.mredrock.cyxbs.common.config.DIR_LOG
 import com.mredrock.cyxbs.common.config.ICP_WEBSITE
@@ -131,33 +129,27 @@ class AboutActivity : BaseViewModelActivity<AboutViewModel>() {
     private fun clickFeatureIntroduction() {
         val materialDialog = Dialog(this)
         val view = LayoutInflater.from(this).inflate(
-            R.layout.mine_layout_dialog_recyclerview_dynamic,
+            R.layout.mine_layout_dialog_version_info,
             materialDialog.window?.decorView as ViewGroup,
             false
         )
-        val rv_content: RecyclerView = view.findViewById(R.id.rv_content)
-        val loader: ProgressBar = view.findViewById(R.id.loader)
+        val mine_feature_intro_title: TextView = view.findViewById(R.id.mine_about_rv_title)
+        mine_feature_intro_title.apply {
+            gravity = Gravity.START
+            textSize = 15f
+            text = "${getAppVersionName()}功能介绍"
+            visibility = View.VISIBLE
+        }
+        val mine_feature_intro_content: TextView = view.findViewById(R.id.mine_about_rv_content)
+        mine_feature_intro_content.apply {
+            gravity = Gravity.START
+            textSize = 15f
+            text = getAppUpdateContent()
+            visibility = View.VISIBLE
+        }
         materialDialog.setContentView(view)
         materialDialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        val featureIntroAdapter = DynamicRVAdapter(viewModel.featureIntroList)
-        rv_content.adapter = featureIntroAdapter
-        rv_content.layoutManager = LinearLayoutManager(this@AboutActivity)
-        if (viewModel.featureIntroList.isNotEmpty()) loader.visibility = View.GONE
         materialDialog.show()
-        getAppVersionName().let {
-            val name = "zscy-feature-intro-${it}"
-            viewModel.getFeatureIntro(name,
-                successCallBack = {
-                    featureIntroAdapter.notifyDataSetChanged()
-                    loader.visibility = View.GONE
-                },
-                errorCallback = {
-                    materialDialog.dismiss()
-                    toast("获取失败")
-                }
-            )
-        }
-
     }
 
     private fun clickUpdate() {

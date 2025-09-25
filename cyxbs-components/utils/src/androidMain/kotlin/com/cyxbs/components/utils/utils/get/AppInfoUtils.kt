@@ -15,3 +15,10 @@ fun getAppVersionCode(): Long {
 fun getAppVersionName(): String {
     return BuildConfig.VERSION_NAME
 }
+
+/**
+ * 获取版本更新内容
+ */
+fun getAppUpdateContent(): String {
+    return BuildConfig.VERSION_UPDATE_CONTENT
+}
