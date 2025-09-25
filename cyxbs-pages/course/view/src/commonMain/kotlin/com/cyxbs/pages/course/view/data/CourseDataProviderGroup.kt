@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.view.data
 
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -16,7 +16,7 @@ import kotlinx.datetime.DayOfWeek
  * @date 2025/3/10
  */
 class CourseDataProviderGroup(
-  vararg val providers: CourseDataProvider, // 添加顺序即为显示的层级顺序，越靠前则越显示在顶层
+  vararg val providers: CourseDataProvider<*>, // 添加顺序即为显示的层级顺序，越靠前则越显示在顶层
 ) {
 
   private var timeline: CourseTimeline? = null
@@ -28,11 +28,11 @@ class CourseDataProviderGroup(
   private val itemListeners = providers.map { provider ->
     object : CourseDataProvider.ItemListener {
       val provider = provider
-      override fun onAdd(item: CourseItemModel) {
+      override fun onAdd(item: CourseItemWrapper<*>) {
         weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 
-      override fun onRemove(item: CourseItemModel) {
+      override fun onRemove(item: CourseItemWrapper<*>) {
         weekDataPoolByPage[item.page]?.get(item.dayOfWeek)?.tryRefresh()
       }
 

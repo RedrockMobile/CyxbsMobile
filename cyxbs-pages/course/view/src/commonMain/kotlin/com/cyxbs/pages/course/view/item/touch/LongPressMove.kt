@@ -33,7 +33,7 @@ import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.IMovableItemModel
+import com.cyxbs.pages.course.view.item.IMovableItemExtension
 import com.cyxbs.pages.course.view.overlay.CourseItemRange
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
@@ -240,13 +240,13 @@ class LongPressMoveControllerImpl(
   // 自身 showRange 转换器（包含自身完全不显示的情况）
   private val selfShowRangeTransformerForAll = CourseItemState.ShowRangeTransformer { _, overlap ->
     // 被长按的 item 即使被覆盖也完整展示
-    listOf(CourseItemRange(overlap.item.beginTime, overlap.item.finalTime))
+    listOf(CourseItemRange(overlap.wrapper.beginTime, overlap.wrapper.finalTime))
   }
 
   // 自身 showRange 转换器（自在自身完全不显示时处理）
   private val selfShowRangeTransformerForEmpty =
     CourseItemState.ShowRangeTransformer { show, overlap ->
-      show.ifEmpty { listOf(CourseItemRange(overlap.item.beginTime, overlap.item.finalTime)) }
+      show.ifEmpty { listOf(CourseItemRange(overlap.wrapper.beginTime, overlap.wrapper.finalTime)) }
     }
 
   // 处理被覆盖 item 的 overlap 更新触发器
@@ -254,7 +254,7 @@ class LongPressMoveControllerImpl(
     CourseItemState.CoveredItemShowRangeTransformerTrigger(pageContext) { show, overlap ->
       // 解除被覆盖 item 的隐藏区域
       val coveredRange = overlap.coveredRangeList
-        .filter { it.itemOverlap.item === itemState.item }
+        .filter { it.itemOverlap.wrapper.item == itemState.itemWrapper.item }
         .map { it.range }
       (show + coveredRange).mergeOverlapRange()
     }
@@ -265,20 +265,22 @@ class LongPressMoveControllerImpl(
       // 单独处理被全覆盖这类 item 的展示
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
-          .filter { it.itemOverlap.item === itemState.item }
+          .filter { it.itemOverlap.wrapper.item == itemState.itemWrapper.item }
           .map { it.range }
         (show + coveredRange).mergeOverlapRange()
       }
     }
 
   override fun enable(transition: MutableState<Offset>): Boolean {
-    return transition.value == Offset.Zero && itemState.item is IMovableItemModel
+    return transition.value == Offset.Zero && itemState.itemWrapper.item is IMovableItemExtension
   }
 
   override fun onStartLongPress(pointer: PointerInputChange) {
     super.onStartLongPress(pointer)
     edgePosition = edgeScroll.add()
+    // 解除自身被覆盖的区域
     itemState.addShowRangeTransformer(selfShowRangeTransformerForAll)
+    // 展示被覆盖的 item
     itemState.addOverlapChangeTrigger(overlapChangeTriggerForAllCovered)
   }
 
@@ -301,8 +303,8 @@ class LongPressMoveControllerImpl(
 
   // 移动过程中判断是否需要展开时间轴折叠部分
   private fun tryExpandTimeline(screenLeftTop: Offset, size: IntSize) {
-    val item = itemState.item as IMovableItemModel
-    if (!item.enableExpandTimelineWhenMove()) return
+    val item = itemState.itemWrapper.item as IMovableItemExtension
+    if (!item.enableExpandTimelineWhenMove(itemState)) return
     val scrollContext = pageContext.scrollContext.value ?: return
     itemState.timeline.data.asSequence()
       .filterIsInstance<MutableTimelineData>()
@@ -349,7 +351,7 @@ class LongPressMoveControllerImpl(
     screenLeftTop: Offset,
     size: IntSize
   ) {
-    val item = itemState.item as IMovableItemModel
+    val item = itemState.itemWrapper.item as IMovableItemExtension
     val destinationOffset = item.getMoveDestinationOffset(
       upOrCancel = upOrCancel,
       itemState = itemState,
@@ -373,7 +375,7 @@ class LongPressMoveControllerImpl(
         itemState: CourseItemState
       ): MutableSet<LongPressMoveControllerImpl> {
         itemState.overlap.coveredRangeList.mapNotNull { cover ->
-          pageContext.findItemState(cover.itemOverlap.item)
+          pageContext.findItemState(cover.itemOverlap.wrapper)
             ?.getData(LongPressMoveControllerImpl)
         }.fastForEach {
           set.add(it)

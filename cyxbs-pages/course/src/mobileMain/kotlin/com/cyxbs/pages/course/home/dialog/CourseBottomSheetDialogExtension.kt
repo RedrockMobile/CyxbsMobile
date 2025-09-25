@@ -32,20 +32,31 @@ import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.components.view.ui.rememberBottomSheetState
+import com.cyxbs.pages.course.view.item.CourseItemExtension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.math.hypot
 import kotlin.math.max
 
 /**
- * 移动端课表 item 点击后出现的 BottomSheetDialog
+ * 点击课表 item 弹起的 BottomSheetDialog
  *
  * @author 985892345
- * @date 2025/3/27
+ * @date 2025/3/29
+ */
+interface CourseBottomSheetDialogExtension : CourseItemExtension {
+
+  val courseBottomSheetDialogContent : @Composable () -> Unit
+}
+
+
+/**
+ * 移动端课表 item 点击后出现的 BottomSheetDialog
  */
 @Composable
 fun MobileCourseBottomSheetDialog(
-  dialogContents: MutableState<List<BottomSheetDialogContent>>,
+  dialogContents: MutableState<List<CourseBottomSheetDialogExtension>>,
+  contentWrapper: @Composable (@Composable () -> Unit) -> Unit = { it.invoke() }, // 可用于传递 contextProvider
 ) {
   if (dialogContents.value.isNotEmpty()) {
     Window(
@@ -53,40 +64,42 @@ fun MobileCourseBottomSheetDialog(
         dialogContents.value = emptyList()
       }
     ) {
-      val bottomSheetState = rememberBottomSheetState()
-      BottomSheetCompose(
-        modifier = Modifier,
-        bottomSheetState = bottomSheetState,
-        dismissOnClickOutside = true,
-        scrimColor = Color.Transparent,
-      ) {
-        Box(modifier = Modifier.navigationBarsPadding().fillMaxWidth().height(280.dp)) {
-          Spacer(
-            modifier = Modifier.fillMaxWidth().height(36.dp).background(
-              brush = Brush.verticalGradient(
-                colors = listOf(Color(0x005369BC), Color(0x205369BC))
+      contentWrapper.invoke {
+        val bottomSheetState = rememberBottomSheetState()
+        BottomSheetCompose(
+          modifier = Modifier,
+          bottomSheetState = bottomSheetState,
+          dismissOnClickOutside = true,
+          scrimColor = Color.Transparent,
+        ) {
+          Box(modifier = Modifier.navigationBarsPadding().fillMaxWidth().height(280.dp)) {
+            Spacer(
+              modifier = Modifier.fillMaxWidth().height(36.dp).background(
+                brush = Brush.verticalGradient(
+                  colors = listOf(Color(0x005369BC), Color(0x205369BC))
+                )
               )
             )
-          )
-          Box(
-            modifier = Modifier.padding(top = 20.dp)
-              .fillMaxSize()
-              .then(bottomSheetDraggable())
-              .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-              .background(LocalAppColors.current.whiteBlack)
-          ) {
-            CourseBottomSheetDialogContent(dialogContents.value)
+            Box(
+              modifier = Modifier.padding(top = 20.dp)
+                .fillMaxSize()
+                .then(bottomSheetDraggable())
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .background(LocalAppColors.current.whiteBlack)
+            ) {
+              CourseBottomSheetDialogContent(dialogContents.value)
+            }
           }
         }
-      }
-      LaunchedEffect(Unit) {
-        try {
-          bottomSheetState.expand()
-        } catch (e: CancellationException) {
-          // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
+        LaunchedEffect(Unit) {
+          try {
+            bottomSheetState.expand()
+          } catch (e: CancellationException) {
+            // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
+          }
+          bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
+          dialogContents.value = emptyList()
         }
-        bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
-        dialogContents.value = emptyList()
       }
     }
   }
@@ -94,7 +107,7 @@ fun MobileCourseBottomSheetDialog(
 
 @Composable
 private fun CourseBottomSheetDialogContent(
-  itemDialogContents: List<BottomSheetDialogContent>
+  itemDialogContents: List<CourseBottomSheetDialogExtension>
 ) {
   val pagerState = rememberPagerState(
     initialPage = if (itemDialogContents.size == 1) 0 else itemDialogContents.size * 1000,
@@ -106,7 +119,7 @@ private fun CourseBottomSheetDialogContent(
       state = pagerState,
       modifier = Modifier.fillMaxWidth().weight(1F),
     ) {
-      itemDialogContents[it % itemDialogContents.size].BottomSheetDialogContent()
+      itemDialogContents[it % itemDialogContents.size].courseBottomSheetDialogContent()
     }
     // 底部的圆点指示器
     Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {
@@ -143,7 +156,7 @@ private fun getWaterDropIndicator(
   radius: Float,
   fraction: Float, // 0.0 -> 1.0
   interval: Float,
-) : Path {
+): Path {
   var path = Path()
   // 中间大圆的坐标
   val outerX = interval / 2

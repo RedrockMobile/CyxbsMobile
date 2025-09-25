@@ -3,7 +3,7 @@ package com.cyxbs.pages.course.view.overlay
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * 重叠的数据
@@ -13,19 +13,23 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
  */
 @Stable
 class CourseItemOverlap(
-  val item: CourseItemModel,
+  val wrapper: CourseItemWrapper<*>,
   val showRangeList: List<CourseItemRange>, // 能够展示区域
 ) {
   // ItemCover 类型会在判断 equal 时使父子构成循环引用，所以需要单独分离
-  val coveredRangeList: MutableList<CourseItemCover> = mutableListOf() // 被覆盖的区域
+
+  // 被覆盖的区域
+  // 其 CourseItemCover#itemOverlap 为上层 item
+  val coveredRangeList: MutableList<CourseItemCover> = mutableListOf()
 
   // 覆盖的 item 集合，只保存了直接覆盖的子 item，如果需要查找所有覆盖的 item，需要进行递归收集
+  // 其 CourseItemCover#itemOverlap 为下层 item
   val coveredItemList: MutableList<CourseItemCover> = mutableListOf()
 
   companion object {
-    fun transformOverlap(items: List<CourseItemModel>): List<CourseItemOverlap> {
+    fun transformOverlap(wrappers: List<CourseItemWrapper<*>>): List<CourseItemOverlap> {
       val coveredList = mutableListOf<CourseItemCover>()
-      return items
+      return wrappers
         .asReversed()
         .map {
           transform(it, coveredList)
@@ -48,35 +52,35 @@ data class CourseItemCover(
 
 
 private fun transform(
-  item: CourseItemModel,
+  wrapper: CourseItemWrapper<*>,
   coveredList: MutableList<CourseItemCover>,
 ): CourseItemOverlap {
   val showRangeList = mutableListOf<CourseItemRange>()
-  val itemOverlap = CourseItemOverlap(item, showRangeList)
+  val itemOverlap = CourseItemOverlap(wrapper, showRangeList)
   var index = 0
-  while (index < coveredList.size && coveredList[index].range.final <= item.beginTime) {
+  while (index < coveredList.size && coveredList[index].range.final <= wrapper.beginTime) {
     index++ // 找到第一个 [index].final > item.begin 的位置
   }
   if (index == coveredList.size) {
     // 当前 item 比所有的都大
-    val range = CourseItemRange(item.beginTime, item.finalTime)
+    val range = CourseItemRange(wrapper.beginTime, wrapper.finalTime)
     showRangeList.add(range)
     coveredList.add(CourseItemCover(range, itemOverlap))
   } else {
     // 此时 item.begin < now.final
     //       ------ ｜     ----?????  ｜   -----??????  ｜
     // ======       ｜  ==========    ｜      ======    ｜
-    var itemBegin = item.beginTime
+    var itemBegin = wrapper.beginTime
     while (true) {
       val now = coveredList[index]
-      if (now.range.begin >= item.finalTime) {
+      if (now.range.begin >= wrapper.finalTime) {
         // 完全不相交
         //       ------
         // ======
-        showRangeList.add(CourseItemRange(itemBegin, item.finalTime))
+        showRangeList.add(CourseItemRange(itemBegin, wrapper.finalTime))
         coveredList.add(
           index,
-          CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+          CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap)
         )
         break
       } else if (now.range.begin > itemBegin) {
@@ -84,26 +88,26 @@ private fun transform(
         //    ----?????
         // ==========
         showRangeList.add(CourseItemRange(itemBegin, now.range.begin))
-        if (now.range.final == item.finalTime) {
+        if (now.range.final == wrapper.finalTime) {
           //    -------
           // ==========
           val coveredRange = CourseItemRange(now.range.begin, now.range.final)
           itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
           now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
           coveredList[index] =
-            CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+            CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap)
           break
-        } else if (now.range.final > item.finalTime) {
+        } else if (now.range.final > wrapper.finalTime) {
           //    ----------
           // ==========
-          val coveredRange = CourseItemRange(now.range.begin, item.finalTime)
+          val coveredRange = CourseItemRange(now.range.begin, wrapper.finalTime)
           itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
           now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
           coveredList[index] =
-            CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap)
+            CourseItemCover(CourseItemRange(wrapper.finalTime, now.range.final), now.itemOverlap)
           coveredList.add(
             index,
-            CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+            CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap)
           )
           break
         } else {
@@ -115,7 +119,7 @@ private fun transform(
           coveredList.removeAt(index)
           if (index == coveredList.size) {
             // 没有下一个 item，则直接添加到末尾
-            coveredList.add(CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+            coveredList.add(CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap))
             break
           } else {
             // 进入下一次 while 循环
@@ -127,10 +131,10 @@ private fun transform(
         // 此时 now.begin ≤ itemBegin < now.final
         // -----??????
         //    ======
-        if (now.range.final == item.finalTime) {
+        if (now.range.final == wrapper.finalTime) {
           // ---------
           //    ======
-          val coveredRange = CourseItemRange(itemBegin, item.finalTime)
+          val coveredRange = CourseItemRange(itemBegin, wrapper.finalTime)
           itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
           now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
           if (now.range.begin == itemBegin) {
@@ -139,7 +143,7 @@ private fun transform(
             coveredList.removeAt(index)
             coveredList.add(
               index,
-              CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+              CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap)
             )
             break
           } else {
@@ -150,19 +154,19 @@ private fun transform(
             coveredList.add(index + 1, CourseItemCover(coveredRange, itemOverlap))
             break
           }
-        } else if (now.range.final > item.finalTime) {
+        } else if (now.range.final > wrapper.finalTime) {
           // ------------
           //    ======
-          val coveredRange = CourseItemRange(itemBegin, item.finalTime)
+          val coveredRange = CourseItemRange(itemBegin, wrapper.finalTime)
           itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
           now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
           if (now.range.begin == itemBegin) {
             // ---------
             // ======
             coveredList[index] =
-              CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap)
+              CourseItemCover(CourseItemRange(wrapper.finalTime, now.range.final), now.itemOverlap)
             coveredList.add(index,
-              CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+              CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap))
             break
           } else {
             // ------------
@@ -171,7 +175,7 @@ private fun transform(
               CourseItemCover(CourseItemRange(now.range.begin, itemBegin), now.itemOverlap)
             coveredList.add(index + 1, CourseItemCover(coveredRange, itemOverlap))
             coveredList.add(index + 2,
-              CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap))
+              CourseItemCover(CourseItemRange(wrapper.finalTime, now.range.final), now.itemOverlap))
             break
           }
         } else {
@@ -188,7 +192,7 @@ private fun transform(
             if (index == coveredList.size) {
               // 没有下一个 item，则直接添加到末尾
               coveredList.add(
-                CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+                CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap))
               break
             } else {
               // 进入下一次 while 循环
@@ -204,7 +208,7 @@ private fun transform(
             if (index == coveredList.size) {
               // 没有下一个 item，则直接添加到末尾
               coveredList.add(
-                CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+                CourseItemCover(CourseItemRange(wrapper.beginTime, wrapper.finalTime), itemOverlap))
               break
             } else {
               // 进入下一次 while 循环

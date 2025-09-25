@@ -1,7 +1,8 @@
 package com.cyxbs.pages.course.home.item
 
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -16,9 +17,10 @@ interface AffairItemFactory {
   fun createAffairItemModel(
     page: Int,
     affairDateModel: AffairDateModel,
-  ): AffairItemModel
+  ): CourseItemWrapper<CourseAffairItem>
 }
 
-interface AffairItemModel : CourseItemModel {
+interface CourseAffairItem : CourseItem {
+  val page: Int
   val affairDateModel: AffairDateModel
 }

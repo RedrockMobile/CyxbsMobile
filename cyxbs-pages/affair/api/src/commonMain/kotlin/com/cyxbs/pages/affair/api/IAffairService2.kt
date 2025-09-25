@@ -14,7 +14,7 @@ interface IAffairService2 {
   /**
    * 观察登陆人的事务模型
    *
-   * 事务模型中包含 增、删、改 相关功能，详情看 [AffairModel]
+   * 事务模型中包含 增、删、改 相关功能，详情看 [AffairGroupModel]
    */
-  fun observeAffairModelStateFlow(): StateFlow<AffairModel?>
+  fun observeAffairModelStateFlow(): StateFlow<AffairGroupModel?>
 }

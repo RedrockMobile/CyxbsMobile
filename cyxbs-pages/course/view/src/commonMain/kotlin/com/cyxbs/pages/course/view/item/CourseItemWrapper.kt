@@ -16,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.DrawResult
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -54,25 +57,33 @@ import kotlin.math.roundToInt
  * @date 2025/2/14
  */
 @Stable
-interface CourseItemModel {
+class CourseItemWrapper<T : CourseItem>(
+  val item: T,
+  val page: Int,
+  val dayOfWeek: DayOfWeek,
+  val beginTime: MinuteTime,
+  // 如果 finalTime < beginTime 则表示跨了一天
+  val finalTime: MinuteTime,
+)
 
-  // 在一周课表中的 item key，用于 Compose 重组时进行定位
-  val weekItemKey: String
+// CourseItem 自身引用将作为 Compose 重组的 key()
+// 更新后应尽量保证等价的 item 前后属于同一个对象
+interface CourseItem {
 
-  val page: Int
-  val dayOfWeek: DayOfWeek
-  val beginTime: MinuteTime
-  val finalTime: MinuteTime // 如果 finalTime < beginTime 则表示跨了一天
+  // item 支持的扩展功能
+  val extension: CourseItemExtension
 
   /**
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
    */
-  @Composable
-  fun CourseItemContent(
+  val content: @Composable (
     modifier: Modifier,
     itemState: CourseItemState,
-  )
+  ) -> Unit
 }
+
+// 用于描述 item 支持的扩展功能
+interface CourseItemExtension
 
 @Composable
 fun CourseDefaultItemContent(
@@ -82,6 +93,7 @@ fun CourseDefaultItemContent(
   bottomText: String,
   textColor: Color,
   backgroundColor: Color,
+  onBuildDrawCache: CacheDrawScope.() -> DrawResult = { onDrawBehind { } },
   onClick: ((CourseItemRange) -> Unit)? = null,
 ) {
   if (itemState.realShowRange.isEmpty()) return
@@ -92,8 +104,8 @@ fun CourseDefaultItemContent(
     modifier = modifier
       .then(
         itemState.timeline.createLayoutModifier(
-          itemState.item.beginTime,
-          itemState.item.finalTime
+          itemState.itemWrapper.beginTime,
+          itemState.itemWrapper.finalTime
         )
       ).longPressMove( // 长按移动 item
         remember {
@@ -111,11 +123,12 @@ fun CourseDefaultItemContent(
           )
         }
       ).courseItemBackground(backgroundColor) // 通用背景
+      .drawWithCache(onBuildDrawCache)
   ) {
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemRange = CourseItemRange(itemState.item.beginTime, itemState.item.finalTime),
+        itemRange = CourseItemRange(itemState.itemWrapper.beginTime, itemState.itemWrapper.finalTime),
         enableShowCoverTip = itemState.overlap.coveredItemList.isNotEmpty(),
         timeline = itemState.timeline,
         topText = topText,

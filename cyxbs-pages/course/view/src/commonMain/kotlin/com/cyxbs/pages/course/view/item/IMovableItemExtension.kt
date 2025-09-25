@@ -13,7 +13,7 @@ import com.cyxbs.pages.course.view.page.LocalCoursePageContext
  * @author 985892345
  * @date 2025/5/1
  */
-interface IMovableItemModel : CourseItemModel {
+interface IMovableItemExtension : CourseItemExtension {
 
   // 得到抬手时目的地的偏移量
   fun getMoveDestinationOffset(
@@ -42,5 +42,5 @@ interface IMovableItemModel : CourseItemModel {
   }
 
   // 在移动过程中是否允许展开时间轴
-  fun enableExpandTimelineWhenMove(): Boolean = false
+  fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean = false
 }
