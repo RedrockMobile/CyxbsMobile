@@ -137,7 +137,7 @@ class AboutActivity : BaseViewModelActivity<AboutViewModel>() {
         mine_feature_intro_title.apply {
             gravity = Gravity.START
             textSize = 15f
-            text = "${getAppVersionName()}功能介绍"
+            text = "${getAppVersionName()}版本信息"
             visibility = View.VISIBLE
         }
         val mine_feature_intro_content: TextView = view.findViewById(R.id.mine_about_rv_content)
