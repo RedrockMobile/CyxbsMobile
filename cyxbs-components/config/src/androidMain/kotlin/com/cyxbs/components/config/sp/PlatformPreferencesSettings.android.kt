@@ -5,10 +5,9 @@ import com.cyxbs.components.init.appApplication
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
 
-internal actual class PlatformAccountSettings actual constructor(actual val stuNum: String?) {
+internal actual class PlatformPreferencesSettings actual constructor(actual val key: String) {
 
-  private val accountSettingsName = "AccountSettings-${stuNum}"
-  private val accountSp = appApplication.getSharedPreferences(accountSettingsName, 0)
+  private val accountSp = appApplication.getSharedPreferences(key, 0)
 
   actual val settings: Settings = SharedPreferencesSettings(accountSp)
 

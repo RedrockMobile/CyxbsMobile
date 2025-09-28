@@ -3,11 +3,9 @@ package com.cyxbs.components.config.sp
 import com.russhwolf.settings.PreferencesSettings
 import com.russhwolf.settings.Settings
 
-internal actual class PlatformAccountSettings actual constructor(actual val stuNum: String?) {
+internal actual class PlatformPreferencesSettings actual constructor(actual val key: String) {
 
-  private val accountSettingsName = "AccountSettings-${stuNum}"
-
-  actual val settings: Settings = PreferencesSettings.Factory().create(accountSettingsName)
+  actual val settings: Settings = PreferencesSettings.Factory().create(key)
 
   actual fun keyMap(originKey: String): String {
     return originKey

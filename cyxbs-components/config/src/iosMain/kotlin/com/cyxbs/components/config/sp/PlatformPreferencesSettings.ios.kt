@@ -10,11 +10,9 @@ import com.russhwolf.settings.Settings
  * @date 2025/3/15
  */
 
-internal actual class PlatformAccountSettings actual constructor(actual val stuNum: String?) {
+internal actual class PlatformPreferencesSettings actual constructor(actual val key: String) {
 
-  private val accountSettingsName = "AccountSettings-${stuNum}"
-
-  actual val settings: Settings = NSUserDefaultsSettings.Factory().create(accountSettingsName)
+  actual val settings: Settings = NSUserDefaultsSettings.Factory().create(key)
 
   actual fun keyMap(originKey: String): String {
     return originKey
