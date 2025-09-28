@@ -21,33 +21,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.pages.course.home.item.CourseAffairItem
+import com.cyxbs.pages.course.home.item.MobileSelfLessonItem
+import com.cyxbs.pages.course.view.item.CourseItemExtension
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_landmark
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_time
 import org.jetbrains.compose.resources.painterResource
 
 /**
- * 提供给主页课表展示外层的 Header，应由 CourseItem 实现类进行实现，参考 SelfLessonItem
+ * 提供给主页课表展示外层的 Header，应作为 [CourseItemExtension] 附加到 [CourseAffairItem] 上
+ * 参考 [MobileSelfLessonItem]
  *
  * @author 985892345
  * @date 2025/3/16
  */
 @Stable
-interface BottomSheetItemHeader {
+interface CourseBottomSheetHeaderExtension : CourseItemExtension {
 
-  @Composable
-  fun BottomSheetHeaderContent(modifier: Modifier)
+  val courseBottomSheetHeaderContent: @Composable (modifier: Modifier) -> Unit
 }
 
 // 只显示文本的 BottomSheet Header
-class HintBottomSheetItemHeader(
+class HintCourseBottomSheetHeader(
   val hint: String,
   val onLongClick: (() -> Unit)? = null,
   val onClick: (() -> Unit)? = null,
-) : BottomSheetItemHeader {
+) : CourseBottomSheetHeaderExtension {
 
-  @Composable
-  override fun BottomSheetHeaderContent(modifier: Modifier) {
+  override val courseBottomSheetHeaderContent: @Composable ((Modifier) -> Unit) = { modifier ->
     Box(modifier = modifier.fillMaxSize()) {
       Text(
         modifier = Modifier

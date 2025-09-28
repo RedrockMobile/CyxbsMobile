@@ -24,9 +24,8 @@ import androidx.compose.ui.util.fastFold
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.add
 import com.cyxbs.pages.course.view.data.CourseWeekDataPool
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.page.LocalCoursePageContext.OnDisposable
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
@@ -125,7 +124,7 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
     val dayOfWeek = timeline.beginDayOfWeek.add(index)
     val dayDataPool = weekDataPool.get(dayOfWeek)
     dayDataPool.state.collectAsState().value.fastForEach { overlay ->
-      key(overlay.item.weekItemKey) {
+      key(overlay.wrapper.item) {
         val itemState = remember {
           CourseItemState(
             timeline = timeline,
@@ -139,12 +138,11 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
           )
         }
         DisposableEffect(Unit) {
-          pageContext.putItemState(overlay.item, itemState)
-          onDispose { pageContext.putItemState(overlay.item, null) }
+          pageContext.putItemState(overlay.wrapper, itemState)
+          onDispose { pageContext.putItemState(overlay.wrapper, null) }
         }
-        overlay.item.CourseItemContent(
-          itemState = itemState,
-          modifier = Modifier.layout { measurable, constraints ->
+        overlay.wrapper.item.content(
+          Modifier.layout { measurable, constraints ->
             val placeable = measurable.measure(
               Constraints(
                 maxWidth = constraints.maxWidth / 7,
@@ -155,6 +153,7 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
               placeable.placeRelative(index * placeable.width, 0)
             }
           },
+          itemState,
         )
       }
     }
@@ -173,38 +172,38 @@ class LocalCoursePageContext(
   var weekDataPool: CourseWeekDataPool by mutableStateOf(weekDataPool)
     private set
 
-  private val itemStateMap = mutableMapOf<CourseItemModel, CourseItemState>()
+  private val itemStateByItem = mutableMapOf<Any, CourseItemState>()
 
-  private val findActions = mutableMapOf<CourseItemModel, MutableList<(CourseItemState) -> Unit>>()
+  private val findActionsByItem = mutableMapOf<Any, MutableList<(CourseItemState) -> Unit>>()
 
-  fun findItemState(item: CourseItemModel): CourseItemState? = itemStateMap[item]
+  fun findItemState(item: CourseItemWrapper<*>): CourseItemState? = itemStateByItem[item]
 
   // 用于延迟查找的方法
   // 如果超时则需要调用 onDispose 进行移除保存的 action 操作
-  fun findItemState(item: CourseItemModel, action: (CourseItemState) -> Unit): OnDisposable? {
-    val state = itemStateMap[item]
+  fun findItemState(wrapper: CourseItemWrapper<*>, action: (CourseItemState) -> Unit): OnDisposable? {
+    val state = itemStateByItem[wrapper.item]
     if (state != null) {
       action(state)
       return null
     } else {
-      findActions.getOrPut(item) { mutableListOf() }.add(action)
+      findActionsByItem.getOrPut(wrapper.item) { mutableListOf() }.add(action)
       return OnDisposable {
-        val list = findActions[item]
+        val list = findActionsByItem[wrapper.item]
         if (list != null) {
           list.remove(action)
-          if (list.isEmpty()) findActions.remove(item)
+          if (list.isEmpty()) findActionsByItem.remove(wrapper.item)
         }
       }
     }
   }
 
-  fun putItemState(item: CourseItemModel, state: CourseItemState?) {
+  fun putItemState(wrapper: CourseItemWrapper<*>, state: CourseItemState?) {
     if (state == null) {
-      itemStateMap.remove(item)
-      findActions.remove(item)
+      itemStateByItem.remove(wrapper.item)
+      findActionsByItem.remove(wrapper.item)
     } else {
-      itemStateMap[item] = state
-      findActions.remove(item)?.fastForEach { it(state) }
+      itemStateByItem[wrapper.item] = state
+      findActionsByItem.remove(wrapper.item)?.fastForEach { it(state) }
     }
   }
 

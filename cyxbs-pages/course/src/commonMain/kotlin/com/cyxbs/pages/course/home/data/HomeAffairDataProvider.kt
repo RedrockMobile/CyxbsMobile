@@ -8,6 +8,7 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.IAffairService2
 import com.cyxbs.pages.course.home.item.AffairItemFactory
+import com.cyxbs.pages.course.home.item.CourseAffairItem
 import com.cyxbs.pages.course.view.data.CourseDataProvider
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2025/3/10
  */
-object HomeAffairDataProvider : CourseDataProvider() {
+object HomeAffairDataProvider : CourseDataProvider<CourseAffairItem>() {
 
   private val itemFactory = AffairItemFactory::class.impl()
 
@@ -29,7 +30,7 @@ object HomeAffairDataProvider : CourseDataProvider() {
     IAffairService2::class.impl()
       .observeAffairModelStateFlow()
       .flatMapLatest {
-        it?.items ?: flowOf(emptyList())
+        it?.itemList ?: flowOf(emptyList())
       }.flatMapLatest { itemModels ->
         combine(itemModels.map { it.whatTimeList }) { array ->
           array.map { map ->

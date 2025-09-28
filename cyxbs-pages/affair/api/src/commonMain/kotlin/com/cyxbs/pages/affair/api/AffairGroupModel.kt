@@ -1,0 +1,163 @@
+package com.cyxbs.pages.affair.api
+
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.MinuteTimePair
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * 事务数据类
+ * - 添加事务使用 [AffairGroupModel.addAffair]
+ * - 删除事务使用 [AffairIdModel.delete]
+ * - 修改事务使用 [AffairIdModel.edit]
+ *
+ * 事务包含两颗树：
+ * - model 树：每个 model 结点在应用生命周期内对象不会改变，且其属性通过 StateFlow 供外界进行观察
+ * - editor 树：编辑 model 树时生成，提交更新后将同步更新到 model 树上
+ *
+ * ```
+ *                                                           +------------------+
+ *                                                           | AffairGroupModel |
+ *                                                           +------------------+
+ *                                                                    | List<Id>
+ *                                             +-------------------------------------------+
+ *                                             |                                           |
+ *                                             V                                           V
+ *                                     +---------------+                           +---------------+
+ *                                     | AffairIdModel | Affair Id                 | AffairIdModel |
+ *                                     +---------------+                           +---------------+
+ *                                             | List<WhatTime>                            |
+ *                         +------------------------------------+                         ...
+ *                         |                                    |
+ *                         V                                    V
+ *              +---------------------+              +---------------------+
+ *              | AffairWhatTimeModel | WhatTime     | AffairWhatTimeModel |
+ *              +---------------------+              +---------------------+
+ *                         | List<Date>
+ *          +---------------------------+
+ *          |                           |
+ *          V                           V
+ * +-----------------+         +-----------------+
+ * | AffairDateModel | Date    | AffairDateModel |
+ * +-----------------+         +-----------------+
+ * ```
+ *
+ * @author 985892345
+ * @date 2025/6/22
+ */
+
+// 事务根结点，其 items 包含所有事务 AffairIdModel
+interface AffairGroupModel {
+  val stuNum: String
+  val itemList: StateFlow<ImmutableList<AffairIdModel>>
+
+  /**
+   * 添加新的事务，并上传到远端
+   *
+   * 删除请调用 [AffairIdModelEditor.clear]
+   */
+  suspend fun addAffair(
+    remindTime: Int, // 提醒时间
+    title: String,
+    content: String,
+    action: suspend (AffairIdModelEditor) -> Unit
+  ): Result<AffairIdModel>
+}
+
+// 单个事务，id 为唯一值
+// 其下包含多个时间段 AffairWhatTimeModel
+interface AffairIdModel {
+  // 返回 false 时表示该 AffairIdModel 已经被删除
+  val enable: StateFlow<Boolean>
+  // 非后端返回 id，此 id 为客户端上的唯一 id
+  val localId: String
+  val remindTime: StateFlow<Int>
+  val title: StateFlow<String>
+  val content: StateFlow<String>
+
+  val whatTimeList: StateFlow<ImmutableList<AffairWhatTimeModel>>
+
+  fun createEditor(): AffairIdModelEditor?
+
+  suspend fun createEditorSuspend(): AffairIdModelEditor
+}
+
+// 事务时间段，timePair 表明了时间段的开始和结束
+// 其下包含多个日期 AffairItemModel
+interface AffairWhatTimeModel {
+  // 返回 false 时表示该 AffairWhatTimeModel 已经被删除
+  val enable: StateFlow<Boolean>
+
+  val idModel: AffairIdModel
+
+  val timePair: StateFlow<MinuteTimePair>
+
+  val dateList: StateFlow<ImmutableList<AffairDateModel>> // 如果使用 List<AffairLeafModel> 会因为对象未改变导致无法监听更新
+}
+
+// 事务日期，作为整个事务的叶子结点
+// 其对象在整个应用生命周期内不会改变，可用于绑定 Compose 结点
+interface AffairDateModel {
+  // 返回 false 时表示该 AffairLeafModel 已经被删除
+  val enable: StateFlow<Boolean>
+
+  val idModel: AffairIdModel
+
+  // whatTime 是可能会发生改变的，例如从原先的 whatTimeList 中分裂出新的 whatTime
+  val whatTime: StateFlow<AffairWhatTimeModel>
+
+  val date: StateFlow<Date>
+}
+
+//////////////////////////////////////// Editor ////////////////////////////////////////
+
+interface AffairIdModelEditor {
+  val idModel: AffairIdModel
+  val remindTime: StateFlow<Int>
+  val title: StateFlow<String>
+  val content: StateFlow<String>
+  val whatTimeList: StateFlow<ImmutableList<AffairWhatTimeModelEditor>>
+
+  fun setRemindTime(remindTime: Int): String?
+  fun setTitle(title: String): String?
+  fun setContent(content: String): String?
+
+  fun add(timePair: MinuteTimePair): AffairWhatTimeModelEditor? // 如果有相同值则返回 null
+
+  fun remove(whatTime: AffairWhatTimeModelEditor): Boolean
+
+  fun clear() // 清空所有 whatTimeList，如果 editor 提交时 whatTimeList 为空则等同于删除当前事务
+
+  fun enableModify(): Boolean // 能否修改
+
+  suspend fun commit(): Result<EditResult>
+
+  sealed interface EditResult {
+    object Success : EditResult
+    object Deleted : EditResult // 已被删除或者当前编辑操作被认定为删除
+  }
+}
+
+interface AffairWhatTimeModelEditor {
+  val idModelEditor: AffairIdModelEditor
+  val timePair: StateFlow<MinuteTimePair>
+  val dateList: StateFlow<ImmutableList<AffairDateModelEditor>>
+
+  fun setTimePair(timePair: MinuteTimePair): String?
+
+  fun add(date: Date): AffairDateModelEditor? // 如果有相同值则返回 null
+  fun remove(date: AffairDateModelEditor): Boolean
+  fun clear()
+}
+
+interface AffairDateModelEditor {
+  val idModelEditor: AffairIdModelEditor
+  val whatTime: StateFlow<AffairWhatTimeModelEditor?>
+  val date: MutableStateFlow<Date>
+
+  fun setDate(date: Date): String?
+
+  fun replace(whatTime: AffairWhatTimeModelEditor): Boolean
+}
+

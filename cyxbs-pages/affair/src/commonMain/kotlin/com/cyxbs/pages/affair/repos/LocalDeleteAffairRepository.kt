@@ -1,4 +1,4 @@
-package com.cyxbs.pages.affair.model
+package com.cyxbs.pages.affair.repos
 
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.serializable.defaultJson

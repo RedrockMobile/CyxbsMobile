@@ -1,4 +1,4 @@
-package com.cyxbs.pages.affair.model
+package com.cyxbs.pages.affair.repos
 
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.isDebug
@@ -10,10 +10,11 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiException
-import com.cyxbs.pages.affair.api.AffairModel
+import com.cyxbs.pages.affair.api.AffairGroupModel
 import com.cyxbs.pages.affair.bean.AffairEntity
 import com.cyxbs.pages.affair.bean.AffairWhatTime
 import com.cyxbs.pages.affair.bean.GetAffairBean
+import com.cyxbs.pages.affair.model.AffairGroupModelImpl
 import com.cyxbs.pages.affair.net.AffairApiService2
 import io.ktor.client.plugins.ClientRequestException
 import kotlinx.coroutines.coroutineScope
@@ -34,7 +35,7 @@ object AffairRepository2 {
   private const val SETTING_KEY_AFFAIR = "setting_key_affair"
 
   private val affairFlow = MutableStateFlow<List<AffairEntity>?>(null)
-  private val affairItemModelFlow = MutableStateFlow<AffairModelImpl?>(null)
+  private val affairItemModelFlow = MutableStateFlow<AffairGroupModelImpl?>(null)
 
   init {
     IAccountService::class.impl()
@@ -43,7 +44,7 @@ object AffairRepository2 {
         if (stuNum != null) {
           val cacheAffair = loadCacheAffair() ?: emptyList()
           affairFlow.value = cacheAffair
-          affairItemModelFlow.value = AffairModelImpl(
+          affairItemModelFlow.value = AffairGroupModelImpl(
             stuNum = stuNum,
             affairList = combineAffair(
               origin = cacheAffair,
@@ -69,7 +70,7 @@ object AffairRepository2 {
       }.launchIn(appCoroutineScope)
   }
 
-  fun getAffairModelStateFlow(): StateFlow<AffairModel?> {
+  fun getAffairModelStateFlow(): StateFlow<AffairGroupModel?> {
     return affairItemModelFlow
   }
 
@@ -117,7 +118,7 @@ object AffairRepository2 {
   }
 
   /**
-   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
+   * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
    */
   private suspend fun addAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
@@ -173,7 +174,7 @@ object AffairRepository2 {
   }
 
   /**
-   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
+   * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
    */
   private suspend fun updateAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
@@ -246,7 +247,7 @@ object AffairRepository2 {
   }
 
   /**
-   * 内部独用方法，外界请使用 [AffairModel] 编辑事务
+   * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
    */
   private suspend fun deleteAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号

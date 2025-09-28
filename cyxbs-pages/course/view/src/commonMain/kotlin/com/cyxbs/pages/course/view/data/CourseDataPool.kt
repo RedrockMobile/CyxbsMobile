@@ -20,7 +20,7 @@ import kotlinx.datetime.DayOfWeek
 // 课表一周的数据
 @Stable
 class CourseWeekDataPool(
-  val providers: Array<out CourseDataProvider>,
+  val providers: Array<out CourseDataProvider<*>>,
   val timeline: CourseTimeline,
   val page: Int,
 ) {
@@ -71,7 +71,7 @@ class CourseDayDataPool(
   // itemSet 改变时触发的刷新
   private fun refreshByItemSet() {
     val itemList = weekDataPool.providers.map {
-      it.getDayData(weekDataPool.page, dayOfWeek).sortedWith(it::compare)
+      it.getDayData(week = weekDataPool.page, dayOfWeek = dayOfWeek, compare = true)
     }.asReversed().flatten()
     _state.value = CourseItemOverlap.transformOverlap(itemList)
   }

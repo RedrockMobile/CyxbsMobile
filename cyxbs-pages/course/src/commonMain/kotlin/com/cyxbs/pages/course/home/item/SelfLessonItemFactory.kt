@@ -1,7 +1,8 @@
 package com.cyxbs.pages.course.home.item
 
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * SelfLessonItem 工厂，由具体平台实现
@@ -17,9 +18,10 @@ interface SelfLessonItemFactory {
   fun createSelfLessonItemModel(
     page: Int,
     lesson: LessonByWeeks,
-  ): SelfLessonItemModel
+  ): CourseItemWrapper<SelfLessonItem>
 }
 
-interface SelfLessonItemModel : CourseItemModel {
+interface SelfLessonItem : CourseItem {
+  val page: Int
   val lesson: LessonByWeeks
 }

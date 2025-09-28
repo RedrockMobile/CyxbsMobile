@@ -13,7 +13,9 @@ import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 
 /**
- * .
+ * [CourseItemWrapper] 对应的 状态，生命周期与页面进行绑定
+ *
+ * 如果需要获取的话可通过 LocalCoursePage.current.findItemState(item.weekItemKey) 得到
  *
  * @author 985892345
  * @date 2025/5/4
@@ -24,14 +26,15 @@ class CourseItemState(
   overlap: CourseItemOverlap,
 ) {
 
-  val item = overlap.item
-
   var timeline by mutableStateOf(timeline)
     private set
 
   // item 重叠数据
   var overlap by mutableStateOf(overlap)
     private set
+
+  val itemWrapper: CourseItemWrapper<*>
+    get() = overlap.wrapper
 
   // item 真实展示区间
   // 通过转换器最后才能确定
@@ -42,10 +45,10 @@ class CourseItemState(
     this.timeline = timeline
     this.overlap = overlap
     // 调用 overlap 触发器
-    overlapChangeTriggers = overlapChangeTriggers.mapValues {
+    overlapChangeTriggers = overlapChangeTriggers.mapValuesTo(LinkedHashMap()) {
       it.value.onDispose()
       it.key.onChangeOverlap(overlap)
-    } as LinkedHashMap<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>
+    }
     // 调用 showRange 转换器
     realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, interceptor ->
       interceptor.transform(prev, overlap)
@@ -113,7 +116,7 @@ class CourseItemState(
     override fun onChangeOverlap(overlap: CourseItemOverlap): OverlapChangeTrigger.OnDisposable {
       val coveredItemStateList = mutableListOf<CourseItemState>()
       val findOnDisposables = overlap.coveredItemList.fastMapNotNull { cover ->
-        pageContext.findItemState(cover.itemOverlap.item) {
+        pageContext.findItemState(cover.itemOverlap.wrapper) {
           // 找到被覆盖的 item 添加 showRange 转换器
           it.addShowRangeTransformer(transformer)
           coveredItemStateList.add(it)

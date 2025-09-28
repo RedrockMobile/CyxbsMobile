@@ -6,11 +6,11 @@ import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
-import com.cyxbs.pages.course.home.item.LinkLessonItemModel
+import com.cyxbs.pages.course.home.item.LinkLessonItem
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2025/3/10
  */
-object HomeLinkLessonDataProvider : CourseDataProvider() {
+object HomeLinkLessonDataProvider : CourseDataProvider<LinkLessonItem>() {
 
   private const val SETTING_KEY_ENABLE_SHOW_LINK_COURSE = "enable_show_link_course"
 
@@ -69,12 +69,12 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     return if (linkStuNum.isEmpty()) flowOf(null)
     else LessonRepository.observeLesson(
       stuNum = linkStuNum,
-      needCache = true,
+      needOldData = true,
     )
   }
 
   private fun resetData(data: List<LessonByWeeks>?) {
-    clear()
+    clear() // 对于课程来说每一次更新可以使用全量更新
     data ?: return
     if (enableShow.value != true) return
     data.forEach { lesson ->
@@ -87,11 +87,9 @@ object HomeLinkLessonDataProvider : CourseDataProvider() {
     }
   }
 
-  override fun compare(a: CourseItemModel, b: CourseItemModel): Int {
-    a as LinkLessonItemModel
-    b as LinkLessonItemModel
+  override fun compare(a: CourseItemWrapper<LinkLessonItem>, b: CourseItemWrapper<LinkLessonItem>): Int {
     if (a.page == 0 && b.page == 0) {
-      val weekDiff = a.lesson.week.first() - b.lesson.week.first()
+      val weekDiff = a.item.lesson.week.first() - b.item.lesson.week.first()
       return if (weekDiff != 0) -weekDiff else super.compare(a, b)
     }
     return super.compare(a, b)

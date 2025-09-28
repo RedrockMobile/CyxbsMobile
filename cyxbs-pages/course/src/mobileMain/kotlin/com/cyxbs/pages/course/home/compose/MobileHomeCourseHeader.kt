@@ -38,8 +38,8 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
 import com.cyxbs.pages.course.home.header.NextItemHeaderUtils
-import com.cyxbs.pages.course.home.header.BottomSheetItemHeader
-import com.cyxbs.pages.course.home.header.HintBottomSheetItemHeader
+import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
+import com.cyxbs.pages.course.home.header.HintCourseBottomSheetHeader
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_single
@@ -123,23 +123,23 @@ fun MobileHomeCourseHeader(
   }
 }
 
-private val EmptyHeader = HintBottomSheetItemHeader("今天和明天都没课咯～")
+private val EmptyHeader = HintCourseBottomSheetHeader("今天和明天都没课咯～")
 
 @Composable
 private fun MobileHomeCourseOuterHeader(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
 ) {
-  var header by remember(frame) { mutableStateOf<BottomSheetItemHeader>(EmptyHeader) }
+  var header by remember(frame) { mutableStateOf<CourseBottomSheetHeaderExtension>(EmptyHeader) }
   key(header) {
-    header.BottomSheetHeaderContent(modifier)
+    header.CourseBottomSheetHeaderContent(modifier)
   }
   LaunchedEffect(frame) {
     val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     var now = localDateTime.toMinuteTimeDate()
     snapshotFlow { NextItemHeaderUtils.find(now, frame) }
       .flatMapLatest {
-        if (it == null) flowOf<BottomSheetItemHeader?>(null) else flow {
+        if (it == null) flowOf<CourseBottomSheetHeaderExtension?>(null) else flow {
           emit(it)
           delay(1.minutes - localDateTime.second.seconds)
           while (true) {
