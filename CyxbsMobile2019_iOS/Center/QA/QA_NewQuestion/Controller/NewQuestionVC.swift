@@ -319,7 +319,7 @@ class NewQuestionVC : UIViewController, UITextFieldDelegate {
             switch response{
             case .success:
                 print("Successfully Published!")
-                RemindHUD.shared().showDefaultHUD(withText: "发布成功")
+                TaskManager.shared.uploadTaskProgress(title: "提一个问题", stampCount: 10, remindText: "今日已提问题1次，获得10张邮票")
                 self.navigationController?.popViewController(animated: true)
             case .failure:
                 print("Publish Failed!")
