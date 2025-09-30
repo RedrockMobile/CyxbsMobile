@@ -2,8 +2,8 @@ import com.android.build.gradle.BaseExtension
 
 plugins {
   id("kmp.base")
-  id("org.jetbrains.kotlin.plugin.compose")
-  id("org.jetbrains.compose")
+  id(libsEx.plugins.kotlinCompose)
+  id(libsEx.plugins.composeMultiplatform)
 }
 
 kotlin {
@@ -17,7 +17,9 @@ kotlin {
       implementation(compose.components.uiToolingPreview)
       implementation(compose.materialIconsExtended)
       implementation(libsEx.`compose-navigation`)
-      implementation(libsEx.`compose-lifecycle`)
+      implementation(libsEx.`compose-lifecycle-runtime-compose`)
+      implementation(libsEx.`compose-lifecycle-viewmodel-compose`)
+      implementation(libsEx.`compose-savedstate`)
       implementation(libsEx.`compose-constraintLayout`)
     }
 

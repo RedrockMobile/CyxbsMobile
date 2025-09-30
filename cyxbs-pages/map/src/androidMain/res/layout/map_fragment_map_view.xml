@@ -84,10 +84,20 @@
                 android:layout_height="36dp"
                 android:layout_marginLeft="16dp"
                 android:scaleType="centerCrop"
-                android:src="@drawable/map_ic_vr"
+                android:src="@drawable/map_ic_vr_new"
                 app:layout_constraintBottom_toBottomOf="@+id/map_iv_compass"
                 app:layout_constraintLeft_toLeftOf="parent"
                 app:layout_constraintTop_toTopOf="@+id/map_iv_compass" />
+
+            <ImageView
+                android:id="@+id/map_iv_vr_description"
+                android:layout_width="46dp"
+                android:layout_height="36dp"
+                android:src="@drawable/map_ic_vr_description"
+                android:scaleType="fitCenter"
+                app:layout_constraintEnd_toEndOf="@+id/map_iv_vr"
+                app:layout_constraintStart_toStartOf="@+id/map_iv_vr"
+                app:layout_constraintTop_toBottomOf="@+id/map_iv_vr" />
 
             <com.cyxbs.pages.map.component.ClickView
                 android:id="@+id/map_iv_compass"
@@ -95,8 +105,8 @@
                 android:layout_height="66dp"
                 android:layout_marginTop="32dp"
                 android:layout_marginRight="16dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/map_ic_compass"
+                android:scaleType="fitCenter"
+                android:src="@drawable/map_ic_compass_new"
                 app:layout_constraintRight_toRightOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 

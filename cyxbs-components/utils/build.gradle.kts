@@ -50,7 +50,7 @@ kotlin {
         implementation(libs.ktor.client.darwin)
       }
     }
-    if (Multiplatform.enableWasm(project)) {
+    if (Multiplatform.enableWeb(project)) {
       wasmJsMain.dependencies {
         implementation(libs.ktor.client.js)
       }

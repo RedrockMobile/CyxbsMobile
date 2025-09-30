@@ -1,6 +1,5 @@
 package com.cyxbs.components.utils.network
 
-import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.js.Js
 
@@ -11,7 +10,4 @@ import io.ktor.client.engine.js.Js
  * @date 2025/1/5
  */
 internal actual fun createHttpClientEngine(): HttpClientEngine = Js.create {
-}
-
-internal actual fun HttpClientConfig<*>.platformConfigHttpClient() {
 }

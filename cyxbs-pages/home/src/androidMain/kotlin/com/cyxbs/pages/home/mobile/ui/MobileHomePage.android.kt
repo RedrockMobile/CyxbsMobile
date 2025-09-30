@@ -12,12 +12,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.viewpager2.widget.ViewPager2
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.utils.Umeng
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeArgument
 import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
@@ -26,7 +28,7 @@ import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.adapter.MainAdapter
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
-import com.cyxbs.pages.home.mobile.viewmodel.CourseFrameViewModel
+import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -44,12 +46,14 @@ internal actual fun PlatformMobileHomePage(
 ) {
   content()
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val courseFrameViewModel = viewModel(CourseFrameViewModel::class)
+  val courseBottomNavViewModel = viewModel(CourseBottomSheetViewModel::class)
   val activity = LocalActivity.current
   LaunchedEffect(Unit) {
     when (activity?.intent?.action) {
       DESKTOP_SHORTCUT_COURSE -> {
-        courseFrameViewModel.frame.bottomSheetState.expand()
+        if (!IAccountService::class.impl().isTouristMode()) {
+          courseBottomNavViewModel.state.value = true
+        }
       }
       DESKTOP_SHORTCUT_EXAM -> {
         startActivity(DISCOVER_GRADES)
@@ -63,7 +67,9 @@ internal actual fun PlatformMobileHomePage(
       else -> {
         if (defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
           // 打开应用优先显示课表的设置
-          courseFrameViewModel.frame.bottomSheetState.expand()
+          if (!IAccountService::class.impl().isTouristMode()) {
+            courseBottomNavViewModel.state.value = true
+          }
         }
       }
     }

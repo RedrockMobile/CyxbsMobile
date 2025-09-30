@@ -1,7 +1,7 @@
 package com.cyxbs.pages.course.api
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * .

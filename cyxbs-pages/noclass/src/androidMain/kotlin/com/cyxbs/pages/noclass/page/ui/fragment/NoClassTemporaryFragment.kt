@@ -121,7 +121,10 @@ class NoClassTemporaryFragment : BaseFragment(R.layout.noclass_fragment_temporar
             layoutManager = lm
             adapter = mAdapter.apply {
                 //加入本人
-                val list = listOf(Student("","","","",mUserName,mUserId,""))
+                val list = listOf(Student(
+                    name1 = mUserName,
+                    stunum1 = mUserId,
+                ))
                 submitList(list)
                 setOnItemDelete {
                     deleteMember(it)
@@ -187,7 +190,7 @@ class NoClassTemporaryFragment : BaseFragment(R.layout.noclass_fragment_temporar
                                 setOnClickClass { cls ->
                                     val clsList = mAdapter.currentList.toMutableSet()
                                     val ids = clsList.map {stu -> stu.id }
-                                    cls.members.forEach {stu ->
+                                    cls.members?.forEach {stu ->
                                         if (stu.id !in ids){
                                             clsList.add(stu)
                                         }
@@ -205,7 +208,7 @@ class NoClassTemporaryFragment : BaseFragment(R.layout.noclass_fragment_temporar
                                 setOnClickGroup { group ->
                                     val groupList = mAdapter.currentList.toMutableSet()
                                     val ids = groupList.map {stu -> stu.id }
-                                    group.members.forEach {stu ->
+                                    group.members?.forEach {stu ->
                                         if (stu.id !in ids){
                                             groupList.add(stu)
                                         }

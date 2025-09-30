@@ -14,7 +14,18 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 
 /**
- * 简化 Ktorfit 的使用方式
+ * 简化 Ktorfit 的使用方式，更多查看 [ApiGenerator] 的注释
+ *
+ * ```
+ * runCatchingCoroutine {
+ *   CourseApiService::class.impl().getStuLesson(stuNum) // 直接使用 XXXApi::class.impl() 就可以直接获取到实现类
+ * }.mapCatching {
+ *   it.throwApiExceptionIfFail()
+ *   it
+ * }.onSuccess {
+ *   // 网络请求返回结果
+ * }
+ * ```
  *
  * Ktorfit 有以下缺点：
  * - 每次使用都要先触发 KSP task 才会生成，非常不便捷

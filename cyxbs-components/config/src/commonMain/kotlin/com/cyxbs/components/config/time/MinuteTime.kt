@@ -1,7 +1,6 @@
 package com.cyxbs.components.config.time
 
 import androidx.compose.runtime.Stable
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.KSerializer
@@ -11,6 +10,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.time.Clock
 
 /**
  * 如果需要两个 [MinuteTime] 组合，可以使用 [MinuteTimePair]

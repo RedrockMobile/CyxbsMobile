@@ -16,9 +16,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
-import com.cyxbs.components.config.route.DECLARE_ENTRY
 import com.cyxbs.components.config.route.FAIRGROUND_ENTRY
 import com.cyxbs.components.config.route.FOOD_ENTRY
+import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.config.service.startActivity
@@ -59,42 +59,42 @@ class FairgroundPageFragment : BaseFragment(R.layout.ufield_fragment_fairground)
         }
         startSquare.setOnClickListener {
             doIfLogin {
-                startActivity(DECLARE_ENTRY)
+                startActivity(QA_ENTRY)
             }
         }
         viewModel.days.observe(viewLifecycleOwner) {
-                val text = "这是你来到邮乐园的第 $it 天"
+            val text = "这是你来到邮乐园的第 $it 天"
 
-                val spannableStringBuilder = SpannableStringBuilder(text)
-                val startIndex = text.indexOf(it)
-                val endIndex = startIndex + it.length
+            val spannableStringBuilder = SpannableStringBuilder(text)
+            val startIndex = text.indexOf(it)
+            val endIndex = startIndex + it.length
 
-                // 设置加粗样式
-                spannableStringBuilder.setSpan(
-                    StyleSpan(Typeface.BOLD),
-                    startIndex,
-                    endIndex,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
+            // 设置加粗样式
+            spannableStringBuilder.setSpan(
+                StyleSpan(Typeface.BOLD),
+                startIndex,
+                endIndex,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
 
-                // 设置字体大小
-                spannableStringBuilder.setSpan(
-                    AbsoluteSizeSpan(20, true),
-                    startIndex,
-                    endIndex,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
+            // 设置字体大小
+            spannableStringBuilder.setSpan(
+                AbsoluteSizeSpan(20, true),
+                startIndex,
+                endIndex,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
 
-                // 设置字体颜色
-                spannableStringBuilder.setSpan(
-                    ForegroundColorSpan(Color.parseColor("#5D5DF7")),
-                    startIndex,
-                    endIndex,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
+            // 设置字体颜色
+            spannableStringBuilder.setSpan(
+                ForegroundColorSpan(Color.parseColor("#5D5DF7")),
+                startIndex,
+                endIndex,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
 
-                // 将 spannableStringBuilder 应用到文本视图
-                tvDays.text = spannableStringBuilder
+            // 将 spannableStringBuilder 应用到文本视图
+            tvDays.text = spannableStringBuilder
         }
         viewModel.message.observe(viewLifecycleOwner) {
             if (it != null) {

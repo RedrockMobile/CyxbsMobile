@@ -9,6 +9,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.time.Clock
 
 /**
  * .
@@ -109,7 +110,7 @@ value class MinuteTimeDate(val value: Int) : Comparable<MinuteTimeDate> {
   companion object {
     fun now(): MinuteTimeDate {
       val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-      return MinuteTimeDate(now.year, now.monthNumber, now.dayOfMonth, MinuteTime(now.hour, now.minute))
+      return MinuteTimeDate(now.year, now.month.number, now.day, MinuteTime(now.hour, now.minute))
     }
   }
 }
@@ -117,8 +118,8 @@ value class MinuteTimeDate(val value: Int) : Comparable<MinuteTimeDate> {
 fun LocalDateTime.toMinuteTimeDate(): MinuteTimeDate {
   return MinuteTimeDate(
     year = this.year,
-    month = this.monthNumber,
-    dayOfMonth = this.dayOfMonth,
+    month = month.number,
+    dayOfMonth = day,
     hour = this.hour,
     minute = this.minute,
   )

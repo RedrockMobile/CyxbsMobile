@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.onEach
  */
 object HomeAffairDataProvider : CourseDataProvider<CourseAffairItem>() {
 
-  private val itemFactory = AffairItemFactory::class.impl()
+  private val itemFactory = AffairItemFactory.get()
 
   init {
     IAffairService2::class.impl()

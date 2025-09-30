@@ -132,9 +132,11 @@ internal fun CourseScrollCompose(
         val topPadding = scrollPaddingValues.calculateTopPadding().roundToPx()
         val bottomPadding = scrollPaddingValues.calculateBottomPadding().roundToPx()
         // 因为有 verticalScroll，所以这里 minHeight 就是父布局的高度
-        val height =
-          ((constraints.minHeight - topPadding - bottomPadding) * (nowWeight / initialWeight))
-            .roundToInt()
+        val minHeight =
+          if (constraints.minHeight > 0) constraints.minHeight
+          else if (constraints.maxHeight != Constraints.Infinity) constraints.maxHeight
+          else 1200
+        val height = ((minHeight - topPadding - bottomPadding) * (nowWeight / initialWeight)).roundToInt()
         val maxWidth = constraints.maxWidth - startPadding - endPadding
         val placeables = measurables.fastMapIndexed { index, measurable ->
           measurable.measure(

@@ -72,42 +72,58 @@ object StuLessonRepository {
       .asObservable()
       .observeOn(Schedulers.io())
       .switchMap { stuNum ->
-        // 使用 switchMap 可以停止之前学号的订阅
-        if (stuNum.isEmpty()) Observable.just(emptyList()) else {
-          if (ILessonService.isUseLocalSaveLesson) {
-            LessonDataBase.stuLessonDao
-              .observeLesson(stuNum)
-              .doOnSubscribe {
-                // 在开始订阅时异步请求一次云端数据，所以下游会先拿到本地数据库中的数据，如果远端数据更新了，整个流会再次通知
-                refreshLesson(stuNum).doOnError {
-                  if (isToast) {
-                    val lastUpdateDay = mLastUpdateDay
-                    if (lastUpdateDay < 1) {
-                      toastLong("课表正在使用缓存\n不能保证数据正确性")
-                    } else {
-                      toastLong("已 $lastUpdateDay 天未更新课表\n建议联网更新")
-                    }
-                  }
-                }.unsafeSubscribeBy {
-                  mLastUpdateDay = 0
-                }
-              }.distinctUntilChanged() // 去重
-              .subscribeOn(Schedulers.io())
-          } else {
-            // 不允许使用本地数据时
-            flow {
-              // 直到第一次网络请求成功前一直挂起，不返回结果给下游
-              NetworkUtil.suspendUntilAvailable()
-              emit(Unit)
-            }.asObservable()
-              .switchMap {
-                refreshLesson(stuNum)
-                  .onErrorComplete() // 网络请求的异常全部吞掉
-                  .toObservable()
-              }
-          }
-        }
+        observeLesson(stuNum, isToast)
       }
+  }
+
+  /**
+   * 观察 stuNum 的课程
+   * - 第一次观察时会请求新的数据
+   * - 使用了 distinctUntilChanged()，只会在数据更改了才会回调
+   * - 没登录时发送 emptyList()
+   * - 没有连接网络并且不允许使用本地缓存时会一直不发送数据给下游
+   * - 不会抛出异常给下游
+   *
+   * @param isToast 是否提示课表正在使用缓存数据
+   */
+  fun observeLesson(
+    stuNum: String,
+    isToast: Boolean = false,
+  ): Observable<List<StuLessonEntity>> {
+    return if (stuNum.isEmpty()) Observable.just(emptyList()) else {
+      if (ILessonService.isUseLocalSaveLesson) {
+        LessonDataBase.stuLessonDao
+          .observeLesson(stuNum)
+          .doOnSubscribe {
+            // 在开始订阅时异步请求一次云端数据，所以下游会先拿到本地数据库中的数据，如果远端数据更新了，整个流会再次通知
+            refreshLesson(stuNum).doOnError {
+              if (isToast) {
+                val lastUpdateDay = mLastUpdateDay
+                if (lastUpdateDay < 1) {
+                  toastLong("课表正在使用缓存\n不能保证数据正确性")
+                } else {
+                  toastLong("已 $lastUpdateDay 天未更新课表\n建议联网更新")
+                }
+              }
+            }.unsafeSubscribeBy {
+              mLastUpdateDay = 0
+            }
+          }.distinctUntilChanged() // 去重
+          .subscribeOn(Schedulers.io())
+      } else {
+        // 不允许使用本地数据时
+        flow {
+          // 直到第一次网络请求成功前一直挂起，不返回结果给下游
+          NetworkUtil.suspendUntilAvailable()
+          emit(Unit)
+        }.asObservable()
+          .switchMap {
+            refreshLesson(stuNum)
+              .onErrorComplete() // 网络请求的异常全部吞掉
+              .toObservable()
+          }
+      }
+    }
   }
   
   /**

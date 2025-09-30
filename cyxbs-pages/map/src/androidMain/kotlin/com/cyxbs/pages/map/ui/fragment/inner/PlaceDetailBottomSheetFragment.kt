@@ -1,11 +1,14 @@
 package com.cyxbs.pages.map.ui.fragment.inner
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatButton
+import androidx.core.net.toUri
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -26,6 +29,7 @@ import com.cyxbs.pages.map.viewmodel.MapViewModel
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import java.net.URLEncoder
 
 
 class PlaceDetailBottomSheetFragment : BaseFragment() {
@@ -42,6 +46,7 @@ class PlaceDetailBottomSheetFragment : BaseFragment() {
     private val mTvDetailShare by R.id.map_tv_detail_share.view<TextView>()
     private val mapTvDetailAboutText by R.id.map_tv_detail_about_text.view<TextView>()
     private val mapTvDetailPlaceName by R.id.map_tv_detail_place_name.view<TextView>()
+    private val mapBtnDetailPlaceNavigation by R.id.map_btn_detail_place_navigation.view<AppCompatButton>()
 
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
@@ -152,6 +157,27 @@ class PlaceDetailBottomSheetFragment : BaseFragment() {
         mTvDetailShare.setOnClickListener {
             context?.let { it1 -> viewModel.sharePicture(it1, this) }
 
+        }
+        mapBtnDetailPlaceNavigation.setOnClickListener {
+            val endPlace = "重庆邮电大学" + mapTvDetailPlaceName.text.toString().removePrefix("name:")
+            jumpToNavigation(endPlace)
+        }
+    }
+    private fun jumpToNavigation(endPlace: String) {
+        try {
+
+            val uri = ("baidumap://map/direction?" +
+                    "destination=name:$endPlace" +
+                    "&mode=walking").toUri()
+            val intent = Intent(Intent.ACTION_VIEW, uri)
+            startActivity(intent)
+        }catch (e: Exception){
+            // 未安装百度地图App，跳转网页版
+            // 对终点进行URL编码，处理特殊字符
+            val encodedEndPlace = URLEncoder.encode(endPlace, "UTF-8")
+            val webUrl = "http://api.map.baidu.com/geocoder?address=$encodedEndPlace&output=html&src=webapp.baidu.openAPIdemo"
+            val browserIntent = Intent(Intent.ACTION_VIEW, webUrl.toUri())
+            startActivity(browserIntent)
         }
     }
 

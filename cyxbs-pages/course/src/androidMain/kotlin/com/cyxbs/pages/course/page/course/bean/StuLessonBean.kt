@@ -1,7 +1,5 @@
 package com.cyxbs.pages.course.page.course.bean
 
-import android.os.Handler
-import android.os.Looper
 import com.google.gson.annotations.SerializedName
 import com.cyxbs.pages.course.BuildConfig
 import com.cyxbs.pages.course.page.course.room.ILessonEntity

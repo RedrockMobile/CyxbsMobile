@@ -34,6 +34,7 @@ fun BaseUi.doIfLogin(msg: String? = "此功能", next: (() -> Unit)? = null): Bo
       )
     ).setPositiveClick {
       ILoginService::class.impl().jumpToLoginPage()
+      dismiss()
     }.show()
     return false
   }

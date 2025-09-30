@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
   kotlin("multiplatform")
@@ -9,6 +8,11 @@ plugins {
 }
 
 kotlin {
+
+  compilerOptions {
+    optIn.add("kotlin.time.ExperimentalTime") // 抑制 ExperimentalTime 的警告
+  }
+
   androidTarget {
     compilerOptions {
       jvmTarget.set(JvmTarget.fromTarget(libsEx.versions.kotlinJvmTarget))
@@ -16,36 +20,26 @@ kotlin {
   }
   if (Multiplatform.enableDesktop(project)) {
     jvm("desktop")
-    jvmToolchain(libsEx.versions.kotlinJvmTarget.toInt())
   }
   if (Multiplatform.enableIOS(project)) {
-    listOf(
-      iosX64(),
-      iosArm64(),
-      iosSimulatorArm64()
-    ).forEach { iosTarget ->
-      iosTarget.binaries.framework {
-        baseName = Config.getBaseName(project)
-        isStatic = true
-      }
-    }
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
   }
-  if (Multiplatform.enableWasm(project)) {
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-      outputModuleName.set(Config.getBaseName(project))
+  if (Multiplatform.enableWeb(project)) {
+    js {
       browser {
-        val rootDirPath = project.rootDir.path
-        val projectDirPath = project.projectDir.path
         commonWebpackConfig {
           outputFileName = "${Config.getBaseName(project)}.js"
-          devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-            static = (static ?: mutableListOf()).apply {
-              // Serve sources to debug inside browser
-              add(rootDirPath)
-              add(projectDirPath)
-            }
-          }
+        }
+      }
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+      browser {
+        commonWebpackConfig {
+          outputFileName = "${Config.getBaseName(project)}.js"
         }
       }
     }
@@ -60,16 +54,28 @@ kotlin {
       implementation(libsEx.`kmp-uri`)
       implementation(libsEx.`kmp-settings-core`)
       implementation(libsEx.`kmp-settings-serialization`)
+      // atomicfu 显示依赖解决 strictly 0.23.2 问题 https://github.com/Kotlin/kotlinx-atomicfu/issues/469
+      implementation(libsEx.`kotlinx-atomicfu`)
     }
     androidMain.dependencies {
       implementation(libsEx.`kotlinx-coroutines-android`)
       implementation(libsEx.`androidx-appcompat`)
     }
+    // 桌面端
     if (Multiplatform.enableDesktop(project)) {
       val desktopMain by getting
       desktopMain.dependencies {
         implementation(libsEx.`kotlinx-coroutines-swing`)
       }
+    }
+    // iOS 端
+    if (Multiplatform.enableIOS(project)) {
+      val iosMain = create("iosMain") {
+        dependsOn(commonMain.get())
+      }
+      iosX64Main { dependsOn(iosMain) }
+      iosArm64Main { dependsOn(iosMain) }
+      iosSimulatorArm64Main { dependsOn(iosMain) }
     }
 
     // 移动端，建议 mobileMain 里面只放 UI
@@ -79,12 +85,18 @@ kotlin {
     }
     androidMain { dependsOn(mobileMain) }
     if (Multiplatform.enableIOS(project)) {
-      val iosMain = create("iosMain") {
+      val iosMain by getting {
         dependsOn(mobileMain)
       }
-      iosX64Main { dependsOn(iosMain) }
-      iosArm64Main { dependsOn(iosMain) }
-      iosSimulatorArm64Main { dependsOn(iosMain) }
+    }
+
+    // web 端配置
+    if (Multiplatform.enableWeb(project)) {
+      val webMain = create("webMain") {
+        dependsOn(commonMain.get())
+      }
+      jsMain { dependsOn(webMain) }
+      wasmJsMain { dependsOn(webMain) }
     }
 
     // 单独为 jb Compose 添加一个源集，区分安卓的 jetpack Compose
@@ -101,8 +113,8 @@ kotlin {
         dependsOn(jbComposeMain)
       }
     }
-    if (Multiplatform.enableWasm(project)) {
-      val wasmJsMain by getting {
+    if (Multiplatform.enableWeb(project)) {
+      val webMain by getting {
         dependsOn(jbComposeMain)
       }
     }

@@ -141,7 +141,7 @@ class SearchAllDialog : BaseBottomSheetDialogFragment() {
                                     dialog.cancel()
                                 }
                                 isOnlyGroup = false
-                                searchResultList.addAll(data.students)
+                                searchResultList.addAll(data.students ?: emptyList())
                             }
 
                             CLASS_TYPE -> {
@@ -162,7 +162,7 @@ class SearchAllDialog : BaseBottomSheetDialogFragment() {
                                 searchResultList.add(0,data.group)
                                 // 如果只有分组，此时才显示分组下面的学生
                                 if (isOnlyGroup) {
-                                    searchResultList.addAll(data.group.members)
+                                    searchResultList.addAll(data.group.members ?: emptyList())
                                     //单独设置的原因是因为要求点击分组下面的组员要求弹窗不消失
                                     setOnClickStudent {
                                         onClickStudent?.invoke(it)
@@ -185,13 +185,13 @@ class SearchAllDialog : BaseBottomSheetDialogFragment() {
                                     mViewModel.addMembers(groupId, stuSet)
                                 }
                                 isOnlyGroup = false
-                                searchResultList.addAll(data.students)
+                                searchResultList.addAll(data.students ?: emptyList())
                             }
 
                             CLASS_TYPE -> {
                                 setOnClickClass {
                                     // 添加至缓冲区
-                                    val stuSet = it.members.toSet()
+                                    val stuSet = it.members?.toSet() ?: emptySet()
                                     mWaitAdd[stuSet] = CLASS_TYPE
                                     // 进行网络请求增加班级内成员
                                     mViewModel.addMembers(groupId, stuSet)
@@ -202,7 +202,7 @@ class SearchAllDialog : BaseBottomSheetDialogFragment() {
 
                             GROUP_TYPE -> {
                                 setOnClickGroup {
-                                    val stuSet = it.members.toSet()
+                                    val stuSet = it.members?.toSet() ?: emptySet()
                                     mWaitAdd[stuSet] = GROUP_TYPE
                                     mViewModel.addMembers(groupId, stuSet)
                                 }
@@ -214,7 +214,7 @@ class SearchAllDialog : BaseBottomSheetDialogFragment() {
                                         mWaitAdd[stuSet] = STUDENT_TYPE
                                         mViewModel.addMembers(groupId, stuSet)
                                     }
-                                    searchResultList.addAll(data.group.members)
+                                    searchResultList.addAll(data.group.members ?: emptyList())
                                 }
                             }
                         }

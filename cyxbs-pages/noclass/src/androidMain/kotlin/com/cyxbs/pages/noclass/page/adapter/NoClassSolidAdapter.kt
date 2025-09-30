@@ -86,6 +86,7 @@ class NoClassSolidAdapter : ListAdapter<NoClassGroup, NoClassSolidAdapter.MyHold
                 mMenuLayout.closeRightSlide()
                 val item = getItem(bindingAdapterPosition)
                 onClickGroupDelete?.invoke(item)
+                rightSlideOpenLoc = null
             }
             mMenuLayout.setOnSlideChangedListener(object : OnSlideChangedListener {
                 override fun onSlideStateChanged(

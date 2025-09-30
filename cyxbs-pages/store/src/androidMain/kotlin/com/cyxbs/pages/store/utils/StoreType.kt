@@ -6,6 +6,7 @@ import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
 import com.cyxbs.components.config.route.FOOD_ENTRY
 import com.cyxbs.components.config.route.MINE_CHECK_IN
+import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.config.service.startActivity
@@ -14,6 +15,7 @@ import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_DECLARE
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_FOOD
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_NOCLASS
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_UFIELD
+import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_QA
 import com.cyxbs.pages.store.api.IStoreService.Task.LOGIN_VOLUNTEER
 import com.cyxbs.pages.store.bean.StampCenter
 
@@ -43,6 +45,9 @@ class StoreType {
         }
         JOIN_DECLARE.title-> {
           startActivity(DECLARE_ENTRY)
+        }
+        JOIN_QA.title->{
+          startActivity(QA_ENTRY)
         }
         JOIN_UFIELD.title-> {
           startActivity(UFIELD_MAIN_ENTRY)

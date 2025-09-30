@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="qa_string_publish">发布</string>
+    <string name="qa_publish_edit_hint">请输入你的问题~</string>
+    <string name="qa_publish_question_card">你的问题已有答案~</string>
+    <string name="qa_detail_no_net">网络菌伺服西去了联系QwQ</string>
+    <string name="qa_loading">正在加载中~</string>
+    <string name="qa_string_no_content">这里空空如也~</string>
+</resources>

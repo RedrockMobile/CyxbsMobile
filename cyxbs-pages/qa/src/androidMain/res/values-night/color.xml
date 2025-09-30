@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--返回箭头的颜色-->
+    <color name="qa_arrow_back_color">#FFFFFF</color>
+
+    <!--标题字体颜色-->
+    <color name="qa_text_title_color">#FFFFFF</color>
+
+    <!--内容字体颜色-->
+    <color name="qa_text_content_color">#767677</color>
+
+    <!--发布页背景色-->
+    <color name="qa_publish_background_color">#1A1A1A</color>
+
+    <!--标签item的未选中的背景色-->
+    <color name="qa_publish_tag_default_bg_color">#5A5A5A</color>
+
+    <!--标签item的选中的背景色-->
+    <color name="qa_publish_tag_selected_bg_color">#D4DAFF</color>
+
+    <!--标签item的未选中的字体色-->
+    <color name="qa_publish_tag_default_text_color">#D2D2D2</color>
+
+    <!--标签item的选中的字体色-->
+    <color name="qa_publish_tag_selected_text_color">#4A44E4</color>
+
+    <!--问答卡片的的背景色-->
+    <color name="qa_publish_question_card_bg_color">#2D2D2D</color>
+
+    <!--问答卡片的分割线的颜色-->
+    <color name="qa_publish_question_card_divider_color">#313131</color>
+
+    <!--搜索框颜色-->
+    <color name="qa_search_background_color">#1A1A1A</color>
+
+    <!--搜索字样颜色-->
+    <color name="qa_search_content_color">#767677</color>
+
+    <!-- card背景的颜色 -->
+    <color name="qa_home_btn_publish_color">#5F5AE7</color>
+
+    <color name="qa_home_btn_publish_color_selected">#4C48B9</color>
+
+</resources>

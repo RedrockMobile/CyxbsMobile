@@ -1,8 +1,11 @@
 package com.cyxbs.pages.course.home.item
 
+import androidx.compose.runtime.Stable
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemWrapper
+import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -18,8 +21,15 @@ interface AffairItemFactory {
     page: Int,
     affairDateModel: AffairDateModel,
   ): CourseItemWrapper<CourseAffairItem>
+
+  companion object {
+    fun get(): AffairItemFactory {
+      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItemModel
+    }
+  }
 }
 
+@Stable
 interface CourseAffairItem : CourseItem {
   val page: Int
   val affairDateModel: AffairDateModel

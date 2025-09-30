@@ -38,6 +38,8 @@ interface IStoreService {
     JOIN_FOOD("使用美食板块", TaskType.BASE),
     //以下是跳转到没课约
     JOIN_NOCLASS("使用一次没课约", TaskType.BASE),
+    //以下跳转到QA
+    JOIN_QA("提一个问题", TaskType.BASE),
     //以下跳转到表态
     JOIN_DECLARE("发表一次表态", TaskType.BASE),
     //以下跳转到module_ufield

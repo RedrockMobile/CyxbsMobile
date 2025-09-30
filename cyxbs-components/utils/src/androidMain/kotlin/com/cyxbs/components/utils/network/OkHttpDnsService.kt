@@ -18,9 +18,13 @@ object OkHttpDnsService {
   val dns = object : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
       val system = Dns.Companion.SYSTEM.lookup(hostname)
-      val systemIpv4 = system.filter { it is Inet4Address }
-      val systemIpv6 = system.filter { it is Inet6Address }
-      return systemIpv4 + systemIpv6 // 因为学校域名 DNS 解析原因，走 ipv6 会很慢，所以优先使用 ipv4
+      return system.sortedBy { // 因为学校域名 DNS 解析原因，走 ipv6 会很慢，所以优先使用 ipv4
+        when (it) {
+          is Inet4Address -> 0
+          is Inet6Address -> 1
+          else -> 2
+        }
+      }
     }
   }
 }

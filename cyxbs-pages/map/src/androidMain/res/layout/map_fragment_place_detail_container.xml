@@ -102,7 +102,20 @@
                         app:layout_constraintEnd_toStartOf="@id/map_iv_detail_favorite"
                         app:layout_constraintTop_toTopOf="@+id/map_iv_detail_favorite" />
 
-
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/map_btn_detail_place_navigation"
+                        android:layout_width="80dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/map_shape_navigation_btn_bg"
+                        android:gravity="center"
+                        android:text="导航"
+                        android:textColor="#FFFFFF"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="@id/map_iv_detail_favorite"
+                        app:layout_constraintHorizontal_bias="1.0"
+                        app:layout_constraintStart_toEndOf="@+id/map_rv_detail_place_attribute"
+                        app:layout_constraintStart_toStartOf="@id/map_rv_detail_place_attribute"
+                        app:layout_constraintTop_toBottomOf="@id/map_iv_detail_favorite" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
             </FrameLayout>
