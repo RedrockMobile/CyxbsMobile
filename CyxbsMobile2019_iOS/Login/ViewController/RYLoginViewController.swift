@@ -160,6 +160,7 @@ extension RYLoginViewController {
                     
                     self.checktoutEmailBiding()
                     self.updatePersonModel()
+                    UserItem.default().getUserInfo()
                     TodoSyncTool.share().logInSuccess()
                     
                 } else if status == 20004 { // status == "20004"

@@ -9,6 +9,7 @@
 #import "ScheduleViewController.h"
 #import "HistoryView.h"
 #import "ClassmatesList.h"
+#import "RemindHud.h"
 /**最大的搜索历史记录个数*/
 #define MAXLEN 9
 
@@ -224,11 +225,11 @@
            
        } failure:^(NSURLSessionDataTask * _Nonnull task, NSError * _Nonnull error) {
            [loading hide:YES];
-           MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-           hud.mode = MBProgressHUDModeText;
-           hud.labelText = @"加载失败";
-           [hud hide:YES afterDelay:1];
-           
+           if ([error.userInfo[NSLocalizedDescriptionKey] isEqual: @"Request failed: client error (429)"]) {
+               [RemindHUD.shared showDefaultHUDWithText:@"请求过于频繁~，请稍后再试" completion:nil];
+           } else {
+               [RemindHUD.shared showDefaultHUDWithText:@"加载失败" completion:nil];
+           }
            //没有发生跳转，那就只改变显示历史记录的控件的内部数据，而不刷新历史记录控件布局
            [self.historyView addHistoryBtnWithString:string reLayout:NO];
        }];
