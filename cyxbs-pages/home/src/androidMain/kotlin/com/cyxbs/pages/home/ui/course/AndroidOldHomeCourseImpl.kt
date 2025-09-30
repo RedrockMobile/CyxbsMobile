@@ -22,7 +22,7 @@ import com.g985892345.provider.api.annotation.ImplProvider
  * @date 2025/9/20
  */
 @ImplProvider
-object OldHomeCourseImpl : IOldHomeCourse {
+object AndroidOldHomeCourseImpl : IOldHomeCourse {
 
   override val enable: Boolean = !defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
 
