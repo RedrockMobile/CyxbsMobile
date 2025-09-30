@@ -19,12 +19,10 @@ import com.cyxbs.pages.course.api.utils.getStartRow
 import com.cyxbs.pages.course.api.utils.getStartTimeMinute
 import com.cyxbs.pages.course.api.utils.parseClassRoom
 import io.reactivex.rxjava3.core.Observable
-import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.rx3.asObservable
-import okhttp3.internal.filterList
 import java.util.Calendar
 import java.util.TreeSet
 import java.util.concurrent.TimeUnit
@@ -218,7 +216,7 @@ object CourseHeaderHelper {
       } else diff
     }
     treeSet.addAll(
-      lessonList.filterList {
+      lessonList.filter {
         /*
         * 筛选出今天和明天的课
         * 存在两种情况：
@@ -227,15 +225,15 @@ object CourseHeaderHelper {
         * */
         if (tomorrowHashDay == 0) {
           // 明天是下周一
-          week == nowWeek && hashDay == todayHashDay
-              || week == nowWeek + 1 && hashDay == tomorrowHashDay
+          it.week == nowWeek && it.hashDay == todayHashDay
+              || it.week == nowWeek + 1 && it.hashDay == tomorrowHashDay
         } else {
-          week == nowWeek && (hashDay == todayHashDay || hashDay == tomorrowHashDay)
+          it.week == nowWeek && (it.hashDay == todayHashDay || it.hashDay == tomorrowHashDay)
         }
       }.map { LessonItem(it, it.stuNum == selfNum) }
     )
     treeSet.addAll(
-      affairList.filterList {
+      affairList.filter {
         /*
         * 筛选出今天和明天的课
         * 存在两种情况：
@@ -244,10 +242,10 @@ object CourseHeaderHelper {
         * */
         if (tomorrowHashDay == 0) {
           // 明天是下周一
-          week == nowWeek && day == todayHashDay
-              || week == nowWeek + 1 && day == tomorrowHashDay
+          it.week == nowWeek && it.day == todayHashDay
+              || it.week == nowWeek + 1 && it.day == tomorrowHashDay
         } else {
-          week == nowWeek && (day == todayHashDay || day == tomorrowHashDay)
+          it.week == nowWeek && (it.day == todayHashDay || it.day == tomorrowHashDay)
         }
       }.map { AffairItem(it) }
     )

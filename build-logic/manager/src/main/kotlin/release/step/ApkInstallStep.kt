@@ -33,12 +33,12 @@ class ApkInstallStep(val project: Project) {
       val stdout = ByteArrayOutputStream()
       val stderr = ByteArrayOutputStream()
       val execResult = runCatching {
-        project.exec {
+        project.providers.exec {
           commandLine("adb", "devices")
           standardOutput = stdout
           errorOutput = stderr
           isIgnoreExitValue = true
-        }
+        }.result.get()
       }.onFailure {
         it.printStackTrace()
       }.getOrNull()
@@ -71,11 +71,11 @@ class ApkInstallStep(val project: Project) {
 
   private fun installApk(apk: File): Boolean {
     while (true) {
-      val installResult = project.exec {
+      val installResult = project.providers.exec {
         // adb install 安装
         commandLine("adb", "install", "-r", apk)
         isIgnoreExitValue = true
-      }
+      }.result.get()
       if (installResult.exitValue != 0) {
         println("❌ 安装失败，请检查设备是否正常连接".red())
         println()
@@ -95,7 +95,7 @@ class ApkInstallStep(val project: Project) {
 
   private fun confirm(): Boolean {
     println("✅ apk 已安装，请检查课表是否正常显示，5秒后将进行确认".bold())
-    project.exec {
+    project.providers.exec {
       // adb shell am start 打开 app
       commandLine(
         "adb", "shell", "am", "start",

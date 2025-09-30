@@ -37,42 +37,40 @@ class ApkDownloadStep(
     var count = 0
     while (true) {
       try {
-        val response = originOkHttpClient.newCall(request).execute()
-        val responseBody = response.body
-        if (responseBody == null) {
-          throw RuntimeException("response.body 为空")
-        }
+        originOkHttpClient.newCall(request).execute().use { response ->
+          val responseBody = response.body
 
-        downloadFile.parentFile?.mkdirs()
+          downloadFile.parentFile?.mkdirs()
 
-        val totalBytes = responseBody.contentLength()
+          val totalBytes = responseBody.contentLength()
 
-        FileOutputStream(downloadFile).use { outputStream ->
-          val source = responseBody.source()
-          val buffer = okio.Buffer()
-          var totalBytesRead = 0L
+          FileOutputStream(downloadFile).use { outputStream ->
+            val source = responseBody.source()
+            val buffer = okio.Buffer()
+            var totalBytesRead = 0L
 
-          val startTime = System.currentTimeMillis().milliseconds
+            val startTime = System.currentTimeMillis().milliseconds
 
-          while (!source.exhausted()) {
-            val bytesRead = source.read(buffer, 8192)
-            if (bytesRead == -1L) break
+            while (!source.exhausted()) {
+              val bytesRead = source.read(buffer, 8192)
+              if (bytesRead == -1L) break
 
-            outputStream.write(buffer.readByteArray())
-            totalBytesRead += bytesRead
+              outputStream.write(buffer.readByteArray())
+              totalBytesRead += bytesRead
 
-            // 计算并回调进度
-            if (totalBytes > 0) {
-              val progress = totalBytesRead * 100 * 100000 / totalBytes / 100000.0 // 保留 5 位小数
-              val diffTime = System.currentTimeMillis().milliseconds - startTime
-              println("下载进度: $totalBytesRead/$totalBytes" +
-                  " (${progress.toString().padEnd(7, '0')}%)" +
-                  "   耗时 $diffTime" +
-                  "   预计剩余时间 ${diffTime / progress * (100 - progress)}")
+              // 计算并回调进度
+              if (totalBytes > 0) {
+                val progress = totalBytesRead * 100 * 100000 / totalBytes / 100000.0 // 保留 5 位小数
+                val diffTime = System.currentTimeMillis().milliseconds - startTime
+                println("下载进度: $totalBytesRead/$totalBytes" +
+                    " (${progress.toString().padEnd(7, '0')}%)" +
+                    "   耗时 $diffTime" +
+                    "   预计剩余时间 ${diffTime / progress * (100 - progress)}")
+              }
             }
-          }
 
-          outputStream.flush()
+            outputStream.flush()
+          }
         }
         println("✅ 下载成功".bold())
         return downloadFile

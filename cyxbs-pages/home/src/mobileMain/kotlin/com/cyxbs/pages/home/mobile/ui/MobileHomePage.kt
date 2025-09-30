@@ -37,6 +37,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeArgument
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.view.ui.BottomSheetValueState
@@ -94,15 +95,15 @@ interface IOldHomeCourse {
 
 @Composable
 private fun HomeCourseCompose(modifier: Modifier = Modifier) {
-  val oldHomeCourse = IOldHomeCourse::class.impl()
-  if (oldHomeCourse.enable) {
+  val oldHomeCourse = IOldHomeCourse::class.implOrNull()
+  if (oldHomeCourse?.enable == true) {
     // 使用旧版课表进行展示
     oldHomeCourse.content.invoke(modifier)
     return
   }
-  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
-  val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
+  val bottomNavViewModel = viewModel { BottomNavViewModel() }
+  val courseFrameViewModel = viewModel { MobileCourseFrameViewModel() }
+  val courseBottomSheetViewModel = viewModel { CourseBottomSheetViewModel() }
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
@@ -167,7 +168,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val bottomNavViewModel = viewModel { BottomNavViewModel() }
   val shadowElevation by bottomNavViewModel.selectedItem.map {
     if (it === bottomNavViewModel.discoverItem || it === bottomNavViewModel.mineItem) 0.dp else 4.dp
   }.collectAsState(0.dp)
@@ -193,7 +194,7 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavItemCompose(item: BottomNavViewModel.BottomNavItem, modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val bottomNavViewModel = viewModel { BottomNavViewModel() }
   val coroutineScope = rememberCoroutineScope()
   val selected by bottomNavViewModel.selectedItem.map { it === item }.collectAsState(false)
   val hasRedDot by item.observerRedDot().collectAsState()

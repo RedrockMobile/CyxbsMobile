@@ -21,12 +21,11 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.IMovableItemModel
 import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
-import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 

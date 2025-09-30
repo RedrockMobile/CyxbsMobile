@@ -16,8 +16,8 @@ object Multiplatform {
     return (project.localProperties[key] ?: project.rootProject.properties[key]) == "true"
   }
 
-  fun enableWasm(project: Project): Boolean {
-    val key = "cyxbs.multiplatform.wasm"
+  fun enableWeb(project: Project): Boolean {
+    val key = "cyxbs.multiplatform.web"
     return (project.localProperties[key] ?: project.rootProject.properties[key]) == "true"
   }
 

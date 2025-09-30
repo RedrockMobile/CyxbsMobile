@@ -4,7 +4,4 @@
    <FileRef
       location = "group:CyxbsMobile2019_iOS.xcodeproj">
    </FileRef>
-   <FileRef
-      location = "group:Pods/Pods.xcodeproj">
-   </FileRef>
 </Workspace>
