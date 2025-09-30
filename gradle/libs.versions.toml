@@ -112,7 +112,7 @@ ktor = "3.3.0"
 # https://github.com/eygraber/uri-kmp
 kmp-uri = "0.0.20"
 # https://github.com/985892345/KtProvider
-kmp-ktProvider = "1.5.0-3-SNAPSHOT" # 985892345 的 kt 多平台跨模块服务提供框架
+kmp-ktProvider = "1.5.0-5-SNAPSHOT" # 985892345 的 kt 多平台跨模块服务提供框架
 # https://github.com/russhwolf/multiplatform-settings
 kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit

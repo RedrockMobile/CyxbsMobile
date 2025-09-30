@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
   kotlin("multiplatform")
@@ -27,14 +26,22 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
   }
-  if (Multiplatform.enableWasm(project)) {
+  if (Multiplatform.enableWeb(project)) {
     js {
-      browser()
+      browser {
+        commonWebpackConfig {
+          outputFileName = "${Config.getBaseName(project)}.js"
+        }
+      }
     }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-      browser()
+      browser {
+        commonWebpackConfig {
+          outputFileName = "${Config.getBaseName(project)}.js"
+        }
+      }
     }
   }
 
@@ -54,12 +61,14 @@ kotlin {
       implementation(libsEx.`kotlinx-coroutines-android`)
       implementation(libsEx.`androidx-appcompat`)
     }
+    // 桌面端
     if (Multiplatform.enableDesktop(project)) {
       val desktopMain by getting
       desktopMain.dependencies {
         implementation(libsEx.`kotlinx-coroutines-swing`)
       }
     }
+    // iOS 端
     if (Multiplatform.enableIOS(project)) {
       val iosMain = create("iosMain") {
         dependsOn(commonMain.get())
@@ -81,6 +90,15 @@ kotlin {
       }
     }
 
+    // web 端配置
+    if (Multiplatform.enableWeb(project)) {
+      val webMain = create("webMain") {
+        dependsOn(commonMain.get())
+      }
+      jsMain { dependsOn(webMain) }
+      wasmJsMain { dependsOn(webMain) }
+    }
+
     // 单独为 jb Compose 添加一个源集，区分安卓的 jetpack Compose
     val jbComposeMain = create("jbComposeMain") {
       dependsOn(commonMain.get())
@@ -95,8 +113,8 @@ kotlin {
         dependsOn(jbComposeMain)
       }
     }
-    if (Multiplatform.enableWasm(project)) {
-      val wasmJsMain by getting {
+    if (Multiplatform.enableWeb(project)) {
+      val webMain by getting {
         dependsOn(jbComposeMain)
       }
     }

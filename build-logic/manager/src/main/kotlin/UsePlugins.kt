@@ -97,7 +97,8 @@ private fun Project.kspMultiplatform(dependencyNotation: Any) {
       "kspIosArm64"(dependencyNotation)
       "kspIosSimulatorArm64"(dependencyNotation)
     }
-    if (Multiplatform.enableWasm(project)) {
+    if (Multiplatform.enableWeb(project)) {
+      "kspJs"(dependencyNotation)
       "kspWasmJs"(dependencyNotation)
     }
     if (Multiplatform.enableDesktop(project)) {

@@ -91,7 +91,7 @@ kotlin {
       }
     }
   }
-  if (Multiplatform.enableWasm(project)) {
+  if (Multiplatform.enableWeb(project)) {
     js {
       binaries.executable()
     }

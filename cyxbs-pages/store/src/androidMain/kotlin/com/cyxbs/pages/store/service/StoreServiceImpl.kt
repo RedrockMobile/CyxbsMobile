@@ -2,7 +2,6 @@ package com.cyxbs.pages.store.service
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy

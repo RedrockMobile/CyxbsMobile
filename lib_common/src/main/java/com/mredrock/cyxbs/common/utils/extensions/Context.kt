@@ -8,6 +8,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.fragment.app.Fragment
 import com.cyxbs.components.init.appContext
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
 import com.mredrock.cyxbs.common.utils.Internals
 
@@ -37,10 +38,10 @@ fun Activity.setFullScreen() {
 }
 
 @Deprecated("使用 utils 中 toast() 替换", replaceWith = ReplaceWith("com.cyxbs.components.utils.extensions.toast(message)"))
-fun toast(message: CharSequence) = com.cyxbs.components.utils.extensions.toast(message)
+fun toast(message: CharSequence) = toast(message)
 
 @Deprecated("使用 utils 中 toast() 替换", replaceWith = ReplaceWith("com.cyxbs.components.utils.extensions.toast(res)"))
-fun toast(res: Int) = com.cyxbs.components.utils.extensions.toast(appContext.resources.getText(res))
+fun toast(res: Int) = toast(appContext.resources.getText(res))
 
 @Deprecated("使用 utils 中 isDarkMode() 替换")
 fun Context.getDarkModeStatus(): Boolean {
