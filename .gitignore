@@ -15,7 +15,7 @@ key-cyxbs
 local_helper
 secret.gradle
 ./hooks/cache
-/.idea/
+/.idea/*
 *.log
 **/lint-baseline.xml
 **/modules
@@ -36,5 +36,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# 暂时不忽略 xcode.xml，解决无法选择指定 iosApp 打包的问题
+# https://youtrack.jetbrains.com/issue/KMT-1298/Support-multiple-iosApp-target-in-the-same-project
+!/.idea/xcode.xml
 
 
