@@ -9,6 +9,11 @@ plugins {
 }
 
 kotlin {
+
+  compilerOptions {
+    optIn.add("kotlin.time.ExperimentalTime") // 抑制 ExperimentalTime 的警告
+  }
+
   androidTarget {
     compilerOptions {
       jvmTarget.set(JvmTarget.fromTarget(libsEx.versions.kotlinJvmTarget))
@@ -16,38 +21,20 @@ kotlin {
   }
   if (Multiplatform.enableDesktop(project)) {
     jvm("desktop")
-    jvmToolchain(libsEx.versions.kotlinJvmTarget.toInt())
   }
   if (Multiplatform.enableIOS(project)) {
-    listOf(
-      iosX64(),
-      iosArm64(),
-      iosSimulatorArm64()
-    ).forEach { iosTarget ->
-      iosTarget.binaries.framework {
-        baseName = Config.getBaseName(project)
-        isStatic = true
-      }
-    }
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
   }
   if (Multiplatform.enableWasm(project)) {
+    js {
+      browser()
+    }
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-      outputModuleName.set(Config.getBaseName(project))
-      browser {
-        val rootDirPath = project.rootDir.path
-        val projectDirPath = project.projectDir.path
-        commonWebpackConfig {
-          outputFileName = "${Config.getBaseName(project)}.js"
-          devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-            static = (static ?: mutableListOf()).apply {
-              // Serve sources to debug inside browser
-              add(rootDirPath)
-              add(projectDirPath)
-            }
-          }
-        }
-      }
+      browser()
     }
   }
 
@@ -60,6 +47,8 @@ kotlin {
       implementation(libsEx.`kmp-uri`)
       implementation(libsEx.`kmp-settings-core`)
       implementation(libsEx.`kmp-settings-serialization`)
+      // atomicfu 显示依赖解决 strictly 0.23.2 问题 https://github.com/Kotlin/kotlinx-atomicfu/issues/469
+      implementation(libsEx.`kotlinx-atomicfu`)
     }
     androidMain.dependencies {
       implementation(libsEx.`kotlinx-coroutines-android`)

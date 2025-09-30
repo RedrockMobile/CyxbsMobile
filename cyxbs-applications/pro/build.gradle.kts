@@ -155,15 +155,15 @@ tasks.register("buildReleaseAndInstall") {
     val apkFile = channel.outputDir.listFiles()!!.first {
       it.name.contains("official") // 找到第一个 official 的渠道包
     }
-    val installResult = exec {
+    val installResult = providers.exec {
       // adb install 安装
       commandLine(
         "adb", "install", "-r",
         apkFile
       )
-    }
+    }.result.get()
     if (installResult.exitValue == 0) {
-      exec {
+      providers.exec {
         // adb shell am start 打开 app
         commandLine(
           "adb", "shell", "am", "start",

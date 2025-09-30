@@ -79,7 +79,23 @@ android {
 }
 
 kotlin {
+  if (Multiplatform.enableIOS(project)) {
+    listOf(
+      iosX64(),
+      iosArm64(),
+      iosSimulatorArm64()
+    ).forEach { iosTarget ->
+      iosTarget.binaries.framework {
+        baseName = Config.getBaseName(project)
+        isStatic = true
+      }
+    }
+  }
   if (Multiplatform.enableWasm(project)) {
+    js {
+      binaries.executable()
+    }
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
       binaries.executable()

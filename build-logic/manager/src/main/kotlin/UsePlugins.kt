@@ -17,11 +17,10 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 fun Project.useKtProvider(isNeedKsp: Boolean = !name.startsWith("api")) {
   if (isNeedKsp) {
     // kapt 按需引入
-    apply(plugin = "com.google.devtools.ksp")
+    apply(plugin = libsEx.plugins.ksp)
     apply(plugin = libsEx.plugins.ktProvider)
     val ktProvider = extensions.getByName("ktProvider") as KtProviderExtensions
     kspMultiplatform(ktProvider.ksp)
-    ktProvider.configurations.add("debugImplementation") // debug 模块需要单独添加配置
   }
   extensions.configure<KotlinMultiplatformExtension> {
     sourceSets.commonMain.dependencies {
@@ -40,7 +39,7 @@ fun Project.useRoom(
   paging: Boolean = false,
 ) {
   // ksp 按需引入
-  apply(plugin = "com.google.devtools.ksp")
+  apply(plugin = libsEx.plugins.ksp)
   extensions.configure<KspExtension> {
     arg("room.schemaLocation", "${project.projectDir}/schemas") // room 的架构导出目录
     // https://developer.android.com/jetpack/androidx/releases/room#compiler-options
@@ -69,7 +68,7 @@ fun Project.useRoom(
  */
 fun Project.useNetwork() {
   // ksp 按需引入
-  apply(plugin = "com.google.devtools.ksp")
+  apply(plugin = libsEx.plugins.ksp)
   apply(plugin = libsEx.plugins.ktorfit)
   extensions.configure<KotlinMultiplatformExtension> {
     sourceSets.commonMain.dependencies {
