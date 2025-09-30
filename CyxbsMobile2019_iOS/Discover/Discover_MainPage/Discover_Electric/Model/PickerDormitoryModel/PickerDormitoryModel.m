@@ -13,14 +13,13 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        self.placeArray = @[@"宁静苑", @"明理苑", @"知行苑", @"兴业苑", @"四海苑", @"明志苑"];
+        self.placeArray = @[@"宁静苑", @"明理苑", @"知行苑", @"兴业苑", @"四海苑"];
         self.siHaiPlace = @[@"1舍", @"2舍"];
         self.ningJingPlace = @[@"1舍", @"2舍", @"3舍", @"4舍", @"5舍", @"6舍", @"7舍", @"8舍", @"9舍", @"10舍"];
         self.mingLiPlace = @[@"1舍", @"2舍", @"3舍", @"4舍", @"5舍", @"6舍", @"7舍", @"8舍", @"9舍"];
         self.zhiXingPlace = @[@"1舍", @"2舍", @"3舍", @"4舍", @"5舍", @"6舍", @"7舍", @"8舍", @"9舍"];
         self.xingYePlace = @[@"1舍", @"2舍", @"3舍", @"4舍", @"5舍", @"6舍", @"7舍", @"8舍"];
-        self.mingZhiPlace = @[@"1舍", @"2舍", @"3舍"];
-        self.allArray = @[self.ningJingPlace, self.mingLiPlace, self.zhiXingPlace, self.xingYePlace, self.siHaiPlace, self.mingZhiPlace];
+        self.allArray = @[self.ningJingPlace, self.mingLiPlace, self.zhiXingPlace, self.xingYePlace, self.siHaiPlace];
     }
 
     return self;
@@ -61,10 +60,8 @@
         } else if (num == 8) {
             return @"23B栋";
         }
-    } else if ([building isEqual:@"四海苑"]) {
+    } else {//四海苑
         num += 35;
-    } else if ([building isEqual:@"明志苑"]) {
-        num += 44;
     }
 
     return [NSString stringWithFormat:@"%2d栋", num];
@@ -97,8 +94,6 @@
         return @[@4, @(num - 36)];
     } else if (num == 39) {//明理苑9舍
         return @[@1, @8];
-    } else if (num >= 45 && num <= 47) {//明志苑1-3舍
-        return @[@0, @(num - 45)];
     }
 
     return @[@0, @0];

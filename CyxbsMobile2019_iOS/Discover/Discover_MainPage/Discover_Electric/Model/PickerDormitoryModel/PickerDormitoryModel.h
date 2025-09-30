@@ -18,7 +18,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray <NSString *> *mingLiPlace;
 @property (nonatomic, copy) NSArray <NSString *> *xingYePlace;
 @property (nonatomic, copy) NSArray <NSString *> *zhiXingPlace;
-@property (nonatomic, copy) NSArray <NSString *> *mingZhiPlace;
 @property (nonatomic, copy) NSArray <NSArray <NSString *> *> *allArray;
 
 ///根据苑名字和几舍获取栋数字：例如参数1：知行苑，参数2：8舍，返回：16栋
