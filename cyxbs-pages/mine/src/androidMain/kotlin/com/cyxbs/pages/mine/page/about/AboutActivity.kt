@@ -31,13 +31,13 @@ import com.mredrock.cyxbs.common.config.APP_WEBSITE
 import com.mredrock.cyxbs.common.config.DIR_LOG
 import com.mredrock.cyxbs.common.config.ICP_WEBSITE
 import com.mredrock.cyxbs.common.config.OKHTTP_LOCAL_LOG
-import com.mredrock.cyxbs.common.ui.BaseViewModelActivity
+import com.mredrock.cyxbs.common.ui.BaseActivity
 import com.mredrock.cyxbs.common.utils.extensions.toast
 import java.io.File
 import java.util.Calendar
 
 
-class AboutActivity : BaseViewModelActivity<AboutViewModel>() {
+class AboutActivity : BaseActivity() {
     private val mine_about_rl_share by R.id.mine_about_rl_share.view<RelativeLayout>()
     private val mine_about_rl_website by R.id.mine_about_rl_website.view<RelativeLayout>()
     private val mine_about_rl_update by R.id.mine_about_rl_update.view<RelativeLayout>()
@@ -189,7 +189,7 @@ class AboutActivity : BaseViewModelActivity<AboutViewModel>() {
     private var selfUpdateCheck = false
     private fun bindUpdate() {
         IAppUpdateService::class.impl().apply {
-            getUpdateStatus().observe {
+            getUpdateStatus().observe(this@AboutActivity) {
                 when (it) {
                     AppUpdateStatus.UNCHECK -> checkUpdate()
                     AppUpdateStatus.DATED -> {
