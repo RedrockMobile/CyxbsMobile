@@ -12,7 +12,8 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class AffairEntity(
-  val id: Int,
+  val remoteId: Int,
+  val localId: String = "",
   val remindTime: Int,
   val title: String,
   val content: String,

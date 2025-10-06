@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.view.data
 
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
@@ -49,8 +50,9 @@ class CourseDataProviderGroup(
   }
 
   // 获取 page 对应的周数据，其中 page 为 0 时表示整学期
+  @Stable
   fun getWeekDataPool(page: Int): CourseWeekDataPool {
-    return synchronized(weekDataPoolByPageLock) {
+    return weekDataPoolByPage[page] ?: synchronized(weekDataPoolByPageLock) {
       weekDataPoolByPage.getOrPut(page) {
         CourseWeekDataPool(providers, timeline!!, page)
       }

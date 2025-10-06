@@ -59,7 +59,7 @@ data class GetAffairBean(
     fun toAffair(): AffairEntity? {
       val affair = runCatching {
         AffairEntity(
-          id = id,
+          remoteId = id,
           remindTime = remindTime,
           title = title,
           content = content,

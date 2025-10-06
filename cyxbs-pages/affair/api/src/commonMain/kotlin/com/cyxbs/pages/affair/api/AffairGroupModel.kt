@@ -3,6 +3,9 @@ package com.cyxbs.pages.affair.api
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTimePair
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -61,6 +64,7 @@ interface AffairGroupModel {
     remindTime: Int, // 提醒时间
     title: String,
     content: String,
+    remoteId: Int = 0, // 如果大于等于 0，则认为是后端新下发的数据，就仅本地新增，不上传到后端
     action: suspend (AffairIdModelEditor) -> Unit
   ): Result<AffairIdModel>
 }
@@ -72,11 +76,13 @@ interface AffairIdModel {
   val enable: StateFlow<Boolean>
   // 非后端返回 id，此 id 为客户端上的唯一 id
   val localId: String
-  val remindTime: StateFlow<Int>
-  val title: StateFlow<String>
-  val content: StateFlow<String>
+  // 后端 id，如果 <= 0，则说明是本地临时事务
+  val remoteId: MutableStateFlow<Int>
+  val remindTime: EditorStateFlow<AffairIdModelEditor, Int>
+  val title: EditorStateFlow<AffairIdModelEditor, String>
+  val content: EditorStateFlow<AffairIdModelEditor, String>
 
-  val whatTimeList: StateFlow<ImmutableList<AffairWhatTimeModel>>
+  val whatTimeDate: EditorStateFlow<AffairIdModelEditor, out ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
 
   fun createEditor(): AffairIdModelEditor?
 
@@ -87,37 +93,38 @@ interface AffairIdModel {
 // 其下包含多个日期 AffairItemModel
 interface AffairWhatTimeModel {
   // 返回 false 时表示该 AffairWhatTimeModel 已经被删除
-  val enable: StateFlow<Boolean>
+  val enable: EditorStateFlow<AffairWhatTimeModelEditor, Boolean>
 
   val idModel: AffairIdModel
 
-  val timePair: StateFlow<MinuteTimePair>
-
-  val dateList: StateFlow<ImmutableList<AffairDateModel>> // 如果使用 List<AffairLeafModel> 会因为对象未改变导致无法监听更新
+  val timePair: EditorStateFlow<AffairWhatTimeModelEditor, MinuteTimePair>
 }
 
 // 事务日期，作为整个事务的叶子结点
 // 其对象在整个应用生命周期内不会改变，可用于绑定 Compose 结点
 interface AffairDateModel {
   // 返回 false 时表示该 AffairLeafModel 已经被删除
-  val enable: StateFlow<Boolean>
+  val enable: EditorStateFlow<AffairDateModelEditor, Boolean>
 
   val idModel: AffairIdModel
 
   // whatTime 是可能会发生改变的，例如从原先的 whatTimeList 中分裂出新的 whatTime
-  val whatTime: StateFlow<AffairWhatTimeModel>
+  val whatTime: EditorStateFlow<AffairDateModelEditor, AffairWhatTimeModel>
 
-  val date: StateFlow<Date>
+  val date: EditorStateFlow<AffairDateModelEditor, Date>
 }
 
 //////////////////////////////////////// Editor ////////////////////////////////////////
 
 interface AffairIdModelEditor {
   val idModel: AffairIdModel
-  val remindTime: StateFlow<Int>
-  val title: StateFlow<String>
-  val content: StateFlow<String>
-  val whatTimeList: StateFlow<ImmutableList<AffairWhatTimeModelEditor>>
+  val remindTime: Int
+  val title: String
+  val content: String
+  val whatTimeDate: Map<out AffairWhatTimeModelEditor, List<AffairDateModelEditor>>
+
+  val incrementAddList: List<AffairWhatTimeModelEditor> // 增量添加数据
+  val incrementRemoveList: List<AffairWhatTimeModelEditor> // 增量移除数据
 
   fun setRemindTime(remindTime: Int): String?
   fun setTitle(title: String): String?
@@ -131,7 +138,9 @@ interface AffairIdModelEditor {
 
   fun enableModify(): Boolean // 能否修改
 
-  suspend fun commit(): Result<EditResult>
+  suspend fun commit(
+    needUpload: Boolean = true, // 是否需要上传到后端
+  ): Result<EditResult>
 
   sealed interface EditResult {
     object Success : EditResult
@@ -141,8 +150,12 @@ interface AffairIdModelEditor {
 
 interface AffairWhatTimeModelEditor {
   val idModelEditor: AffairIdModelEditor
-  val timePair: StateFlow<MinuteTimePair>
-  val dateList: StateFlow<ImmutableList<AffairDateModelEditor>>
+  val whatTimeModel: AffairWhatTimeModel
+  val timePair: MinuteTimePair
+  val dateList: List<AffairDateModelEditor>
+
+  val incrementAddList: List<AffairDateModelEditor> // 增量添加数据
+  val incrementRemoveList: List<AffairDateModelEditor> // 增量移除数据
 
   fun setTimePair(timePair: MinuteTimePair): String?
 
@@ -153,11 +166,17 @@ interface AffairWhatTimeModelEditor {
 
 interface AffairDateModelEditor {
   val idModelEditor: AffairIdModelEditor
-  val whatTime: StateFlow<AffairWhatTimeModelEditor?>
-  val date: MutableStateFlow<Date>
+  val whatTimeEditor: AffairWhatTimeModelEditor?
+  val dateModel: AffairDateModel
+  val date: Date
 
   fun setDate(date: Date): String?
 
   fun replace(whatTime: AffairWhatTimeModelEditor): Boolean
 }
 
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+abstract class EditorStateFlow<Editor, Value>(
+  val valueFlow: StateFlow<Value>,
+  val valueByEditorFlow: Flow<Pair<Editor, Value>>
+) : StateFlow<Value> by valueFlow

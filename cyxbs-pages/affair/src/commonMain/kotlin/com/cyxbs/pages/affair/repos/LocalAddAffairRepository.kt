@@ -1,16 +1,11 @@
 package com.cyxbs.pages.affair.repos
 
-import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.affair.bean.AffairEntity
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.getAndUpdate
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * .
@@ -22,76 +17,72 @@ object LocalAddAffairRepository {
 
   private const val SETTING_KEY_AFFAIR_LOCAL_ADD = "setting_key_affair_local_add"
 
-  private val addAffairFlow = MutableStateFlow<Map<Int, AffairEntity>>(emptyMap())
+  private val addAffairMap = HashMap<String, MutableMap<String, AffairEntity>>()
 
-  init {
-    IAccountService::class.impl()
-      .stuNumFlow
-      .onEach {
-        addAffairFlow.value = if (it != null) loadLocalAddAffair() else emptyMap()
-      }.launchIn(appCoroutineScope)
-  }
+  private val synchronizedObject = SynchronizedObject()
 
-  fun add(affair: AffairEntity): AffairEntity {
-    while (true) {
-      val prevValue = addAffairFlow.value
-      val id = (prevValue.minOfOrNull { it.value.id } ?: 0) - 1
-      val newAffair = affair.copy(id = id)
-      val nextValue = prevValue.toMutableMap().apply { put(id, newAffair) }
-      if (addAffairFlow.compareAndSet(prevValue, nextValue)) {
-        saveAffair()
-        return newAffair
+  fun get(stuNum: String): Map<String, AffairEntity> {
+    return addAffairMap[stuNum] ?: synchronized(synchronizedObject) {
+      addAffairMap.getOrPut(stuNum) {
+        loadLocalAddAffair(stuNum)
       }
     }
   }
 
-  fun update(affair: AffairEntity) {
-    if (affair.id < 0) {
-      val old = addAffairFlow.getAndUpdate { map ->
-        if (map.containsKey(affair.id)) {
-          map.toMutableMap().apply { put(affair.id, affair) }
-        } else map
+  @OptIn(ExperimentalUuidApi::class)
+  fun add(stuNum: String, affair: AffairEntity) {
+    require(affair.localId.isNotEmpty()) { "localId 不能为空, $affair" }
+    synchronized(synchronizedObject) {
+      val map = addAffairMap.getOrPut(stuNum) {
+        loadLocalAddAffair(stuNum)
       }
-      if (old.containsKey(affair.id)) {
-        saveAffair()
+      map[affair.localId] = affair
+      saveAffair(stuNum, map)
+    }
+  }
+
+  fun update(stuNum: String, affair: AffairEntity) {
+    require(affair.localId.isNotEmpty()) { "localId 不能为空, $affair" }
+    synchronized(synchronizedObject) {
+      val map = addAffairMap.getOrPut(stuNum) {
+        loadLocalAddAffair(stuNum)
+      }
+      if (map.containsKey(affair.localId)) {
+        map[affair.localId] = affair
+        saveAffair(stuNum, map)
       }
     }
   }
 
-  fun delete(id: Int) {
-    if (id < 0) {
-      val old = addAffairFlow.getAndUpdate { map ->
-        if (map.containsKey(id)) {
-          map.toMutableMap().apply { remove(id) }
-        } else map
+  fun remove(stuNum: String, localId: String) {
+    require(localId.isNotEmpty()) { "localId 不能为空" }
+    synchronized(synchronizedObject) {
+      val map = addAffairMap.getOrPut(stuNum) {
+        loadLocalAddAffair(stuNum)
       }
-      if (old.containsKey(id)) {
-        saveAffair()
+      if (map.remove(localId) != null) {
+        saveAffair(stuNum, map)
       }
     }
   }
 
-  fun getFlow(): StateFlow<Map<Int, AffairEntity>> {
-    return addAffairFlow
-  }
-
-  private fun loadLocalAddAffair(): Map<Int, AffairEntity> {
+  private fun loadLocalAddAffair(stuNum: String): MutableMap<String, AffairEntity> {
     // 读取磁盘
-    val accountSettings = AccountSettings.now
+    val accountSettings = AccountSettings.get(stuNum)
     return accountSettings.getStringOrNull(SETTING_KEY_AFFAIR_LOCAL_ADD)?.let { json ->
       runCatching {
-        defaultJson.decodeFromString<Map<Int, AffairEntity>>(json)
+        defaultJson.decodeFromString<MutableMap<String, AffairEntity>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR_LOCAL_ADD)
       }.getOrNull()
-    } ?: emptyMap()
+    } ?: mutableMapOf()
   }
 
-  private fun saveAffair() {
+  private fun saveAffair(stuNum: String, map: Map<String, AffairEntity>) {
     // 保存进磁盘
-    AccountSettings.now.putString(
+    AccountSettings.get(stuNum).putString(
       SETTING_KEY_AFFAIR_LOCAL_ADD,
-      defaultJson.encodeToString<Map<Int, AffairEntity>>(addAffairFlow.value)
+      defaultJson.encodeToString<Map<String, AffairEntity>>(map)
     )
   }
 }

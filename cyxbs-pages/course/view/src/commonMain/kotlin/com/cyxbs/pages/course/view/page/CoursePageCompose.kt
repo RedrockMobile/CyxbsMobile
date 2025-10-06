@@ -141,7 +141,7 @@ private fun CourseWeekDataContent(weekDataPool: CourseWeekDataPool, timeline: Co
           pageContext.putItemState(overlay.wrapper, itemState)
           onDispose { pageContext.putItemState(overlay.wrapper, null) }
         }
-        overlay.wrapper.item.content(
+        overlay.wrapper.item.CourseItemContent(
           Modifier.layout { measurable, constraints ->
             val placeable = measurable.measure(
               Constraints(

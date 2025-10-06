@@ -57,7 +57,7 @@ import kotlin.math.roundToInt
  * @date 2025/2/14
  */
 @Stable
-class CourseItemWrapper<T : CourseItem>(
+class CourseItemWrapper<T : CourseItem>( // todo 属性需要可变，待重新设计
   val item: T,
   val page: Int,
   val dayOfWeek: DayOfWeek,
@@ -76,10 +76,11 @@ interface CourseItem {
   /**
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
    */
-  val content: @Composable (
+  @Composable
+  fun CourseItemContent(
     modifier: Modifier,
     itemState: CourseItemState,
-  ) -> Unit
+  )
 }
 
 // 用于描述 item 支持的扩展功能

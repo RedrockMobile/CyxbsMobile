@@ -1,15 +1,9 @@
 package com.cyxbs.pages.affair.repos
 
-import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
-import com.cyxbs.components.init.appCoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 /**
  * .
@@ -21,46 +15,57 @@ object LocalDeleteAffairRepository {
 
   private const val SETTING_KEY_AFFAIR_LOCAL_DELETE = "setting_key_affair_local_delete"
 
-  private val deleteAffairFlow = MutableStateFlow<Set<Int>>(emptySet())
+  private val deleteAffairMap = mutableMapOf<String, MutableSet<String>>()
 
-  init {
-    IAccountService::class.impl()
-      .stuNumFlow
-      .onEach {
-        deleteAffairFlow.value = if (it != null) loadLocalDeleteAffair() else emptySet()
-      }.launchIn(appCoroutineScope)
-  }
+  private val synchronizedObject = SynchronizedObject()
 
-  fun delete(id: Int) {
-    if (id >= 0) {
-      deleteAffairFlow.update { map ->
-        map.toMutableSet().apply { add(id) }
+  fun get(stuNum: String): Set<String> {
+    return deleteAffairMap[stuNum] ?: synchronized(synchronizedObject) {
+      deleteAffairMap.getOrPut(stuNum) {
+        loadLocalDeleteAffair(stuNum)
       }
-      saveAffair()
     }
   }
 
-  fun getFlow(): StateFlow<Set<Int>> {
-    return deleteAffairFlow
+  fun add(stuNum: String, localId: String) {
+    require(localId.isNotEmpty()) { "localId 不能为空" }
+    synchronized(synchronizedObject) {
+      val set = deleteAffairMap.getOrPut(stuNum) {
+        loadLocalDeleteAffair(stuNum)
+      }
+      set.add(localId)
+      saveAffair(stuNum, set)
+    }
   }
 
-  private fun loadLocalDeleteAffair(): Set<Int> {
+  fun remove(stuNum: String, localId: String) {
+    require(localId.isNotEmpty()) { "localId 不能为空" }
+    synchronized(synchronizedObject) {
+      val set = deleteAffairMap.getOrPut(stuNum) {
+        loadLocalDeleteAffair(stuNum)
+      }
+      set.remove(localId)
+      saveAffair(stuNum, set)
+    }
+  }
+
+  private fun loadLocalDeleteAffair(stuNum: String): MutableSet<String> {
     // 读取磁盘
-    val accountSettings = AccountSettings.now
+    val accountSettings = AccountSettings.get(stuNum)
     return accountSettings.getStringOrNull(SETTING_KEY_AFFAIR_LOCAL_DELETE)?.let { json ->
       runCatching {
-        defaultJson.decodeFromString<Set<Int>>(json)
+        defaultJson.decodeFromString<MutableSet<String>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR_LOCAL_DELETE)
       }.getOrNull()
-    } ?: emptySet()
+    } ?: mutableSetOf()
   }
 
-  private fun saveAffair() {
+  private fun saveAffair(stuNum: String, set: Set<String>) {
     // 保存进磁盘
-    AccountSettings.now.putString(
+    AccountSettings.get(stuNum).putString(
       SETTING_KEY_AFFAIR_LOCAL_DELETE,
-      defaultJson.encodeToString<Set<Int>>(deleteAffairFlow.value)
+      defaultJson.encodeToString<Set<String>>(set)
     )
   }
 }

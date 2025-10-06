@@ -2,7 +2,6 @@ package com.cyxbs.pages.course.home.data
 
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.affair.api.AffairDateModel
@@ -11,9 +10,10 @@ import com.cyxbs.pages.course.home.item.AffairItemFactory
 import com.cyxbs.pages.course.home.item.CourseAffairItem
 import com.cyxbs.pages.course.view.data.CourseDataProvider
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -26,45 +26,54 @@ object HomeAffairDataProvider : CourseDataProvider<CourseAffairItem>() {
 
   private val itemFactory = AffairItemFactory.get()
 
+  private val dateModelSet = mutableSetOf<AffairDateModel>()
+  private val dateModelRemovedList = mutableListOf<AffairDateModel>()
+
   init {
-    IAffairService2::class.impl()
-      .observeAffairModelStateFlow()
+    SchoolCalendar.observeFirstMonDay()
+      .onEach {
+        clear() // 开学日期发生改变，清空数据
+      }
       .flatMapLatest {
-        it?.itemList ?: flowOf(emptyList())
-      }.flatMapLatest { itemModels ->
-        combine(itemModels.map { it.whatTimeList }) { array ->
-          array.map { map ->
-            map.map { entry ->
-              entry.key
-            }
-          }.flatten()
+        IAffairService2::class.impl()
+          .observeAffairModelStateFlow()
+      }
+      .onEach {
+        if (it == null) {
+          clear() // 事务数据为空，说明退出登陆了，清空数据
         }
-      }.flatMapLatest { whatTimeModels ->
-        combine(whatTimeModels.map { it.dateList }) { array ->
-          array.map { map ->
-            map.map { entry ->
-              entry.key
-            }
-          }.flatten()
+      }
+      .filterNotNull()
+      .flatMapLatest {
+        it.itemList
+      }.flatMapLatest { idModels ->
+        idModels.map { idModel ->
+          idModel.whatTimeDate.map {
+            it.values
+          }.map {
+            it.flatten()
+          }
+        }.let { listFlow ->
+          combine(listFlow) {
+            it.toList().flatten()
+          }
         }
-      }.combine(SchoolCalendar.observeFirstMonDay()) { affairs, firstDate ->
-        // Compose 新课表事务魔改了 server 下方的事务数据结构含义，week 字段不再作为周数，而是日期
-        // 所以需要获取开学第一天的日期才能计算出周数
-        affairs to firstDate
-      }.onEach {
-        resetData(it.first, it.second)
-      }.launchIn(appCoroutineScope)
+      }
+      .onEach {
+//        resetData(it)
+      }
+      .launchIn(appCoroutineScope)
   }
 
-  private fun resetData(dateModels: List<AffairDateModel>, firstDate: Date) {
-    clear()
-    if (dateModels.isEmpty()) return
-    dateModels.fastForEach {
-      val page = firstDate.daysUntil(it.date.value) / 7 + 1
-      if (page >= 1) {
-        add(itemFactory.createAffairItemModel(0, it))
-        add(itemFactory.createAffairItemModel(page, it))
-      }
-    }
-  }
+//  private fun resetData(dateModels: List<AffairDateModel>) {
+//    clear()
+//    if (dateModels.isEmpty()) return
+//    dateModels.fastForEach {
+//      val page = firstDate.daysUntil(it.date.value) / 7 + 1
+//      if (page >= 1) {
+//        add(itemFactory.createAffairItemModel(0, it))
+//        add(itemFactory.createAffairItemModel(page, it))
+//      }
+//    }
+//  }
 }

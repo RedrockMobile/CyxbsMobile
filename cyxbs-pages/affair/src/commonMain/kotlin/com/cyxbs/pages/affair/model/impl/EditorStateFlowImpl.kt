@@ -1,0 +1,27 @@
+package com.cyxbs.pages.affair.model.impl
+
+import com.cyxbs.pages.affair.api.EditorStateFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+
+/**
+ * .
+ *
+ * @author 985892345
+ * @date 2025/10/1
+ */
+class EditorStateFlowImpl<Editor, Value>(
+  valueFlow: MutableStateFlow<Value>,
+  valueByEditorFlow: MutableSharedFlow<Pair<Editor, Value>> = MutableSharedFlow(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST,
+  ),
+) : EditorStateFlow<Editor, Value>(
+  valueFlow,
+  valueByEditorFlow.debounce(10)
+) {
+  val valueStateFlow = valueFlow
+  val valueByEditorStateFlow = valueByEditorFlow
+}

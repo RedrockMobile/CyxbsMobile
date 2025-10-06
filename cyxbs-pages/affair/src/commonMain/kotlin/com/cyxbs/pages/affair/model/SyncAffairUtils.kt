@@ -8,7 +8,7 @@ import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.affair.bean.AffairEntity
 import com.cyxbs.pages.affair.bean.AffairWhatTime
-import com.cyxbs.pages.affair.model.a.AffairGroupModelImpl
+import com.cyxbs.pages.affair.model.impl.AffairGroupModelImpl
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
@@ -22,9 +22,12 @@ object SyncAffairUtils {
 
   suspend fun syncAffair(affairs: List<AffairEntity>, groupModel: AffairGroupModelImpl) {
     // 本地数据与远端数据都有数据，但数据存在差异，需要进行比较
-    // 先通过 id 整合起来比较单个事务
-    val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId.value }
-    val newMap = affairs.associateByTo(LinkedHashMap()) { it.id }
+    // 先通过 remoteId 整合起来比较单个事务
+    val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) {
+      it.remoteId.value.coerceAtLeast(0)
+    }
+    oldMap.remove(0) // 本地临时事务不参与更新
+    val newMap = affairs.associateByTo(LinkedHashMap()) { it.remoteId }
     val newMapIterator = newMap.iterator()
     while (newMapIterator.hasNext()) {
       val newItem = newMapIterator.next()
@@ -32,13 +35,11 @@ object SyncAffairUtils {
       if (oldItem != null) {
         // newMap 和 oldMap 都包含相同 id 的事务
         newMapIterator.remove() // 从 newMap 中移除
-        if (newItem.value == oldItem.) continue // 如果 entity 相等，则无需更新
+        if (newItem.value == oldItem.entity) continue // 如果 entity 相等，则无需更新
         // 同步本地数据为远端数据
         val editor = oldItem.createEditorSuspend()
         syncAffairEntity(editor, newItem.value)
-        editor.commit(needUpload = false).onSuccess {
-          oldItem.affair = newItem.value
-        }.onFailure {
+        editor.commit(needUpload = false).onFailure {
           // 在同步为远端事务时正常来说不应该会出现失败的情况，
           // 并且这里 needUpload = false 也不会是请求失败，只可能是事务本身出现了问题，我们抛弃该事务的更新
           if (isDebug()) {
@@ -69,7 +70,7 @@ object SyncAffairUtils {
         title = it.value.title,
         content = it.value.content,
         remindTime = it.value.remindTime,
-        needUpload = false, // 不上传
+        remoteId = it.value.remoteId, // 不上传
       ) { editor ->
         syncAffairEntity(editor, it.value)
       }
@@ -87,7 +88,7 @@ object SyncAffairUtils {
   private fun syncAffairWhatTimeList(editor: AffairIdModelEditor, list: List<AffairWhatTime>) {
     if (list.isEmpty()) {
       editor.clear()
-    } else if (editor.whatTimeList.value.isEmpty()) {
+    } else if (editor.whatTimeDate.isEmpty()) {
       // 这里需要聚合一下 timePair 的数据
       list.groupBy(
         keySelector = { it.timePair },
@@ -108,7 +109,11 @@ object SyncAffairUtils {
           date = entry.value.flatten().fastDistinctBy { it }.sorted(),
         )
       }
-      val oldMapByTimePair = editor.whatTimeList.value.associateByTo(LinkedHashMap()) { it.timePair.value }
+      val oldMapByTimePair = editor.whatTimeDate.entries.associateByTo(
+        destination = LinkedHashMap(),
+        keySelector = { it.key.timePair },
+        valueTransform = { it.key }
+      )
 
       // 以 timePair 比较新旧数据
       val newSetIterator = newMapByTimePair.iterator()
@@ -143,14 +148,14 @@ object SyncAffairUtils {
   private fun syncDateList(editor: AffairWhatTimeModelEditor, dateList: List<Date>) {
     if (dateList.isEmpty()) {
       editor.clear()
-    } else if (editor.dateList.value.isEmpty()) {
+    } else if (editor.dateList.isEmpty()) {
       dateList.forEach {
         editor.add(it)
       }
     } else {
       // 再使用 Set 集合去重
       val newSet = dateList.toMutableSet()
-      val oldSet = editor.dateList.value.associateByTo(LinkedHashMap()) { it.date.value }
+      val oldSet = editor.dateList.associateByTo(LinkedHashMap()) { it.date }
       val newSetIterator = newSet.iterator()
       while (newSetIterator.hasNext()) {
         val new = newSetIterator.next()

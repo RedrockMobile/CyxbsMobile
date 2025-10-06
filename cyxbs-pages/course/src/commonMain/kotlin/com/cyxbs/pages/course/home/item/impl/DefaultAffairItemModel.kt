@@ -9,9 +9,11 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.home.item.AffairItemFactory
-import com.cyxbs.pages.course.home.item.AffairItemModel
+import com.cyxbs.pages.course.home.item.CourseAffairItem
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
+import com.cyxbs.pages.course.view.item.CourseItemExtension
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.datetime.DayOfWeek
 
@@ -22,28 +24,32 @@ import kotlinx.datetime.DayOfWeek
  * @date 2025/9/23
  */
 @Stable
-class DefaultAffairItemModel(
+data class DefaultAffairItemModel(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   override val affairDateModel: AffairDateModel,
-) : AffairItemModel {
+) : CourseAffairItem {
 
   @ImplProvider
   companion object Companion : AffairItemFactory {
     override fun createAffairItemModel(
       page: Int,
       affairDateModel: AffairDateModel
-    ): AffairItemModel {
-      return DefaultAffairItemModel(page = page, affairDateModel = affairDateModel)
+    ): CourseItemWrapper<CourseAffairItem> {
+      return CourseItemWrapper(
+        item = DefaultAffairItemModel(page, affairDateModel),
+        page = page,
+        dayOfWeek = affairDateModel.date.value.dayOfWeek,
+        beginTime = affairDateModel.whatTime.value.timePair.value.first,
+        finalTime = affairDateModel.whatTime.value.timePair.value.second,
+      )
     }
   }
 
-  override val weekItemKey: String = affairDateModel.hashCode().toString()
-
-  override val dayOfWeek: DayOfWeek
+  val dayOfWeek: DayOfWeek
     get() = affairDateModel.date.value.dayOfWeek
-  override val beginTime: MinuteTime
+  val beginTime: MinuteTime
     get() = affairDateModel.whatTime.value.timePair.value.first
-  override val finalTime: MinuteTime
+  val finalTime: MinuteTime
     get() = affairDateModel.whatTime.value.timePair.value.second
 
   @Composable
@@ -78,4 +84,7 @@ class DefaultAffairItemModel(
         ", date=${affairDateModel.date.value}" +
         ")"
   }
+
+  override val extension: CourseItemExtension
+    get() = TODO("Not yet implemented")
 }

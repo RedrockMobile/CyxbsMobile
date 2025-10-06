@@ -5,7 +5,6 @@ import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.extensions.toast
@@ -14,15 +13,23 @@ import com.cyxbs.pages.affair.api.AffairGroupModel
 import com.cyxbs.pages.affair.bean.AffairEntity
 import com.cyxbs.pages.affair.bean.AffairWhatTime
 import com.cyxbs.pages.affair.bean.GetAffairBean
-import com.cyxbs.pages.affair.model.AffairGroupModelImpl
+import com.cyxbs.pages.affair.model.SyncAffairUtils
+import com.cyxbs.pages.affair.model.impl.AffairGroupModelImpl
 import com.cyxbs.pages.affair.net.AffairApiService2
 import io.ktor.client.plugins.ClientRequestException
-import kotlinx.coroutines.coroutineScope
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.updateAndGet
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * .
@@ -34,40 +41,48 @@ object AffairRepository2 {
 
   private const val SETTING_KEY_AFFAIR = "setting_key_affair"
 
-  private val affairFlow = MutableStateFlow<List<AffairEntity>?>(null)
-  private val affairItemModelFlow = MutableStateFlow<AffairGroupModelImpl?>(null)
+  private val affairFlowMap = HashMap<String, MutableStateFlow<PersistentList<AffairEntity>>>()
+  private val affairFlowMapSynchronized = SynchronizedObject()
+
+  private val affairItemModelMap = HashMap<String, AffairGroupModelImpl>()
+  private val affairItemModelFlow = MutableStateFlow<AffairGroupModel?>(null)
 
   init {
     IAccountService::class.impl()
       .stuNumFlow
       .mapLatest { stuNum ->
+        val groupModel = if (stuNum != null) {
+          affairItemModelMap.getOrPut(stuNum) {
+            AffairGroupModelImpl(stuNum, getAffairStateFlow(stuNum).value)
+          }
+        } else null
+        affairItemModelFlow.value = groupModel
         if (stuNum != null) {
-          val cacheAffair = loadCacheAffair() ?: emptyList()
-          affairFlow.value = cacheAffair
-          affairItemModelFlow.value = AffairGroupModelImpl(
-            stuNum = stuNum,
-            affairList = combineAffair(
-              origin = cacheAffair,
-              add = LocalAddAffairRepository.getFlow().value,
-              update = LocalUpdateAffairRepository.getFlow().value,
-              delete = LocalDeleteAffairRepository.getFlow().value
-            ),
-            addAction = {
-              addAffair(stuNum, it, allowLocal = true, needShowException = true)
-            },
-            updateAction = {
-              updateAffair(stuNum, it, allowLocal = true, needShowException = true)
-            },
-            deleteAction = {
-              deleteAffair(stuNum, it, allowLocal = true, needShowException = true)
-            },
-          )
           requestAffair(stuNum)
-        } else {
-          affairFlow.value = null
-          affairItemModelFlow.value = null
         }
-      }.launchIn(appCoroutineScope)
+      }
+  }
+
+  private inline fun editAffairList(
+    stuNum: String,
+    action: (PersistentList<AffairEntity>) -> PersistentList<AffairEntity>
+  ): PersistentList<AffairEntity> {
+    val stateFlow = getAffairStateFlowInternal(stuNum)
+    return stateFlow.updateAndGet {
+      action.invoke(it)
+    }
+  }
+
+  private fun getAffairStateFlowInternal(stuNum: String): MutableStateFlow<PersistentList<AffairEntity>> {
+    return affairFlowMap[stuNum] ?: synchronized(affairFlowMapSynchronized) {
+      affairFlowMap.getOrPut(stuNum) {
+        MutableStateFlow(loadCacheAffair(stuNum).toPersistentList())
+      }
+    }
+  }
+
+  fun getAffairStateFlow(stuNum: String): StateFlow<ImmutableList<AffairEntity>> {
+    return getAffairStateFlowInternal(stuNum)
   }
 
   fun getAffairModelStateFlow(): StateFlow<AffairGroupModel?> {
@@ -77,14 +92,11 @@ object AffairRepository2 {
   /**
    * 请求课程
    */
-  private suspend fun requestAffair(
+  @OptIn(ExperimentalUuidApi::class)
+  suspend fun requestAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
   ): Result<List<AffairEntity>> {
-    val nowStuNum = IAccountService::class.impl().stuNum
-    if (stuNum != nowStuNum) {
-      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
-    }
-    // 先上传所有本地临时事务才能拉取的远端事务
+    // 先上传所有本地临时事务才能拉取远端事务
     uploadLocalAffair(stuNum).onFailure {
       return Result.failure(it)
     }
@@ -93,45 +105,114 @@ object AffairRepository2 {
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it
-    }.mapCatching {
-      // 检查请求前后的学号一致性
-      checkStuNum(stuNum)
-      it
     }.mapCatching { bean ->
       bean.data.mapNotNull { it.toAffair() }
-    }.onSuccess { entities ->
-      affairFlow.updateAndGet {
-        if (it != null) entities else null
-      }?.also {
-        saveAffair(it)
+    }.onSuccess { newAffairList ->
+      editAffairList(stuNum) { oldAffairList ->
+        newAffairList.map { new ->
+          new.copy(
+            localId = oldAffairList.find { it.remoteId == new.remoteId }?.localId
+              ?: Uuid.random().toString()
+          )
+        }.toPersistentList()
+      }.also {
+        saveAffair(stuNum, it)
       }
-    }.onSuccess { entities ->
-      val newAffair = combineAffair(
-        origin = entities,
-        add = LocalAddAffairRepository.getFlow().value,
-        update = LocalUpdateAffairRepository.getFlow().value,
-        delete = LocalDeleteAffairRepository.getFlow().value
-      )
-      // 同步远端事务到本地
-      affairItemModelFlow.value?.syncAffair(newAffair)
+    }.onSuccess {
+      val groupModel = affairItemModelMap[stuNum]
+      if (groupModel != null) {
+        SyncAffairUtils.syncAffair(it, groupModel)
+      }
     }
   }
 
   /**
    * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
    */
-  private suspend fun addAffair(
+  @OptIn(ExperimentalUuidApi::class)
+  suspend fun addAffair(
+    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
+    localId: String = Uuid.random().toString(), // 生成本地唯一 localId
+    title: String,
+    content: String,
+    remindTime: Int,
+    whatTime: List<AffairWhatTime>,
+    allowLocal: Boolean,
+    needShowException: Boolean,
+  ): Result<AffairEntity> {
+    return runCatchingCoroutine {
+      AffairApiService2::class.impl().addAffair(
+        time = remindTime,
+        title = title,
+        content = content,
+        dateJson = whatTime.toDateJson(),
+      )
+    }.mapCatching {
+      it.throwApiExceptionIfFail()
+      @OptIn(ExperimentalUuidApi::class)
+      AffairEntity(
+        remoteId = it.id,
+        localId = localId,
+        remindTime = remindTime,
+        title = title,
+        content = content,
+        whatTime = whatTime,
+      )
+    }.recoverCatching {
+      // 上传失败
+      if (it is ClientRequestException || it is ApiException) {
+        if (needShowException) showExceptionDialog(
+          RuntimeException("添加失败, update whatTime = $whatTime", it)
+        )
+      } else if (allowLocal) {
+        // 添加进本地临时数据中
+        @OptIn(ExperimentalUuidApi::class)
+        val newAffair = AffairEntity(
+          remoteId = 0, // 本地临时事务 remoteId 为 0
+          localId = localId,
+          remindTime = remindTime,
+          title = title,
+          content = content,
+          whatTime = whatTime,
+        )
+        LocalAddAffairRepository.add(stuNum, newAffair)
+        return@recoverCatching newAffair
+      } else {
+        if (needShowException) showExceptionDialog(it)
+      }
+      throw it
+    }.onSuccess { newAffair ->
+      editAffairList(stuNum) { list ->
+        val index = list.indexOfFirst { it.localId == newAffair.localId }
+        if (index > 0) {
+          // 已经存在，此时应该是本地临时事务的上传
+          list.set(index, newAffair)
+        } else {
+          list.add(newAffair)
+        }
+      }.also {
+        saveAffair(stuNum, it)
+      }
+    }
+  }
+
+  /**
+   * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
+   */
+  suspend fun updateAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
     affair: AffairEntity,
     allowLocal: Boolean,
     needShowException: Boolean,
-  ): Result<AffairEntity> {
-    val nowStuNum = IAccountService::class.impl().stuNum
-    if (stuNum != nowStuNum) {
-      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
+  ): Result<Any> {
+    if (affair.remoteId <= 0 && affair.localId.isNotEmpty()) {
+      // localId 小于等于 0 且 localId 不为空 则说明是本地临时事务
+      LocalAddAffairRepository.update(stuNum, affair)
+      return Result.success(Unit)
     }
     return runCatchingCoroutine {
-      AffairApiService2::class.impl().addAffair(
+      AffairApiService2::class.impl().updateAffair(
+        remoteId = affair.remoteId,
         time = affair.remindTime,
         title = affair.title,
         content = affair.content,
@@ -140,35 +221,26 @@ object AffairRepository2 {
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it
-    }.mapCatching {
-      // 检查请求前后的学号一致性
-      checkStuNum(stuNum)
-      affair.copy(id = it.id)
-    }.onSuccess { newAffair ->
-      // 上传成功
-      affairFlow.updateAndGet {
-        if (it == null) null else listOf(newAffair) + it
-      }?.also {
-        saveAffair(it)
-      }
     }.recoverCatching {
       // 上传失败
-      if (it is ClientRequestException) {
+      if (it is ClientRequestException || it is ApiException) {
         if (needShowException) showExceptionDialog(
-          RuntimeException("添加失败, http 400, update affair = $affair", it)
+          RuntimeException("更新失败, update affair = $affair", it)
         )
-        throw it
-      } else if (it is ApiException) {
-        if (needShowException) showExceptionDialog(
-          RuntimeException("添加失败, update affair = $affair", it)
-        )
-        throw it
-      } else if (allowLocal && it !is StuNumNotMatchException) {
+      } else if (allowLocal) {
         // 添加进本地临时数据中
-        LocalAddAffairRepository.add(affair)
+        LocalUpdateAffairRepository.add(stuNum, affair)
+        return@recoverCatching Unit
       } else {
         if (needShowException) showExceptionDialog(it)
-        throw it
+      }
+      throw it
+    }.onSuccess {
+      editAffairList(stuNum) { list ->
+        val index = list.indexOfFirst { it.localId == affair.localId }
+        list.set(index, affair)
+      }.also {
+        saveAffair(stuNum, it)
       }
     }
   }
@@ -176,210 +248,150 @@ object AffairRepository2 {
   /**
    * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
    */
-  private suspend fun updateAffair(
+  suspend fun deleteAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
-    affair: AffairEntity,
+    localId: String,
     allowLocal: Boolean,
     needShowException: Boolean,
   ): Result<Any> {
-    val nowStuNum = IAccountService::class.impl().stuNum
-    if (stuNum != nowStuNum) {
-      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
-    }
-    if (affair.id < 0) {
-      // id 小于 0 说明是本地临时事务
-      LocalAddAffairRepository.update(affair)
+    val affair = findAffairByLocalId(stuNum, localId) ?: return Result.failure(
+      IllegalArgumentException("未找到对应 localId 的事务, localId = $localId")
+    )
+    if (affair.remoteId <= 0 && affair.localId.isNotEmpty()) {
+      // localId 小于等于 0 且 localId 不为空 则说明是本地临时事务
+      LocalAddAffairRepository.remove(stuNum, localId)
       return Result.success(Unit)
-    } else {
-      return runCatchingCoroutine {
-        AffairApiService2::class.impl().updateAffair(
-          remoteId = affair.id,
-          time = affair.remindTime,
-          title = affair.title,
-          content = affair.content,
-          dateJson = affair.whatTime.toDateJson(),
+    }
+    return runCatchingCoroutine {
+      AffairApiService2::class.impl().deleteAffair(affair.remoteId)
+    }.mapCatching {
+      it.throwApiExceptionIfFail()
+      it
+    }.recoverCatching {
+      // 上传失败
+      if (it is ClientRequestException || it is ApiException) {
+        if (needShowException) showExceptionDialog(
+          RuntimeException("删除失败, delete affair = $affair", it)
         )
-      }.mapCatching {
-        it.throwApiExceptionIfFail()
-        it
-      }.mapCatching {
-        // 检查请求前后的学号一致性
-        checkStuNum(stuNum)
-      }.onSuccess {
-        // 上传成功
-        affairFlow.updateAndGet { list ->
-          if (list == null) {
-            // 正常情况下不会为空，除非更新事务的接口返回太慢了
-            null
-          } else {
-            val index = list.indexOfFirst { it.id == affair.id }
-            if (index >= 0) {
-              list.toMutableList().apply { set(index, affair) }
-            } else {
-              // index < 0 说明事务不存在，正常情况也不会出现
-              list
-            }
-          }
-        }?.also {
-          saveAffair(it)
-        }
-      }.recoverCatching {
-        // 上传失败
-        if (it is ClientRequestException) {
-          if (needShowException) showExceptionDialog(
-            RuntimeException("更新失败, http 400, update affair = $affair", it)
-          )
-          throw it
-        } else if (it is ApiException) {
-          if (needShowException) showExceptionDialog(
-            RuntimeException("更新失败, update affair = $affair", it)
-          )
-          throw it
-        } else if (allowLocal && it !is StuNumNotMatchException) {
-          // 添加进本地临时数据中
-          LocalUpdateAffairRepository.update(affair)
-        } else {
-          if (needShowException) showExceptionDialog(it)
-          throw it
-        }
+      } else if (allowLocal) {
+        // 添加进本地临时数据中
+        LocalDeleteAffairRepository.add(stuNum, localId)
+        return@recoverCatching Unit
+      } else {
+        if (needShowException) showExceptionDialog(it)
+      }
+      throw it
+    }.onSuccess {
+      editAffairList(stuNum) {
+        val index = it.indexOfFirst { it.localId == localId }
+        it.removeAt(index)
+      }.also {
+        saveAffair(stuNum, it)
       }
     }
   }
 
-  /**
-   * 内部独用方法，外界请使用 [AffairGroupModel] 编辑事务
-   */
-  private suspend fun deleteAffair(
-    stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
-    id: Int,
-    allowLocal: Boolean,
-    needShowException: Boolean,
-  ): Result<Any> {
-    val nowStuNum = IAccountService::class.impl().stuNum
-    if (stuNum != nowStuNum) {
-      return Result.failure(StuNumNotMatchException(stuNum, nowStuNum))
-    }
-    if (id < 0) {
-      // id 小于 0 说明是本地临时事务
-      LocalAddAffairRepository.delete(id)
-      return Result.success(Unit)
-    } else {
-      return runCatchingCoroutine {
-        AffairApiService2::class.impl().deleteAffair(id)
-      }.mapCatching {
-        it.throwApiExceptionIfFail()
-        it
-      }.mapCatching {
-        // 检查请求前后的学号一致性
-        checkStuNum(stuNum)
-      }.onSuccess {
-        affairFlow.updateAndGet { list ->
-          list?.filter { it.id != id }
-        }?.also {
-          saveAffair(it)
-        }
-      }.recoverCatching { throwable ->
-        // 上传失败
-        if (throwable is ClientRequestException) {
-          if (needShowException) showExceptionDialog(
-            RuntimeException(
-              "删除失败, http 400, " +
-                "delete affair = ${affairFlow.value?.find { it.id == id } ?: id}", throwable))
-          throw throwable
-        } else if (throwable is ApiException) {
-          if (needShowException) showExceptionDialog(
-            RuntimeException(
-              "删除失败, " +
-                "delete affair = ${affairFlow.value?.find { it.id == id } ?: id}", throwable))
-          throw throwable
-        } else if (allowLocal && throwable !is StuNumNotMatchException) {
-          // 添加进本地临时数据中
-          LocalDeleteAffairRepository.delete(id)
-        } else {
-          if (needShowException) showExceptionDialog(throwable)
-          throw throwable
-        }
-      }
-    }
-  }
+  // 同一时间内只有有一个协程触发本地临时事务的上传
+  private val uploadLocalAffairMutex = Mutex()
 
   private suspend fun uploadLocalAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
   ): Result<Unit> {
-    return runCatchingCoroutine {
-      coroutineScope {
+    return uploadLocalAffairMutex.withLock {
+      runCatchingCoroutine {
         fun checkException(e: Throwable) {
-          if (e is ClientRequestException) {
-            // 如果是 400 异常，则认为是客户端参数问题，我们丢弃掉这次请求
+          if (e is ClientRequestException || e is ApiException) {
+            // 如果是 400 或者 ApiException，则认为是客户端参数问题，我们丢弃掉这次请求
           } else throw e
         }
         // 这里无需异步上传，同步即可
-        LocalDeleteAffairRepository.getFlow().value.forEach { id ->
-          deleteAffair(stuNum, id, allowLocal = false, needShowException = false).recoverCatching {
-            checkException(it)
-          }.onSuccess {
-            LocalDeleteAffairRepository.delete(id)
-          }.getOrThrow()
-        }
-        LocalUpdateAffairRepository.getFlow().value.forEach { (_, affair) ->
-          updateAffair(
-            stuNum,
-            affair,
+        LocalDeleteAffairRepository.get(stuNum).forEach { localId ->
+          deleteAffair(
+            stuNum = stuNum,
+            localId = localId,
             allowLocal = false,
             needShowException = false
           ).recoverCatching {
             checkException(it)
           }.onSuccess {
-            LocalUpdateAffairRepository.delete(affair.id)
+            LocalDeleteAffairRepository.remove(stuNum, localId)
           }.getOrThrow()
         }
-        LocalAddAffairRepository.getFlow().value.forEach { (_, affair) ->
-          addAffair(stuNum, affair, allowLocal = false, needShowException = false).recoverCatching {
+        LocalUpdateAffairRepository.get(stuNum).forEach { (remoteId, affair) ->
+          updateAffair(
+            stuNum = stuNum,
+            affair = affair,
+            allowLocal = false,
+            needShowException = false
+          ).recoverCatching {
             checkException(it)
           }.onSuccess {
-            LocalAddAffairRepository.delete(affair.id)
+            LocalUpdateAffairRepository.remove(stuNum, remoteId)
+          }.getOrThrow()
+        }
+        LocalAddAffairRepository.get(stuNum).forEach { (localId, affair) ->
+          addAffair(
+            stuNum = stuNum,
+            localId = affair.localId,
+            remindTime = affair.remindTime,
+            title = affair.title,
+            content = affair.content,
+            whatTime = affair.whatTime,
+            allowLocal = false,
+            needShowException = false
+          ).onSuccess {
+            LocalAddAffairRepository.remove(stuNum, localId)
+          }.onSuccess { newAffair ->
+            // 更新 idModel 中的 remoteId
+            affairItemModelMap[stuNum]?.itemList?.value?.find {
+              it.localId == localId
+            }?.let {
+              it.remoteId.value = newAffair.remoteId
+              it.entity = newAffair
+            }
+          }.recoverCatching {
+            checkException(it)
           }.getOrThrow()
         }
       }
     }
-  }
-
-  // 根据原始事务数据与本地临时添加、更新、删除操作计算而得出最终该显示的事务数据
-  private fun combineAffair(
-    origin: List<AffairEntity>,
-    add: Map<Int, AffairEntity>,
-    update: Map<Int, AffairEntity>,
-    delete: Set<Int>,
-  ): List<AffairEntity> {
-    val list = add.values.toMutableList()
-    origin.forEach {
-      if (!delete.contains(it.id)) {
-        list.add(update[it.id] ?: it)
-      }
-    }
-    return list
   }
 
   // 加载磁盘中的事务
-  private fun loadCacheAffair(): List<AffairEntity>? {
+  private fun loadCacheAffair(stuNum: String): List<AffairEntity> {
     // 读取磁盘
-    val accountSettings = AccountSettings.now
+    val accountSettings = AccountSettings.get(stuNum)
     return accountSettings.getStringOrNull(SETTING_KEY_AFFAIR)?.let { json ->
       runCatching {
         defaultJson.decodeFromString<List<AffairEntity>>(json)
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR)
-        if (isDebug()) toast("加载磁盘中的事务异常, ${it.message}")
+        if (isDebug()) {
+          toast("加载磁盘中的事务异常, ${it.message}")
+          showExceptionDialog(it)
+        }
       }.getOrNull()
-    }
+    } ?: emptyList()
   }
 
   // 保存进磁盘
-  private fun saveAffair(list: List<AffairEntity>) {
-    AccountSettings.now.putString(
+  private fun saveAffair(stuNum: String, list: List<AffairEntity>) {
+    AccountSettings.get(stuNum).putString(
       SETTING_KEY_AFFAIR,
       defaultJson.encodeToString<List<AffairEntity>>(list)
     )
+  }
+
+  private fun findAffairByLocalId(stuNum: String, localId: String): AffairEntity? {
+    return getAffairStateFlow(stuNum).value.find {
+      it.localId == localId
+    }
+  }
+
+  private fun findAffairByRemoteId(stuNum: String, remoteId: Int): AffairEntity? {
+    return getAffairStateFlow(stuNum).value.find {
+      it.remoteId == remoteId
+    }
   }
 
   /**
@@ -406,16 +418,4 @@ object AffairRepository2 {
       defaultJson.encodeToString(it)
     }
   }
-
-  private fun checkStuNum(oldStuNum: String?) {
-    val newStuNum = IAccountService::class.impl().stuNum
-    if (newStuNum != oldStuNum) {
-      throw StuNumNotMatchException(oldStuNum, newStuNum)
-    }
-  }
-
-  private class StuNumNotMatchException(
-    oldStuNum: String?,
-    newStuNum: String?
-  ) : IllegalStateException("旧学号 $oldStuNum 与新学号 $newStuNum 不匹配")
 }

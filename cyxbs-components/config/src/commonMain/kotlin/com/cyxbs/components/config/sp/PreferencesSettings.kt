@@ -20,6 +20,8 @@ open class PreferencesSettings internal constructor(val key: String) : Settings 
     private val mapSynchronized = SynchronizedObject()
 
     fun get(key: String): PreferencesSettings {
+      val value = map[key]
+      if (value != null) return value
       return synchronized(mapSynchronized) {
         // 因为 kotlin 官方未提供线程安全的 map 实现，所以这里暂时使用锁来实现线程安全
         map.getOrPut(key) { PreferencesSettings(key) }
@@ -37,7 +39,6 @@ open class PreferencesSettings internal constructor(val key: String) : Settings 
 
   override fun clear() {
     mPlatformAccountSettings.clear()
-    mPlatformAccountSettings.settings.nullableInt()
   }
 
   override fun remove(key: String) {
