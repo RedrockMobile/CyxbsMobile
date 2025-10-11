@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-          
+
       - name: Install python dependency
         run: pip install beautifulsoup4
 
@@ -35,9 +35,9 @@ jobs:
         env:
           LARK_BOT_APP_ID: ${{secrets.LARK_BOT_APP_ID}}
           LARK_BOT_APP_SECRET: ${{secrets.LARK_BOT_APP_SECRET}}
-          TITLE:  ${{ github.event.pull_request.title }}
-          BODY:  ${{ github.event.pull_request.body}}
-          
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body}}
+
   build:
 
     runs-on: macos-latest
@@ -100,7 +100,7 @@ jobs:
           name: CyxbsMobile-test
           path: cyxbs-applications/test/build/channel/*official*.apk
           retention-days: 15
-          
+
   send_message:
     if: always()
     runs-on: macos-latest
@@ -122,5 +122,5 @@ jobs:
         env:
           LARK_BOT_APP_ID: ${{secrets.LARK_BOT_APP_ID}}
           LARK_BOT_APP_SECRET: ${{secrets.LARK_BOT_APP_SECRET}}
-          TITLE:  ${{ github.event.pull_request.title }}
-          BODY:  ${{ github.event.pull_request.body }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
