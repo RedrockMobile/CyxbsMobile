@@ -41,4 +41,4 @@ node_modules/
 # https://youtrack.jetbrains.com/issue/KMT-1298/Support-multiple-iosApp-target-in-the-same-project
 !/.idea/xcode.xml
 
-
+kotlin-js-store/wasm/yarn.lock
