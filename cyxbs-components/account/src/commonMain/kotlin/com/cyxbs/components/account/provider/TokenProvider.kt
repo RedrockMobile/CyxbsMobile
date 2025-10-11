@@ -7,9 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -44,7 +44,7 @@ internal object TokenProvider {
   fun set(tokenBean: TokenBean) {
     val json = defaultJson.encodeToString(tokenBean)
     defaultSettings.putString(KEY, SecretTransformer.impl.secretEncrypt(json))
-    tokenExpiredTime = tokenBean.info.exp.toLong().seconds
+    tokenExpiredTime = tokenBean.info.exp.toLong().seconds // 后端规定 3 天过期
     val nowTime = Clock.System.now().toEpochMilliseconds().milliseconds
     refreshTokenExpiredTime = nowTime + 45.days // 后端规定 45 天过期
     defaultSettings.putLong(KEY_REFRESH_TOKEN_EXPIRED, refreshTokenExpiredTime.inWholeMilliseconds)
@@ -59,12 +59,10 @@ internal object TokenProvider {
     _stateFlow.value = null // 赋值需要放到最后
   }
 
-  // token 是否过期
-  fun isTokenExpired(): Boolean {
-    if (stateFlow.value == null) return true
+  // 得到 token 还有效的剩余时间。如果过期，则返回负数
+  fun getTokenRemainTime(): Duration {
     val curTime = Clock.System.now().toEpochMilliseconds().milliseconds
-    // 提前 30 分钟过期
-    return curTime > tokenExpiredTime - 30.minutes
+    return tokenExpiredTime - curTime
   }
 
   // 强制 token 过期
