@@ -1,9 +1,28 @@
-# CyxbsMobile_Android
+# CyxbsMobile
+掌上重邮——重庆邮电大学首款整合校园与生活的App
+
+本项目正迁移至 Compose Multiplatform 框架，目前支持如下:
+
+| 平台      | 功能   | 状态                                                            |
+|---------|------|---------------------------------------------------------------|
+| Android | 功能完善 | 部分页面使用 Compose                                                |
+| iOS     | 功能完善 | 几乎都是原生，KMP、CMP 还在迁移中                                          |
+| 桌面版     | 仅课表  | 暂无发版计划                                                        |
+| 网页版     | 仅课表  | 暂无发版计划 [🔗体验链接](https://redrockmobile.github.io/CyxbsMobile/) |
 
 ## 如何编译
-- 请先查看必看文档中的多模块教程，熟悉多模块开发规范
-- 对 `module_main` 模块进行单模块编译
-  - ⚠️注：`module_app` 模块只用于打正式包，因为包含密钥等文件，所以只能由副站持有
+若需编译多平台请先安装 Kotlin Multiplatform 插件
+
+| 平台      |                                                                 |
+|---------|-----------------------------------------------------------------|
+| Android | Android Studio 运行 `cyxbs-applications:test` 模块                  |
+| iOS     | 安装 Kotlin Multiplatform 插件后运行 `iosApp` 配置                       |
+| 桌面版     | 安装 Kotlin Multiplatform 插件后运行 `cyxbs-applications [desktop]` 配置 |
+| 网页版     | 安装 Kotlin Multiplatform 插件后运行 `cyxbs-applications [wasmJs]` 配置  |
+
+⚠️注:
+- Android 中 `cyxbs-applications:pro` 模块只用于打正式包并发版，需要密钥等文件，由每届副站或部长持有
+- iOS 中若需体验完整项目，请使用 XCode 运行 [cyxbs-applications/pro/iosApp](cyxbs-applications/pro/iosApp)，目前暂无 Compose 界面，KMP 仅包含简单互调用
 
 ## 必看文档
 - [多模块教程](https://github.com/VegetableChicken-Group/WanAndroid_Multi/blob/framework/doce/%E5%A4%9A%E6%A8%A1%E5%9D%97%E6%8C%87%E5%8D%97.md): 包含 api、lib、module 模块相关问题，还有多模块使用规范、多模块通信、单模块调试等教程
