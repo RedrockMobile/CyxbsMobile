@@ -21,7 +21,7 @@ class QAMainTopView: UIView{
         backButton.snp.makeConstraints{ make in
             make.leading.equalToSuperview().offset(16)
             make.top.equalToSuperview().offset(Constants.statusBarHeight + 13)
-            make.width.equalTo(9)
+            make.width.equalTo(24)
             make.height.equalTo(18)
         }
         
