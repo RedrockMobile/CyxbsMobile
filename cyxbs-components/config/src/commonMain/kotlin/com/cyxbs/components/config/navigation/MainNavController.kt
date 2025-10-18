@@ -42,13 +42,11 @@ fun MainNavHost() {
   }
   NavHost(
     navController = navController,
-    startDestination = remember {
-      if (checkIsLogin() == null) {
-        // 未登录则起点是登录页面
-        // 这里 targetRoute 因为 navController 还未初始化 graph，所以手动指定为 HomeArgument 的 route
-        LoginArgument(HomeArgument.serializer().descriptor.serialName)
-      } else HomeArgument
-    },
+    startDestination = if (checkIsLogin() == null) {
+      // 未登录则起点是登录页面
+      // 这里 targetRoute 因为 navController 还未初始化 graph，所以手动指定为 HomeArgument 的 route
+      LoginArgument(HomeArgument.serializer().descriptor.serialName)
+    } else HomeArgument,
   ) {
     destinations.forEach { (scheme, destination) ->
       composable(
@@ -67,7 +65,7 @@ fun MainNavHost() {
         sizeTransform = destination::sizeTransform,
         content = {
           val parcel = DestinationParcel<Any>(it.toRoute(destination.argumentClass), it, this)
-          destination.content(parcel)
+          destination.DestinationContent(parcel)
         },
       )
     }

@@ -88,8 +88,10 @@ import kotlin.time.Duration.Companion.seconds
  */
 @ImplProvider(clazz = MainDestination::class, name = "login")
 class LoginDestination : MainDestination<LoginArgument>(LoginArgument::class) {
-  override val content: @Composable (DestinationParcel<LoginArgument>) -> Unit = {
-    viewModel { LoginViewModel(it.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+
+  @Composable
+  override fun DestinationContent(parcel: DestinationParcel<LoginArgument>) {
+    viewModel { LoginViewModel(parcel.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
     LoginPage()
   }
 }

@@ -56,7 +56,8 @@ abstract class MainDestination<T : Any>(
   val typeMap: Map<KType, NavType<*>> = emptyMap()
 ) {
 
-  abstract val content: @Composable (DestinationParcel<T>) -> Unit
+  @Composable
+  abstract fun DestinationContent(parcel: DestinationParcel<T>)
 
   open fun enterTransition(
     scope: AnimatedContentTransitionScope<NavBackStackEntry>
