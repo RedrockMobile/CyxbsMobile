@@ -33,6 +33,7 @@ interface ITokenService {
 
   /**
    * 主动触发 refreshToken 过期，跳转到登录页，30 分钟内只能触发一次
+   * @param msg 触发源，将以 toast 弹出进行排查问题
    */
-  fun tryRefreshTokenExpired()
+  fun tryRefreshTokenExpired(msg: String)
 }
