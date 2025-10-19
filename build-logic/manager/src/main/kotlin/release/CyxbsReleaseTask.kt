@@ -77,6 +77,7 @@ abstract class CyxbsReleaseTask : DefaultTask() {
             return
         }
         // 本地 apk 安装检查
+        // 如果提示 adb 找不到，注释该 Step
         val apkInstallStep = ApkInstallStep(project)
         if (!apkInstallStep.execute(apk)) {
             return
