@@ -27,7 +27,7 @@ interface ITokenService {
   fun isRefreshTokenExpired(): Boolean
 
   /**
-   * 主动触发 token 过期，1 分钟内只能触发一次
+   * 主动触发 token 过期，30 分钟内只能触发一次
    */
   fun tryTokenExpired()
 
