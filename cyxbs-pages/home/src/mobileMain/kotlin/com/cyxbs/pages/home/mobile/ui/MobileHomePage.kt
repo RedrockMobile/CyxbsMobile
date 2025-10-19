@@ -175,15 +175,15 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
   }.collectAsState(0.dp)
   Row(
     modifier = modifier
-      .navigationBarsPadding()
-      .height(bottomNavViewModel.height)
-      .fillMaxWidth()
-      .shadow(shadowElevation)
       .graphicsLayer {
         alpha = bottomNavViewModel.alpha.floatValue
         translationY = (bottomNavViewModel.offsetYRadio.floatValue * bottomNavViewModel.height).toPx()
       }
-      .background(LocalAppColors.current.topBg),
+      .shadow(shadowElevation)
+      .background(LocalAppColors.current.topBg)
+      .navigationBarsPadding()
+      .height(bottomNavViewModel.height)
+      .fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceAround,
     verticalAlignment = Alignment.CenterVertically,
   ) {
