@@ -30,20 +30,15 @@ class ApkInstallStep(val project: Project) {
 
   private fun checkDevices(): Boolean {
     while (true) {
-      val stdout = ByteArrayOutputStream()
-      val stderr = ByteArrayOutputStream()
       val execResult = runCatching {
         project.providers.exec {
           commandLine("adb", "devices")
-          standardOutput = stdout
-          errorOutput = stderr
-          isIgnoreExitValue = true
-        }.result.get()
+        }
       }.onFailure {
         it.printStackTrace()
       }.getOrNull()
-      if (execResult?.exitValue == 0) {
-        val lines = stdout.toString().lines()
+      if (execResult?.result?.get()?.exitValue == 0) {
+        val lines = execResult.standardOutput.toString().lines()
         val deviceLines = lines.filter {
           it.isNotBlank() && !it.startsWith("List of devices") && it.contains("\t")
         }
@@ -60,7 +55,7 @@ class ApkInstallStep(val project: Project) {
           break
         }
       } else {
-        println("❌ adb 异常: $stderr".red())
+        println("❌ adb 异常: ${execResult?.standardError}".red())
         println("❌ 请确保已正确配置 adb 环境变量".red())
         println("❌ 如果终端有 adb 命令，则可能是 AS 抽风了，重启一下".red())
         return false

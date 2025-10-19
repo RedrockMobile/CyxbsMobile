@@ -2,6 +2,9 @@ package com.cyxbs.pages.login.api
 
 import androidx.navigation.serialization.generateRouteWithArgs
 import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.init.appCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 /**
@@ -37,15 +40,19 @@ class LoginArgument(
       target: Any?,
       clearStack: Boolean,
     ) {
-      MainNavController.navigate(
-        LoginArgument(target)
-      ) {
-        if (clearStack) {
-          // 清空栈
-          popUpTo(0) { inclusive = true }
+      appCoroutineScope.launch(Dispatchers.Main.immediate) {
+        // 使用 Dispatchers.Main.immediate
+        // 如果当前就是主线程，则直接执行，否则切换到主线程才执行
+        MainNavController.navigate(
+          LoginArgument(target)
+        ) {
+          if (clearStack) {
+            // 清空栈
+            popUpTo(0) { inclusive = true }
+          }
+          launchSingleTop = true
+          restoreState = false
         }
-        launchSingleTop = true
-        restoreState = false
       }
     }
   }

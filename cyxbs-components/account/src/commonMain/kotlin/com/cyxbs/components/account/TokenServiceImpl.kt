@@ -100,7 +100,7 @@ object TokenServiceImpl : ITokenService {
   override fun tryTokenExpired() {
     synchronized(tryTokenExpiredLock) {
       val now = Clock.System.now().toEpochMilliseconds().milliseconds
-      if (now - lastTryTokenExpiredTime > 1.minutes) {
+      if (now - lastTryTokenExpiredTime > 30.minutes) {
         lastTryTokenExpiredTime = now
         TokenProvider.forceTokenExpired()
       }
@@ -111,12 +111,12 @@ object TokenServiceImpl : ITokenService {
   private var lastTryRefreshTokenExpiredTime = 0.milliseconds
   private val tryRefreshTokenExpiredLock = SynchronizedObject()
 
-  override fun tryRefreshTokenExpired() {
+  override fun tryRefreshTokenExpired(msg: String) {
     synchronized(tryRefreshTokenExpiredLock) {
       val now = Clock.System.now().toEpochMilliseconds().milliseconds
       if (now - lastTryRefreshTokenExpiredTime > 30.minutes) {
         lastTryRefreshTokenExpiredTime = now
-        toast("登录已过期，请重新登录")
+        toastLong("登录已过期，请重新登录\n原因：$msg")
         IAccountEditService::class.impl().onLogout()
         ILoginService::class.impl().jumpToLoginPage() // 跳转登录页
       }
@@ -169,11 +169,11 @@ object TokenServiceImpl : ITokenService {
           when {
             failureBean.status == 20004 -> {
               toastRefreshTokenFailed("refresh token 已失效，请重新登录")
-              tryRefreshTokenExpired()
+              tryRefreshTokenExpired("refresh, status=20004")
             }
             failureBean.errcode == 10010 && failureBean.errmessage.contains("重复的学号") -> {
               toastRefreshTokenFailed("refresh token 重签失败，请重新登录")
-              tryRefreshTokenExpired()
+              tryRefreshTokenExpired("refresh, emergence refused:重复的学号")
             }
             failureBean.errcode == 10010 && failureBean.errmessage.contains("find redid error") -> {
               toastRefreshTokenFailed("refresh token 系统内部调用失败")

@@ -16,8 +16,10 @@ import com.g985892345.provider.api.annotation.ImplProvider
  */
 @ImplProvider(clazz = MainDestination::class, name = "home")
 class HomeDestination : MainDestination<HomeArgument>(HomeArgument::class) {
-  override val content: @Composable (DestinationParcel<HomeArgument>) -> Unit = {
-    remember { PlatformHomePage::class.implOrNull() ?: PlatformHomePage }.content(it)
+
+  @Composable
+  override fun DestinationContent(parcel: DestinationParcel<HomeArgument>) {
+    remember { PlatformHomePage::class.implOrNull() ?: PlatformHomePage }.HomePageContent(parcel)
   }
 }
 
@@ -25,11 +27,15 @@ class HomeDestination : MainDestination<HomeArgument>(HomeArgument::class) {
  * 由于需要兼容移动端布局，所以 mobileMain 中单独实现移动端的 PlatformHomePage
  */
 internal interface PlatformHomePage {
-  val content: @Composable (DestinationParcel<HomeArgument>) -> Unit
+
+  @Composable
+  fun HomePageContent(parcel: DestinationParcel<HomeArgument>)
 
   // 默认实现
   companion object : PlatformHomePage {
-    override val content: @Composable (DestinationParcel<HomeArgument>) -> Unit =
-      { AdaptiveHomePage(it) }
+    @Composable
+    override fun HomePageContent(parcel: DestinationParcel<HomeArgument>) {
+      AdaptiveHomePage(parcel)
+    }
   }
 }

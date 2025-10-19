@@ -36,7 +36,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeArgument
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
@@ -64,8 +63,10 @@ import org.jetbrains.compose.resources.stringResource
  */
 @ImplProvider
 class MobileHomePage : PlatformHomePage {
-  override val content: @Composable (DestinationParcel<HomeArgument>) -> Unit = {
-    PlatformMobileHomePage(it) {
+
+  @Composable
+  override fun HomePageContent(parcel: DestinationParcel<HomeArgument>) {
+    PlatformMobileHomePage(parcel) {
       Box(
         modifier = Modifier.fillMaxSize()
       ) {
@@ -174,15 +175,15 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
   }.collectAsState(0.dp)
   Row(
     modifier = modifier
-      .navigationBarsPadding()
-      .height(bottomNavViewModel.height)
-      .fillMaxWidth()
-      .shadow(shadowElevation)
       .graphicsLayer {
         alpha = bottomNavViewModel.alpha.floatValue
         translationY = (bottomNavViewModel.offsetYRadio.floatValue * bottomNavViewModel.height).toPx()
       }
-      .background(LocalAppColors.current.topBg),
+      .shadow(shadowElevation)
+      .background(LocalAppColors.current.topBg)
+      .navigationBarsPadding()
+      .height(bottomNavViewModel.height)
+      .fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceAround,
     verticalAlignment = Alignment.CenterVertically,
   ) {
