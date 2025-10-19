@@ -135,9 +135,9 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
           // 在请求失败时后端会返回 http 状态码 400，这里需要单独进行解析
           val failureBean = throwable.response.body<LoginFailureBean>()
           when {
+            failureBean.status == 20003 -> toast("用户不存在")
             failureBean.status == 20004 -> toast("学号或者密码错误")
             failureBean.status == 40004 -> toast("登录过于频繁，请15分钟后再试")
-            failureBean.errcode == 10010 -> toast("该学号信息未注册")
             else -> toastLong("未知错误\nhttp status=${throwable.response.status}\nbody=${throwable.response.bodyAsText()}")
           }
         } else {
