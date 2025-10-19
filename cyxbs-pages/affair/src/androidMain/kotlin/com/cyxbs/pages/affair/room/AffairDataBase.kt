@@ -140,7 +140,6 @@ abstract class AffairDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   protected abstract fun insertAffair(affair: AffairEntity)
 
-  @Transaction
   open fun deleteAffairReturn(stuNum: String, onlyId: Int): AffairEntity? {
     return findAffairByOnlyId(stuNum, onlyId)
       .doOnSuccess {
@@ -151,7 +150,6 @@ abstract class AffairDao {
   /**
    * 更新旧事务的 id
    */
-  @Transaction
   open fun updateRemoteId(stuNum: String, onlyId: Int, newRemoteId: Int) {
     findAffairByOnlyId(stuNum, onlyId)
       .doOnSuccess {
@@ -172,7 +170,6 @@ abstract class AffairDao {
   /**
    * 返回当前插入的 [AffairEntity]
    */
-  @Transaction
   open fun insertAffair(
     stuNum: String,
     incompleteEntity: AffairIncompleteEntity
@@ -198,7 +195,6 @@ abstract class AffairDao {
   /**
    * 重新设置数据，先删除，再插入
    */
-  @Transaction
   open fun resetData(
     stuNum: String,
     incompleteEntity: List<AffairIncompleteEntity>
@@ -249,7 +245,6 @@ abstract class AffairCalendarDao {
   @Query("DELETE FROM affair_calendar WHERE onlyId = :onlyId")
   protected abstract fun delete(onlyId: Int)
   
-  @Transaction
   open fun remove(onlyId: Int): List<Long> {
     val list = get(onlyId)
     delete(onlyId)
