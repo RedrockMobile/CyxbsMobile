@@ -8,7 +8,6 @@ import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
@@ -51,42 +50,80 @@ import kotlin.time.Duration.Companion.minutes
 @ImplProvider
 object TokenServiceImpl : ITokenService {
 
-  private val mutex = Mutex()
+  private val requestMutex = Mutex()
+
+  private val requestSynchronized = SynchronizedObject()
 
   // 是否在异步刷新 token 中
   private val isInAsyncRefresh: AtomicBoolean = atomic(false)
 
   override suspend fun getOrRequestToken(): String? {
     val token = TokenProvider.stateFlow.value ?: return null  // 未登录则直接返回 null
-    val tokenRemainTime = TokenProvider.getTokenRemainTime()
-    if (tokenRemainTime > 12.hours) {
-      // 大于 12 小时的 token 不需要触发刷新
+    if (checkTokenEnable(token)) {
       return token.token
-    } else if (tokenRemainTime > 10.minutes) {
-      // 12 小时 - 10 分钟内 则异步触发 token 的刷新
-      if (!isInAsyncRefresh.compareAndSet(expect = false, update = true)) {
-        // 这里竞争不会很激烈，采取自旋而非协程锁的挂起
-        requestToken(token).invokeOnCompletion {
-          isInAsyncRefresh.lazySet(false)
-        }
+    }
+    return requestMutex.withLock {
+      val newToken = TokenProvider.stateFlow.value
+      if (newToken != null && token != newToken) {
+        // 如果 token 不相等，则说明 token 已经刷新了
+        newToken.token
+      } else {
+        // 同步等待刷新
+        requestToken(token).await()
       }
+    }
+  }
+
+  override fun getOrRequestToken2(runBlock: (Deferred<String>) -> String): String? {
+    val token = TokenProvider.stateFlow.value ?: return null  // 未登录则直接返回 null
+    if (checkTokenEnable(token)) {
       return token.token
-    } else {
-      // 10 分钟后或已经过期则同步触发 token 的刷新
-      return mutex.withLock {
-        if (token != TokenProvider.stateFlow.value) {
-          // 如果 token 不相等，则说明 token 已经刷新了
-          token.token
-        } else {
-          // 同步等待刷新
-          requestToken(token).await()
-        }
+    }
+    // 同步请求 token
+    return synchronized(requestSynchronized) {
+      val newToken = TokenProvider.stateFlow.value
+      if (newToken != null && token != newToken) {
+        // 如果 token 不相等，则说明 token 已经刷新了
+        newToken.token
+      } else {
+        // 同步等待刷新
+        runBlock.invoke(requestToken(token))
       }
     }
   }
 
   override fun getToken(): String? {
-    return TokenProvider.stateFlow.value?.token
+    val token = TokenProvider.stateFlow.value ?: return null  // 未登录则直接返回 null
+    if (checkTokenEnable(token)) {
+      return token.token
+    }
+    return null
+  }
+
+  private fun checkTokenEnable(token: TokenBean): Boolean {
+    val tokenRemainTime = TokenProvider.getTokenRemainTime()
+    if (tokenRemainTime > 12.hours) {
+      // 大于 12 小时的 token 不需要触发刷新
+      return true
+    } else if (tokenRemainTime > 10.minutes) {
+      // 12 小时 - 10 分钟内 则异步触发 token 的刷新
+      if (token == TokenProvider.stateFlow.value) { // 双检锁锁住
+        if (isInAsyncRefresh.compareAndSet(expect = false, update = true)) {
+          if (token == TokenProvider.stateFlow.value) {
+            // 这里竞争不会很激烈，采取自旋锁
+            // 这距离真正的 token 过期还存在一段时间，所以不使用 requestSynchronized 加锁
+            requestToken(token).invokeOnCompletion {
+              isInAsyncRefresh.lazySet(false)
+            }
+          } else {
+            isInAsyncRefresh.lazySet(false)
+          }
+        }
+      }
+      return true
+    }
+    // 仅剩 10 分钟或已经过期则返回 不可用
+    return false
   }
 
   override fun isRefreshTokenExpired(): Boolean {
@@ -123,26 +160,40 @@ object TokenServiceImpl : ITokenService {
     }
   }
 
+  @Volatile
+  private var requestTokenDeferred: Deferred<String>? = null
+  private val deferredSynchronizedObject = SynchronizedObject()
+
   private fun requestToken(token: TokenBean): Deferred<String> {
-    return appCoroutineScope.async {
-      runCatchingCoroutine {
-        HttpClientNoToken.post("/magipoke/token/refresh") {
-          setBody(buildJsonObject {
-            put("refreshToken", token.refreshToken)
-          }.toString())
-          header("STU-NUM", token.info.data.stuNum)
-        }.body<ApiWrapper<TokenBean>>()
-      }.mapCatching {
-        it.throwApiExceptionIfFail()
-        it.data
-      }.onFailure {
-        // token 请求失败
-        onRequestTokenFailure(it)
-      }.onSuccess {
-        TokenProvider.set(it)
-      }.map {
-        it.token
-      }.getOrThrow()
+    val deferred = requestTokenDeferred
+    if (deferred != null) return deferred
+    synchronized(deferredSynchronizedObject) {
+      val deferred = requestTokenDeferred
+      if (deferred != null) return deferred
+      return appCoroutineScope.async {
+        runCatchingCoroutine {
+          HttpClientNoToken.post("/magipoke/token/refresh") {
+            setBody(buildJsonObject {
+              put("refreshToken", token.refreshToken)
+            }.toString())
+            header("STU-NUM", token.info.data.stuNum)
+          }.body<ApiWrapper<TokenBean>>()
+        }.mapCatching {
+          it.throwApiExceptionIfFail()
+          it.data
+        }.onFailure {
+          // token 请求失败
+          onRequestTokenFailure(it)
+          requestTokenDeferred = null
+        }.onSuccess {
+          TokenProvider.set(it)
+          requestTokenDeferred = null
+        }.map {
+          it.token
+        }.getOrThrow()
+      }.also {
+        requestTokenDeferred = it
+      }
     }
   }
 

@@ -16,6 +16,8 @@ import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.rx3.asSingle
 import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
@@ -379,7 +381,6 @@ object ApiGenerator {
                     // 未登录直接请求，有些人对于不需要 token 的请求也使用了这个
                     return@Interceptor it.proceed(it.request())
                 }
-                // todo ApiGenerator 先暂时不检查 token 是否过期，后续慢慢迁移到 Network
                 it.proceedWithToken()
             })
         }.build()
@@ -388,7 +389,9 @@ object ApiGenerator {
     private fun Interceptor.Chain.proceedWithToken(
         block: (Request.Builder.() -> Unit)? = null
     ): Response {
-        val token = ITokenService::class.impl().getToken()
+        val token = ITokenService::class.impl().getOrRequestToken2 {
+            it.asSingle(Dispatchers.IO).blockingGet() // 无奈之举，先使用这种方式转换成 rxjava 在堵塞等待结果
+        }
         return proceed(
             request()
                 .newBuilder()
