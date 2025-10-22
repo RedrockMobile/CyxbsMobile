@@ -30,8 +30,8 @@ object AffairServiceImpl : IAffairService {
       .map { it.toAffair() }
   }
   
-  override fun observeSelfAffair(): Observable<List<IAffairService.Affair>> {
-    return AffairRepository.observeAffair()
+  override fun observeSelfAffair(needRefresh: Boolean): Observable<List<IAffairService.Affair>> {
+    return AffairRepository.observeAffair(needRefresh)
       .map { it.toAffair() }
   }
   

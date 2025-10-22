@@ -2,10 +2,13 @@ package com.cyxbs.pages.course.page.course.room
 
 import android.content.Context
 import androidx.core.content.edit
-import com.google.gson.reflect.TypeToken
 import com.cyxbs.components.utils.extensions.defaultGson
+import com.google.gson.annotations.SerializedName
+import com.google.gson.reflect.TypeToken
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
+import kotlinx.atomicfu.locks.SynchronizedObject
+import java.io.Serializable
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -56,77 +59,142 @@ sealed interface ILessonEntity {
 }
 
 data class StuLessonEntity(
+  @SerializedName("stuNum")
   val stuNum: String,
+  @SerializedName("beginLesson")
   override val beginLesson: Int,
+  @SerializedName("classroom")
   override val classroom: String,
+  @SerializedName("course")
   override val course: String,
+  @SerializedName("courseNum")
   override val courseNum: String,
+  @SerializedName("day")
   override val day: String,
+  @SerializedName("hashDay")
   override val hashDay: Int,
+  @SerializedName("hashLesson")
   override val hashLesson: Int,
+  @SerializedName("lesson")
   override val lesson: String,
+  @SerializedName("period")
   override val period: Int,
+  @SerializedName("rawWeek")
   override val rawWeek: String,
+  @SerializedName("teacher")
   override val teacher: String,
+  @SerializedName("type")
   override val type: String,
+  @SerializedName("week")
   override val week: List<Int>,
+  @SerializedName("weekBegin")
   override val weekBegin: Int,
+  @SerializedName("weekEnd")
   override val weekEnd: Int,
+  @SerializedName("weekModel")
   override val weekModel: String,
-) : ILessonEntity {
+) : ILessonEntity, Serializable {
   override val num: String
     get() = stuNum
 }
-
-private val Gson = defaultGson
 
 class StuLessonDao {
 
   private val stuLessonSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_lesson", Context.MODE_PRIVATE)
 
   private val observerMap = ConcurrentHashMap<String, BehaviorSubject<List<StuLessonEntity>>>()
+
+  private val synchronizedObject = SynchronizedObject()
   
   fun observeLesson(stuNum: String): Observable<List<StuLessonEntity>> {
-    return observerMap.getOrPut(stuNum) {
-      val list = getLesson(stuNum)
-      BehaviorSubject.createDefault(list)
+    synchronized(synchronizedObject) {
+      return observerMap.getOrPut(stuNum) {
+        val list = getLesson(stuNum)
+        BehaviorSubject.createDefault(list)
+      }
     }
   }
   
   fun getLesson(stuNum: String): List<StuLessonEntity> {
+    synchronized(synchronizedObject) {
+      val cache = observerMap[stuNum]
+      if (cache != null) {
+        return cache.value ?: emptyList()
+      }
+      return getLessonFromSp(stuNum)
+    }
+  }
+
+  private fun getLessonFromSp(stuNum: String): List<StuLessonEntity> {
     return stuLessonSp.getString(stuNum, null)?.let {
-      Gson.fromJson(it, object : TypeToken<List<StuLessonEntity>>() {}.type)
+      runCatching<List<StuLessonEntity>> {
+        val list = defaultGson.fromJson<List<StuLessonEntity>>(it, object : TypeToken<List<StuLessonEntity>>() {}.type)
+        if (list.all { it.week == null }) {
+          // 之前 StuLessonEntity 字段被混淆的，所以旧版本上存在一段时间数据是混淆格式，会导致这里反序列化不兼容
+          // 所以如果 weeks 字段为空，则直接删除旧数据
+          stuLessonSp.edit {
+            remove(stuNum)
+          }
+          emptyList()
+        } else {
+          list
+        }
+      }.onFailure {
+        stuLessonSp.edit {
+          remove(stuNum)
+        }
+      }.getOrNull()
     } ?: emptyList()
   }
   
   fun resetData(stuNum: String, lesson: List<StuLessonEntity>) {
-    stuLessonSp.edit {
-      putString(stuNum, Gson.toJson(lesson))
+    synchronized(synchronizedObject) {
+      stuLessonSp.edit {
+        putString(stuNum, defaultGson.toJson(lesson))
+      }
+      observerMap[stuNum]?.onNext(lesson)
     }
-    observerMap[stuNum]?.onNext(lesson)
   }
 }
 
 data class TeaLessonEntity(
+  @SerializedName("teaNum")
   val teaNum: String,
+  @SerializedName("beginLesson")
   override val beginLesson: Int,
+  @SerializedName("classroom")
   override val classroom: String,
+  @SerializedName("course")
   override val course: String,
+  @SerializedName("courseNum")
   override val courseNum: String,
+  @SerializedName("day")
   override val day: String,
+  @SerializedName("hashDay")
   override val hashDay: Int,
+  @SerializedName("hashLesson")
   override val hashLesson: Int,
+  @SerializedName("lesson")
   override val lesson: String,
+  @SerializedName("period")
   override val period: Int,
+  @SerializedName("rawWeek")
   override val rawWeek: String,
+  @SerializedName("teacher")
   override val teacher: String,
+  @SerializedName("type")
   override val type: String,
+  @SerializedName("week")
   override val week: List<Int>,
+  @SerializedName("weekBegin")
   override val weekBegin: Int,
+  @SerializedName("weekEnd")
   override val weekEnd: Int,
+  @SerializedName("weekModel")
   override val weekModel: String,
+  @SerializedName("classNumber")
   val classNumber: List<String>,
-) : ILessonEntity {
+) : ILessonEntity, Serializable {
   override val num: String
     get() = teaNum
 }
@@ -137,14 +205,14 @@ class TeaLessonDao {
 
   fun getLesson(teaNum: String): List<TeaLessonEntity> {
     return teaLessonSp.getString(teaNum, null)?.let {
-      Gson.fromJson(it, object : TypeToken<List<TeaLessonEntity>>() {}.type)
+      defaultGson.fromJson(it, object : TypeToken<List<TeaLessonEntity>>() {}.type)
     } ?: emptyList()
   }
 
 
   fun resetData(teaNum: String, lesson: List<TeaLessonEntity>) {
     teaLessonSp.edit {
-      putString(teaNum, Gson.toJson(lesson))
+      putString(teaNum, defaultGson.toJson(lesson))
     }
   }
 }

@@ -1,13 +1,20 @@
 package com.cyxbs.pages.affair.room
 
-import androidx.room.*
+import android.content.Context
+import androidx.core.content.edit
 import com.google.gson.reflect.TypeToken
 import com.cyxbs.pages.affair.ui.adapter.data.AffairAdapterData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairTimeData
 import com.cyxbs.pages.affair.ui.adapter.data.AffairWeekData
 import com.cyxbs.components.utils.extensions.defaultGson
+import com.google.gson.annotations.SerializedName
 import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.subjects.BehaviorSubject
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import java.io.Serializable
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * ...
@@ -15,32 +22,12 @@ import io.reactivex.rxjava3.core.Observable
  * @email 2767465918@qq.com
  * @date 2022/5/2 16:14
  */
-@Database(
-  entities = [
-    AffairEntity::class,
-    AffairCalendarEntity::class,
-    LocalAddAffairEntity::class,
-    LocalUpdateAffairEntity::class,
-    LocalDeleteAffairEntity::class,
-             ],
-  version = 2
-)
-abstract class AffairDataBase : RoomDatabase() {
-  abstract fun getAffairDao(): AffairDao
-  abstract fun getAffairCalendarDao(): AffairCalendarDao
-  abstract fun getLocalAddAffairDao(): LocalAddAffairDao
-  abstract fun getLocalUpdateAffairDao(): LocalUpdateAffairDao
-  abstract fun getLocalDeleteAffairDao(): LocalDeleteAffairDao
-
-  companion object {
-    val INSTANCE by lazy {
-      Room.databaseBuilder(
-        com.cyxbs.components.init.appContext,
-        AffairDataBase::class.java,
-        "course_affair_db"
-      ).fallbackToDestructiveMigration().build()
-    }
-  }
+object AffairDataBase {
+  fun getAffairDao(): AffairDao = AffairDaoImpl
+  fun getAffairCalendarDao(): AffairCalendarDao = AffairCalendarDaoImpl
+  fun getLocalAddAffairDao(): LocalAddAffairDao = LocalAddAffairDaoImpl
+  fun getLocalUpdateAffairDao(): LocalUpdateAffairDao = LocalUpdateAffairDaoImpl
+  fun getLocalDeleteAffairDao(): LocalDeleteAffairDao = LocalDeleteAffairDaoImpl
 }
 
 
@@ -54,24 +41,46 @@ abstract class AffairDataBase : RoomDatabase() {
  * 用于删库后重新添加的残缺的实体类，因为插入时需要重新获取新的 [AffairEntity.onlyId]，所以要单独插入
  */
 data class AffairIncompleteEntity(
+  @SerializedName("remoteId")
   val remoteId: Int, // 后端的 id，因为存在本地临时事务，所以会发生改变
+  @SerializedName("time")
   val time: Int, // 提醒时间
+  @SerializedName("title")
   val title: String,
+  @SerializedName("content")
   val content: String,
+  @SerializedName("atWhatTime")
   val atWhatTime: List<AffairEntity.AtWhatTime>
-)
+): Serializable {
+  fun toEntity(stuNum: String, onlyId: Int): AffairEntity {
+    return AffairEntity(
+      stuNum = stuNum,
+      onlyId = onlyId,
+      remoteId = remoteId,
+      time = time,
+      title = title,
+      content = content,
+      atWhatTime = atWhatTime
+    )
+  }
+}
 
-@TypeConverters(AffairEntity.AtWhatTimeConverter::class)
-@Entity(tableName = "affair", primaryKeys = ["stuNum", "onlyId"])
 data class AffairEntity(
+  @SerializedName("stuNum")
   val stuNum: String,
+  @SerializedName("onlyId")
   val onlyId: Int, // 本地的唯一 id，由我们端上给出
+  @SerializedName("remoteId")
   val remoteId: Int, // 后端的 id，如果小于 0，则说明是本地临时添加的事务，并且可能会发生改变，业务侧不建议使用
+  @SerializedName("time")
   val time: Int, // 提醒时间
+  @SerializedName("title")
   val title: String,
+  @SerializedName("content")
   val content: String,
+  @SerializedName("atWhatTime")
   val atWhatTime: List<AtWhatTime>
-) {
+): Serializable {
   
   companion object {
     /**
@@ -81,28 +90,16 @@ data class AffairEntity(
   }
 
   data class AtWhatTime(
+    @SerializedName("beginLesson")
     val beginLesson: Int, // 开始节数，如：1、2 节课以 1 开始；3、4 节课以 3 开始，注意：中午是以 -1 开始，傍晚是以 -2 开始
+    @SerializedName("day")
     val day: Int, // 星期数，星期一为 0
+    @SerializedName("period")
     val period: Int, // 长度
+    @SerializedName("week")
     val week: List<Int> // 在哪几周，特别注意：整学期的 week 为 0
-  )
+  ): Serializable
 
-  class AtWhatTimeConverter {
-    companion object {
-      private val GSON = defaultGson
-    }
-
-    @TypeConverter
-    fun listToString(list: List<AtWhatTime>): String {
-      return GSON.toJson(list)
-    }
-
-    @TypeConverter
-    fun stringToList(string: String): List<AtWhatTime> {
-      return GSON.fromJson(string, object : TypeToken<List<AtWhatTime>>() {}.type)
-    }
-  }
-  
   // 将数据库的类转化为要展示的类
   fun toAffairAdapterData(): List<AffairAdapterData> {
     val newList = arrayListOf<AffairAdapterData>()
@@ -113,97 +110,191 @@ data class AffairEntity(
   }
 }
 
+object AffairDaoImpl : AffairDao() {
 
-@Dao
+  private val affairSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_affair", Context.MODE_PRIVATE)
+
+  private val observerMap = ConcurrentHashMap<String, BehaviorSubject<List<AffairEntity>>>()
+
+  private val entityListType = object : TypeToken<List<AffairEntity>>() {}.type
+
+  private val synchronizedObject = SynchronizedObject()
+
+  override fun getAffairByStuNum(stuNum: String): List<AffairEntity> {
+    synchronized(synchronizedObject) {
+      val cache = observerMap[stuNum]
+      if (cache != null) {
+        return cache.value ?: emptyList()
+      }
+      return getAffairByStuNumFromSp(stuNum)
+    }
+  }
+
+  private fun getAffairByStuNumFromSp(stuNum: String): List<AffairEntity> {
+    return affairSp.getString(stuNum, null)?.let {
+      runCatching<List<AffairEntity>> {
+        defaultGson.fromJson(it, entityListType)
+      }.onFailure {
+        affairSp.edit {
+          remove(stuNum)
+        }
+      }.getOrNull()
+    } ?: emptyList()
+  }
+
+  override fun findAffairByOnlyId(
+    stuNum: String,
+    onlyId: Int
+  ): Maybe<AffairEntity> {
+    val entity = getAffairByStuNum(stuNum).firstOrNull {
+      it.onlyId == onlyId
+    }
+    return if (entity != null) {
+      Maybe.just(entity)
+    } else {
+      Maybe.empty()
+    }
+  }
+
+  override fun observeAffair(stuNum: String): Observable<List<AffairEntity>> {
+    synchronized(synchronizedObject) {
+      return observerMap.getOrPut(stuNum) {
+        val list = getAffairByStuNumFromSp(stuNum)
+        BehaviorSubject.createDefault(list)
+      }
+    }
+  }
+
+  override fun deleteAffair(stuNum: String, onlyId: Int): AffairEntity? {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == onlyId }
+      val entity = list.removeAt(index)
+      affairSp.edit {
+        putString(stuNum, defaultGson.toJson(list, entityListType))
+      }
+      observerMap[stuNum]?.onNext(list)
+      return entity
+    }
+  }
+
+  override fun updateAffair(affair: AffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index == -1) return
+      list[index] = affair
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+      observerMap[affair.stuNum]?.onNext(list)
+    }
+  }
+
+  override fun deleteAffair(affair: AffairEntity) {
+    deleteAffair(stuNum = affair.stuNum, onlyId = affair.onlyId)
+  }
+
+  override fun insertAffair(affair: AffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index == -1) {
+        list.add(affair)
+      } else {
+        list[index] = affair
+      }
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+      observerMap[affair.stuNum]?.onNext(list)
+    }
+  }
+
+  override fun updateRemoteId(stuNum: String, onlyId: Int, newRemoteId: Int) {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == onlyId }
+      if (index == -1) return
+      list[index] = list[index].copy(remoteId = newRemoteId)
+      affairSp.edit {
+        putString(stuNum, defaultGson.toJson(list, entityListType))
+      }
+      observerMap[stuNum]?.onNext(list)
+    }
+  }
+
+  override fun insertAffair(
+    stuNum: String,
+    incompleteEntity: AffairIncompleteEntity
+  ): AffairEntity {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(stuNum)
+      val maxOnlyId = list.maxOfOrNull { it.onlyId } ?: 0
+      val newEntity = incompleteEntity.toEntity(stuNum, maxOnlyId + 1)
+      insertAffair(newEntity)
+      return newEntity
+    }
+  }
+
+  override fun resetData(
+    stuNum: String,
+    incompleteEntity: List<AffairIncompleteEntity>
+  ): List<AffairEntity> {
+    synchronized(synchronizedObject) {
+      val list = getAffairByStuNum(stuNum)
+      val maxOnlyId = list.maxOfOrNull { it.onlyId } ?: 0
+      var onlyId = maxOnlyId + 1
+      val newList = incompleteEntity.map { it.toEntity(stuNum, onlyId++) }
+      affairSp.edit {
+        putString(stuNum, defaultGson.toJson(newList, entityListType))
+      }
+      observerMap[stuNum]?.onNext(newList)
+      return newList
+    }
+  }
+
+
+}
+
 abstract class AffairDao {
 
-  @Query("SELECT * FROM affair WHERE stuNum = :stuNum")
   abstract fun getAffairByStuNum(stuNum: String): List<AffairEntity>
 
-  @Query("SELECT * FROM affair WHERE stuNum = :stuNum AND onlyId = :onlyId")
   abstract fun findAffairByOnlyId(stuNum: String, onlyId: Int): Maybe<AffairEntity>
 
-  @Query("SELECT * FROM affair WHERE stuNum = :stuNum")
   abstract fun observeAffair(stuNum: String): Observable<List<AffairEntity>>
   
-  @Query("DELETE FROM affair WHERE stuNum = :stuNum AND onlyId = :onlyId")
-  abstract fun deleteAffair(stuNum: String, onlyId: Int)
+  abstract fun deleteAffair(stuNum: String, onlyId: Int): AffairEntity?
   
-  @Update
   abstract fun updateAffair(affair: AffairEntity)
   
   // 内部使用
-  @Delete
   protected abstract fun deleteAffair(affair: AffairEntity)
   
   // 内部使用
-  @Insert(onConflict = OnConflictStrategy.REPLACE)
   protected abstract fun insertAffair(affair: AffairEntity)
 
-  open fun deleteAffairReturn(stuNum: String, onlyId: Int): AffairEntity? {
-    return findAffairByOnlyId(stuNum, onlyId)
-      .doOnSuccess {
-        deleteAffair(it)
-      }.blockingGet()
-  }
-  
   /**
    * 更新旧事务的 id
    */
-  open fun updateRemoteId(stuNum: String, onlyId: Int, newRemoteId: Int) {
-    findAffairByOnlyId(stuNum, onlyId)
-      .doOnSuccess {
-        updateAffair(it.copy(remoteId = newRemoteId))
-      }.blockingGet()
-  }
-  
-  @Query("SELECT MAX(onlyId) FROM affair WHERE stuNum = :stuNum")
-  protected abstract fun getMaxOnlyId(stuNum: String): Int
-  
-  /**
-   * 提供一个唯一的 [AffairEntity.onlyId]
-   */
-  private fun getNewOnlyId(stuNum: String): Int {
-    return getMaxOnlyId(stuNum) + 1
-  }
+  abstract fun updateRemoteId(stuNum: String, onlyId: Int, newRemoteId: Int)
   
   /**
    * 返回当前插入的 [AffairEntity]
    */
-  open fun insertAffair(
+  abstract fun insertAffair(
     stuNum: String,
     incompleteEntity: AffairIncompleteEntity
-  ) : AffairEntity {
-    val onlyId = getNewOnlyId(stuNum)
-    val entity = AffairEntity(
-      stuNum,
-      onlyId,
-      incompleteEntity.remoteId,
-      incompleteEntity.time,
-      incompleteEntity.title,
-      incompleteEntity.content,
-      incompleteEntity.atWhatTime
-    )
-    insertAffair(entity)
-    return entity
-  }
-  
-  // 内部使用
-  @Query("DELETE FROM affair WHERE stuNum = :stuNum")
-  protected abstract fun deleteAffairByStuNum(stuNum: String)
+  ) : AffairEntity
   
   /**
    * 重新设置数据，先删除，再插入
    */
-  open fun resetData(
+  abstract fun resetData(
     stuNum: String,
     incompleteEntity: List<AffairIncompleteEntity>
-  ) : List<AffairEntity> {
-    deleteAffairByStuNum(stuNum)
-    return incompleteEntity.map {
-      insertAffair(stuNum, it)
-    }
-  }
+  ) : List<AffairEntity>
 }
 
 
@@ -212,44 +303,47 @@ abstract class AffairDao {
 //    事务与手机日历对应表
 //
 ////////////////////////////
-@Entity(tableName = "affair_calendar")
-@TypeConverters(AffairCalendarEntity.CalendarIdConverter::class)
 data class AffairCalendarEntity(
-  @PrimaryKey
   val onlyId: Int,
   val eventIdList: List<Long> // 手机日历的 id
-) {
-  class CalendarIdConverter {
-    @TypeConverter
-    fun listToString(list: List<Long>): String {
-      return list.joinToString("*&*")
-    }
-    @TypeConverter
-    fun stringToList(string: String): List<Long> {
-      return string.split("*&*").map { it.toLong() }
+)
+
+object AffairCalendarDaoImpl : AffairCalendarDao() {
+
+  private val affairSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_affair_calendar", Context.MODE_PRIVATE)
+
+  private val longListType = object : TypeToken<List<Long>>() {}.type
+
+  private val cacheMap = mutableMapOf<Int, List<Long>>()
+
+  private val synchronizedObject = SynchronizedObject()
+
+  override fun insert(entity: AffairCalendarEntity) {
+    synchronized(synchronizedObject) {
+      cacheMap[entity.onlyId] = entity.eventIdList
+      affairSp.edit {
+        putString(entity.onlyId.toString(), defaultGson.toJson(entity, longListType))
+      }
     }
   }
+
+  override fun remove(onlyId: Int): List<Long> {
+    synchronized(synchronizedObject) {
+      val list = cacheMap.remove(onlyId) ?: emptyList()
+      affairSp.edit {
+        remove(onlyId.toString())
+      }
+      return list
+    }
+  }
+
 }
 
-@Dao
 abstract class AffairCalendarDao {
   
-  @Insert
   abstract fun insert(entity: AffairCalendarEntity)
-  
-  // 内部使用
-  @Query("SELECT * FROM affair_calendar WHERE onlyId = :onlyId")
-  protected abstract fun get(onlyId: Int): AffairCalendarEntity?
-  
-  // 内部使用
-  @Query("DELETE FROM affair_calendar WHERE onlyId = :onlyId")
-  protected abstract fun delete(onlyId: Int)
-  
-  open fun remove(onlyId: Int): List<Long> {
-    val list = get(onlyId)
-    delete(onlyId)
-    return list?.eventIdList ?: emptyList()
-  }
+
+  abstract fun remove(onlyId: Int): List<Long>
 }
 
 
@@ -258,35 +352,118 @@ abstract class AffairCalendarDao {
 //     临时添加事务表
 //
 ////////////////////////////
-@Entity(tableName = "affair_local_add", primaryKeys = ["stuNum", "onlyId"])
 data class LocalAddAffairEntity(
+  @SerializedName("stuNum")
   val stuNum: String,
+  @SerializedName("onlyId")
   val onlyId: Int,
+  @SerializedName("time")
   val time: Int,
+  @SerializedName("title")
   val title: String,
+  @SerializedName("content")
   val content: String,
+  @SerializedName("dateJson")
   val dateJson: String
-)
+) : Serializable
 
-@Dao
+object LocalAddAffairDaoImpl : LocalAddAffairDao() {
+  private val affairSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_affair_local_add", Context.MODE_PRIVATE)
+  private val entityListType = object : TypeToken<List<LocalAddAffairEntity>>() {}.type
+
+  private val cacheMap = mutableMapOf<String, List<LocalAddAffairEntity>>()
+
+  private val synchronizedObject = SynchronizedObject()
+
+  override fun insertLocalAddAffair(affair: LocalAddAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalAddAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index != -1) {
+        list[index] = affair
+      } else {
+        list.add(affair)
+      }
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun updateLocalAddAffair(affair: LocalAddAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalAddAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index == -1) return
+      list[index] = affair
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun deleteLocalAddAffair(stuNum: String, onlyId: Int) {
+    synchronized(synchronizedObject) {
+      val list = getLocalAddAffair(stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == onlyId }
+      if (index == -1) return
+      list.removeAt(index)
+      cacheMap[stuNum] = list
+      affairSp.edit {
+        putString(stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun findLocalAddAffair(
+    stuNum: String,
+    onlyId: Int
+  ): LocalAddAffairEntity? {
+    return getLocalAddAffair(stuNum).firstOrNull { it.onlyId == onlyId }
+  }
+
+  override fun getLocalAddAffair(stuNum: String): List<LocalAddAffairEntity> {
+    synchronized(synchronizedObject) {
+      val cache = cacheMap[stuNum]
+      if (cache != null) {
+        return cache
+      }
+      return getLocalAffAffairFromSp(stuNum)
+    }
+  }
+
+  private fun getLocalAffAffairFromSp(stuNum: String): List<LocalAddAffairEntity> {
+    return affairSp.getString(stuNum, null)?.let {
+      runCatching {
+        defaultGson.fromJson<List<LocalAddAffairEntity>>(it, entityListType)
+      }.onFailure {
+        affairSp.edit {
+          remove(stuNum)
+        }
+      }.getOrNull()
+    } ?: emptyList()
+  }
+
+  override fun deleteLocalAddAffair(affair: LocalAddAffairEntity) {
+    deleteLocalAddAffair(affair.stuNum, affair.onlyId)
+  }
+
+}
+
 abstract class LocalAddAffairDao {
   
-  @Insert(onConflict = OnConflictStrategy.REPLACE)
   abstract fun insertLocalAddAffair(affair: LocalAddAffairEntity)
   
-  @Update
   abstract fun updateLocalAddAffair(affair: LocalAddAffairEntity)
   
-  @Query("DELETE FROM affair_local_add WHERE stuNum = :stuNum AND onlyId = :onlyId")
   abstract fun deleteLocalAddAffair(stuNum: String, onlyId: Int)
   
-  @Query("SELECT * FROM affair_local_add WHERE stuNum = :stuNum AND onlyId = :onlyId")
   abstract fun findLocalAddAffair(stuNum: String, onlyId: Int): LocalAddAffairEntity?
   
-  @Query("SELECT * FROM affair_local_add WHERE stuNum = :stuNum")
   abstract fun getLocalAddAffair(stuNum: String): List<LocalAddAffairEntity>
   
-  @Delete
   abstract fun deleteLocalAddAffair(affair: LocalAddAffairEntity)
 }
 
@@ -296,33 +473,109 @@ abstract class LocalAddAffairDao {
 //     临时更新事务表
 //
 ////////////////////////////
-@Entity(tableName = "affair_local_update", primaryKeys = ["stuNum", "onlyId"])
 data class LocalUpdateAffairEntity(
+  @SerializedName("stuNum")
   val stuNum: String,
+  @SerializedName("onlyId")
   val onlyId: Int,
+  @SerializedName("remoteId")
   val remoteId: Int,
+  @SerializedName("time")
   val time: Int,
+  @SerializedName("title")
   val title: String,
+  @SerializedName("content")
   val content: String,
+  @SerializedName("dateJson")
   val dateJson: String
-)
+): Serializable
 
-@Dao
+object LocalUpdateAffairDaoImpl : LocalUpdateAffairDao() {
+  private val affairSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_affair_local_update", Context.MODE_PRIVATE)
+  private val entityListType = object : TypeToken<List<LocalUpdateAffairEntity>>() {}.type
+  private val cacheMap = mutableMapOf<String, List<LocalUpdateAffairEntity>>()
+
+  private val synchronizedObject = SynchronizedObject()
+
+  override fun insertLocalUpdateAffair(affair: LocalUpdateAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalUpdateAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index != -1) {
+        list[index] = affair
+      } else {
+        list.add(affair)
+      }
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun updateLocalUpdateAffair(affair: LocalUpdateAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalUpdateAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index == -1) return
+      list[index] = affair
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun deleteLocalUpdateAffair(stuNum: String, onlyId: Int) {
+    synchronized(synchronizedObject) {
+      val list = getLocalUpdateAffair(stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == onlyId }
+      if (index == -1) return
+      list.removeAt(index)
+      cacheMap[stuNum] = list
+      affairSp.edit {
+        putString(stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun getLocalUpdateAffair(stuNum: String): List<LocalUpdateAffairEntity> {
+    synchronized(synchronizedObject) {
+      val cache = cacheMap[stuNum]
+      if (cache != null) {
+        return cache
+      }
+      return getLocalAffAffairFromSp(stuNum)
+    }
+  }
+
+  override fun deleteLocalUpdateAffair(affair: LocalUpdateAffairEntity) {
+    deleteLocalUpdateAffair(affair.stuNum, affair.onlyId)
+  }
+
+  private fun getLocalAffAffairFromSp(stuNum: String): List<LocalUpdateAffairEntity> {
+    return affairSp.getString(stuNum, null)?.let {
+      runCatching {
+        defaultGson.fromJson<List<LocalUpdateAffairEntity>>(it, entityListType)
+      }.onFailure {
+        affairSp.edit {
+          remove(stuNum)
+        }
+      }.getOrNull()
+    } ?: emptyList()
+  }
+}
+
 abstract class LocalUpdateAffairDao {
   
-  @Insert(onConflict = OnConflictStrategy.REPLACE)
   abstract fun insertLocalUpdateAffair(affair: LocalUpdateAffairEntity)
   
-  @Update
   abstract fun updateLocalUpdateAffair(affair: LocalUpdateAffairEntity)
   
-  @Query("DELETE FROM affair_local_update WHERE stuNum = :stuNum AND onlyId = :onlyId")
   abstract fun deleteLocalUpdateAffair(stuNum: String, onlyId: Int)
   
-  @Query("SELECT * FROM affair_local_update WHERE stuNum = :stuNum")
   abstract fun getLocalUpdateAffair(stuNum: String): List<LocalUpdateAffairEntity>
   
-  @Delete
   abstract fun deleteLocalUpdateAffair(affair: LocalUpdateAffairEntity)
 }
 
@@ -332,22 +585,76 @@ abstract class LocalUpdateAffairDao {
 //     临时删除事务表
 //
 ////////////////////////////
-@Entity(tableName = "affair_local_delete", primaryKeys = ["stuNum", "onlyId"])
 data class LocalDeleteAffairEntity(
   val stuNum: String,
   val onlyId: Int,
   val remoteId: Int
-)
+) : Serializable
 
-@Dao
+object LocalDeleteAffairDaoImpl : LocalDeleteAffairDao() {
+  private val affairSp = com.cyxbs.components.init.appContext.getSharedPreferences("stu_affair_local_delete", Context.MODE_PRIVATE)
+  private val entityListType = object : TypeToken<List<LocalDeleteAffairEntity>>() {}.type
+  private val cacheMap = mutableMapOf<String, List<LocalDeleteAffairEntity>>()
+
+  private val synchronizedObject = SynchronizedObject()
+
+  override fun insertLocalDeleteAffair(affair: LocalDeleteAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalDeleteAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      if (index != -1) {
+        list[index] = affair
+      } else {
+        list.add(affair)
+      }
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  override fun getLocalDeleteAffair(stuNum: String): List<LocalDeleteAffairEntity> {
+    synchronized(synchronizedObject) {
+      val cache = cacheMap[stuNum]
+      if (cache != null) {
+        return cache
+      }
+      return getLocalAffAffairFromSp(stuNum)
+    }
+  }
+
+  override fun deleteLocalDeleteAffair(affair: LocalDeleteAffairEntity) {
+    synchronized(synchronizedObject) {
+      val list = getLocalDeleteAffair(affair.stuNum).toMutableList()
+      val index = list.indexOfFirst { it.onlyId == affair.onlyId }
+      list.removeAt(index)
+      cacheMap[affair.stuNum] = list
+      affairSp.edit {
+        putString(affair.stuNum, defaultGson.toJson(list, entityListType))
+      }
+    }
+  }
+
+  private fun getLocalAffAffairFromSp(stuNum: String): List<LocalDeleteAffairEntity> {
+    return affairSp.getString(stuNum, null)?.let {
+      runCatching {
+        defaultGson.fromJson<List<LocalDeleteAffairEntity>>(it, entityListType)
+      }.onFailure {
+        affairSp.edit {
+          remove(stuNum)
+        }
+      }.getOrNull()
+    } ?: emptyList()
+  }
+
+}
+
 abstract class LocalDeleteAffairDao {
   
-  @Insert(onConflict = OnConflictStrategy.REPLACE)
   abstract fun insertLocalDeleteAffair(affair: LocalDeleteAffairEntity)
   
-  @Query("SELECT * FROM affair_local_delete WHERE stuNum = :stuNum")
   abstract fun getLocalDeleteAffair(stuNum: String): List<LocalDeleteAffairEntity>
   
-  @Delete
   abstract fun deleteLocalDeleteAffair(affair: LocalDeleteAffairEntity)
 }

@@ -171,7 +171,7 @@ object TokenServiceImpl : ITokenService {
       val deferred = requestTokenDeferred
       if (deferred != null) return deferred
       return appCoroutineScope.async {
-        runCatchingCoroutine {
+        runCatching {
           HttpClientNoToken.post("/magipoke/token/refresh") {
             setBody(buildJsonObject {
               put("refreshToken", token.refreshToken)
@@ -182,6 +182,7 @@ object TokenServiceImpl : ITokenService {
           it.throwApiExceptionIfFail()
           it.data
         }.onFailure {
+          // 这里会包含协程的 CancellationException
           // token 请求失败
           onRequestTokenFailure(it)
           requestTokenDeferred = null
