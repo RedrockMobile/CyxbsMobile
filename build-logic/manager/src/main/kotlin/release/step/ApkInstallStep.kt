@@ -1,7 +1,7 @@
 package release.step
 
+import localProperties
 import org.gradle.api.Project
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Scanner
 
@@ -28,11 +28,14 @@ class ApkInstallStep(val project: Project) {
     return true
   }
 
+  private val adb = project.localProperties["sdk.dir"].toString() + File.separator + "platform-tools" + File.separator + "adb"
+
   private fun checkDevices(): Boolean {
     while (true) {
       val execResult = runCatching {
         project.providers.exec {
-          commandLine("adb", "devices")
+          commandLine(adb, "devices")
+          isIgnoreExitValue = true
         }
       }.onFailure {
         it.printStackTrace()
@@ -68,7 +71,7 @@ class ApkInstallStep(val project: Project) {
     while (true) {
       val installResult = project.providers.exec {
         // adb install 安装
-        commandLine("adb", "install", "-r", apk)
+        commandLine(adb, "install", "-r", apk)
         isIgnoreExitValue = true
       }.result.get()
       if (installResult.exitValue != 0) {
@@ -93,11 +96,12 @@ class ApkInstallStep(val project: Project) {
     project.providers.exec {
       // adb shell am start 打开 app
       commandLine(
-        "adb", "shell", "am", "start",
+        adb, "shell", "am", "start",
         "-a", "com.mredrock.cyxbs.action.COURSE", // 启动就直接打开课表的 action
         "-p", Config.getApplicationId(project), // 启动的包名
       )
-    }
+      isIgnoreExitValue = true
+    }.result.get()
     Thread.sleep(5000)
     val sc = Scanner(System.`in`)
     println("\n请确定课表功能正常，能否正常显示课程? (y/n)".red())

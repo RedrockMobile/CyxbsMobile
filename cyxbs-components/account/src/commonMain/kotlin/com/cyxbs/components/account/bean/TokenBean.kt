@@ -6,6 +6,7 @@ import com.cyxbs.components.utils.extensions.toast
 import io.ktor.util.decodeBase64String
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * .
@@ -21,6 +22,7 @@ class TokenBean(
   val refreshToken: String,
 ) {
   // 从 token 中解码的数据
+  @Transient
   val info: TokenInfo = kotlin.runCatching {
     val str = token.substringBefore(".").decodeBase64String()
     defaultJson.decodeFromString<TokenInfo>(str)

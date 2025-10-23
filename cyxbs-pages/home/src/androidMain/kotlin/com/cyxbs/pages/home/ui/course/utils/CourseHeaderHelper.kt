@@ -148,11 +148,11 @@ object CourseHeaderHelper {
     linkNum: String,
   ): Observable<Header> {
     // 这里不需要调用 observeSelfLesson()，因为外面的 observeSelfLinkStu() 有观察 self 的作用
-    val selfSingle = lessonService.observeSelfLesson()
+    val selfSingle = lessonService.observeSelfLesson(needRefresh = false)
     val linkSingle =
-      if (linkNum.isNotBlank()) lessonService.observeLinkLesson()
+      if (linkNum.isNotBlank()) lessonService.observeLinkLesson(needRefresh = false)
       else Observable.just(emptyList())
-    val affairObservable = affairService.observeSelfAffair()
+    val affairObservable = affairService.observeSelfAffair(false) // 由课表触发刷新即可
     // combineLast 可以同时观察任一个 Observable，
     // 只要收到一个新的，他就会整和数据发给下游，不同于 zip 操作符，
     // zip 操作符需要三个都发送新的才会整合发给下游

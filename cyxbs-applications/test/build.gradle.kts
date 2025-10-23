@@ -85,6 +85,7 @@ tasks.register("buildReleaseAndInstall") {
         "adb", "install", "-r",
         apkFile
       )
+      isIgnoreExitValue = true
     }.result.get()
     if (installResult.exitValue == 0) {
       providers.exec {
@@ -94,7 +95,8 @@ tasks.register("buildReleaseAndInstall") {
           "-c", "android.intent.category.LAUNCHER",
           "-p", android.defaultConfig.applicationId,
         )
-      }
+        isIgnoreExitValue = true
+      }.result.get()
     }
     if (apkFile.name.endsWith(".apk")) {
       // 改名为 .Apk 后缀，方便发到 QQ

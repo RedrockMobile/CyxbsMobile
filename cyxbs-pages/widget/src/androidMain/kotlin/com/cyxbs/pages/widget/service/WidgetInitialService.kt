@@ -43,9 +43,9 @@ object WidgetInitialService : InitialService {
         val lessonService = ILessonService::class.impl()
         val affairService = IAffairService::class.impl()
         Observable.combineLatest(
-            lessonService.observeSelfLesson(), // 自己课的观察流
-            lessonService.observeLinkLesson(), // 关联人课的观察流
-            affairService.observeSelfAffair(), // 事务的观察流
+            lessonService.observeSelfLesson(needRefresh = false), // 自己课的观察流
+            lessonService.observeLinkLesson(needRefresh = false), // 关联人课的观察流
+            affairService.observeSelfAffair(needRefresh = false), // 事务的观察流
         ) { self, link, affair ->
             // 装换为 data 数据类
             notifyWidgetRefresh(self, link, affair)

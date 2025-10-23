@@ -44,7 +44,7 @@ class EditAffairViewModel : BaseViewModel() {
   fun findAffairEntity(onlyId: Int) {
     val stuNum = IAccountService::class.impl().stuNum.orEmpty()
     if (stuNum.isNotEmpty()) {
-      AffairDataBase.INSTANCE.getAffairDao()
+      AffairDataBase.getAffairDao()
         .findAffairByOnlyId(stuNum, onlyId)
         .subscribeOn(Schedulers.io())
         .safeSubscribeBy {

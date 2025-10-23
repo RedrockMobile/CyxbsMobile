@@ -52,20 +52,4 @@ object Multiplatform {
     }
   }
 
-
-  private val Project.localProperties: Properties
-    get() {
-      val key = "Project.localProperties"
-      if (rootProject.extra.has(key)) {
-        return rootProject.extra.get(key) as Properties
-      } else {
-        val properties = Properties()
-        val localPropertiesFile = rootProject.rootDir.resolve("local.properties")
-        if (localPropertiesFile.exists()) {
-          properties.load(localPropertiesFile.inputStream())
-        }
-        rootProject.extra.set(key, properties)
-        return properties
-      }
-    }
 }
