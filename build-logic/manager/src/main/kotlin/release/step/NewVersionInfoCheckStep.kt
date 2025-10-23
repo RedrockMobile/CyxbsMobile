@@ -64,7 +64,7 @@ class NewVersionInfoCheckStep(val project: Project, val netService: TaskService)
         throw IllegalArgumentException("改了 versionCode 却没改 versionName, 线上为 " + lastVersion.versionName.blue()
             + ", 即将发布的新版为 " + Config.versionName.yellow())
       } else if (lastVersion.updateContent == Config.updateContent) {
-        throw IllegalArgumentException("没改更新的文案，去找产品要一个，然后写在 Config#updateContent 中")
+        throw IllegalArgumentException("没改更新的文案，请更改 Config#updateContent")
       } else if (!lastVersion.versionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
         throw IllegalArgumentException("versionName 不符合规则，只能为 x.y.z")
       } else if (compareVersion(lastVersion.versionName, Config.versionName) >= 0) {

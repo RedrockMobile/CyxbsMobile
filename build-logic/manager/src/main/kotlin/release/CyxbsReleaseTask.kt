@@ -106,10 +106,18 @@ abstract class CyxbsReleaseTask : DefaultTask() {
         // 发布新版本信息
         UploadNewVersionInfoStep(netService).execute(apkUrl) ?: return
         println()
-        println("版本已发布，请及时发布 github release !!!".red())
+        println("项目根路径 /release 下已将包名改名为 .Apk 后缀".bold() + ", 请及时发布到掌邮反馈群".yellow())
         println()
-        println("已改名为 .Apk 后缀".bold() + ", 请及时发布到掌邮反馈群".yellow())
-        apk.renameTo(apk.parentFile.resolve(apk.name.replace(".apk", ".Apk")))
+        println("版本已发布，请及时发布 github release，需同步上传 apk 文件和混淆文件 proguardMapping.txt".red())
+        val releaseFile = project.rootDir.resolve("release")
+            .resolve(Config.versionName.replace(".", "_"))
+        releaseFile.mkdirs()
+        apk.copyTo(releaseFile.resolve(apk.name.replace(".apk", ".Apk")))
+        val proguardMappingFile = project.rootDir
+            .resolve("build-logic")
+            .resolve("manager")
+            .resolve("proguardMapping.txt")
+        proguardMappingFile.copyTo(releaseFile.resolve("proguardMapping-${Config.versionName}.txt"))
     }
 
     fun String.red() = "\u001B[31m$this\u001B[0m"

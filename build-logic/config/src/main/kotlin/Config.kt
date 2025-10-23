@@ -12,7 +12,7 @@ import java.util.regex.Pattern
 object Config {
   // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
   const val versionCode = 93 // 线上92，开发93
-  const val versionName = "6.10.5-alpha" // 线上6.10.4，开发6.10.5-alpha，自己打包 -alpha，内测 -beta
+  const val versionName = "6.10.5" // 线上6.10.4，开发6.10.5-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
     get() = versionName.substringBeforeLast("-")
@@ -22,14 +22,9 @@ object Config {
 
   // 线上版本更新内容，注意缩进统一
   val updateContent = """
-    [bugfix 6.10.4]
-    1. 修护 6.10.3 版本引入的事务无法删除问题
-    
-    [bugfix 6.10.3]
-    1. 修护登录经常过期从而回退到游客模式
-    2. 修护没课约从下往上删除学生时崩溃
-    3. 修护主页导航栏区域颜色透明问题
-    4. 修护跳转登录后偶现崩溃
+    [bugfix]
+    1. 修护无法编辑和创建课表事务
+    2. 修护登录经常过期
   """.trimIndent()
 
   val resourcesExclude = listOf(
