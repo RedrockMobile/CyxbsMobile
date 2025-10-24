@@ -8,7 +8,7 @@
 
 import UIKit
 import XBSBugly
-import CyxbsApplicationsPro
+// import CyxbsApplicationsPro
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -21,7 +21,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         setupWindow() // 设置应用程序窗口
         setupAlicloudSDK() // 设置阿里云SDK
         XBSBugly.buglyInit() // 设置bugly
-        IOSAppKt.doInitApp() // Kotlin Multiplatform 工程初始化
+        // IOSAppKt.doInitApp() // Kotlin Multiplatform 工程初始化
         
         return true
     }
