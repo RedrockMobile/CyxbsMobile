@@ -13,6 +13,7 @@
 #import "EmptyClassTableViewCell.h"
 #import "EmptyClassCollectionViewCell.h"
 #import "MJRefresh.h"
+#import "掌上重邮-Swift.h"
 
 @interface EmptyClassViewController () <EmptyContentViewDelegate, UITableViewDataSource>
 
@@ -82,17 +83,17 @@
 }
 
 - (void)viewDidAppear:(BOOL)animated {
-    NSInteger nowWeek = getNowWeek_NSString.integerValue-1;
+    NSInteger nowWeek = [SwiftToOC getNowWeek] - 1;
     if(nowWeek < 0){
         nowWeek = 0;
     }
     
     // 获取当前是星期几
-    NSInteger today;
-    if ([NSDate date].weekday == 1) {
+    NSInteger today = [NSDate date].weekday;
+    if (today == 1) {
         today = 7;
     } else {
-        today = [NSDate date].weekday - 1;
+        today = today - 1;
     }
     
     // 自动选择当前日期

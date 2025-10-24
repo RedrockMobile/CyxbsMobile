@@ -30,22 +30,24 @@ class WeDateCourseScheduleVC: UIViewController {
         super.loadView()
         view.frame.size.height -= statusBarHeight
     }
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
         view.addSubview(titleLab)
         
-        CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { courseScheduleModel in
-            self.nowWeek = courseScheduleModel.nowWeek
-            self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
-            self.fact?.delegate = self
-            // 添加回到本周按钮时需确保fact有值，否则点击会崩溃
-            self.view.addSubview(self.button)
-            // 添加collectionView时需确保fact有值，否则会崩溃
-            self.view.addSubview(self.collectionView)
-        } failure: { error in
-            print(error)
+        if(stuNumAry.count != 0){
+            CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { courseScheduleModel in
+                self.nowWeek = courseScheduleModel.nowWeek
+                self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
+                self.fact?.delegate = self
+                // 添加回到本周按钮时需确保fact有值，否则点击会崩溃
+                self.view.addSubview(self.button)
+                // 添加collectionView时需确保fact有值，否则会崩溃
+                self.view.addSubview(self.collectionView)
+            } failure: { error in
+                print(error)
+            }
         }
     }
     
