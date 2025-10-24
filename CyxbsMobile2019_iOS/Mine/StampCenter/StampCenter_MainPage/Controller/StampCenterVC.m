@@ -18,6 +18,7 @@
 #import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
 #import "掌上重邮-Swift.h"
+#import "CheckInModel.h"
 
 //Model
 #import "StampGoodsData.h"
@@ -731,8 +732,9 @@
 
 //每日签到
 - (void)checkInToday{
+    CheckInModel *checkInModel = [[CheckInModel alloc] init];
     [CheckInModel CheckInSucceeded:^{
-        [RemindHUD.shared showDefaultHUDWithText:@"签到成功，邮票+10" completion:^{
+        [RemindHUD.shared showDefaultHUDWithText:[NSString stringWithFormat:@"签到成功，邮票+%ld",checkInModel.CheckInStampsCalculate] completion:^{
             [[NSNotificationCenter defaultCenter] postNotificationName:@"refreshPage" object:nil];
         }];
     } Failed:^(NSError * _Nonnull err) {

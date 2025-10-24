@@ -49,7 +49,7 @@ class QADetailVC: UIViewController {
         backButton.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(16)
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(13)
-            make.width.equalTo(9)
+            make.width.equalTo(24)
             make.height.equalTo(18)
         }
         

@@ -1,7 +1,7 @@
 source 'https://github.com/CocoaPods/specs'
 source 'https://github.com/aliyun/aliyun-specs.git'
 
-platform :ios, '13.0'
+platform :ios, '26.0'
 use_frameworks!
 
 # 是否为模拟器环境，真机/发版请改为 false
@@ -77,7 +77,7 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'  # 不仅仅针对当前激活的架构编译，适用于多架构编译
       config.build_settings['HEADER_SEARCH_PATHS'] = '$(PROJECT_DIR)/**'  # 头文件搜索路径
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'  # 部署目标版本注释补全的部分：
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'  # 部署目标版本注释补全的部分：
 
       config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""  # 扩展代码签名标识
       config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"  # 不要求代码签名
