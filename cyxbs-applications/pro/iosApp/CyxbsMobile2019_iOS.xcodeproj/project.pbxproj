@@ -335,6 +335,8 @@
 		73AAA1D326C918250084E44D /* PurchaseinfoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1BE26C918240084E44D /* PurchaseinfoViewController.m */; };
 		73AAA1D426C918250084E44D /* PurchaseInfoGoodsInfoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C126C918240084E44D /* PurchaseInfoGoodsInfoView.m */; };
 		73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */; };
+		73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */; };
+		73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */; };
 		752A03EC2B0796C1003256C1 /* ActivityMessageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */; };
 		752A03EE2B0796CF003256C1 /* ActivityMessageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */; };
 		752A03F02B0796D9003256C1 /* ActivityMessageVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */; };
@@ -436,8 +438,6 @@
 		75F729732C7D8F4B00B36A56 /* TodoDataModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 75F729702C7D8F4B00B36A56 /* TodoDataModel.m */; };
 		75F729742C7D8F4B00B36A56 /* TodoSyncTool.m in Sources */ = {isa = PBXBuildFile; fileRef = 75F729712C7D8F4B00B36A56 /* TodoSyncTool.m */; };
 		75FD5F692BC5514500D8302D /* CustomNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FD5F672BC5514500D8302D /* CustomNavigationController.swift */; };
-		770514562D72F8160052942A /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */; };
-		770514572D72F8160052942A /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 770514522D72F8160052942A /* DetailsBaseTableViewCell.m */; };
 		7FBF39F4257B79F30077494E /* ByPasswordViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FBF39EB257B79F20077494E /* ByPasswordViewController.m */; };
 		7FBF39F6257B79F30077494E /* ByWordViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FBF39EF257B79F30077494E /* ByWordViewController.m */; };
 		9AB758842CEEEE6600E8258A /* SAAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB758832CEEEE6600E8258A /* SAAlertController.swift */; };
@@ -1284,6 +1284,10 @@
 		73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PurchaseInfoOrderIDView.m; sourceTree = "<group>"; };
 		73AAA1C326C918240084E44D /* PurchaseInfoOrderIDView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoOrderIDView.h; sourceTree = "<group>"; };
 		73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoGoodsInfoView.h; sourceTree = "<group>"; };
+		73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
+		73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
+		73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
+		73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
 		752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageModel.swift; sourceTree = "<group>"; };
 		752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageCell.swift; sourceTree = "<group>"; };
 		752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageVC.swift; sourceTree = "<group>"; };
@@ -1445,10 +1449,6 @@
 		75F729712C7D8F4B00B36A56 /* TodoSyncTool.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TodoSyncTool.m; sourceTree = "<group>"; };
 		75F729722C7D8F4B00B36A56 /* TodoDataModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TodoDataModel.h; sourceTree = "<group>"; };
 		75FD5F672BC5514500D8302D /* CustomNavigationController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CustomNavigationController.swift; sourceTree = "<group>"; };
-		770514512D72F8160052942A /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
-		770514522D72F8160052942A /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
-		770514532D72F8160052942A /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
-		770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
 		7A64BFF32892826F007CCB1E /* NewQAHeader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NewQAHeader.h; sourceTree = "<group>"; };
 		7AA4C469288D23A700E204C8 /* MineHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineHeader.h; sourceTree = "<group>"; };
 		7AA4C46E288FCEA800E204C8 /* ClassScheduleHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassScheduleHeader.h; sourceTree = "<group>"; };
@@ -4223,8 +4223,8 @@
 		73AAA1A826C918240084E44D /* StampDetails */ = {
 			isa = PBXGroup;
 			children = (
-				770514552D72F8160052942A /* GenericClass */,
 				73AAA1AA26C918240084E44D /* MainPage */,
+				73AAA1C526C918240084E44D /* GenericClass   */,
 			);
 			path = StampDetails;
 			sourceTree = "<group>";
@@ -4288,6 +4288,17 @@
 				73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		73AAA1C526C918240084E44D /* GenericClass   */ = {
+			isa = PBXGroup;
+			children = (
+				73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */,
+				73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */,
+				73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */,
+				73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */,
+			);
+			path = "GenericClass  ";
 			sourceTree = "<group>";
 		};
 		752A03E72B079671003256C1 /* ActivityMessage_module */ = {
@@ -4742,17 +4753,6 @@
 				75F5E32D2C887FFA00D539BA /* ToDoTopNoDeadlineStyleCellForFinder.swift */,
 			);
 			path = TableViewCell;
-			sourceTree = "<group>";
-		};
-		770514552D72F8160052942A /* GenericClass */ = {
-			isa = PBXGroup;
-			children = (
-				770514512D72F8160052942A /* DetailsBaseTableViewCell.h */,
-				770514522D72F8160052942A /* DetailsBaseTableViewCell.m */,
-				770514532D72F8160052942A /* DetailsCustomizeNavigationBar.h */,
-				770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */,
-			);
-			path = GenericClass;
 			sourceTree = "<group>";
 		};
 		7A64BFF22892826F007CCB1E /* Source */ = {
@@ -6468,7 +6468,6 @@
 			buildConfigurationList = 1A9B7693235F50A900725937 /* Build configuration list for PBXNativeTarget "CyxbsMobile2019_iOS" */;
 			buildPhases = (
 				9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */,
-				771FC25E2D6B675F004CD87E /* Compile Compose Multiplatform */,
 				1A9B7663235F50A600725937 /* Sources */,
 				1A9B7664235F50A600725937 /* Frameworks */,
 				1A9B7665235F50A600725937 /* Resources */,
@@ -6645,24 +6644,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		771FC25E2D6B675F004CD87E /* Compile Compose Multiplatform */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Compile Compose Multiplatform";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/../../..\"\nchmod +x ./gradlew  # 确保 gradlew 具有可执行权限\n# 取消下面注释即可开启 Kotlin 多平台\n# ./gradlew :cyxbs-applications:pro:embedAndSignAppleFrameworkForXcode\n";
-		};
 		9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -6830,6 +6811,7 @@
 				7591F1AF2B95D61E001890D2 /* TaskManager.swift in Sources */,
 				B0C9F2332B0126E1006F4286 /* ActivityDatePickerVC.swift in Sources */,
 				AAE3307225E367E400324750 /* MainPageTableViewCell.m in Sources */,
+				73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */,
 				B0F71C982ABC71B200F8B1AC /* PublishPageModel.m in Sources */,
 				187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */,
 				646B199D28313CDB0015DF28 /* StationView.m in Sources */,
@@ -7047,6 +7029,7 @@
 				757729502C85914F00982233 /* ToDoDetailVC.swift in Sources */,
 				1A141322235F521C0001417E /* BaseNavigationController.m in Sources */,
 				B033366E294C971D004D141D /* HttpTool.m in Sources */,
+				73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */,
 				75CC080E2C539B3700810A4E /* TestArrangeViewController.m in Sources */,
 				75F729742C7D8F4B00B36A56 /* TodoSyncTool.m in Sources */,
 				73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */,
@@ -7328,8 +7311,6 @@
 				AA4CD61025EF7E0F002D9394 /* NothingStateView.m in Sources */,
 				DB4065002466D889006CE5BC /* DLHistodyButton.m in Sources */,
 				AA0DDB51286C8B1900802324 /* MineViewController.m in Sources */,
-				770514562D72F8160052942A /* DetailsCustomizeNavigationBar.m in Sources */,
-				770514572D72F8160052942A /* DetailsBaseTableViewCell.m in Sources */,
 				18CDF4BF257F8DBD006E8E5C /* questionAndAnswerModel.m in Sources */,
 				DB4064F62466D889006CE5BC /* DLReminderViewController.m in Sources */,
 				AA86E38B2635B04A00756F05 /* ColorManager.m in Sources */,
