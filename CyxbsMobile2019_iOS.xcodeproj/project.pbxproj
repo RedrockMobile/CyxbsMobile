@@ -1154,8 +1154,6 @@
 		1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSDate+Timestamp.m"; sourceTree = "<group>"; };
 		1AFE534F24F7571300F42A74 /* IntroductionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IntroductionController.h; sourceTree = "<group>"; };
 		1AFE535024F7571300F42A74 /* IntroductionController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IntroductionController.m; sourceTree = "<group>"; };
-		29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
-		3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
 		491DAE5526E207C600693AAA /* CommonQuestionData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CommonQuestionData.h; sourceTree = "<group>"; };
 		491DAE5626E207C600693AAA /* CommonQuestionData.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionData.m; sourceTree = "<group>"; };
 		49252DA826D39CC9003A8A7F /* FeedBackMainPageViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FeedBackMainPageViewController.h; sourceTree = "<group>"; };
@@ -1196,6 +1194,7 @@
 		49A50B6526D83B9600B25DDF /* CommonQuestionDetailVC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionDetailVC.m; sourceTree = "<group>"; };
 		49C2E78126D563AF00AFBE6F /* TypeSelectView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TypeSelectView.h; sourceTree = "<group>"; };
 		49C2E78226D563AF00AFBE6F /* TypeSelectView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TypeSelectView.m; sourceTree = "<group>"; };
+		5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		6464F93226E4F6EE008562C5 /* BuyModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BuyModel.h; sourceTree = "<group>"; };
 		6464F93326E4F6EE008562C5 /* BuyModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BuyModel.m; sourceTree = "<group>"; };
 		6464F98726F4FDB4008562C5 /* ExchangeCenterViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ExchangeCenterViewController.h; sourceTree = "<group>"; };
@@ -1462,11 +1461,12 @@
 		7AA4C4842892217100E204C8 /* MapHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MapHeader.h; sourceTree = "<group>"; };
 		7AA4C48628922F9A00E204C8 /* ToDoHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ToDoHeader.h; sourceTree = "<group>"; };
 		7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineMainPageHeader.h; sourceTree = "<group>"; };
+		7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
 		7FBF39E8257B79F20077494E /* ByWordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByWordViewController.h; sourceTree = "<group>"; };
 		7FBF39E9257B79F20077494E /* ByPasswordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByPasswordViewController.h; sourceTree = "<group>"; };
 		7FBF39EB257B79F20077494E /* ByPasswordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByPasswordViewController.m; sourceTree = "<group>"; };
 		7FBF39EF257B79F30077494E /* ByWordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByWordViewController.m; sourceTree = "<group>"; };
-		8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
+		811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
 		9AB758832CEEEE6600E8258A /* SAAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAAlertController.swift; sourceTree = "<group>"; };
 		9AB758852CEF02EC00E8258A /* NoticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeView.swift; sourceTree = "<group>"; };
 		9AB758872CEF113800E8258A /* NoticeItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeItem.swift; sourceTree = "<group>"; };
@@ -1579,7 +1579,6 @@
 		AAE3308625E3AD5E00324750 /* MainPageNumBtn.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MainPageNumBtn.m; sourceTree = "<group>"; };
 		AAFD87CE24F50DB800CBBD11 /* FakeTabBarView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FakeTabBarView.h; sourceTree = "<group>"; };
 		AAFD87CF24F50DB800CBBD11 /* FakeTabBarView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FakeTabBarView.m; sourceTree = "<group>"; };
-		AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		B00C3C322AF243D60057DDBA /* RemindHUD.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RemindHUD.h; sourceTree = "<group>"; };
 		B00C3C332AF243D60057DDBA /* RemindHUD.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RemindHUD.m; sourceTree = "<group>"; };
 		B01A9E302AB4590C0083C476 /* NetworkManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NetworkManager.h; sourceTree = "<group>"; };
@@ -1866,6 +1865,7 @@
 		EE131C1F2471362E00B6ED97 /* URLController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLController.h; sourceTree = "<group>"; };
 		EE131C202471362E00B6ED97 /* URLController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = URLController.m; sourceTree = "<group>"; };
 		EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bahnschrift.ttf; sourceTree = "<group>"; };
+		F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JudgeArrangeMessage.swift; sourceTree = "<group>"; };
 		FC06D0E52A9DC0EA00A974D8 /* CreateGroupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupModel.swift; sourceTree = "<group>"; };
 		FC06D0EB2A9E636F00A974D8 /* GroupItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupItem.swift; sourceTree = "<group>"; };
@@ -1942,6 +1942,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = QA;
 			sourceTree = "<group>";
 		};
@@ -3601,9 +3603,9 @@
 				1A9B768D235F50A900725937 /* CyxbsMobile2019_iOSUITests */,
 				1476CA1F2AFCD1C000635848 /* CyxbsWidget */,
 				1A9B7668235F50A600725937 /* Products */,
-				31CAD973D4E3B19C047677AE /* Pods */,
 				2CDC888D97D2E7657DB18FB6 /* Frameworks */,
 				AA0DEF682668C7D400284112 /* Introduction */,
+				3FBB4223D1D40C47740825EF /* Pods */,
 			);
 			sourceTree = "<group>";
 		};
@@ -3724,14 +3726,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		31CAD973D4E3B19C047677AE /* Pods */ = {
+		3FBB4223D1D40C47740825EF /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
-				8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
-				29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
-				3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */,
+				5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
+				F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
+				7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
+				811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */,
 			);
+			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -6671,13 +6674,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -6714,13 +6713,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -7460,7 +7455,7 @@
 /* Begin XCBuildConfiguration section */
 		1476CA2F2AFCD1C100635848 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
+			baseConfigurationReference = 7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7501,7 +7496,7 @@
 		};
 		1476CA302AFCD1C100635848 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */;
+			baseConfigurationReference = 811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7656,7 +7651,7 @@
 		};
 		1A9B7694235F50A900725937 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
+			baseConfigurationReference = 5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -7712,7 +7707,7 @@
 		};
 		1A9B7695235F50A900725937 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
+			baseConfigurationReference = F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
