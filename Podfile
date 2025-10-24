@@ -1,7 +1,7 @@
 source 'https://github.com/CocoaPods/specs'
 source 'https://github.com/aliyun/aliyun-specs.git'
 
-platform :ios, '13.0'
+platform :ios, '15.0'
 use_frameworks!
 
 # 是否为模拟器环境，真机/发版请改为 false
