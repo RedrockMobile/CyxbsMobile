@@ -650,12 +650,6 @@
     [RemindHUD.shared showDefaultHUDWithText:@"网络异常" completion:nil];
 }
 
-//跳转至QA
-- (void)jumpToNewQA{
-    self.tabBarController.selectedIndex = 1;
-    [self.navigationController popViewControllerAnimated:NO];
-}
-
 //跳转至发动态界面
 - (void)jumpToReleaseDynamic{
 //    SZHReleaseDynamic *SVC = [[SZHReleaseDynamic alloc]init];
@@ -697,6 +691,12 @@
 - (void)jumpToZhiyuan{
 //    QueryLoginViewController *QVC = [[QueryLoginViewController alloc]init];
 //    [self.navigationController pushViewController:QVC animated:YES];
+}
+
+//跳转至QA
+- (void)jumpToNewQA{
+    NewQuestionVC *QVC = [[NewQuestionVC alloc] init];
+    [self.navigationController pushViewController:QVC animated:YES];
 }
 
 //跳转至个人中心

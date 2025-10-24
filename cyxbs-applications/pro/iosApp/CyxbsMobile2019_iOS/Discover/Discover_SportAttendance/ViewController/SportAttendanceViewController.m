@@ -13,6 +13,7 @@
 #import "DateModle.h"
 #import "RemindHUD.h"
 #import "MJRefresh.h"
+#import "掌上重邮-Swift.h"
 
 @interface SportAttendanceViewController ()<UITableViewDelegate, UITableViewDataSource>
 
@@ -31,12 +32,20 @@
 
 @implementation SportAttendanceViewController
 
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        self.IsLoad = false;
+    }
+    return self;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#FFFFFF"] darkColor:[UIColor colorWithHexString:@"#000000"]];
-    //默认为错误页
-    [self addWrongView];
+    // 默认为成功页
+    [self addSussesView];
     //判断是否假期
     [self judgeHoliday];
     self.IsLoad = false;
@@ -205,7 +214,7 @@
 #pragma mark - Method
 - (void)judgeHoliday {
     //获取当前周数
-    int count = [getNowWeek_NSString.numberValue intValue] ;
+    int count = [SwiftToOC getNowWeek];
     if (count > 19) {
         _Isholiday = true;
     }else{
@@ -298,7 +307,7 @@
     }];
 }
 
-- (void) addNoRunImg{
+- (void)addNoRunImg {
     UIImageView *img = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"人在手机里"]];
     [self.view addSubview:img];
     [img mas_makeConstraints:^(MASConstraintMaker *make) {

@@ -62,11 +62,11 @@ extension HttpManager {
     
     /// 查询同学信息
     @discardableResult
-    func magipoke_text_search_people(stu: String) -> DataRequest {
+    func magipoke_jwzx_search_people(stu: String) -> DataRequest {
         let parameters: [String: Any] = [
             "stu": stu
         ]
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-text/search/people"), parameters: parameters)
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-jwzx/search/people"), parameters: parameters)
     }
     
     /// 获取token
@@ -349,7 +349,7 @@ extension HttpManager {
             "activity_detail": activity_detail
         ]
         return SessionManager.shared.ry_upload(APIConfig.current.api("/magipoke-ufield/activity/publish/"), method: .post, parameters: parameters, fileData: activity_cover_file, withName: "activity_cover_file", fileName: "image.png", mimeType: "image/png")
-
+        
     }
     
     ///获取待审核活动
@@ -372,7 +372,7 @@ extension HttpManager {
         //这个接口奇奇怪怪的，必须将参数拼接到URL里，手动更改编码方式
     }
     
-    ///活动消息
+    /// 活动消息
     func magipoke_ufield_message_list(lower_id: Int?) ->DataRequest {
         let parameters: [String: Any?] = [
             "lower_id": lower_id
@@ -380,7 +380,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/message/list/"), method: .get, parameters: excludeOptionalParameter(parameters))
     }
     
-    ///活动详情
+    /// 活动详情
     func magipoke_ufield_activity(activity_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "activity_id": activity_id
@@ -388,7 +388,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/activity/"), method: .get, parameters: parameters)
     }
     
-    ///已读活动消息
+    /// 已读活动消息
     func magipoke_ufield_action_click(message_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "message_id": message_id
@@ -396,7 +396,7 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/message/action/click/"), method: .put, parameters: parameters, encoding: URLEncoding.queryString)
     }
     
-    ///完成任务接口
+    /// 完成任务接口
     func magipoke_intergral_integral_progress(title: String) -> DataRequest {
         let parameters: [String: Any] = [
             "title": title
@@ -404,10 +404,76 @@ extension HttpManager {
         return SessionManager.shared.ry_upload(APIConfig.current.api("/magipoke-intergral/Integral/progress"), method: .post, parameters: parameters)
     }
     
+    /// 活动&邮子清单联动
     func magipoke_ufield_activity_addTodo(activity_id: Int) -> DataRequest {
         let parameters: [String: Any] = [
             "activity_id": activity_id
         ]
         return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-ufield/activity/addTodo"), method: .put, parameters: parameters, encoding: URLEncoding.queryString)
+    }
+    
+    
+    ///QA板块发布问题
+    func magipoke_qa_publishQuestion(q: String, tags: String) -> DataRequest {
+        let parameters: [String: Any] = [
+            "q": q,
+            "tags": tags
+        ]
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/publish"), method: .post, parameters: parameters, encoding: JSONEncoding())
+    }
+    
+    ///QA板块列出问题
+    func magipoke_qa_listQuestion(tags: String, page: Int? = nil, page_size: Int? = nil) -> DataRequest{
+        var parameters : [String: Any] = [
+            "tags": tags
+        ]
+        
+        if let page = page {
+            parameters["page"] = page
+        }
+        
+        if let page_size = page_size{
+            parameters["page_size"] = page_size
+        }
+        
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/list"), method: .post, parameters: parameters, encoding: URLEncoding.httpBody)
+    }
+    
+    ///QA请求问题详情
+    func magipoke_qa_getDetail(identifier: Int) -> DataRequest {
+        let urlString = APIConfig.current.api("/magipoke-qa/api/v1/mobile/detail?id=\(identifier)")
+        return SessionManager.shared.ry_request(
+            urlString,
+            method: .get
+        )
+    }
+    
+    ///QA点赞
+    func magipoke_qa_like(id: Int) -> DataRequest{
+        let urlString = APIConfig.current.api("/magipoke-qa/api/v1/mobile/like?id=\(id)")
+        return SessionManager.shared.ry_request(
+            urlString,
+            method: .post
+        )
+    }
+    
+    ///QA取消点赞
+    func magipoke_qa_unlike(id: Int) -> DataRequest{
+        let urlString = APIConfig.current.api("/magipoke-qa/api/v1/mobile/unlike?id=\(id)")
+        return SessionManager.shared.ry_request(
+            urlString,
+            method: .post
+        )
+    }
+    
+    ///QA搜索
+    func magipoke_qa_search(q: String) -> DataRequest{
+        let parameters : [String: Any] = ["q": q]
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-qa/api/v1/mobile/search"), method: .post, parameters: parameters, encoding: URLEncoding.queryString)
+    }
+    
+    /// 体育打卡信息说明
+    func magipoke_sport_notice() -> DataRequest {
+        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-sport/notice"), method: .get)
     }
 }

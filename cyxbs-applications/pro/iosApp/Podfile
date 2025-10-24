@@ -16,7 +16,7 @@ target 'CyxbsMobile2019_iOS' do
   pod 'ProgressHUD',      '13.7.2'  # 进度指示器库
   pod 'TZImagePickerController'  # 图片选择器库
   pod 'YBImageBrowser'  # 图片浏览器库
-  pod 'NudeIn'  # 图片隐私处理库
+  pod 'NudeIn'  # 基于UITextView的富文本控件
   pod 'SDWebImage'  # 异步加载网络图片库
   pod 'AFNetworking'  # 网络请求库
   pod 'FMDB'  # SQLite数据库封装库
