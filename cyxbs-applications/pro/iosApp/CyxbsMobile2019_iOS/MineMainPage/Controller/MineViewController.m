@@ -476,7 +476,8 @@
     [CheckInModel CheckInSucceeded:^{
         [self.signView setSignBtnEnable:NO];
         [self.signView setSignDay:[UserItemTool defaultItem].checkInDay];
-        [RemindHUD.shared showDefaultHUDWithText:@"签到成功，邮票+10" completion:nil];
+        CheckInModel *checkInModel = [[CheckInModel alloc] init];
+        [RemindHUD.shared showDefaultHUDWithText:[NSString stringWithFormat:@"签到成功，邮票+%ld",checkInModel.CheckInStampsCalculate] completion:nil];
     } Failed:^(NSError * _Nonnull err) {
         [RemindHUD.shared showDefaultHUDWithText:@"签到失败" completion:nil];
     }];
