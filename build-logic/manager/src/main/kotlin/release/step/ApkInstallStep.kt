@@ -16,9 +16,6 @@ class ApkInstallStep(val project: Project) {
   fun execute(apk: File): Boolean {
     println("\n======================== 安装检查 ========================".purple())
 
-    if (!checkDevices()) {
-      return false
-    }
     if (!installApk(apk)) {
       return false
     }
@@ -30,51 +27,15 @@ class ApkInstallStep(val project: Project) {
 
   private val adb = project.localProperties["sdk.dir"].toString() + File.separator + "platform-tools" + File.separator + "adb"
 
-  private fun checkDevices(): Boolean {
-    while (true) {
-      val execResult = runCatching {
-        project.providers.exec {
-          commandLine(adb, "devices")
-          isIgnoreExitValue = true
-        }
-      }.onFailure {
-        it.printStackTrace()
-      }.getOrNull()
-      if (execResult?.result?.get()?.exitValue == 0) {
-        val lines = execResult.standardOutput.toString().lines()
-        val deviceLines = lines.filter {
-          it.isNotBlank() && !it.startsWith("List of devices") && it.contains("\t")
-        }
-        if (deviceLines.isNotEmpty()) {
-          println("已连接设备如下: ")
-          deviceLines.forEach {
-            println(it)
-          }
-        }
-        if (deviceLines.all { !it.endsWith("\tdevice") }) {
-          println("❌ 未检测到任何可用设备连接，请连接安卓设备以进行发版前的安装检查".red())
-          Thread.sleep(2000)
-        } else {
-          break
-        }
-      } else {
-        println("❌ adb 异常: ${execResult?.standardError}".red())
-        println("❌ 请确保已正确配置 adb 环境变量".red())
-        println("❌ 如果终端有 adb 命令，则可能是 AS 抽风了，重启一下".red())
-        return false
-      }
-    }
-    return true
-  }
-
   private fun installApk(apk: File): Boolean {
     while (true) {
       val installResult = project.providers.exec {
         // adb install 安装
         commandLine(adb, "install", "-r", apk)
         isIgnoreExitValue = true
-      }.result.get()
-      if (installResult.exitValue != 0) {
+      }
+      if (installResult.result.get().exitValue != 0) {
+        println(installResult.standardError.asText.get())
         println("❌ 安装失败，请检查设备是否正常连接".red())
         println()
         val sc = Scanner(System.`in`)

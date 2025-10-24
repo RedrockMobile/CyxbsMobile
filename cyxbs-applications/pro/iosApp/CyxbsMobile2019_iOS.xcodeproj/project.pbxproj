@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 55;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -160,6 +160,7 @@
 		14FFFC082AF8C0FD005A7EBD /* TabBarPresentationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */; };
 		14FFFC092AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */; };
 		14FFFC0A2AF8C0FD005A7EBD /* TabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */; };
+		1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1851CEE12E53541300356C1A /* QAImage.xcassets */; };
 		187DF4BA260310DD000BCDE9 /* LYEmptyBaseView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */; };
 		187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B2260310DD000BCDE9 /* UIScrollView+Empty.m */; };
 		187DF4BD260310DD000BCDE9 /* LYEmptyView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B6260310DD000BCDE9 /* LYEmptyView.m */; };
@@ -334,6 +335,8 @@
 		73AAA1D326C918250084E44D /* PurchaseinfoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1BE26C918240084E44D /* PurchaseinfoViewController.m */; };
 		73AAA1D426C918250084E44D /* PurchaseInfoGoodsInfoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C126C918240084E44D /* PurchaseInfoGoodsInfoView.m */; };
 		73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */; };
+		73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */; };
+		73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */; };
 		752A03EC2B0796C1003256C1 /* ActivityMessageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */; };
 		752A03EE2B0796CF003256C1 /* ActivityMessageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */; };
 		752A03F02B0796D9003256C1 /* ActivityMessageVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */; };
@@ -435,10 +438,11 @@
 		75F729732C7D8F4B00B36A56 /* TodoDataModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 75F729702C7D8F4B00B36A56 /* TodoDataModel.m */; };
 		75F729742C7D8F4B00B36A56 /* TodoSyncTool.m in Sources */ = {isa = PBXBuildFile; fileRef = 75F729712C7D8F4B00B36A56 /* TodoSyncTool.m */; };
 		75FD5F692BC5514500D8302D /* CustomNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FD5F672BC5514500D8302D /* CustomNavigationController.swift */; };
-		770514562D72F8160052942A /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */; };
-		770514572D72F8160052942A /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 770514522D72F8160052942A /* DetailsBaseTableViewCell.m */; };
 		7FBF39F4257B79F30077494E /* ByPasswordViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FBF39EB257B79F20077494E /* ByPasswordViewController.m */; };
 		7FBF39F6257B79F30077494E /* ByWordViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FBF39EF257B79F30077494E /* ByWordViewController.m */; };
+		9AB758842CEEEE6600E8258A /* SAAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB758832CEEEE6600E8258A /* SAAlertController.swift */; };
+		9AB758862CEF02EC00E8258A /* NoticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB758852CEF02EC00E8258A /* NoticeView.swift */; };
+		9AB758882CEF113800E8258A /* NoticeItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB758872CEF113800E8258A /* NoticeItem.swift */; };
 		9AEC13522CA9062300486D26 /* XBSAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEC13512CA9062300486D26 /* XBSAlertController.swift */; };
 		9AEC13542CA9396D00486D26 /* ToDoAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEC13532CA9396D00486D26 /* ToDoAlertController.swift */; };
 		AA0DD8FB286C50E500802324 /* MineMsgCntView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DD8FA286C50E400802324 /* MineMsgCntView.m */; };
@@ -936,6 +940,7 @@
 		14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarPresentationViewController.swift; sourceTree = "<group>"; };
 		14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UITabBarItem+TabBar.swift"; sourceTree = "<group>"; };
 		14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
+		1851CEE12E53541300356C1A /* QAImage.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = QAImage.xcassets; sourceTree = "<group>"; };
 		187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LYEmptyBaseView.m; sourceTree = "<group>"; };
 		187DF4B0260310DD000BCDE9 /* LYEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LYEmptyView.h; sourceTree = "<group>"; };
 		187DF4B1260310DD000BCDE9 /* FTEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FTEmptyView.h; sourceTree = "<group>"; };
@@ -1149,8 +1154,6 @@
 		1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSDate+Timestamp.m"; sourceTree = "<group>"; };
 		1AFE534F24F7571300F42A74 /* IntroductionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IntroductionController.h; sourceTree = "<group>"; };
 		1AFE535024F7571300F42A74 /* IntroductionController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IntroductionController.m; sourceTree = "<group>"; };
-		29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
-		3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
 		491DAE5526E207C600693AAA /* CommonQuestionData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CommonQuestionData.h; sourceTree = "<group>"; };
 		491DAE5626E207C600693AAA /* CommonQuestionData.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionData.m; sourceTree = "<group>"; };
 		49252DA826D39CC9003A8A7F /* FeedBackMainPageViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FeedBackMainPageViewController.h; sourceTree = "<group>"; };
@@ -1191,6 +1194,7 @@
 		49A50B6526D83B9600B25DDF /* CommonQuestionDetailVC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionDetailVC.m; sourceTree = "<group>"; };
 		49C2E78126D563AF00AFBE6F /* TypeSelectView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TypeSelectView.h; sourceTree = "<group>"; };
 		49C2E78226D563AF00AFBE6F /* TypeSelectView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TypeSelectView.m; sourceTree = "<group>"; };
+		5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		6464F93226E4F6EE008562C5 /* BuyModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BuyModel.h; sourceTree = "<group>"; };
 		6464F93326E4F6EE008562C5 /* BuyModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BuyModel.m; sourceTree = "<group>"; };
 		6464F98726F4FDB4008562C5 /* ExchangeCenterViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ExchangeCenterViewController.h; sourceTree = "<group>"; };
@@ -1280,6 +1284,10 @@
 		73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PurchaseInfoOrderIDView.m; sourceTree = "<group>"; };
 		73AAA1C326C918240084E44D /* PurchaseInfoOrderIDView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoOrderIDView.h; sourceTree = "<group>"; };
 		73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoGoodsInfoView.h; sourceTree = "<group>"; };
+		73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
+		73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
+		73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
+		73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
 		752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageModel.swift; sourceTree = "<group>"; };
 		752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageCell.swift; sourceTree = "<group>"; };
 		752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageVC.swift; sourceTree = "<group>"; };
@@ -1441,10 +1449,6 @@
 		75F729712C7D8F4B00B36A56 /* TodoSyncTool.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TodoSyncTool.m; sourceTree = "<group>"; };
 		75F729722C7D8F4B00B36A56 /* TodoDataModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TodoDataModel.h; sourceTree = "<group>"; };
 		75FD5F672BC5514500D8302D /* CustomNavigationController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CustomNavigationController.swift; sourceTree = "<group>"; };
-		770514512D72F8160052942A /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
-		770514522D72F8160052942A /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
-		770514532D72F8160052942A /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
-		770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
 		7A64BFF32892826F007CCB1E /* NewQAHeader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NewQAHeader.h; sourceTree = "<group>"; };
 		7AA4C469288D23A700E204C8 /* MineHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineHeader.h; sourceTree = "<group>"; };
 		7AA4C46E288FCEA800E204C8 /* ClassScheduleHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassScheduleHeader.h; sourceTree = "<group>"; };
@@ -1457,11 +1461,15 @@
 		7AA4C4842892217100E204C8 /* MapHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MapHeader.h; sourceTree = "<group>"; };
 		7AA4C48628922F9A00E204C8 /* ToDoHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ToDoHeader.h; sourceTree = "<group>"; };
 		7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineMainPageHeader.h; sourceTree = "<group>"; };
+		7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
 		7FBF39E8257B79F20077494E /* ByWordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByWordViewController.h; sourceTree = "<group>"; };
 		7FBF39E9257B79F20077494E /* ByPasswordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByPasswordViewController.h; sourceTree = "<group>"; };
 		7FBF39EB257B79F20077494E /* ByPasswordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByPasswordViewController.m; sourceTree = "<group>"; };
 		7FBF39EF257B79F30077494E /* ByWordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByWordViewController.m; sourceTree = "<group>"; };
-		8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
+		811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
+		9AB758832CEEEE6600E8258A /* SAAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAAlertController.swift; sourceTree = "<group>"; };
+		9AB758852CEF02EC00E8258A /* NoticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeView.swift; sourceTree = "<group>"; };
+		9AB758872CEF113800E8258A /* NoticeItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeItem.swift; sourceTree = "<group>"; };
 		9AEC13512CA9062300486D26 /* XBSAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBSAlertController.swift; sourceTree = "<group>"; };
 		9AEC13532CA9396D00486D26 /* ToDoAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToDoAlertController.swift; sourceTree = "<group>"; };
 		AA0DD8F9286C50E400802324 /* MineMsgCntView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MineMsgCntView.h; sourceTree = "<group>"; };
@@ -1571,7 +1579,6 @@
 		AAE3308625E3AD5E00324750 /* MainPageNumBtn.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MainPageNumBtn.m; sourceTree = "<group>"; };
 		AAFD87CE24F50DB800CBBD11 /* FakeTabBarView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FakeTabBarView.h; sourceTree = "<group>"; };
 		AAFD87CF24F50DB800CBBD11 /* FakeTabBarView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FakeTabBarView.m; sourceTree = "<group>"; };
-		AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		B00C3C322AF243D60057DDBA /* RemindHUD.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RemindHUD.h; sourceTree = "<group>"; };
 		B00C3C332AF243D60057DDBA /* RemindHUD.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RemindHUD.m; sourceTree = "<group>"; };
 		B01A9E302AB4590C0083C476 /* NetworkManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NetworkManager.h; sourceTree = "<group>"; };
@@ -1858,6 +1865,7 @@
 		EE131C1F2471362E00B6ED97 /* URLController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLController.h; sourceTree = "<group>"; };
 		EE131C202471362E00B6ED97 /* URLController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = URLController.m; sourceTree = "<group>"; };
 		EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bahnschrift.ttf; sourceTree = "<group>"; };
+		F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JudgeArrangeMessage.swift; sourceTree = "<group>"; };
 		FC06D0E52A9DC0EA00A974D8 /* CreateGroupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupModel.swift; sourceTree = "<group>"; };
 		FC06D0EB2A9E636F00A974D8 /* GroupItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupItem.swift; sourceTree = "<group>"; };
@@ -1930,6 +1938,16 @@
 		FEBA676227E9BAC000C4D231 /* updatePopView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = updatePopView.h; sourceTree = "<group>"; };
 		FEBA676327E9BAC000C4D231 /* updatePopView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = updatePopView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = QA;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1476CA172AFCD1C000635848 /* Frameworks */ = {
@@ -3585,9 +3603,9 @@
 				1A9B768D235F50A900725937 /* CyxbsMobile2019_iOSUITests */,
 				1476CA1F2AFCD1C000635848 /* CyxbsWidget */,
 				1A9B7668235F50A600725937 /* Products */,
-				31CAD973D4E3B19C047677AE /* Pods */,
 				2CDC888D97D2E7657DB18FB6 /* Frameworks */,
 				AA0DEF682668C7D400284112 /* Introduction */,
+				3FBB4223D1D40C47740825EF /* Pods */,
 			);
 			sourceTree = "<group>";
 		};
@@ -3627,6 +3645,7 @@
 				AA4496F7260625B5004B4E1A /* PrefixHeader.pch */,
 				14F6F4FC2AFB81B9007C7CA6 /* LaunchScreen.storyboard */,
 				14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */,
+				1851CEE12E53541300356C1A /* QAImage.xcassets */,
 				B0C9F24B2B01270A006F4286 /* CyxbsMobileImage.xcassets */,
 			);
 			path = CyxbsMobile2019_iOS;
@@ -3707,14 +3726,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		31CAD973D4E3B19C047677AE /* Pods */ = {
+		3FBB4223D1D40C47740825EF /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
-				8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
-				29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
-				3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */,
+				5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
+				F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
+				7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
+				811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */,
 			);
+			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -4203,8 +4223,8 @@
 		73AAA1A826C918240084E44D /* StampDetails */ = {
 			isa = PBXGroup;
 			children = (
-				770514552D72F8160052942A /* GenericClass */,
 				73AAA1AA26C918240084E44D /* MainPage */,
+				73AAA1C526C918240084E44D /* GenericClass   */,
 			);
 			path = StampDetails;
 			sourceTree = "<group>";
@@ -4268,6 +4288,17 @@
 				73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		73AAA1C526C918240084E44D /* GenericClass   */ = {
+			isa = PBXGroup;
+			children = (
+				73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */,
+				73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */,
+				73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */,
+				73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */,
+			);
+			path = "GenericClass  ";
 			sourceTree = "<group>";
 		};
 		752A03E72B079671003256C1 /* ActivityMessage_module */ = {
@@ -4344,6 +4375,7 @@
 		7551F9A92C6549B30072CA88 /* Discover_SportAttendanceForMainPage */ = {
 			isa = PBXGroup;
 			children = (
+				9AB758822CEEEE4900E8258A /* Alert */,
 				7551F9A22C6549B30072CA88 /* Controller */,
 				7551F9A52C6549B30072CA88 /* PopUpController */,
 				7551F9A82C6549B30072CA88 /* View */,
@@ -4723,17 +4755,6 @@
 			path = TableViewCell;
 			sourceTree = "<group>";
 		};
-		770514552D72F8160052942A /* GenericClass */ = {
-			isa = PBXGroup;
-			children = (
-				770514512D72F8160052942A /* DetailsBaseTableViewCell.h */,
-				770514522D72F8160052942A /* DetailsBaseTableViewCell.m */,
-				770514532D72F8160052942A /* DetailsCustomizeNavigationBar.h */,
-				770514542D72F8160052942A /* DetailsCustomizeNavigationBar.m */,
-			);
-			path = GenericClass;
-			sourceTree = "<group>";
-		};
 		7A64BFF22892826F007CCB1E /* Source */ = {
 			isa = PBXGroup;
 			children = (
@@ -4784,6 +4805,16 @@
 				7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */,
 			);
 			path = Source;
+			sourceTree = "<group>";
+		};
+		9AB758822CEEEE4900E8258A /* Alert */ = {
+			isa = PBXGroup;
+			children = (
+				9AB758832CEEEE6600E8258A /* SAAlertController.swift */,
+				9AB758852CEF02EC00E8258A /* NoticeView.swift */,
+				9AB758872CEF113800E8258A /* NoticeItem.swift */,
+			);
+			path = Alert;
 			sourceTree = "<group>";
 		};
 		AA0DDAC8286C8B1900802324 /* MineMainPage */ = {
@@ -5853,6 +5884,7 @@
 		B5B454FC29C0C09F00875DF7 /* Center */ = {
 			isa = PBXGroup;
 			children = (
+				187D2C3E2E4D7EDD00D8B45C /* QA */,
 				B0C9F1F82B0126E1006F4286 /* Activity */,
 				B0F71C342ABC71B200F8B1AC /* Attitude */,
 				14F6F53E2AFB8CDA007C7CA6 /* Carnie */,
@@ -6436,7 +6468,6 @@
 			buildConfigurationList = 1A9B7693235F50A900725937 /* Build configuration list for PBXNativeTarget "CyxbsMobile2019_iOS" */;
 			buildPhases = (
 				9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */,
-				771FC25E2D6B675F004CD87E /* Compile Compose Multiplatform */,
 				1A9B7663235F50A600725937 /* Sources */,
 				1A9B7664235F50A600725937 /* Frameworks */,
 				1A9B7665235F50A600725937 /* Resources */,
@@ -6448,6 +6479,9 @@
 			);
 			dependencies = (
 				1476CA2C2AFCD1C100635848 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				187D2C3E2E4D7EDD00D8B45C /* QA */,
 			);
 			name = CyxbsMobile2019_iOS;
 			productName = CyxbsMobile2019_iOS;
@@ -6531,7 +6565,6 @@
 				};
 			};
 			buildConfigurationList = 1A9B7662235F50A600725937 /* Build configuration list for PBXProject "CyxbsMobile2019_iOS" */;
-			compatibilityVersion = "Xcode 13.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -6543,6 +6576,7 @@
 				"tz-RU",
 			);
 			mainGroup = 1A9B765E235F50A600725937;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 1A9B7668235F50A600725937 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -6585,6 +6619,7 @@
 				DB34EB27239BD4550052B65E /* AddRemindViewController.xib in Resources */,
 				B0C9F24C2B01270A006F4286 /* CyxbsMobileImage.xcassets in Resources */,
 				DB34EB2B239BD4550052B65E /* RemindTableViewCell.xib in Resources */,
+				1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */,
 				492C19AE26CE458000C485D9 /* Bauhaus-93.ttf in Resources */,
 				B047BF8A2AB3240F00616A5B /* AliyunEmasServices-Info.plist in Resources */,
 				AA0DEF6A2668C88D00284112 /* 掌邮工具类.md in Resources */,
@@ -6609,24 +6644,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		771FC25E2D6B675F004CD87E /* Compile Compose Multiplatform */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Compile Compose Multiplatform";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/../../..\"\nchmod +x ./gradlew  # 确保 gradlew 具有可执行权限\n./gradlew :cyxbs-applications:pro:embedAndSignAppleFrameworkForXcode\n";
-		};
 		9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -6794,6 +6811,7 @@
 				7591F1AF2B95D61E001890D2 /* TaskManager.swift in Sources */,
 				B0C9F2332B0126E1006F4286 /* ActivityDatePickerVC.swift in Sources */,
 				AAE3307225E367E400324750 /* MainPageTableViewCell.m in Sources */,
+				73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */,
 				B0F71C982ABC71B200F8B1AC /* PublishPageModel.m in Sources */,
 				187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */,
 				646B199D28313CDB0015DF28 /* StationView.m in Sources */,
@@ -6849,6 +6867,7 @@
 				757729682C85916E00982233 /* ToDoTableViewCell.swift in Sources */,
 				FC4B3BD02A8766F2003336C8 /* WeDateTopView.swift in Sources */,
 				14B73F8B2823577600D08ADD /* SSRButton.m in Sources */,
+				9AB758862CEF02EC00E8258A /* NoticeView.swift in Sources */,
 				75CC08082C539B3700810A4E /* ExamArrangeModel.m in Sources */,
 				7551F9AA2C6549B30072CA88 /* DiscoverSAVC.m in Sources */,
 				DB34EACF239BD4550052B65E /* WYCClassAndRemindDataModel.m in Sources */,
@@ -7010,6 +7029,7 @@
 				757729502C85914F00982233 /* ToDoDetailVC.swift in Sources */,
 				1A141322235F521C0001417E /* BaseNavigationController.m in Sources */,
 				B033366E294C971D004D141D /* HttpTool.m in Sources */,
+				73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */,
 				75CC080E2C539B3700810A4E /* TestArrangeViewController.m in Sources */,
 				75F729742C7D8F4B00B36A56 /* TodoSyncTool.m in Sources */,
 				73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */,
@@ -7072,6 +7092,7 @@
 				FC52790A2AAC490F00B09685 /* GroupSearchResultTableViewCell.swift in Sources */,
 				FC9E3A992AB6D2F200E3C65F /* WeDateCourseScheduleVC.swift in Sources */,
 				73AAA1D026C918250084E44D /* DetailsTaskTableViewCell.m in Sources */,
+				9AB758842CEEEE6600E8258A /* SAAlertController.swift in Sources */,
 				B0F71C962ABC71B200F8B1AC /* ExpressDetailCell.m in Sources */,
 				14F6F55A2AFB8CDB007C7CA6 /* ScheduleCustomEditView.swift in Sources */,
 				FC7EC7C22AA9000E009FC098 /* ChooseGroupVC.swift in Sources */,
@@ -7224,6 +7245,7 @@
 				735BC53526D392D400F22678 /* FeedBackTableViewCell.m in Sources */,
 				FC52790F2AACB8D200B09685 /* RepeatNameVC.swift in Sources */,
 				14FFFBE72AF8C0F3005A7EBD /* ConstantsMain.swift in Sources */,
+				9AB758882CEF113800E8258A /* NoticeItem.swift in Sources */,
 				D0101F64243587A1004337ED /* GKPhotoBrowser.m in Sources */,
 				7577295C2C85915E00982233 /* ToDoTopView.swift in Sources */,
 				75CC08412C5657AA00810A4E /* SCChart.m in Sources */,
@@ -7289,8 +7311,6 @@
 				AA4CD61025EF7E0F002D9394 /* NothingStateView.m in Sources */,
 				DB4065002466D889006CE5BC /* DLHistodyButton.m in Sources */,
 				AA0DDB51286C8B1900802324 /* MineViewController.m in Sources */,
-				770514562D72F8160052942A /* DetailsCustomizeNavigationBar.m in Sources */,
-				770514572D72F8160052942A /* DetailsBaseTableViewCell.m in Sources */,
 				18CDF4BF257F8DBD006E8E5C /* questionAndAnswerModel.m in Sources */,
 				DB4064F62466D889006CE5BC /* DLReminderViewController.m in Sources */,
 				AA86E38B2635B04A00756F05 /* ColorManager.m in Sources */,
@@ -7435,7 +7455,7 @@
 /* Begin XCBuildConfiguration section */
 		1476CA2F2AFCD1C100635848 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 29E6C8304DE9F06A1B859D75 /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
+			baseConfigurationReference = 7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7454,7 +7474,7 @@
 				INFOPLIST_FILE = CyxbsWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CyxbsWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2023 Redrock. All rights reserved.";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -7476,7 +7496,7 @@
 		};
 		1476CA302AFCD1C100635848 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3A6EE456968066B325CFA50B /* Pods-CyxbsWidgetExtension.release.xcconfig */;
+			baseConfigurationReference = 811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7494,7 +7514,7 @@
 				INFOPLIST_FILE = CyxbsWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CyxbsWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2023 Redrock. All rights reserved.";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -7631,7 +7651,7 @@
 		};
 		1A9B7694235F50A900725937 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AE9B2A72E2CE641D87ABF235 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
+			baseConfigurationReference = 5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -7639,7 +7659,7 @@
 				CODE_SIGN_ENTITLEMENTS = "CyxbsMobile2019_iOS/掌上重邮.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 727CVV9PLJ;
 				EXCLUDED_ARCHS = "";
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "arm64 $(inherited)";
@@ -7664,12 +7684,12 @@
 				GCC_PREFIX_HEADER = "$(SRCROOT)/CyxbsMobile2019_iOS/PrefixHeader.pch";
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				INFOPLIST_FILE = CyxbsMobile2019_iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 6.5.2;
+				MARKETING_VERSION = 6.6.3;
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited) -D DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mredrock.cyxbs;
@@ -7687,14 +7707,14 @@
 		};
 		1A9B7695235F50A900725937 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8C1447906DC7EB77D1BE49BD /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
+			baseConfigurationReference = F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = "CyxbsMobile2019_iOS/掌上重邮.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 727CVV9PLJ;
 				EXCLUDED_ARCHS = "";
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "arm64 $(inherited)";
@@ -7745,12 +7765,12 @@
 					"\"${PODS_ROOT}/Bugly\"",
 				);
 				INFOPLIST_FILE = CyxbsMobile2019_iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 6.5.2;
+				MARKETING_VERSION = 6.6.3;
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mredrock.cyxbs;
 				PRODUCT_NAME = "掌上重邮";
@@ -7773,7 +7793,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = D67VC378K4;
 				INFOPLIST_FILE = CyxbsMobile2019_iOSTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -7798,7 +7818,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = D67VC378K4;
 				INFOPLIST_FILE = CyxbsMobile2019_iOSTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -7820,6 +7840,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = D67VC378K4;
 				INFOPLIST_FILE = CyxbsMobile2019_iOSUITests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -7839,6 +7860,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = D67VC378K4;
 				INFOPLIST_FILE = CyxbsMobile2019_iOSUITests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

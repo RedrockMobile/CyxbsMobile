@@ -18,7 +18,7 @@
 #define ClassSchedule_POST_emptyClass_API [CyxbsMobileBaseURL_1 stringByAppendingString:@"magipoke-jwzx/roomEmpty"]
 
 /// 同学课表之查找同学，GET，参数：@{@"stu"]: 用来搜索的数据}
-#define ClassSchedule_GET_searchPeople_API  [CyxbsMobileBaseURL_1 stringByAppendingString:@"magipoke-text/search/people"]
+#define ClassSchedule_GET_searchPeople_API  [CyxbsMobileBaseURL_1 stringByAppendingString:@"magipoke-jwzx/search/people"]
 
 /// 查找老师，POST，参数：@{@"teaName"]: 用来搜索的数据}
 #define ClassSchedule_POST_searchTeacher_API [CyxbsMobileBaseURL_1 stringByAppendingString:@"magipoke-teakb/api/teaSearch"]

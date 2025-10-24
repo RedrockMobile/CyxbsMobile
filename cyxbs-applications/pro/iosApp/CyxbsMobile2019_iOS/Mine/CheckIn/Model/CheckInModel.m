@@ -62,5 +62,27 @@
     }];
 }
 
+- (NSInteger)CheckInStampsCalculate {
+    // 计算今天
+    NSInteger today;
+    if ([NSDate date].weekday == 1) {
+        today = 7;
+    } else {
+        today = [NSDate date].weekday - 1;
+    }
+    // 计算签到可获得邮票
+    NSInteger checkInDays = [UserItemTool defaultItem].checkInDay.integerValue;
+    NSInteger integral = 0;
+    // 签到天数大于星期数
+    if (checkInDays > today) {
+        integral = 10 + today * 5 - 5;
+    } else {
+        integral = 10 + checkInDays * 5 - 5;
+    }
+    if (integral > 30) {
+        integral = 30;
+    }
+    return integral;
+}
 
 @end

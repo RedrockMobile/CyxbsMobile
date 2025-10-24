@@ -54,7 +54,8 @@
         @"使用一次没课约": @"jumpToWeDate",
         @"在表态广场完成一次表态": @"jumpToProfile",
         @"今日打卡": @"checkInToday",
-        @"参加一次活动": @"jumpToActivity"
+        @"参加一次活动": @"jumpToActivity",
+        @"提一个问题": @"jumpToNewQA"
     };
     NSString *notificationName = targetToNotification[sender.target];
     if (notificationName) {

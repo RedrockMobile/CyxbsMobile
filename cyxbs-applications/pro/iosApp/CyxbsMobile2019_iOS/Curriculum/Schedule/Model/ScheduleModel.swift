@@ -32,7 +32,6 @@ extension ScheduleModel {
 
 struct ScheduleModel: Codable {
     
-    // 学号
     var sno: String
     
     var customType: CustomType = .system
@@ -138,7 +137,7 @@ extension ScheduleModel {
         
         que.async {
             
-            HttpManager.shared.magipoke_text_search_people(stu: sno).ry_JSON { response in
+            HttpManager.shared.magipoke_jwzx_search_people(stu: sno).ry_JSON { response in
                 if case let .success(model) = response, let ary = model["data"].array?.map(SearchStudentModel.init) {
                     scheduleModel.student = ary.first
                 }
@@ -196,15 +195,14 @@ extension ScheduleModel {
         let semaphore = DispatchSemaphore(value: 0)
         
         que.async {
-            // 搜索当前学生信息
-            HttpManager.shared.magipoke_text_search_people(stu: UserModel.default.token?.stuNum ?? "").ry_JSON { response in
+            
+            HttpManager.shared.magipoke_jwzx_search_people(stu: UserModel.default.token?.stuNum ?? "").ry_JSON { response in
                 if case let .success(model) = response, let ary = model["data"].array?.map(SearchStudentModel.init) {
                     scheduleModel.student = ary.first
                 }
                 semaphore.signal()
             }
             
-            // 请求事务
             HttpManager.shared.magipoke_reminder_Person_getTransaction().ry_JSON { response in
                 if case .success(let model) = response {
                     scheduleModel.sno = model["stuNum"].stringValue

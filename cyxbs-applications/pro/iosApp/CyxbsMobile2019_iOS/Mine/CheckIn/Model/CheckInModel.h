@@ -16,6 +16,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (void)requestCheckInInfoSucceeded:(void (^ _Nullable)(void))succeeded Failed:(void (^ _Nullable)(NSError * _Nullable))failed;
 
+- (NSInteger)CheckInStampsCalculate;
+
 @end
 
 NS_ASSUME_NONNULL_END
