@@ -7,7 +7,6 @@ import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
