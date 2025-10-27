@@ -160,6 +160,8 @@
 		14FFFC082AF8C0FD005A7EBD /* TabBarPresentationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */; };
 		14FFFC092AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */; };
 		14FFFC0A2AF8C0FD005A7EBD /* TabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */; };
+		1849D8B62EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 1849D8B22EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m */; };
+		1849D8B72EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 1849D8B42EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m */; };
 		1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1851CEE12E53541300356C1A /* QAImage.xcassets */; };
 		187DF4BA260310DD000BCDE9 /* LYEmptyBaseView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */; };
 		187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B2260310DD000BCDE9 /* UIScrollView+Empty.m */; };
@@ -335,8 +337,6 @@
 		73AAA1D326C918250084E44D /* PurchaseinfoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1BE26C918240084E44D /* PurchaseinfoViewController.m */; };
 		73AAA1D426C918250084E44D /* PurchaseInfoGoodsInfoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C126C918240084E44D /* PurchaseInfoGoodsInfoView.m */; };
 		73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */; };
-		73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */; };
-		73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */; };
 		752A03EC2B0796C1003256C1 /* ActivityMessageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */; };
 		752A03EE2B0796CF003256C1 /* ActivityMessageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */; };
 		752A03F02B0796D9003256C1 /* ActivityMessageVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */; };
@@ -940,6 +940,10 @@
 		14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarPresentationViewController.swift; sourceTree = "<group>"; };
 		14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UITabBarItem+TabBar.swift"; sourceTree = "<group>"; };
 		14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
+		1849D8B12EAF4E4700DBFD72 /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
+		1849D8B22EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
+		1849D8B32EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
+		1849D8B42EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
 		1851CEE12E53541300356C1A /* QAImage.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = QAImage.xcassets; sourceTree = "<group>"; };
 		187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LYEmptyBaseView.m; sourceTree = "<group>"; };
 		187DF4B0260310DD000BCDE9 /* LYEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LYEmptyView.h; sourceTree = "<group>"; };
@@ -1284,10 +1288,6 @@
 		73AAA1C226C918240084E44D /* PurchaseInfoOrderIDView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PurchaseInfoOrderIDView.m; sourceTree = "<group>"; };
 		73AAA1C326C918240084E44D /* PurchaseInfoOrderIDView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoOrderIDView.h; sourceTree = "<group>"; };
 		73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PurchaseInfoGoodsInfoView.h; sourceTree = "<group>"; };
-		73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
-		73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
-		73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
-		73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
 		752A03EB2B0796C1003256C1 /* ActivityMessageModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageModel.swift; sourceTree = "<group>"; };
 		752A03ED2B0796CF003256C1 /* ActivityMessageCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageCell.swift; sourceTree = "<group>"; };
 		752A03EF2B0796D9003256C1 /* ActivityMessageVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActivityMessageVC.swift; sourceTree = "<group>"; };
@@ -1942,8 +1942,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = QA;
 			sourceTree = "<group>";
 		};
@@ -3018,6 +3016,17 @@
 			path = NewQA;
 			sourceTree = "<group>";
 		};
+		1849D8B52EAF4E4700DBFD72 /* GenericClass */ = {
+			isa = PBXGroup;
+			children = (
+				1849D8B12EAF4E4700DBFD72 /* DetailsBaseTableViewCell.h */,
+				1849D8B22EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m */,
+				1849D8B32EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.h */,
+				1849D8B42EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m */,
+			);
+			path = GenericClass;
+			sourceTree = "<group>";
+		};
 		187DF4AE260310DD000BCDE9 /* LYEmptyView */ = {
 			isa = PBXGroup;
 			children = (
@@ -3734,7 +3743,6 @@
 				7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
 				811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -4224,7 +4232,6 @@
 			isa = PBXGroup;
 			children = (
 				73AAA1AA26C918240084E44D /* MainPage */,
-				73AAA1C526C918240084E44D /* GenericClass   */,
 			);
 			path = StampDetails;
 			sourceTree = "<group>";
@@ -4275,6 +4282,7 @@
 				73AAA1BE26C918240084E44D /* PurchaseinfoViewController.m */,
 				73AAA1BF26C918240084E44D /* PurchaseinfoViewController.h */,
 				73AAA1C026C918240084E44D /* Views */,
+				1849D8B52EAF4E4700DBFD72 /* GenericClass */,
 			);
 			path = PurchaseInfo;
 			sourceTree = "<group>";
@@ -4288,17 +4296,6 @@
 				73AAA1C426C918240084E44D /* PurchaseInfoGoodsInfoView.h */,
 			);
 			path = Views;
-			sourceTree = "<group>";
-		};
-		73AAA1C526C918240084E44D /* GenericClass   */ = {
-			isa = PBXGroup;
-			children = (
-				73AAA1C626C918240084E44D /* DetailsCustomizeNavigationBar.h */,
-				73AAA1C826C918240084E44D /* DetailsCustomizeNavigationBar.m */,
-				73AAA1C926C918240084E44D /* DetailsBaseTableViewCell.h */,
-				73AAA1C726C918240084E44D /* DetailsBaseTableViewCell.m */,
-			);
-			path = "GenericClass  ";
 			sourceTree = "<group>";
 		};
 		752A03E72B079671003256C1 /* ActivityMessage_module */ = {
@@ -6674,9 +6671,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -6713,9 +6714,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -6811,7 +6816,6 @@
 				7591F1AF2B95D61E001890D2 /* TaskManager.swift in Sources */,
 				B0C9F2332B0126E1006F4286 /* ActivityDatePickerVC.swift in Sources */,
 				AAE3307225E367E400324750 /* MainPageTableViewCell.m in Sources */,
-				73AAA1D726C918250084E44D /* DetailsCustomizeNavigationBar.m in Sources */,
 				B0F71C982ABC71B200F8B1AC /* PublishPageModel.m in Sources */,
 				187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */,
 				646B199D28313CDB0015DF28 /* StationView.m in Sources */,
@@ -6859,6 +6863,8 @@
 				AA57588924EE739F002F6F6D /* TimeBtnSelectedBackView.m in Sources */,
 				75FD5F692BC5514500D8302D /* CustomNavigationController.swift in Sources */,
 				14F6F5532AFB8CDB007C7CA6 /* RYScheduleInteractionFact.swift in Sources */,
+				1849D8B62EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m in Sources */,
+				1849D8B72EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m in Sources */,
 				FC5849B92A967F7F00D9BBDF /* CreateGroupVC.swift in Sources */,
 				4931630D26CD7B6800140412 /* StampCenterCollectionHeaderView.m in Sources */,
 				B0FE5F29294C94540070E755 /* NSDate+Rising.m in Sources */,
@@ -7029,7 +7035,6 @@
 				757729502C85914F00982233 /* ToDoDetailVC.swift in Sources */,
 				1A141322235F521C0001417E /* BaseNavigationController.m in Sources */,
 				B033366E294C971D004D141D /* HttpTool.m in Sources */,
-				73AAA1D626C918250084E44D /* DetailsBaseTableViewCell.m in Sources */,
 				75CC080E2C539B3700810A4E /* TestArrangeViewController.m in Sources */,
 				75F729742C7D8F4B00B36A56 /* TodoSyncTool.m in Sources */,
 				73AAA1D526C918250084E44D /* PurchaseInfoOrderIDView.m in Sources */,
