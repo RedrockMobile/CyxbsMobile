@@ -59,6 +59,7 @@ import com.cyxbs.components.config.appName
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainDestination
+import com.cyxbs.components.config.navigation.NAV_LOGIN_ENTRY
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
@@ -86,7 +87,7 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/30
  */
-@ImplProvider(clazz = MainDestination::class, name = "login")
+@ImplProvider(clazz = MainDestination::class, name = NAV_LOGIN_ENTRY)
 class LoginDestination : MainDestination<LoginArgument>(LoginArgument::class) {
 
   @Composable
