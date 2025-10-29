@@ -20,12 +20,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
+import com.cyxbs.components.config.APP_WEBSITE
+import com.cyxbs.components.config.ICP_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainDestination
@@ -35,6 +38,7 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.compose.shareText
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
@@ -188,7 +192,8 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
             color = 0x80294169.dark(0x48F0F0F2)
         )
         Image(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 11.dp),
+            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+                .align(Alignment.CenterEnd),
             painter = painterResource(Res.drawable.mine_ic_arrow_right),
             contentDescription = null
         )
@@ -204,20 +209,22 @@ private fun VersionInfoCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ProductWebsiteCompose(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
     InfoItem(modifier, "产品官网") {
-
+        uriHandler.openUri(APP_WEBSITE)
     }
 }
 
 @Composable
 private fun ShareCompose(modifier: Modifier = Modifier) {
     InfoItem(modifier, "分享") {
-
+        shareText("掌上重邮是重邮首款校园生活类App，拥有查课表，签到，邮问等功能，记得分享给好友哦。 $APP_WEBSITE")
     }
 }
 
 @Composable
 private fun BottomInfoCompose(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
     val blueTextColor = 0xFF0BCCF0.dark(0xFF0BCCF0)
     val declareTextColor = 0x64294169.dark(0x48F0F0F2)
     val currentYear = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year
@@ -255,7 +262,11 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
             color = declareTextColor
         )
         Text(
-            modifier = Modifier.padding(top = 5.dp),
+            modifier = Modifier
+                .padding(top = 5.dp)
+                .clickableNoIndicator {
+                    uriHandler.openUri(ICP_WEBSITE)
+                },
             text = "ICP备案号: 渝ICP备17002788号-7A",
             fontSize = 11.sp,
             color = blueTextColor
@@ -283,7 +294,8 @@ private fun InfoItem(
             fontSize = 16.sp
         )
         Image(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 11.dp),
+            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+                .align(Alignment.CenterEnd),
             painter = painterResource(Res.drawable.mine_ic_arrow_right),
             contentDescription = null
         )
