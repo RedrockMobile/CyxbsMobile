@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.about.mine.ui
+package com.cyxbs.pages.mine.about.ui
 
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
