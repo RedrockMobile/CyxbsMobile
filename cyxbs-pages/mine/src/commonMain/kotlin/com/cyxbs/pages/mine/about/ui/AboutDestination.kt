@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,11 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +39,7 @@ import androidx.constraintlayout.compose.ConstraintSet
 import com.cyxbs.components.config.APP_WEBSITE
 import com.cyxbs.components.config.ICP_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainDestination
 import com.cyxbs.components.config.navigation.NAV_ABOUT_ENTRY
@@ -182,14 +189,29 @@ private fun BackgroundIvCompose(modifier: Modifier = Modifier) {
 @Composable
 private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
     val interactionSource = MutableInteractionSource()
+    var updateStatus = remember { mutableStateOf("已是最新版本") }
+    var versionUpdateContent by remember {
+        mutableStateOf(
+            if (isDebug()) {
+                "${updateStatus.value} 长按测试(debug才显示)"
+            } else {
+                updateStatus.value
+            }
+        )
+    }
     MaterialTheme {
         Box(
             modifier = modifier
-                .clickable(
+                .combinedClickable(
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
                     onClick = {
-
+                        IAboutService::class.implOrNull("about")?.clickUpdate()
+                    },
+                    onLongClick = {
+                        if (isDebug()) {
+                            IAboutService::class.implOrNull("about")?.debugUpdateInfo()
+                        } else null
                     }
                 )
                 .padding(top = 9.dp, bottom = 9.dp)
@@ -202,7 +224,7 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
             )
             Text(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
-                text = "已是最新版本",
+                text = versionUpdateContent,
                 fontSize = 13.sp,
                 color = 0x80294169.dark(0x48F0F0F2)
             )
@@ -214,13 +236,18 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
             )
         }
     }
+    LaunchedEffect(Unit) {
+        IAboutService::class.implOrNull("about")?.bingUpdate(updateStatus)
+    }
 }
 
 @Composable
 private fun VersionInfoCompose(modifier: Modifier = Modifier) {
+    val showState = remember { mutableStateOf(false) }
     InfoItem(modifier, "版本信息") {
-
+        showState.value = true
     }
+    UpdateInfoDialog(showState)
 }
 
 @Composable
