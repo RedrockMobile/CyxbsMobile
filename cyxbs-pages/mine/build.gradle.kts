@@ -21,7 +21,6 @@ kotlin {
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.notification.api)
-      implementation(libs.ktor.core)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
