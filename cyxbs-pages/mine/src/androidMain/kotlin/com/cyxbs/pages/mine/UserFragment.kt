@@ -35,8 +35,7 @@ import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.pages.mine.about.mine.ui.AboutArgument
-import com.cyxbs.pages.mine.page.about.AboutActivity
+import com.cyxbs.pages.mine.about.ui.AboutArgument
 import com.cyxbs.pages.mine.page.edit.EditInfoActivity
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity

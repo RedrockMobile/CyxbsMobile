@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.about.mine.ui
+package com.cyxbs.pages.mine.about.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -37,12 +37,14 @@ import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainDestination
 import com.cyxbs.components.config.navigation.NAV_ABOUT_ENTRY
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.compose.shareText
 import com.cyxbs.components.utils.utils.get.getAppVersionName
+import com.cyxbs.pages.mine.about.service.IAboutService
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
@@ -250,7 +252,10 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
             Text(
                 text = "《用户协议》",
                 fontSize = 11.sp,
-                color = blueTextColor
+                color = blueTextColor,
+                modifier = Modifier.clickableNoIndicator {
+                    IAboutService::class.implOrNull("about")?.clickUserAgreement()
+                }
             )
             Text(
                 text = "&",
@@ -260,7 +265,10 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
             Text(
                 text = "《隐私政策》",
                 fontSize = 11.sp,
-                color = blueTextColor
+                color = blueTextColor,
+                modifier = Modifier.clickableNoIndicator {
+                    IAboutService::class.implOrNull("about")?.clickPrivacyPolicy()
+                }
             )
         }
         Text(
