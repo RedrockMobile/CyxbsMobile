@@ -13,6 +13,7 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsPages.store.api)
+      implementation(projects.cyxbsPages.food.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

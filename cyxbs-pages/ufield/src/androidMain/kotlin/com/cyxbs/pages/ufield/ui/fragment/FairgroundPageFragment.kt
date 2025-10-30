@@ -17,11 +17,12 @@ import androidx.fragment.app.viewModels
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.config.route.FAIRGROUND_ENTRY
-import com.cyxbs.components.config.route.FOOD_ENTRY
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
-import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
+import com.cyxbs.pages.food.api.FoodArgument
 import com.cyxbs.pages.ufield.R
 import com.cyxbs.pages.ufield.viewmodel.FairgroundViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -54,7 +55,9 @@ class FairgroundPageFragment : BaseFragment(R.layout.ufield_fragment_fairground)
         }
         startFood.setOnClickListener {
             doIfLogin {
-                startActivity(FOOD_ENTRY)
+                //startActivity(FOOD_ENTRY)
+                //接入Compose
+                MainNavController.navigate(FoodArgument)
             }
         }
         startSquare.setOnClickListener {

@@ -9,10 +9,12 @@ useKtProvider() // api 模块服务提供
 kotlin {
   sourceSets {
     commonMain.dependencies {
+      subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
-      implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsPages.store.api)
+      implementation(projects.cyxbsComponents.config)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
