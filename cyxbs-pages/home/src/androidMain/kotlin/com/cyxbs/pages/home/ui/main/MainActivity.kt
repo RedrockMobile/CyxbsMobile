@@ -36,7 +36,7 @@ class MainActivity : BaseActivity() {
   }
 
   private fun initUpdate() {
-    IAppUpdateService::class.impl().tryNoticeUpdate(this)
+    IAppUpdateService::class.impl().tryNoticeUpdate()
   }
 
   private fun initPing() {

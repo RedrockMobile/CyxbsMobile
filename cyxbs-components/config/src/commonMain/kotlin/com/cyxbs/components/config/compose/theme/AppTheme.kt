@@ -61,6 +61,7 @@ fun AppTheme(
   }
 }
 
+// 默认的点击效果，带波纹
 lateinit var DefaultIndication: Indication
 
 // 目前 XML 界面中常见的颜色值
