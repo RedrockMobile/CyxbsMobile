@@ -138,6 +138,8 @@ compose-constraintLayout = "0.6.1"
 compose-constraintLayout-android = "1.1.1"
 # https://github.com/alexzhirkevich/compottie
 compose-lottie = "2.0.1"
+# https://github.com/JetBrains/compose-hot-reload
+compose-hotReload = "1.0.0-rc02"
 
 ####################################################################################################
 #                                               三方库
@@ -334,6 +336,7 @@ kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", versio
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinAtomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "kotlinx-atomicfu" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hotReload" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 vasdolly = { id = "com.tencent.vasdolly" }
 ktProvider = { id = "io.github.985892345.KtProvider", version.ref = "kmp-ktProvider" }
