@@ -1,6 +1,6 @@
 package com.cyxbs.pages.mine.about.service
 
-import androidx.compose.runtime.MutableState
+import kotlinx.coroutines.flow.Flow
 
 /**
  * @Desc : 关于我的页面多平台扩展的服务类
@@ -21,7 +21,7 @@ interface IAboutService {
     fun debugUpdateInfo()
 
     // 绑定更新状态
-    fun bingUpdate(state: MutableState<String>)
+    fun bindUpdate(): Flow<String>
 
     // 点击检测更新状态
     fun clickUpdate()

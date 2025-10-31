@@ -3,7 +3,6 @@ package com.cyxbs.pages.mine.about.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
@@ -38,6 +36,7 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import com.cyxbs.components.config.APP_WEBSITE
 import com.cyxbs.components.config.ICP_WEBSITE
+import com.cyxbs.components.config.compose.theme.DefaultIndication
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.navigation.DestinationParcel
@@ -55,6 +54,7 @@ import com.cyxbs.pages.mine.about.service.IAboutService
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -188,56 +188,56 @@ private fun BackgroundIvCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
-    val interactionSource = MutableInteractionSource()
-    var updateStatus = remember { mutableStateOf("已是最新版本") }
-    var versionUpdateContent by remember {
+    val interactionSource = remember { MutableInteractionSource() }
+    var updateStatus by remember { mutableStateOf("已是最新版本") }
+    var versionUpdateContent by remember(updateStatus) {
         mutableStateOf(
             if (isDebug()) {
-                "${updateStatus.value} 长按测试(debug才显示)"
+                "$updateStatus 长按测试(debug才显示)"
             } else {
-                updateStatus.value
+                updateStatus
             }
         )
     }
-    MaterialTheme {
-        Box(
-            modifier = modifier
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = LocalIndication.current,
-                    onClick = {
-                        IAboutService::class.implOrNull("about")?.clickUpdate()
-                    },
-                    onLongClick = {
-                        if (isDebug()) {
-                            IAboutService::class.implOrNull("about")?.debugUpdateInfo()
-                        } else null
-                    }
-                )
-                .padding(top = 9.dp, bottom = 9.dp)
-        ) {
-            Text(
-                modifier = Modifier.padding(start = 20.dp),
-                text = "版本更新",
-                color = LocalAppColors.current.tvLv2,
-                fontSize = 16.sp
+    Box(
+        modifier = modifier
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = DefaultIndication,
+                onClick = {
+                    IAboutService::class.implOrNull()?.clickUpdate()
+                },
+                onLongClick = {
+                    if (isDebug()) {
+                        IAboutService::class.implOrNull()?.debugUpdateInfo()
+                    } else null
+                }
             )
-            Text(
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
-                text = versionUpdateContent,
-                fontSize = 13.sp,
-                color = 0x80294169.dark(0x48F0F0F2)
-            )
-            Image(
-                modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
-                    .align(Alignment.CenterEnd),
-                painter = painterResource(Res.drawable.mine_ic_arrow_right),
-                contentDescription = null
-            )
-        }
+            .padding(top = 9.dp, bottom = 9.dp)
+    ) {
+        Text(
+            modifier = Modifier.padding(start = 20.dp),
+            text = "版本更新",
+            color = LocalAppColors.current.tvLv2,
+            fontSize = 16.sp
+        )
+        Text(
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
+            text = versionUpdateContent,
+            fontSize = 13.sp,
+            color = 0x80294169.dark(0x48F0F0F2)
+        )
+        Image(
+            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+                .align(Alignment.CenterEnd),
+            painter = painterResource(Res.drawable.mine_ic_arrow_right),
+            contentDescription = null
+        )
     }
     LaunchedEffect(Unit) {
-        IAboutService::class.implOrNull("about")?.bingUpdate(updateStatus)
+        IAboutService::class.implOrNull()?.bindUpdate()?.collectLatest { status ->
+            updateStatus = status
+        }
     }
 }
 
@@ -281,7 +281,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableNoIndicator {
-                    IAboutService::class.implOrNull("about")?.clickUserAgreement()
+                    IAboutService::class.implOrNull()?.clickUserAgreement()
                 }
             )
             Text(
@@ -294,7 +294,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableNoIndicator {
-                    IAboutService::class.implOrNull("about")?.clickPrivacyPolicy()
+                    IAboutService::class.implOrNull()?.clickPrivacyPolicy()
                 }
             )
         }
@@ -330,28 +330,26 @@ private fun InfoItem(
     onClick: () -> Unit
 ) {
     val interactionSource = MutableInteractionSource()
-    MaterialTheme {
-        Box(
-            modifier = modifier
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = LocalIndication.current,
-                    onClick = onClick
-                )
-                .padding(top = 9.dp, bottom = 9.dp)
-        ) {
-            Text(
-                modifier = Modifier.padding(start = 20.dp),
-                text = text,
-                color = LocalAppColors.current.tvLv2,
-                fontSize = 16.sp
+    Box(
+        modifier = modifier
+            .clickable(
+                interactionSource = interactionSource,
+                indication = DefaultIndication,
+                onClick = onClick
             )
-            Image(
-                modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
-                    .align(Alignment.CenterEnd),
-                painter = painterResource(Res.drawable.mine_ic_arrow_right),
-                contentDescription = null
-            )
-        }
+            .padding(top = 9.dp, bottom = 9.dp)
+    ) {
+        Text(
+            modifier = Modifier.padding(start = 20.dp),
+            text = text,
+            color = LocalAppColors.current.tvLv2,
+            fontSize = 16.sp
+        )
+        Image(
+            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+                .align(Alignment.CenterEnd),
+            painter = painterResource(Res.drawable.mine_ic_arrow_right),
+            contentDescription = null
+        )
     }
 }
