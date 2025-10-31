@@ -13,6 +13,7 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform) apply false
   alias(libs.plugins.kotlinAtomicfu) apply false
   alias(libs.plugins.composeMultiplatform) apply false
+  alias(libs.plugins.composeHotReload) apply false
   alias(libs.plugins.ksp) apply false
   alias(libs.plugins.ktProvider) apply false
 }

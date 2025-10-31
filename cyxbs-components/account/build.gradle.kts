@@ -13,8 +13,5 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsPages.login.api)
     }
-    androidMain.dependencies {
-      implementation(libs.dialog)
-    }
   }
 }
