@@ -139,11 +139,6 @@ static UserItem *item = nil;
     [self _archiveRootObject:self toFile:[UserItemTool userItemPath]];
 }
 
-- (void)setRefreshToken:(NSString *)refreshToken {
-    _refreshToken = refreshToken;
-    [self _archiveRootObject:self toFile:[UserItemTool userItemPath]];
-}
-
 - (void)setRealName:(NSString *)realName {
     _realName = realName;
     [self _archiveRootObject:self toFile:[UserItemTool userItemPath]];
@@ -268,7 +263,6 @@ static UserItem *item = nil;
     _token = nil;
     _iat = nil;
     _exp = nil;
-    _refreshToken = nil;
     _realName = nil;
     _gender = nil;
     _college = nil;

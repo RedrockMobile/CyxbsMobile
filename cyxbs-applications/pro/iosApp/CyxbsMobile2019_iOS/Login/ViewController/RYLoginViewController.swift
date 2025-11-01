@@ -153,7 +153,7 @@ extension RYLoginViewController {
                     let token = model["data"]["token"].stringValue
                     let refreshToken = model["data"]["refreshToken"].stringValue
                     
-                    UserModel.default.setingTokenToOC(token: TokenModel(token: token, refreshToken: refreshToken))
+                    UserModel.default.setingTokenToOC(token: TokenModel(token: token))
                     UserDefaultsManager.shared.latestRequestToken = Date()
                     
                     ProgressHUD.showSucceed("登录成功")
@@ -400,10 +400,10 @@ extension RYLoginViewController {
                     return
                 }
                 
-                requestNewToken(refreshToken: tokenModel.refreshToken) { isSuccess in
-                    afterCallAction(showVC: !isSuccess, action: action)
-                    return
-                }
+//                requestNewToken(refreshToken: tokenModel.refreshToken) { isSuccess in
+//                    afterCallAction(showVC: !isSuccess, action: action)
+//                    return
+//                }
                 return
             }
         }
@@ -419,7 +419,7 @@ extension RYLoginViewController {
                 let token = model["data"]["token"].stringValue
                 let refreshToken = model["data"]["refreshToken"].stringValue
                 
-                UserModel.default.setingTokenToOC(token: TokenModel(token: token, refreshToken: refreshToken))
+                UserModel.default.setingTokenToOC(token: TokenModel(token: token))
                 UserDefaultsManager.shared.latestRequestToken = Date()
                 
                 success(true)

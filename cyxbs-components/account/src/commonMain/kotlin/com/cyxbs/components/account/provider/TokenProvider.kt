@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2025/1/18
  */
-internal object TokenProvider {
+object TokenProvider {
 
   private const val KEY = "cyxbsmobile_user_v2"
   private const val KEY_REFRESH_TOKEN_EXPIRED = "user_refresh_token_expired_time"

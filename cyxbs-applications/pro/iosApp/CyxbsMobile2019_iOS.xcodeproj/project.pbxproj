@@ -656,6 +656,7 @@
 		DB4065012466D889006CE5BC /* DLTimeSelectedButton.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F02466D888006CE5BC /* DLTimeSelectedButton.m */; };
 		DB4065022466D889006CE5BC /* DLReminderView+Reset.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F32466D888006CE5BC /* DLReminderView+Reset.m */; };
 		DB4065032466D889006CE5BC /* DLReminderView.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F42466D888006CE5BC /* DLReminderView.m */; };
+		E700DA83D883A1453118CA83 /* KmpInterfaceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */; };
 		EE131C212471362E00B6ED97 /* URLController.m in Sources */ = {isa = PBXBuildFile; fileRef = EE131C202471362E00B6ED97 /* URLController.m */; };
 		EE899DEA2367DB2600DDB0D9 /* Bahnschrift.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */; };
 		FC05B1CC2ADAF054008B245B /* JudgeArrangeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */; };
@@ -1863,6 +1864,7 @@
 		DB4064F32466D888006CE5BC /* DLReminderView+Reset.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "DLReminderView+Reset.m"; sourceTree = "<group>"; };
 		DB4064F42466D888006CE5BC /* DLReminderView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DLReminderView.m; sourceTree = "<group>"; };
 		DB4064F52466D888006CE5BC /* DLReminderModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DLReminderModel.h; sourceTree = "<group>"; };
+		E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KmpInterfaceImpl.swift; sourceTree = "<group>"; };
 		EE131C1F2471362E00B6ED97 /* URLController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLController.h; sourceTree = "<group>"; };
 		EE131C202471362E00B6ED97 /* URLController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = URLController.m; sourceTree = "<group>"; };
 		EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bahnschrift.ttf; sourceTree = "<group>"; };
@@ -3635,6 +3637,7 @@
 			isa = PBXGroup;
 			children = (
 				14F6F4CE2AFB8171007C7CA6 /* AppDelegate.swift */,
+				E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */,
 				14F6F5002AFB8CDA007C7CA6 /* Curriculum */,
 				14F6F5222AFB8CDA007C7CA6 /* Finder */,
 				14F6F5352AFB8CDA007C7CA6 /* Login */,
@@ -6467,6 +6470,7 @@
 			buildConfigurationList = 1A9B7693235F50A900725937 /* Build configuration list for PBXNativeTarget "CyxbsMobile2019_iOS" */;
 			buildPhases = (
 				D20A96DC9B125C7C260E5CA0 /* [CP] Check Pods Manifest.lock */,
+				77621B9C2EAFAF15001AC358 /* Compile Compose Multiplatform */,
 				1A9B7663235F50A600725937 /* Sources */,
 				1A9B7664235F50A600725937 /* Frameworks */,
 				1A9B7665235F50A600725937 /* Resources */,
@@ -6659,6 +6663,25 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
+		};
+		77621B9C2EAFAF15001AC358 /* Compile Compose Multiplatform */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Compile Compose Multiplatform";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/../../..\"\nchmod +x ./gradlew  # 确保 gradlew 具有可执行权限\n# 取消下面注释即可开启 Kotlin 多平台\n./gradlew :cyxbs-applications:pro:embedAndSignAppleFrameworkForXcode";
 		};
 		9FDBE85C2EA059152E1FA856 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -7408,6 +7431,7 @@
 				75F5E3332C887FFA00D539BA /* ToDoTopActiveStyleCellForFinder.swift in Sources */,
 				B047BF8D2AB34EF700616A5B /* ReduceAFSecurityPolicy.m in Sources */,
 				738C15CA26E2176700E24F8C /* ImgViewCollectionViewCell.m in Sources */,
+				E700DA83D883A1453118CA83 /* KmpInterfaceImpl.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

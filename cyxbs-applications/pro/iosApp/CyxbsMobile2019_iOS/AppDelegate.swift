@@ -8,7 +8,7 @@
 
 import UIKit
 import XBSBugly
-// import CyxbsApplicationsPro
+import CyxbsApplicationsPro
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -17,23 +17,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     // 应用程序启动时调用的方法
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
+
+        IOSAppKt.doInitApp(impl: KmpInterfaceImpl()) // Kotlin Multiplatform 工程初始化
         setupWindow() // 设置应用程序窗口
         setupAlicloudSDK() // 设置阿里云SDK
         XBSBugly.buglyInit() // 设置bugly
-        // IOSAppKt.doInitApp() // Kotlin Multiplatform 工程初始化
-        
+
         return true
     }
     
     // 当应用程序从后台进入前台时调用的方法
     func applicationWillEnterForeground(_ application: UIApplication) {
         //检查token是否过期
-        RYLoginViewController.checkToken(rootVC: window?.rootViewController)
+//         RYLoginViewController.checkToken(rootVC: window?.rootViewController)
         //更新Tabbar上方的课表topView显示的课程信息
-        if let vc = window?.rootViewController as? TabBarController {
-            vc.reloadData()
-        }
+        // if let vc = window?.rootViewController as? TabBarController {
+        //     vc.reloadData()
+        // }
     }
     
     // 当应用程序进入后台时调用的方法
@@ -53,8 +53,12 @@ extension AppDelegate {
     
     // 设置应用程序窗口
     func setupWindow() {
-        let rootVC = TabBarController()
-        
+//         let rootVC = TabBarController()
+        let rootVC = IOSAppKt.MainViewController() // 使用 CMP 主页
+        // 扩展到安全区域以下显示
+        rootVC.edgesForExtendedLayout = .all
+        rootVC.extendedLayoutIncludesOpaqueBars = true
+
         window = UIWindow()
         window?.rootViewController = rootVC
         window?.makeKeyAndVisible()

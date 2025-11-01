@@ -186,7 +186,7 @@
     
     [scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.equalTo(self.view);
-        make.bottom.equalTo(self.view).offset(-150);
+        make.bottom.equalTo(self.view).offset(-70);
         make.top.equalTo(self.view).offset(getStatusBarHeight_Double);
     }];
 }
