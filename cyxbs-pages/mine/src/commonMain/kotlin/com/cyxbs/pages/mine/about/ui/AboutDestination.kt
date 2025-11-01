@@ -77,6 +77,10 @@ object AboutArgument
 
 @ImplProvider(clazz = MainDestination::class, name = NAV_ABOUT_ENTRY)
 class AboutDestination : MainDestination<AboutArgument>(AboutArgument::class) {
+
+    override val needLogin: Boolean
+        get() = false
+
     @Composable
     override fun DestinationContent(parcel: DestinationParcel<AboutArgument>) {
         AboutPage()
@@ -225,13 +229,13 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
     ) {
         Text(
             modifier = Modifier.padding(start = 20.dp),
-            text = "版本更新",
+            text = "版本更新" + if (isDebug()) " (长按测试)" else "",
             color = LocalAppColors.current.tvLv2,
             fontSize = 16.sp
         )
         Text(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
-            text = updateStatus.value + if (isDebug()) " 长按测试(debug才显示)" else "",
+            text = updateStatus.value,
             fontSize = 13.sp,
             color = 0x80294169.dark(0x48F0F0F2)
         )
@@ -294,7 +298,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableNoIndicator {
-                    IAboutService::class.implOrNull()?.clickUserAgreement()
+                    IAboutService::class.implOrNull()?.clickUserAgreement() ?: toast("当前应用未实现「用户协议」功能")
                 }
             )
             Text(
@@ -307,7 +311,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableSingle {
-                    IAboutService::class.implOrNull()?.clickPrivacyPolicy()
+                    IAboutService::class.implOrNull()?.clickPrivacyPolicy() ?: toast("当前应用未实现「隐私政策」功能")
                 }
             )
         }

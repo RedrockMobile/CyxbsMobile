@@ -2,6 +2,7 @@ package com.cyxbs.components.init
 
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
@@ -25,7 +26,7 @@ fun runApp(block: suspend CoroutineScope.() -> Unit) {
   runBlocking {
     // appCoroutineScopeInternal 使用 SupervisorJob 避免异常传播
     val supervisor = SupervisorJob(coroutineContext[Job])
-    val coroutineScope = CoroutineScope(supervisor + AppCoroutineExceptionHandler)
+    val coroutineScope = CoroutineScope(supervisor + Dispatchers.Main.immediate + AppCoroutineExceptionHandler)
     appCoroutineScopeInternal = coroutineScope
     block()
   }

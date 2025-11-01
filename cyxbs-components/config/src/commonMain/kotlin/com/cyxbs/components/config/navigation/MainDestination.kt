@@ -56,6 +56,9 @@ abstract class MainDestination<T : Any>(
   val typeMap: Map<KType, NavType<*>> = emptyMap()
 ) {
 
+  // 页面是否需要登录，如果是的话，则在未登录时将先跳转登录页
+  abstract val needLogin: Boolean
+
   @Composable
   abstract fun DestinationContent(parcel: DestinationParcel<T>)
 

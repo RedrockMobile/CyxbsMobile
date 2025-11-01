@@ -29,7 +29,7 @@ fun Modifier.clickableNoIndicator(
   onClick = onClick
 )
 
-var lastClickTime = 0L
+private var lastClickTime = 0L
 
 /**
  * @param interval 毫秒为单位，点击间隔小于这个值监听事件无法生效
