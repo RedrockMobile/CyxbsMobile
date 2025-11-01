@@ -12,7 +12,7 @@ extension UserModel {
     
     mutating func setingTokenToOC(token: TokenModel) {
         self.token = token
-        
+
         let item = UserItemTool.defaultItem()
         item.stuNum = token.stuNum
         item.gender = token.gender
@@ -20,7 +20,6 @@ extension UserModel {
         item.exp = "\(token.exp)"
         item.iat = "\(token.iat)"
         item.token = token.token
-        item.refreshToken = token.refreshToken
         
         // UserDefaults写入stuNum,有可能OC里面会用到
         UserDefaults.standard.set(token.stuNum, forKey: "stuNum")

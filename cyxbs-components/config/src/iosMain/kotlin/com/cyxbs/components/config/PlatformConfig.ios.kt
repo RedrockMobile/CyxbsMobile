@@ -1,5 +1,7 @@
 package com.cyxbs.components.config
 
+import com.cyxbs.components.config.service.impl
+
 /**
  * .
  *
@@ -9,8 +11,10 @@ package com.cyxbs.components.config
 actual val appName: String
   get() = "掌上重邮"
 
-var isIOSDebug = false // 由 applications 模块设置
+interface IOSDebug {
+  fun isDebug(): Boolean
+}
 
 actual fun isDebug(): Boolean {
-  return isIOSDebug
+  return IOSDebug::class.impl().isDebug()
 }

@@ -15,9 +15,9 @@ open class TabBarController: UITabBarController {
     open override func viewDidLoad() {
         super.viewDidLoad()
         
-        setupTabBar()
+        // setupTabBar()
         setupViewControllers()
-        setupLogin()
+        // setupLogin()
     }
     
     lazy var finderVC = RYFinderViewController()
@@ -112,10 +112,10 @@ extension TabBarController {
     func setupViewControllers() {
         let vcs = viewControllersForTabBar
         if vcs.count == 0 { return }
-        let tabBarItems = tabBarItemsForTabBar
-        for index in 0..<vcs.count {
-            vcs[index].tabBarItem = tabBarItems[min(index, tabBarItems.count - 1)]
-        }
+//        let tabBarItems = tabBarItemsForTabBar
+//        for index in 0..<vcs.count {
+//            vcs[index].tabBarItem = tabBarItems[min(index, tabBarItems.count - 1)]
+//        }
         viewControllers = vcs
     }
     

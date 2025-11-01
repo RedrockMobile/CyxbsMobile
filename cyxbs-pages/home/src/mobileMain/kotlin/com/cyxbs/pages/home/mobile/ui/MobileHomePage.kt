@@ -66,6 +66,10 @@ class MobileHomePage : PlatformHomePage {
 
   @Composable
   override fun HomePageContent(parcel: DestinationParcel<HomeArgument>) {
+    // 提前初始化好 ViewModel
+    val bottomNavViewModel = viewModel { BottomNavViewModel() }
+    val courseFrameViewModel = viewModel { MobileCourseFrameViewModel() }
+    val courseBottomSheetViewModel = viewModel { CourseBottomSheetViewModel() }
     PlatformMobileHomePage(parcel) {
       Box(
         modifier = Modifier.fillMaxSize()
@@ -102,9 +106,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     oldHomeCourse.content.invoke(modifier)
     return
   }
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
-  val courseFrameViewModel = viewModel { MobileCourseFrameViewModel() }
-  val courseBottomSheetViewModel = viewModel { CourseBottomSheetViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height

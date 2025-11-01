@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <!--  <component name="XcodeMetaData" PROJECT_DIR="$PROJECT_DIR$/cyxbs-applications/pro/iosApp" PROJECT_FILE="$PROJECT_DIR$/cyxbs-applications/pro/iosApp/CyxbsMobile2019_iOS.xcworkspace" />-->
-  <component name="XcodeMetaData" PROJECT_DIR="$PROJECT_DIR$/cyxbs-applications/test/iosApp" PROJECT_FILE="$PROJECT_DIR$/cyxbs-applications/test/iosApp/iosApp.xcodeproj" />
-
-  <!--该文件可用于在多个 iosApp 时指定打包的 iosApp 的 target，等待后续官方支持多 iosApp 打包-->
-  <!--https://youtrack.jetbrains.com/issue/KMT-1298/Support-multiple-iosApp-target-in-the-same-project-->
+  <component name="XcodeMetaData" PROJECT_DIR="$PROJECT_DIR$/cyxbs-applications/pro/iosApp" PROJECT_FILE="$PROJECT_DIR$/cyxbs-applications/pro/iosApp/CyxbsMobile2019_iOS.xcworkspace" COCOAPODS_PROJECT_EXCLUDED="true" />
 </project>

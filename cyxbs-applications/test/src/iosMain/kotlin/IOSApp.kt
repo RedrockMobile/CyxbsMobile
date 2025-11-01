@@ -1,7 +1,9 @@
 import androidx.compose.ui.window.ComposeUIViewController
+import com.cyxbs.components.config.IOSDebug
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.config.isIOSDebug
 import com.cyxbs.components.config.navigation.MainNavHost
+import com.cyxbs.components.utils.extensions.IOSToast
+import com.g985892345.provider.api.annotation.ImplProvider
 import platform.UIKit.UIViewController
 
 /**
@@ -12,9 +14,9 @@ import platform.UIKit.UIViewController
  */
 
 // 在 iOS 项目 AppDelegate#application 调用
-fun doInitApp(isDebug: Boolean) {
-  isIOSDebug = isDebug
+fun doInitApp(impl: IOSKmpInterface) {
   initProvider()
+  IOSKmpInterfaceLink.impl = impl
 }
 
 fun MainViewController(): UIViewController {
@@ -30,3 +32,24 @@ fun MainViewController(): UIViewController {
 // 因为 KSP 只会在最底层源集生成代码，iosMain 是 iosX64、iosArm64、iosSimulatorArm64 共用共同父源集
 // 所以这里需要在最底层源集初始化 KtProvider
 internal expect fun initProvider()
+
+interface IOSKmpInterface {
+  fun isDebug(): Boolean
+}
+
+@ImplProvider(IOSDebug::class)
+internal object IOSKmpInterfaceLink : IOSDebug {
+
+  lateinit var impl: IOSKmpInterface
+
+  override fun isDebug(): Boolean {
+    return impl.isDebug()
+  }
+}
+
+@ImplProvider(IOSToast::class)
+internal object IOSToast : IOSToast {
+  override fun toast(s: String, isLong: Boolean) {
+    // todo
+  }
+}

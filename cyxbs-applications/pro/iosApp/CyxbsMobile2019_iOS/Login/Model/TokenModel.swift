@@ -26,15 +26,12 @@ struct TokenModel: Codable {
     var sub: String = "web"
     
     var token: String
-    
-    var refreshToken: String
 }
 
 extension TokenModel {
     
-    init(token: String, refreshToken: String) {
+    init(token: String) {
         self.token = token
-        self.refreshToken = refreshToken
         let payload = token.components(separatedBy: ".").first ?? ""
         let data = Data(base64Encoded: payload) ?? Data()
         let dic = JSON(data)

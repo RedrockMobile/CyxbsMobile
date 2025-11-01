@@ -7,27 +7,31 @@
 //
 
 import UIKit
+import CyxbsApplicationsPro
 
 class SwiftToOC: NSObject {
 
+    // 退出登录
     @objc
     class func loginOut() {
         UserModel.default.logout()
         
-        let loginVC = RYLoginViewController()
-        loginVC.modalPresentationStyle = .fullScreen
-
-        guard let tabBarVC = UIApplication.shared.delegate?.window??.rootViewController as? UITabBarController else {
-            return
-        }
-        
-        if tabBarVC.presentedViewController != nil {
-            tabBarVC.dismiss(animated: true) {
-                tabBarVC.present(loginVC, animated: true, completion: nil)
-            }
-        } else {
-            tabBarVC.present(loginVC, animated: true, completion: nil)
-        }
+//        let loginVC = RYLoginViewController()
+//        loginVC.modalPresentationStyle = .fullScreen
+//
+//        guard let tabBarVC = UIApplication.shared.delegate?.window??.rootViewController as? UITabBarController else {
+//            return
+//        }
+//        
+//        if tabBarVC.presentedViewController != nil {
+//            tabBarVC.dismiss(animated: true) {
+//                tabBarVC.present(loginVC, animated: true, completion: nil)
+//            }
+//        } else {
+//            tabBarVC.present(loginVC, animated: true, completion: nil)
+//        }
+        // 跳转到 Compose 的登录页
+        IOSAppKt.onLogout()
         
         // 假销毁单例
         UserItem.default().attemptDealloc()
