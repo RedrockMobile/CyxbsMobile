@@ -46,6 +46,7 @@ import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.compose.shareText
@@ -129,7 +130,7 @@ private fun TopBarCompose(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 20.dp)
-                    .clickableNoIndicator {
+                    .clickableSingle {
                         MainNavController.popBackStack()
                     }
             )
@@ -293,7 +294,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 text = "《隐私政策》",
                 fontSize = 11.sp,
                 color = blueTextColor,
-                modifier = Modifier.clickableNoIndicator {
+                modifier = Modifier.clickableSingle {
                     IAboutService::class.implOrNull()?.clickPrivacyPolicy()
                 }
             )
@@ -313,7 +314,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
         Text(
             modifier = Modifier
                 .padding(top = 5.dp)
-                .clickableNoIndicator {
+                .clickableSingle {
                     uriHandler.openUri(ICP_WEBSITE)
                 },
             text = "ICP备案号: 渝ICP备17002788号-7A",
