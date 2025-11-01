@@ -3,6 +3,7 @@ package com.cyxbs.components.init
 import androidx.lifecycle.coroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 
@@ -18,5 +19,6 @@ private val AppCoroutineExceptionHandler = CoroutineExceptionHandler { _, throwa
 actual val appCoroutineScope: CoroutineScope =
   CoroutineScope(
     SupervisorJob(appLifecycle.coroutineScope.coroutineContext[Job])
+        + Dispatchers.Main.immediate
         + AppCoroutineExceptionHandler
   )

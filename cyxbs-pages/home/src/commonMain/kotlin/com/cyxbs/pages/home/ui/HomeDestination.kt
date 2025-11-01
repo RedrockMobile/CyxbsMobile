@@ -17,9 +17,12 @@ import com.g985892345.provider.api.annotation.ImplProvider
 @ImplProvider(clazz = MainDestination::class, name = "home")
 class HomeDestination : MainDestination<HomeArgument>(HomeArgument::class) {
 
+  override val needLogin: Boolean
+    get() = false // 主页允许未登录打开
+
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<HomeArgument>) {
-    remember { PlatformHomePage::class.implOrNull() ?: PlatformHomePage }.HomePageContent(parcel)
+    PlatformHomePage.HomePageContent(parcel)
   }
 }
 
@@ -32,7 +35,7 @@ internal interface PlatformHomePage {
   fun HomePageContent(parcel: DestinationParcel<HomeArgument>)
 
   // 默认实现
-  companion object : PlatformHomePage {
+  companion object : PlatformHomePage by PlatformHomePage::class.implOrNull() ?: object : PlatformHomePage {
     @Composable
     override fun HomePageContent(parcel: DestinationParcel<HomeArgument>) {
       AdaptiveHomePage(parcel)

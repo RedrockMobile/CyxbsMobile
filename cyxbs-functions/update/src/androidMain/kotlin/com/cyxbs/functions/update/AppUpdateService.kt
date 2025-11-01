@@ -3,6 +3,8 @@ package com.cyxbs.functions.update
 import android.content.Intent
 import androidx.core.net.toUri
 import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.WhichButton
+import com.afollestad.materialdialogs.actions.getActionButton
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.init.appCoroutineScope
@@ -12,6 +14,8 @@ import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.functions.update.bean.UpdateInfo
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
@@ -36,7 +40,7 @@ internal object AppUpdateService : IAppUpdateService {
     
     private fun noticeUpdateInternal(info: UpdateInfo) {
         val activity = appTopActivity.get() ?: return
-        MaterialDialog(activity).show {
+        val dialog = MaterialDialog(activity).show {
             title(text = "有新版本更新")
             message(text = "最新版本:" + info.versionName + "\n\n" + info.updateContent + "\n\n点击点击，现在就更新一发吧~")
             positiveButton(text = "下载最新安装包") {
@@ -55,12 +59,19 @@ internal object AppUpdateService : IAppUpdateService {
             cornerRadius(16F)
         }
         if (isDebug() && AppUpdateModel.mockDated) {
-            toast("⚠️注意：当前处于测试更新弹窗状态中")
+            toast("⚠️注意：当前处于测试更新弹窗状态中，5 秒后将自动点击更新按钮")
+            val job = appCoroutineScope.launch {
+                delay(5000)
+                dialog.getActionButton(WhichButton.POSITIVE).performClick()
+            }
+            dialog.setOnDismissListener {
+                job.cancel()
+            }
         }
     }
     
     override fun tryNoticeUpdate(needFrequency: Boolean) {
-        appCoroutineScope.launch {
+        appCoroutineScope.launch(Dispatchers.Main) {
             val status = checkUpdate()
             if (status == AppUpdateStatus.Result.Dated) {
                 val nowTime = System.currentTimeMillis()
@@ -81,7 +92,6 @@ internal object AppUpdateService : IAppUpdateService {
     }
 
     override fun debug() {
-        if (!isDebug()) return
         AppUpdateModel.mockDated = true
         tryNoticeUpdate(needFrequency = false)
     }

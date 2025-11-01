@@ -90,6 +90,9 @@ import kotlin.time.Duration.Companion.seconds
 @ImplProvider(clazz = MainDestination::class, name = NAV_LOGIN_ENTRY)
 class LoginDestination : MainDestination<LoginArgument>(LoginArgument::class) {
 
+  override val needLogin: Boolean
+    get() = false // 登录页允许未登录时打开
+
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<LoginArgument>) {
     viewModel { LoginViewModel(parcel.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
