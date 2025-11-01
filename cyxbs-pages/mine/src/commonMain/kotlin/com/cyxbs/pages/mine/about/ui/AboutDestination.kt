@@ -19,10 +19,9 @@ import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,12 +49,16 @@ import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.compose.shareText
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.getAppVersionName
+import com.cyxbs.functions.update.api.AppUpdateStatus
+import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.mine.about.service.IAboutService
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -189,29 +192,33 @@ private fun BackgroundIvCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
-    val interactionSource = remember { MutableInteractionSource() }
-    var updateStatus by remember { mutableStateOf("已是最新版本") }
-    var versionUpdateContent by remember(updateStatus) {
-        mutableStateOf(
-            if (isDebug()) {
-                "$updateStatus 长按测试(debug才显示)"
-            } else {
-                updateStatus
-            }
-        )
-    }
+    val updateStatus = remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
     Box(
         modifier = modifier
             .combinedClickable(
-                interactionSource = interactionSource,
+                interactionSource = remember { MutableInteractionSource() },
                 indication = DefaultIndication,
                 onClick = {
-                    IAboutService::class.implOrNull()?.clickUpdate()
+                    val appUpdateService = IAppUpdateService
+                    if (appUpdateService.getUpdateStatus().value == AppUpdateStatus.Result.Dated) {
+                        appUpdateService.noticeUpdate()
+                    } else coroutineScope.launch {
+                        val status = appUpdateService.checkUpdate()
+                        when (status) {
+                            AppUpdateStatus.Result.Dated -> appUpdateService.noticeUpdate()
+                            AppUpdateStatus.Result.Valid -> toast("已经是最新版了哦")
+                            is AppUpdateStatus.Result.Error -> {
+                                toast("有一股神秘力量阻拦了更新，可尝试点击「产品官网」下载最新版～")
+                                // TODO 打开 CrashDialog
+                            }
+                        }
+                    }
                 },
                 onLongClick = {
                     if (isDebug()) {
-                        IAboutService::class.implOrNull()?.debugUpdateInfo()
-                    } else null
+                        IAppUpdateService::class.implOrNull()?.debug()
+                    }
                 }
             )
             .padding(top = 9.dp, bottom = 9.dp)
@@ -224,7 +231,7 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
         )
         Text(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
-            text = versionUpdateContent,
+            text = updateStatus.value + if (isDebug()) " 长按测试(debug才显示)" else "",
             fontSize = 13.sp,
             color = 0x80294169.dark(0x48F0F0F2)
         )
@@ -236,8 +243,13 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
         )
     }
     LaunchedEffect(Unit) {
-        IAboutService::class.implOrNull()?.bindUpdate()?.collectLatest { status ->
-            updateStatus = status
+        IAppUpdateService.getUpdateStatus().collectLatest {
+            updateStatus.value = when (it) {
+                AppUpdateStatus.Checking -> "检查中..."
+                AppUpdateStatus.Result.Dated -> "发现新版本"
+                AppUpdateStatus.Result.Valid -> "已是最新版本"
+                is AppUpdateStatus.Result.Error -> "新版本请求失败 >_<"
+            }
         }
     }
 }

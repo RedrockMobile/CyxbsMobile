@@ -17,8 +17,11 @@ import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.launch
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.getAppUpdateContent
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
@@ -26,13 +29,13 @@ import com.cyxbs.functions.update.api.BuildConfig
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.mine.R
-import com.cyxbs.pages.mine.util.ui.DebugUpdateDialog
 import com.mredrock.cyxbs.common.config.APP_WEBSITE
 import com.mredrock.cyxbs.common.config.DIR_LOG
 import com.mredrock.cyxbs.common.config.ICP_WEBSITE
 import com.mredrock.cyxbs.common.config.OKHTTP_LOCAL_LOG
 import com.mredrock.cyxbs.common.ui.BaseActivity
-import com.mredrock.cyxbs.common.utils.extensions.toast
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import java.io.File
 import java.util.Calendar
 
@@ -94,12 +97,7 @@ class AboutActivity : BaseActivity() {
             val oldText = title.text
             title.text = "$oldText 长按测试(debug才显示)"
             mine_about_rl_update.setOnLongClickListener {
-                DebugUpdateDialog.Builder(this).setPositiveClick {
-                    IAppUpdateService::class.impl().debug(
-                        this@AboutActivity,
-                        getContent()
-                    )
-                }.show()
+                IAppUpdateService::class.impl().debug()
                 true
             }
         }
@@ -153,14 +151,20 @@ class AboutActivity : BaseActivity() {
     }
 
     private fun clickUpdate() {
-        selfUpdateCheck = true
-        IAppUpdateService::class.impl().apply {
-            when (getUpdateStatus().value) {
-                AppUpdateStatus.DATED -> {
-                    noticeUpdate(this@AboutActivity)
+        IAppUpdateService.apply {
+            if (getUpdateStatus().value == AppUpdateStatus.Result.Dated) {
+                noticeUpdate()
+                return
+            }
+            launch {
+                val status = checkUpdate()
+                when (status) {
+                    AppUpdateStatus.Result.Dated -> noticeUpdate()
+                    AppUpdateStatus.Result.Valid -> toast("已经是最新版了哦")
+                    is AppUpdateStatus.Result.Error -> {
+                        toast("有一股神秘力量阻拦了更新，请稍候重试或尝试反馈")
+                    }
                 }
-
-                else -> checkUpdate()
             }
         }
     }
@@ -186,30 +190,24 @@ class AboutActivity : BaseActivity() {
             StringBuilder("Version ").append(getAppVersionName())
     }
 
-    private var selfUpdateCheck = false
     private fun bindUpdate() {
-        IAppUpdateService::class.impl().apply {
-            getUpdateStatus().observe(this@AboutActivity) {
+        IAppUpdateService.apply {
+            getUpdateStatus().onEach {
                 when (it) {
-                    AppUpdateStatus.UNCHECK -> checkUpdate()
-                    AppUpdateStatus.DATED -> {
+                    AppUpdateStatus.Checking -> {
+                        mine_about_tv_already_up_to_date.text = "检查中..."
+                    }
+                    AppUpdateStatus.Result.Dated -> {
                         mine_about_tv_already_up_to_date.text = "发现新版本"
-                        if (selfUpdateCheck) noticeUpdate(this@AboutActivity)
                     }
-
-                    AppUpdateStatus.VALID -> {
+                    AppUpdateStatus.Result.Valid -> {
                         mine_about_tv_already_up_to_date.text = "已是最新版本"
-                        if (selfUpdateCheck) toast("已经是最新版了哦")
                     }
-
-                    AppUpdateStatus.ERROR -> {
-                        mine_about_tv_already_up_to_date.text = "建议再试试哟~"
-                        if (selfUpdateCheck) toast("有一股神秘力量阻拦了更新，请稍候重试或尝试反馈")
+                    is AppUpdateStatus.Result.Error -> {
+                        mine_about_tv_already_up_to_date.text = "新版本请求失败 >_<"
                     }
-
-                    else -> {}
                 }
-            }
+            }.launchIn(lifecycleScope)
         }
     }
 

@@ -8,13 +8,6 @@
         <activity android:name="com.cyxbs.pages.mine.page.feedback.history.detail.HistoryDetailActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.feedback.edit.ui.FeedbackEditActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.feedback.history.list.HistoryListActivity" />
-        <activity
-            android:name=".page.mine.ui.activity.IdentityActivity"
-            android:exported="true" />
-        <activity
-            android:name=".page.mine.ui.activity.HomepageActivity"
-            android:configChanges="uiMode"
-            android:exported="true" />
         <activity android:name="com.cyxbs.pages.mine.page.setting.SettingActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.FindPasswordActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.ForgetPasswordActivity" />
@@ -22,7 +15,6 @@
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.SetPasswordProtectActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.ChangePasswordActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.FindPasswordByIdsActivity" />
-        <activity android:name=".page.mine.ui.activity.FanActivity" />
         <activity
             android:name="com.cyxbs.pages.mine.page.security.activity.SecurityActivity"
             android:theme="@style/ConfigAppTheme.NoActionBar" />
@@ -32,9 +24,6 @@
             android:screenOrientation="portrait" />
         <activity
             android:name="com.cyxbs.pages.mine.page.sign.DailySignActivity"
-            android:launchMode="singleTop" />
-        <activity
-            android:name="com.cyxbs.pages.mine.page.about.AboutActivity"
             android:launchMode="singleTop" />
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
