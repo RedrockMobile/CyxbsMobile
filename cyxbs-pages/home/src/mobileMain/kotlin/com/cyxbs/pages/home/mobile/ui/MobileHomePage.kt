@@ -35,7 +35,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
@@ -65,12 +65,12 @@ import org.jetbrains.compose.resources.stringResource
 class MobileHomePage : PlatformHomePage {
 
   @Composable
-  override fun HomePageContent(parcel: DestinationParcel<HomeArgument>) {
+  override fun HomePageContent(parcel: DestinationParcel<HomeNavArgument>) {
     PlatformMobileHomePage(parcel) {
       Box(
         modifier = Modifier.fillMaxSize()
       ) {
-        HomeViewPagerCompose()
+        HomeViewPagerCompose(parcel)
         HomeCourseCompose()
         HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
       }
@@ -81,12 +81,15 @@ class MobileHomePage : PlatformHomePage {
 // 提供给具体平台用于包裹 content，可以设置些特别的 LocalProvider 或者获取 ViewModel 啥的
 @Composable
 internal expect fun PlatformMobileHomePage(
-  parcel: DestinationParcel<HomeArgument>,
+  parcel: DestinationParcel<HomeNavArgument>,
   content: @Composable () -> Unit,
 )
 
 @Composable
-internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)
+internal expect fun HomeViewPagerCompose(
+  parcel: DestinationParcel<HomeNavArgument>,
+  modifier: Modifier = Modifier,
+)
 
 // 旧版课表
 interface IOldHomeCourse {

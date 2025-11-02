@@ -4,7 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
@@ -13,7 +13,7 @@ import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
 import io.ktor.client.call.body
@@ -38,10 +38,10 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/31
  */
-expect class LoginViewModel(argument: LoginArgument) : CommonLoginViewModel
+expect class LoginViewModel(argument: LoginNavArgument) : CommonLoginViewModel
 
 @Stable
-abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel() {
+abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewModel() {
 
   val stuNum = mutableStateOf("")
 
@@ -170,7 +170,7 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
   // 进入游客模式
   open fun enterTouristMode() {
     // 弹出所有页面，重新回到主页
-    MainNavController.navigate(HomeArgument) {
+    MainNavController.navigate(HomeNavArgument()) {
       popUpTo(0) { inclusive = true }
     }
   }

@@ -51,30 +51,51 @@ fun ChooseDialogCompose(
       properties = properties,
       onDismissRequest = onDismissRequest,
     ) {
-      Box(
-        modifier = modifier.clip(RoundedCornerShape(16.dp))
-          .background(LocalAppColors.current.topBg),
-      ) {
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          content()
-          if (negativeBtnText != null) {
-            DialogTwoBtnCompose(
-              positiveBtnText = positiveBtnText,
-              negativeBtnText = negativeBtnText,
-              btnSize = btnSize,
-              onClickPositiveBtn = onClickPositiveBtn,
-              onClickNegativeBtn = onClickNegativeBtn
-            )
-          } else {
-            DialogOneBtnCompose(
-              positiveBtnText = positiveBtnText,
-              btnSize = btnSize,
-              onClickPositiveBtn = onClickPositiveBtn
-            )
-          }
-        }
+      ChooseDialogComposeContent(
+        modifier = modifier,
+        btnSize = btnSize,
+        positiveBtnText = positiveBtnText,
+        negativeBtnText = negativeBtnText,
+        onClickPositiveBtn = onClickPositiveBtn,
+        onClickNegativeBtn = onClickNegativeBtn,
+        content,
+      )
+    }
+  }
+}
+
+@Composable
+fun ChooseDialogComposeContent(
+  modifier: Modifier = Modifier.width(300.dp).wrapContentHeight(),
+  btnSize: DpSize = DpSize(80.dp, 34.dp),
+  positiveBtnText: String = "确定",
+  negativeBtnText: String? = null, // 如果不需要第二个按钮，则传 null
+  onClickPositiveBtn: () -> Unit = { },
+  onClickNegativeBtn: () -> Unit = { },
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  Box(
+    modifier = modifier.clip(RoundedCornerShape(16.dp))
+      .background(LocalAppColors.current.topBg),
+  ) {
+    Column(
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      content()
+      if (negativeBtnText != null) {
+        DialogTwoBtnCompose(
+          positiveBtnText = positiveBtnText,
+          negativeBtnText = negativeBtnText,
+          btnSize = btnSize,
+          onClickPositiveBtn = onClickPositiveBtn,
+          onClickNegativeBtn = onClickNegativeBtn
+        )
+      } else {
+        DialogOneBtnCompose(
+          positiveBtnText = positiveBtnText,
+          btnSize = btnSize,
+          onClickPositiveBtn = onClickPositiveBtn
+        )
       }
     }
   }
@@ -102,7 +123,7 @@ fun DialogTwoBtnCompose(
 }
 
 @Composable
-private fun DialogOneBtnCompose(
+fun DialogOneBtnCompose(
   modifier: Modifier = Modifier.padding(bottom = 30.dp),
   positiveBtnText: String = "确定",
   btnSize: DpSize = DpSize(80.dp, 34.dp),

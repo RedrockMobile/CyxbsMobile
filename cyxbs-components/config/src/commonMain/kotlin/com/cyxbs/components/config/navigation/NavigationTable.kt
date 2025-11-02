@@ -9,13 +9,35 @@ package com.cyxbs.components.config.navigation
 /**
  * 路由表命名规则：
  *
- * 1、常量名（全大写）：NAV_模块名_功能描述，例：NAV_QA_ENTRY
- * 2、二级路由：模块名/功能描述，例：qa/entry
- * 3、多级路由：模块依赖关系倒置/功能描述，例：map/discover/entry
+ * 1. 对于普通页面:
+ *    NAV_页面 = "页面"
+ *    示例: NAV_LOGIN = "login"
+ *
+ * 2. 对于弹窗页面:
+ *    NAV_DIALOG_页面 = "页面"
+ *    示例: NAV_DIALOG_UPDATE = "dialog/update"
+ *
+ * 对于二级页面，应该作为一级页面 Argument 的一个 query 参数，不应该单独声明
+ * 比如：
+ * ```
+ * // Home 页一个 ViewPager 下存在三个页面：discover、fairground、mine
+ * class HomeNavArgument(
+ *     val page: String = "discover" // 这里默认定位 discover
+ * )
+ *
+ * // 如果外界想直接定位到「我的」二级页面，那么应该使用如下 deeplink：
+ * "cyxbs://home?page=mine"
+ * ```
  */
 
+// 主页
+const val NAV_HOME = "home"
+
 // 登录
-const val NAV_LOGIN_ENTRY = "login"
+const val NAV_LOGIN = "login"
 
 // 关于我们
-const val NAV_ABOUT_ENTRY = "about"
+const val NAV_ABOUT = "about"
+
+// 更新弹窗
+const val NAV_DIALOG_UPDATE = "dialog/update"
