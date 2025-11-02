@@ -45,6 +45,18 @@ class FoodViewModel() : BaseViewModel() {
 		DiningTag("没胃2口"),
 	)
 
+	//是否显示描述页
+	//没招了ChooseDialogCompose需要传入一个State，
+	val showDescribe = mutableStateOf(false)
+
+	fun openDescribe(){
+		showDescribe.value = true
+	}
+
+	fun closeDescribe(){
+		showDescribe.value = false
+	}
+
 	private val selectedDiningArea = mutableSetOf<String>()
 	private val selectedDiningFeature = mutableSetOf<String>()
 	private var selectedDiningNumber: String? = null

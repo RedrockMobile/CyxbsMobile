@@ -46,6 +46,7 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.food.api.FoodArgument
 import com.cyxbs.pages.food.viewmodel.FoodViewModel
+import com.cyxbs.pages.food.widget.FoodDescribeDialog
 import com.cyxbs.pages.food.widget.TagSelector
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.food.generated.resources.Res
@@ -64,6 +65,7 @@ import org.jetbrains.compose.resources.painterResource
 class FoodDestination : MainDestination<FoodArgument>(FoodArgument::class) {
 	@Composable
 	override fun DestinationContent(parcel: DestinationParcel<FoodArgument>) {
+		viewModel { FoodViewModel() }
 		FoodPage()
 	}
 }
@@ -83,6 +85,7 @@ fun FoodPage() {
 		DiningFeatureCompose(Modifier.layoutId(FoodElement.DiningFeature))
 		MealResultCompose(Modifier.layoutId(FoodElement.MealResult))
 	}
+	FoodDescribeDialog()
 }
 
 @Composable
@@ -108,7 +111,7 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 		Box(
 			modifier = Modifier.fillMaxWidth()
 		) {
-
+			val viewModel = viewModel(FoodViewModel::class)
 			Image(
 				modifier = Modifier.padding(start = 16.dp).align(Alignment.CenterStart)
 					.clickableNoIndicator {
@@ -129,10 +132,10 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 			)
 
 			Image(
-				modifier = Modifier.padding(end = 15.dp).align(Alignment.CenterEnd).clickableNoIndicator {
-				},
+				modifier = Modifier.padding(end = 15.dp).align(Alignment.CenterEnd)
+					.clickableNoIndicator(onClick = viewModel::openDescribe),
 				painter = painterResource(Res.drawable.food_ic_notification),
-				contentDescription = "notification",
+				contentDescription = "describe",
 				contentScale = ContentScale.Crop,
 			)
 		}
@@ -143,10 +146,10 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 private fun WelcomePictureCompose(modifier: Modifier = Modifier) {
 	//TODO 等待接入网络访问加载Welcome图片
 	Image(
-		modifier = modifier.size(418.dp, 117.dp),
+		modifier = modifier.width(410.dp),
 		painter = painterResource(Res.drawable.food_ic_welcome_picture),
 		contentDescription = "welcome",
-		contentScale = ContentScale.FillWidth
+		contentScale = ContentScale.FillBounds
 	)
 }
 
