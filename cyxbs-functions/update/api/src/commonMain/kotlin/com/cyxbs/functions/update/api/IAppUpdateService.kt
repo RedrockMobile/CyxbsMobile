@@ -1,8 +1,6 @@
 package com.cyxbs.functions.update.api
 
-import com.cyxbs.components.config.service.implOrNull
-import com.cyxbs.components.utils.extensions.toast
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.cyxbs.components.config.service.impl
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -14,7 +12,7 @@ interface IAppUpdateService {
     // 检查更新
     suspend fun checkUpdate(): AppUpdateStatus.Result
     // 通知用户有更新
-    fun noticeUpdate()
+    fun noticeUpdate(newVersion: UpdateInfo)
 
     /**
      * 尝试通知用户更新，内部有时间和状态判断
@@ -29,30 +27,5 @@ interface IAppUpdateService {
      */
     fun debug()
 
-    companion object : IAppUpdateService by IAppUpdateService::class.implOrNull() ?: object : IAppUpdateService {
-
-        private val stateFlow = MutableStateFlow(
-            AppUpdateStatus.Result.Error(IllegalStateException("当前应用无更新功能！！！")))
-
-        override fun getUpdateStatus(): StateFlow<AppUpdateStatus> {
-            return stateFlow
-        }
-
-        override suspend fun checkUpdate(): AppUpdateStatus.Result {
-            toast("当前应用无更新功能！！！")
-            return stateFlow.value
-        }
-
-        override fun noticeUpdate() {
-            toast("当前应用无更新功能！！！")
-        }
-
-        override fun tryNoticeUpdate(needFrequency: Boolean) {
-            toast("当前应用无更新功能！！！")
-        }
-
-        override fun debug() {
-            toast("当前应用无更新功能！！！")
-        }
-    }
+    companion object : IAppUpdateService by IAppUpdateService::class.impl()
 }

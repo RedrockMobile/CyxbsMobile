@@ -8,7 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.pages.home.viewmodel.AdaptiveCourseFrameViewModel
 
 /**
@@ -18,7 +18,7 @@ import com.cyxbs.pages.home.viewmodel.AdaptiveCourseFrameViewModel
  * @date 2025/9/22
  */
 @Composable
-fun AdaptiveHomePage(parcel: DestinationParcel<HomeArgument>) {
+fun AdaptiveHomePage(parcel: DestinationParcel<HomeNavArgument>) {
   val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel() }
   Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     courseFrameViewModel.frame.HomeCourseContent(

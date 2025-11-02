@@ -39,8 +39,8 @@ import com.cyxbs.components.config.compose.theme.DefaultIndication
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainDestination
-import com.cyxbs.components.config.navigation.NAV_ABOUT_ENTRY
+import com.cyxbs.components.config.navigation.MainNavDestination
+import com.cyxbs.components.config.navigation.NAV_ABOUT
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.init.MainNavController
@@ -75,8 +75,8 @@ import kotlin.time.Clock
 @Serializable
 object AboutArgument
 
-@ImplProvider(clazz = MainDestination::class, name = NAV_ABOUT_ENTRY)
-class AboutDestination : MainDestination<AboutArgument>(AboutArgument::class) {
+@ImplProvider(clazz = MainNavDestination::class, name = NAV_ABOUT)
+class AboutNavDestination : MainNavDestination<AboutArgument>(AboutArgument::class) {
 
     override val needLogin: Boolean
         get() = false
@@ -205,13 +205,13 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
                 indication = DefaultIndication,
                 onClick = {
                     val appUpdateService = IAppUpdateService
-                    if (appUpdateService.getUpdateStatus().value == AppUpdateStatus.Result.Dated) {
-                        appUpdateService.noticeUpdate()
+                    val nowUpdateStatus = appUpdateService.getUpdateStatus().value
+                    if (nowUpdateStatus is AppUpdateStatus.Result.Dated) {
+                        appUpdateService.noticeUpdate(nowUpdateStatus.newVersion)
                     } else coroutineScope.launch {
-                        val status = appUpdateService.checkUpdate()
-                        when (status) {
-                            AppUpdateStatus.Result.Dated -> appUpdateService.noticeUpdate()
+                        when (val status = appUpdateService.checkUpdate()) {
                             AppUpdateStatus.Result.Valid -> toast("已经是最新版了哦")
+                            is AppUpdateStatus.Result.Dated -> appUpdateService.noticeUpdate(status.newVersion)
                             is AppUpdateStatus.Result.Error -> {
                                 toast("有一股神秘力量阻拦了更新，可尝试点击「产品官网」下载最新版～")
                                 // TODO 打开 CrashDialog
@@ -250,8 +250,8 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
         IAppUpdateService.getUpdateStatus().collectLatest {
             updateStatus.value = when (it) {
                 AppUpdateStatus.Checking -> "检查中..."
-                AppUpdateStatus.Result.Dated -> "发现新版本"
                 AppUpdateStatus.Result.Valid -> "已是最新版本"
+                is AppUpdateStatus.Result.Dated -> "发现新版本"
                 is AppUpdateStatus.Result.Error -> "新版本请求失败 >_<"
             }
         }
