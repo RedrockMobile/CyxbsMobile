@@ -53,22 +53,32 @@ class ApkInstallStep(val project: Project) {
   }
 
   private fun confirm(): Boolean {
-    println("✅ apk 已安装，请检查课表是否正常显示，5秒后将进行确认".bold())
-    project.providers.exec {
-      // adb shell am start 打开 app
-      commandLine(
-        adb, "shell", "am", "start",
-        "-a", "com.mredrock.cyxbs.action.COURSE", // 启动就直接打开课表的 action
-        "-p", Config.getApplicationId(project), // 启动的包名
-      )
-      isIgnoreExitValue = true
-    }.result.get()
-    Thread.sleep(5000)
+    println("✅ apk 已安装, ".bold() + "请按如下步骤进行严格的检查！！！".red())
+    var index = 0
+    var result = check("${index++}. 覆盖安装后能否继承登录状态?", listOf())
+    result = result && check("${index++}. 首页轮播图是否正常加载出图片?", null)
+    result = result && check("${index++}. 即将打开课表，请确认能否正常打开并显示?", listOf("-a", "com.mredrock.cyxbs.action.COURSE"))
+    result = result && check("${index++}. 即将强制触发更新弹窗，请确认更新弹窗能正常弹出且能跳转下载? " + "(最核心功能)".red(), listOf("-a", "com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG"))
+    return result
+  }
+
+  private fun check(title: String, action: List<String>?): Boolean {
     val sc = Scanner(System.`in`)
-    println("\n请确定课表功能正常，能否正常显示课程? (y/n)".red())
+    println("\n$title (y/n)".red())
+    if (action != null) {
+      project.providers.exec {
+        // adb shell am start 打开 app
+        commandLine(
+          adb, "shell", "am", "start",
+          "-p", Config.getApplicationId(project),
+          *action.toTypedArray()
+        )
+        isIgnoreExitValue = true
+      }.result.get()
+    }
     val nextLine = sc.nextLine()
     if (nextLine != "y") {
-      println("❌ 取消发版".red())
+      println("❌ 失败，取消发版".red())
       return false
     }
     return true

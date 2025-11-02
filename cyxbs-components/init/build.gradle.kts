@@ -8,7 +8,8 @@ kotlin {
       implementation(libs.compose.navigation)
     }
     androidMain.dependencies {
-      implementation(libs.bundles.projectBase)
+      implementation(libs.androidx.appcompat)
+      implementation(libs.androidx.lifecycle.process)
     }
   }
 }

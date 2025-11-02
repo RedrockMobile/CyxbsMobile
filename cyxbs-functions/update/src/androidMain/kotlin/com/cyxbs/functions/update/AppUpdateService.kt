@@ -1,16 +1,23 @@
 package com.cyxbs.functions.update
 
-import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import androidx.core.content.edit
-import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.LiveData
+import androidx.core.net.toUri
 import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.WhichButton
+import com.afollestad.materialdialogs.actions.getActionButton
+import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.config.sp.defaultSettings
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.init.appTopActivity
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.functions.update.bean.UpdateInfo
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 /**
@@ -18,23 +25,26 @@ import java.util.concurrent.TimeUnit
  */
 @ImplProvider
 internal object AppUpdateService : IAppUpdateService {
-    override fun getUpdateStatus(): LiveData<AppUpdateStatus> = AppUpdateModel.status
-
-    override fun checkUpdate() {
-        AppUpdateModel.checkUpdate()
+    override fun getUpdateStatus(): StateFlow<AppUpdateStatus> {
+        return AppUpdateModel.status
     }
 
-    override fun noticeUpdate(activity: FragmentActivity) {
+    override suspend fun checkUpdate(): AppUpdateStatus.Result {
+        return AppUpdateModel.checkUpdate()
+    }
+
+    override fun noticeUpdate() {
         val info = AppUpdateModel.updateInfo ?: return
-        noticeUpdateInternal(activity, info)
+        noticeUpdateInternal(info)
     }
     
-    private fun noticeUpdateInternal(activity: FragmentActivity, info: UpdateInfo) {
-        MaterialDialog(activity).show {
+    private fun noticeUpdateInternal(info: UpdateInfo) {
+        val activity = appTopActivity.get() ?: return
+        val dialog = MaterialDialog(activity).show {
             title(text = "有新版本更新")
-            message(text = "最新版本:" + info.versionName + "\n" + info.updateContent + "\n点击点击，现在就更新一发吧~")
+            message(text = "最新版本:" + info.versionName + "\n\n" + info.updateContent + "\n\n点击点击，现在就更新一发吧~")
             positiveButton(text = "下载最新安装包") {
-                val uri = Uri.parse(info.apkUrl)
+                val uri = info.apkUrl.toUri()
                 /*
                 * 22-8-30
                 * 因为应用内更新有很多毛病，所以采用浏览器下载
@@ -48,36 +58,41 @@ internal object AppUpdateService : IAppUpdateService {
             }
             cornerRadius(16F)
         }
-    }
-    
-    override fun tryNoticeUpdate(activity: FragmentActivity, isForce: Boolean) {
-        checkUpdate()
-        getUpdateStatus().observe(activity) {
-            if (it == AppUpdateStatus.DATED) {
-                val sp = activity.getSharedPreferences("更新记录", Context.MODE_PRIVATE)
-                val nowTime = System.currentTimeMillis()
-                if (isForce) {
-                    noticeUpdate(activity)
-                    sp.edit { putLong("上次提醒更新时间", nowTime) }
-                    return@observe
-                }
-                val lastTime = sp.getLong("上次提醒更新时间", 0L)
-                val diff = TimeUnit.HOURS.convert(nowTime - lastTime, TimeUnit.MILLISECONDS)
-                if (diff >= 12) {
-                    // 如果有更新，则每隔 12 个小时提醒一次更新
-                    noticeUpdate(activity)
-                    sp.edit { putLong("上次提醒更新时间", nowTime) }
-                }
+        if (isDebug() && AppUpdateModel.mockDated) {
+            toast("⚠️注意：当前处于测试更新弹窗状态中，5 秒后将自动点击更新按钮")
+            val job = appCoroutineScope.launch {
+                delay(5000)
+                dialog.getActionButton(WhichButton.POSITIVE).performClick()
+            }
+            dialog.setOnDismissListener {
+                job.cancel()
             }
         }
     }
     
-    override fun debug(activity: FragmentActivity, updateContent: String) {
-        if (BuildConfig.DEBUG) {
-            val info = AppUpdateModel.updateInfo
-                ?.copy(updateContent = updateContent)
-                ?: UpdateInfo(updateContent = updateContent)
-            noticeUpdateInternal(activity, info)
+    override fun tryNoticeUpdate(needFrequency: Boolean) {
+        appCoroutineScope.launch(Dispatchers.Main) {
+            val status = checkUpdate()
+            if (status == AppUpdateStatus.Result.Dated) {
+                val nowTime = System.currentTimeMillis()
+                if (!needFrequency) {
+                    noticeUpdate()
+                    defaultSettings.putLong("上次提醒更新时间", nowTime)
+                    return@launch
+                }
+                val lastTime = defaultSettings.getLong("上次提醒更新时间", 0L)
+                val diff = TimeUnit.HOURS.convert(nowTime - lastTime, TimeUnit.MILLISECONDS)
+                if (diff >= 12) {
+                    // 如果有更新，则每隔 12 个小时提醒一次更新
+                    noticeUpdate()
+                    defaultSettings.putLong("上次提醒更新时间", nowTime)
+                }
+            }
         }
+    }
+
+    override fun debug() {
+        AppUpdateModel.mockDated = true
+        tryNoticeUpdate(needFrequency = false)
     }
 }

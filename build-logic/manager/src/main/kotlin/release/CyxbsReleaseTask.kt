@@ -77,7 +77,10 @@ abstract class CyxbsReleaseTask : DefaultTask() {
             return
         }
         // 本地 apk 安装检查
-        // 如果提示 adb 找不到，注释该 Step
+        // 在发版前进行测试，需要严格测试如下功能：
+        // 1. 安装后能直接继承登录状态，并且 banner 图正常显示
+        // 2. 课表能正常打开并显示
+        // 3. 更新弹窗能正常弹出 (最重要)
         val apkInstallStep = ApkInstallStep(project)
         if (!apkInstallStep.execute(apk)) {
             return
