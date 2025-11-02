@@ -1,6 +1,7 @@
 package com.cyxbs.functions.update.bean
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * ...
@@ -9,17 +10,18 @@ import com.google.gson.annotations.SerializedName
  * @date 2023/10/28
  * @Description:
  */
+@Serializable
 data class GithubUpdateInfo(
-    @SerializedName("assets")
+    @SerialName("assets")
     val assets: List<Asset>,
-    @SerializedName("body")
+    @SerialName("body")
     val body: String,
-    @SerializedName("tag_name")
+    @SerialName("tag_name")
     val tag: String
 ) {
+    @Serializable
     data class Asset(
-        @SerializedName("browser_download_url")
+        @SerialName("browser_download_url")
         val downloadUrl: String,
-    ) {
-    }
+    )
 }

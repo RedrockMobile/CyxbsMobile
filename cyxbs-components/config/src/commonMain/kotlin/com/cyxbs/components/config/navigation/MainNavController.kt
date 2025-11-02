@@ -24,6 +24,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
 import androidx.navigation.toRoute
@@ -34,7 +35,8 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.allImpl
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -45,30 +47,36 @@ import kotlinx.serialization.Serializable
  */
 
 /**
- * 主页的路由参数，对应的界面在 [HomeDestination]
+ * 主页的路由参数，对应的界面在 [HomeNavDestination]
  */
 @Serializable
-object HomeArgument
+class HomeNavArgument(
+  @SerialName("page")
+  val page: String = "discover",
+)
 
 /**
  * 应用最顶层的 Compose NavHost
  *
- * 如果需要注册页面，详细请查看 [MainDestination]
+ * 如果需要注册页面，详细请查看 [MainNavDestination]
  */
 @Composable
 fun MainNavHost() {
   val navController = rememberNavController()
   MainNavController = navController
   val destinations = remember {
-    MainDestination::class.allImpl().mapValues { it.value.get() as MainDestination<Any> }
+    MainNavDestination::class.allImpl().mapValues { it.value.get() as MainNavDestination<Any> }
+  }
+  val dialogs = remember {
+    MainNavDialog::class.allImpl().mapValues { it.value.get() as MainNavDialog<Any> }
   }
   NavHost(
     navController = navController,
     startDestination = if (checkIsLogin() == null) {
       // 未登录则起点是登录页面
       // 这里 targetRoute 因为 navController 还未初始化 graph，所以手动指定为 HomeArgument 的 route
-      LoginArgument(HomeArgument.serializer().descriptor.serialName)
-    } else HomeArgument,
+      LoginNavArgument(HomeNavArgument.serializer().descriptor.serialName)
+    } else HomeNavArgument(),
   ) {
     destinations.forEach { (scheme, destination) ->
       composable(
@@ -86,12 +94,38 @@ fun MainNavHost() {
         popExitTransition = destination::popExitTransition,
         sizeTransform = destination::sizeTransform,
         content = {
-          CheckLoginBeforeDestination(destination) {
+          val accountStateFlow = remember { IAccountService::class.impl().state }.collectAsState()
+          if (!destination.needLogin || accountStateFlow.value is AccountState.Login) {
+            // 登录检查
             val parcel = DestinationParcel<Any>(it.toRoute(destination.argumentClass), it, this)
             destination.DestinationContent(parcel)
+          } else {
+            LoginDialog()
           }
         },
       )
+    }
+    dialogs.forEach { (scheme, navDialog) ->
+      dialog(
+        route = navDialog.argumentClass,
+        typeMap = navDialog.typeMap,
+        deepLinks = navDialog.extraDeepLinks + navDeepLink(
+          // 注册 path 为 @ImplProvider name 的默认 deepLink
+          route = navDialog.argumentClass,
+          basePath = "cyxbs://$scheme",
+          typeMap = navDialog.typeMap
+        ) {},
+        dialogProperties = navDialog.dialogProperties,
+      ) {
+        val accountStateFlow = remember { IAccountService::class.impl().state }.collectAsState()
+        if (!navDialog.needLogin || accountStateFlow.value is AccountState.Login) {
+          // 登录检查
+          val parcel = DialogDestinationParcel<Any>(it.toRoute(navDialog.argumentClass), it)
+          navDialog.DialogContent(parcel)
+        } else {
+          LoginDialog()
+        }
+      }
     }
   }
 }
@@ -107,19 +141,6 @@ private fun checkIsLogin(): Boolean? {
     return true
   }
   return false
-}
-
-@Composable
-private fun CheckLoginBeforeDestination(
-  destination: MainDestination<*>,
-  content: @Composable () -> Unit,
-) {
-  val accountStateFlow = remember { IAccountService::class.impl().state }.collectAsState()
-  if (!destination.needLogin || accountStateFlow.value is AccountState.Login) {
-    content()
-  } else {
-    LoginDialog()
-  }
 }
 
 @Composable
@@ -155,8 +176,7 @@ private fun LoginDialog() {
             .clip(MaterialTheme.shapes.large)
             .background(LocalAppColors.current.positive)
             .clickable {
-              MainNavController.popBackStack() // 弹出自身
-              LoginArgument.navigate(target = null, clearStack = false) // 打开登录页
+              LoginNavArgument.navigate(target = null, clearStack = false) // 打开登录页
             },
           contentAlignment = Alignment.Center
         ) {

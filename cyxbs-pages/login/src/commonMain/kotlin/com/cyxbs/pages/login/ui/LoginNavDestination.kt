@@ -58,12 +58,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.appName
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainDestination
-import com.cyxbs.components.config.navigation.NAV_LOGIN_ENTRY
+import com.cyxbs.components.config.navigation.MainNavDestination
+import com.cyxbs.components.config.navigation.NAV_LOGIN
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.login.generated.resources.Res
@@ -87,14 +87,14 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/30
  */
-@ImplProvider(clazz = MainDestination::class, name = NAV_LOGIN_ENTRY)
-class LoginDestination : MainDestination<LoginArgument>(LoginArgument::class) {
+@ImplProvider(clazz = MainNavDestination::class, name = NAV_LOGIN)
+class LoginNavDestination : MainNavDestination<LoginNavArgument>(LoginNavArgument::class) {
 
   override val needLogin: Boolean
     get() = false // 登录页允许未登录时打开
 
   @Composable
-  override fun DestinationContent(parcel: DestinationParcel<LoginArgument>) {
+  override fun DestinationContent(parcel: DestinationParcel<LoginNavArgument>) {
     viewModel { LoginViewModel(parcel.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
     LoginPage()
   }

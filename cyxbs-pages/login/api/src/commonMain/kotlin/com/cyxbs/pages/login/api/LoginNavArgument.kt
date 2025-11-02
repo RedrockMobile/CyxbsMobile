@@ -5,6 +5,7 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.init.appCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,7 +15,8 @@ import kotlinx.serialization.Serializable
  * @date 2025/4/2
  */
 @Serializable
-class LoginArgument(
+class LoginNavArgument(
+  @SerialName("targetRoute")
   val targetRoute: String?,
 ) {
 
@@ -44,7 +46,7 @@ class LoginArgument(
         // 使用 Dispatchers.Main.immediate
         // 如果当前就是主线程，则直接执行，否则切换到主线程才执行
         MainNavController.navigate(
-          LoginArgument(target)
+          LoginNavArgument(target)
         ) {
           if (clearStack) {
             // 清空栈

@@ -14,7 +14,7 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.login.api.ILegalNoticeService
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.DeviceInfoParams
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.network.LoginApiService
@@ -25,7 +25,7 @@ import com.cyxbs.pages.login.network.LoginApiService
  * @author 985892345
  * @date 2024/12/31
  */
-actual class LoginViewModel actual constructor(argument: LoginArgument) :
+actual class LoginViewModel actual constructor(argument: LoginNavArgument) :
   CommonLoginViewModel(argument) {
 
   init {
