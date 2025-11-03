@@ -27,7 +27,7 @@ target 'CyxbsMobile2019_iOS' do
   pod 'Masonry'  # 自动布局库
   pod 'MJRefresh'  # 下拉刷新库
   pod 'AMapLocation-NO-IDFA'  # 高德地图定位库
-  pod 'AMap3DMap-NO-IDFA'  # 高德地图3D库
+  pod 'AMap3DMap-NO-IDFA', '~> 10.1.500'  # 高德地图3D库
   pod 'MJExtension'  # 字典和模型之间的转换库
   pod 'SDCycleScrollView'  # 轮播图库
   pod 'FSCalendar'  # iOS日历库，兼容Objective-C和Swift
