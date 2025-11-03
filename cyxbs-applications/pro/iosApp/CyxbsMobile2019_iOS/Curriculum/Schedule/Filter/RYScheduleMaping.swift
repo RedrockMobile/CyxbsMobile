@@ -105,18 +105,60 @@ extension RYScheduleMaping {
 
 extension RYScheduleMaping {
     
-    // map a ScheduleModel on mapTable, O(n * m), n: section, m: lenth
     func maping(_ model: ScheduleModel, prepare cals: [ScheduleCalModel]? = nil, priority: Priority = .mainly) {
+        // 线程安全检查（可选）
+        #if DEBUG
+        if !Thread.isMainThread {
+            print("RYScheduleMaping建议在主线程调用，当前线程: \(Thread.current)")
+        }
+        #endif
+        
         if model.customType == .system {
             start = model.start
             nowWeek = model.nowWeek
         }
-        if scheduleModelMap[model] != nil { return }
+        
+        guard scheduleModelMap[model] == nil else { return }
+        
         didFinished = false
         scheduleModelMap[model] = priority
-        let cals = cals ?? model.calModels
-        for cal in cals {
+        
+        // 安全获取cals数组
+        let safeCals = cals ?? model.calModels
+        
+        // 安全检查数组
+        guard !safeCals.isEmpty else {
+            print("课程数据为空数组，model: \(model)")
+            return
+        }
+        
+        // 安全遍历和处理
+        for (index, cal) in safeCals.enumerated() {
+            // 验证cal数据完整性
+            guard !cal.curriculum.period.isEmpty else {
+                print("跳过第\(index)个课程: 周期为空")
+                continue
+            }
+            
+            // 验证section和week的有效性
+            guard cal.inSection >= 0 && cal.curriculum.inWeek >= 0 else {
+                print("跳过第\(index)个课程: 无效的section(\(cal.inSection))或week(\(cal.curriculum.inWeek))")
+                continue
+            }
+            
             for idx in cal.curriculum.period {
+                // 验证idx有效性
+                guard idx >= 0 else {
+                    print("跳过无效索引: \(idx), 课程位置: \(index)")
+                    continue
+                }
+                
+                // 防止location值过大
+                guard idx < 50 else {
+                    print("课程索引过大: \(idx), 课程位置: \(index)")
+                    continue
+                }
+                
                 let pointCal = Collection(cal: cal, location: idx, priority: priority)
                 map(pCal: pointCal)
             }
@@ -124,29 +166,44 @@ extension RYScheduleMaping {
     }
     
     private func map(pCal: Collection) {
+        // 输入验证
+        guard pCal.location >= 0 else {
+            print("无效的location: \(pCal.location)")
+            return
+        }
+        
+        guard pCal.cal.inSection >= 0 && pCal.cal.curriculum.inWeek >= 0 else {
+            print("无效的section(\(pCal.cal.inSection))或week(\(pCal.cal.curriculum.inWeek))")
+            return
+        }
+        
         let indexPath = IndexPath(indexes: [pCal.cal.inSection, pCal.cal.curriculum.inWeek])
         var ary = mapTable[indexPath] ?? []
+        
+        // 安全扩展数组
         if ary.count <= pCal.location {
+            // 限制最大扩展数量，防止内存爆炸
+            let maxReasonableSize = 50
+            guard pCal.location < maxReasonableSize else {
+                print("location值过大: \(pCal.location)")
+                return
+            }
+            
             for _ in ary.count ... pCal.location {
                 ary.append(nil)
             }
         }
         
-        // do not check priority to layout
-        
+        // 原有逻辑保持不变
         if !checkPriority {
             abandon_the_old_for_the_new()
             return
         }
         
-        // if is old exist
-        
         guard let old = ary[pCal.location] else {
             abandon_the_old_for_the_new()
             return
         }
-        
-        // abandon the old for the new
         
         if pCal.priority < old.priority {
             abandon_the_old_for_the_new(old: old)
@@ -254,5 +311,44 @@ extension RYScheduleMaping {
         oldValues = []
         finalData = [[]]
         didFinished = false
+    }
+}
+
+// MARK: Validate
+
+extension RYScheduleMaping {
+    func validateScheduleData(_ model: ScheduleModel) -> (isValid: Bool, issues: [String]) {
+        var issues: [String] = []
+        
+        let cals = model.calModels
+        
+        if cals.isEmpty {
+            issues.append("课程数据为空")
+        }
+        
+        for (index, cal) in cals.enumerated() {
+            if cal.inSection < 0 {
+                issues.append("第\(index)个课程section为负数: \(cal.inSection)")
+            }
+            
+            if cal.curriculum.inWeek < 0 {
+                issues.append("第\(index)个课程week为负数: \(cal.curriculum.inWeek)")
+            }
+            
+            if cal.curriculum.period.isEmpty {
+                issues.append("第\(index)个课程周期为空")
+            }
+            
+            for period in cal.curriculum.period {
+                if period < 0 {
+                    issues.append("第\(index)个课程有负数的周期: \(period)")
+                }
+                if period >= 50 {
+                    issues.append("第\(index)个课程周期值过大: \(period)")
+                }
+            }
+        }
+        
+        return (issues.isEmpty, issues)
     }
 }

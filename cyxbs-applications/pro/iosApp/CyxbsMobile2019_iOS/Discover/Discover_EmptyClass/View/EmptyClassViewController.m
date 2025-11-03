@@ -83,9 +83,16 @@
 }
 
 - (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    
     NSInteger nowWeek = [SwiftToOC getNowWeek] - 1;
     if(nowWeek < 0){
         nowWeek = 0;
+    }
+    
+    if (nowWeek >= self.contentView.weekButtonArray.count) {
+        NSLog(@"周数索引越界保护: nowWeek=%ld, 数组长度=%lu", nowWeek, (unsigned long)self.contentView.weekButtonArray.count);
+        nowWeek = self.contentView.weekButtonArray.count - 1; // 选择最后一个有效的周数
     }
     
     // 获取当前是星期几
@@ -96,9 +103,20 @@
         today = today - 1;
     }
     
+    NSInteger todayIndex = today - 1;
+    if (todayIndex >= self.contentView.weekDayButtonArray.count) {
+        NSLog(@"星期索引越界保护: todayIndex=%ld, 数组长度=%lu", todayIndex, (unsigned long)self.contentView.weekDayButtonArray.count);
+        todayIndex = self.contentView.weekDayButtonArray.count - 1; // 选择最后一个有效的星期
+    }
+    
     // 自动选择当前日期
-    [self weekButtonChoosed:self.contentView.weekButtonArray[nowWeek]];
-    [self weekdayButtonChoosed:self.contentView.weekDayButtonArray[today - 1]];
+    if (self.contentView.weekButtonArray.count > nowWeek) {
+        [self weekButtonChoosed:self.contentView.weekButtonArray[nowWeek]];
+    }
+    
+    if (self.contentView.weekDayButtonArray.count > todayIndex) {
+        [self weekdayButtonChoosed:self.contentView.weekDayButtonArray[todayIndex]];
+    }
 }
 
 - (void)dealloc
