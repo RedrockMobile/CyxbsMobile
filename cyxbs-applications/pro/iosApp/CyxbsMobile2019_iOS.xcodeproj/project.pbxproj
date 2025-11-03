@@ -270,7 +270,6 @@
 		1AC2550823C9B14F00DF0475 /* DidNotCheckInDot.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AC2550723C9B14F00DF0475 /* DidNotCheckInDot.m */; };
 		1AF4B6072362EBFE00A0823A /* NSDate+Timestamp.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */; };
 		1AFE535124F7571300F42A74 /* IntroductionController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AFE535024F7571300F42A74 /* IntroductionController.m */; };
-		24C9C7125720E6BDA5A78E82 /* Pods_CyxbsMobile2019_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0659993564DFBAFC3CF4EB6A /* Pods_CyxbsMobile2019_iOS.framework */; };
 		491DAE5726E207C600693AAA /* CommonQuestionData.m in Sources */ = {isa = PBXBuildFile; fileRef = 491DAE5626E207C600693AAA /* CommonQuestionData.m */; };
 		49252DAA26D39CC9003A8A7F /* FeedBackMainPageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 49252DA926D39CC9003A8A7F /* FeedBackMainPageViewController.m */; };
 		492C19AE26CE458000C485D9 /* Bauhaus-93.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 492C19AD26CE458000C485D9 /* Bauhaus-93.ttf */; };
@@ -292,6 +291,8 @@
 		4999FA8326D44EA8005D0ADE /* HintView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4999FA8226D44EA8005D0ADE /* HintView.m */; };
 		49A50B6726D83B9600B25DDF /* CommonQuestionDetailVC.m in Sources */ = {isa = PBXBuildFile; fileRef = 49A50B6526D83B9600B25DDF /* CommonQuestionDetailVC.m */; };
 		49C2E78326D563AF00AFBE6F /* TypeSelectView.m in Sources */ = {isa = PBXBuildFile; fileRef = 49C2E78226D563AF00AFBE6F /* TypeSelectView.m */; };
+		54A015758B176F663A191330 /* Pods_CyxbsWidgetExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1843D71C9EBEADC648DA3CE4 /* Pods_CyxbsWidgetExtension.framework */; };
+		5F73C44C6FE2FF78EB4A2B49 /* Pods_CyxbsMobile2019_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 387F1BE7DB99B7F30EA14155 /* Pods_CyxbsMobile2019_iOS.framework */; };
 		6464F93426E4F6EE008562C5 /* BuyModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 6464F93326E4F6EE008562C5 /* BuyModel.m */; };
 		646B1967282AA9420015DF28 /* BusGuideViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1966282AA9420015DF28 /* BusGuideViewController.m */; };
 		646B1975282CDF840015DF28 /* StationsCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1974282CDF840015DF28 /* StationsCollectionViewCell.m */; };
@@ -657,7 +658,6 @@
 		DB4065032466D889006CE5BC /* DLReminderView.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F42466D888006CE5BC /* DLReminderView.m */; };
 		EE131C212471362E00B6ED97 /* URLController.m in Sources */ = {isa = PBXBuildFile; fileRef = EE131C202471362E00B6ED97 /* URLController.m */; };
 		EE899DEA2367DB2600DDB0D9 /* Bahnschrift.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */; };
-		F1ACE21393DEB5E478FB3DD7 /* Pods_CyxbsWidgetExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CDEA1F98570FFFC0D6A8C14E /* Pods_CyxbsWidgetExtension.framework */; };
 		FC05B1CC2ADAF054008B245B /* JudgeArrangeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */; };
 		FC06D0E62A9DC0EA00A974D8 /* CreateGroupModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC06D0E52A9DC0EA00A974D8 /* CreateGroupModel.swift */; };
 		FC06D0EC2A9E637000A974D8 /* GroupItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC06D0EB2A9E636F00A974D8 /* GroupItem.swift */; };
@@ -760,7 +760,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0659993564DFBAFC3CF4EB6A /* Pods_CyxbsMobile2019_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CyxbsMobile2019_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1451EA51282A09B800A5BB55 /* UserPublishModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UserPublishModel.h; sourceTree = "<group>"; };
 		1451EA52282A09B800A5BB55 /* UserPublishModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UserPublishModel.m; sourceTree = "<group>"; };
 		1451EA56282BAF0C00A5BB55 /* MessageDetailTitleView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MessageDetailTitleView.h; sourceTree = "<group>"; };
@@ -940,6 +939,7 @@
 		14FFFBFD2AF8C0FD005A7EBD /* TabBarPresentationViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarPresentationViewController.swift; sourceTree = "<group>"; };
 		14FFFBFE2AF8C0FD005A7EBD /* UITabBarItem+TabBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UITabBarItem+TabBar.swift"; sourceTree = "<group>"; };
 		14FFFBFF2AF8C0FD005A7EBD /* TabBarController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
+		1843D71C9EBEADC648DA3CE4 /* Pods_CyxbsWidgetExtension.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CyxbsWidgetExtension.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1849D8B12EAF4E4700DBFD72 /* DetailsBaseTableViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsBaseTableViewCell.h; sourceTree = "<group>"; };
 		1849D8B22EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsBaseTableViewCell.m; sourceTree = "<group>"; };
 		1849D8B32EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
@@ -1158,6 +1158,8 @@
 		1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSDate+Timestamp.m"; sourceTree = "<group>"; };
 		1AFE534F24F7571300F42A74 /* IntroductionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IntroductionController.h; sourceTree = "<group>"; };
 		1AFE535024F7571300F42A74 /* IntroductionController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IntroductionController.m; sourceTree = "<group>"; };
+		21BAC4215263E008B4AD6F34 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
+		387F1BE7DB99B7F30EA14155 /* Pods_CyxbsMobile2019_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CyxbsMobile2019_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		491DAE5526E207C600693AAA /* CommonQuestionData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CommonQuestionData.h; sourceTree = "<group>"; };
 		491DAE5626E207C600693AAA /* CommonQuestionData.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionData.m; sourceTree = "<group>"; };
 		49252DA826D39CC9003A8A7F /* FeedBackMainPageViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FeedBackMainPageViewController.h; sourceTree = "<group>"; };
@@ -1198,7 +1200,6 @@
 		49A50B6526D83B9600B25DDF /* CommonQuestionDetailVC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CommonQuestionDetailVC.m; sourceTree = "<group>"; };
 		49C2E78126D563AF00AFBE6F /* TypeSelectView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TypeSelectView.h; sourceTree = "<group>"; };
 		49C2E78226D563AF00AFBE6F /* TypeSelectView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TypeSelectView.m; sourceTree = "<group>"; };
-		5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		6464F93226E4F6EE008562C5 /* BuyModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BuyModel.h; sourceTree = "<group>"; };
 		6464F93326E4F6EE008562C5 /* BuyModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BuyModel.m; sourceTree = "<group>"; };
 		6464F98726F4FDB4008562C5 /* ExchangeCenterViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ExchangeCenterViewController.h; sourceTree = "<group>"; };
@@ -1461,12 +1462,10 @@
 		7AA4C4842892217100E204C8 /* MapHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MapHeader.h; sourceTree = "<group>"; };
 		7AA4C48628922F9A00E204C8 /* ToDoHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ToDoHeader.h; sourceTree = "<group>"; };
 		7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineMainPageHeader.h; sourceTree = "<group>"; };
-		7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
 		7FBF39E8257B79F20077494E /* ByWordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByWordViewController.h; sourceTree = "<group>"; };
 		7FBF39E9257B79F20077494E /* ByPasswordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByPasswordViewController.h; sourceTree = "<group>"; };
 		7FBF39EB257B79F20077494E /* ByPasswordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByPasswordViewController.m; sourceTree = "<group>"; };
 		7FBF39EF257B79F30077494E /* ByWordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByWordViewController.m; sourceTree = "<group>"; };
-		811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
 		9AB758832CEEEE6600E8258A /* SAAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAAlertController.swift; sourceTree = "<group>"; };
 		9AB758852CEF02EC00E8258A /* NoticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeView.swift; sourceTree = "<group>"; };
 		9AB758872CEF113800E8258A /* NoticeItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeItem.swift; sourceTree = "<group>"; };
@@ -1746,7 +1745,9 @@
 		B0FE5F28294C94540070E755 /* RisingUIKitExtension.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RisingUIKitExtension.h; sourceTree = "<group>"; };
 		B0FE5F2E294C958E0070E755 /* RisingScheduleHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RisingScheduleHeader.h; sourceTree = "<group>"; };
 		B5A4532B2AA4C3A500356128 /* CenterHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CenterHeader.h; sourceTree = "<group>"; };
-		CDEA1F98570FFFC0D6A8C14E /* Pods_CyxbsWidgetExtension.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CyxbsWidgetExtension.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBD6D6815FF2D7891EB58CCF /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.debug.xcconfig"; sourceTree = "<group>"; };
+		C11B9D0740D75F48082F4CE3 /* Pods-CyxbsWidgetExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.debug.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.debug.xcconfig"; sourceTree = "<group>"; };
+		C9EFC6AF88D5890D072E7C6A /* Pods-CyxbsWidgetExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsWidgetExtension.release.xcconfig"; path = "Target Support Files/Pods-CyxbsWidgetExtension/Pods-CyxbsWidgetExtension.release.xcconfig"; sourceTree = "<group>"; };
 		D0101D3F2433C885004337ED /* NSLayoutConstraint+SDMask.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSLayoutConstraint+SDMask.m"; sourceTree = "<group>"; };
 		D0101D402433C885004337ED /* NSLayoutConstraint+SDMask.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSLayoutConstraint+SDMask.h"; sourceTree = "<group>"; };
 		D0101D412433C885004337ED /* SDMask.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDMask.h; sourceTree = "<group>"; };
@@ -1865,7 +1866,6 @@
 		EE131C1F2471362E00B6ED97 /* URLController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLController.h; sourceTree = "<group>"; };
 		EE131C202471362E00B6ED97 /* URLController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = URLController.m; sourceTree = "<group>"; };
 		EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bahnschrift.ttf; sourceTree = "<group>"; };
-		F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JudgeArrangeMessage.swift; sourceTree = "<group>"; };
 		FC06D0E52A9DC0EA00A974D8 /* CreateGroupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupModel.swift; sourceTree = "<group>"; };
 		FC06D0EB2A9E636F00A974D8 /* GroupItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupItem.swift; sourceTree = "<group>"; };
@@ -1942,6 +1942,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = QA;
 			sourceTree = "<group>";
 		};
@@ -1954,7 +1956,7 @@
 			files = (
 				1476CA1E2AFCD1C000635848 /* SwiftUI.framework in Frameworks */,
 				1476CA1C2AFCD1C000635848 /* WidgetKit.framework in Frameworks */,
-				F1ACE21393DEB5E478FB3DD7 /* Pods_CyxbsWidgetExtension.framework in Frameworks */,
+				54A015758B176F663A191330 /* Pods_CyxbsWidgetExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1967,7 +1969,7 @@
 				B03FAB8A2AB9DD2C00609124 /* libresolv.tbd in Frameworks */,
 				B03FAB882AB9DD2500609124 /* libsqlite3.0.tbd in Frameworks */,
 				D09081DA23F4571B00D5342D /* UserNotifications.framework in Frameworks */,
-				24C9C7125720E6BDA5A78E82 /* Pods_CyxbsMobile2019_iOS.framework in Frameworks */,
+				5F73C44C6FE2FF78EB4A2B49 /* Pods_CyxbsMobile2019_iOS.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3727,10 +3729,10 @@
 				B03FAB892AB9DD2C00609124 /* libresolv.tbd */,
 				B03FAB872AB9DD2500609124 /* libsqlite3.0.tbd */,
 				D09081D923F4571B00D5342D /* UserNotifications.framework */,
-				0659993564DFBAFC3CF4EB6A /* Pods_CyxbsMobile2019_iOS.framework */,
 				1476CA1B2AFCD1C000635848 /* WidgetKit.framework */,
 				1476CA1D2AFCD1C000635848 /* SwiftUI.framework */,
-				CDEA1F98570FFFC0D6A8C14E /* Pods_CyxbsWidgetExtension.framework */,
+				387F1BE7DB99B7F30EA14155 /* Pods_CyxbsMobile2019_iOS.framework */,
+				1843D71C9EBEADC648DA3CE4 /* Pods_CyxbsWidgetExtension.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -3738,10 +3740,10 @@
 		3FBB4223D1D40C47740825EF /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
-				F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
-				7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
-				811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */,
+				BBD6D6815FF2D7891EB58CCF /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */,
+				21BAC4215263E008B4AD6F34 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */,
+				C11B9D0740D75F48082F4CE3 /* Pods-CyxbsWidgetExtension.debug.xcconfig */,
+				C9EFC6AF88D5890D072E7C6A /* Pods-CyxbsWidgetExtension.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -6446,7 +6448,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1476CA312AFCD1C100635848 /* Build configuration list for PBXNativeTarget "CyxbsWidgetExtension" */;
 			buildPhases = (
-				DF3B2AA67F204A07B24D38C5 /* [CP] Check Pods Manifest.lock */,
+				BF95850F95C3649A0F1C132D /* [CP] Check Pods Manifest.lock */,
 				1476CA162AFCD1C000635848 /* Sources */,
 				1476CA172AFCD1C000635848 /* Frameworks */,
 				1476CA182AFCD1C000635848 /* Resources */,
@@ -6464,13 +6466,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1A9B7693235F50A900725937 /* Build configuration list for PBXNativeTarget "CyxbsMobile2019_iOS" */;
 			buildPhases = (
-				9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */,
+				D20A96DC9B125C7C260E5CA0 /* [CP] Check Pods Manifest.lock */,
 				1A9B7663235F50A600725937 /* Sources */,
 				1A9B7664235F50A600725937 /* Frameworks */,
 				1A9B7665235F50A600725937 /* Resources */,
-				9D6DE73ED0B00224C261C76A /* [CP] Copy Pods Resources */,
-				ED9CCCACD34909A5C62007B2 /* [CP] Embed Pods Frameworks */,
 				1476CA2E2AFCD1C100635848 /* Embed Foundation Extensions */,
+				4AABE1C961F30E7095829135 /* [CP] Embed Pods Frameworks */,
+				9FDBE85C2EA059152E1FA856 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -6641,29 +6643,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		9436D3173DF4AA80557C9E35 /* [CP] Check Pods Manifest.lock */ = {
+		4AABE1C961F30E7095829135 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
+			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-CyxbsMobile2019_iOS-checkManifestLockResult.txt",
+				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		9D6DE73ED0B00224C261C76A /* [CP] Copy Pods Resources */ = {
+		9FDBE85C2EA059152E1FA856 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -6671,20 +6668,16 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		DF3B2AA67F204A07B24D38C5 /* [CP] Check Pods Manifest.lock */ = {
+		BF95850F95C3649A0F1C132D /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -6706,25 +6699,26 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		ED9CCCACD34909A5C62007B2 /* [CP] Embed Pods Frameworks */ = {
+		D20A96DC9B125C7C260E5CA0 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
 			);
-			name = "[CP] Embed Pods Frameworks";
+			name = "[CP] Check Pods Manifest.lock";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-CyxbsMobile2019_iOS-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks.sh\"\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -7460,7 +7454,7 @@
 /* Begin XCBuildConfiguration section */
 		1476CA2F2AFCD1C100635848 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7B61847E373D44F0CD3F513E /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
+			baseConfigurationReference = C11B9D0740D75F48082F4CE3 /* Pods-CyxbsWidgetExtension.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7501,7 +7495,7 @@
 		};
 		1476CA302AFCD1C100635848 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 811D21D513080E3ECA71E77C /* Pods-CyxbsWidgetExtension.release.xcconfig */;
+			baseConfigurationReference = C9EFC6AF88D5890D072E7C6A /* Pods-CyxbsWidgetExtension.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -7656,7 +7650,7 @@
 		};
 		1A9B7694235F50A900725937 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5B721AEAABA63E4476ECFBA0 /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
+			baseConfigurationReference = BBD6D6815FF2D7891EB58CCF /* Pods-CyxbsMobile2019_iOS.debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -7712,7 +7706,7 @@
 		};
 		1A9B7695235F50A900725937 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F167DEF493C8B6C8720CE5F9 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
+			baseConfigurationReference = 21BAC4215263E008B4AD6F34 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
