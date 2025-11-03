@@ -39,14 +39,17 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainDestination
+import com.cyxbs.components.config.navigation.MainNavDestination
+import com.cyxbs.components.config.navigation.NAV_FOOD
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.pages.food.api.FoodArgument
+import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.food.viewmodel.FoodViewModel
 import com.cyxbs.pages.food.widget.FoodDescribeDialog
+import com.cyxbs.pages.food.widget.FoodSuggestMoreTagsDialog
+import com.cyxbs.pages.food.widget.FoodWarnDialog
 import com.cyxbs.pages.food.widget.TagSelector
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.food.generated.resources.Res
@@ -61,10 +64,13 @@ import org.jetbrains.compose.resources.painterResource
  * email : qq2420226433@outlook.comx`
  * date : 2025/10/29 23:58
  */
-@ImplProvider(clazz = MainDestination::class, name = "food")
-class FoodDestination : MainDestination<FoodArgument>(FoodArgument::class) {
+@ImplProvider(clazz = MainNavDestination::class, name = NAV_FOOD)
+class FoodDestination : MainNavDestination<FoodNavArgument>(FoodNavArgument::class) {
+	override val needLogin: Boolean
+		get() = true
+
 	@Composable
-	override fun DestinationContent(parcel: DestinationParcel<FoodArgument>) {
+	override fun DestinationContent(parcel: DestinationParcel<FoodNavArgument>) {
 		viewModel { FoodViewModel() }
 		FoodPage()
 	}
@@ -82,10 +88,12 @@ fun FoodPage() {
 		WelcomePictureCompose(Modifier.layoutId(FoodElement.WelcomePicture))
 		DiningAreaCompose(Modifier.layoutId(FoodElement.DiningArea))
 		DiningNumberCompose(Modifier.layoutId(FoodElement.DiningNumber))
-		DiningFeatureCompose(Modifier.layoutId(FoodElement.DiningFeature))
+		DiningPropertyCompose(Modifier.layoutId(FoodElement.DiningProperty))
 		MealResultCompose(Modifier.layoutId(FoodElement.MealResult))
 	}
 	FoodDescribeDialog()
+	FoodSuggestMoreTagsDialog()
+	FoodWarnDialog()
 }
 
 @Composable
@@ -178,14 +186,14 @@ private fun DiningNumberCompose(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DiningFeatureCompose(modifier: Modifier = Modifier) {
+private fun DiningPropertyCompose(modifier: Modifier = Modifier) {
 	val viewModel = viewModel(FoodViewModel::class)
 	TagSelector(
 		modifier = modifier,
 		title = "餐饮特征",
 		subTitle = "可多选",
-		tagList = viewModel.diningFeature,
-		onSelectChange = viewModel::toggleDiningFeatureSelect
+		tagList = viewModel.diningProperty,
+		onSelectChange = viewModel::toggleDiningPropertySelect
 	)
 }
 
@@ -204,20 +212,20 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 			contentAlignment = Alignment.Center
 		) {
 			AnimatedContent(
-				targetState = viewModel.result,
+				targetState = viewModel.current.value,
 				transitionSpec = {
 					slideInVertically(
-						animationSpec = tween(durationMillis = 1000)
+						animationSpec = tween(durationMillis = 500)
 					) togetherWith fadeOut()
 				}
-			) { targetText ->
+			) { current ->
 				//在嵌套一层，contentAlignment 实际只影响 动画中两个内容的过渡对齐方式
 				Box(
 					modifier = Modifier.fillMaxSize(),
 					contentAlignment = Alignment.Center
 				) {
 					Text(
-						text = targetText,
+						text = current?.name.orEmpty(),
 						textAlign = TextAlign.Center,
 						fontSize = 16.sp,
 						color = 0xFF2F5085.dark(0xFF4A6A9E)
@@ -235,7 +243,7 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 			horizontalArrangement = Arrangement.spacedBy(14.dp)
 		) {
 			//这里需要根据有没有内容显示不同的效果
-			if (viewModel.result.isBlank()) {
+			if (viewModel.current.value == null) {
 				//此时是未第一次点击的时候，查看详情还未显示出来
 				Box(
 					modifier = Modifier
@@ -244,8 +252,7 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 						.background(
 							color = 0xFF5D5DF7.dark(0xFF4841E2)
 						).clickableNoIndicator {
-							//TODO 等待接入网络
-							viewModel.result += "d"
+							viewModel.doRandomGenerated()
 						}
 				) {
 					Text(
@@ -263,8 +270,7 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 						.clip(RoundedCornerShape(30.dp))
 						.background(0xFF5D5DF7.dark(0xFF4841E2))
 						.clickableNoIndicator {
-							//TODO 等待接入网络
-							viewModel.result += "d"
+							viewModel.doRandomGenerated()
 						}
 				) {
 					Text(
@@ -284,8 +290,7 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 							shape = RoundedCornerShape(22.dp)
 						)
 						.clickableNoIndicator {
-							//TODO 等待接入网络
-							viewModel.result += "d"
+							viewModel.doChange()
 						}
 
 				) {

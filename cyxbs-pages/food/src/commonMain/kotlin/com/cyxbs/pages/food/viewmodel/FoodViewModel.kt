@@ -1,12 +1,18 @@
 package com.cyxbs.pages.food.viewmodel
 
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.network.ApiException
+import com.cyxbs.pages.food.bean.FoodResultBeanItem
+import com.cyxbs.pages.food.bean.eatArea2DiningTag
+import com.cyxbs.pages.food.bean.eatNum2DiningTag
+import com.cyxbs.pages.food.bean.eatProperty2DiningTag
+import com.cyxbs.pages.food.model.FoodRepository
 import com.cyxbs.pages.food.widget.DiningTag
+import kotlinx.coroutines.launch
 
 /**
  * description ： 美食咨询处的ViewModel
@@ -16,52 +22,89 @@ import com.cyxbs.pages.food.widget.DiningTag
  */
 
 class FoodViewModel() : BaseViewModel() {
-	val diningArea = mutableStateListOf(
-		DiningTag("千喜鹤"),
-		DiningTag("樱花"),
-		DiningTag("衍生"),
-		DiningTag("中心"),
-		DiningTag("兴业苑"),
-		DiningTag("莘莘"),
-		DiningTag("滨湖"),
-		DiningTag(""),
-	)
+	private val model by lazy {
+		FoodRepository
+	}
 
-	val diningNumber = mutableStateListOf(
-		DiningTag("1-2人"),
-		DiningTag("3-4人"),
-		DiningTag("4人以上"),
-		DiningTag(""),
-	)
+	init {
+		requestFoodMain()
+	}
 
-	val diningFeature = mutableStateListOf(
-		DiningTag("甜品"),
-		DiningTag("便宜实惠"),
-		DiningTag("清爽"),
-		DiningTag("没胃口"),
-		DiningTag("甜品2"),
-		DiningTag("便宜实3"),
-		DiningTag("清1爽"),
-		DiningTag("没胃2口"),
-	)
+	val diningArea = mutableStateListOf<DiningTag>()
 
-	//是否显示描述页
-	//没招了ChooseDialogCompose需要传入一个State，
+	val diningNumber = mutableStateListOf<DiningTag>()
+
+	val diningProperty = mutableStateListOf<DiningTag>()
+
+	/**
+	 * 	是否显示描述页
+	 * 	没招了ChooseDialogCompose需要传入一个State
+	 */
+
 	val showDescribe = mutableStateOf(false)
 
-	fun openDescribe(){
+	fun openDescribe() {
 		showDescribe.value = true
 	}
 
-	fun closeDescribe(){
+	fun closeDescribe() {
 		showDescribe.value = false
 	}
 
+	/**
+	 * 显示温馨提示(尝试选择更多关键词)
+	 */
+	val showWarn = mutableStateOf(false)
+
+	fun openWarn() {
+		showWarn.value = true
+	}
+
+	fun closeWarn() {
+		showWarn.value = false
+	}
+
+	/**
+	 * 提示选择更多标签的Dialog
+	 */
+	val showTips = mutableStateOf(false)
+	fun openTips() {
+		showTips.value = true
+	}
+
+	fun closeTips() {
+		showTips.value = false
+	}
+
+
 	private val selectedDiningArea = mutableSetOf<String>()
-	private val selectedDiningFeature = mutableSetOf<String>()
+	private val selectedDiningProperty = mutableSetOf<String>()
 	private var selectedDiningNumber: String? = null
 
-	var result by mutableStateOf("")
+
+	// 是否需要重新请求网络
+	private var needRequest = false
+
+	/**
+	 * 网络获取的结果列表
+	 */
+	val resultList = mutableStateListOf<FoodResultBeanItem>()
+
+
+	// 当前显示的索引
+	val currentIndex = mutableStateOf(0)
+
+	// 当前显示的 item
+	val current = derivedStateOf {
+		resultList.getOrNull(currentIndex.value)
+	}
+
+	//设置数据
+	fun setData(newList: List<FoodResultBeanItem>) {
+		resultList.clear()
+		resultList.addAll(newList)
+		currentIndex.value = 0
+	}
 
 
 	//改变DinningArea的选中
@@ -77,23 +120,22 @@ class FoodViewModel() : BaseViewModel() {
 		} else {
 			selectedDiningArea.remove(newTag.name)
 		}
-		logg(selectedDiningArea)
+		needRequest = true
 	}
 
-	//改变DinningFeature的选中
-	fun toggleDiningFeatureSelect(clickTag: DiningTag) {
-		val idx = diningFeature.indexOfFirst { it.name == clickTag.name }
+	//改变DinningProperty的选中
+	fun toggleDiningPropertySelect(clickTag: DiningTag) {
+		val idx = diningProperty.indexOfFirst { it.name == clickTag.name }
 		if (idx == -1) return
-		val newTag = diningFeature[idx].copy(isSelected = !diningFeature[idx].isSelected)
-		diningFeature[idx] = newTag
+		val newTag = diningProperty[idx].copy(isSelected = !diningProperty[idx].isSelected)
+		diningProperty[idx] = newTag
 
 		if (newTag.isSelected) {
-			selectedDiningFeature.add(newTag.name)
+			selectedDiningProperty.add(newTag.name)
 		} else {
-			selectedDiningFeature.remove(newTag.name)
+			selectedDiningProperty.remove(newTag.name)
 		}
-		logg(selectedDiningFeature)
-
+		needRequest = true
 	}
 
 	//改变DinningNumbers的选中
@@ -108,8 +150,7 @@ class FoodViewModel() : BaseViewModel() {
 			diningNumber[idx] = diningNumber[idx].copy(isSelected = false)
 			selectedDiningNumber = null
 
-			logg(selectedDiningNumber)
-
+			needRequest = true
 			return
 		}
 
@@ -124,7 +165,88 @@ class FoodViewModel() : BaseViewModel() {
 		diningNumber[idx] = diningNumber[idx].copy(isSelected = true)
 		selectedDiningNumber = clickTag.name
 
-		logg(selectedDiningNumber)
+		needRequest = true
+	}
+
+	/**
+	 * 随机生成美食
+	 */
+	fun doRandomGenerated() {
+		//先检查选择项
+		if (!checkTagSelected()) {
+			openTips()
+			return
+		}
+		viewModelScope.launch {
+			val requestResult = model.requestRandomGenerate(
+				eatArea = selectedDiningArea.toList(),
+				eatNumber = selectedDiningNumber!!,
+				eatProperty = selectedDiningProperty.toList()
+			)
+			val data = requestResult.getOrElse { throwable ->
+				if (throwable is ApiException && throwable.status == 10100) {
+					openWarn()
+				} else {
+					toast("网络错误")
+				}
+				//已经处理完异常了，还是返回一个null方便下面逻辑
+				null
+			}
+			data?.let {
+				setData(it)
+			}
+		}
+	}
+
+	/**
+	 * 换一换
+	 */
+	fun doChange() {
+		if (needRequest) {
+			// 用户修改了Tag，需要重新请求网络
+			doRandomGenerated()
+			needRequest = false //重置
+			return
+		}
+
+		//检查是否还有下一条
+		if (currentIndex.value < resultList.size - 1) {
+			currentIndex.value += 1
+		} else {
+			// 已经走完了，提示
+			openWarn()
+		}
+	}
+
+	/**
+	 * 检查标签选择是否合规
+	 * @return 选择是否合规
+	 */
+	private fun checkTagSelected(): Boolean {
+
+		val diningNumberVerified = selectedDiningNumber != null
+
+		val diningAreaVerified = selectedDiningArea.isNotEmpty()
+
+		val diningPropertyVerified = selectedDiningProperty.isNotEmpty()
+
+		return diningAreaVerified && diningPropertyVerified && diningNumberVerified
+	}
+
+
+	//首次进入时加载
+	private fun requestFoodMain() {
+		viewModelScope.launch {
+			val result = model.requestFoodMain()
+			val data = result.getOrNull()
+			if (data == null) {
+				toast("网络错误")
+				return@launch
+			}
+			diningNumber.addAll(data.eatNum2DiningTag())
+			diningProperty.addAll(data.eatProperty2DiningTag())
+			diningArea.addAll(data.eatArea2DiningTag())
+		}
 	}
 
 }

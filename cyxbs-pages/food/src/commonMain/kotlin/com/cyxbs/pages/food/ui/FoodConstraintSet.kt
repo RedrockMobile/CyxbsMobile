@@ -18,7 +18,7 @@ enum class FoodElement {
 	WelcomePicture,
 	DiningArea,
 	DiningNumber,
-	DiningFeature,
+	DiningProperty,
 	MealResult,//随机结果
 }
 
@@ -31,7 +31,7 @@ class FoodConstraintSet(
 	val welcomePicture = scope.createRefFor(FoodElement.WelcomePicture)
 	val diningArea = scope.createRefFor(FoodElement.DiningArea)
 	val diningNumber = scope.createRefFor(FoodElement.DiningNumber)
-	val diningFeature = scope.createRefFor(FoodElement.DiningFeature)
+	val diningProperty = scope.createRefFor(FoodElement.DiningProperty)
 	val mealResult = scope.createRefFor(FoodElement.MealResult)
 
 	fun createConstrain() {
@@ -72,7 +72,7 @@ private fun FoodConstraintSet.wh100vInfinity() {
 			height = Dimension.wrapContent
 		}
 
-		constrain(diningFeature) {
+		constrain(diningProperty) {
 			top.linkTo(diningNumber.bottom, margin = 21.dp)
 			linkTo(parent.start, parent.end, startMargin = 10.dp, endMargin = 10.dp)
 			width = Dimension.fillToConstraints
@@ -80,7 +80,7 @@ private fun FoodConstraintSet.wh100vInfinity() {
 		}
 
 		constrain(mealResult) {
-			top.linkTo(diningFeature.bottom, margin = 32.dp)
+			top.linkTo(diningProperty.bottom, margin = 32.dp)
 			linkTo(parent.start, parent.end)
 		}
 

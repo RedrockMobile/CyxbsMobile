@@ -41,3 +41,6 @@ const val NAV_ABOUT = "about"
 
 // 更新弹窗
 const val NAV_DIALOG_UPDATE = "dialog/update"
+
+//美食咨询处
+const val NAV_FOOD = "food"

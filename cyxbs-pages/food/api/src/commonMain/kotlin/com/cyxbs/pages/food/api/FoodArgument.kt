@@ -9,4 +9,4 @@ import kotlinx.serialization.Serializable
  * date : 2025/10/29 23:50
  */
 @Serializable
-object FoodArgument
+object FoodNavArgument
