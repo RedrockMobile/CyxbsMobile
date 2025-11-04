@@ -7,8 +7,8 @@ import android.view.View
 import android.widget.FrameLayout
 import com.cyxbs.components.base.pages.SecretActivity
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
+import com.cyxbs.components.init.appApplication
 import com.cyxbs.components.utils.utils.impl.ActivityLifecycleCallbacksImpl
 import com.g985892345.provider.api.annotation.ImplProvider
 import tech.linjiang.pandora.Pandora
@@ -24,8 +24,8 @@ import tech.linjiang.pandora.util.SensorDetector
 @ImplProvider(clazz = InitialService::class, name = "PandoraInitialService")
 object PandoraInitialService: InitialService, SensorDetector.Callback {
   
-  override fun onMainProcess(manager: InitialManager) {
-    super.onMainProcess(manager)
+  override fun onMainProcess() {
+    super.onMainProcess()
     Pandora.get().disableShakeSwitch() // 取消 Pandora 默认的摇一摇打开方法
 
     if (isDebug()) {
@@ -36,7 +36,7 @@ object PandoraInitialService: InitialService, SensorDetector.Callback {
     /*
     * 除了摇一摇以外，点击屏幕顶部状态栏下正中间区域 10 下也能打开
     * */
-    manager.application.registerActivityLifecycleCallbacks(
+    appApplication.registerActivityLifecycleCallbacks(
       object : ActivityLifecycleCallbacksImpl {
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
           val decorView = activity.window.decorView as FrameLayout

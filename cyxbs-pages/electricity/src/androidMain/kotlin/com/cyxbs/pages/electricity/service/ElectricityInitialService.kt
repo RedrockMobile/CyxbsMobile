@@ -6,7 +6,6 @@ import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.electricity.config.SP_BUILDING_FOOT_KEY
@@ -25,8 +24,8 @@ import kotlinx.coroutines.flow.onEach
 @ImplProvider(clazz = InitialService::class, name = "ElectricityInitialService")
 object ElectricityInitialService : InitialService {
     @SuppressLint("CheckResult")
-    override fun onMainProcess(manager: InitialManager) {
-        super.onMainProcess(manager)
+    override fun onMainProcess() {
+        super.onMainProcess()
         IAccountService::class.impl().state
             .onEach {
                 if (it is AccountState.Logout) {

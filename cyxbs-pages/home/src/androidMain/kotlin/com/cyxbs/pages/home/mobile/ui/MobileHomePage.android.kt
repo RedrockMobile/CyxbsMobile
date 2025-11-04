@@ -148,16 +148,18 @@ private fun execIntentAction(
     }
   }
   if (isNewIntent) {
-    runCatching {
-      MainNavController.navigate(
-        request = NavDeepLinkRequest(
-          uri = intent.data,
-          action = intent.action,
-          mimeType = intent.type,
+    val url = intent.data
+    if (url != null) {
+      runCatching {
+        MainNavController.navigate(
+          request = NavDeepLinkRequest.Builder.fromUri(url)
+            .apply { intent.action?.let { setAction(it)} }
+            .apply { intent.type?.let { setMimeType(it)} }
+            .build()
         )
-      )
-    }.onFailure {
-      logg(it.stackTraceToString())
+      }.onFailure {
+        logg(it.stackTraceToString())
+      }
     }
   }
 }

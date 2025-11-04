@@ -16,3 +16,10 @@ expect val defaultSettings: Settings
 // 当前登录人的 Key-Value 对象本地存储
 val accountSettings: AccountSettings
   get() = AccountSettings.now
+
+/*
+* 请在下面写上传递的 key 值，以 SP_模块名_作用名 开头命名，后面还可以细分
+* */
+
+// 隐私条例是否同意
+const val SP_PRIVACY_AGREED = "privacy_agreed"

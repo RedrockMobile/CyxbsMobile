@@ -4,6 +4,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.launchApplication
 import androidx.compose.ui.window.rememberWindowState
 import com.cyxbs.components.config.compose.theme.AppTheme
+import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
@@ -18,6 +19,7 @@ import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProvider
 
 fun main() = runApp {
   TestKtProviderInitializer.tryInitKtProvider()
+  InitialManager.init(isMainProcess = true)
   launchApplication {
     val width = 800
     val height = 600

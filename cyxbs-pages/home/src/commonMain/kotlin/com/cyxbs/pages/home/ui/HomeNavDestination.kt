@@ -6,6 +6,7 @@ import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.navigation.MainNavDestination
 import com.cyxbs.components.config.navigation.NAV_HOME
 import com.cyxbs.components.config.service.implOrNull
+import com.cyxbs.pages.notification.api.IHomeNoticeDialogService
 import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
@@ -23,6 +24,7 @@ class HomeNavDestination : MainNavDestination<HomeNavArgument>(HomeNavArgument::
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<HomeNavArgument>) {
     PlatformHomePage.HomePageContent(parcel)
+    IHomeNoticeDialogService.HomeNoticeDialogContent() // 重要通知弹窗，冷启动时就会弹出
   }
 }
 

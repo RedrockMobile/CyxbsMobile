@@ -1,5 +1,6 @@
 import androidx.compose.ui.window.ComposeUIViewController
 import com.cyxbs.components.config.compose.theme.AppTheme
+import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.isIOSDebug
 import com.cyxbs.components.config.navigation.MainNavHost
 import platform.UIKit.UIViewController
@@ -15,6 +16,7 @@ import platform.UIKit.UIViewController
 fun doInitApp(isDebug: Boolean) {
   isIOSDebug = isDebug
   initProvider()
+  InitialManager.init(isMainProcess = true)
 }
 
 fun MainViewController(): UIViewController {
