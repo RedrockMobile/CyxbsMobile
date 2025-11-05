@@ -67,8 +67,6 @@ class RollerViewActivity : BaseActivity() {
 
         setContentView(R.layout.discover_activity_roller_view)
         setTheme(com.google.android.material.R.style.Theme_MaterialComponents) //这里是用的Material主题
-        //如果是DEBUG就开启webview的debug
-        if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
 
         val url = intent.getStringExtra("URL")
 
@@ -86,7 +84,15 @@ class RollerViewActivity : BaseActivity() {
         }
 
         webApi?.apply {
-            discover_web_view.init(this)
+            discover_web_view.init(
+                this,
+                onPageFinish = {
+                    //在加载完之后，获得js中init中调用的方法
+                    //这里需要Js代码中初始化，否则无法启动
+                    initBgm()
+                    initSensor()
+                }
+            )
         }
         //加载网页
         discover_web_view.loadUrl(url.toString())
@@ -102,76 +108,6 @@ class RollerViewActivity : BaseActivity() {
                 }
                 super.onReceivedTitle(view, title)
             }
-        }
-        discover_web_view.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest
-            ): Boolean {
-                val requestUrl = request.url
-                // 如果为http/https的链接则正常加载，如果为qq这种schema部分的则手动拦截进行外部跳转
-                if (URLUtil.isHttpsUrl(requestUrl.toString()) || URLUtil.isHttpUrl(requestUrl.toString())) {
-                    return super.shouldOverrideUrlLoading(view, request)
-                } else {
-                    //使用隐式intent跳转qq
-                    val intent = Intent(Intent.ACTION_VIEW, requestUrl)
-                    try {
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        toast("未安装qq客户端或版本不支持!")
-                    }
-                    return true
-                }
-            }
-
-            //这里是页面加载完之后调用
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                //在加载完之后，获得js中init中调用的方法
-                //这里需要Js代码中初始化，否则无法启动
-                initBgm()
-                initSensor()
-            }
-        }
-        discover_web_view.setDownloadListener { downloadUrl, _, _, _, _ ->
-            // 直接交给浏览器下载，简单粗暴
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.addCategory(Intent.CATEGORY_BROWSABLE)
-            intent.data = Uri.parse(downloadUrl)
-            startActivity(intent)
-        }
-        //长按处理各种信息
-        discover_web_view.setOnLongClickListener { view ->
-            val result = (view as WebView).hitTestResult
-            val type = result.type
-
-            if (type == WebView.HitTestResult.UNKNOWN_TYPE) return@setOnLongClickListener false
-            when (type) {
-                WebView.HitTestResult.IMAGE_TYPE -> {
-                    val imgUrl = result.extra
-                }
-                //如果是长按超链接就跳转
-                WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
-                    val intent = Intent(Intent.ACTION_VIEW,Uri.parse(result.extra))
-                    startActivity(intent)
-                    return@setOnLongClickListener true
-                }
-            }
-            true
-        }
-        //这里为什么要用onTouch，因为clickListener收不到，需要提示用户超链接需要长按进入
-        discover_web_view.setOnTouchListener { view, motionEvent ->
-            when(motionEvent.action){
-                MotionEvent.ACTION_DOWN ->{
-                    val result = (view as WebView).hitTestResult
-                    when(result.type){
-                        WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
-                            toast("长按即可跳转到浏览器打开")
-                        }
-                    }
-                }
-            }
-            false
         }
     }
 
@@ -234,6 +170,7 @@ class RollerViewActivity : BaseActivity() {
         }
     }
 
+    // todo 待后续统一封装 webView 逻辑
     private fun savePic(url: String) {
         doPermissionAction(Manifest.permission.WRITE_EXTERNAL_STORAGE) {
             doAfterGranted {

@@ -62,7 +62,6 @@ class UpdateInfoDialog : MainNavDialog<UpdateInfoArgument>(
     ChooseDialogComposeContent(
       positiveBtnText = "立即更新",
       negativeBtnText = "下次一定",
-      btnSize = DpSize(110.dp, 36.dp),
       onClickPositiveBtn = {
         // 下载更新
         IPlatformUpdateInfoDownload::class.implOrNull()

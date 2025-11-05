@@ -41,3 +41,6 @@ const val NAV_ABOUT = "about"
 
 // 更新弹窗
 const val NAV_DIALOG_UPDATE = "dialog/update"
+
+// 公告弹窗
+const val NAV_DIALOG_NOTICE = "dialog/notice"

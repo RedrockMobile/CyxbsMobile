@@ -4,9 +4,9 @@ import com.cyxbs.applications.pro.BuildConfig
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.base.crash.CrashMonitor
-import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.appApplication
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.tencent.bugly.crashreport.CrashReport
 import com.tencent.vasdolly.helper.ChannelReaderUtil
@@ -23,12 +23,12 @@ import com.tencent.vasdolly.helper.ChannelReaderUtil
 object BuglyInitialService : InitialService {
     
     // bugly 会读取 Android id
-    override fun onPrivacyAgreed(manager: InitialManager) {
-        init(manager)
+    override fun onPrivacyAgreed() {
+        init()
     }
     
-    private fun init(manager: InitialManager) {
-        val appContext = manager.application.applicationContext
+    private fun init() {
+        val appContext = appApplication.applicationContext
         
         if (BuildConfig.DEBUG) {
             CrashReport.setUserSceneTag(appContext, 83913)
@@ -43,7 +43,7 @@ object BuglyInitialService : InitialService {
             isUploadProcess = true // 增加上报进程
             appVersion = BuildConfig.VERSION_NAME
             appPackageName = BuildConfig.APPLICATION_ID
-            appChannel = ChannelReaderUtil.getChannel(manager.application)
+            appChannel = ChannelReaderUtil.getChannel(appApplication)
         }
         
         CrashReport.setUserId(
