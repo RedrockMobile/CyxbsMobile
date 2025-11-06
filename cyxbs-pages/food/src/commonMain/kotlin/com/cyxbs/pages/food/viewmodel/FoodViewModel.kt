@@ -76,6 +76,18 @@ class FoodViewModel() : BaseViewModel() {
 		showTips.value = false
 	}
 
+	var showDetail = mutableStateOf(false)
+
+	fun openDetail() {
+		if (current.value == null) {
+			return
+		}
+		showDetail.value = true
+	}
+
+	fun closeDetail() {
+		showDetail.value = false
+	}
 
 	private val selectedDiningArea = mutableSetOf<String>()
 	private val selectedDiningProperty = mutableSetOf<String>()
@@ -84,6 +96,9 @@ class FoodViewModel() : BaseViewModel() {
 
 	// 是否需要重新请求网络
 	private var needRequest = false
+
+	// 标记是否初始化完成
+	private var initialized = false
 
 	/**
 	 * 网络获取的结果列表
@@ -120,7 +135,9 @@ class FoodViewModel() : BaseViewModel() {
 		} else {
 			selectedDiningArea.remove(newTag.name)
 		}
-		needRequest = true
+		if (initialized) {
+			needRequest = true
+		}
 	}
 
 	//改变DinningProperty的选中
@@ -135,7 +152,9 @@ class FoodViewModel() : BaseViewModel() {
 		} else {
 			selectedDiningProperty.remove(newTag.name)
 		}
-		needRequest = true
+		if (initialized) {
+			needRequest = true
+		}
 	}
 
 	//改变DinningNumbers的选中
@@ -150,7 +169,9 @@ class FoodViewModel() : BaseViewModel() {
 			diningNumber[idx] = diningNumber[idx].copy(isSelected = false)
 			selectedDiningNumber = null
 
-			needRequest = true
+			if (initialized) {
+				needRequest = true
+			}
 			return
 		}
 
@@ -165,7 +186,9 @@ class FoodViewModel() : BaseViewModel() {
 		diningNumber[idx] = diningNumber[idx].copy(isSelected = true)
 		selectedDiningNumber = clickTag.name
 
-		needRequest = true
+		if (initialized) {
+			needRequest = true
+		}
 	}
 
 	/**
@@ -194,6 +217,10 @@ class FoodViewModel() : BaseViewModel() {
 			}
 			data?.let {
 				setData(it)
+			}
+			//如果是第一次，则完成初始化
+			if (!initialized) {
+				initialized = true
 			}
 		}
 	}
@@ -246,6 +273,45 @@ class FoodViewModel() : BaseViewModel() {
 			diningNumber.addAll(data.eatNum2DiningTag())
 			diningProperty.addAll(data.eatProperty2DiningTag())
 			diningArea.addAll(data.eatArea2DiningTag())
+		}
+	}
+
+	fun doPraiseFood() {
+		val currentFood = current.value
+		if (currentFood == null) {
+			return
+		}
+		viewModelScope.launch {
+			val result = model.doPraiseFood(currentFood.name)
+			val data = result.getOrNull()
+			if (data == null) {
+				toast("网络错误")
+				return@launch
+			}
+
+			//触发重组
+			resultList[currentIndex.value] = currentFood.copy(
+				praiseIs = data.praiseIs, praiseNum = data.praiseNum
+			)
+		}
+	}
+
+	fun refreshFoodProperty() {
+		viewModelScope.launch {
+			val result = model.refreshProperty(selectedDiningArea.toList(), selectedDiningNumber ?: "")
+			val data = result.getOrNull()
+			if (data == null) {
+				toast("网络错误")
+				return@launch
+			}
+
+			//后端给的数据有可能重复，这里去重一下
+			val distinctData = data.eatProperty2DiningTag().distinctBy { it.name }
+			selectedDiningProperty.clear()
+			diningProperty.clear()
+			diningProperty.addAll(distinctData)
+
+
 		}
 	}
 

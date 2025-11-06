@@ -37,14 +37,14 @@ interface FoodApiServiceKtorfit {
 	/**
 	 *点赞
 	 */
-	@POST("/magipoke-delicacy/food/praise")
+	@POST("magipoke-delicacy/food/praise")
 	@FormUrlEncoded
 	suspend fun postFoodPraise(@Field("name") name: String): ApiWrapper<FoodPraiseBean>
 
 	/**
 	 * 刷新餐饮特征
 	 */
-	@POST("/magipoke-delicacy/food/refresh")
+	@POST("magipoke-delicacy/food/refresh")
 	@FormUrlEncoded
 	suspend fun postFoodRefresh(
 		@Field("eat_area") eatArea: List<String>,

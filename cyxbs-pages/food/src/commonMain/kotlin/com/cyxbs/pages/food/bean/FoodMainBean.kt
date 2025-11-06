@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * description ： TODO:类的作用
+ * description ： 首次进入时加载的数据类
  * author : HI-IR
  * email : qq2420226433@outlook.com
  * date : 2025/11/2 22:11

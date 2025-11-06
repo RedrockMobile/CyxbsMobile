@@ -3,6 +3,8 @@ package com.cyxbs.pages.food.model
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.food.bean.FoodMainBean
+import com.cyxbs.pages.food.bean.FoodPraiseBean
+import com.cyxbs.pages.food.bean.FoodRefreshBean
 import com.cyxbs.pages.food.bean.FoodResultBeanItem
 import com.cyxbs.pages.food.network.FoodApiServiceKtorfit
 
@@ -38,6 +40,33 @@ object FoodRepository {
 		}.mapCatching {
 			//随机出来的推荐美食
 			it.throwApiExceptionIfFail()
+			it.data
+		}
+	}
+
+	/**
+	 * 点赞Food
+	 */
+	suspend fun doPraiseFood(
+		name: String
+	): Result<FoodPraiseBean> {
+		return runCatchingCoroutine {
+			FoodApiServiceKtorfit::class.impl().postFoodPraise(name)
+		}.mapCatching {
+			it.data
+		}
+	}
+
+	/**
+	 * 刷新餐饮特征
+	 */
+	suspend fun refreshProperty(
+		eatArea: List<String>,
+		eatNum: String
+	): Result<FoodRefreshBean> {
+		return runCatchingCoroutine {
+			FoodApiServiceKtorfit::class.impl().postFoodRefresh(eatArea, eatNum)
+		}.mapCatching {
 			it.data
 		}
 	}

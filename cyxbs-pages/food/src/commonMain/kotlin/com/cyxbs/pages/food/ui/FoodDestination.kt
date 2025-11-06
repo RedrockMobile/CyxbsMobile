@@ -48,6 +48,7 @@ import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.food.viewmodel.FoodViewModel
 import com.cyxbs.pages.food.widget.FoodDescribeDialog
+import com.cyxbs.pages.food.widget.FoodDetailDialog
 import com.cyxbs.pages.food.widget.FoodSuggestMoreTagsDialog
 import com.cyxbs.pages.food.widget.FoodWarnDialog
 import com.cyxbs.pages.food.widget.TagSelector
@@ -94,6 +95,7 @@ fun FoodPage() {
 	FoodDescribeDialog()
 	FoodSuggestMoreTagsDialog()
 	FoodWarnDialog()
+	FoodDetailDialog()
 }
 
 @Composable
@@ -152,12 +154,11 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun WelcomePictureCompose(modifier: Modifier = Modifier) {
-	//TODO 等待接入网络访问加载Welcome图片
 	Image(
 		modifier = modifier.width(410.dp),
 		painter = painterResource(Res.drawable.food_ic_welcome_picture),
 		contentDescription = "welcome",
-		contentScale = ContentScale.FillBounds
+		contentScale = ContentScale.Fit
 	)
 }
 
@@ -193,7 +194,9 @@ private fun DiningPropertyCompose(modifier: Modifier = Modifier) {
 		title = "餐饮特征",
 		subTitle = "可多选",
 		tagList = viewModel.diningProperty,
-		onSelectChange = viewModel::toggleDiningPropertySelect
+		onSelectChange = viewModel::toggleDiningPropertySelect,
+		canRefresh = true,
+		onRefresh = viewModel::refreshFoodProperty
 	)
 }
 
@@ -270,7 +273,7 @@ fun MealResultCompose(modifier: Modifier = Modifier) {
 						.clip(RoundedCornerShape(30.dp))
 						.background(0xFF5D5DF7.dark(0xFF4841E2))
 						.clickableNoIndicator {
-							viewModel.doRandomGenerated()
+							viewModel.openDetail()
 						}
 				) {
 					Text(

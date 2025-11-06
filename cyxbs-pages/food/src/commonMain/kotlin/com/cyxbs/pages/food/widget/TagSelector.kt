@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +32,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import cyxbsmobile.cyxbs_pages.food.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_btn_pressed
+import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_food_main_refresh
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_notification_small
 import org.jetbrains.compose.resources.painterResource
 
@@ -48,11 +50,11 @@ data class DiningTag(
 
 //选择器的单个Item
 @Composable
-fun SelectorItem(tag: DiningTag, onClick: (DiningTag) -> Unit) {
+fun SelectorItem(tag: DiningTag, onClick: (DiningTag) -> Unit,modifier: Modifier = Modifier) {
 	val selectTextColor = remember { Color(0xFF4A44E4) }
 	val itemBackgroundColor = 0xFFF5F6F8.dark(0xFF111111)
 	Box(
-		modifier = Modifier
+		modifier = modifier
 			.padding(3.dp)
 			.size(74.dp, 29.dp)
 			.clip(RoundedCornerShape(8.dp))
@@ -92,7 +94,9 @@ fun TagSelector(
 	title: String,
 	subTitle: String,
 	tagList: List<DiningTag>,
-	onSelectChange: (DiningTag) -> Unit
+	onSelectChange: (DiningTag) -> Unit,
+	canRefresh: Boolean = false,
+	onRefresh: () -> Unit = {}
 ) {
 	val unimportanceTipColor = remember { Color(0xFFAABCD8) }
 	Column(
@@ -120,6 +124,20 @@ fun TagSelector(
 				fontSize = 10.sp,
 				color = unimportanceTipColor
 			)
+			//用来把刷新撑到最后面
+			Spacer(modifier = Modifier.weight(1f))
+			if (canRefresh) {
+				Image(
+					modifier = Modifier.size(15.dp, 14.dp).clickableNoIndicator{
+						onRefresh.invoke()
+					},
+					painter = painterResource(Res.drawable.food_ic_food_main_refresh),
+					contentScale = ContentScale.Crop,
+					contentDescription = null,
+					colorFilter = ColorFilter.tint(0xFF15315B.dark(0xFFFFFFFF))
+				)
+			}
+
 		}
 
 		Spacer(Modifier.height(14.dp))
@@ -136,7 +154,7 @@ fun TagSelector(
 				key = {
 					it.name
 				}) {
-				SelectorItem(tag = it, onClick = onSelectChange)
+				SelectorItem(tag = it, onClick = onSelectChange, modifier = Modifier.animateItem())
 			}
 		}
 	}
