@@ -5,12 +5,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.network.ApiException
 import com.cyxbs.pages.food.bean.FoodResultBeanItem
 import com.cyxbs.pages.food.bean.eatArea2DiningTag
 import com.cyxbs.pages.food.bean.eatNum2DiningTag
 import com.cyxbs.pages.food.bean.eatProperty2DiningTag
 import com.cyxbs.pages.food.model.FoodRepository
+import com.cyxbs.pages.food.service.IFoodService
 import com.cyxbs.pages.food.widget.DiningTag
 import kotlinx.coroutines.launch
 
@@ -221,6 +223,8 @@ class FoodViewModel() : BaseViewModel() {
 			//如果是第一次，则完成初始化
 			if (!initialized) {
 				initialized = true
+				//更新任务中心数据
+				IFoodService::class.implOrNull()?.doFinishTask() ?: toast("当前平台等待适配完成任务")
 			}
 		}
 	}
