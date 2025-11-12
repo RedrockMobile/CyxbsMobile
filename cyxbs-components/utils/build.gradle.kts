@@ -12,6 +12,8 @@ kotlin {
       api(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
+      implementation(libs.coil.compose)
+      implementation(libs.coil.network.ktor3)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

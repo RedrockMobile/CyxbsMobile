@@ -99,6 +99,20 @@ kotlin {
       wasmJsMain { dependsOn(webMain) }
     }
 
+    // noMobile 端配置
+    val noMobileMain = create("noMobileMain") {
+      dependsOn(commonMain.get())
+    }
+    if (Multiplatform.enableWeb(project)) {
+      jsMain { dependsOn(noMobileMain) }
+      wasmJsMain { dependsOn(noMobileMain) }
+    }
+    if(Multiplatform.enableDesktop(project)) {
+      val desktopMain by getting {
+        dependsOn(noMobileMain)
+      }
+    }
+
     // 单独为 jb Compose 添加一个源集，区分安卓的 jetpack Compose
     val jbComposeMain = create("jbComposeMain") {
       dependsOn(commonMain.get())

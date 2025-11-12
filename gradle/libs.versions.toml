@@ -103,7 +103,7 @@ kotlinx-collections = "0.4.0"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.9.0"
 # https://github.com/Kotlin/kotlinx-datetime
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.7.1-0.6.x-compat"
 # https://github.com/Kotlin/kotlinx-atomicfu
 kotlinx-atomicfu = "0.29.0"
 # https://github.com/ktorio/ktor
@@ -186,6 +186,10 @@ pandora = "androidx_v2.1.0"
 codelocator = "2.0.4"
 # https://github.com/square/kotlinpoet
 kotlinpoet = "2.2.0"
+# kmp大图浏览 https://github.com/jvziyaoyao/scale
+scale = "1.1.1-beta.2"
+# coil kmp网络图片加载框架 https://github.com/coil-kt/coil
+coil = "3.3.0"
 
 [libraries]
 ####################################################################################################
@@ -312,6 +316,10 @@ leakcanary = { module = "com.squareup.leakcanary:leakcanary-android", version.re
 pandora = { module = "com.github.whataa:pandora", version.ref = "pandora" }         # 很牛逼的 debug 检测工具，debug 模式下摇一摇手机或者按三次手机中间顶部区域触发
 codeLocator-core = { module = "com.bytedance.tools.codelocator:codelocator-core", version.ref = "codelocator" }
 kotlinpoet = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
+scale-sampling-decoder = { module = "com.jvziyaoyao.scale:sampling-decoder", version.ref = "scale" }
+scale-image-viewer = { module = "com.jvziyaoyao.scale:image-viewer", version.ref = "scale" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 
 ####################################### 公有依赖，大部分模块使用 #######################################
 eventBus = { module = "org.greenrobot:eventbus", version.ref = "eventBus" }

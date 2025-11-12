@@ -52,3 +52,6 @@ const val NAV_FOOD = "food"
 const val NAV_COURSE = "course"
 // 公告弹窗
 const val NAV_DIALOG_NOTICE = "dialog/notice"
+
+// 地图
+const val NAV_MAP = "map"
