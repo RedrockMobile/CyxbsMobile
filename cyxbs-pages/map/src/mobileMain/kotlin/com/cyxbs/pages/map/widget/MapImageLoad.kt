@@ -28,15 +28,17 @@ import com.jvziyaoyao.scale.zoomable.zoomable.detectTransformGestures
  * @param mapWidgetState 地图状态的统一管理处
  * @param onMapWidgetStateChange 地图状态改变
  * @param onClick 点击回调
+ * @param onDoubleClick 双击回调
+ * @param anchorContent 锚点信息的Composable
  */
 @Composable
 actual fun MapImageLoad(
   inputStream: ByteArray?,
   mapWidgetState: MapWidgetState,
-  anchorItemState: List<AnchorItemState>,
   onMapWidgetStateChange: (scale: Float, offset: Offset) -> Unit,
   onClick: (offset: Offset) -> Unit,
-  onDoubleClick: (offset: Offset) -> Unit
+  onDoubleClick: (offset: Offset) -> Unit,
+  anchorContent: @Composable () -> Unit
 ) {
   val (samplingDecoder) = rememberSamplingDecoder(inputStream)
   samplingDecoder?.let { samplingDecoder ->
@@ -101,12 +103,18 @@ actual fun MapImageLoad(
             mapWidgetState.offset,
             Offset(0f, 0f),
             mapWidgetState.scale
+          ) - Offset(
+            0f,
+            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
           )
           val rightBottomOrigin = calculateOriginPosition(
             center,
             mapWidgetState.offset,
             Offset(weight, height),
             mapWidgetState.scale
+          ) - Offset(
+            0f,
+            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
           )
           // 将区域原本的位置/weight或者height,进行归一化,因为参数传的是需要高清的切片占原来整个图的相对位置(0f-1f)
           val leftVisual = (leftTopOrigin.x / weight).coerceIn(0f, 1f)
@@ -120,19 +128,7 @@ actual fun MapImageLoad(
               visualRect = Rect(leftVisual, topVisual, rightVisual, bottomVisual)
             )
           )
-          anchorItemState.forEach { anchorItemState ->
-            if (anchorItemState.visible) {
-              AnchorItem(
-                modifier = Modifier
-                  .size(45.dp / mapWidgetState.scale)
-                  .onSizeChanged { anchorItemState.size = it }
-                  .graphicsLayer {
-                    translationX = anchorItemState.position.x - anchorItemState.size.width / 2
-                    translationY = anchorItemState.position.y - anchorItemState.size.height
-                  }
-              )
-            }
-          }
+          anchorContent()
         }
       }
     }
