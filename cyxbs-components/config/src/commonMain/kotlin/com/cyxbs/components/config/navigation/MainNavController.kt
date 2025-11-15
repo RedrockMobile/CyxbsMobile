@@ -52,7 +52,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 class HomeNavArgument(
   @SerialName("page")
-  val page: String = "discover",
+  val page: String = "discover", // discover、fairground、mine
 )
 
 /**
