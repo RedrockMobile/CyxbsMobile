@@ -18,6 +18,7 @@ data class FoodMainBean(
 	val eatNum: List<String>,
 	@SerialName("eat_property")
 	val eatProperty: List<String>,
+  @SerialName("picture")
 	val picture: String
 )
 

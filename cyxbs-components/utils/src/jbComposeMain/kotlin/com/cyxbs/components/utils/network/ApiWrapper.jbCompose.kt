@@ -15,5 +15,8 @@ actual data class ApiWrapper<T>(
 	actual override val info: String
 ) : IApiWrapper<T> {
 	actual override val data: T
-		get() = dataNullable!!
+		get() {
+      throwApiExceptionIfFail()
+      return dataNullable!!
+    }
 }

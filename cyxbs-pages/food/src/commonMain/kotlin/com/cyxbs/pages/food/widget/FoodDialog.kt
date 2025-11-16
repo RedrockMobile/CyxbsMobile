@@ -128,7 +128,7 @@ fun FoodDetailDialog() {
 }
 
 @Composable
-fun FoodDetailDialogCompose(
+private fun FoodDetailDialogCompose(
 	showState: State<Boolean>,
 	modifier: Modifier = Modifier.width(255.dp).wrapContentHeight(),
 	btnSize: DpSize = DpSize(93.dp, 34.dp),
@@ -173,7 +173,7 @@ fun FoodDetailDialogCompose(
 }
 
 @Composable
-fun FoodDetailDialogTwoButton(
+private fun FoodDetailDialogTwoButton(
 	modifier: Modifier = Modifier.padding(bottom = 30.dp),
 	positiveBtnText: String = "点赞",
 	positiveBtnBackgroundColor: Color = LocalAppColors.current.positive,
@@ -203,7 +203,7 @@ fun FoodDetailDialogTwoButton(
 }
 
 @Composable
-fun FoodDetailDialogNegativeBtnCompose(
+private fun FoodDetailDialogNegativeBtnCompose(
 	modifier: Modifier = Modifier,
 	negativeBtnText: String = "取消",
 	textColor: Color = Color.White,

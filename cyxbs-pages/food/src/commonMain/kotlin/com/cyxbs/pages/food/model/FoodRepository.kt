@@ -39,7 +39,6 @@ object FoodRepository {
 			)
 		}.mapCatching {
 			//随机出来的推荐美食
-			it.throwApiExceptionIfFail()
 			it.data
 		}
 	}
