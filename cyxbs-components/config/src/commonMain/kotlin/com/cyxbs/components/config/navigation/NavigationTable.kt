@@ -9,11 +9,14 @@ package com.cyxbs.components.config.navigation
 /**
  * 路由表命名规则：
  *
- * 1. 对于普通页面:
+ * 1. 对于 Activity:
  *    NAV_页面 = "页面"
  *    示例: NAV_LOGIN = "login"
  *
- * 2. 对于弹窗页面:
+ * 2. 对于 Fragment:
+ *    NAV_FRAGMENT_页面 = "页面"
+ *
+ * 3. 对于弹窗页面:
  *    NAV_DIALOG_页面 = "页面"
  *    示例: NAV_DIALOG_UPDATE = "dialog/update"
  *
@@ -42,5 +45,10 @@ const val NAV_ABOUT = "about"
 // 更新弹窗
 const val NAV_DIALOG_UPDATE = "dialog/update"
 
+//美食咨询处
+const val NAV_FOOD = "food"
+
+// 课表单页
+const val NAV_COURSE = "course"
 // 公告弹窗
 const val NAV_DIALOG_NOTICE = "dialog/notice"

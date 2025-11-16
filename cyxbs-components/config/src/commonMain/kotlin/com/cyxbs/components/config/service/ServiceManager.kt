@@ -33,34 +33,34 @@ import kotlin.reflect.KClass
  *
  * # 2、Fragment 注册使用
  * ```
- * @ImplProvider(clazz = Fragment::class, name = XXX_FRAGMENT)
+ * @ImplProvider(clazz = Fragment::class, name = NAV_FRAGMENT_页面)
  * class MyFragment : BaseFragment() {}
  *
  * // 使用时：
- * val fragment = Fragment::class::impl(XXX_FRAGMENT)
+ * val fragment = Fragment::class::impl(NAV_FRAGMENT_页面)
  * ```
  * ## 注意事项
  * - @ImplProvider clazz 参数只能写 Fragment::class
- * - @ImplProvider name  参数统一放在 config 模块 /route/RoutingTable.kt 中定义
+ * - @ImplProvider name  参数统一放在 config 模块 /navigation/NavigationTable.kt 中定义
  *
  *
  *
  * # 3、Activity 注册使用
  * ```
- * @KClassProvider(clazz = Activity::class, name = XXX_ENTER)
+ * @KClassProvider(clazz = Activity::class, name = NAV_页面)
  * class MyActivity : BaseActivity() {}
  *
  * // 使用时：
- * startActivity(XXX_ENTER) {
+ * startActivity(NAV_页面) {
  *   // 虽然这里可以拿到 Intent 传递参数，但是更推荐使用 api 模块提供方法来约束参数传递
  * }
  *
  * // 直接拿到 KClass<MyActivity>
- * val clazz = MyActivity::class.implClass(XXX_ENTER)
+ * val clazz = MyActivity::class.implClass(NAV_页面)
  * ```
  * ## 注意事项
  * - @KClassProvider clazz 参数只能写 Activity::class 的父类
- * - @KClassProvider name  参数统一放在 config 模块 /route/RoutingTable.kt 中定义
+ * - @KClassProvider name  参数统一放在 config 模块 /navigation/NavigationTable.kt 中定义
  *
  */
 
@@ -74,10 +74,10 @@ import kotlin.reflect.KClass
  * val isLogin = IAccountService::class.impl().isLogin()
  *
  * // 得到 Fragment
- * @ImplProvider(clazz = Fragment::class, name = XXX_FRAGMENT)
+ * @ImplProvider(clazz = Fragment::class, name = NAV_FRAGMENT_页面)
  * class MyFragment : BaseFragment()
  *
- * val fragment = Fragment::class::impl(XXX_FRAGMENT)
+ * val fragment = Fragment::class::impl(NAV_FRAGMENT_页面)
  * ```
  */
 fun <T : Any> KClass<T>.impl(name: String = ""): T {
@@ -101,14 +101,14 @@ fun <T : Any> KClass<out T>.allImpl(): Map<String, ImplProviderWrapper<T>> {
 /**
  * 得到实现类 KClass，一般用于 Activity 中
  * ```
- * @KClassProvider(clazz = Activity::class, name = XXX_ENTER)
+ * @KClassProvider(clazz = Activity::class, name = NAV_页面)
  * class MyActivity : BaseActivity() {}
  *
  * // 跳转便捷写法
- * startActivity(XXX_ENTER)
+ * startActivity(NAV_页面)
  *
  * // 获得 KClass<MyActivity>
- * val clazz = MyActivity::class.implClass(XXX_ENTER)
+ * val clazz = MyActivity::class.implClass(NAV_页面)
  * ```
  */
 fun <T : Any> KClass<T>.implClass(name: String): KClass<out T> {

@@ -18,15 +18,11 @@ import kotlinx.serialization.Serializable
  * @date 2022/5/29 23:06
  */
 @Serializable
-data class ApiWrapper<T>(
-  @SerialName("data")
-  override val data: T,
-  @SerialName("status")
-  override val status: Int,
-  @SerialName("info")
+expect class ApiWrapper<T>: IApiWrapper<T>{
+  override val data: T
+  override val status: Int
   override val info: String
-) : IApiWrapper<T>, GsonDataBean
-
+}
 /**
  * 没有 data 字段的接口数据包裹类
  *

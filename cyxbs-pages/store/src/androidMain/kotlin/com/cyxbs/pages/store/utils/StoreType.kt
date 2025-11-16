@@ -4,12 +4,14 @@ import android.content.Context
 import com.cyxbs.components.config.route.DECLARE_ENTRY
 import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
-import com.cyxbs.components.config.route.FOOD_ENTRY
+import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.MainNavController
+import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.store.api.IStoreService.Task.DAILY_SIGN
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_DECLARE
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_FOOD
@@ -38,7 +40,11 @@ class StoreType {
           startActivity(MINE_CHECK_IN)
         }
         JOIN_FOOD.title-> {
-          startActivity(FOOD_ENTRY)
+          //startActivity(FOOD_ENTRY)
+          //因为新版本的Food页面是一个MainActivity的一个Compose页面，所以这里先跳转到MainActivity
+          startActivity(MAIN_ENTRY)
+          MainNavController.navigate(FoodNavArgument)
+
         }
         JOIN_NOCLASS.title-> {
           startActivity(DISCOVER_NO_CLASS)
