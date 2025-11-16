@@ -20,11 +20,11 @@ package com.cyxbs.components.init
  */
 interface InitialService {
     // 所有进程的回调
-    fun onAllProcess(manager: InitialManager) {}
+    fun onAllProcess() {}
     //处于主进程的调用(可以进行与隐私策略无关的sdk的初始化,因为app启动就会回调)
-    fun onMainProcess(manager: InitialManager) {}
-    //隐私策略同意的时候的回调，注意：只会在主线程上调用
-    fun onPrivacyAgreed(manager: InitialManager) {}
+    fun onMainProcess() {}
     //处于sdk所对应的进程的时候的回调
-    fun onOtherProcess(manager: InitialManager) {}
+    fun onOtherProcess() {}
+    //隐私策略同意的时候的回调，注意：只会在主线程上调用，且整个应用生命周期内只回调一次
+    fun onPrivacyAgreed() {}
 }

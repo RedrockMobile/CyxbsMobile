@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
@@ -50,6 +51,10 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
   val isCheckUserArgument = mutableStateOf(false)
 
   val isLoginAnim = mutableStateOf(false)
+
+  init {
+    InitialManager.cancelPrivacyAgree() // 重新登录时取消之前已保存的隐私政策同意状态
+  }
 
   // 点击登录
   fun clickLogin() {
@@ -123,6 +128,7 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
       token = bean.token,
       refreshToken = bean.refreshToken,
     )
+    InitialManager.tryPrivacyAgree()
   }
 
   // 登录失败的处理

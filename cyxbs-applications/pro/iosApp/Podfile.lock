@@ -20,7 +20,7 @@ PODS:
   - AlicloudUTDID (1.6.1)
   - AlicloudUtils (2.0.1):
     - AlicloudUTDID
-  - AMap3DMap-NO-IDFA (10.1.200):
+  - AMap3DMap-NO-IDFA (10.1.600):
     - AMapFoundation-NO-IDFA (>= 1.8.0)
   - AMapFoundation-NO-IDFA (1.8.2)
   - AMapLocation-NO-IDFA (2.10.0):
@@ -142,7 +142,7 @@ DEPENDENCIES:
   - AFNetworking
   - Alamofire
   - AlicloudHTTPDNS (= 2.2.0)
-  - AMap3DMap-NO-IDFA
+  - AMap3DMap-NO-IDFA (~> 10.1.500)
   - AMapLocation-NO-IDFA
   - Bugly
   - FluentDarkModeKit
@@ -238,7 +238,7 @@ SPEC CHECKSUMS:
   AlicloudHTTPDNS: b1efa2e175672c5822d322c68efeae62068d7d05
   AlicloudUTDID: 5d2f22d50e11eecd38f30bc7a48c71925ea90976
   AlicloudUtils: ef4436f52b828b1182b002373758ecb88068e679
-  AMap3DMap-NO-IDFA: 595999463230cf460ef7bdfa6e8dbf21ba342642
+  AMap3DMap-NO-IDFA: 5279e94b7d4d6561826c63411f52389a3b2e2eff
   AMapFoundation-NO-IDFA: 6ce0ef596d4eb8d934ff498e56747b6de1247b05
   AMapLocation-NO-IDFA: 735791aeb1ba52dff666e4158b86caf4b68b5be7
   Bugly: 217ac2ce5f0f2626d43dbaa4f70764c953a26a31
@@ -279,6 +279,6 @@ SPEC CHECKSUMS:
   YYImage: 1e1b62a9997399593e4b9c4ecfbbabbf1d3f3b54
   YYKit: 7cda43304a8dc3696c449041e2cb3107b4e236e7
 
-PODFILE CHECKSUM: 71f2905ba60ec74ca20a6e267271f84ed48884d7
+PODFILE CHECKSUM: 5666fb8a91394f227184da1e450ca2fe1235deff
 
 COCOAPODS: 1.16.2

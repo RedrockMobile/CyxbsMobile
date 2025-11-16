@@ -10,8 +10,16 @@ import androidx.compose.runtime.Stable
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDeepLink
 import androidx.navigation.NavType
+import androidx.savedstate.SavedState
+import androidx.savedstate.read
+import androidx.savedstate.write
+import com.cyxbs.components.config.serializable.defaultJson
+import com.eygraber.uri.UriCodec
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializer
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+import kotlin.reflect.typeOf
 
 /**
  * 导航目的地抽象类，其子类为具体的目的地页面
@@ -41,8 +49,9 @@ import kotlin.reflect.KType
  *
  * # 对于 [typeMap] 参数
  * 用于注册自定义类型的解析
- * argument 只支持 基本类型、String、List<String>，其他类型需要注册 NavType 进行解析
- * 详细查看 [androidx.navigation.serialization.generateRouteWithArgs]
+ * - 官方默认的 argument 只支持 基本类型、String、List<String>
+ * - 其他类型需要注册 NavType 进行解析，可以直接使用 [JsonNavType]
+ * - 参数转换成 route 过程可查看 [androidx.navigation.serialization.generateRouteWithArgs]
  *
  *
  * @param extraDeepLinks 额外的 deeplink
@@ -88,3 +97,57 @@ data class DestinationParcel<T>(
   val entry: NavBackStackEntry,
   val scope: AnimatedContentScope,
 )
+
+// 以 json 的形式支持特殊类型的 NavType
+// ⚠️注意：链接直接附加 json 文本无效，还需要进行一边 url 编码才能正常解析
+class JsonNavType<T : Any?>(
+  val serializer: KSerializer<T>,
+  isNullableAllowed: Boolean,
+) : NavType<T>(isNullableAllowed) {
+
+  companion object {
+
+    inline fun <reified T : Any?> pair(): Pair<KType, JsonNavType<T>> {
+      return typeOf<T>() to create<T>()
+    }
+
+    inline fun <reified T : Any?> create(): JsonNavType<T> {
+      val serializer = serializer<T>()
+      return JsonNavType(
+        serializer = serializer,
+        isNullableAllowed = serializer.descriptor.isNullable,
+      )
+    }
+  }
+
+  override fun put(
+    bundle: SavedState,
+    key: String,
+    value: T
+  ) {
+    bundle.write {
+      val json = runCatching {
+        defaultJson.encodeToString(serializer, value)
+      }.getOrNull()
+      if (json != null) {
+        putString(key, json)
+      }
+    }
+  }
+
+  override fun get(
+    bundle: SavedState,
+    key: String
+  ): T? {
+    return bundle.read {
+      val json = getStringOrNull(key) ?: return@read null
+      return runCatching {
+        defaultJson.decodeFromString(serializer, json)
+      }.getOrNull()
+    }
+  }
+
+  override fun parseValue(value: String): T {
+    return defaultJson.decodeFromString(serializer, value)
+  }
+}

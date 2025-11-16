@@ -1,6 +1,7 @@
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.cyxbs.components.config.compose.theme.AppTheme
+import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 
@@ -14,6 +15,7 @@ import com.cyxbs.components.utils.extensions.PlatformToastCompose
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
   initKtProvider()
+  InitialManager.init(isMainProcess = true)
   ComposeViewport {
     AppTheme {
       MainNavHost()

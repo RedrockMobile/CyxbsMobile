@@ -9,9 +9,10 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.annotation.CallSuper
 import com.cyxbs.components.base.crash.CrashMonitor
-import com.cyxbs.components.base.utils.InitialManagerImpl
+import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.init.appActivities
 import com.cyxbs.components.init.appApplication
+import com.cyxbs.components.init.appCurrentProcessName
 import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.utils.utils.impl.ActivityLifecycleCallbacksImpl
 import java.lang.ref.WeakReference
@@ -48,8 +49,6 @@ abstract class BaseApp : Application() {
       return "${Build.MANUFACTURER} ${Build.MODEL}"
     }
   }
-  
-  private lateinit var mInitialManager: InitialManagerImpl
 
   override fun attachBaseContext(base: Context) {
     super.attachBaseContext(base)
@@ -62,7 +61,7 @@ abstract class BaseApp : Application() {
   @CallSuper
   override fun onCreate() {
     super.onCreate()
-    initInitialService()
+    InitialManager.init(isMainProcess = appCurrentProcessName == packageName)
     initActivityManger()
   }
 
@@ -71,21 +70,6 @@ abstract class BaseApp : Application() {
    */
   abstract fun initProvider()
   
-  private fun initInitialService() {
-    mInitialManager = InitialManagerImpl(this)
-    mInitialManager.init()
-  }
-  
-  // 隐私策略同意，在登录后调用
-  fun tryPrivacyAgree() {
-    mInitialManager.tryPrivacyAgree()
-  }
-
-  // 取消同意隐私策略，用于重新登录
-  fun cancelPrivacyAgree() {
-    mInitialManager.cancelPrivacyAgree()
-  }
-
   private fun initActivityManger() {
     registerActivityLifecycleCallbacks(
       object : ActivityLifecycleCallbacksImpl {

@@ -100,11 +100,6 @@ internal actual fun HomeViewPagerCompose(
         id = R.id.home_view_pager_id // 这里需要赋值 id，否则 ViewPager2 不会使用系统重建的 Fragment
         adapter = MainAdapter(context as FragmentActivity)
         isUserInputEnabled = false
-        when (parcel.argument.page) {
-          "discover" -> bottomNavViewModel.select(bottomNavViewModel.discoverItem)
-          "fairground" -> bottomNavViewModel.select(bottomNavViewModel.fairgroundItem)
-          "mine" -> bottomNavViewModel.select(bottomNavViewModel.mineItem)
-        }
         bottomNavViewModel.selectedItem.map {
           bottomNavViewModel.items.indexOf(it)
         }.onEach {
@@ -148,16 +143,18 @@ private fun execIntentAction(
     }
   }
   if (isNewIntent) {
-    runCatching {
-      MainNavController.navigate(
-        request = NavDeepLinkRequest(
-          uri = intent.data,
-          action = intent.action,
-          mimeType = intent.type,
+    val url = intent.data
+    if (url != null) {
+      runCatching {
+        MainNavController.navigate(
+          request = NavDeepLinkRequest.Builder.fromUri(url)
+            .apply { intent.action?.let { setAction(it)} }
+            .apply { intent.type?.let { setMimeType(it)} }
+            .build()
         )
-      )
-    }.onFailure {
-      logg(it.stackTraceToString())
+      }.onFailure {
+        logg(it.stackTraceToString())
+      }
     }
   }
 }

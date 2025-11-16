@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -266,7 +267,7 @@ fun FoodWarnDialog() {
 //Food页统一风格的Dialog
 @Composable
 fun FoodDialog(
-	showSate: State<Boolean>,
+	showSate: MutableState<Boolean>,
 	onDismissRequest: () -> Unit,
 	onClickButton: () -> Unit,
 	content: String
