@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.notification.api.INotificationService
 import cyxbsmobile.cyxbs_pages.home.generated.resources.Res
@@ -36,7 +37,9 @@ import org.jetbrains.compose.resources.StringResource
  * @author 985892345
  * @date 2025/1/4
  */
-class BottomNavViewModel : BaseViewModel() {
+class BottomNavViewModel(
+  val homeNavArgument: HomeNavArgument,
+) : BaseViewModel() {
 
   val height: Dp = 60.dp
   val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
@@ -63,7 +66,14 @@ class BottomNavViewModel : BaseViewModel() {
   )
 
   val items = persistentListOf(discoverItem, fairgroundItem, mineItem)
-  val selectedItem: MutableStateFlow<BottomNavItem> = MutableStateFlow(items[0])
+  val selectedItem: MutableStateFlow<BottomNavItem> = MutableStateFlow(
+    when (homeNavArgument.page) {
+      "discover" -> discoverItem
+      "fairground" -> fairgroundItem
+      "mine" -> mineItem
+      else -> discoverItem
+    }
+  )
 
   fun select(item: BottomNavItem) {
     selectedItem.value = item

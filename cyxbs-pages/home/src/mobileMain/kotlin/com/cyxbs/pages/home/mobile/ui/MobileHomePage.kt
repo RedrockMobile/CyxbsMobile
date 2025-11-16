@@ -66,6 +66,9 @@ class MobileHomePage : PlatformHomePage {
 
   @Composable
   override fun HomePageContent(parcel: DestinationParcel<HomeNavArgument>) {
+    viewModel { BottomNavViewModel(parcel.argument) }
+    viewModel { MobileCourseFrameViewModel() }
+    viewModel { CourseBottomSheetViewModel() }
     PlatformMobileHomePage(parcel) {
       Box(
         modifier = Modifier.fillMaxSize()
@@ -105,9 +108,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     oldHomeCourse.content.invoke(modifier)
     return
   }
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
-  val courseFrameViewModel = viewModel { MobileCourseFrameViewModel() }
-  val courseBottomSheetViewModel = viewModel { CourseBottomSheetViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
@@ -172,7 +175,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val shadowElevation by bottomNavViewModel.selectedItem.map {
     if (it === bottomNavViewModel.discoverItem || it === bottomNavViewModel.mineItem) 0.dp else 4.dp
   }.collectAsState(0.dp)
@@ -198,7 +201,7 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavItemCompose(item: BottomNavViewModel.BottomNavItem, modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val coroutineScope = rememberCoroutineScope()
   val selected by bottomNavViewModel.selectedItem.map { it === item }.collectAsState(false)
   val hasRedDot by item.observerRedDot().collectAsState()

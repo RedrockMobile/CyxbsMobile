@@ -100,11 +100,6 @@ internal actual fun HomeViewPagerCompose(
         id = R.id.home_view_pager_id // 这里需要赋值 id，否则 ViewPager2 不会使用系统重建的 Fragment
         adapter = MainAdapter(context as FragmentActivity)
         isUserInputEnabled = false
-        when (parcel.argument.page) {
-          "discover" -> bottomNavViewModel.select(bottomNavViewModel.discoverItem)
-          "fairground" -> bottomNavViewModel.select(bottomNavViewModel.fairgroundItem)
-          "mine" -> bottomNavViewModel.select(bottomNavViewModel.mineItem)
-        }
         bottomNavViewModel.selectedItem.map {
           bottomNavViewModel.items.indexOf(it)
         }.onEach {
