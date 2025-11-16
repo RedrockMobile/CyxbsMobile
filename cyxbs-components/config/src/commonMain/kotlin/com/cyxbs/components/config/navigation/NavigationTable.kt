@@ -47,3 +47,6 @@ const val NAV_DIALOG_UPDATE = "dialog/update"
 
 //美食咨询处
 const val NAV_FOOD = "food"
+
+// 课表单页
+const val NAV_COURSE = "course"

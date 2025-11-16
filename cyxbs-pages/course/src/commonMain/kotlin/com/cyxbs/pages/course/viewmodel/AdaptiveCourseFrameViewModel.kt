@@ -1,4 +1,4 @@
-package com.cyxbs.pages.home.viewmodel
+package com.cyxbs.pages.course.viewmodel
 
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl

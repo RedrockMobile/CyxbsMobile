@@ -66,7 +66,7 @@ import org.jetbrains.compose.resources.painterResource
  * date : 2025/10/29 23:58
  */
 @ImplProvider(clazz = MainNavDestination::class, name = NAV_FOOD)
-class FoodDestination : MainNavDestination<FoodNavArgument>(FoodNavArgument::class) {
+class FoodNavDestination : MainNavDestination<FoodNavArgument>(FoodNavArgument::class) {
 	override val needLogin: Boolean
 		get() = true
 
