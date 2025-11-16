@@ -24,19 +24,19 @@ data class FoodMainBean(
 
 
 fun FoodMainBean.eatArea2DiningTag(): List<DiningTag> {
-	return eatArea.map {
+	return eatArea.filter { it.isNotBlank() }.map {
 		DiningTag(it)
 	}
 }
 
 fun FoodMainBean.eatNum2DiningTag(): List<DiningTag> {
-	return eatNum.map {
+	return eatNum.filter { it.isNotBlank() }.map {
 		DiningTag(it)
 	}
 }
 
 fun FoodMainBean.eatProperty2DiningTag(): List<DiningTag> {
-	return eatProperty.map {
+	return eatProperty.filter { it.isNotBlank() }.map {
 		DiningTag(it)
 	}
 }
