@@ -1,16 +1,20 @@
 package com.cyxbs.pages.map.widget
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
-import com.cyxbs.pages.map.util.calculateOriginPosition
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.pages.map.model.bean.MapInfo
+import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_local
 import kotlinx.coroutines.launch
@@ -23,15 +27,25 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 @Composable
-fun MapWidget(inputStream: ByteArray?) {
+fun MapWidgetCompose(
+  modifier: Modifier = Modifier,
+  inputStream: ByteArray?,
+  mapInfo: MapInfo,
+  mapWidgetState: MapWidgetState,
+  anchorItemState: AnchorItemState,
+  anchorItemStateList: List<AnchorItemState>
+) {
+  val viewmodel = viewModel(MapComposeViewModel::class)
   val coroutineScope = rememberCoroutineScope()
-  val mapWidgetState = rememberMapWidgetState()
-  val anchorItemState = rememberAnchorItemState()
-  val anchorStateList = listOf(anchorItemState)
-  Box() {
+  Box(
+    modifier = modifier.background(Color(0xFFA8BCF1))
+  ) {
     MapImageLoad(
       inputStream = inputStream,
       mapWidgetState = mapWidgetState,
+      onMapContainerChange = { size ->
+        viewmodel.mapContainer.value = size
+      },
       onMapWidgetStateChange = { scale, offset ->
         coroutineScope.launch {
           mapWidgetState.setScale(scale)
@@ -39,19 +53,11 @@ fun MapWidget(inputStream: ByteArray?) {
         }
       },
       onClick = { offset ->
-        anchorItemState.visible = true
-        val ratio = 8022f / 14267f // 图片的宽高比例，后续拿api替换，这里与box的宽高不同
-        // 这里要减去是因为
-        val originOffset = calculateOriginPosition(
-          mapWidgetState.center,
-          mapWidgetState.offset,
+        viewmodel.clickAnchorItem(
+          coroutineScope,
           offset,
-          mapWidgetState.scale
-        ) - Offset(
-          0f,
-          (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
+          mapInfo
         )
-        anchorItemState.position = originOffset
       },
       onDoubleClick = { offset ->
         // 如果大于6f,则还原初始
@@ -77,16 +83,17 @@ fun MapWidget(inputStream: ByteArray?) {
         }
       },
       anchorContent = {
-        anchorStateList.forEach { anchorItemState ->
+        if (anchorItemState.visible) {
+          AnchorItem(
+            mapWidgetState,
+            anchorItemState
+          )
+        }
+        anchorItemStateList.forEach { anchorItemState ->
           if (anchorItemState.visible) {
             AnchorItem(
-              modifier = Modifier
-                .size(45.dp / mapWidgetState.scale)
-                .onSizeChanged { anchorItemState.size = it }
-                .graphicsLayer {
-                  translationX = anchorItemState.position.x - anchorItemState.size.width / 2
-                  translationY = anchorItemState.position.y - anchorItemState.size.height
-                }
+              mapWidgetState,
+              anchorItemState
             )
           }
         }
@@ -96,7 +103,29 @@ fun MapWidget(inputStream: ByteArray?) {
 }
 
 @Composable
-fun AnchorItem(modifier: Modifier = Modifier) {
+fun AnchorItem(
+  mapWidgetState: MapWidgetState,
+  anchorItemState: AnchorItemState
+) {
+  // 这里不推荐写成size(45.dp / scale),因为会不断触发measure->layout->draw的重组
+  // 应该写在graphicsLayer里面，只会在draw阶段重组
+  AnchorImage(
+    modifier = Modifier
+      .size(45.dp)
+      .graphicsLayer {
+        val scale = if (mapWidgetState.scale != 0f) 1f / mapWidgetState.scale else 1f
+        // 更改transformOrigin为底边中间
+        transformOrigin = TransformOrigin(0.5f, 1f)
+        scaleX = scale * anchorItemState.scale
+        scaleY = scale * anchorItemState.scale
+        translationX = anchorItemState.position.x - size.width / 2
+        translationY = anchorItemState.position.y - size.height
+      }
+  )
+}
+
+@Composable
+fun AnchorImage(modifier: Modifier = Modifier) {
   Image(
     modifier = modifier,
     painter = painterResource(Res.drawable.map_ic_local),

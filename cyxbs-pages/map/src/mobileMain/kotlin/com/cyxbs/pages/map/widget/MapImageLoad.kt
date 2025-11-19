@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,7 +12,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.cyxbs.pages.map.util.actualOffset
 import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculateRatio
@@ -22,19 +21,11 @@ import com.jvziyaoyao.scale.image.sampling.SamplingCanvasViewPort
 import com.jvziyaoyao.scale.image.sampling.rememberSamplingDecoder
 import com.jvziyaoyao.scale.zoomable.zoomable.detectTransformGestures
 
-/**
- * 分叉后的地图大图加载，目前这个库只支持mobileMain
- * @param inputStream 图片的ByteArray对象
- * @param mapWidgetState 地图状态的统一管理处
- * @param onMapWidgetStateChange 地图状态改变
- * @param onClick 点击回调
- * @param onDoubleClick 双击回调
- * @param anchorContent 锚点信息的Composable
- */
 @Composable
 actual fun MapImageLoad(
   inputStream: ByteArray?,
   mapWidgetState: MapWidgetState,
+  onMapContainerChange: (size: IntSize) -> Unit,
   onMapWidgetStateChange: (scale: Float, offset: Offset) -> Unit,
   onClick: (offset: Offset) -> Unit,
   onDoubleClick: (offset: Offset) -> Unit,
@@ -48,10 +39,12 @@ actual fun MapImageLoad(
         .fillMaxSize()
         .onSizeChanged {
           mapWidgetState.container = it
+          onMapContainerChange(it)
         }
         .pointerInput(Unit) {
           mapWidgetState.stop()
           detectTransformGestures(
+            panZoomLock = mapWidgetState.isLock,
             onTap = onClick,
             onDoubleTap = onDoubleClick
           ) { centroid, pan, zoom, _, _ ->
