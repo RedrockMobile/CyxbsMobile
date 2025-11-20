@@ -35,6 +35,11 @@ class MapComposeViewModel : BaseViewModel() {
 
   // 单独记录地图组件宽高
   var mapContainer = mutableStateOf(IntSize.Zero)
+  val mapCenter: Offset
+    get() = Offset(
+      mapContainer.value.width / 2f,
+      mapContainer.value.height / 2f
+    )
 
   // 点击锚点状态
   var anchorItemState = AnchorItemState()
@@ -180,7 +185,7 @@ class MapComposeViewModel : BaseViewModel() {
         val getOffset = calculateClickTagInMap(
           currentOffset = originOffset,
           placeItem = placeItem,
-          containerSize = mapWidgetState.container,
+          containerSize = mapContainer.value,
           mapSize = IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
         )
         if (getOffset != Offset.Zero) {
@@ -194,7 +199,7 @@ class MapComposeViewModel : BaseViewModel() {
               currentOffset = originOffset,
               placeItem = placeItem,
               placeBuildingItem = placeBuildingItem,
-              containerSize = mapWidgetState.container,
+              containerSize = mapContainer.value,
               mapSize = IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
             )
             if (getOffsetFromBuilding != Offset.Zero) {
@@ -215,7 +220,7 @@ class MapComposeViewModel : BaseViewModel() {
       }
       launch {
         if (isFind) {
-          mapWidgetState.animateOffset((mapWidgetState.center - realOffset) * 6f)
+          mapWidgetState.animateOffset((mapCenter - realOffset) * 6f)
         }
       }
       // 对于点击建筑标签时，关闭列表动画采用同时进行，对齐之前的代码

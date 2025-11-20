@@ -39,7 +39,6 @@ actual fun MapImageLoad(
         .fillMaxSize()
         .onSizeChanged {
           mapWidgetState.container = it
-          onMapContainerChange(it)
         }
         .pointerInput(Unit) {
           mapWidgetState.stop()
@@ -79,6 +78,9 @@ actual fun MapImageLoad(
           }
           .fillMaxWidth()
           .aspectRatio(ratio)
+          .onSizeChanged {
+            onMapContainerChange(it)
+          }
           .align(Alignment.Center)
       ) {
         if (mapWidgetState.container.width > 0 && mapWidgetState.container.height > 0) {
