@@ -18,6 +18,8 @@ import com.cyxbs.pages.map.util.getImage
 import com.cyxbs.pages.map.util.isMapLocalExist
 import com.cyxbs.pages.map.util.loadImage
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
+import com.cyxbs.pages.map.widget.DownloadFailedDialog
+import com.cyxbs.pages.map.widget.MapProgressDialog
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
@@ -40,6 +42,8 @@ class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::cla
   override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
     viewModel { MapComposeViewModel() }
     MapCompose()
+    MapProgressDialog()
+    DownloadFailedDialog()
   }
 }
 
@@ -49,13 +53,13 @@ fun MapCompose(modifier: Modifier = Modifier) {
   val imageResult by produceState<ByteArray?>(null, viewmodel.mapInfo.value) {
     viewmodel.mapInfo.value?.let { mapInfo ->
       if (!isMapLocalExist()) {
+        viewmodel.progressDialogState.value = true
         value = loadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-          // TODO 引入下载进度dialog
-
+          viewmodel.downloadProgress.value = bytesRead.toFloat() / contentLength.toFloat()
         }
-        value?.let {
-          toast("地图加载失败！请返回重试")
-          MainNavController.popBackStack()
+        if (value == null) {
+          viewmodel.downloadFailedDialogState.value = true
+          viewmodel.progressDialogState.value = false
         }
       }
     }
@@ -63,6 +67,7 @@ fun MapCompose(modifier: Modifier = Modifier) {
   viewmodel.mapInfo.value?.let { mapInfo ->
     val bytes = imageResult ?: if (isMapLocalExist()) getImage() else null
     bytes?.let { bytes ->
+      viewmodel.progressDialogState.value = false
       MapWidgetCompose(
         modifier = modifier,
         inputStream = bytes,

@@ -8,10 +8,10 @@ import androidx.compose.ui.unit.IntSize
 actual fun MapImageLoad(
   inputStream: ByteArray?,
   mapWidgetState: MapWidgetState,
-  onMapContainerChange: (size: IntSize) -> Unit,
-  onMapWidgetStateChange: (scale: Float, offset: Offset) -> Unit,
-  onClick: (offset: Offset) -> Unit,
-  onDoubleClick: (offset: Offset) -> Unit,
-  anchorContent: @Composable () -> Unit
+  onMapContainerChange: (IntSize) -> Unit,
+  onMapWidgetStateChange: (Float, Offset) -> Unit,
+  onClick: (Offset) -> Unit,
+  onDoubleClick: (Offset) -> Unit,
+  anchorContent: @Composable (() -> Unit)
 ) {
 }

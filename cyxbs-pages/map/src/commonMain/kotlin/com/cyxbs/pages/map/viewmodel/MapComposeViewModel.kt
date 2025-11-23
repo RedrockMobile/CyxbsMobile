@@ -49,6 +49,13 @@ class MapComposeViewModel : BaseViewModel() {
   var mapInfo = mutableStateOf<MapInfo?>(null)
   var buttonInfoItemList = mutableStateListOf<ButtonInfoItem>()
 
+  // 下载地图进度dialog相关信息
+  var progressDialogState = mutableStateOf(false)
+  var downloadProgress = mutableStateOf(0f)
+
+  // 下载失败的dialog
+  var downloadFailedDialogState = mutableStateOf(false)
+
   init {
     initMapInfo()
     getButtonInfo()

@@ -99,6 +99,20 @@ kotlin {
       wasmJsMain { dependsOn(webMain) }
     }
 
+    // noWeb 端配置
+    val noWebMain = create("noWebMain") {
+      dependsOn(commonMain.get())
+    }
+    androidMain { dependsOn(noWebMain) }
+    if (Multiplatform.enableIOS(project)) {
+      iosMain { dependsOn(noWebMain) }
+    }
+    if (Multiplatform.enableDesktop(project)) {
+      val desktopMain by getting {
+        dependsOn(noWebMain)
+      }
+    }
+
     // noMobile 端配置
     val noMobileMain = create("noMobileMain") {
       dependsOn(commonMain.get())

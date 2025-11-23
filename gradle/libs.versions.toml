@@ -103,7 +103,7 @@ kotlinx-collections = "0.4.0"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.9.0"
 # https://github.com/Kotlin/kotlinx-datetime
-kotlinx-datetime = "0.7.1-0.6.x-compat"
+kotlinx-datetime = "0.7.1"
 # https://github.com/Kotlin/kotlinx-atomicfu
 kotlinx-atomicfu = "0.29.0"
 # https://github.com/ktorio/ktor
@@ -187,7 +187,7 @@ codelocator = "2.0.4"
 # https://github.com/square/kotlinpoet
 kotlinpoet = "2.2.0"
 # kmp大图浏览 https://github.com/jvziyaoyao/scale
-scale = "1.1.1-beta.2"
+scale = "1.1.1-beta.3"
 # coil kmp网络图片加载框架 https://github.com/coil-kt/coil
 coil = "3.3.0"
 

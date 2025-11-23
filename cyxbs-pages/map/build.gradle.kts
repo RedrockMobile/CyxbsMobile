@@ -25,7 +25,7 @@ kotlin {
       // 地图加载需要的大图浏览控件
       compileOnly("com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0")
     }
-    mobileMain.dependencies {
+    noWebMain.dependencies {
       implementation(libs.scale.image.viewer)
       implementation(libs.scale.sampling.decoder)
     }
