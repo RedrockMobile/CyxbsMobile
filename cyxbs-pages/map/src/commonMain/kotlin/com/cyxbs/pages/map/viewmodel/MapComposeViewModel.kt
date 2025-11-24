@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.ButtonInfoItem
 import com.cyxbs.pages.map.model.bean.MapInfo
@@ -28,6 +29,8 @@ class MapComposeViewModel : BaseViewModel() {
 
   companion object {
     const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
+    const val MAX_SCALE = 6f
+    const val MIN_SCALE = 1f
   }
 
   // 地图组件状态
@@ -35,11 +38,6 @@ class MapComposeViewModel : BaseViewModel() {
 
   // 单独记录地图组件宽高
   var mapContainer = mutableStateOf(IntSize.Zero)
-  val mapCenter: Offset
-    get() = Offset(
-      mapContainer.value.width / 2f,
-      mapContainer.value.height / 2f
-    )
 
   // 点击锚点状态
   var anchorItemState = AnchorItemState()
@@ -66,22 +64,23 @@ class MapComposeViewModel : BaseViewModel() {
     launch {
       MapRepository.getMapInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
-        null // 暂时返回null
-        // TODO 引入缓存数据
+        MapDataRepository.getMapInfo()
       }?.let {
         mapInfo.value = it
-        // TODO 引入缓存数据
+        MapDataRepository.saveMapInfo(it)
+      } ?: run {
+        downloadFailedDialogState.value = true
       }
     }
   }
 
   // 初始化聚焦信息
   fun initFocus(coroutine: CoroutineScope) {
-    mapInfo.value?.let {
-      it.placeList.forEach { placeItem ->
-        if (placeItem.placeId == it.openSiteId) {
-          focusOnPlace(placeItem, coroutine)
-        }
+    mapInfo.value?.let { mapInfo ->
+      mapInfo.placeList.find {
+        it.placeId == mapInfo.openSiteId
+      }?.let { placeItem ->
+        focusOnPlace(placeItem, coroutine)
       }
     }
   }
@@ -89,26 +88,17 @@ class MapComposeViewModel : BaseViewModel() {
   // 聚焦于某个地点
   fun focusOnPlace(placeItem: PlaceItem, coroutine: CoroutineScope) {
     mapInfo.value?.let { mapInfo ->
-      if (mapContainer.value != IntSize.Zero) {
-        val getOffset = calculatePlaceInMap(
-          Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
-          mapContainer.value,
-          IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
-        )
-        val containerCenter = Offset(mapContainer.value.width / 2f, mapContainer.value.height / 2f)
-        toast(placeItem.placeName)
-        coroutine.launch {
-          launch {
-            mapWidgetState.animateScale(6f)
-          }
-          launch {
-            mapWidgetState.animateOffset((containerCenter - getOffset) * 6f)
-          }
-          launch {
-            anchorItemState.visible = true
-            anchorItemState.position = getOffset
-            anchorItemState.animateClick()
-          }
+      if (mapContainer.value == IntSize.Zero) return
+      val getOffset = calculatePlaceInMap(
+        Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
+        mapContainer.value,
+        IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
+      )
+      toast(placeItem.placeName)
+      coroutine.launch {
+        animateMapToPosition(this, getOffset)
+        launch {
+          updateAnchorState(getOffset, true)
         }
       }
     }
@@ -119,10 +109,11 @@ class MapComposeViewModel : BaseViewModel() {
     launch {
       MapRepository.getButtonInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
-        null
+        MapDataRepository.getButtonInfo()
       }?.let { buttonInfo ->
         buttonInfoItemList.clear()
         buttonInfoItemList.addAll(buttonInfo.buttonInfo)
+        MapDataRepository.saveButtonInfo(buttonInfo)
       }
     }
   }
@@ -156,12 +147,7 @@ class MapComposeViewModel : BaseViewModel() {
           }
         }
       }
-      launch {
-        mapWidgetState.animateScale(1f)
-      }
-      launch {
-        mapWidgetState.animateOffset(Offset.Zero)
-      }
+      resetMap(this)
       launch {
         anchorItemStateList.forEach { anchorItemState ->
           anchorItemState.visible = true
@@ -220,15 +206,8 @@ class MapComposeViewModel : BaseViewModel() {
     }
     // 启动动画
     coroutine.launch {
-      launch {
-        if (isFind) {
-          mapWidgetState.animateScale(6f)
-        }
-      }
-      launch {
-        if (isFind) {
-          mapWidgetState.animateOffset((mapCenter - realOffset) * 6f)
-        }
+      if (isFind) {
+        animateMapToPosition(this, realOffset)
       }
       // 对于点击建筑标签时，关闭列表动画采用同时进行，对齐之前的代码
       anchorItemStateList.forEach { anchorItemState ->
@@ -240,16 +219,53 @@ class MapComposeViewModel : BaseViewModel() {
         }
       }
       launch {
-        if (anchorItemState.scale != 0f) anchorItemState.animateClose()
         // 如果找到就启动点击出现的动画并更新状态
         if (isFind) {
-          anchorItemState.visible = true
-          anchorItemState.position = realOffset
-          anchorItemState.animateClick()
+          updateAnchorState(realOffset, true)
         } else {
-          anchorItemState.visible = false
+          updateAnchorState(visible = false)
         }
       }
+    }
+  }
+
+  // 还原地图为初始状态
+  fun resetMap(coroutine: CoroutineScope) {
+    coroutine.launch {
+      launch {
+        mapWidgetState.animateScale(MIN_SCALE)
+      }
+      launch {
+        mapWidgetState.animateOffset(Offset.Zero)
+      }
+    }
+  }
+
+  fun animateMapToPosition(coroutine: CoroutineScope, offset: Offset) {
+    coroutine.launch {
+      // 执行动画
+      launch {
+        mapWidgetState.animateScale(MAX_SCALE)
+      }
+      launch {
+        mapWidgetState.animateOffset((mapWidgetState.center - offset) * 6f)
+      }
+    }
+  }
+
+  // 更新锚点的状态
+  private suspend fun updateAnchorState(
+    position: Offset = anchorItemState.position,
+    visible: Boolean,
+    animate: Boolean = true
+  ) {
+    if (anchorItemState.scale != 0f) {
+      anchorItemState.animateClose()
+    }
+    anchorItemState.visible = visible
+    if (animate && visible) {
+      anchorItemState.position = position
+      anchorItemState.animateClick()
     }
   }
 }

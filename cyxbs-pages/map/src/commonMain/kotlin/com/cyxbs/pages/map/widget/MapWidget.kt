@@ -62,24 +62,9 @@ fun MapWidgetCompose(
       onDoubleClick = { offset ->
         // 如果大于6f,则还原初始
         if (mapWidgetState.scale >= 6f) {
-          coroutineScope.launch {
-            launch {
-              mapWidgetState.animateScale(1f)
-            }
-            launch {
-              mapWidgetState.animateOffset(Offset.Zero)
-            }
-          }
+          viewmodel.resetMap(coroutineScope)
         } else {
-          coroutineScope.launch {
-            // 执行动画
-            launch {
-              mapWidgetState.animateScale(6f)
-            }
-            launch {
-              mapWidgetState.animateOffset((mapWidgetState.center - offset) * (6f / mapWidgetState.scale) + mapWidgetState.offset)
-            }
-          }
+          viewmodel.animateMapToPosition(coroutineScope, offset)
         }
       },
       anchorContent = {
