@@ -1,4 +1,4 @@
-package com.cyxbs.pages.map.widget
+package com.cyxbs.pages.map.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box

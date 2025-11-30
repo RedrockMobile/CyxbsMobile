@@ -1,18 +1,20 @@
 package com.cyxbs.pages.map.widget
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
@@ -37,74 +39,88 @@ fun MapWidgetCompose(
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val coroutineScope = rememberCoroutineScope()
-  Box(
-    modifier = modifier.background(Color(0xFFA8BCF1))
-  ) {
-    MapImageLoad(
-      inputStream = inputStream,
-      mapWidgetState = mapWidgetState,
-      onMapContainerChange = { size ->
-        viewmodel.mapContainer.value = size
-      },
-      onMapWidgetStateChange = { scale, offset ->
-        coroutineScope.launch {
-          mapWidgetState.setScale(scale)
-          mapWidgetState.setOffset(offset)
+
+  MapImageLoad(
+    inputStream = inputStream,
+    mapWidgetState = mapWidgetState,
+    onMapContainerChange = { size ->
+      viewmodel.mapContainer.value = size
+    },
+    onMapWidgetStateChange = { scale, offset ->
+      coroutineScope.launch {
+        mapWidgetState.setScale(scale)
+        mapWidgetState.setOffset(offset)
+      }
+    },
+    onClick = { offset ->
+      viewmodel.clickPlace(
+        coroutineScope,
+        offset,
+        mapInfo
+      )
+    },
+    onDoubleClick = { offset ->
+      // 如果大于6f,则还原初始
+      if (mapWidgetState.scale >= 6f) {
+        viewmodel.resetMap(coroutineScope)
+      } else {
+        viewmodel.animateMapToPosition(coroutineScope, offset)
+      }
+    },
+    anchorContent = {
+      if (anchorItemState.visible) {
+        AnchorItem(
+          mapWidgetState,
+          anchorItemState
+        ) {
+          viewmodel.clickAnchorItem(coroutineScope, anchorItemState)
         }
-      },
-      onClick = { offset ->
-        viewmodel.clickAnchorItem(
-          coroutineScope,
-          offset,
-          mapInfo
-        )
-      },
-      onDoubleClick = { offset ->
-        // 如果大于6f,则还原初始
-        if (mapWidgetState.scale >= 6f) {
-          viewmodel.resetMap(coroutineScope)
-        } else {
-          viewmodel.animateMapToPosition(coroutineScope, offset)
-        }
-      },
-      anchorContent = {
+      }
+      anchorItemStateList.forEach { anchorItemState ->
         if (anchorItemState.visible) {
           AnchorItem(
             mapWidgetState,
             anchorItemState
-          )
-        }
-        anchorItemStateList.forEach { anchorItemState ->
-          if (anchorItemState.visible) {
-            AnchorItem(
-              mapWidgetState,
-              anchorItemState
-            )
+          ) {
+            viewmodel.clickAnchorItem(coroutineScope, anchorItemState)
           }
         }
       }
-    )
-  }
+    }
+  )
 }
 
 @Composable
 fun AnchorItem(
   mapWidgetState: MapWidgetState,
-  anchorItemState: AnchorItemState
+  anchorItemState: AnchorItemState,
+  onClick: () -> Unit
 ) {
   // 这里不推荐写成size(45.dp / scale),因为会不断触发measure->layout->draw的重组
   // 应该写在graphicsLayer里面，只会在draw阶段重组
+  val anchorScale by remember(mapWidgetState.scale) {
+    mutableStateOf(
+      if (mapWidgetState.scale != 0f) 1f / mapWidgetState.scale else 1f
+    )
+  }
   AnchorImage(
     modifier = Modifier
+      .offset {
+        IntOffset(
+          x = anchorItemState.position.x.toInt() - (45.dp.roundToPx() / 2),
+          y = anchorItemState.position.y.toInt() - 45.dp.roundToPx()
+        )
+      }
       .size(45.dp)
       .graphicsLayer {
-        val scale = if (mapWidgetState.scale != 0f) 1f / mapWidgetState.scale else 1f
         // 更改transformOrigin为底边中间
         transformOrigin = TransformOrigin(0.5f, 1f)
-        scaleX = scale * anchorItemState.scale
-        scaleY = scale * anchorItemState.scale
-        translationX = anchorItemState.position.x - size.width / 2
-        translationY = anchorItemState.position.y - size.height
+        scaleX = anchorScale * anchorItemState.scale
+        scaleY = anchorScale * anchorItemState.scale
+      }
+      // 这里要在scale变换后调用，如果放在前面则会扩大点击区域
+      .clickableSingle {
+        onClick()
       }
   )
 }

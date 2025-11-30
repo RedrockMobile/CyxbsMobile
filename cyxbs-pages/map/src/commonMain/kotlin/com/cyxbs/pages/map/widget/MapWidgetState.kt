@@ -61,7 +61,7 @@ class MapWidgetState(
   suspend fun animateScale(scale: Float = this.scale) {
     scaleAnim.animateTo(
       targetValue = scale,
-      animationSpec = tween(600, easing = LinearOutSlowInEasing)
+      animationSpec = tween(800, easing = LinearOutSlowInEasing)
     )
   }
 
@@ -69,7 +69,7 @@ class MapWidgetState(
   suspend fun animateOffset(offset: Offset = this.offset) {
     offsetAnim.animateTo(
       targetValue = offset,
-      animationSpec = tween(600, easing = LinearOutSlowInEasing)
+      animationSpec = tween(800, easing = LinearOutSlowInEasing)
     )
   }
 

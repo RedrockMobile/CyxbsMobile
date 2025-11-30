@@ -19,10 +19,12 @@ import androidx.compose.ui.geometry.Offset
 @Stable
 class AnchorItemState(
   initialPosition: Offset = Offset.Zero,
-  visible: Boolean = false
+  visible: Boolean = false,
+  placeId: String
 ) {
   var position by mutableStateOf(initialPosition)
   var visible by mutableStateOf(visible)
+  var placeId by mutableStateOf(placeId)
   val scale get() = scaleAnim.value
   private val scaleAnim = Animatable(1f)
 
@@ -58,5 +60,6 @@ class AnchorItemState(
 @Composable
 fun rememberAnchorItemState(
   initialPosition: Offset = Offset.Zero,
-  visible: Boolean = false
-) = remember { AnchorItemState(initialPosition, visible) }
+  visible: Boolean = false,
+  placeId: String
+) = remember { AnchorItemState(initialPosition, visible, placeId) }

@@ -19,7 +19,7 @@ import com.cyxbs.pages.map.util.calculateRatio
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvas
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvasViewPort
 import com.jvziyaoyao.scale.image.sampling.rememberSamplingDecoder
-import com.jvziyaoyao.scale.zoomable.zoomable.detectTransformGestures
+import com.cyxbs.pages.map.util.detectTransformGestures
 
 @Composable
 actual fun MapImageLoad(

@@ -5,10 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.view.ui.BottomSheetState
+import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.ButtonInfoItem
 import com.cyxbs.pages.map.model.bean.MapInfo
+import com.cyxbs.pages.map.model.bean.PlaceDetails
 import com.cyxbs.pages.map.model.bean.PlaceItem
 import com.cyxbs.pages.map.util.calculateClickBuildingInMap
 import com.cyxbs.pages.map.util.calculateClickTagInMap
@@ -25,7 +28,9 @@ import kotlinx.coroutines.launch
  * @Date : 2025/11/18 10:48
  */
 
-class MapComposeViewModel : BaseViewModel() {
+expect class MapComposeViewModel : CommonMapComposeViewModel
+
+abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   companion object {
     const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
@@ -34,25 +39,35 @@ class MapComposeViewModel : BaseViewModel() {
   }
 
   // 地图组件状态
-  var mapWidgetState = MapWidgetState()
+  val mapWidgetState = MapWidgetState()
 
   // 单独记录地图组件宽高
-  var mapContainer = mutableStateOf(IntSize.Zero)
+  val mapContainer = mutableStateOf(IntSize.Zero)
+  val mapCenter get() = Offset(mapContainer.value.width / 2f, mapContainer.value.height / 2f)
 
   // 点击锚点状态
-  var anchorItemState = AnchorItemState()
+  val anchorItemState = AnchorItemState(placeId = "1")
 
   // 展示锚点集合状态
-  var anchorItemStateList = mutableStateListOf<AnchorItemState>()
-  var mapInfo = mutableStateOf<MapInfo?>(null)
-  var buttonInfoItemList = mutableStateListOf<ButtonInfoItem>()
+  val anchorItemStateList = mutableStateListOf<AnchorItemState>()
+  val mapInfo = mutableStateOf<MapInfo?>(null)
+  val buttonInfoItemList = mutableStateListOf<ButtonInfoItem>()
 
   // 下载地图进度dialog相关信息
-  var progressDialogState = mutableStateOf(false)
-  var downloadProgress = mutableStateOf(0f)
+  val progressDialogState = mutableStateOf(false)
+  val downloadProgress = mutableStateOf(0f)
 
   // 下载失败的dialog
-  var downloadFailedDialogState = mutableStateOf(false)
+  val downloadFailedDialogState = mutableStateOf(false)
+
+  // 地图更新的dialog
+  val updateMapDialogState = mutableStateOf(false)
+  val isUpdateStart = mutableStateOf(false)
+
+  // 地点详细信息
+  val placeDetails = mutableStateOf<PlaceDetails?>(null)
+  val bottomSheetState = BottomSheetState(hideable = true)
+
 
   init {
     initMapInfo()
@@ -75,18 +90,19 @@ class MapComposeViewModel : BaseViewModel() {
   }
 
   // 初始化聚焦信息
-  fun initFocus(coroutine: CoroutineScope) {
+  fun initFocus(scope: CoroutineScope) {
     mapInfo.value?.let { mapInfo ->
       mapInfo.placeList.find {
         it.placeId == mapInfo.openSiteId
       }?.let { placeItem ->
-        focusOnPlace(placeItem, coroutine)
+        getPlaceDetails(placeItem.placeId)
+        focusOnPlace(placeItem, scope)
       }
     }
   }
 
   // 聚焦于某个地点
-  fun focusOnPlace(placeItem: PlaceItem, coroutine: CoroutineScope) {
+  fun focusOnPlace(placeItem: PlaceItem, scope: CoroutineScope) {
     mapInfo.value?.let { mapInfo ->
       if (mapContainer.value == IntSize.Zero) return
       val getOffset = calculatePlaceInMap(
@@ -94,8 +110,7 @@ class MapComposeViewModel : BaseViewModel() {
         mapContainer.value,
         IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
       )
-      toast(placeItem.placeName)
-      coroutine.launch {
+      scope.launch {
         animateMapToPosition(this, getOffset)
         launch {
           updateAnchorState(getOffset, true)
@@ -118,12 +133,25 @@ class MapComposeViewModel : BaseViewModel() {
     }
   }
 
+  // 获取地点详细信息
+  fun getPlaceDetails(placeId: String) {
+    launch {
+      MapRepository.getPlaceDetails(placeId).getOrElse { throwable ->
+        toast(NETWORK_ERROR_INFO)
+        MapDataRepository.getPlaceDetails(placeId)
+      }?.let {
+        placeDetails.value = it
+        MapDataRepository.savePlaceDetails(placeId, it)
+      }
+    }
+  }
+
   // 点击按钮展示anchorList
-  fun showAnchorList(coroutine: CoroutineScope, index: Int) {
+  fun showAnchorList(scope: CoroutineScope, index: Int) {
     var item = 0
     val buttonInfoItem = buttonInfoItemList[index]
     val duration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
-    coroutine.launch {
+    scope.launch {
       if (anchorItemState.scale != 0f) anchorItemState.animateClose()
       anchorItemStateList.forEach { anchorItemState ->
         anchorItemState.animateClose(duration)
@@ -140,7 +168,8 @@ class MapComposeViewModel : BaseViewModel() {
             )
             anchorItemStateList.add(
               AnchorItemState(
-                initialPosition = getOffset
+                initialPosition = getOffset,
+                placeId = placeItem.placeId
               )
             )
             item++
@@ -157,8 +186,21 @@ class MapComposeViewModel : BaseViewModel() {
     }
   }
 
+  // 点击anchorItem
+  fun clickAnchorItem(scope: CoroutineScope, anchorItemState: AnchorItemState) {
+    getPlaceDetails(anchorItemState.placeId)
+    scope.launch {
+      launch {
+        animateMapToPosition(scope, anchorItemState.position)
+      }
+      launch {
+        bottomSheetState.expand()
+      }
+    }
+  }
+
   // 点击地图后的判断
-  fun clickAnchorItem(coroutine: CoroutineScope, offset: Offset, mapInfo: MapInfo) {
+  fun clickPlace(scope: CoroutineScope, offset: Offset, mapInfo: MapInfo) {
     val mapRatio = mapInfo.mapWidth.toFloat() / mapInfo.mapHeight.toFloat()
     // 这里要减去是因为大图组件高为aspectRatio(ratio)，故只会占在中间一部分，故需要减去顶部的一部分距离
     val originOffset = calculateOriginPosition(
@@ -172,6 +214,7 @@ class MapComposeViewModel : BaseViewModel() {
     )
     var isFind = false
     var realOffset = Offset.Zero
+    var placeId = anchorItemState.placeId
     mapInfo.placeList.forEach { placeItem ->
       if (!isFind) {
         // 先寻找标签
@@ -182,8 +225,8 @@ class MapComposeViewModel : BaseViewModel() {
           mapSize = IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
         )
         if (getOffset != Offset.Zero) {
-          toast(placeItem.placeName)
           realOffset = getOffset
+          placeId = placeItem.placeId
           isFind = true
         } else {
           // 再寻找建筑
@@ -196,42 +239,56 @@ class MapComposeViewModel : BaseViewModel() {
               mapSize = IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
             )
             if (getOffsetFromBuilding != Offset.Zero) {
-              toast(placeItem.placeName)
               realOffset = getOffsetFromBuilding
+              placeId = placeItem.placeId
               isFind = true
             }
           }
         }
       }
     }
+    anchorItemState.placeId = placeId // 更新一下对应的placeId
+    if (isFind) getPlaceDetails(placeId)
     // 启动动画
-    coroutine.launch {
+    scope.launch {
       if (isFind) {
         animateMapToPosition(this, realOffset)
       }
       // 对于点击建筑标签时，关闭列表动画采用同时进行，对齐之前的代码
-      anchorItemStateList.forEach { anchorItemState ->
-        if (anchorItemState.visible) {
-          launch {
-            anchorItemState.animateClose(300)
-            anchorItemState.visible = false
-          }
+      anchorItemStateList.filter {
+        it.visible
+      }.forEach { anchorItemState ->
+        launch {
+          anchorItemState.animateClose(300)
+          anchorItemState.visible = false
         }
       }
       launch {
         // 如果找到就启动点击出现的动画并更新状态
         if (isFind) {
-          updateAnchorState(realOffset, true)
+          launch {
+            updateAnchorState(realOffset, true)
+          }
+          if (bottomSheetState.state == BottomSheetValueState.Hide) {
+            launch {
+              bottomSheetState.collapse()
+            }
+          }
         } else {
-          updateAnchorState(visible = false)
+          launch {
+            updateAnchorState(visible = false)
+          }
+          launch {
+            bottomSheetState.hide() // 老逻辑这里是不会关闭dialog的，这里增加了一个如果没点到就关闭dialog的动画
+          }
         }
       }
     }
   }
 
   // 还原地图为初始状态
-  fun resetMap(coroutine: CoroutineScope) {
-    coroutine.launch {
+  fun resetMap(scope: CoroutineScope) {
+    scope.launch {
       launch {
         mapWidgetState.animateScale(MIN_SCALE)
       }
@@ -241,17 +298,21 @@ class MapComposeViewModel : BaseViewModel() {
     }
   }
 
-  fun animateMapToPosition(coroutine: CoroutineScope, offset: Offset) {
-    coroutine.launch {
+  // 将地图中心移至某点
+  fun animateMapToPosition(scope: CoroutineScope, offset: Offset) {
+    scope.launch {
       // 执行动画
       launch {
         mapWidgetState.animateScale(MAX_SCALE)
       }
       launch {
-        mapWidgetState.animateOffset((mapWidgetState.center - offset) * 6f)
+        mapWidgetState.animateOffset((mapCenter - offset) * 6f)
       }
     }
   }
+
+  // 跳转导航
+  open fun jumpToNavigation(endPlace: String) {}
 
   // 更新锚点的状态
   private suspend fun updateAnchorState(

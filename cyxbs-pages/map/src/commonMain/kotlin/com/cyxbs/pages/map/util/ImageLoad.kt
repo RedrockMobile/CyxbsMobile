@@ -7,7 +7,7 @@ package com.cyxbs.pages.map.util
  */
 
 // 用于拿到图片的ByteArray对象
-expect fun getImage(): ByteArray?
+expect suspend fun getImage(): ByteArray?
 
 /**
  * 用于从网络加载图片
@@ -21,4 +21,7 @@ expect suspend fun loadImage(
 ): ByteArray?
 
 // 判断本地图片缓存是否存在
-expect fun isMapLocalExist(): Boolean
+expect suspend fun isMapLocalExist(): Boolean
+
+// 删除本地图片
+expect suspend fun deleteFile()

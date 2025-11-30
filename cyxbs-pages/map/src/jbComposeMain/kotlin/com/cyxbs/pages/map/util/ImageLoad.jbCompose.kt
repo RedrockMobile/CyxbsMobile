@@ -1,6 +1,6 @@
 package com.cyxbs.pages.map.util
 
-actual fun getImage(): ByteArray? {
+actual suspend fun getImage(): ByteArray? {
   return null
 }
 
@@ -11,6 +11,9 @@ actual suspend fun loadImage(
   return null
 }
 
-actual fun isMapLocalExist(): Boolean {
+actual suspend fun isMapLocalExist(): Boolean {
   return false
+}
+
+actual suspend fun deleteFile() {
 }
