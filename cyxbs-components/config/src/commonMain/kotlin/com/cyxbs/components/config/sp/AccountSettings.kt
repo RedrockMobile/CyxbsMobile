@@ -15,10 +15,10 @@ class AccountSettings(val stuNum: String?) : PreferencesSettings("AccountSetting
 
     private val map = mutableMapOf<String?, AccountSettings>()
 
+    private val mapSynchronized = SynchronizedObject()
+
     // 获取当前登录人的 AccountSettings
     var now: AccountSettings = get(IAccountService::class.impl().stuNum)
-
-    private val mapSynchronized = SynchronizedObject()
 
     // 获取指定学号的 AccountSettings
     // stuNum 为 null 表示未登录
