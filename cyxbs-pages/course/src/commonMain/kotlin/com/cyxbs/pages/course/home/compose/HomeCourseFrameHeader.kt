@@ -24,11 +24,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
+import com.cyxbs.pages.course.home.item.decoration.LinkLessonDecorationViewModel
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_single
@@ -43,16 +45,6 @@ import kotlin.math.abs
  * @author 985892345
  * @date 2025/9/23
  */
-@Preview
-@Composable
-fun HomeCourseHeaderPreview() {
-  HomeCourseHeader(
-    modifier = Modifier,
-    frame = remember { PreviewHomeCourseFrame() }
-  )
-}
-
-class PreviewHomeCourseFrame : AbstractHomeCourseFrame() {}
 
 // 课表头
 // 默认 fillMaxSize 并向下居中
@@ -176,7 +168,8 @@ private fun CourseLinkStudentBtn(
       modifier = modifier.size(32.dp).graphicsLayer {
         translationX = (101.dp * pageFraction).toPx()
       }.clickableNoIndicator {
-        HomeLinkLessonDataProvider.changeVisible()
+        // todo 修改关联人课表是否展示
+//        viewModel(LinkLessonDecorationViewModel::class).changeVisible()
       },
     )
   }

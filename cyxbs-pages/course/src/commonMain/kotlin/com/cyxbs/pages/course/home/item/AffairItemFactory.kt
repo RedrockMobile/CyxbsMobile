@@ -4,8 +4,7 @@ import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
-import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
+import com.cyxbs.pages.course.home.item.impl.DefaultAffairItem
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -20,11 +19,11 @@ interface AffairItemFactory {
   fun createAffairItemModel(
     page: Int,
     affairDateModel: AffairDateModel,
-  ): CourseItemWrapper<CourseAffairItem>
+  ): CourseAffairItem
 
   companion object {
     fun get(): AffairItemFactory {
-      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItemModel
+      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItem
     }
   }
 }

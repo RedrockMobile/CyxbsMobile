@@ -20,10 +20,11 @@ import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
+import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.IMovableItemExtension
-import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
+import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlin.math.roundToInt
 
@@ -44,45 +45,51 @@ data class MobileCourseAffairItem(
     override fun createAffairItemModel(
       page: Int,
       affairDateModel: AffairDateModel
-    ): CourseItemWrapper<CourseAffairItem> {
-      return CourseItemWrapper(
-        item = MobileCourseAffairItem(page = page, affairDateModel = affairDateModel),
-        page = page,
-        dayOfWeek = affairDateModel.date.value.dayOfWeek,
-        beginTime = affairDateModel.whatTime.value.timePair.value.first,
-        finalTime = affairDateModel.whatTime.value.timePair.value.second,
-      )
+    ): CourseAffairItem {
+      return MobileCourseAffairItem(page, affairDateModel)
     }
   }
 
+  override val whatTime = CourseItemWhatTime.Changeable(
+    fixed = CourseItemWhatTime.Fixed(
+      page = page,
+      dayOfWeek = affairDateModel.date.value.dayOfWeek,
+      beginTime = affairDateModel.whatTime.value.timePair.value.first,
+      finalTime = affairDateModel.whatTime.value.timePair.value.second,
+    )
+  )
+
   override val extension = MobileCourseAffairItemExtensionGroup(this)
 
-  override val content: @Composable ((Modifier, CourseItemState) -> Unit) = { modifier, itemState ->
+  @Composable
+  override fun CourseItemContent() {
     val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
+    val itemState = itemState
     CourseDefaultItemContent(
-      modifier = modifier,
       itemState = itemState,
       topText = affairDateModel.idModel.title.collectAsState().value,
       bottomText = affairDateModel.idModel.content.collectAsState().value,
       textColor = LocalAppColors.current.tvLv2,
       backgroundColor = Color.Transparent,
-      onBuildDrawCache = drawAffairItemBackground(),
+//      onBuildDrawCache = drawAffairItemBackground(), // todo 待实现
     ) {
       fun collectCoveredItems(
-        set: MutableSet<CourseItemWrapper<*>>,
-        data: CourseItemOverlap,
-      ): Set<CourseItemWrapper<*>> {
-        data.coveredItemList.fastForEach {
-          val item = it.itemOverlap.wrapper
-          if (item.beginTime < itemState.itemWrapper.finalTime && item.finalTime > itemState.itemWrapper.beginTime) {
+        set: MutableSet<CourseItem>,
+        overlap: OverlapResult,
+      ): Set<CourseItem> {
+        overlap.coveredItemList.fastForEach {
+          val item = it.result.itemState.item
+          if (item.whatTime.now.beginTime < whatTime.now.finalTime && item.whatTime.now.finalTime > whatTime.now.beginTime) {
             set.add(item)
           }
-          collectCoveredItems(set, it.itemOverlap)
+          collectCoveredItems(set, it.result)
         }
         return set
       }
-      dialogContents.value = collectCoveredItems(linkedSetOf(itemState.itemWrapper), itemState.overlap)
-        .mapNotNull { it.item as? CourseBottomSheetDialogExtension }
+      dialogContents.value = itemState.overlap?.let { overlap ->
+        collectCoveredItems(linkedSetOf(this), overlap)
+          .mapNotNull { it.extension as? CourseBottomSheetDialogExtension }
+      } ?: listOf(extension)
     }
     MobileCourseBottomSheetDialog(dialogContents = dialogContents)
   }
@@ -131,7 +138,8 @@ private class MobileCourseAffairCourseBottomSheetDialogExtension(
 private class MobileCourseAffairCourseBottomSheetHeaderExtension(
   val itemKeyImpl: MobileCourseAffairItem
 ) : CourseBottomSheetHeaderExtension {
-  override val courseBottomSheetHeaderContent: @Composable ((Modifier) -> Unit) = { modifier ->
+  @Composable
+  override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
     CourseItemBottomSheetHeader(
       modifier = modifier,

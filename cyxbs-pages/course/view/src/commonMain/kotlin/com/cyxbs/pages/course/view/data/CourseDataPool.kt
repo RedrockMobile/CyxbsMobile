@@ -73,7 +73,7 @@ class CourseDayDataPool(
     val itemList = weekDataPool.providers.map {
       it.getDayData(week = weekDataPool.page, dayOfWeek = dayOfWeek, compare = true)
     }.asReversed().flatten()
-    _state.value = CourseItemOverlap.transformOverlap(itemList)
+//    _state.value = CourseItemOverlap.transformOverlap(itemList)
   }
 
   // 尝试触发刷新，将在下一个消息进行执行

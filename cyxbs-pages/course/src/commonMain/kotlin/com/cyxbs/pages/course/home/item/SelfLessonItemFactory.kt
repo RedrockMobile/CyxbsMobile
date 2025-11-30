@@ -3,9 +3,8 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItem
 import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
-import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItemModel
 
 /**
  * SelfLessonItem 工厂，由具体平台实现
@@ -18,14 +17,14 @@ import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItemModel
  */
 interface SelfLessonItemFactory {
 
-  fun createSelfLessonItemModel(
+  fun createSelfLessonItem(
     page: Int,
     lesson: LessonByWeeks,
-  ): CourseItemWrapper<SelfLessonItem>
+  ): SelfLessonItem
 
   companion object {
     fun get(): SelfLessonItemFactory {
-      return SelfLessonItemFactory::class.implOrNull() ?: DefaultSelfLessonItemModel
+      return SelfLessonItemFactory::class.implOrNull() ?: DefaultSelfLessonItem
     }
   }
 }

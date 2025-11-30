@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.item.touch
+package com.cyxbs.pages.course.view.item.modifier
 
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.zIndex
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.getValue
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
@@ -34,7 +35,7 @@ import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.IMovableItemExtension
-import com.cyxbs.pages.course.view.overlay.CourseItemRange
+import com.cyxbs.pages.course.view.item.touch.EdgeScroll
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
@@ -48,6 +49,17 @@ import kotlin.math.min
  * @date 2025/5/4
  */
 
+object LongPressMoveItemModifier : CourseItemModifier {
+  @Composable
+  override fun createModifier(): Modifier {
+    val extension = itemState.item.extension
+    if (extension is LongPressMoveController) {
+      return Modifier.longPressMove(extension)
+    }
+    return Modifier
+  }
+}
+
 sealed interface LongPressMoveState {
   data object Idle : LongPressMoveState
   data object Touching : LongPressMoveState
@@ -59,7 +71,6 @@ abstract class LongPressMoveController {
 
   // 用于暴露给被覆盖的 item 进行设置
   var zIndex by mutableFloatStateOf(0F)
-    protected set
 
   var state by mutableStateOf<LongPressMoveState>(LongPressMoveState.Idle)
     private set
@@ -225,59 +236,58 @@ fun Modifier.longPressMove(
 // 耦合 CourseItemState
 class LongPressMoveControllerImpl(
   val itemState: CourseItemState,
-  val edgeScroll: EdgeScroll,
   val pageContext: LocalCoursePageContext,
 ) : LongPressMoveController() {
-
-  companion object : CourseItemState.DataStore<LongPressMoveControllerImpl>
-
-  init {
-    itemState.setData(LongPressMoveControllerImpl, this)
-  }
 
   private var edgePosition: EdgeScroll.EdgePosition? = null
 
   // 自身 showRange 转换器（包含自身完全不显示的情况）
   private val selfShowRangeTransformerForAll = CourseItemState.ShowRangeTransformer { _, overlap ->
     // 被长按的 item 即使被覆盖也完整展示
-    listOf(CourseItemRange(overlap.wrapper.beginTime, overlap.wrapper.finalTime))
+    val beginTime = overlap.itemState.item.whatTime.now.beginTime
+    val finalTime = overlap.itemState.item.whatTime.now.finalTime
+    listOf(MinuteTimePair(beginTime, finalTime))
   }
 
   // 自身 showRange 转换器（自在自身完全不显示时处理）
   private val selfShowRangeTransformerForEmpty =
     CourseItemState.ShowRangeTransformer { show, overlap ->
-      show.ifEmpty { listOf(CourseItemRange(overlap.wrapper.beginTime, overlap.wrapper.finalTime)) }
+      show.ifEmpty {
+        val beginTime = overlap.itemState.item.whatTime.now.beginTime
+        val finalTime = overlap.itemState.item.whatTime.now.finalTime
+        listOf(MinuteTimePair(beginTime, finalTime))
+      }
     }
 
   // 处理被覆盖 item 的 overlap 更新触发器
   private val overlapChangeTriggerForAllCovered =
-    CourseItemState.CoveredItemShowRangeTransformerTrigger(pageContext) { show, overlap ->
+    CourseItemState.CoveredItemShowRangeTransformerTrigger { show, overlap ->
       // 解除被覆盖 item 的隐藏区域
       val coveredRange = overlap.coveredRangeList
-        .filter { it.itemOverlap.wrapper.item == itemState.itemWrapper.item }
+        .filter { it.result.itemState === itemState }
         .map { it.range }
       (show + coveredRange).mergeOverlapRange()
     }
 
   // 处理被全覆盖 item 的 overlap 更新触发器
   private val overlapChangeTriggerForEmptyCovered =
-    CourseItemState.CoveredItemShowRangeTransformerTrigger(pageContext) { show, overlap ->
+    CourseItemState.CoveredItemShowRangeTransformerTrigger { show, overlap ->
       // 单独处理被全覆盖这类 item 的展示
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
-          .filter { it.itemOverlap.wrapper.item == itemState.itemWrapper.item }
+          .filter { it.result.itemState === itemState }
           .map { it.range }
         (show + coveredRange).mergeOverlapRange()
       }
     }
 
   override fun enable(transition: MutableState<Offset>): Boolean {
-    return transition.value == Offset.Zero && itemState.itemWrapper.item is IMovableItemExtension
+    return transition.value == Offset.Zero && itemState.item.extension is IMovableItemExtension
   }
 
   override fun onStartLongPress(pointer: PointerInputChange) {
     super.onStartLongPress(pointer)
-    edgePosition = edgeScroll.add()
+    edgePosition = pageContext.scrollContext.edgeScroll.add()
     // 解除自身被覆盖的区域
     itemState.addShowRangeTransformer(selfShowRangeTransformerForAll)
     // 展示被覆盖的 item
@@ -303,20 +313,20 @@ class LongPressMoveControllerImpl(
 
   // 移动过程中判断是否需要展开时间轴折叠部分
   private fun tryExpandTimeline(screenLeftTop: Offset, size: IntSize) {
-    val item = itemState.itemWrapper.item as IMovableItemExtension
+    val item = itemState.item.extension as IMovableItemExtension
     if (!item.enableExpandTimelineWhenMove(itemState)) return
-    val scrollContext = pageContext.scrollContext.value ?: return
-    itemState.timeline.data.asSequence()
+    val scrollContext = pageContext.scrollContext
+    pageContext.timeline.data.asSequence()
       .filterIsInstance<MutableTimelineData>()
       .filter { it.state.value == MutableTimelineData.State.Collapse }
       .mapNotNull { time ->
         scrollContext.timelineCoordinatesMap[time]?.let { coor ->
           coor.localToScreen(Offset.Zero).let {
             val threshold = min(20, size.height / 2 - 10).coerceAtLeast(0)
-            if (time == itemState.timeline.data.first()) {
+            if (time == pageContext.timeline.data.first()) {
               // 如果是开始的折叠时间，则需要超过一定距离才能触发展开
               screenLeftTop.y + threshold * 6 < it.y
-            } else if (time == itemState.timeline.data.last()) {
+            } else if (time == pageContext.timeline.data.last()) {
               // 如果是结束的折叠时间，则也需要超过一定距离才能触发展开
               screenLeftTop.y + size.height - threshold * 6 > it.y + coor.size.height
             } else {
@@ -351,7 +361,7 @@ class LongPressMoveControllerImpl(
     screenLeftTop: Offset,
     size: IntSize
   ) {
-    val item = itemState.itemWrapper.item as IMovableItemExtension
+    val item = itemState.item.extension as IMovableItemExtension
     val destinationOffset = item.getMoveDestinationOffset(
       upOrCancel = upOrCancel,
       itemState = itemState,
@@ -360,7 +370,7 @@ class LongPressMoveControllerImpl(
       screenTopLeft = screenLeftTop,
       size = size,
     )
-    var topControllers = emptySet<LongPressMoveControllerImpl>()
+    var topControllers = emptySet<LongPressMoveController>()
     if (destinationOffset == Offset.Zero) {
       // 在 onEndLongPress 中移除了 overlapChangeTriggerForAllCovered 是为了让被部分覆盖的 item 能提前触发 text 位置还原动画
       // 但是这样会导致被全部覆盖的这类 item 也在动画前提前结束了，现象就是直接消失，体验起来很奇怪
@@ -371,15 +381,15 @@ class LongPressMoveControllerImpl(
       itemState.addShowRangeTransformer(selfShowRangeTransformerForEmpty)
       // 递归拿到所有上层 item
       fun collectTopItems(
-        set: MutableSet<LongPressMoveControllerImpl>,
+        set: MutableSet<LongPressMoveController>,
         itemState: CourseItemState
-      ): MutableSet<LongPressMoveControllerImpl> {
-        itemState.overlap.coveredRangeList.mapNotNull { cover ->
-          pageContext.findItemState(cover.itemOverlap.wrapper)
-            ?.getData(LongPressMoveControllerImpl)
-        }.fastForEach {
-          set.add(it)
-          collectTopItems(set, it.itemState)
+      ): MutableSet<LongPressMoveController> {
+        itemState.overlap?.coveredRangeList?.fastForEach { cover ->
+          val controller = cover.result.itemState.item.extension as? LongPressMoveController
+          if (controller != null) {
+            set.add(controller)
+          }
+          collectTopItems(set, cover.result.itemState)
         }
         return set
       }

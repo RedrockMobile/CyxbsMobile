@@ -39,6 +39,16 @@ object LessonRepository {
 
   private val mLessonObserveFlowObject = SynchronizedObject()
   private val mLessonObserveFlowMap = mutableMapOf<String, MutableSharedFlow<List<LessonByWeeks>>>()
+  private fun getLessonObserveFlow(stuNum: String): MutableSharedFlow<List<LessonByWeeks>> {
+    return mLessonObserveFlowMap[stuNum] ?: synchronized(mLessonObserveFlowObject) {
+      mLessonObserveFlowMap.getOrPut(stuNum) {
+        MutableSharedFlow( // 事件类型，首次监听不会下发旧数据
+          extraBufferCapacity = 1,
+          onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+      }
+    }
+  }
 
   /**
    * 观察课程
@@ -51,14 +61,7 @@ object LessonRepository {
     needRequest: Boolean = false,
   ): Flow<List<LessonByWeeks>> {
     stuNum ?: return emptyFlow()
-    return synchronized(mLessonObserveFlowObject) {
-      mLessonObserveFlowMap.getOrPut(stuNum) {
-        MutableSharedFlow(
-          extraBufferCapacity = 1,
-          onBufferOverflow = BufferOverflow.DROP_OLDEST,
-        )
-      }
-    }.onStart {
+    return getLessonObserveFlow(stuNum).onStart {
       var needRequestLocal = needRequest
       if (needOldData) {
         val cache = getCacheLesson(stuNum)
@@ -92,7 +95,9 @@ object LessonRepository {
         accountSettings.remove(SETTING_KEY_LESSON)
         if (isDebug()) toast("课表数据转换异常, ${it.message}")
       }.mapCatching { bean ->
-        val requestTime = Instant.fromEpochMilliseconds(accountSettings.getLongOrNull(SETTING_KEY_LESSON_REQUEST_TIME)!!)
+        val requestTime = Instant.fromEpochMilliseconds(
+          accountSettings.getLongOrNull(SETTING_KEY_LESSON_REQUEST_TIME)!!
+        )
         val data = bean.data.mapNotNull { it.toLessonByWeeks() }
         ILessonService2.CacheLesson(requestTime, data)
       }.onSuccess {

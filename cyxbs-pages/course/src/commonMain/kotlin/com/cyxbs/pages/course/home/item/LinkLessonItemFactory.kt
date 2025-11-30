@@ -3,10 +3,8 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItem
 import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
-import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
-import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItemModel
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -18,14 +16,14 @@ import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItemModel
  */
 interface LinkLessonItemFactory {
 
-  fun createLinkLessonItemModel(
+  fun createLinkLessonItem(
     page: Int,
     lesson: LessonByWeeks,
-  ): CourseItemWrapper<LinkLessonItem>
+  ): LinkLessonItem
 
   companion object {
     fun get(): LinkLessonItemFactory {
-      return LinkLessonItemFactory::class.implOrNull() ?: DefaultLinkLessonItemModel
+      return LinkLessonItemFactory::class.implOrNull() ?: DefaultLinkLessonItem
     }
   }
 }

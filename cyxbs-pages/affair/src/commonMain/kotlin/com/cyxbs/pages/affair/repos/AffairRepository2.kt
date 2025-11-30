@@ -5,6 +5,8 @@ import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
+import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.extensions.toast
@@ -12,10 +14,12 @@ import com.cyxbs.components.utils.network.ApiException
 import com.cyxbs.pages.affair.api.AffairGroupModel
 import com.cyxbs.pages.affair.bean.AffairEntity
 import com.cyxbs.pages.affair.bean.AffairWhatTime
-import com.cyxbs.pages.affair.bean.GetAffairBean
+import com.cyxbs.pages.affair.bean.AffairWhenBean
 import com.cyxbs.pages.affair.model.SyncAffairUtils
 import com.cyxbs.pages.affair.model.impl.AffairGroupModelImpl
+import com.cyxbs.pages.affair.net.AddAffairRequest
 import com.cyxbs.pages.affair.net.AffairApiService2
+import com.cyxbs.pages.affair.net.UpdateAffairRequest
 import io.ktor.client.plugins.ClientRequestException
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -104,15 +108,20 @@ object AffairRepository2 {
       AffairApiService2::class.impl().getAffair()
     }.mapCatching {
       it.throwApiExceptionIfFail()
-      it
-    }.mapCatching { bean ->
-      bean.data.mapNotNull { it.toAffair() }
-    }.onSuccess { newAffairList ->
+      it.data
+    }.mapCatching { beanList ->
       editAffairList(stuNum) { oldAffairList ->
-        newAffairList.map { new ->
-          new.copy(
-            localId = oldAffairList.find { it.remoteId == new.remoteId }?.localId
-              ?: Uuid.random().toString()
+        beanList.map { bean ->
+          AffairEntity(
+            remoteId = bean.remoteId,
+            localId = oldAffairList.find { it.remoteId == bean.remoteId }?.localId
+              ?: Uuid.random().toString(),
+            remindTime = bean.remindTime,
+            title = bean.title,
+            content = bean.content,
+            whatTime = bean.whenList.map { whenBean ->
+              whenBean.toAffairWhatTime()
+            }
           )
         }.toPersistentList()
       }.also {
@@ -133,48 +142,26 @@ object AffairRepository2 {
   suspend fun addAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
     localId: String = Uuid.random().toString(), // 生成本地唯一 localId
-    title: String,
-    content: String,
-    remindTime: Int,
-    whatTime: List<AffairWhatTime>,
+    request: AddAffairRequest,
     allowLocal: Boolean,
     needShowException: Boolean,
   ): Result<AffairEntity> {
     return runCatchingCoroutine {
-      AffairApiService2::class.impl().addAffair(
-        time = remindTime,
-        title = title,
-        content = content,
-        dateJson = whatTime.toDateJson(),
-      )
+      AffairApiService2::class.impl().addAffair(request)
     }.mapCatching {
       it.throwApiExceptionIfFail()
       @OptIn(ExperimentalUuidApi::class)
-      AffairEntity(
-        remoteId = it.id,
-        localId = localId,
-        remindTime = remindTime,
-        title = title,
-        content = content,
-        whatTime = whatTime,
-      )
+      request.toAffairEntity(localId = localId, remoteId = it.id)
     }.recoverCatching {
       // 上传失败
       if (it is ClientRequestException || it is ApiException) {
         if (needShowException) showExceptionDialog(
-          RuntimeException("添加失败, update whatTime = $whatTime", it)
+          RuntimeException("添加失败, request = $request", it)
         )
       } else if (allowLocal) {
         // 添加进本地临时数据中
         @OptIn(ExperimentalUuidApi::class)
-        val newAffair = AffairEntity(
-          remoteId = 0, // 本地临时事务 remoteId 为 0
-          localId = localId,
-          remindTime = remindTime,
-          title = title,
-          content = content,
-          whatTime = whatTime,
-        )
+        val newAffair = request.toAffairEntity(localId = localId, remoteId = 0) // 本地临时事务 remoteId 为 0
         LocalAddAffairRepository.add(stuNum, newAffair)
         return@recoverCatching newAffair
       } else {
@@ -205,18 +192,26 @@ object AffairRepository2 {
     allowLocal: Boolean,
     needShowException: Boolean,
   ): Result<Any> {
-    if (affair.remoteId <= 0 && affair.localId.isNotEmpty()) {
-      // localId 小于等于 0 且 localId 不为空 则说明是本地临时事务
+    if (affair.remoteId == 0 && affair.localId.isNotEmpty()) {
+      // localId 等于 0 且 localId 不为空 则说明是本地临时事务
       LocalAddAffairRepository.update(stuNum, affair)
       return Result.success(Unit)
     }
     return runCatchingCoroutine {
       AffairApiService2::class.impl().updateAffair(
-        remoteId = affair.remoteId,
-        time = affair.remindTime,
-        title = affair.title,
-        content = affair.content,
-        dateJson = affair.whatTime.toDateJson(),
+        request = UpdateAffairRequest(
+          remoteId = affair.remoteId,
+          remindTime = affair.remindTime,
+          title = affair.title,
+          content = affair.content,
+          whenList = affair.whatTime.map {
+            AffairWhenBean(
+              start = it.timePair.first.minuteOfDay,
+              end = it.timePair.second.minuteOfDay,
+              date = it.date
+            )
+          }
+        )
       )
     }.mapCatching {
       it.throwApiExceptionIfFail()
@@ -333,10 +328,18 @@ object AffairRepository2 {
           addAffair(
             stuNum = stuNum,
             localId = affair.localId,
-            remindTime = affair.remindTime,
-            title = affair.title,
-            content = affair.content,
-            whatTime = affair.whatTime,
+            request = AddAffairRequest(
+              remindTime = affair.remoteId,
+              title = affair.title,
+              content = affair.content,
+              whenList = affair.whatTime.map {
+                AffairWhenBean(
+                  start = it.timePair.first.minuteOfDay,
+                  end = it.timePair.second.minuteOfDay,
+                  date = it.date,
+                )
+              }
+            ),
             allowLocal = false,
             needShowException = false
           ).onSuccess {
@@ -394,28 +397,36 @@ object AffairRepository2 {
     }
   }
 
-  /**
-   * Compose 版本课表在旧版课表接口上实现了随意时间段的新事务
-   *
-   * 新版本事务按一下规则进行解析:
-   * - 如果 day < 0，
-   *   - 则表示该事务是任意时间段的事务
-   *   - 则 begin_lesson 字段表示 事务开始时间，格式为 小时数 * 100 + 分钟数
-   *   - 则 period 字段表示 事务持续时间，单位分钟
-   *   - 则 week 字段表示该事务在哪几天，格式为 年份 * 10000 + 月份 * 100 + 日
-   */
-  private fun List<AffairWhatTime>.toDateJson(): String {
-    return map { whatTime ->
-      GetAffairBean.AffairDateBean(
-        day = -1, // Compose 新课表标识
-        beginLesson = whatTime.timePair.first.hour * 100 + whatTime.timePair.first.minute,
-        period = whatTime.timePair.first.minutesUntil(whatTime.timePair.second),
-        week = whatTime.date.map {
-          it.year * 10000 + it.monthNumber * 100 + it.dayOfMonth
-        }
-      )
-    }.let {
-      defaultJson.encodeToString(it)
-    }
+
+  private fun AddAffairRequest.toAffairEntity(
+    localId: String,
+    remoteId: Int,
+  ): AffairEntity {
+    return AffairEntity(
+      remoteId = remoteId,
+      localId = localId,
+      remindTime = remindTime,
+      title = title,
+      content = content,
+      whatTime = whenList.map { whenBean ->
+        whenBean.toAffairWhatTime()
+      }
+    )
+  }
+
+  private fun AffairWhenBean.toAffairWhatTime(): AffairWhatTime {
+    return AffairWhatTime(
+      timePair = MinuteTimePair(
+        first = MinuteTime(
+          hour = start / 60,
+          minute = start % 60,
+        ),
+        second = MinuteTime(
+          hour = end / 60,
+          minute = end % 60,
+        )
+      ),
+      date = date,
+    )
   }
 }

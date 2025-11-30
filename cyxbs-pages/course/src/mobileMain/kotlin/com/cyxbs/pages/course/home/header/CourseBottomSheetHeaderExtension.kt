@@ -39,7 +39,8 @@ import org.jetbrains.compose.resources.painterResource
 @Stable
 interface CourseBottomSheetHeaderExtension : CourseItemExtension {
 
-  val courseBottomSheetHeaderContent: @Composable (modifier: Modifier) -> Unit
+  @Composable
+  fun CourseBottomSheetHeaderContent(modifier: Modifier)
 }
 
 // 只显示文本的 BottomSheet Header
@@ -49,7 +50,8 @@ class HintCourseBottomSheetHeader(
   val onClick: (() -> Unit)? = null,
 ) : CourseBottomSheetHeaderExtension {
 
-  override val courseBottomSheetHeaderContent: @Composable ((Modifier) -> Unit) = { modifier ->
+  @Composable
+  override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
       Text(
         modifier = Modifier

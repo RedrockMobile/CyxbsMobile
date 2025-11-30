@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.view.item.touch
 
 import androidx.compose.animation.core.animate
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -23,7 +24,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToDown
@@ -41,10 +41,12 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
-import com.cyxbs.components.utils.extensions.logg
-import com.cyxbs.pages.course.view.item.courseItemBackground
 import com.cyxbs.pages.course.view.item.touch.LongPressCreate.TouchingItem
-import com.cyxbs.pages.course.view.page.CoursePageDecoration
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.item.modifier.PressScaleController
+import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
+import com.cyxbs.pages.course.view.item.modifier.pressScale
+import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
@@ -55,6 +57,8 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.datetime.DayOfWeek
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.collections.component1
+import kotlin.collections.component2
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -68,8 +72,8 @@ import kotlin.math.roundToInt
 class LongPressCreate : CoursePageDecoration {
 
   @Composable
-  override fun InnerCoursePage(content: @Composable () -> Unit) {
-    LongPressCreateCoursePageWrapper(content)
+  override fun CoursePage(nextContent: @Composable (() -> Unit)) {
+    LongPressCreateCoursePageWrapper(nextContent)
   }
 
   @Stable
@@ -138,7 +142,7 @@ class LongPressCreate : CoursePageDecoration {
 }
 
 @Composable
-private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
+private fun LongPressCreateCoursePageWrapper(nextContent: @Composable (() -> Unit)) {
   val scrollContext = LocalCourseScroll.current
   val timeline = scrollContext.timeline
   val layoutCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -180,49 +184,75 @@ private fun LongPressCreateCoursePageWrapper(content: @Composable () -> Unit) {
       enableClick = enableClick
     )
   ) {
-    content()
-    touchedItems.forEach { item ->
-      key(item.id) {
-        Box(
-          modifier = Modifier.layout { measurable, constraints ->
-            val width = constraints.maxWidth / 7
-            val weight = timeline.calculateBeginFinalWeight(item.start, item.end)
-            val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
-            val placeable = measurable.measure(Constraints.fixed(width, height))
-            layout(placeable.width, placeable.height) {
-              placeable.placeRelativeWithLayer(
-                x = item.dayOfWeek.ordinal * width,
-                y = (constraints.maxHeight * weight.x).roundToInt(),
-                layerBlock = {
-                  alpha = item.alphaState.floatValue
-                }
-              )
-            }
-          }.courseItemBackground(0xFFE9EDF2.dark(0xFF202223))
-            .pressScale() // 点击后的 Q 弹动画
-        )
-      }
+    nextContent.invoke()
+    TouchedItems(
+      touchedItems = touchedItems,
+      timeline = timeline,
+    )
+    TouchingItems(
+      touchingItems = touchingItems,
+      scrollContext = scrollContext,
+      layoutCoordinates = layoutCoordinates,
+    )
+  }
+}
+
+@Composable
+private fun TouchedItems(
+  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
+  timeline: CourseTimeline
+) {
+  touchedItems.forEach { item ->
+    key(item.id) {
+      Box(
+        modifier = Modifier.layout { measurable, constraints ->
+          val width = constraints.maxWidth / 7
+          val weight = timeline.calculateBeginFinalWeight(item.start, item.end)
+          val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+          val placeable = measurable.measure(Constraints.fixed(width, height))
+          layout(placeable.width, placeable.height) {
+            placeable.placeRelativeWithLayer(
+              x = item.dayOfWeek.ordinal * width,
+              y = (constraints.maxHeight * weight.x).roundToInt(),
+              layerBlock = {
+                alpha = item.alphaState.floatValue
+              }
+            )
+          }
+        }.then(RoundedShadowItemModifier.createModifier())
+          .background(0xFFE9EDF2.dark(0xFF202223))
+          .pressScale(PressScaleController) // 点击后的 Q 弹动画
+      )
     }
-    touchingItems.forEach { (pointerId, item) ->
-      key(pointerId.value) {
-        Box(
-          modifier = Modifier.layout { measurable, constraints ->
-            scrollContext.scrollState.value // 滚轴滚动时仍然触发布局
-            val width = constraints.maxWidth / 7
-            val y1 = timeline.calculateWeight(item.initTime) * constraints.maxHeight
-            val y2 =
-              layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
-            val height = abs(y2 - y1).roundToInt()
-            val placeable = measurable.measure(Constraints.fixed(width, height))
-            layout(placeable.width, placeable.height) {
-              placeable.placeRelative(
-                x = (item.initPosition.x / width).toInt() * width,
-                y = minOf(y1, y2).roundToInt()
-              )
-            }
-          }.courseItemBackground(0xFFE9EDF2.dark(0xFF202223))
-        )
-      }
+  }
+}
+
+@Composable
+private fun TouchingItems(
+  touchingItems: SnapshotStateMap<PointerId, TouchingItem>,
+  scrollContext: LocalCourseScrollContext,
+  layoutCoordinates: State<LayoutCoordinates?>,
+) {
+  touchingItems.forEach { (pointerId, item) ->
+    key(pointerId.value) {
+      Box(
+        modifier = Modifier.layout { measurable, constraints ->
+          scrollContext.scrollState.value // 滚轴滚动时仍然触发布局
+          val width = constraints.maxWidth / 7
+          val y1 = scrollContext.timeline.calculateWeight(item.initTime) * constraints.maxHeight
+          val y2 =
+            layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
+          val height = abs(y2 - y1).roundToInt()
+          val placeable = measurable.measure(Constraints.fixed(width, height))
+          layout(placeable.width, placeable.height) {
+            placeable.placeRelative(
+              x = (item.initPosition.x / width).toInt() * width,
+              y = minOf(y1, y2).roundToInt()
+            )
+          }
+        }.then(RoundedShadowItemModifier.createModifier())
+          .background(0xFFE9EDF2.dark(0xFF202223))
+      )
     }
   }
 }

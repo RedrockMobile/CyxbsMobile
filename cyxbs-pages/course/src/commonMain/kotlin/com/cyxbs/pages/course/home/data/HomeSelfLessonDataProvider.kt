@@ -86,10 +86,10 @@ object HomeSelfLessonDataProvider : CourseDataProvider<SelfLessonItem>() {
     data ?: return
     data.forEach { lesson ->
       // 添加进整学期
-      add(itemFactory.createSelfLessonItemModel(0, lesson))
+//      add(itemFactory.createSelfLessonItem(0, lesson))
       // 添加进每周
       lesson.week.forEach { week ->
-        add(itemFactory.createSelfLessonItemModel(week, lesson))
+//        add(itemFactory.createSelfLessonItem(week, lesson))
       }
     }
   }

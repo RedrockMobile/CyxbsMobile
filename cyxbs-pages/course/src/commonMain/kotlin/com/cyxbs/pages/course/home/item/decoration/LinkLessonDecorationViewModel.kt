@@ -1,15 +1,17 @@
-package com.cyxbs.pages.course.home.data
+package com.cyxbs.pages.course.home.item.decoration
 
+import androidx.compose.runtime.Composable
+import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.home.item.LinkLessonItem
+import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
-import com.cyxbs.pages.course.view.data.CourseDataProvider
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,11 +26,21 @@ import kotlinx.coroutines.flow.onEach
  * .
  *
  * @author 985892345
- * @date 2025/3/10
+ * @date 2025/10/18
  */
-object HomeLinkLessonDataProvider : CourseDataProvider<LinkLessonItem>() {
+class LinkLessonDecorationViewModel(
+  val hierarchy: CourseItemViewModel.ItemHierarchy<LinkLessonItem>,
+) : BaseViewModel(), CoursePageDecoration {
 
-  private const val SETTING_KEY_ENABLE_SHOW_LINK_COURSE = "enable_show_link_course"
+  companion object {
+    val Comparable = compareBy<LinkLessonItem> { -it.page } // page 越小越在上
+      .thenBy { -it.lesson.dayOfWeek.ordinal } // dayOfWeek 越小越在上
+      .thenBy { it.lesson.beginTime } // beginTime 越大越在上
+      .thenBy { it.lesson.finalTime } // finalTime 越大越在上
+  }
+
+
+  private val SETTING_KEY_ENABLE_SHOW_LINK_COURSE = "enable_show_link_course"
 
   val enableShow: StateFlow<Boolean?> get() = _enableShow
   private val _enableShow = MutableStateFlow<Boolean?>(null)
@@ -73,7 +85,7 @@ object HomeLinkLessonDataProvider : CourseDataProvider<LinkLessonItem>() {
   }
 
   private fun resetData(data: List<LessonByWeeks>?) {
-    clear() // 对于课程来说每一次更新可以使用全量更新
+//    clear() // 对于课程来说每一次更新可以使用全量更新
     data ?: return
     if (enableShow.value != true) return
     data.forEach { lesson ->
@@ -86,11 +98,8 @@ object HomeLinkLessonDataProvider : CourseDataProvider<LinkLessonItem>() {
     }
   }
 
-  override fun compare(a: CourseItemWrapper<LinkLessonItem>, b: CourseItemWrapper<LinkLessonItem>): Int {
-    if (a.page == 0 && b.page == 0) {
-      val weekDiff = a.item.lesson.week.first() - b.item.lesson.week.first()
-      return if (weekDiff != 0) -weekDiff else super.compare(a, b)
-    }
-    return super.compare(a, b)
+  @Composable
+  override fun CoursePage(nextContent: @Composable (() -> Unit)) {
+
   }
 }

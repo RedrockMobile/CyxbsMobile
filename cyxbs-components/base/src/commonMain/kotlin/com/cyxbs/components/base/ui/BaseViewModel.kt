@@ -24,7 +24,14 @@ abstract class CommonBaseViewModel : ViewModel(), ToastUtils {
   /**
    * 开启协程并收集 Flow
    */
-  protected fun <T> Flow<T>.collectLaunch(action: suspend (value: T) -> Unit): Job = launch {
+  protected fun <T> Flow<T>.collectLaunch(
+    context: CoroutineContext = EmptyCoroutineContext,
+    start: CoroutineStart = CoroutineStart.DEFAULT,
+    action: suspend (value: T) -> Unit
+  ): Job = launch(
+    context = context,
+    start = start,
+  ) {
     collect{ action.invoke(it) }
   }
 

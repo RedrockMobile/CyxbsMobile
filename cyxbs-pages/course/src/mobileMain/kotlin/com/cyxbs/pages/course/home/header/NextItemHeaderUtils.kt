@@ -33,10 +33,12 @@ object NextItemHeaderUtils {
     frame: MobileHomeCourseFrame,
   ): CourseBottomSheetHeaderExtension? {
     val dayOfWeek = nowTime.date.dayOfWeek
-    return findMinDayItemFromDayDataPool(
-      nowTime,
-      frame.providerGroup.getWeekDataPool(frame.getPage(nowTime.date)).get(dayOfWeek)
-    )
+//    return findMinDayItemFromDayDataPool(
+//      nowTime,
+//      frame.providerGroup.getWeekDataPool(frame.getPage(nowTime.date)).get(dayOfWeek)
+//    )
+    // todo 待实现寻找下一节课程
+    return null
   }
 
   private fun findMinDayItemFromDayDataPool(

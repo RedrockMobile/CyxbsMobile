@@ -17,15 +17,15 @@ import com.cyxbs.pages.course.home.dialog.compose.LessonBottomSheetDialog
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
-import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.IMovableItemExtension
-import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
+import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -43,27 +43,29 @@ data class MobileSelfLessonItem(
 
   @ImplProvider
   companion object Companion : SelfLessonItemFactory {
-    override fun createSelfLessonItemModel(
+    override fun createSelfLessonItem(
       page: Int,
       lesson: LessonByWeeks
-    ): CourseItemWrapper<SelfLessonItem> {
-      return CourseItemWrapper(
-        item = MobileSelfLessonItem(page = page, lesson = lesson),
-        page = page,
-        dayOfWeek = lesson.dayOfWeek,
-        beginTime = lesson.beginTime,
-        finalTime = lesson.finalTime,
-      )
+    ): SelfLessonItem {
+      return MobileSelfLessonItem(page = page, lesson = lesson)
     }
   }
 
+  override val whatTime: CourseItemWhatTime = CourseItemWhatTime.Fixed(
+    page = page,
+    dayOfWeek = lesson.dayOfWeek,
+    beginTime = lesson.beginTime,
+    finalTime = lesson.finalTime,
+  )
+
   override val extension = MobileSelfLessonItemExtensionGroup(this)
 
-  override val content: @Composable (Modifier, CourseItemState) -> Unit = { modifier, itemState ->
+  @Composable
+  override fun CourseItemContent() {
     val dialogContents =
       remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
+    val itemState = itemState
     CourseDefaultItemContent(
-      modifier = modifier,
       itemState = itemState,
       topText = lesson.course,
       bottomText = lesson.classroomSimplify,
@@ -79,20 +81,23 @@ data class MobileSelfLessonItem(
       },
     ) {
       fun collectCoveredItems(
-        set: MutableSet<CourseItemWrapper<*>>,
-        data: CourseItemOverlap,
-      ): Set<CourseItemWrapper<*>> {
+        set: MutableSet<CourseItem>,
+        data: OverlapResult,
+      ): Set<CourseItem> {
         data.coveredItemList.fastForEach {
-          val item = it.itemOverlap.wrapper
-          if (item.beginTime < itemState.itemWrapper.finalTime && item.finalTime > itemState.itemWrapper.beginTime) {
+          val item = it.result.itemState.item
+          if (item.whatTime.now.beginTime < whatTime.now.finalTime && item.whatTime.now.finalTime > whatTime.now.beginTime) {
             set.add(item)
           }
-          collectCoveredItems(set, it.itemOverlap)
+          collectCoveredItems(set, it.result)
         }
         return set
       }
-      dialogContents.value = collectCoveredItems(linkedSetOf(itemState.itemWrapper), itemState.overlap)
-        .mapNotNull { it.item.extension as? CourseBottomSheetDialogExtension }
+      val overlap = itemState.overlap
+      dialogContents.value =
+        if (overlap == null) listOf(extension)
+        else collectCoveredItems(linkedSetOf(this), overlap)
+          .mapNotNull { it.extension as? CourseBottomSheetDialogExtension }
     }
     MobileCourseBottomSheetDialog(dialogContents = dialogContents)
   }
@@ -100,9 +105,9 @@ data class MobileSelfLessonItem(
 
 class MobileSelfLessonItemExtensionGroup(
   val itemKeyImpl: MobileSelfLessonItem
-) : IMovableItemExtension by MobileSelfMovableItemExtension(itemKeyImpl)
-  , CourseBottomSheetDialogExtension by MobileSelfCourseBottomSheetDialogExtension(itemKeyImpl)
-  , CourseBottomSheetHeaderExtension by MobileSelfCourseBottomSheetHeaderExtension(itemKeyImpl)
+) : IMovableItemExtension by MobileSelfMovableItemExtension(itemKeyImpl),
+  CourseBottomSheetDialogExtension by MobileSelfCourseBottomSheetDialogExtension(itemKeyImpl),
+  CourseBottomSheetHeaderExtension by MobileSelfCourseBottomSheetHeaderExtension(itemKeyImpl)
 
 private class MobileSelfMovableItemExtension(
   val itemKeyImpl: MobileSelfLessonItem
@@ -118,8 +123,9 @@ private class MobileSelfCourseBottomSheetDialogExtension(
 
 private class MobileSelfCourseBottomSheetHeaderExtension(
   val itemKeyImpl: MobileSelfLessonItem
-): CourseBottomSheetHeaderExtension {
-  override val courseBottomSheetHeaderContent: @Composable ((Modifier) -> Unit) = { modifier ->
+) : CourseBottomSheetHeaderExtension {
+  @Composable
+  override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
     val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
     CourseItemBottomSheetHeader(
@@ -152,7 +158,7 @@ private class MobileSelfCourseBottomSheetHeaderExtension(
         state.value = "进行中..."
         // 后续会显示下一节课，会重新触发重组，不用再 delay
       } else {
-        // 只有明天课程才会进入改分支
+        // 只有明天课程才会进入该分支
         state.value = "明天"
       }
     }

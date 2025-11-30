@@ -11,20 +11,21 @@ import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.dialog.CourseBottomSheetDialogExtension
-import com.cyxbs.pages.course.home.dialog.compose.LessonBottomSheetDialog
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
+import com.cyxbs.pages.course.home.dialog.compose.LessonBottomSheetDialog
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
+import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.IMovableItemExtension
-import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
+import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -39,26 +40,27 @@ data class MobileLinkLessonItem(
   override val page: Int, // 为 0 则表示整学期，否则表示第几周
   override val lesson: LessonByWeeks,
 ) : LinkLessonItem {
-
   @ImplProvider
   companion object Companion : LinkLessonItemFactory {
-    override fun createLinkLessonItemModel(page: Int, lesson: LessonByWeeks): CourseItemWrapper<LinkLessonItem> {
-      return CourseItemWrapper(
-        item = MobileLinkLessonItem(page, lesson),
-        page = page,
-        dayOfWeek = lesson.dayOfWeek,
-        beginTime = lesson.beginTime,
-        finalTime = lesson.finalTime,
-      )
+    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
+      return MobileLinkLessonItem(page, lesson)
     }
   }
 
+  override val whatTime = CourseItemWhatTime.Fixed(
+    page = page,
+    dayOfWeek = lesson.dayOfWeek,
+    beginTime = lesson.beginTime,
+    finalTime = lesson.finalTime,
+  )
+
   override val extension = MobileLinkLessonItemExtensionGroup(this)
 
-  override val content: @Composable ((Modifier, CourseItemState) -> Unit) = { modifier, itemState ->
+  @Composable
+  override fun CourseItemContent() {
     val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
+    val itemState = itemState
     CourseDefaultItemContent(
-      modifier = modifier,
       itemState = itemState,
       topText = lesson.course,
       bottomText = lesson.classroomSimplify,
@@ -66,20 +68,23 @@ data class MobileLinkLessonItem(
       backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
     ) {
       fun collectCoveredItems(
-        set: MutableSet<CourseItemWrapper<*>>,
-        data: CourseItemOverlap,
-      ): Set<CourseItemWrapper<*>> {
+        set: MutableSet<CourseItem>,
+        data: OverlapResult,
+      ): Set<CourseItem> {
         data.coveredItemList.fastForEach {
-          val item = it.itemOverlap.wrapper
-          if (item.beginTime < itemState.itemWrapper.finalTime && item.finalTime > itemState.itemWrapper.beginTime) {
+          val item = it.result.itemState.item
+          if (item.whatTime.now.beginTime < whatTime.now.finalTime && item.whatTime.now.finalTime > whatTime.now.beginTime) {
             set.add(item)
           }
-          collectCoveredItems(set, it.itemOverlap)
+          collectCoveredItems(set, it.result)
         }
         return set
       }
-      dialogContents.value = collectCoveredItems(linkedSetOf(itemState.itemWrapper), itemState.overlap)
-        .mapNotNull { it.item as? CourseBottomSheetDialogExtension }
+      val overlap = itemState.overlap
+      dialogContents.value =
+        if (overlap == null) listOf(extension)
+        else collectCoveredItems(linkedSetOf(this), overlap)
+          .mapNotNull { it.extension as? CourseBottomSheetDialogExtension }
     }
     MobileCourseBottomSheetDialog(dialogContents = dialogContents)
   }
@@ -110,7 +115,8 @@ private class MobileLinkCourseBottomSheetDialogExtension(
 private class MobileLinkCourseBottomSheetHeaderExtension(
   val itemKeyImpl: MobileLinkLessonItem
 ) : CourseBottomSheetHeaderExtension {
-  override val courseBottomSheetHeaderContent: @Composable ((Modifier) -> Unit) = { modifier ->
+  @Composable
+  override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
     val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
     CourseItemBottomSheetHeader(

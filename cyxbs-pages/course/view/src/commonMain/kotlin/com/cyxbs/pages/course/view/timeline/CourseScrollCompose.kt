@@ -32,6 +32,7 @@ import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastMapIndexed
 import com.cyxbs.components.utils.compose.reflexScrollableForMouse
+import com.cyxbs.pages.course.view.item.touch.EdgeScroll
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -58,6 +59,9 @@ class LocalCourseScrollContext(
 
   var scrollState by mutableStateOf(scrollState)
     private set
+
+  // 边缘滚动处理
+  val edgeScroll = EdgeScroll()
 
   // scroll 外层布局
   val outerCoordinates by outerCoordinatesState
@@ -116,6 +120,7 @@ internal fun CourseScrollCompose(
         LocalCourseScroll provides context
       ) {
         content()
+        context.edgeScroll.attachCompose() // 处理边缘滚动的工具类
       }
     },
     measurePolicy = remember(timeline) {

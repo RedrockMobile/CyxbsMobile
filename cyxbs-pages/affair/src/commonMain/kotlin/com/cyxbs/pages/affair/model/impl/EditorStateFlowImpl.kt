@@ -5,6 +5,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * .
@@ -20,7 +21,7 @@ class EditorStateFlowImpl<Editor, Value>(
   ),
 ) : EditorStateFlow<Editor, Value>(
   valueFlow,
-  valueByEditorFlow.debounce(10)
+  valueByEditorFlow.debounce(10.milliseconds)
 ) {
   val valueStateFlow = valueFlow
   val valueByEditorStateFlow = valueByEditorFlow

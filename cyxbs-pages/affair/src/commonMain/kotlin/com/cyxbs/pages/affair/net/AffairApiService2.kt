@@ -1,12 +1,17 @@
 package com.cyxbs.pages.affair.net
 
 import com.cyxbs.components.utils.network.ApiStatus
-import com.cyxbs.pages.affair.bean.AddAffairBean2
-import com.cyxbs.pages.affair.bean.GetAffairBean
+import com.cyxbs.components.utils.network.ApiWrapper
+import com.cyxbs.components.utils.network.IApiStatus
+import com.cyxbs.pages.affair.bean.AffairBean2
+import com.cyxbs.pages.affair.bean.AffairWhenBean
+import de.jensklingenberg.ktorfit.http.Body
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.Headers
 import de.jensklingenberg.ktorfit.http.POST
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * .
@@ -16,41 +21,21 @@ import de.jensklingenberg.ktorfit.http.POST
  */
 interface AffairApiService2 {
 
-  @POST("magipoke-reminder/Person/addTransaction")
-  @FormUrlEncoded
-  @Headers("App-Version:74")
+  @POST("magipoke-reminder/Person/addTimeTransaction")
   suspend fun addAffair(
-    @Field("time")
-    time: Int, // 提醒时间
-    @Field("title")
-    title: String,
-    @Field("content")
-    content: String,
-    @Field("date")
-    dateJson: String // 为 json 序列化后的 string，结构详看 AffairDateBean
-  ): AddAffairBean2
+    @Body request: AddAffairRequest,
+  ): AddAffairResponse
 
-  @POST("magipoke-reminder/Person/getTransaction")
+  @POST("magipoke-reminder/Person/getTimeTransaction")
   @Headers("App-Version:74")
-  suspend fun getAffair(): GetAffairBean
+  suspend fun getAffair(): ApiWrapper<List<AffairBean2>>
 
-  @POST("magipoke-reminder/Person/editTransaction")
-  @FormUrlEncoded
-  @Headers("App-Version:74")
+  @POST("magipoke-reminder/Person/editTimeTransaction")
   suspend fun updateAffair(
-    @Field("id")
-    remoteId: Int,
-    @Field("time")
-    time: Int,
-    @Field("title")
-    title: String,
-    @Field("content")
-    content: String,
-    @Field("date")
-    dateJson: String
+    @Body request: UpdateAffairRequest,
   ): ApiStatus
 
-  @POST("magipoke-reminder/Person/deleteTransaction")
+  @POST("magipoke-reminder/Person/deleteTimeTransaction")
   @FormUrlEncoded
   @Headers("App-Version:74")
   suspend fun deleteAffair(
@@ -58,3 +43,39 @@ interface AffairApiService2 {
     remoteId: Int
   ): ApiStatus
 }
+
+@Serializable
+data class AddAffairRequest(
+  @SerialName("time")
+  val remindTime: Int, // 提醒时间
+  @SerialName("title")
+  val title: String,
+  @SerialName("content")
+  val content: String,
+  @SerialName("when")
+  val whenList: List<AffairWhenBean>, // 时间段
+)
+
+@Serializable
+data class AddAffairResponse(
+  @SerialName("id")
+  val id: Int,
+  @SerialName("info")
+  override val info: String,
+  @SerialName("status")
+  override val status: Int
+) : IApiStatus
+
+@Serializable
+data class UpdateAffairRequest(
+  @SerialName("id")
+  val remoteId: Int,
+  @SerialName("time")
+  val remindTime: Int, // 提醒时间
+  @SerialName("title")
+  val title: String,
+  @SerialName("content")
+  val content: String,
+  @SerialName("when")
+  val whenList: List<AffairWhenBean>, // 时间段
+)

@@ -5,6 +5,8 @@ import com.cyxbs.pages.affair.api.AffairIdModel
 import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.bean.AffairEntity
 import com.cyxbs.pages.affair.bean.AffairWhatTime
+import com.cyxbs.pages.affair.bean.AffairWhenBean
+import com.cyxbs.pages.affair.net.AddAffairRequest
 import com.cyxbs.pages.affair.repos.AffairRepository2
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,12 +62,17 @@ class AffairGroupModelImpl(
       return AffairRepository2.addAffair(
         stuNum = stuNum,
         localId = entity.localId,
-        title = entity.title,
-        content = entity.content,
-        remindTime = entity.remindTime,
-        whatTime = model.whatTimeDate.value.map { entry ->
-          AffairWhatTime(entry.key.timePair.value, entry.value.map { it.date.value })
-        },
+        request = AddAffairRequest(
+          remindTime = entity.remindTime,
+          title = entity.title,
+          content = entity.content,
+          whenList = model.whatTimeDate.value.map { entry ->
+            AffairWhenBean(
+              entry.key.timePair.value.first.minuteOfDay,
+              entry.key.timePair.value.second.minuteOfDay,
+              entry.value.map { it.date.value })
+          },
+        ),
         allowLocal = true,
         needShowException = true,
       ).onSuccess {

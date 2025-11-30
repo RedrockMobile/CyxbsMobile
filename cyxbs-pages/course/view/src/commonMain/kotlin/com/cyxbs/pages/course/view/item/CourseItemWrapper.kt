@@ -7,20 +7,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.CacheDrawScope
-import androidx.compose.ui.draw.DrawResult
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -33,20 +28,22 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.compose.getValue
-import com.cyxbs.components.utils.compose.rememberWrapper
-import com.cyxbs.components.utils.compose.setValue
-import com.cyxbs.pages.course.view.item.touch.EdgeScroll
-import com.cyxbs.pages.course.view.item.touch.LongPressMoveControllerImpl
-import com.cyxbs.pages.course.view.item.touch.PressScaleControllerImpl
-import com.cyxbs.pages.course.view.item.touch.longPressMove
-import com.cyxbs.pages.course.view.item.touch.pressScale
-import com.cyxbs.pages.course.view.overlay.CourseItemRange
+import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
+import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
+import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
+import com.cyxbs.pages.course.view.item.modifier.PressScaleItemModifier
+import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.cyxbs.pages.course.view.page.LocalCoursePage
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
 import kotlin.math.roundToInt
 
@@ -57,7 +54,8 @@ import kotlin.math.roundToInt
  * @date 2025/2/14
  */
 @Stable
-class CourseItemWrapper<T : CourseItem>( // todo 属性需要可变，待重新设计
+class CourseItemWrapper<T : CourseItem>(
+  // todo 属性需要可变，待重新设计
   val item: T,
   val page: Int,
   val dayOfWeek: DayOfWeek,
@@ -66,21 +64,66 @@ class CourseItemWrapper<T : CourseItem>( // todo 属性需要可变，待重新�
   val finalTime: MinuteTime,
 )
 
+val LocalCourseItemState = staticCompositionLocalOf<CourseItemState> { error("未初始化") }
+
 // CourseItem 自身引用将作为 Compose 重组的 key()
 // 更新后应尽量保证等价的 item 前后属于同一个对象
 interface CourseItem {
 
+  // item 的时间信息
+  val whatTime: CourseItemWhatTime
+
   // item 支持的扩展功能
   val extension: CourseItemExtension
+
+  // item 所在的页面上下文
+  val coursePage: LocalCoursePageContext
+    @Composable
+    get() = LocalCoursePage.current
+
+  // item 当前 Compose 中的状态
+  val itemState: CourseItemState
+    @Composable
+    get() = LocalCourseItemState.current
 
   /**
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
    */
   @Composable
-  fun CourseItemContent(
-    modifier: Modifier,
-    itemState: CourseItemState,
-  )
+  fun CourseItemContent()
+}
+
+sealed interface CourseItemWhatTime {
+
+  val now: Fixed
+
+  data class Fixed(
+    val page: Int, // 为 0 则表示整学期，否则表示第几周
+    val dayOfWeek: DayOfWeek,
+    val beginTime: MinuteTime,
+    val finalTime: MinuteTime,
+  ) : CourseItemWhatTime {
+    override val now: Fixed
+      get() = this
+  }
+
+  class Changeable(
+    fixed: Fixed,
+  ) : CourseItemWhatTime {
+
+    private val flow = MutableStateFlow(fixed)
+
+    override val now: Fixed
+      get() = flow.value
+
+    fun update(now: Fixed) {
+      flow.value = now
+    }
+
+    fun observe(): StateFlow<Fixed> {
+      return flow
+    }
+  }
 }
 
 // 用于描述 item 支持的扩展功能
@@ -88,50 +131,39 @@ interface CourseItemExtension
 
 @Composable
 fun CourseDefaultItemContent(
-  modifier: Modifier = Modifier,
   itemState: CourseItemState,
+  modifierList: ImmutableList<CourseItemModifier?> = remember {
+    persistentListOf(
+      LayoutItemModifier, // 布局
+      PressScaleItemModifier, // 点击弹 Q 动画
+      LongPressMoveItemModifier, // 长按移动 item
+      RoundedShadowItemModifier, // 圆角+阴影
+    )
+  },
   topText: String,
   bottomText: String,
   textColor: Color,
   backgroundColor: Color,
-  onBuildDrawCache: CacheDrawScope.() -> DrawResult = { onDrawBehind { } },
-  onClick: ((CourseItemRange) -> Unit)? = null,
+  onClick: ((MinuteTimePair) -> Unit)? = null,
 ) {
   if (itemState.realShowRange.isEmpty()) return
-  val edgeScroll = remember { EdgeScroll() } // 边缘滚动处理
-  edgeScroll.attachCompose()
-  val coursePageContext = LocalCoursePage.current
   Box(
-    modifier = modifier
-      .then(
-        itemState.timeline.createLayoutModifier(
-          itemState.itemWrapper.beginTime,
-          itemState.itemWrapper.finalTime
-        )
-      ).longPressMove( // 长按移动 item
-        remember {
-          LongPressMoveControllerImpl(
-            itemState = itemState,
-            edgeScroll = edgeScroll,
-            pageContext = coursePageContext,
-          )
-        }
-      ).pressScale( // 点击后的 Q 弹动画
-        remember {
-          PressScaleControllerImpl(
-            itemState = itemState,
-            coursePageContext = coursePageContext
-          )
-        }
-      ).courseItemBackground(backgroundColor) // 通用背景
-      .drawWithCache(onBuildDrawCache)
+    modifier = Modifier.plusDsl {
+      // 外界实现 CourseItemModifier 来修改 item 的样式
+      modifierList.forEach {
+        then(it?.createModifier() ?: Modifier)
+      }
+    }.background(backgroundColor)
   ) {
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemRange = CourseItemRange(itemState.itemWrapper.beginTime, itemState.itemWrapper.finalTime),
-        enableShowCoverTip = itemState.overlap.coveredItemList.isNotEmpty(),
-        timeline = itemState.timeline,
+        itemRange = MinuteTimePair(
+          itemState.item.whatTime.now.beginTime,
+          itemState.item.whatTime.now.finalTime
+        ),
+        enableShowCoverTip = itemState.overlap?.coveredItemList?.isNotEmpty() == true,
+        timeline = itemState.item.coursePage.timeline,
         topText = topText,
         bottomText = bottomText,
         textColor = textColor,
@@ -141,57 +173,29 @@ fun CourseDefaultItemContent(
   }
 }
 
-@Stable
-fun Modifier.courseItemBackground(backgroundColor: Color): Modifier = composed {
-  padding(1.dp)
-    .background(LocalAppColors.current.topBg, RoundedCornerShape(8.dp))
-    .padding(0.6.dp)
-    .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))
-    .background(LocalAppColors.current.topBg) // 遮挡 shadow 阴影
-    .background(backgroundColor)
-}
-
 @Composable
 private fun CourseShowRange(
-  range: CourseItemRange,
-  itemRange: CourseItemRange,
+  range: MinuteTimePair,
+  itemRange: MinuteTimePair,
   enableShowCoverTip: Boolean,
   timeline: CourseTimeline,
   topText: String,
   bottomText: String,
   textColor: Color,
-  onClick: ((CourseItemRange) -> Unit)? = null,
+  onClick: ((MinuteTimePair) -> Unit)? = null,
 ) {
-  val calculateWeight: (CourseItemRange) -> Offset = {
-    timeline.calculateRelativeWeight(
-      beginTime1 = it.begin,
-      finalTime1 = it.final,
-      beginTime2 = itemRange.begin,
-      finalTime2 = itemRange.final,
-    )
-  }
-  var lastRange by rememberWrapper(range)
-  var lastWeight by rememberWrapper { Snapshot.withoutReadObservation { calculateWeight(range) } }
   val weightAnim = remember {
     Animatable(
       typeConverter = Offset.VectorConverter,
-      initialValue = lastWeight
+      initialValue = calculateWeight(timeline, range, itemRange)
     )
   }
-  LaunchedEffect(range) {
-    lastRange = range
-    weightAnim.snapTo(lastWeight)
-    val newWeight = calculateWeight(range)
-    if (newWeight != lastWeight) {
-      weightAnim.animateTo(newWeight)
-    }
+  LaunchedEffect(range, itemRange) {
+    weightAnim.animateTo(calculateWeight(timeline, range, itemRange))
   }
   CourseItemTopBottomText(
     modifier = Modifier.layout { measurable, constraints ->
-      val weight = if (weightAnim.isRunning) weightAnim.value else {
-        // 这里使用 lastRange，确保在 range 发生改变时先触发动画
-        calculateWeight(lastRange).also { lastWeight = it } // lastWeight 用于记录重组后计算出的最新 weight
-      }
+      val weight = weightAnim.value
       val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
       val placeable = measurable.measure(
         Constraints.fixed(constraints.maxWidth, height)
@@ -216,6 +220,21 @@ private fun CourseShowRange(
     bottomText = bottomText,
     textColor = textColor,
   )
+}
+
+private fun calculateWeight(
+  timeline: CourseTimeline,
+  range: MinuteTimePair,
+  itemRange: MinuteTimePair,
+): Offset {
+  Snapshot.withoutReadObservation {
+    return timeline.calculateRelativeWeight(
+      beginTime1 = range.first,
+      finalTime1 = range.second,
+      beginTime2 = itemRange.first,
+      finalTime2 = itemRange.second,
+    )
+  }
 }
 
 

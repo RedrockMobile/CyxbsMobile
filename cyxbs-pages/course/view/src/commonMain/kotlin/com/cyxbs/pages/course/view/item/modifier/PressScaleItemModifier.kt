@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.item.touch
+package com.cyxbs.pages.course.view.item.modifier
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -20,7 +20,6 @@ import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
-import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import kotlinx.coroutines.launch
 
 /**
@@ -29,7 +28,19 @@ import kotlinx.coroutines.launch
  * @author 985892345
  * @date 2025/5/4
  */
-open class PressScaleController {
+
+object PressScaleItemModifier : CourseItemModifier {
+  @Composable
+  override fun createModifier(): Modifier {
+    val extension = itemState.item.extension
+    if (extension is PressScaleController) {
+      return Modifier.pressScale(extension)
+    }
+    return Modifier
+  }
+}
+
+abstract class PressScaleController {
   companion object : PressScaleController()
   open fun onStartPress() {}
   open fun onEndPress() {}
@@ -39,7 +50,7 @@ open class PressScaleController {
 @Stable
 @Composable
 fun Modifier.pressScale(
-  controller: PressScaleController = PressScaleController.Companion,
+  controller: PressScaleController,
 ): Modifier {
   val controllerWrapper by rememberUpdatedWrapper(controller)
   val pointerOffset = rememberWrapper<Offset?>(null)
@@ -90,18 +101,17 @@ fun Modifier.pressScale(
 // 点击后的 Q 弹动画控制器的默认实现
 class PressScaleControllerImpl(
   val itemState: CourseItemState,
-  var coursePageContext: LocalCoursePageContext,
 ) : PressScaleController() {
 
   // overlap 更新触发器
   private val overlapChangeTrigger =
-    CourseItemState.CoveredItemShowRangeTransformerTrigger(coursePageContext) { show, overlap ->
+    CourseItemState.CoveredItemShowRangeTransformerTrigger { show, overlap ->
       // 只有没有 showRange 时才能移除覆盖区域展示出来
       // 防止部分覆盖的这类 item 一碰就立马触发 text 扩展动画，看起来就很怪异
       // 如果 item 本身存在一些区域可以展示，那么它的背景是能完全展示的，也不需要单独取消覆盖区域
       show.ifEmpty {
         val coveredRange = overlap.coveredRangeList
-          .filter { it.itemOverlap.wrapper.item == itemState.itemWrapper.item }
+          .filter { it.result.itemState === itemState }
           .map { it.range }
         (show + coveredRange).mergeOverlapRange()
       }

@@ -117,7 +117,7 @@ class AffairIdModelEditorImpl(
         timePair = timePair,
       )
       val whatTimeModelEditor = AffairWhatTimeModelEditorImpl(this, whatTimeModel)
-      whatTimeDate.put(whatTimeModelEditor, mutableListOf())
+      whatTimeDate[whatTimeModelEditor] = mutableListOf()
       incrementAddList.add(whatTimeModelEditor)
       sendValueByEditorStateFlow()
       return whatTimeModelEditor
@@ -172,7 +172,7 @@ class AffairIdModelEditorImpl(
       }
       incrementAddList.clear()
       incrementRemoveList.forEach {
-        whatTimeDate.put(it, mutableListOf())
+        whatTimeDate[it] = mutableListOf()
         it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to true)
       }
       incrementRemoveList.clear()

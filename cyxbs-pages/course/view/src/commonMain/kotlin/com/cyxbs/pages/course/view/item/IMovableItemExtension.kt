@@ -42,5 +42,5 @@ interface IMovableItemExtension : CourseItemExtension {
   }
 
   // 在移动过程中是否允许展开时间轴
-  fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean = false
+  fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean = true
 }

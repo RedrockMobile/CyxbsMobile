@@ -1,24 +1,35 @@
 package com.cyxbs.pages.course.home.compose
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
-import com.cyxbs.pages.course.home.compose.decoration.TodayDecoration
-import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
-import com.cyxbs.pages.course.home.data.HomeSelfLessonDataProvider
-import com.cyxbs.pages.course.view.data.CourseDataProviderGroup
-import com.cyxbs.pages.course.view.item.touch.LongPressCreate
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
-import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.datetime.DayOfWeek
 
 /**
  * 课表框架
@@ -35,13 +46,6 @@ abstract class AbstractHomeCourseFrame {
   // 课表起始日期，如果为 null 则不会显示号数
   open var beginDate: Date? by mutableStateOf(SchoolCalendar.getFirstMonDay())
 
-  // 课表数据
-  open val providerGroup: CourseDataProviderGroup = CourseDataProviderGroup(
-    HomeSelfLessonDataProvider,
-//    HomeAffairDataProvider, // todo 课表事务还未完成
-    HomeLinkLessonDataProvider,
-  )
-
   // 课表 HorizontalPager 状态
   open val pagerState: PagerState by lazy {
     PagerState(initialPage) { maxPage }
@@ -55,7 +59,8 @@ abstract class AbstractHomeCourseFrame {
     get() = getPage(TodayNoEffect)
 
   open fun getPage(date: Date): Int {
-    val realBeginDate = beginDate?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
+    val realBeginDate =
+      beginDate?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
     val page = (realBeginDate.daysUntil(date) / 7 + 1).coerceAtLeast(0)
     return if (page >= maxPage) 0 else page
   }
@@ -64,21 +69,60 @@ abstract class AbstractHomeCourseFrame {
 @Composable
 fun AbstractHomeCourseFrame.HomeCoursePageContent(
   page: Int,
+  decorations: ImmutableList<CoursePageDecoration>,
 ) {
   val date = beginDate?.plusWeeks(page - 1)
     ?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal)
-  Column {
+  val timelineWidth = 40.dp
+  val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
+  Column(
+    modifier = Modifier.drawTodayShadow(
+      beginDayOfWeek = timeline.beginDayOfWeek,
+      timelineWidth = timelineWidth,
+      scrollPaddingValues = scrollPaddingValues
+    )
+  ) {
     CourseWeekCompose(
       weekBeginDate = if (page == 0) null else date, // 整学期页不显示日期
       beginDayOfWeek = timeline.beginDayOfWeek,
+      timelineWidth = timelineWidth,
+      scrollPaddingValues = scrollPaddingValues,
     )
     CoursePageCompose(
+      page = page,
       timeline = timeline,
-      weekDataPool = providerGroup.getWeekDataPool(page),
-      decorations = persistentListOf(
-        TodayDecoration(weekBeginDate = if (page == 0) null else date),
-        LongPressCreate(),
-      ),
+      timelineWidth = timelineWidth,
+      scrollPaddingValues = scrollPaddingValues,
+      decorations = decorations,
+    )
+  }
+}
+
+// 绘制课表今日的背景阴影
+private fun Modifier.drawTodayShadow(
+  beginDayOfWeek: DayOfWeek,
+  timelineWidth: Dp,
+  scrollPaddingValues: PaddingValues,
+): Modifier = composed {
+  val color = 0x93E8F0FC.dark(0x26000101)
+  val todayIndex by rememberDerivedStateOfStructure(beginDayOfWeek) {
+    (Today.dayOfWeekOrdinal + 7 - beginDayOfWeek.ordinal) % 7
+  }
+  drawBehind {
+    val paddingStart = scrollPaddingValues.calculateStartPadding(layoutDirection).toPx()
+    val paddingEnd = scrollPaddingValues.calculateEndPadding(layoutDirection).toPx()
+    val width = (size.width - timelineWidth.toPx() - paddingStart - paddingEnd) / 7
+    val offsetX = timelineWidth.toPx() + paddingStart + todayIndex * width
+    drawRoundRect(
+      color = color,
+      topLeft = Offset(x = offsetX, y = 0F),
+      size = Size(width = width, height = 10.dp.toPx()),
+      cornerRadius = CornerRadius(x = 8.dp.toPx(), y = 8.dp.toPx())
+    )
+    drawRect(
+      color = color,
+      topLeft = Offset(x = offsetX, y = 10F),
+      size = Size(width = width, height = size.height - 10.dp.toPx()),
     )
   }
 }
