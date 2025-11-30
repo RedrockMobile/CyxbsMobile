@@ -8,6 +8,7 @@
 
 import UIKit
 import RYTransitioningDelegateSwift
+import SwiftyJSON
 
 open class TabBarController: UITabBarController {
 
@@ -126,9 +127,42 @@ extension TabBarController {
                 self.present(nav, animated: true)
             } else {
                 self.reloadData()
-                if UserDefaultsManager.shared.presentScheduleWhenOpenApp {
-                    self.presentSchedule()
+                if !(UserDefaultsManager.shared.hasReadSportsCheckInInfo ?? false) {
+                    self.showSANotice { success in
+                        if success {
+                            UserDefaultsManager.shared.hasReadSportsCheckInInfo = true
+                        }
+                        self.checkPresentSchedule()
+                    }
+                } else {
+                    self.checkPresentSchedule()
                 }
+            }
+        }
+    }
+    
+    /// 是否需要弹出课表
+    func checkPresentSchedule() {
+        if UserDefaultsManager.shared.presentScheduleWhenOpenApp {
+            self.presentSchedule()
+        }
+    }
+    
+    /// 体育打卡信息说明
+    func showSANotice(completion: ((Bool) -> Void)?) {
+        HttpManager.shared.magipoke_sport_notice().ry_JSON { [weak self] response in
+            guard let self = self else { return }
+            switch response {
+            case .success(let model):
+                let status = model["status"].intValue
+                if status == 10000 {
+                    let noticeItems = model["data"].arrayValue.map { NoticeItem(json: $0) }
+                    let alertController = SAAlertController(noticeItems: noticeItems, completion: completion)
+                    self.present(alertController, animated: true)
+                }
+            case .failure(let netError):
+                print(netError)
+                completion?(false)
             }
         }
     }

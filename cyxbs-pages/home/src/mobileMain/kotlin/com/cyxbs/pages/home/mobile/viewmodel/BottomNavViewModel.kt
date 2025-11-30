@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.notification.api.INotificationService
 import cyxbsmobile.cyxbs_pages.home.generated.resources.Res
@@ -22,6 +23,7 @@ import cyxbsmobile.cyxbs_pages.home.generated.resources.home_nav_mine
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -35,18 +37,26 @@ import org.jetbrains.compose.resources.StringResource
  * @author 985892345
  * @date 2025/1/4
  */
-class BottomNavViewModel : BaseViewModel() {
+class BottomNavViewModel(
+  val homeNavArgument: HomeNavArgument,
+) : BaseViewModel() {
+
+  val height: Dp = 60.dp
+  val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
+  val alpha: MutableFloatState = mutableFloatStateOf(1F)
 
   val discoverItem = BottomNavItem(
     Res.string.home_nav_discover,
     Res.drawable.home_ic_explore_selected,
     Res.drawable.home_ic_explore_unselected,
   )
+
   val fairgroundItem = BottomNavItem(
     Res.string.home_nav_fairground,
     Res.drawable.home_ic_fairground_selectored,
     Res.drawable.home_ic_fairground_unselectored,
   )
+
   val mineItem = BottomNavItem(
     Res.string.home_nav_mine,
     Res.drawable.home_ic_mine_selected,
@@ -56,13 +66,14 @@ class BottomNavViewModel : BaseViewModel() {
   )
 
   val items = persistentListOf(discoverItem, fairgroundItem, mineItem)
-
-  val height: Dp = 60.dp
-
-  val selectedItem: MutableStateFlow<BottomNavItem> = MutableStateFlow(items[0])
-
-  val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
-  val alpha: MutableFloatState = mutableFloatStateOf(1F)
+  val selectedItem: MutableStateFlow<BottomNavItem> = MutableStateFlow(
+    when (homeNavArgument.page) {
+      "discover" -> discoverItem
+      "fairground" -> fairgroundItem
+      "mine" -> mineItem
+      else -> discoverItem
+    }
+  )
 
   fun select(item: BottomNavItem) {
     selectedItem.value = item
@@ -78,13 +89,17 @@ class BottomNavViewModel : BaseViewModel() {
     val redObserveFlow: Flow<Boolean> = emptyFlow(), // 监听红点状态的 Job
   ) {
 
-    private val redJob = redObserveFlow.distinctUntilChanged().collectLaunch {
-      if (it && selectedItem.value !== this) {
-        redDot.value = true
+    private val redDot = MutableStateFlow(false)
+
+    // redObserveFlow 的监听需要使用到 selectedItem，
+    // 如果直接以类变量初始化，则此时 selectedItem 还没有初始化，会导致空指针
+    private val redJob by lazy {
+      redObserveFlow.distinctUntilChanged().collectLaunch {
+        if (it && selectedItem.value !== this) {
+          redDot.value = true
+        }
       }
     }
-
-    private val redDot = MutableStateFlow(false)
 
     fun select() {
       if (redDot.value) {
@@ -93,6 +108,9 @@ class BottomNavViewModel : BaseViewModel() {
       }
     }
 
-    fun observerRedDot() = redDot.asStateFlow()
+    fun observerRedDot(): StateFlow<Boolean> {
+      redJob.hashCode() // 触发第一次初始化
+      return redDot.asStateFlow()
+    }
   }
 }

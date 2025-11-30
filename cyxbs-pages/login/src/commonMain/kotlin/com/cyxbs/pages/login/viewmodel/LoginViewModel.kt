@@ -4,7 +4,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.init.InitialManager
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
@@ -13,7 +14,7 @@ import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
 import io.ktor.client.call.body
@@ -38,10 +39,10 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/31
  */
-expect class LoginViewModel(argument: LoginArgument) : CommonLoginViewModel
+expect class LoginViewModel(argument: LoginNavArgument) : CommonLoginViewModel
 
 @Stable
-abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel() {
+abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewModel() {
 
   val stuNum = mutableStateOf("")
 
@@ -50,6 +51,10 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
   val isCheckUserArgument = mutableStateOf(false)
 
   val isLoginAnim = mutableStateOf(false)
+
+  init {
+    InitialManager.cancelPrivacyAgree() // 重新登录时取消之前已保存的隐私政策同意状态
+  }
 
   // 点击登录
   fun clickLogin() {
@@ -123,6 +128,7 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
       token = bean.token,
       refreshToken = bean.refreshToken,
     )
+    InitialManager.tryPrivacyAgree()
   }
 
   // 登录失败的处理
@@ -135,9 +141,9 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
           // 在请求失败时后端会返回 http 状态码 400，这里需要单独进行解析
           val failureBean = throwable.response.body<LoginFailureBean>()
           when {
+            failureBean.status == 20003 -> toast("用户不存在")
             failureBean.status == 20004 -> toast("学号或者密码错误")
             failureBean.status == 40004 -> toast("登录过于频繁，请15分钟后再试")
-            failureBean.errcode == 10010 -> toast("该学号信息未注册")
             else -> toastLong("未知错误\nhttp status=${throwable.response.status}\nbody=${throwable.response.bodyAsText()}")
           }
         } else {
@@ -170,7 +176,7 @@ abstract class CommonLoginViewModel(val argument: LoginArgument) : BaseViewModel
   // 进入游客模式
   open fun enterTouristMode() {
     // 弹出所有页面，重新回到主页
-    MainNavController.navigate(HomeArgument) {
+    MainNavController.navigate(HomeNavArgument()) {
       popUpTo(0) { inclusive = true }
     }
   }

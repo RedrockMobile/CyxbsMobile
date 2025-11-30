@@ -48,7 +48,7 @@ object AffairRepository {
 
   private val Api = AffairApiService.INSTANCE
 
-  private val DB = AffairDataBase.INSTANCE
+  private val DB = AffairDataBase
   private val AffairDao = DB.getAffairDao()
   private val AffairCalendarDao = DB.getAffairCalendarDao()
   private val LocalAddDao = DB.getLocalAddAffairDao()
@@ -69,7 +69,9 @@ object AffairRepository {
    * - 使用了 distinctUntilChanged()，只会在数据更改了才会回调
    * - 上游不会抛出错误到下游
    */
-  fun observeAffair(): Observable<List<AffairEntity>> {
+  fun observeAffair(
+    needRefresh: Boolean,
+  ): Observable<List<AffairEntity>> {
     return IAccountService::class.impl()
       .stuNumFlow
       .map { it.orEmpty() }
@@ -81,8 +83,10 @@ object AffairRepository {
           AffairDao.observeAffair(it)
             .distinctUntilChanged()
             .doOnSubscribe {
-              // 观察时先请求一次最新数据
-              refreshAffair().unsafeSubscribeBy()
+              if (needRefresh) {
+                // 观察时先请求一次最新数据
+                refreshAffair().unsafeSubscribeBy()
+              }
             }.subscribeOn(Schedulers.io())
         }
       }
@@ -248,7 +252,7 @@ object AffairRepository {
     return Single.create {
       try {
         // 找不到时直接抛错，删除操作还能找不到?
-        val entity = AffairDao.deleteAffairReturn(stuNum, onlyId)!!
+        val entity = AffairDao.deleteAffair(stuNum, onlyId)!!
         it.onSuccess(entity)
       } catch (e: Exception) {
         it.tryOnError(e)
@@ -279,6 +283,7 @@ object AffairRepository {
     .subscribeOn(Schedulers.io())
     .observeOn(AndroidSchedulers.mainThread())
 
+  private val uploadLocalAffairSynchronized = Any()
 
   /**
    * 发送本地临时保存的事务
@@ -345,8 +350,8 @@ object AffairRepository {
 
     return Completable.create { emitter ->
       try {
-        // 必须使用 Transaction，保证数据库的同步性
-        DB.runInTransaction {
+        // 加锁保证只会触发一次
+        synchronized(uploadLocalAffairSynchronized) {
           localAdd.invoke()
           localUpdate.invoke()
           localDelete.invoke()

@@ -2,10 +2,23 @@ package com.cyxbs.components.base.webView
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.AttributeSet
+import android.view.MotionEvent
+import android.webkit.URLUtil
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.extensions.toast
+import androidx.core.net.toUri
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import com.cyxbs.components.config.isDebug
 
 /**
  * 传入的实现类应该继承 IAndroidWebView,如果仅使用这个自定义类的话，生命周期回调是没有效果的
@@ -18,7 +31,7 @@ class LiteJsWebView : WebView {
     constructor(context: Context,attrs: AttributeSet?):super(context,attrs)
     constructor(context: Context):super(context)
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     fun init(
         androidWebView: IAndroidWebView = AndroidWebView(
             exe = {
@@ -31,8 +44,11 @@ class LiteJsWebView : WebView {
                 //弹toast
                 it.toast()
             }
-        )
+        ),
+        onPageFinish: ((url: String?) -> Unit)? = null,
     ) {
+        //如果是DEBUG就开启webview的debug
+        if (isDebug()) setWebContentsDebuggingEnabled(true)
         //基本配置
         this.settings.apply {
             //支持js
@@ -55,6 +71,76 @@ class LiteJsWebView : WebView {
         }
         //加载js文件的
         this.addJavascriptInterface(androidWebView, androidWebView::class.simpleName.toString())
+
+        setDownloadListener { downloadUrl, _, _, _, _ ->
+            // 直接交给浏览器下载，简单粗暴
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.addCategory(Intent.CATEGORY_BROWSABLE)
+            intent.data = downloadUrl.toUri()
+            context.startActivity(intent)
+        }
+
+        webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
+                val requestUrl = request.url
+                // 如果为http/https的链接则正常加载，如果为qq这种schema部分的则手动拦截进行外部跳转
+                if (URLUtil.isHttpsUrl(requestUrl.toString()) || URLUtil.isHttpUrl(requestUrl.toString())) {
+                    return super.shouldOverrideUrlLoading(view, request)
+                } else {
+                    //使用隐式intent跳转qq
+                    val intent = Intent(Intent.ACTION_VIEW, requestUrl)
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        toast("未安装qq客户端或版本不支持!")
+                    }
+                    return true
+                }
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                onPageFinish?.invoke(url)
+            }
+        }
+
+        //长按处理各种信息
+        setOnLongClickListener { view ->
+            val result = (view as WebView).hitTestResult
+            val type = result.type
+
+            if (type == WebView.HitTestResult.UNKNOWN_TYPE) return@setOnLongClickListener false
+            when (type) {
+                HitTestResult.IMAGE_TYPE -> {
+                    val imgUrl = result.extra
+                }
+                //如果是长按超链接就跳转
+                HitTestResult.SRC_ANCHOR_TYPE -> {
+                    val intent = Intent(Intent.ACTION_VIEW,Uri.parse(result.extra))
+                    context.startActivity(intent)
+                    return@setOnLongClickListener true
+                }
+            }
+            true
+        }
+
+        //这里为什么要用onTouch，因为clickListener收不到，需要提示用户超链接需要长按进入
+        setOnTouchListener { view, motionEvent ->
+            when(motionEvent.action){
+                MotionEvent.ACTION_DOWN ->{
+                    val result = (view as WebView).hitTestResult
+                    when(result.type){
+                        HitTestResult.SRC_ANCHOR_TYPE -> {
+                            toast("长按即可跳转到浏览器打开")
+                        }
+                    }
+                }
+            }
+            false
+        }
     }
 
 }

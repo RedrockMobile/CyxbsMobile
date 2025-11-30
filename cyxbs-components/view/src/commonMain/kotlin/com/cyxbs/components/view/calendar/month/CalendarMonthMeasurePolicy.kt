@@ -1,6 +1,7 @@
 package com.cyxbs.components.view.calendar.month
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.layout.LazyLayoutMeasurePolicy
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.State
@@ -27,22 +28,22 @@ internal class CalendarMonthMeasurePolicy(
   private val clickDateState: State<Date>,
   private val lineHeightState: MutableFloatState,
   private val itemProvider: CalendarMonthItemProvider,
-) : (LazyLayoutMeasureScope, Constraints) -> MeasureResult {
+) : LazyLayoutMeasurePolicy {
 
-  override fun invoke(scope: LazyLayoutMeasureScope, constraints: Constraints): MeasureResult {
+  override fun LazyLayoutMeasureScope.measure(constraints: Constraints): MeasureResult {
     itemConstraints = Constraints.fixed(0, 0)
     return when (val vertical = verticalScrollState.value) {
       VerticalScrollState.Collapsed -> when (horizontalScrollState.value) {
-        HorizontalScrollState.Idle -> scope.collapsedHorizontalIdleMeasure(constraints)
-        is HorizontalScrollState.Scrolling -> scope.collapsedHorizontalScrollingMeasure(constraints)
+        HorizontalScrollState.Idle -> collapsedHorizontalIdleMeasure(constraints)
+        is HorizontalScrollState.Scrolling -> collapsedHorizontalScrollingMeasure(constraints)
       }
 
       is VerticalScrollState.Expanded -> when (horizontalScrollState.value) {
-        HorizontalScrollState.Idle -> scope.expandedHorizontalIdleMeasure(constraints)
-        is HorizontalScrollState.Scrolling -> scope.expandedHorizontalScrollingMeasure(constraints)
+        HorizontalScrollState.Idle -> expandedHorizontalIdleMeasure(constraints)
+        is HorizontalScrollState.Scrolling -> expandedHorizontalScrollingMeasure(constraints)
       }
 
-      is VerticalScrollState.Scrolling -> scope.verticalScrollingMeasure(constraints, vertical)
+      is VerticalScrollState.Scrolling -> verticalScrollingMeasure(constraints, vertical)
     }
   }
 

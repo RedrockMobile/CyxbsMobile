@@ -29,9 +29,23 @@
                 <action android:name="com.mredrock.cyxbs.action.EMPTYROOM" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/home_shortcut" />
+
+            <!--deeplink 注册开始-->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cyxbs" />
+            </intent-filter>
+            <!--deeplink 注册结束-->
+
         </activity>
     </application>
 

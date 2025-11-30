@@ -153,7 +153,7 @@
     integralImageView.image = [UIImage imageNamed:@"签到气泡"];
     [self addSubview:integralImageView];
     
-    // 计算签到可获得积分
+    // 计算签到可获得邮票
     NSInteger checkInDays = [UserItemTool defaultItem].checkInDay.integerValue;
     NSInteger integral = 0;
     // 签到天数大于星期数
@@ -167,7 +167,7 @@
     }
     
     UILabel *integralLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 38, 16)];
-    integralLabel.text = [NSString stringWithFormat:@"%ld积分", integral];
+    integralLabel.text = [NSString stringWithFormat:@"%ld邮票", integral];
     integralLabel.textAlignment = NSTextAlignmentCenter;
     if (@available(iOS 11.0, *)) {
         integralLabel.textColor = [UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#4841E2" alpha:1] darkColor:[UIColor colorWithHexString:@"#1C1C1C" alpha:1]];

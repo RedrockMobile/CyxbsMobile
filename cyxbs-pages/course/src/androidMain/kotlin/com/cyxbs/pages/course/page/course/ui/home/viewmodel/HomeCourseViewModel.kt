@@ -1,12 +1,12 @@
 package com.cyxbs.pages.course.page.course.ui.home.viewmodel
 
-import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.cyxbs.components.base.crash.CrashDialog
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.utils.extensions.asFlow
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.asFlow
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.course.page.course.data.AffairData
@@ -79,12 +79,10 @@ class HomeCourseViewModel : BaseViewModel() {
     // 这里更新后，所有观察关联人的地方都会重新发送新数据
   }
 
-  private var mDataObserveDisposable = initObserve(true)
+  private var mDataObserveDisposable = initObserve(isToast = true, needRefresh = true)
 
   /**
    * 取消课表数据的观察流
-   *
-   * 建议与 [refreshDataObserve] 配合使用
    */
   fun cancelDataObserve() {
     if (!mDataObserveDisposable.isDisposed) {
@@ -93,24 +91,31 @@ class HomeCourseViewModel : BaseViewModel() {
   }
 
   /**
+   * 重新开始观察课表数据
+   */
+  fun startDateObserve() {
+    cancelDataObserve()
+    mDataObserveDisposable = initObserve(isToast = false, needRefresh = false)
+  }
+
+  /**
    * 刷新整个课表数据的观察流，相当于刷新课表数据
    */
   fun refreshDataObserve() {
     cancelDataObserve()
     LessonDataBase.lessonVerDao.clear() // 清空课程数据版本号，强制使用网络数据
-    mDataObserveDisposable = initObserve(false)
+    mDataObserveDisposable = initObserve(isToast = false, needRefresh = true)
   }
-
 
   /**
    * 注意：整个课表采用了观察者模式。数据库对应的数据改变，会自动修改视图内容
    */
-  private fun initObserve(isToast: Boolean): Disposable {
+  private fun initObserve(isToast: Boolean, needRefresh: Boolean): Disposable {
     // 合并观察流
     return Observable.combineLatest(
-      LessonServiceImpl.observeSelfLessonInternal(isToast = isToast), // 自己课的观察流
-      LessonServiceImpl.observeLinkLessonInternal(), // 关联人课的观察流
-      IAffairService::class.impl().observeSelfAffair(), // 事务的观察流
+      LessonServiceImpl.observeSelfLessonInternal(isToast = isToast, needRefresh = needRefresh), // 自己课的观察流
+      LessonServiceImpl.observeLinkLessonInternal(needRefresh = needRefresh), // 关联人课的观察流
+      IAffairService::class.impl().observeSelfAffair(needRefresh = needRefresh), // 事务的观察流
     ) { self, link, affair ->
       // 装换为 data 数据类
       HomePageResultImpl.flatMap(
@@ -119,7 +124,7 @@ class HomeCourseViewModel : BaseViewModel() {
         affair.toAffairData()
       )
     }.doOnError {
-      Log.d(TAG, "合并课表数据流发生异常：\n${it.stackTraceToString()}")
+      CrashDialog.show(RuntimeException("合并课表数据流发生异常，长按第几周后可尝试再次触发刷新", it))
     }.subscribeOn(Schedulers.io())
       .safeSubscribeBy {
         _homeWeekData.postValue(it)

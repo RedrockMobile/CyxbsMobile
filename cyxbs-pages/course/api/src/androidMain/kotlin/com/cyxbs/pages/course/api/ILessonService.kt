@@ -67,7 +67,9 @@ interface ILessonService {
    * - 没有连接网络并且不允许使用本地缓存时会一直不发送数据给下游
    * - 不会抛出异常给下游
    */
-  fun observeSelfLesson(): Observable<List<Lesson>>
+  fun observeSelfLesson(
+    needRefresh: Boolean,
+  ): Observable<List<Lesson>>
 
   /**
    * 观察当前关联人的课
@@ -78,7 +80,9 @@ interface ILessonService {
    * - 没有连接网络并且不允许使用本地缓存时会一直不发送数据给下游
    * - 不会抛出异常给下游
    */
-  fun observeLinkLesson(): Observable<List<Lesson>>
+  fun observeLinkLesson(
+    needRefresh: Boolean,
+  ): Observable<List<Lesson>>
   
   /**
    * 这里提供 Calendar 与 [hashDay] 互换代码

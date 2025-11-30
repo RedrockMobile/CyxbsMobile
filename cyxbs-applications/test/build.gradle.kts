@@ -79,22 +79,27 @@ tasks.register("buildReleaseAndInstall") {
     val apkFile = channel.outputDir.listFiles()!!.first {
       it.name.contains("official") // 找到第一个 official 的渠道包
     }
+    val adb = project.localProperties["sdk.dir"].toString() + File.separator + "platform-tools" + File.separator + "adb"
     val installResult = providers.exec {
       // adb install 安装
       commandLine(
-        "adb", "install", "-r",
+        adb, "install", "-r",
         apkFile
       )
+      isIgnoreExitValue = true
     }.result.get()
     if (installResult.exitValue == 0) {
+      println("applicationId = " + android.defaultConfig.applicationId)
       providers.exec {
         // adb shell am start 打开 app
         commandLine(
-          "adb", "shell", "am", "start",
+          adb, "shell", "monkey",
           "-c", "android.intent.category.LAUNCHER",
           "-p", android.defaultConfig.applicationId,
+          1
         )
-      }
+        isIgnoreExitValue = true
+      }.result.get()
     }
     if (apkFile.name.endsWith(".apk")) {
       // 改名为 .Apk 后缀，方便发到 QQ

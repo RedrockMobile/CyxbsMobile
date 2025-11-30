@@ -4,12 +4,11 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import androidx.core.content.edit
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.init.InitialManager
 import com.cyxbs.components.init.InitialService
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.unsafeSubscribeBy
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.IAffairService
 import com.cyxbs.pages.course.api.ILessonService
 import com.cyxbs.pages.course.api.utils.getStartRow
@@ -38,14 +37,14 @@ import kotlinx.coroutines.rx3.asObservable
 @ImplProvider(clazz = InitialService::class, name = "WidgetInitialService")
 object WidgetInitialService : InitialService {
 
-    override fun onMainProcess(manager: InitialManager) {
-        super.onMainProcess(manager)
+    override fun onMainProcess() {
+        super.onMainProcess()
         val lessonService = ILessonService::class.impl()
         val affairService = IAffairService::class.impl()
         Observable.combineLatest(
-            lessonService.observeSelfLesson(), // 自己课的观察流
-            lessonService.observeLinkLesson(), // 关联人课的观察流
-            affairService.observeSelfAffair(), // 事务的观察流
+            lessonService.observeSelfLesson(needRefresh = false), // 自己课的观察流
+            lessonService.observeLinkLesson(needRefresh = false), // 关联人课的观察流
+            affairService.observeSelfAffair(needRefresh = false), // 事务的观察流
         ) { self, link, affair ->
             // 装换为 data 数据类
             notifyWidgetRefresh(self, link, affair)

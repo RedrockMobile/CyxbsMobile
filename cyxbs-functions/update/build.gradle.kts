@@ -1,5 +1,6 @@
 plugins {
   id("manager.lib")
+  id("kmp.compose")
 }
 
 useNetwork() // 网络请求
@@ -9,12 +10,10 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       subprojects.forEach { implementation(it) }
+      implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.utils)
-      implementation(projects.cyxbsComponents.utils)
-    }
-    androidMain.dependencies {
-      implementation(libs.dialog)
-      implementation(libs.rxpermissions)
+      implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.view)
     }
   }
 }

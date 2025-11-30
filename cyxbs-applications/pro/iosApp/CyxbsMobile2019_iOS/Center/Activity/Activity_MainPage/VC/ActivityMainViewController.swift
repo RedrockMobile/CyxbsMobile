@@ -113,6 +113,7 @@ class ActivityMainViewController: UIViewController {
         segmentedDataSource.isTitleColorGradientEnabled = true
         segmentedDataSource.isBackGroundColorGradientEnabled = true
         segmentedDataSource.isItemSpacingAverageEnabled = true
+        segmentedDataSource.isSelectedAnimable = true
         segmentedDataSource.itemWidthIncrement = 28
         segmentedDataSource.itemSpacing = 12
         segmentedDataSource.cornerRadius = 15

@@ -1,5 +1,6 @@
 package com.cyxbs.components.config.compose.theme
 
+import androidx.compose.foundation.Indication
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.FocusInteraction
@@ -48,6 +49,7 @@ fun AppTheme(
         typography = createTypography(),
         shapes = Shapes,
       ) {
+        DefaultIndication = LocalIndication.current
         CompositionLocalProvider(
           LocalAppColors provides if (!LocalAppDark.current) AppColor else AppDarkColor,
           LocalIndication provides CardIndicationNodeFactory,
@@ -58,6 +60,9 @@ fun AppTheme(
     }
   }
 }
+
+// 默认的点击效果，带波纹
+lateinit var DefaultIndication: Indication
 
 // 目前 XML 界面中常见的颜色值
 private val windowBackgroundColor = 0xFFF2F3F8 and 0xFF000000

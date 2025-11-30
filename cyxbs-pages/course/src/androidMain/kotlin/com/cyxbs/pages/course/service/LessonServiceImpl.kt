@@ -51,21 +51,22 @@ object LessonServiceImpl : ILessonService {
       }
   }
   
-  override fun observeSelfLesson(): Observable<List<ILessonService.Lesson>> {
-    return observeSelfLessonInternal().map { it.toLesson() }
+  override fun observeSelfLesson(needRefresh: Boolean): Observable<List<ILessonService.Lesson>> {
+    return observeSelfLessonInternal(needRefresh = needRefresh).map { it.toLesson() }
   }
 
-  override fun observeLinkLesson(): Observable<List<ILessonService.Lesson>> {
-    return observeLinkLessonInternal().map { it.toLesson() }
+  override fun observeLinkLesson(needRefresh: Boolean): Observable<List<ILessonService.Lesson>> {
+    return observeLinkLessonInternal(needRefresh = needRefresh).map { it.toLesson() }
   }
 
   fun observeSelfLessonInternal(
     isToast: Boolean = false,
+    needRefresh: Boolean = true,
   ): Observable<List<StuLessonEntity>> {
-    return StuLessonRepository.observeSelfLesson(isToast = isToast)
+    return StuLessonRepository.observeSelfLesson(isToast = isToast, needRefresh = needRefresh)
   }
 
-  fun observeLinkLessonInternal(): Observable<List<StuLessonEntity>> {
+  fun observeLinkLessonInternal(needRefresh: Boolean): Observable<List<StuLessonEntity>> {
     return LinkRepository.observeLinkStudent()
       .switchMap { entity ->
         // 没得关联人和不显示关联课程时发送空数据
@@ -78,7 +79,7 @@ object LessonServiceImpl : ILessonService {
             emit(Unit)
           }.asObservable()
             .flatMap {
-              StuLessonRepository.observeLesson(entity.linkNum)
+              StuLessonRepository.observeLesson(entity.linkNum, needRefresh = needRefresh)
             }.onErrorReturn {
               emptyList()
             }

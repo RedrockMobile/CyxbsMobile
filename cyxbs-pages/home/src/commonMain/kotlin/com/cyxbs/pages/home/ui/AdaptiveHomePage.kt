@@ -1,33 +1,114 @@
 package com.cyxbs.pages.home.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavUri
+import com.cyxbs.components.account.api.IAccountEditService
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeArgument
-import com.cyxbs.pages.home.viewmodel.AdaptiveCourseFrameViewModel
+import com.cyxbs.components.config.navigation.HomeNavArgument
+import com.cyxbs.components.config.navigation.NAV_ABOUT
+import com.cyxbs.components.config.navigation.NAV_FOOD
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.course.api.CourseNavArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 
 /**
- * 默认的 PlatformHomePage 实现，自适应宽高的主页
+ *
  *
  * @author 985892345
  * @date 2025/9/22
  */
-@Composable
-fun AdaptiveHomePage(parcel: DestinationParcel<HomeArgument>) {
-  val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel() }
-  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    courseFrameViewModel.frame.HomeCourseContent(
-      modifier = Modifier.systemBarsPadding(),
-    )
 
-//    Text(text = "退出登录", modifier = Modifier.clickable {
-//      IAccountEditService::class.impl().onLogout()
-//      LoginArgument.navigate(HomeArgument, clearStack = true)
-//    })
+// 在这里注册你的 Compose 页面用于 desktop 端的测试
+// 如果你的页面没有返回键，则按 ESC 键进行返回
+private val itemList = listOf(
+  ActionItem("我的课表") {
+    MainNavController.navigate(CourseNavArgument)
+  },
+  ActionItem("关于我们") {
+    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_ABOUT"))
+  },
+  ActionItem("美食咨询处") {
+    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_FOOD"))
+  },
+
+
+
+
+  // 退出登陆放到最后，其他测试页面放到上面👆
+  ActionItem("退出登录") {
+    IAccountEditService::class.impl().onLogout()
+    LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
+  },
+)
+
+@Composable
+fun AdaptiveHomePage(parcel: DestinationParcel<HomeNavArgument>) {
+  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    LazyVerticalGrid(
+      columns = GridCells.Adaptive(74.dp),
+      modifier = Modifier,
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+      horizontalArrangement = Arrangement.spacedBy(10.dp),
+      userScrollEnabled = false,
+    ) {
+      items(
+        items = itemList,
+        key = {
+          it.name
+        }) {
+        SelectorItem(it)
+      }
+    }
   }
+}
+
+@Stable
+class ActionItem(
+  val name: String,
+  val onClick: () -> Unit
+)
+
+// 选择器的单个Item
+@Composable
+private fun SelectorItem(item: ActionItem, modifier: Modifier = Modifier) {
+  Box(
+    modifier = modifier
+      .padding(3.dp)
+      .size(74.dp, 29.dp)
+      .clip(RoundedCornerShape(8.dp))
+      .background(color = 0xFFF5F6F8.dark(0xFF111111))
+      .clickableNoIndicator {
+        item.onClick.invoke()
+      }
+  ) {
+    // 文字
+    Text(
+      modifier = Modifier.align(Alignment.Center),
+      text = item.name,
+      fontSize = 12.sp,
+      color = LocalAppColors.current.tvLv3
+    )
+  }
+
 }

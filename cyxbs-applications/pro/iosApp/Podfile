@@ -1,7 +1,7 @@
 source 'https://github.com/CocoaPods/specs'
 source 'https://github.com/aliyun/aliyun-specs.git'
 
-platform :ios, '13.0'
+platform :ios, '26.0'
 use_frameworks!
 
 # 是否为模拟器环境，真机/发版请改为 false
@@ -16,7 +16,7 @@ target 'CyxbsMobile2019_iOS' do
   pod 'ProgressHUD',      '13.7.2'  # 进度指示器库
   pod 'TZImagePickerController'  # 图片选择器库
   pod 'YBImageBrowser'  # 图片浏览器库
-  pod 'NudeIn'  # 图片隐私处理库
+  pod 'NudeIn'  # 基于UITextView的富文本控件
   pod 'SDWebImage'  # 异步加载网络图片库
   pod 'AFNetworking'  # 网络请求库
   pod 'FMDB'  # SQLite数据库封装库
@@ -27,7 +27,7 @@ target 'CyxbsMobile2019_iOS' do
   pod 'Masonry'  # 自动布局库
   pod 'MJRefresh'  # 下拉刷新库
   pod 'AMapLocation-NO-IDFA'  # 高德地图定位库
-  pod 'AMap3DMap-NO-IDFA'  # 高德地图3D库
+  pod 'AMap3DMap-NO-IDFA', '~> 10.1.500'  # 高德地图3D库
   pod 'MJExtension'  # 字典和模型之间的转换库
   pod 'SDCycleScrollView'  # 轮播图库
   pod 'FSCalendar'  # iOS日历库，兼容Objective-C和Swift
@@ -77,7 +77,7 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'  # 不仅仅针对当前激活的架构编译，适用于多架构编译
       config.build_settings['HEADER_SEARCH_PATHS'] = '$(PROJECT_DIR)/**'  # 头文件搜索路径
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'  # 部署目标版本注释补全的部分：
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'  # 部署目标版本注释补全的部分：
 
       config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""  # 扩展代码签名标识
       config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"  # 不要求代码签名

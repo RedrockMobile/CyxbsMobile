@@ -40,8 +40,6 @@
 
 - (void)viewWillAppear:(BOOL)animated{
     [super viewWillAppear:animated];
-    //尝试获取数据
-//    [self getSportData];
 }
 
 #pragma mark - getter

@@ -30,7 +30,7 @@ interface IAffairService {
    * - 上游已主动切换成 io 线程
    * - 不会抛异常
    */
-  fun observeSelfAffair(): Observable<List<Affair>>
+  fun observeSelfAffair(needRefresh: Boolean): Observable<List<Affair>>
 
   fun deleteAffair(onlyId: Int): Completable
   

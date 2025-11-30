@@ -1,5 +1,7 @@
 package com.cyxbs.components.account.api
 
+import kotlinx.coroutines.Deferred
+
 /**
  * .
  *
@@ -18,7 +20,17 @@ interface ITokenService {
    */
   suspend fun getOrRequestToken(): String?
 
-  // 提供给 ApiGenerator 使用
+  /**
+   * 仅提供给 ApiGenerator 使用
+   * @param runBlock 用于将 Deferred 进行堵塞等待结果，因为多平台无法在普通函数中强行等待协程结束，所以需要 ApiGenerator 内部进行转换
+   */
+  fun getOrRequestToken2(runBlock: (Deferred<String>) -> String): String?
+
+  /**
+   * 获取当前 token
+   * - 如果已过期则返回 null
+   * - 如果未登录则返回 null
+   */
   fun getToken(): String?
 
   /**
@@ -27,12 +39,13 @@ interface ITokenService {
   fun isRefreshTokenExpired(): Boolean
 
   /**
-   * 主动触发 token 过期，1 分钟内只能触发一次
+   * 主动触发 token 过期，30 分钟内只能触发一次
    */
   fun tryTokenExpired()
 
   /**
    * 主动触发 refreshToken 过期，跳转到登录页，30 分钟内只能触发一次
+   * @param msg 触发源，将以 toast 弹出进行排查问题
    */
-  fun tryRefreshTokenExpired()
+  fun tryRefreshTokenExpired(msg: String)
 }

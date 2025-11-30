@@ -109,6 +109,9 @@ class NoClassTemporaryAdapter : ListAdapter<Student,NoClassTemporaryAdapter.VH>(
         val list = currentList.toMutableList()
         list.remove(stu)
         submitList(list)
+
+        //把标记打开rightSlide的item的变量置空，防止从下往上删除时数组越界
+        rightSlideOpenLoc = null
     }
 
     /**

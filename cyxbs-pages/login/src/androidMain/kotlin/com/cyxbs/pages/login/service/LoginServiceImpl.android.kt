@@ -1,10 +1,10 @@
 package com.cyxbs.pages.login.service
 
-import com.cyxbs.components.config.navigation.HomeArgument
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.login.api.ILoginService
-import com.cyxbs.pages.login.api.LoginArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 
 /**
  * ...
@@ -17,6 +17,6 @@ actual object LoginServicePlatform : ILoginService {
     // 登录页是在 MainActivity 上的一个 Compose 页面
     // 所以需要先跳转到 MainActivity，然后流转 MainNavController 到登录页
     startActivity(MAIN_ENTRY)
-    LoginArgument.navigate(HomeArgument, clearStack = true)
+    LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
   }
 }

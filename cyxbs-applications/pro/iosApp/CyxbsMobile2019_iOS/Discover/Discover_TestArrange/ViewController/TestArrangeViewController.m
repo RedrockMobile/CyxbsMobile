@@ -143,7 +143,7 @@
 
 
 - (void)addTopBar {
-    UIView *view = [[UIView alloc]initWithFrame:CGRectMake(0, 0, self.view.width, 80)];
+    UIView *view = [[UIView alloc]initWithFrame:CGRectMake(0, 0, self.view.width, 47 + STATUSBARHEIGHT)];
     self.topBar = view;
     view.backgroundColor = self.view.backgroundColor;
     [self.view addSubview:view];
@@ -156,7 +156,7 @@
     [button setImage: [UIImage imageNamed:@"EmptyClassBackButton"] forState:UIControlStateHighlighted];
     [button mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(self.view).offset(17);
-        make.top.equalTo(self.view).offset(43);
+        make.top.equalTo(self.view).offset(10 + STATUSBARHEIGHT);
         make.width.equalTo(@30);
         make.height.equalTo(@30);
     }];

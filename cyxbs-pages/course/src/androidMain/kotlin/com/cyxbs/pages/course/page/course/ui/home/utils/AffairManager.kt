@@ -107,7 +107,7 @@ class AffairManager(
     mCount--
     if (mCount == 0) {
       // 在移动结束后才重新开启课表数据的观察流
-      fragment.parentViewModel.refreshDataObserve()
+      fragment.parentViewModel.startDateObserve()
     }
   }
 }

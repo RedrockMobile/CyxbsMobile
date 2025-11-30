@@ -18,6 +18,7 @@
 #import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
 #import "掌上重邮-Swift.h"
+#import "CheckInModel.h"
 
 //Model
 #import "StampGoodsData.h"
@@ -650,12 +651,6 @@
     [RemindHUD.shared showDefaultHUDWithText:@"网络异常" completion:nil];
 }
 
-//跳转至QA
-- (void)jumpToNewQA{
-    self.tabBarController.selectedIndex = 1;
-    [self.navigationController popViewControllerAnimated:NO];
-}
-
 //跳转至发动态界面
 - (void)jumpToReleaseDynamic{
 //    SZHReleaseDynamic *SVC = [[SZHReleaseDynamic alloc]init];
@@ -699,6 +694,12 @@
 //    [self.navigationController pushViewController:QVC animated:YES];
 }
 
+//跳转至QA
+- (void)jumpToNewQA{
+    NewQuestionVC *QVC = [[NewQuestionVC alloc] init];
+    [self.navigationController pushViewController:QVC animated:YES];
+}
+
 //跳转至个人中心
 - (void)jumpToProfile{
     EditMyInfoViewController *EVC = [[EditMyInfoViewController alloc]init];
@@ -731,8 +732,9 @@
 
 //每日签到
 - (void)checkInToday{
+    CheckInModel *checkInModel = [[CheckInModel alloc] init];
     [CheckInModel CheckInSucceeded:^{
-        [RemindHUD.shared showDefaultHUDWithText:@"签到成功，邮票+10" completion:^{
+        [RemindHUD.shared showDefaultHUDWithText:[NSString stringWithFormat:@"签到成功，邮票+%ld",checkInModel.CheckInStampsCalculate] completion:^{
             [[NSNotificationCenter defaultCenter] postNotificationName:@"refreshPage" object:nil];
         }];
     } Failed:^(NSError * _Nonnull err) {

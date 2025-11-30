@@ -77,6 +77,10 @@ abstract class CyxbsReleaseTask : DefaultTask() {
             return
         }
         // 本地 apk 安装检查
+        // 在发版前进行测试，需要严格测试如下功能：
+        // 1. 安装后能直接继承登录状态，并且 banner 图正常显示
+        // 2. 课表能正常打开并显示
+        // 3. 更新弹窗能正常弹出 (最重要)
         val apkInstallStep = ApkInstallStep(project)
         if (!apkInstallStep.execute(apk)) {
             return
@@ -105,10 +109,18 @@ abstract class CyxbsReleaseTask : DefaultTask() {
         // 发布新版本信息
         UploadNewVersionInfoStep(netService).execute(apkUrl) ?: return
         println()
-        println("版本已发布，请及时发布 github release !!!".red())
+        println("项目根路径 /release 下已将包名改名为 .Apk 后缀".bold() + ", 请及时发布到掌邮反馈群".yellow())
         println()
-        println("已改名为 .Apk 后缀".bold() + ", 请及时发布到掌邮反馈群".yellow())
-        apk.renameTo(apk.parentFile.resolve(apk.name.replace(".apk", ".Apk")))
+        println("版本已发布，请及时发布 github release，需同步上传 apk 文件和混淆文件 proguardMapping.txt".red())
+        val releaseFile = project.rootDir.resolve("release")
+            .resolve(Config.versionName.replace(".", "_"))
+        releaseFile.mkdirs()
+        apk.copyTo(releaseFile.resolve(apk.name.replace(".apk", ".Apk")))
+        val proguardMappingFile = project.rootDir
+            .resolve("build-logic")
+            .resolve("manager")
+            .resolve("proguardMapping.txt")
+        proguardMappingFile.copyTo(releaseFile.resolve("proguardMapping-${Config.versionName}.txt"))
     }
 
     fun String.red() = "\u001B[31m$this\u001B[0m"

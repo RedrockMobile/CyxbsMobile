@@ -117,4 +117,16 @@ extension UserDefaultsManager {
         set { set(newValue, forKey: "LATEST_REQUEST_TOKEN") }
         get { get(key: "LATEST_REQUEST_TOKEN") as? Date }
     }
+    
+    /// 上一次进入QA时间
+    var latestRequestQA: Date? {
+        set { set(newValue, forKey: "LATEST_REQUEST_QA")}
+        get { get(key: "LATEST_REQUEST_QA") as? Date}
+    }
+    
+    /// 是否已读体育打卡信息说明
+    var hasReadSportsCheckInInfo: Bool? {
+       set { set(newValue, forKey: "HAS_READ_SPORTS_CHECKIN_INFO") }
+       get { get(key: "HAS_READ_SPORTS_CHECKIN_INFO") as? Bool }
+    }
 }

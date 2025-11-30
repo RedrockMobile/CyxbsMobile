@@ -54,6 +54,8 @@ class RYFinderHeaderView: UIView {
         btn.frame.size = CGSize(width: 40, height: 34)
         btn.autoresizingMask = [.flexibleLeftMargin]
         btn.setImage(messageImage(read: true), for: .normal)
+        btn.imageEdgeInsets = UIEdgeInsets(top: 7, left: 8, bottom: 7, right: 8) // 调整内容区域
+        btn.imageView?.contentMode = .scaleAspectFit
         btn.addTarget(self, action: #selector(touchUpInside(messageBtn:)), for: .touchUpInside)
         return btn
     }()
@@ -62,7 +64,9 @@ class RYFinderHeaderView: UIView {
         let btn = UIButton()
         btn.frame.size = CGSize(width: 40, height: 34)
         btn.autoresizingMask = [.flexibleLeftMargin]
-        btn.setImage(UIImage(named: "finder_attendance")?.scaled(toHeight: 22)?.withRenderingMode(.alwaysOriginal), for: .normal)
+        btn.setImage(UIImage(named: "finder_attendance"), for: .normal)
+        btn.imageEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8) // 调整内容区域
+        btn.imageView?.contentMode = .scaleAspectFit
         btn.addTarget(self, action: #selector(touchUpInside(attendanceBtn:)), for: .touchUpInside)
         return btn
     }()
@@ -73,9 +77,7 @@ extension RYFinderHeaderView {
     func messageImage(read: Bool) -> UIImage? {
         (read ?
         UIImage(named: "finder_message_read") :
-        UIImage(named: "finder_message_unread"))?
-            .scaled(toHeight: 20)?
-            .withRenderingMode(.alwaysOriginal)
+        UIImage(named: "finder_message_unread"))
     }
     
     func setupUI() {

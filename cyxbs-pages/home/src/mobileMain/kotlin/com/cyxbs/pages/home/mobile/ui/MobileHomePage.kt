@@ -35,8 +35,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeArgument
-import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
@@ -64,12 +63,17 @@ import org.jetbrains.compose.resources.stringResource
  */
 @ImplProvider
 class MobileHomePage : PlatformHomePage {
-  override val content: @Composable (DestinationParcel<HomeArgument>) -> Unit = {
-    PlatformMobileHomePage(it) {
+
+  @Composable
+  override fun HomePageContent(parcel: DestinationParcel<HomeNavArgument>) {
+    viewModel { BottomNavViewModel(parcel.argument) }
+    viewModel { MobileCourseFrameViewModel() }
+    viewModel { CourseBottomSheetViewModel() }
+    PlatformMobileHomePage(parcel) {
       Box(
         modifier = Modifier.fillMaxSize()
       ) {
-        HomeViewPagerCompose()
+        HomeViewPagerCompose(parcel)
         HomeCourseCompose()
         HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
       }
@@ -80,12 +84,15 @@ class MobileHomePage : PlatformHomePage {
 // 提供给具体平台用于包裹 content，可以设置些特别的 LocalProvider 或者获取 ViewModel 啥的
 @Composable
 internal expect fun PlatformMobileHomePage(
-  parcel: DestinationParcel<HomeArgument>,
+  parcel: DestinationParcel<HomeNavArgument>,
   content: @Composable () -> Unit,
 )
 
 @Composable
-internal expect fun HomeViewPagerCompose(modifier: Modifier = Modifier)
+internal expect fun HomeViewPagerCompose(
+  parcel: DestinationParcel<HomeNavArgument>,
+  modifier: Modifier = Modifier,
+)
 
 // 旧版课表
 interface IOldHomeCourse {
@@ -101,9 +108,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     oldHomeCourse.content.invoke(modifier)
     return
   }
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
-  val courseFrameViewModel = viewModel { MobileCourseFrameViewModel() }
-  val courseBottomSheetViewModel = viewModel { CourseBottomSheetViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier.systemBarsPadding(),
     bottomBarHeight = bottomNavViewModel.height
@@ -168,21 +175,21 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val shadowElevation by bottomNavViewModel.selectedItem.map {
     if (it === bottomNavViewModel.discoverItem || it === bottomNavViewModel.mineItem) 0.dp else 4.dp
   }.collectAsState(0.dp)
   Row(
     modifier = modifier
-      .navigationBarsPadding()
-      .height(bottomNavViewModel.height)
-      .fillMaxWidth()
-      .shadow(shadowElevation)
       .graphicsLayer {
         alpha = bottomNavViewModel.alpha.floatValue
         translationY = (bottomNavViewModel.offsetYRadio.floatValue * bottomNavViewModel.height).toPx()
       }
-      .background(LocalAppColors.current.topBg),
+      .shadow(shadowElevation)
+      .background(LocalAppColors.current.topBg)
+      .navigationBarsPadding()
+      .height(bottomNavViewModel.height)
+      .fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceAround,
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -194,7 +201,7 @@ private fun HomeNavCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNavItemCompose(item: BottomNavViewModel.BottomNavItem, modifier: Modifier = Modifier) {
-  val bottomNavViewModel = viewModel { BottomNavViewModel() }
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val coroutineScope = rememberCoroutineScope()
   val selected by bottomNavViewModel.selectedItem.map { it === item }.collectAsState(false)
   val hasRedDot by item.observerRedDot().collectAsState()

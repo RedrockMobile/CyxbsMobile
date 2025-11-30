@@ -34,7 +34,7 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
       "mobileMain",
       "desktopMain",
       "iosMain",
-      "wasmJsMain",
+      "webJsMain",
       "jbComposeMain",
     ).map { SourceSet(project, it) }
 
@@ -47,7 +47,7 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
           "a 表示 androidMain (仅安卓)\n" +
           "d 表示 desktopMain (仅桌面端)\n" +
           "i 表示 iosMain (仅 iOS)\n" +
-          "w 表示 wasmJsMain (仅网页端)\n" +
+          "w 表示 webJsMain (仅网页端)\n" +
           "j 表示 jbComposeMain (仅使用 jb Compose 的平台，androidMain + jbComposeMain = commonMain)\n")
       sc.nextLine().forEach { char ->
         sourceSetList.find { it.name.startsWith(char) }?.codeFile?.mkdirs()

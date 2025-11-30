@@ -65,6 +65,7 @@ object StuLessonRepository {
    */
   fun observeSelfLesson(
     isToast: Boolean = false,
+    needRefresh: Boolean = true,
   ): Observable<List<StuLessonEntity>> {
     return IAccountService::class.impl()
       .stuNumFlow
@@ -72,7 +73,7 @@ object StuLessonRepository {
       .asObservable()
       .observeOn(Schedulers.io())
       .switchMap { stuNum ->
-        observeLesson(stuNum, isToast)
+        observeLesson(stuNum, isToast, needRefresh)
       }
   }
 
@@ -89,24 +90,27 @@ object StuLessonRepository {
   fun observeLesson(
     stuNum: String,
     isToast: Boolean = false,
+    needRefresh: Boolean = true,
   ): Observable<List<StuLessonEntity>> {
     return if (stuNum.isEmpty()) Observable.just(emptyList()) else {
       if (ILessonService.isUseLocalSaveLesson) {
         LessonDataBase.stuLessonDao
           .observeLesson(stuNum)
           .doOnSubscribe {
-            // 在开始订阅时异步请求一次云端数据，所以下游会先拿到本地数据库中的数据，如果远端数据更新了，整个流会再次通知
-            refreshLesson(stuNum).doOnError {
-              if (isToast) {
-                val lastUpdateDay = mLastUpdateDay
-                if (lastUpdateDay < 1) {
-                  toastLong("课表正在使用缓存\n不能保证数据正确性")
-                } else {
-                  toastLong("已 $lastUpdateDay 天未更新课表\n建议联网更新")
+            if (needRefresh) {
+              // 在开始订阅时异步请求一次云端数据，所以下游会先拿到本地数据库中的数据，如果远端数据更新了，整个流会再次通知
+              refreshLesson(stuNum).doOnError {
+                if (isToast) {
+                  val lastUpdateDay = mLastUpdateDay
+                  if (lastUpdateDay < 1) {
+                    toastLong("课表正在使用缓存\n不能保证数据正确性")
+                  } else {
+                    toastLong("已 $lastUpdateDay 天未更新课表\n建议联网更新")
+                  }
                 }
+              }.unsafeSubscribeBy {
+                mLastUpdateDay = 0
               }
-            }.unsafeSubscribeBy {
-              mLastUpdateDay = 0
             }
           }.distinctUntilChanged() // 去重
           .subscribeOn(Schedulers.io())
