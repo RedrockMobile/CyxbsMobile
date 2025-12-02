@@ -1,7 +1,12 @@
 package com.cyxbs.pages.map.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,11 +51,40 @@ class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::cla
   override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
     viewModel(MapComposeViewModel::class)
     MapCompose()
+    MapDestination()
     MapProgressDialog()
     DownloadFailedDialog()
     MapUpdateDialog()
-    PlaceDetailBottomSheet()
   }
+}
+
+@Composable
+fun MapDestination() {
+  val viewmodel = viewModel(MapComposeViewModel::class)
+  AnimatedContent(
+    targetState = viewmodel.mapPagerState.value,
+    transitionSpec = {
+      if (targetState > initialState) {
+        slideInHorizontally { width -> width } togetherWith
+            slideOutHorizontally { width -> -width }
+      } else {
+        slideInHorizontally { width -> -width } togetherWith
+            slideOutHorizontally { width -> width }
+      }
+    }
+  ) { targetPage ->
+    if (targetPage == 1) {
+      AllPictureCompose(Modifier.fillMaxSize())
+    } else {
+      MapContent(Modifier.fillMaxSize())
+    }
+  }
+}
+
+@Composable
+fun MapContent(modifier: Modifier = Modifier) {
+  // TODO 顶部组件
+  PlaceDetailBottomSheet()
 }
 
 @Composable
@@ -58,7 +92,6 @@ fun MapCompose(modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val localImage = remember { mutableStateOf<ByteArray?>(null) }
   val isImageLocalExist = remember { mutableStateOf(false) }
-  // 这里需确保两个观察的value调用时机正确，防止中断下载
   val imageResult by produceState<ByteArray?>(
     null,
     viewmodel.mapInfo.value,

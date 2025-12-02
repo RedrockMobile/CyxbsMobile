@@ -8,8 +8,10 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,11 +35,17 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.pages.map.model.bean.PlaceDetails
+import com.cyxbs.pages.map.ui.MapShowPictureArgument
+import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_detail_more
@@ -140,6 +148,7 @@ private fun PlaceAttributeListCompose(modifier: Modifier = Modifier, placeDetail
         Text(
           modifier = modifier
             .padding(top = 10.dp, bottom = 8.dp, end = 12.dp)
+            .clickAnimation()
             .border(
               width = 1.dp,
               color = textColor,
@@ -183,7 +192,7 @@ private fun PlaceNavigationCompose(modifier: Modifier = Modifier, placeDetails: 
     Text(
       modifier = Modifier.align(Alignment.Center),
       text = "导航",
-      color = LocalAppColors.current.whiteBlack,
+      color = Color.White,
       fontSize = 16.sp
     )
   }
@@ -201,8 +210,12 @@ private fun DetailTextCompose(modifier: Modifier = Modifier, placeDetails: Place
 
 @Composable
 private fun DetailMoreTextCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
+  val viewmodel = viewModel(MapComposeViewModel::class)
   Row(
-    modifier = modifier,
+    modifier = modifier
+      .clickableSingle {
+        viewmodel.mapPagerState.value = 1
+      },
     verticalAlignment = Alignment.CenterVertically
   ) {
     Text(
@@ -221,15 +234,56 @@ private fun DetailMoreTextCompose(modifier: Modifier = Modifier, placeDetails: P
 
 @Composable
 private fun ImageBannerCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
+  // 这个Box主要用于images为空时的占位，BannerCompose内部实现了Box
   Box(
     modifier = modifier.fillMaxWidth().height(180.dp)
-  )
+  ) {
+    placeDetails.images?.let { images ->
+      val bannerPagerState = rememberBannerPagerState(
+        pageCount = images.size,
+        isScrollInfinite = images.size >= 3
+      )
+      BannerCompose(
+        pageCount = images.size,
+        pagerState = bannerPagerState,
+        modifier = Modifier.fillMaxSize(),
+        isAutoScroll = true,
+        scrollTime = 3000L,
+        scrollDuration = 2000,
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        pageSpacing = 4.dp
+      ) { index, virtualIndex ->
+        ImageFromUrlCompose(
+          url = images[index],
+          modifier = Modifier
+            .bannerTransition(pagerState = bannerPagerState, virtualIndex)
+            .fillMaxSize()
+            .clip(RoundedCornerShape(10.dp))
+        )
+      }
+      BannerIndicatorCompose(
+        pagerState = bannerPagerState,
+        count = images.size,
+        modifier = Modifier
+          .align(Alignment.BottomCenter)
+          .padding(bottom = 16.dp),
+        radius = 2.5.dp,
+        selectedWidth = 20.dp,
+        space = 20.dp,
+        shadow = 2.dp
+      )
+    }
+  }
 }
 
 @Composable
 private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
   Row(
-    modifier = modifier.padding(top = 10.dp),
+    modifier = modifier
+      .clickableSingle {
+        toast("功能待开发")
+      }
+      .padding(top = 10.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Image(
@@ -268,6 +322,7 @@ private fun DetailAboutListCompose(modifier: Modifier = Modifier, placeDetails: 
         Text(
           modifier = modifier
             .padding(bottom = 12.dp, end = 12.dp)
+            .clickAnimation()
             .border(
               width = 1.dp,
               color = textColor,

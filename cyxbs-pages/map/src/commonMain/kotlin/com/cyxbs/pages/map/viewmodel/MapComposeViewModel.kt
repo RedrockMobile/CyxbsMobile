@@ -46,7 +46,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   val mapCenter get() = Offset(mapContainer.value.width / 2f, mapContainer.value.height / 2f)
 
   // 点击锚点状态
-  val anchorItemState = AnchorItemState(placeId = "1")
+  val anchorItemState = AnchorItemState(placeId = "0")
 
   // 展示锚点集合状态
   val anchorItemStateList = mutableStateListOf<AnchorItemState>()
@@ -67,6 +67,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 地点详细信息
   val placeDetails = mutableStateOf<PlaceDetails?>(null)
   val bottomSheetState = BottomSheetState(hideable = true)
+
+  // 地图主页与所有图片页的切换(0表示地图主页，1表示所有图片页)
+  val mapPagerState = mutableStateOf(0)
 
 
   init {
@@ -91,6 +94,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 初始化聚焦信息
   fun initFocus(scope: CoroutineScope) {
+    // 如果初始化时bottomSheet展开的，说明当前是从image页pop回来的，不需要重新focus
+    if (bottomSheetState.state == BottomSheetValueState.Expanded) return
     mapInfo.value?.let { mapInfo ->
       mapInfo.placeList.find {
         it.placeId == mapInfo.openSiteId
@@ -113,6 +118,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
       scope.launch {
         animateMapToPosition(this, getOffset)
         launch {
+          anchorItemState.placeId = placeItem.placeId
           updateAnchorState(getOffset, true)
         }
       }

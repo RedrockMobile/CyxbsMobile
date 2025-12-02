@@ -20,7 +20,7 @@ package com.cyxbs.components.config.navigation
  *    NAV_DIALOG_页面 = "页面"
  *    示例: NAV_DIALOG_UPDATE = "dialog/update"
  *
- * 对于二级页面，应该作为一级页面 Argument 的一个 query 参数，不应该单独声明
+ * 对于一个页面下存在多个子页面，应该作为页面 Argument 的一个 query 参数，不应该单独声明
  * 比如：
  * ```
  * // Home 页一个 ViewPager 下存在三个页面：discover、fairground、mine
@@ -55,3 +55,6 @@ const val NAV_DIALOG_NOTICE = "dialog/notice"
 
 // 地图
 const val NAV_MAP = "map"
+
+// 地图-查看图片
+const val NAV_MAP_SHOW_PICTURE = "map_show_picture"
