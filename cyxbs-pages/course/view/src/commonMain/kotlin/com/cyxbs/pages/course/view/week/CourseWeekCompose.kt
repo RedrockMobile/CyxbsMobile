@@ -41,6 +41,7 @@ import kotlinx.datetime.DayOfWeek
 fun CourseWeekCompose(
   weekBeginDate: Date?, // 传递 nul 将不显示号数
   beginDayOfWeek: DayOfWeek,
+  showShadowDayOfWeek: DayOfWeek?, // 星期几展示今日阴影
   timelineWidth: Dp, // 与 timeline 一致
   scrollPaddingValues: PaddingValues,
   modifier: Modifier = Modifier,
@@ -48,8 +49,7 @@ fun CourseWeekCompose(
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .height(50.dp)
-      .background(LocalAppColors.current.topBg),
+      .height(50.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Text(
@@ -68,11 +68,7 @@ fun CourseWeekCompose(
         )
     ) {
       repeat(7) {
-        val showToday by rememberDerivedStateOfStructure(weekBeginDate, beginDayOfWeek) {
-          if (weekBeginDate == null) beginDayOfWeek.add(it) == Today.dayOfWeek else {
-            weekBeginDate.plusDays(it) == Today
-          }
-        }
+        val showToday = showShadowDayOfWeek == beginDayOfWeek.add(it)
         Column(
           modifier = Modifier
             .weight(1F)

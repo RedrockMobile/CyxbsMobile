@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -71,20 +70,27 @@ fun AbstractHomeCourseFrame.HomeCoursePageContent(
   page: Int,
   decorations: ImmutableList<CoursePageDecoration>,
 ) {
-  val date = beginDate?.plusWeeks(page - 1)
+  val pageBeginDate = beginDate?.plusWeeks(page - 1)
     ?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal)
   val timelineWidth = 40.dp
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)
+  val showShadowDayOfWeek by rememberDerivedStateOfStructure(pageBeginDate) {
+    if (page == 0) Today.dayOfWeek else {
+      pageBeginDate?.daysUntil(Today)?.takeIf { it in 0..6 }?.let { Today.dayOfWeek }
+    }
+  }
   Column(
     modifier = Modifier.drawTodayShadow(
+      showShadowDayOfWeek = showShadowDayOfWeek,
       beginDayOfWeek = timeline.beginDayOfWeek,
       timelineWidth = timelineWidth,
       scrollPaddingValues = scrollPaddingValues
     )
   ) {
     CourseWeekCompose(
-      weekBeginDate = if (page == 0) null else date, // 整学期页不显示日期
+      weekBeginDate = if (page == 0) null else pageBeginDate, // 整学期页不显示日期
       beginDayOfWeek = timeline.beginDayOfWeek,
+      showShadowDayOfWeek = showShadowDayOfWeek,
       timelineWidth = timelineWidth,
       scrollPaddingValues = scrollPaddingValues,
     )
@@ -99,16 +105,17 @@ fun AbstractHomeCourseFrame.HomeCoursePageContent(
 }
 
 // 绘制课表今日的背景阴影
+@Composable
 private fun Modifier.drawTodayShadow(
+  showShadowDayOfWeek: DayOfWeek?, // 星期几展示今日阴影
   beginDayOfWeek: DayOfWeek,
   timelineWidth: Dp,
   scrollPaddingValues: PaddingValues,
-): Modifier = composed {
+): Modifier {
+  showShadowDayOfWeek ?: return this
+  val todayIndex = (showShadowDayOfWeek.ordinal - beginDayOfWeek.ordinal + 7) % 7
   val color = 0x93E8F0FC.dark(0x26000101)
-  val todayIndex by rememberDerivedStateOfStructure(beginDayOfWeek) {
-    (Today.dayOfWeekOrdinal + 7 - beginDayOfWeek.ordinal) % 7
-  }
-  drawBehind {
+  return drawBehind {
     val paddingStart = scrollPaddingValues.calculateStartPadding(layoutDirection).toPx()
     val paddingEnd = scrollPaddingValues.calculateEndPadding(layoutDirection).toPx()
     val width = (size.width - timelineWidth.toPx() - paddingStart - paddingEnd) / 7
