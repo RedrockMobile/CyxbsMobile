@@ -3,7 +3,6 @@ package com.cyxbs.pages.course.home.compose
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -50,11 +49,6 @@ class MobileHomeCourseFrame : AbstractHomeCourseFrame(), IMobileHomeCourseFrame 
   // 底部抽屉状态
   override val bottomSheetState by lazy {
     BottomSheetState()
-  }
-
-  // 课表 HorizontalPager 状态
-  override val pagerState: PagerState by lazy {
-    PagerState(initialPage) { maxPage }
   }
 
   var peekHeight: Dp by mutableStateOf(70.dp)

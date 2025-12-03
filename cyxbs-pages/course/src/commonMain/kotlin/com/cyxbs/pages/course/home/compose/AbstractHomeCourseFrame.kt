@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -28,6 +27,7 @@ import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -43,7 +43,7 @@ abstract class AbstractHomeCourseFrame {
   open val timeline: CourseTimeline = CourseTimeline()
 
   // 课表起始日期，如果为 null 则不会显示号数
-  open var beginDate: Date? by mutableStateOf(SchoolCalendar.getFirstMonDay())
+  open var beginDate: StateFlow<Date?> = SchoolCalendar.observeFirstMonDayNullable()
 
   // 课表 HorizontalPager 状态
   open val pagerState: PagerState by lazy {
@@ -59,7 +59,7 @@ abstract class AbstractHomeCourseFrame {
 
   open fun getPage(date: Date): Int {
     val realBeginDate =
-      beginDate?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
+      beginDate.value?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
     val page = (realBeginDate.daysUntil(date) / 7 + 1).coerceAtLeast(0)
     return if (page >= maxPage) 0 else page
   }
@@ -70,7 +70,7 @@ fun AbstractHomeCourseFrame.HomeCoursePageContent(
   page: Int,
   decorations: ImmutableList<CoursePageDecoration>,
 ) {
-  val pageBeginDate = beginDate?.plusWeeks(page - 1)
+  val pageBeginDate = beginDate.collectAsState().value?.plusWeeks(page - 1)
     ?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal)
   val timelineWidth = 40.dp
   val scrollPaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp)

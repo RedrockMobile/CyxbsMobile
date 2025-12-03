@@ -12,14 +12,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.view.ui.BottomSheetValueState
-import com.cyxbs.pages.course.home.header.NextItemHeaderUtils
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.HintCourseBottomSheetHeader
+import com.cyxbs.pages.course.home.header.NextItemHeaderUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -79,14 +79,11 @@ fun MobileHomeCourseHeader(
     }
   }
   LaunchedEffect(frame) {
-    if (frame.beginDate == null) {
-      // beginDate 未初始化，则进行等待
-      val beginDateJob = launch {
-        frame.beginDate = SchoolCalendar.observeFirstMonDay().first()
-      }
+    if (frame.beginDate.value == null) {
       val selectPageJon = launch {
-        beginDateJob.join() // beginDate 初始化后跳到 initialPage
-        frame.pagerState.scrollToPage(frame.initialPage)
+        // beginDate 未初始化，则进行等待
+        frame.beginDate.filterNotNull().first()
+        frame.pagerState.scrollToPage(frame.initialPage) // beginDate 初始化后跳到 initialPage
       }
       launch {
         frame.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Expanded }

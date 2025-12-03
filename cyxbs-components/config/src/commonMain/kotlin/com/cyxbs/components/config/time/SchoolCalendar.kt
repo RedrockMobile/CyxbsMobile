@@ -3,6 +3,7 @@ package com.cyxbs.components.config.time
 import com.cyxbs.components.config.sp.defaultSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
@@ -75,7 +76,14 @@ object SchoolCalendar {
    * 观察开学第一天日期
    */
   fun observeFirstMonDay(): Flow<Date> {
-    return firstDateState.filterNotNull()
+    return observeFirstMonDayNullable().filterNotNull()
+  }
+
+  /**
+   * 观察开学第一天日期，但允许为空
+   */
+  fun observeFirstMonDayNullable(): StateFlow<Date?> {
+    return firstDateState
   }
 
   /**
