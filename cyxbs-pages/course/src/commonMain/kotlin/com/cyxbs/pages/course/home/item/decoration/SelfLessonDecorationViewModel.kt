@@ -41,6 +41,7 @@ class SelfLessonDecorationViewModel(
 
   companion object {
     val Comparable = compareBy<SelfLessonItem> { -it.page } // page 越小越在上
+      .thenBy { -it.lesson.week[0] } // 起始周越小越在上
       .thenBy { -it.lesson.dayOfWeek.ordinal } // dayOfWeek 越小越在上
       .thenBy { it.lesson.beginTime } // beginTime 越大越在上
       .thenBy { it.lesson.finalTime } // finalTime 越大越在上
@@ -53,6 +54,7 @@ class SelfLessonDecorationViewModel(
       .stuNumFlow
       .flatMapLatest {
         createLessonFlow(it)
+//        createLessonFlow("2024210480")
       }.onEach {
         if (it == null) {
           hierarchy.reset(emptyList())
@@ -91,9 +93,9 @@ class SelfLessonDecorationViewModel(
         if (cacheLesson != null) {
           val diffDay = Clock.System.now() - cacheLesson.requestTime
           if (diffDay < 1.days) {
-            com.cyxbs.components.utils.extensions.toastLong("课表正在使用缓存\n不能保证数据正确性")
+            toastLong("课表正在使用缓存\n不能保证数据正确性")
           } else {
-            com.cyxbs.components.utils.extensions.toastLong("已 ${diffDay.inWholeDays} 天未更新课表\n建议联网更新")
+            toastLong("已 ${diffDay.inWholeDays} 天未更新课表\n建议联网更新")
           }
         }
       }

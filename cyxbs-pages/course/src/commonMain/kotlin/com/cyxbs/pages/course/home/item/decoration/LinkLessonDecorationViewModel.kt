@@ -34,6 +34,7 @@ class LinkLessonDecorationViewModel(
 
   companion object {
     val Comparable = compareBy<LinkLessonItem> { -it.page } // page 越小越在上
+      .thenBy { -it.lesson.week[0] } // 起始周越小越在上
       .thenBy { -it.lesson.dayOfWeek.ordinal } // dayOfWeek 越小越在上
       .thenBy { it.lesson.beginTime } // beginTime 越大越在上
       .thenBy { it.lesson.finalTime } // finalTime 越大越在上
