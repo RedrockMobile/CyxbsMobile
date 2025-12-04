@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.utils.compose.clickableSingle
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
@@ -53,18 +54,26 @@ fun MapWidgetCompose(
       }
     },
     onClick = { offset ->
-      viewmodel.clickPlace(
-        coroutineScope,
-        offset,
-        mapInfo
-      )
+      if (mapWidgetState.isLock) {
+        toast("取消锁定后对地图进行操作")
+      } else {
+        viewmodel.clickPlace(
+          coroutineScope,
+          offset,
+          mapInfo
+        )
+      }
     },
     onDoubleClick = { offset ->
-      // 如果大于6f,则还原初始
-      if (mapWidgetState.scale >= 6f) {
-        viewmodel.resetMap(coroutineScope)
+      if (mapWidgetState.isLock) {
+        toast("取消锁定后对地图进行操作")
       } else {
-        viewmodel.animateMapToPosition(coroutineScope, offset)
+        // 如果大于6f,则还原初始
+        if (mapWidgetState.scale >= 6f) {
+          viewmodel.resetMap(coroutineScope)
+        } else {
+          viewmodel.animateMapToPosition(coroutineScope, offset)
+        }
       }
     },
     anchorContent = {

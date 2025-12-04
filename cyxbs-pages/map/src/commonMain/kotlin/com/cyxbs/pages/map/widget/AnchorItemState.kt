@@ -1,6 +1,7 @@
 package com.cyxbs.pages.map.widget
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.keyframes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -35,7 +36,7 @@ class AnchorItemState(
       animationSpec = keyframes {
         durationMillis = duration
         0f at 0
-        1.2f at duration / 3
+        1.2f at duration / 3 using FastOutLinearInEasing
         0.8f at duration / 3 * 2
         1f at duration
       }

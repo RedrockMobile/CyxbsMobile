@@ -43,10 +43,10 @@ actual fun MapImageLoad(
         .pointerInput(Unit) {
           mapWidgetState.stop()
           detectTransformGestures(
-            panZoomLock = mapWidgetState.isLock,
             onTap = onClick,
             onDoubleTap = onDoubleClick
           ) { centroid, pan, zoom, _, _ ->
+            if (mapWidgetState.isLock) return@detectTransformGestures true
             val oldScale = mapWidgetState.scale
             // 放大比例的约束范围
             val newScale = (oldScale * zoom).coerceIn(1f, 15f)

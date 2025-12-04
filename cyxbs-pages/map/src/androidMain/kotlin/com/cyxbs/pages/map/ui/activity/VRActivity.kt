@@ -1,7 +1,7 @@
 package com.cyxbs.pages.map.ui.activity
 
-import android.app.Activity
 import android.app.ProgressDialog
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -26,7 +26,7 @@ class VRActivity : BaseActivity() {
         const val VR_URL = "vr_url"
         const val VR_URL_SP = "vr_url_sp"
         const val DEFAULT_VR_URL = "http://720yun.com/t/0e929mp6utn?pano_id=473004"
-        fun startVRActivity(activity: Activity, vrUrl: String) {
+        fun startVRActivity(activity: Context, vrUrl: String) {
             activity.startActivity(Intent(activity, VRActivity::class.java).putExtra(VR_URL, vrUrl))
         }
     }

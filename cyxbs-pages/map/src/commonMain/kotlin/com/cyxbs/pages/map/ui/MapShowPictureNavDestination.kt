@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -13,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -23,9 +22,7 @@ import com.cyxbs.components.config.navigation.NAV_MAP_SHOW_PICTURE
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.map.widget.BannerCompose
-import com.cyxbs.pages.map.widget.bannerTransition
 import com.cyxbs.pages.map.widget.rememberBannerPagerState
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.serialization.SerialName
@@ -71,6 +68,7 @@ class MapShowPictureNavDestination : MainNavDestination<MapShowPictureArgument>(
         }
         .fillMaxSize()
         .background(Color.Black)
+        .systemBarsPadding()
     ) {
       Text(
         modifier = Modifier

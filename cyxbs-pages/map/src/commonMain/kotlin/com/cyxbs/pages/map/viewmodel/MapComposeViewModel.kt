@@ -20,6 +20,7 @@ import com.cyxbs.pages.map.util.calculatePlaceInMap
 import com.cyxbs.pages.map.widget.AnchorItemState
 import com.cyxbs.pages.map.widget.MapWidgetState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -37,6 +38,12 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     const val MAX_SCALE = 6f
     const val MIN_SCALE = 1f
   }
+
+  // 管理map的job
+  private var mapAnimationJob: Job? = null
+
+  // 管理anchorList的job
+  private var anchorListJob: Job? = null
 
   // 地图组件状态
   val mapWidgetState = MapWidgetState()
@@ -70,6 +77,14 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 地图主页与所有图片页的切换(0表示地图主页，1表示所有图片页)
   val mapPagerState = mutableStateOf(0)
+
+  // 地图基本和搜索页的切换(0表示地图，1表示搜索)
+  val mapSearchPagerState = mutableStateOf(0)
+
+  // 当前button选中项
+  val currentSelectedItem = mutableStateOf(999)
+
+  val searchText = mutableStateOf("")
 
 
   init {
@@ -152,15 +167,36 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
   }
 
+  // 上传搜索热度
+  fun addHot(placeId: String) {
+    launch {
+      MapRepository.addHot(placeId).getOrElse { throwable ->
+        toast("上传搜索热度失败~")
+      }
+    }
+  }
+
+  fun closeAnchorList(scope: CoroutineScope, index: Int) {
+    val buttonInfoItem = buttonInfoItemList[index]
+    val duration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
+    anchorListJob?.cancel()
+    anchorListJob = scope.launch {
+      anchorItemStateList.forEach { anchorItemState ->
+        anchorItemState.animateClose(duration)
+      }
+    }
+  }
+
   // 点击按钮展示anchorList
   fun showAnchorList(scope: CoroutineScope, index: Int) {
     var item = 0
     val buttonInfoItem = buttonInfoItemList[index]
-    val duration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
-    scope.launch {
+    val duration = if (anchorItemStateList.size <= 5) 100 else 50
+    anchorListJob?.cancel()
+    anchorListJob = scope.launch {
       if (anchorItemState.scale != 0f) anchorItemState.animateClose()
       anchorItemStateList.forEach { anchorItemState ->
-        anchorItemState.animateClose(duration)
+        if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
       }
       anchorItemStateList.clear()
       // 从地图信息中寻找匹配的建筑
@@ -183,11 +219,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         }
       }
       resetMap(this)
-      launch {
-        anchorItemStateList.forEach { anchorItemState ->
-          anchorItemState.visible = true
-          anchorItemState.animateClick(duration)
-        }
+      val newDuration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
+      anchorItemStateList.forEach { anchorItemState ->
+        anchorItemState.visible = true
+        anchorItemState.animateClick(newDuration)
       }
     }
   }
@@ -253,6 +288,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         }
       }
     }
+    currentSelectedItem.value = 999
     anchorItemState.placeId = placeId // 更新一下对应的placeId
     if (isFind) getPlaceDetails(placeId)
     // 启动动画
@@ -292,9 +328,20 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
   }
 
+  // 改变锁定的状态
+  fun changeLockStatus() {
+    if (mapWidgetState.isLock) {
+      toast("已解除锁定")
+    } else {
+      toast("已锁定")
+    }
+    mapWidgetState.isLock = !mapWidgetState.isLock
+  }
+
   // 还原地图为初始状态
   fun resetMap(scope: CoroutineScope) {
-    scope.launch {
+    mapAnimationJob?.cancel()
+    mapAnimationJob = scope.launch {
       launch {
         mapWidgetState.animateScale(MIN_SCALE)
       }
@@ -306,7 +353,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 将地图中心移至某点
   fun animateMapToPosition(scope: CoroutineScope, offset: Offset) {
-    scope.launch {
+    mapAnimationJob?.cancel()
+    mapAnimationJob = scope.launch {
       // 执行动画
       launch {
         mapWidgetState.animateScale(MAX_SCALE)
@@ -319,6 +367,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 跳转导航
   open fun jumpToNavigation(endPlace: String) {}
+
+  open fun jumpToVR() {}
 
   // 更新锚点的状态
   private suspend fun updateAnchorState(

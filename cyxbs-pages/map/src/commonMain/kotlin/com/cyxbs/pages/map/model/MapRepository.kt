@@ -2,6 +2,7 @@ package com.cyxbs.pages.map.model
 
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
+import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.pages.map.model.bean.ButtonInfo
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceDetails
@@ -36,6 +37,14 @@ object MapRepository {
   suspend fun getButtonInfo(): Result<ButtonInfo> {
     return runCatchingCoroutine {
       service.getButtonInfo()
+    }.mapCatching {
+      it.data
+    }
+  }
+
+  suspend fun addHot(placeId: String): Result<ApiStatus> {
+    return runCatchingCoroutine {
+      service.addHot(placeId)
     }.mapCatching {
       it.data
     }

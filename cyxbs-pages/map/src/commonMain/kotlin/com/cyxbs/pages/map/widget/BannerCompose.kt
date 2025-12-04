@@ -72,23 +72,31 @@ fun BannerCompose(
     pageContent(index % pageCount, index)
   }
   // 这里不能用currentPage，否则走一半就会跳转
-  LaunchedEffect(pagerState.settledPage, isAutoScroll) {
+  LaunchedEffect(isAutoScroll) {
     if (isAutoScroll) {
-      delay(scrollTime)
-      // 这里判断以下不开启无限循环&&count==2,1的特殊情况
-      val nextPage = if (pagerState.settledPage + 1 < pagerState.pageCount) {
-        pagerState.settledPage + 1
-      } else {
-        if (pagerState.settledPage - 1 < 0) pagerState.settledPage
-        else pagerState.settledPage - 1
+      while (true) {
+        delay(scrollTime)
+        if (!pagerState.isScrollInProgress) {
+          // 这里判断一下不开启无限循环&&count==2,1的特殊情况
+          val nextPage = if (pagerState.settledPage + 1 < pagerState.pageCount) {
+            pagerState.settledPage + 1
+          } else {
+            if (pagerState.settledPage - 1 < 0) pagerState.settledPage
+            else pagerState.settledPage - 1
+          }
+          try {
+            pagerState.animateScrollToPage(
+              page = nextPage,
+              animationSpec = tween(
+                durationMillis = scrollDuration,
+                easing = FastOutSlowInEasing
+              )
+            )
+          } catch (e: Exception) {
+
+          }
+        }
       }
-      pagerState.animateScrollToPage(
-        page = nextPage,
-        animationSpec = tween(
-          durationMillis = scrollDuration,
-          easing = FastOutSlowInEasing
-        )
-      )
     }
   }
 }
@@ -136,7 +144,6 @@ fun BannerIndicatorCompose(
       val currentPage = pagerState.currentPage % count
       val nextPage =
         (currentPage + 1 * sign(pagerState.currentPageOffsetFraction).toInt() + count) % count
-      logg("$currentPage $nextPage ${pagerState.currentPageOffsetFraction}")
       val width = when (index) {
         currentPage -> (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction)) + diameter
         nextPage -> selectedWidth - (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction))

@@ -1,5 +1,6 @@
 package com.cyxbs.pages.map.model.network
 
+import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.pages.map.model.bean.ButtonInfo
 import com.cyxbs.pages.map.model.bean.MapInfo
@@ -26,4 +27,8 @@ interface MapService {
 
   @GET("magipoke-stumap/button")
   suspend fun getButtonInfo() : ApiWrapper<ButtonInfo> // 获取按钮信息
+
+  @FormUrlEncoded
+  @POST("/magipoke-stumap/addhot")
+  fun addHot(@Field("id") placeId: String): ApiWrapper<ApiStatus> // 添加热词
 }
