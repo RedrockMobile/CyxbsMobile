@@ -126,7 +126,7 @@ class CourseItemViewModel : BaseViewModel() {
     }
 
     // 重置所有 item 数据
-    // 支持重叠数据的自动迁移
+    // 支持相等数据的自动迁移
     fun reset(item: List<Item>) {
       synchronized(dateItemsMapSynchronized) {
         if (item.isEmpty()) {

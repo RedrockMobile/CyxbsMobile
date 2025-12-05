@@ -12,7 +12,6 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,19 +23,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
-import com.cyxbs.pages.course.home.data.HomeLinkLessonDataProvider
-import com.cyxbs.pages.course.home.item.decoration.LinkLessonDecorationViewModel
+import com.cyxbs.pages.course.model.LinkLessonRepository
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_single
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.abs
 
 /**
@@ -155,9 +151,8 @@ private fun CourseLinkStudentBtn(
     val fraction = frame.pagerState.currentPageOffsetFraction
     1 - minOf(abs(fraction + frame.pagerState.currentPage - frame.initialPage), 1F)
   }
-  val enableShowState = HomeLinkLessonDataProvider.enableShow.collectAsState()
-  val enableShow = enableShowState.value
-  if (enableShow != null) {
+  if (LinkLessonRepository.state.collectAsState().value.isNotNull()) {
+    val enableShow = LinkLessonRepository.enableShow.collectAsState().value
     Image(
       contentDescription = if (enableShow) "点击不显示关联人课程" else "点击显示关联人课程",
       contentScale = ContentScale.Inside,
@@ -168,8 +163,7 @@ private fun CourseLinkStudentBtn(
       modifier = modifier.size(32.dp).graphicsLayer {
         translationX = (101.dp * pageFraction).toPx()
       }.clickableNoIndicator {
-        // todo 修改关联人课表是否展示
-//        viewModel(LinkLessonDecorationViewModel::class).changeVisible()
+        LinkLessonRepository.changeVisible()
       },
     )
   }

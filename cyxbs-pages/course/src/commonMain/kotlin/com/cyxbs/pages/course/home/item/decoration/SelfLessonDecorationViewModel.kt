@@ -57,18 +57,16 @@ class SelfLessonDecorationViewModel(
 //        createLessonFlow("2024210480")
 //        createLessonFlow("2022211292")
       }.onEach {
-        if (it == null) {
-          hierarchy.reset(emptyList())
-        } else {
-          it.forEach { lesson ->
+        hierarchy.reset(buildList {
+          it?.forEach { lesson ->
             // 添加进整学期
-            hierarchy.add(itemFactory.createSelfLessonItem(0, lesson))
+            add(itemFactory.createSelfLessonItem(0, lesson))
             // 添加进每周
             lesson.week.forEach { week ->
-              hierarchy.add(itemFactory.createSelfLessonItem(week, lesson))
+              add(itemFactory.createSelfLessonItem(week, lesson))
             }
           }
-        }
+        })
       }.catch {
 
       }.launchIn(appCoroutineScope)
@@ -126,10 +124,10 @@ private fun SelfLessonDecorationViewModel.CoursePageCompose(
 ) {
   val page = coursePage.page
   Box {
+    nextContent()
     DayOfWeek.entries.forEach {
       DayOfWeekCompose(page, it)
     }
-    nextContent()
   }
 }
 
