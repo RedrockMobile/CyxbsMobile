@@ -81,10 +81,10 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     val width = constraints.maxWidth / 7
     val height = (constraints.maxHeight * (weightOffset.y - weightOffset.x)).roundToInt()
     val placeable = measurable.measure(Constraints.fixed(width, height))
-    layout(placeable.width, placeable.height) {
+    layout(width, height) {
       placeable.placeRelative(
-        x = (indexAnimatable.value * placeable.width).roundToInt(),
-        y = (weightOffset.x * constraints.maxHeight).roundToInt()
+        x = (indexAnimatable.value * constraints.maxWidth / 7 + (width - placeable.width) / 2F).roundToInt(),
+        y = (weightOffset.x * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt()
       )
     }
   }
