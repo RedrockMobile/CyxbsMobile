@@ -55,6 +55,7 @@ class SelfLessonDecorationViewModel(
       .flatMapLatest {
         createLessonFlow(it)
 //        createLessonFlow("2024210480")
+//        createLessonFlow("2022211292")
       }.onEach {
         if (it == null) {
           hierarchy.reset(emptyList())

@@ -7,9 +7,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.page.LocalCoursePage
@@ -42,11 +42,16 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
       initialValue = calculateIndex(itemState, timeline).toFloat(),
     )
   }
-  // 垂直位置与高度
-  val weightAnimatable = remember {
+  val beginTimeAnimatable = remember {
     Animatable(
-      initialValue = calculateWeight(itemState, timeline),
-      typeConverter = Offset.VectorConverter,
+      initialValue = itemState.item.whatTime.now.beginTime.minuteOfDay,
+      typeConverter = Int.VectorConverter,
+    )
+  }
+  val finalTimeAnimatable = remember {
+    Animatable(
+      initialValue = itemState.item.whatTime.now.finalTime.minuteOfDay,
+      typeConverter = Int.VectorConverter,
     )
   }
   LaunchedEffect(timeline.beginDayOfWeek) {
@@ -54,21 +59,32 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     if (whatTime is CourseItemWhatTime.Changeable) {
       whatTime.observe().collectLatest {
         supervisorScope {
-          launch { indexAnimatable.animateTo(calculateIndex(itemState, timeline).toFloat()) }
-          launch { weightAnimatable.animateTo(calculateWeight(itemState, timeline)) }
+          val newIndex = calculateIndex(itemState, timeline).toFloat()
+          if (newIndex != indexAnimatable.value) {
+            launch { indexAnimatable.animateTo(newIndex) }
+          }
+          if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
+            launch { beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay) }
+          }
+          if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
+            launch { finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay) }
+          }
         }
       }
     }
   }
   return Modifier.layout { measurable, constraints ->
+    val weightOffset = timeline.calculateBeginFinalWeight(
+      beginTime = MinuteTime.new(beginTimeAnimatable.value),
+      finalTime = MinuteTime.new(finalTimeAnimatable.value)
+    )
     val width = constraints.maxWidth / 7
-    val height =
-      (constraints.maxHeight * (weightAnimatable.value.y - weightAnimatable.value.x)).roundToInt()
+    val height = (constraints.maxHeight * (weightOffset.y - weightOffset.x)).roundToInt()
     val placeable = measurable.measure(Constraints.fixed(width, height))
     layout(placeable.width, placeable.height) {
       placeable.placeRelative(
         x = (indexAnimatable.value * placeable.width).roundToInt(),
-        y = (weightAnimatable.value.x * constraints.maxHeight).roundToInt()
+        y = (weightOffset.x * constraints.maxHeight).roundToInt()
       )
     }
   }
@@ -79,14 +95,5 @@ private fun calculateIndex(itemState: CourseItemState, timeline: CourseTimeline)
     val itemDayOfWeekOrdinal = itemState.item.whatTime.now.dayOfWeek.ordinal
     val beginDayOfWeekOrdinal = timeline.beginDayOfWeek.ordinal
     return (itemDayOfWeekOrdinal + 7 - beginDayOfWeekOrdinal) % 7
-  }
-}
-
-private fun calculateWeight(itemState: CourseItemState, timeline: CourseTimeline): Offset {
-  Snapshot.withoutReadObservation {
-    return timeline.calculateBeginFinalWeight(
-      itemState.item.whatTime.now.beginTime,
-      itemState.item.whatTime.now.finalTime
-    )
   }
 }
