@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.geometry.Offset
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,7 +47,6 @@ class EdgeScroll(
           topMoveBoundary = topMoveBoundary,
           bottomMoveBoundary = bottomMoveBoundary
         )
-        logg("111 key = $key, velocity = $velocity")
         scrollVelocityFlow.value = velocity
         if (velocity == 0F) {
           this.handleEdgePointer = null
@@ -63,7 +61,6 @@ class EdgeScroll(
       topMoveBoundary = topMoveBoundary,
       bottomMoveBoundary = bottomMoveBoundary
     )
-    logg("222 key = $key, velocity = $velocity")
     if (velocity != 0F) {
       this.handleEdgePointer = edgePointer
       edgePointerMap.clear()

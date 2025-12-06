@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableFloatState
@@ -41,11 +42,13 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.modifier.PressScaleController
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
+import com.cyxbs.pages.course.view.item.modifier.longPressMove
 import com.cyxbs.pages.course.view.item.modifier.pressScale
-import com.cyxbs.pages.course.view.item.touch.LongPressCreate.TouchingItem
+import com.cyxbs.pages.course.view.item.touch.LongPressCreateDecoration.*
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
@@ -67,7 +70,7 @@ import kotlin.math.roundToInt
  * @date 2025/5/17
  */
 @Stable
-class LongPressCreate : CoursePageDecoration {
+class LongPressCreateDecoration : CoursePageDecoration {
 
   @Composable
   override fun CoursePageContent() {
@@ -151,19 +154,19 @@ private fun LongPressCreateCoursePageWrapper() {
   val touchedItems = rememberSaveable(
     saver = Saver(
       save = {
-        defaultJson.encodeToString<List<LongPressCreate.TouchedItem>>(it)
+        defaultJson.encodeToString<List<TouchedItem>>(it)
       },
       restore = {
-        defaultJson.decodeFromString<List<LongPressCreate.TouchedItem>>(it).toMutableStateList()
+        defaultJson.decodeFromString<List<TouchedItem>>(it).toMutableStateList()
       }
     )) {
-    mutableStateListOf<LongPressCreate.TouchedItem>()
+    mutableStateListOf<TouchedItem>()
   }
 
   // 创建出来的 item 能否允许点击，如果此时还处于触摸中，则是不允许点击的
   val enableClick = rememberWrapper(false)
 
-  Box(
+  Spacer(
     modifier = Modifier.fillMaxSize().onGloballyPositioned {
       layoutCoordinates.value = it
     }.pointerInputCreateItem(
@@ -176,22 +179,21 @@ private fun LongPressCreateCoursePageWrapper() {
     ).pointerInputAllUpEnableClick(
       enableClick = enableClick
     )
-  ) {
-    TouchedItems(
-      touchedItems = touchedItems,
-      timeline = timeline,
-    )
-    TouchingItems(
-      touchingItems = touchingItems,
-      scrollContext = scrollContext,
-      layoutCoordinates = layoutCoordinates,
-    )
-  }
+  )
+  TouchedItems(
+    touchedItems = touchedItems,
+    timeline = timeline,
+  )
+  TouchingItems(
+    touchingItems = touchingItems,
+    scrollContext = scrollContext,
+    layoutCoordinates = layoutCoordinates,
+  )
 }
 
 @Composable
 private fun TouchedItems(
-  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
+  touchedItems: SnapshotStateList<TouchedItem>,
   timeline: CourseTimeline
 ) {
   touchedItems.forEach { item ->
@@ -206,14 +208,16 @@ private fun TouchedItems(
             placeable.placeRelativeWithLayer(
               x = item.dayOfWeek.ordinal * width,
               y = (constraints.maxHeight * weight.x).roundToInt(),
+              zIndex = 1F,
               layerBlock = {
                 alpha = item.alphaState.floatValue
               }
             )
           }
-        }.then(RoundedShadowItemModifier.createModifier())
+        }.pressScale(PressScaleController) // 点击后的 Q 弹动画
+          .then(RoundedShadowItemModifier.createModifier())
           .background(0xFFE9EDF2.dark(0xFF202223))
-          .pressScale(PressScaleController) // 点击后的 Q 弹动画
+
       )
     }
   }
@@ -239,7 +243,8 @@ private fun TouchingItems(
           layout(placeable.width, placeable.height) {
             placeable.placeRelative(
               x = (item.initPosition.x / width).toInt() * width,
-              y = minOf(y1, y2).roundToInt()
+              y = minOf(y1, y2).roundToInt(),
+              zIndex = 1F,
             )
           }
         }.then(RoundedShadowItemModifier.createModifier())
@@ -251,7 +256,7 @@ private fun TouchingItems(
 
 // 手指点击时清理已有的 item
 private fun Modifier.pointerInputClearItem(
-  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
+  touchedItems: SnapshotStateList<TouchedItem>,
 ): Modifier = pointerInput(Unit) {
   supervisorScope {
     awaitEachGesture {
@@ -294,7 +299,7 @@ private fun Modifier.pointerInputAllUpEnableClick(
 // 长按移动创建 item 逻辑
 private fun Modifier.pointerInputCreateItem(
   touchingItems: SnapshotStateMap<PointerId, TouchingItem>,
-  touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
+  touchedItems: SnapshotStateList<TouchedItem>,
   scrollContext: LocalCourseScrollContext,
   layoutCoordinates: State<LayoutCoordinates?>,
 ): Modifier = pointerInput(Unit) {
@@ -330,18 +335,19 @@ private fun Modifier.pointerInputCreateItem(
                 item.onMoveEnd(!change.isConsumed)
                 val nowTime =
                   scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)!!
-                val touchedItem = LongPressCreate.TouchedItem(
+                val touchedItem = TouchedItem(
                   id = change.id.value,
                   dayOfWeek = DayOfWeek((item.initPosition.x / (size.width / 7)).toInt() + 1),
                   start = minOf(item.initTime, nowTime),
                   end = maxOf(item.initTime, nowTime),
                 )
                 touchedItems.add(touchedItem)
-                if (abs(item.initTime.minutesUntil(nowTime)) < 30) {
-                  // 暂定小于 30 分钟的事务不支持
+                if (abs(item.initTime.minutesUntil(nowTime)) < 10) {
+                  // 暂定小于 10 分钟的事务不支持
                   launch { touchedItem.clear() }.invokeOnCompletion {
                     touchedItems.remove(touchedItem)
                   }
+                  toast("不支持创建小于 10 分钟的事务")
                 }
               }
             }
@@ -356,7 +362,7 @@ private fun Modifier.pointerInputCreateItem(
               longPressInitOffset.remove(change.id)
             }
           } else if (job.isCompleted) {
-            // 当前手指事件倒计时已经完成，移动扩大缩小 item
+            // 当前手指事件倒计时已经完成，移动扩大缩小 item 边界
             change.consume()
             touchingItems[change.id]?.let { item ->
               item.nowPosition.value = change.position

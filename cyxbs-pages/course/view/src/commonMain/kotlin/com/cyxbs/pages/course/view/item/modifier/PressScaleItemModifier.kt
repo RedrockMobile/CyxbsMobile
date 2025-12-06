@@ -52,7 +52,7 @@ fun Modifier.pressScale(
 ): Modifier {
   val controllerWrapper by rememberUpdatedWrapper(controller)
   val pointerOffset = rememberWrapper<Offset?>(null)
-  val scale = remember { Animatable(initialValue = 1F) }
+  val scaleAnimatable = remember { Animatable(initialValue = 1F) }
   val coroutineScope = rememberCoroutineScope()
   return pointerInput(Unit) {
     awaitEachGesture {
@@ -62,11 +62,11 @@ fun Modifier.pressScale(
       )
       pointerOffset.value = down.position
       controllerWrapper.onStartPress()
-      coroutineScope.launch { scale.animateTo(0.8F) }
+      coroutineScope.launch { scaleAnimatable.animateTo(0.8F) }
       val endBlock: () -> Unit = {
         pointerOffset.value = null
         coroutineScope.launch {
-          scale.animateTo(1F)
+          scaleAnimatable.animateTo(1F)
         }.invokeOnCompletion {
           controllerWrapper.onEndPress()
         }
@@ -88,8 +88,8 @@ fun Modifier.pressScale(
       }
     }
   }.graphicsLayer {
-    scaleX = scale.value
-    scaleY = scale.value
+    scaleX = scaleAnimatable.value
+    scaleY = scaleAnimatable.value
     val pointer = pointerOffset.value
     if (pointer != null) {
       val centerX = size.width / 2F

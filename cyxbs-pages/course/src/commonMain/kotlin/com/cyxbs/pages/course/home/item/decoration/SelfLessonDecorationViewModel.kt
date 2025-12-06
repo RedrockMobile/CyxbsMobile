@@ -46,8 +46,8 @@ class SelfLessonDecorationViewModel(
     IAccountService::class.impl()
       .stuNumFlow
       .flatMapLatest {
-        createLessonFlow(it)
-//        createLessonFlow("2024210480")
+//        createLessonFlow(it)
+        createLessonFlow("2024210480")
 //        createLessonFlow("2022211292")
       }.onEach {
         hierarchy.reset(buildList {

@@ -23,6 +23,7 @@ import com.cyxbs.pages.course.home.item.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.home.item.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.touch.LongPressCreateDecoration
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -127,15 +128,12 @@ private fun getDecoration(): ImmutableList<CoursePageDecoration> {
       )
     )
   }
-  return remember(
-    selfLessonDecoration,
-    linkLessonDecoration,
-    affairDecoration,
-  ) {
+  return remember {
     persistentListOf(
-      selfLessonDecoration,
-      affairDecoration,
-      linkLessonDecoration,
+      selfLessonDecoration, // 自己的课程
+      affairDecoration, // 自己的事务
+      linkLessonDecoration, // 关联人的课程
+      LongPressCreateDecoration(), // 长按创建事务
     )
   }
 }

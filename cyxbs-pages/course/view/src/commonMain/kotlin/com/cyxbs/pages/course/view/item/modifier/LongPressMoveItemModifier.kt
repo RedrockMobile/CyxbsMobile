@@ -63,8 +63,6 @@ sealed interface LongPressMoveState {
 @Stable
 abstract class LongPressMoveController {
 
-  var zIndex by mutableFloatStateOf(0F)
-
   var state by mutableStateOf<LongPressMoveState>(LongPressMoveState.Idle)
     private set
 
