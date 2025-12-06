@@ -27,7 +27,7 @@ class DialogBottomVpAdapter(
   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CourseViewHolder<*> {
     return when (viewType) {
       AffairVH::class.hashCode() -> AffairVH(parent, dialog)
-      StuLessonVH::class.hashCode() -> StuLessonVH(parent, isShowLink)
+      StuLessonVH::class.hashCode() -> StuLessonVH(parent, isShowLink, dialog)
       TeaLessonVH::class.hashCode() -> TeaLessonVH(parent)
       else -> error("缺失该类型对应的 ViewHolder")
     }

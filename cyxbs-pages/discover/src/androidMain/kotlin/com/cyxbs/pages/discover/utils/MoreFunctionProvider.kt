@@ -32,7 +32,7 @@ object MoreFunctionProvider {
     private var homeFunctions: SoftReference<MutableList<Function>> = SoftReference(mutableListOf())
     val functions = listOf(
             Function(R.drawable.discover_ic_other_course, R.string.discover_title_other_course, R.string.discover_detail_other_course, StartActivityAfterLogin("同学课表", DISCOVER_OTHER_COURSE), ClickEvent.CLICK_KBCX_ENTRY),
-            Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartNavDestination(MapNavArgument), ClickEvent.CLICK_CYDT_ENTRY),
+            Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartNavDestination(MapNavArgument(null)), ClickEvent.CLICK_CYDT_ENTRY),
             Function(R.drawable.discover_ic_no_class, R.string.discover_title_no_class, R.string.discover_detail_no_class, StartActivityAfterLogin("没课约", DISCOVER_NO_CLASS), ClickEvent.CLICK_MKY_ENTRY),
             Function(R.drawable.discover_ic_bus_track, R.string.discover_title_bus_track, R.string.discover_detail_bus_track, StartActivityImpl(DISCOVER_SCHOOL_CAR), ClickEvent.CLICK_XCGJ_ENTRY),
             Function(R.drawable.discover_ic_empty_classroom, R.string.discover_title_empty_classroom, R.string.discover_detail_empty_classroom, StartActivityImpl(DISCOVER_EMPTY_ROOM), ClickEvent.CLICK_YLC_KJS_ENTRY),

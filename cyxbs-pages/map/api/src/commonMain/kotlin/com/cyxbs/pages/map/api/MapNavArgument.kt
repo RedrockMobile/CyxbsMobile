@@ -1,5 +1,6 @@
 package com.cyxbs.pages.map.api
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,4 +10,7 @@ import kotlinx.serialization.Serializable
  */
 
 @Serializable
-object MapNavArgument
+class MapNavArgument(
+  @SerialName("placeSearch")
+  val placeSearch: String? = null
+)

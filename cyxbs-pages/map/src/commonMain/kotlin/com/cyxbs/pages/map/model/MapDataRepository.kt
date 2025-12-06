@@ -21,6 +21,7 @@ object MapDataRepository {
   private const val SETTING_KEY_MAP_BUTTON_INFO = "map_button_info" // 地图按钮信息
   private const val SETTING_KEY_MAP_VERSION = "map_version" // 地图版本信息
   private const val SETTING_KEY_MAP_PLACE_DETAIL = "map_place_detail" // 地点详细信息
+  private const val SETTING_KEY_MAP_COLLECT_LIST = "map_collect_list" // 收藏列表
 
   /**
    * 保存地图信息
@@ -32,7 +33,7 @@ object MapDataRepository {
   /**
    * 拿取地图信息
    */
-  fun getMapInfo() : MapInfo? {
+  fun getMapInfo(): MapInfo? {
     return mapSettings.getStringOrNull(SETTING_KEY_MAP_INFO)?.let { json ->
       runCatching {
         defaultJson.decodeFromString<MapInfo>(json)
@@ -53,7 +54,7 @@ object MapDataRepository {
   /**
    * 拿取按钮信息
    */
-  fun getButtonInfo() : ButtonInfo? {
+  fun getButtonInfo(): ButtonInfo? {
     return mapSettings.getStringOrNull(SETTING_KEY_MAP_BUTTON_INFO)?.let { json ->
       runCatching {
         defaultJson.decodeFromString<ButtonInfo>(json)
@@ -73,7 +74,7 @@ object MapDataRepository {
   /**
    * 拿取地图版本号
    */
-  fun getMapVersion() : Long? {
+  fun getMapVersion(): Long? {
     return mapSettings.getLongOrNull(SETTING_KEY_MAP_VERSION)
   }
 
@@ -87,12 +88,32 @@ object MapDataRepository {
   /**
    * 拿取地点详细信息
    */
-  fun getPlaceDetails(placeId: String) : PlaceDetails? {
+  fun getPlaceDetails(placeId: String): PlaceDetails? {
     return mapSettings.getStringOrNull(SETTING_KEY_MAP_PLACE_DETAIL + placeId)?.let { json ->
       runCatching {
         defaultJson.decodeFromString<PlaceDetails>(json)
       }.onFailure {
         mapSettings.remove(SETTING_KEY_MAP_PLACE_DETAIL + placeId)
+      }.getOrNull()
+    }
+  }
+
+  /**
+   * 保存收藏信息
+   */
+  fun saveCollectList(list: List<String>) {
+    mapSettings.putString(SETTING_KEY_MAP_COLLECT_LIST, defaultJson.encodeToString<List<String>>(list))
+  }
+
+  /**
+   * 拿取收藏信息
+   */
+  fun getCollectList(): List<String>? {
+    return mapSettings.getStringOrNull(SETTING_KEY_MAP_COLLECT_LIST)?.let { json ->
+      runCatching {
+        defaultJson.decodeFromString<List<String>>(json)
+      }.onFailure {
+        mapSettings.remove(SETTING_KEY_MAP_COLLECT_LIST)
       }.getOrNull()
     }
   }

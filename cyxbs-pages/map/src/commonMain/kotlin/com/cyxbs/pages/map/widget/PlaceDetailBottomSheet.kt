@@ -21,6 +21,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,12 +38,14 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.pages.map.model.bean.PlaceDetails
@@ -49,6 +54,8 @@ import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_detail_more
+import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_like
+import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_my_favorite
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_no_like
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_share
 import org.jetbrains.compose.resources.painterResource
@@ -167,13 +174,39 @@ private fun PlaceAttributeListCompose(modifier: Modifier = Modifier, placeDetail
 
 @Composable
 private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
+  val viewmodel = viewModel(MapComposeViewModel::class)
+  val isFavorite = remember { mutableStateOf(false) }
+  val loginDialogState = rememberLoginDialogState()
   Image(
     modifier = modifier
+      .clickableSingle {
+        loginDialogState.doIfLogin(
+          msg = "收藏"
+        ) {
+          if (isFavorite.value) {
+            viewmodel.deleteCollect(viewmodel.placeDetailsId.value)
+          } else {
+            viewmodel.addCollect(viewmodel.placeDetailsId.value)
+          }
+        }
+      }
       .size(40.dp)
       .padding(start = 10.dp, top = 10.dp, bottom = 10.dp),
-    painter = painterResource(Res.drawable.map_ic_no_like),
+    painter = painterResource(
+      if (!isFavorite.value) Res.drawable.map_ic_no_like
+      else Res.drawable.map_ic_like
+    ),
     contentDescription = null
   )
+  LaunchedEffect(viewmodel.placeDetailsId.value, viewmodel.collectListState.size) {
+    var isFind = false
+    viewmodel.collectListState.forEach {
+      if (it == viewmodel.placeDetailsId.value) {
+        isFind = true
+      }
+    }
+    isFavorite.value = isFind
+  }
 }
 
 @Composable

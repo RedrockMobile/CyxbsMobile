@@ -16,11 +16,16 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.utils.extensions.logg
@@ -141,18 +146,27 @@ fun BannerIndicatorCompose(
     verticalAlignment = Alignment.CenterVertically
   ) {
     repeat(count) { index ->
-      val currentPage = pagerState.currentPage % count
-      val nextPage =
-        (currentPage + 1 * sign(pagerState.currentPageOffsetFraction).toInt() + count) % count
-      val width = when (index) {
-        currentPage -> (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction)) + diameter
-        nextPage -> selectedWidth - (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction))
-        else -> diameter
-      }
       Box(
         modifier = Modifier
-          .width(width)
-          .height(radius * 2)
+          .height(diameter)
+          .layout { measurable, constraints ->
+            val currentPage = pagerState.currentPage % count
+            val nextPage = (currentPage + 1 * sign(pagerState.currentPageOffsetFraction).toInt() + count) % count
+            val width = when (index) {
+              currentPage -> (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction)) + diameter
+              nextPage -> selectedWidth - (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction))
+              else -> diameter
+            }.roundToPx()
+            val placeable = measurable.measure(
+              constraints.copy(
+                minWidth = width,
+                maxWidth = width
+              )
+            )
+            layout(placeable.width, placeable.height) {
+              placeable.place(0,0)
+            }
+          }
           .shadow(
             elevation = shadow,
             shape = CircleShape,

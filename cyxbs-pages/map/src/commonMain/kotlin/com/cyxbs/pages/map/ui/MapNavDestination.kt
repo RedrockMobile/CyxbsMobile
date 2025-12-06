@@ -6,6 +6,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,14 +14,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.DropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -38,18 +42,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainNavDestination
 import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.util.BackHandler
@@ -95,7 +105,7 @@ class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::cla
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
     viewModel(MapComposeViewModel::class)
-    MapCompose()
+    MapCompose(parcel.argument)
     MapDestination()
     MapProgressDialog()
     DownloadFailedDialog()
@@ -342,6 +352,8 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val selectedColor = 0xFF2A4E84.dark(0xFFF0F0F2)
   val backgroundColor = 0xFFE8F0FC.dark(0xFF404040)
+  val loginDialogState = rememberLoginDialogState()
+  val expandedCollect = remember { mutableStateOf(false) }
   Row(
     modifier = modifier
       .background(LocalAppColors.current.whiteBlack)
@@ -369,7 +381,7 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
                 viewmodel.showAnchorList(scope, index)
                 viewmodel.currentSelectedItem.value = index
               } else {
-                viewmodel.closeAnchorList(scope, index)
+                viewmodel.closeAnchorList(scope)
                 viewmodel.currentSelectedItem.value = 999
               }
             }
@@ -409,36 +421,94 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
         .width(1.dp)
         .background(0xFFEFF3FD.dark(0xFF202020))
     )
-    Column(
-      modifier = Modifier
-        .padding(end = 8.dp)
-        .height(54.dp)
-        .clickAnimation {
-
-        }
-        .height(54.dp)
-        .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      Image(
+    Box {
+      Column(
         modifier = Modifier
-          .width(23.dp)
-          .height(17.dp),
-        painter = painterResource(Res.drawable.map_ic_my_favorite),
-        contentDescription = null
-      )
-      Text(
-        modifier = Modifier.padding(top = 6.dp),
-        fontSize = 11.sp,
-        text = "我的收藏",
-        color = LocalAppColors.current.tvLv2
-      )
+          .padding(end = 8.dp)
+          .height(54.dp)
+          .clickAnimation {
+            loginDialogState.doIfLogin(
+              msg = "收藏"
+            ) {
+              expandedCollect.value = true
+              viewmodel.changeLockStatus()
+              viewmodel.showCollectList(scope)
+            }
+          }
+          .height(54.dp)
+          .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+      ) {
+        Image(
+          modifier = Modifier
+            .width(23.dp)
+            .height(17.dp),
+          painter = painterResource(Res.drawable.map_ic_my_favorite),
+          contentDescription = null
+        )
+        Text(
+          modifier = Modifier.padding(top = 6.dp),
+          fontSize = 11.sp,
+          text = "我的收藏",
+          color = LocalAppColors.current.tvLv2
+        )
+      }
+      viewmodel.mapInfo.value?.let { mapInfo ->
+        DropdownMenu(
+          expanded = expandedCollect.value,
+          onDismissRequest = { expandedCollect.value = false },
+          offset = DpOffset(x = (-8).dp, y = 8.dp),
+          modifier = Modifier
+            .heightIn(max = 240.dp)
+            .background(
+              color = LocalAppColors.current.whiteBlack,
+              shape = RoundedCornerShape(8.dp)
+            )
+        ) {
+          viewmodel.collectListState.forEach {
+            mapInfo.placeList.find { placeItem ->
+              placeItem.placeId == it
+            }?.let { placeItem ->
+              Column(
+                modifier = Modifier
+                  .width(135.dp)
+                  .clickableSingle {
+                    expandedCollect.value = false
+                    viewmodel.focusOnPlace(placeItem, scope)
+                  },
+                horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                Text(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 16.dp),
+                  text = placeItem.placeName,
+                  fontSize = 15.sp,
+                  color = LocalAppColors.current.tvLv2,
+                  textAlign = TextAlign.Center,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis
+                )
+                if (viewmodel.collectListState.last() != it) {
+                  Box(
+                    modifier = Modifier
+                      .padding(start = 16.dp, end = 16.dp)
+                      .height(1.dp)
+                      .fillMaxWidth()
+                      .background(0xFFEFF3FD.dark(0xFF202020))
+                  )
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
 
 @Composable
-fun MapCompose(modifier: Modifier = Modifier) {
+fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val localImage = remember { mutableStateOf<ByteArray?>(null) }
   val isImageLocalExist = remember { mutableStateOf(false) }
@@ -530,7 +600,13 @@ fun MapCompose(modifier: Modifier = Modifier) {
         .collect {
           // 这里如果立即执行会导致图片加载很奇怪，推测是立即执行时布局还在调整，故这里延迟200ms
           delay(200)
-          viewmodel.initFocus(this)
+          viewmodel.mapInfo.value?.let {
+            argument.placeSearch?.let { placeSearch ->
+              viewmodel.placeSearch(this, placeSearch)
+            } ?: run {
+              viewmodel.initFocus(this, it.openSiteId)
+            }
+          }
         }
     }
   }
