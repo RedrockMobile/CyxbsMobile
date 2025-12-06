@@ -84,7 +84,8 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     layout(width, height) {
       placeable.placeRelative(
         x = (indexAnimatable.value * constraints.maxWidth / 7 + (width - placeable.width) / 2F).roundToInt(),
-        y = (weightOffset.x * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt()
+        y = (weightOffset.x * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
+        zIndex = itemState.zIndexState.floatValue,
       )
     }
   }

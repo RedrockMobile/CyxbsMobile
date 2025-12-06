@@ -9,7 +9,7 @@ import com.cyxbs.pages.course.home.item.LinkLessonItem
 import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.IMovableItemExtension
+import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 
 /**
  * .

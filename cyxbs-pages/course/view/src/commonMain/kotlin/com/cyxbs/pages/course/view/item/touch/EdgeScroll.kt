@@ -6,19 +6,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.LayoutCoordinates
-import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
+import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlin.math.abs
-import kotlin.math.sign
 
 /**
  * 边缘滚动
@@ -30,132 +23,147 @@ import kotlin.math.sign
  */
 @Stable
 class EdgeScroll(
-  val topMoveBoundary: Float = 40F, // 可移动的上边界距离
-  val bottomMoveBoundary: Float = 40F, // 可移动的下边界距离
+  val scrollContext: LocalCourseScrollContext,
 ) {
 
-  private var scrollOuterCoordinates: State<LayoutCoordinates?>? = null
+  private val edgePointerMap = mutableMapOf<String, EdgePointer>()
 
-  private val list = mutableListOf<EdgePosition>()
+  private var handleEdgePointer: EdgePointer? = null
 
-  private val firstPosition = MutableStateFlow<EdgePosition?>(null)
+  private val scrollVelocityFlow = MutableStateFlow(0F)
 
-  fun add(): EdgePosition {
-    val position = EdgePosition()
-    if (list.isEmpty()) {
-      firstPosition.value = position
-    }
-    list.add(position)
-    return position
-  }
-
-  @Composable
-  fun attachCompose() {
-    val scrollContext = LocalCourseScroll.current
-    scrollOuterCoordinates = scrollContext.outerCoordinatesState
-    LaunchedEffect(Unit) {
-      firstPosition.collectLatest { position ->
-        if (position == null) return@collectLatest
-        var changeFlag = true // 用于给 distinctUntilChanged 强制更新
-        position.distanceFlow.distinctUntilChangedBy {
-          it to changeFlag
-        }.collectLatest {
-          if (
-            it in 0F..topMoveBoundary && scrollContext.scrollState.canScrollBackward
-            || it in -bottomMoveBoundary..0F && scrollContext.scrollState.canScrollForward
-          ) {
-            val velocity = if (it > 0) {
-              -((topMoveBoundary - it) / 4 + 2F)
-            } else {
-              (bottomMoveBoundary + it) / 4 + 2F
-            }.coerceIn(-12F, 12F)
-            try {
-              scrollContext.scrollState.scroll {
-                animate(
-                  initialValue = velocity,
-                  targetValue = velocity,
-                  animationSpec = infiniteRepeatable(tween(200))
-                ) { value, _ ->
-                  scrollBy(value)
-                }
-              }
-            } catch (e: CancellationException) {
-              if (e.message == "Mutation interrupted") {
-                // 被其他滚动打断时就锁住
-                position.lock = true
-                // 如果被锁住后，则下一次需要绕开 distinctUntilChanged 重新触发 collect
-                // 因为超出边界外后就只发送 ±0.1，此时就会被 distinctUntilChanged 拦截
-                changeFlag = !changeFlag
-              }
-            }
-          }
+  fun tryEdgeScroll(
+    key: String, // 区分不同的触发源，唯一即可
+    screenTopY: Float, // 相对于 screen 的顶部 y 值
+    height: Int, // 高度
+    topMoveBoundary: Float = 40F, // 可移动的上边界距离
+    bottomMoveBoundary: Float = 40F, // 可移动的下边界距离
+  ) {
+    val handleEdgePointer = handleEdgePointer
+    if (handleEdgePointer != null) {
+      if (handleEdgePointer.key == key) {
+        val velocity = handleEdgePointer.getVelocity(
+          screenTopY = screenTopY,
+          height = height,
+          topMoveBoundary = topMoveBoundary,
+          bottomMoveBoundary = bottomMoveBoundary
+        )
+        logg("111 key = $key, velocity = $velocity")
+        scrollVelocityFlow.value = velocity
+        if (velocity == 0F) {
+          this.handleEdgePointer = null
         }
       }
+      return
+    }
+    val edgePointer = edgePointerMap.getOrPut(key) { EdgePointer(key) }
+    val velocity = edgePointer.getVelocity(
+      screenTopY = screenTopY,
+      height = height,
+      topMoveBoundary = topMoveBoundary,
+      bottomMoveBoundary = bottomMoveBoundary
+    )
+    logg("222 key = $key, velocity = $velocity")
+    if (velocity != 0F) {
+      this.handleEdgePointer = edgePointer
+      edgePointerMap.clear()
     }
   }
 
-  @Stable
-  inner class EdgePosition {
-
-    val distanceFlow =
-      MutableSharedFlow<Float>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-
+  inner class EdgePointer(val key: String) {
     // 是否被锁住
     // 当被锁住时需要移动一段距离才会解锁滚动
-    var lock = true
+    private var lock = true
 
     // 上一次的中心点位置
     // 用于被锁时解锁需要的移动距离阈值判断
     private var lastCenterY = Float.NaN
 
-    /**
-     * @param screenTopY 相对于屏幕的坐标
-     * @param height 组件的高度，如果不为组件而是一个触摸点时传 0 即可
-     */
-    fun update(screenTopY: Float, height: Int) {
-      Snapshot.withoutReadObservation {
-        val outerCoordinates = scrollOuterCoordinates?.value
-        if (outerCoordinates != null) {
-          val topY = outerCoordinates.screenToLocal(Offset(0F, screenTopY)).y
-          val bottomY = topY + height
-          val centerY = topY + height / 2F
-          val outerCenterY = outerCoordinates.size.height / 2F
-          if (lock) {
-            // 被锁住时
-            if (lastCenterY.isNaN()) lastCenterY = centerY // 第一次初始化
-            if (lastCenterY > outerCenterY) {
-              if (centerY < lastCenterY) {
-                // 在底部区域向上移动，则 lastCenterY 跟随 centerY，不进行解锁
-                lastCenterY = centerY
-              } else if (centerY > lastCenterY + 20) {
-                // 只有在底部区域向下移动超过 20 时才解锁
-                lock = false
-              }
-            } else {
-              if (centerY > lastCenterY) {
-                lastCenterY = centerY
-              } else if (centerY < lastCenterY - 20) {
-                lock = false
-              }
-            }
-          } else {
+    fun getVelocity(
+      screenTopY: Float,
+      height: Int,
+      topMoveBoundary: Float, // 可移动的上边界距离
+      bottomMoveBoundary: Float, // 可移动的下边界距离
+    ): Float {
+      val outerCoordinates = scrollContext.outerCoordinates ?: return 0F
+      val topY = outerCoordinates.screenToLocal(Offset(0F, screenTopY)).y
+      val bottomY = topY + height
+      val centerY = topY + height / 2F
+      val outerCenterY = outerCoordinates.size.height / 2F
+      if (lock) {
+        // 被锁住时
+        if (lastCenterY.isNaN()) lastCenterY = centerY // 第一次初始化
+        if (lastCenterY > outerCenterY) {
+          if (centerY < lastCenterY) {
+            // 在底部区域向上移动，则 lastCenterY 跟随 centerY，不进行解锁
             lastCenterY = centerY
-            // 正值表示距离上边界的距离，负值表示距离下边界的距离
-            val distance = if (centerY < outerCenterY) {
-              topY.coerceAtLeast(0.1F)
-            } else {
-              (bottomY - outerCoordinates.size.height).coerceAtMost(-0.1F)
+          } else if (centerY > lastCenterY + 20) {
+            // 只有在底部区域向下移动超过 20 时才解锁
+            lock = false
+          }
+        } else {
+          if (centerY > lastCenterY) {
+            lastCenterY = centerY
+          } else if (centerY < lastCenterY - 20) {
+            lock = false
+          }
+        }
+        return 0F
+      } else {
+        lastCenterY = centerY
+        // 正值表示距离上边界的距离，负值表示距离下边界的距离
+        val distance = if (centerY < outerCenterY) {
+          topY.coerceAtLeast(0.1F)
+        } else {
+          (bottomY - outerCoordinates.size.height).coerceAtMost(-0.1F)
+        }
+        if (
+          distance in 0F..topMoveBoundary && scrollContext.scrollState.canScrollBackward
+          || distance in -bottomMoveBoundary..0F && scrollContext.scrollState.canScrollForward
+        ) {
+          val velocity = if (distance > 0) {
+            -((topMoveBoundary - distance) / 4 + 2F)
+          } else {
+            (bottomMoveBoundary + distance) / 4 + 2F
+          }.coerceIn(-12F, 12F)
+          return velocity
+        }
+      }
+      return 0F
+    }
+  }
+
+
+  @Composable
+  fun AttachCompose() {
+    // 应该改成每个 EdgePosition 都可以尝试触发边缘滚动，但只有第一个成功触发将一直维持到不在滚动，然后再等待下一个 EdgePosition
+    LaunchedEffect(Unit) {
+      scrollVelocityFlow.collectLatest { velocity ->
+        if (velocity == 0F) return@collectLatest
+        try {
+          scrollContext.scrollState.scroll {
+            animate(
+              initialValue = velocity,
+              targetValue = velocity,
+              animationSpec = infiniteRepeatable(tween(200)) // 无限重复动画
+            ) { value, _ ->
+              if (scrollBy(value) == 0F) {
+                // 滚动到底或顶时，抛出异常表示动画结束
+                throw CancellationException("No remaining distance")
+              }
             }
-            distanceFlow.tryEmit(distance)
+          }
+        } catch (e: CancellationException) {
+          if (e.message == "Mutation interrupted"
+            || e.message == "Current mutation had a higher priority"
+            || e.message == "No remaining distance"
+          ) {
+            // 动画结束时重置
+            handleEdgePointer = null
+            scrollVelocityFlow.value = 0F // 还原初始值
           }
         }
       }
-    }
-
-    // 移除，与 add 要成对调用
-    fun remove() {
-      list.remove(this)
-      firstPosition.value = list.firstOrNull()
     }
   }
 }

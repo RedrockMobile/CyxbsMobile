@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
@@ -32,11 +33,8 @@ import kotlinx.coroutines.launch
 object PressScaleItemModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
-    val extension = itemState.item.extension
-    if (extension is PressScaleController) {
-      return Modifier.pressScale(extension)
-    }
-    return Modifier
+    val itemState = itemState
+    return Modifier.pressScale(remember { PressScaleControllerImpl(itemState) })
   }
 }
 
@@ -58,7 +56,10 @@ fun Modifier.pressScale(
   val coroutineScope = rememberCoroutineScope()
   return pointerInput(Unit) {
     awaitEachGesture {
-      val down = awaitFirstDown(requireUnconsumed = false)
+      val down = awaitFirstDown(
+        pass = PointerEventPass.Final, // 这里监听 final 的 down 事件，方便后续 awaitPointerEvent(Final) 收到的是 final 的 move 事件
+        requireUnconsumed = false
+      )
       pointerOffset.value = down.position
       controllerWrapper.onStartPress()
       coroutineScope.launch { scale.animateTo(0.8F) }
@@ -71,7 +72,9 @@ fun Modifier.pressScale(
         }
       }
       while (true) {
-        val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+        val pointer = awaitPointerEvent(
+          pass = PointerEventPass.Final
+        ).changes.firstOrNull { it.id == down.id }
         if (
           pointer == null
           || pointer.isConsumed // 被消耗

@@ -12,8 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.util.fastFold
 import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWrapper
@@ -74,18 +74,9 @@ fun CoursePageCompose(
     CompositionLocalProvider(
       LocalCoursePage provides pageContext,
     ) {
-      remember(decorations) {
-        // 这里采取嵌套而非并列的方式，可用于解决触摸事件的分发
-        // Compose 默认是不会给兄弟节点分发触摸事件的，除非 sharePointerInputWithSiblings 返回 true
-        // 嵌套的布局会更利于触摸事件的传递
-        decorations.asReversed().fastFold<CoursePageDecoration, @Composable () -> Unit>(
-          initial = @Composable {}
-        ) { content, decoration ->
-          @Composable {
-            decoration.CoursePage(content)
-          }
-        }
-      }.invoke()
+      decorations.fastForEachReversed { decoration ->
+        decoration.CoursePageContent()
+      }
     }
   }
 }

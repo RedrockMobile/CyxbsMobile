@@ -14,7 +14,7 @@ import com.cyxbs.pages.course.home.item.AffairItemFactory
 import com.cyxbs.pages.course.home.item.CourseAffairItem
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.IMovableItemExtension
+import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import kotlinx.coroutines.flow.combineTransform
 
 /**

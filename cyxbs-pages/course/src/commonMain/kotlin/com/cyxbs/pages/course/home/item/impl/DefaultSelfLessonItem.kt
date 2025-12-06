@@ -10,8 +10,7 @@ import com.cyxbs.pages.course.home.item.SelfLessonItem
 import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.IMovableItemExtension
-import com.g985892345.provider.api.annotation.ImplProvider
+import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 
 /**
  * .

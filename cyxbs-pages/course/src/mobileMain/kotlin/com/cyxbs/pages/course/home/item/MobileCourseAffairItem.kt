@@ -23,7 +23,7 @@ import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.IMovableItemExtension
+import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlin.math.roundToInt

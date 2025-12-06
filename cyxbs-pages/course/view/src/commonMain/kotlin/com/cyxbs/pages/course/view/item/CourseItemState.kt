@@ -2,6 +2,7 @@ package com.cyxbs.pages.course.view.item
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
@@ -9,6 +10,8 @@ import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * [CourseItemWrapper] 对应的 状态，生命周期与页面进行绑定
@@ -21,8 +24,10 @@ class CourseItemState(
   val item: CourseItem,
 ) {
 
-  var coursePage: LocalCoursePageContext? by mutableStateOf(null)
-    private set
+  // coursePage 页面上下文
+  // 使用 Flow 明确表示他可能会发生改变
+  private val _coursePageFlow: MutableStateFlow<LocalCoursePageContext?> = MutableStateFlow(null)
+  val coursePageFlow: StateFlow<LocalCoursePageContext?> = _coursePageFlow
 
   // item 重叠数据
   var overlap: OverlapResult? by mutableStateOf(null)
@@ -33,8 +38,11 @@ class CourseItemState(
   var realShowRange: List<MinuteTimePair> by mutableStateOf(this.overlap?.showRangeList ?: emptyList())
     private set
 
-  fun update(coursePage: LocalCoursePageContext?) {
-    this.coursePage = coursePage
+  // 提供给一些场景设置 item 的层级
+  val zIndexState = mutableFloatStateOf(0F)
+
+  fun updateCoursePage(coursePage: LocalCoursePageContext?) {
+    _coursePageFlow.value = coursePage
   }
 
   fun updateOverlap(overlap: OverlapResult) {

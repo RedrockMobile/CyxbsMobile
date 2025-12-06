@@ -1,12 +1,19 @@
 package com.cyxbs.pages.course.view.item
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
+import com.cyxbs.pages.course.view.page.LocalCoursePage
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.Dispatchers
@@ -230,6 +237,29 @@ class CourseItemViewModel : BaseViewModel() {
       val dateKey = page * 7 + dayOfWeek.ordinal
       synchronized(dateItemsMapSynchronized) {
         return getDateKeyValue(dateKey).itemStateListStateFlow
+      }
+    }
+
+    @Composable
+    fun CoursePageItemListContent() {
+      DayOfWeek.entries.forEach {
+        DayOfWeekCompose(it)
+      }
+    }
+
+    @Composable
+    private fun DayOfWeekCompose(
+      dayOfWeek: DayOfWeek,
+    ) {
+      val pageContext = LocalCoursePage.current
+      val overlayResultList by observe(pageContext.page, dayOfWeek).collectAsState()
+      overlayResultList.fastForEach { itemState ->
+        key(itemState) {
+          CompositionLocalProvider(LocalCourseItemState provides itemState) {
+            itemState.updateCoursePage(pageContext)
+            itemState.item.CourseItemContent()
+          }
+        }
       }
     }
 

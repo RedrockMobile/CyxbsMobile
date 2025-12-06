@@ -32,6 +32,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
@@ -126,17 +127,14 @@ sealed interface CourseItemWhatTime {
   }
 }
 
-// 用于描述 item 支持的扩展功能
-interface CourseItemExtension
-
 @Composable
 fun CourseDefaultItemContent(
   itemState: CourseItemState,
   modifierList: ImmutableList<CourseItemModifier?> = remember {
     persistentListOf(
       LayoutItemModifier, // 布局
-      PressScaleItemModifier, // 点击弹 Q 动画
       LongPressMoveItemModifier, // 长按移动 item
+      PressScaleItemModifier, // 点击弹 Q 动画，需要在长按移动 item 之后
       RoundedShadowItemModifier, // 圆角+阴影
     )
   },

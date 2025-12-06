@@ -32,7 +32,7 @@ import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.components.view.ui.rememberBottomSheetState
-import com.cyxbs.pages.course.view.item.CourseItemExtension
+import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.math.hypot

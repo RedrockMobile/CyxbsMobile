@@ -5,8 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.LocalCourseItemState
-import com.cyxbs.pages.course.view.page.LocalCoursePage
-import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 
 /**
  * .
@@ -16,10 +14,6 @@ import com.cyxbs.pages.course.view.page.LocalCoursePageContext
  */
 @Stable
 interface CourseItemModifier {
-
-  val coursePage: LocalCoursePageContext
-    @Composable
-    get() = LocalCoursePage.current
 
   val itemState: CourseItemState
     @Composable

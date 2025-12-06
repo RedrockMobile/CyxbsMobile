@@ -61,7 +61,7 @@ class LocalCourseScrollContext(
     private set
 
   // 边缘滚动处理
-  val edgeScroll = EdgeScroll()
+  val edgeScroll = EdgeScroll(scrollContext = this)
 
   // scroll 外层布局
   val outerCoordinates by outerCoordinatesState
@@ -120,7 +120,7 @@ internal fun CourseScrollCompose(
         LocalCourseScroll provides context
       ) {
         content()
-        context.edgeScroll.attachCompose() // 处理边缘滚动的工具类
+        context.edgeScroll.AttachCompose() // 处理边缘滚动的工具类
       }
     },
     measurePolicy = remember(timeline) {

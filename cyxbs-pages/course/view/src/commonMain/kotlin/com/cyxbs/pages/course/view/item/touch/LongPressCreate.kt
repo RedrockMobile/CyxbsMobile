@@ -41,11 +41,11 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
-import com.cyxbs.pages.course.view.item.touch.LongPressCreate.TouchingItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.modifier.PressScaleController
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.cyxbs.pages.course.view.item.modifier.pressScale
+import com.cyxbs.pages.course.view.item.touch.LongPressCreate.TouchingItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
@@ -57,8 +57,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.datetime.DayOfWeek
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -72,8 +70,8 @@ import kotlin.math.roundToInt
 class LongPressCreate : CoursePageDecoration {
 
   @Composable
-  override fun CoursePage(nextContent: @Composable (() -> Unit)) {
-    LongPressCreateCoursePageWrapper(nextContent)
+  override fun CoursePageContent() {
+    LongPressCreateCoursePageWrapper()
   }
 
   @Stable
@@ -82,13 +80,11 @@ class LongPressCreate : CoursePageDecoration {
     val initPosition: Offset,
     val nowPosition: MutableState<Offset>,
     val nowScreenY: MutableFloatState,
-    val edgePosition: EdgeScroll.EdgePosition,
   ) {
 
     private val clickLock = mutableListOf<MutableTimelineData.ClickLock>()
 
     fun onMoveEnd(upOrCancel: Boolean) {
-      edgePosition.remove()
       clickLock.forEach { it.unlock() }
       clickLock.clear()
     }
@@ -142,12 +138,10 @@ class LongPressCreate : CoursePageDecoration {
 }
 
 @Composable
-private fun LongPressCreateCoursePageWrapper(nextContent: @Composable (() -> Unit)) {
+private fun LongPressCreateCoursePageWrapper() {
   val scrollContext = LocalCourseScroll.current
   val timeline = scrollContext.timeline
   val layoutCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
-  val edgeScroll = remember { EdgeScroll(bottomMoveBoundary = 80F) } // 扩大底部边界更容易触发滚动
-  edgeScroll.attachCompose()
 
   // 触摸中的 item
   val touchingItems = remember { mutableStateMapOf<PointerId, TouchingItem>() }
@@ -175,7 +169,6 @@ private fun LongPressCreateCoursePageWrapper(nextContent: @Composable (() -> Uni
     }.pointerInputCreateItem(
       touchingItems = touchingItems,
       touchedItems = touchedItems,
-      edgeScroll = edgeScroll,
       scrollContext = scrollContext,
       layoutCoordinates = layoutCoordinates,
     ).pointerInputClearItem(
@@ -184,7 +177,6 @@ private fun LongPressCreateCoursePageWrapper(nextContent: @Composable (() -> Uni
       enableClick = enableClick
     )
   ) {
-    nextContent.invoke()
     TouchedItems(
       touchedItems = touchedItems,
       timeline = timeline,
@@ -303,7 +295,6 @@ private fun Modifier.pointerInputAllUpEnableClick(
 private fun Modifier.pointerInputCreateItem(
   touchingItems: SnapshotStateMap<PointerId, TouchingItem>,
   touchedItems: SnapshotStateList<LongPressCreate.TouchedItem>,
-  edgeScroll: EdgeScroll,
   scrollContext: LocalCourseScrollContext,
   layoutCoordinates: State<LayoutCoordinates?>,
 ): Modifier = pointerInput(Unit) {
@@ -327,7 +318,6 @@ private fun Modifier.pointerInputCreateItem(
               initPosition = change.position,
               nowPosition = mutableStateOf(change.position),
               nowScreenY = mutableFloatStateOf(layoutCoordinates.value!!.localToScreen(change.position).y),
-              edgePosition = edgeScroll.add(),
             )
           }
         } else if (change.isConsumed || change.changedToUpIgnoreConsumed()) {
@@ -372,7 +362,12 @@ private fun Modifier.pointerInputCreateItem(
               item.nowPosition.value = change.position
               item.nowScreenY.floatValue =
                 layoutCoordinates.value!!.localToScreen(change.position).y
-              item.edgePosition.update(item.nowScreenY.floatValue, 0)
+              scrollContext.edgeScroll.tryEdgeScroll(
+                key = "LongPressCreate_$item",
+                screenTopY = item.nowScreenY.floatValue,
+                height = 0,
+                bottomMoveBoundary = 80F, // 扩大底部边界更容易触发滚动
+              )
               item.tryExpandTimeline(scrollContext)
             }
           }

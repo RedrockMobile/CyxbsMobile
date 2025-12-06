@@ -23,7 +23,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.home.item.CourseAffairItem
 import com.cyxbs.pages.course.home.item.MobileSelfLessonItem
-import com.cyxbs.pages.course.view.item.CourseItemExtension
+import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_landmark
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_time

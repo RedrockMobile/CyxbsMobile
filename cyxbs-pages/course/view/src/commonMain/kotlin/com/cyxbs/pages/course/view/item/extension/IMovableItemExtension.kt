@@ -1,11 +1,11 @@
-package com.cyxbs.pages.course.view.item
+package com.cyxbs.pages.course.view.item.extension
 
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
-import com.cyxbs.pages.course.view.page.LocalCoursePageContext
+import com.cyxbs.pages.course.view.item.CourseItemState
 
 /**
  * 支持长按移动的 item
@@ -19,21 +19,19 @@ interface IMovableItemExtension : CourseItemExtension {
   fun getMoveDestinationOffset(
     upOrCancel: Boolean,
     itemState: CourseItemState,
-    pageContext: LocalCoursePageContext,
     transition: MutableState<Offset>,
     screenTopLeft: Offset,
     size: IntSize,
-  ): Offset = Offset.Zero
+  ): Offset = Offset.Companion.Zero
 
   // 根据最终目的地的偏移量执行动画
   suspend fun animateMove(
     itemState: CourseItemState,
-    pageContext: LocalCoursePageContext,
     transition: MutableState<Offset>,
     destinationOffset: Offset,
   ) {
     animate(
-      typeConverter = Offset.VectorConverter,
+      typeConverter = Offset.Companion.VectorConverter,
       initialValue = transition.value,
       targetValue = destinationOffset,
     ) { value, _ ->
