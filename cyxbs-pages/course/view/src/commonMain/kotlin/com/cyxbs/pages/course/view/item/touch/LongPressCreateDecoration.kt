@@ -339,12 +339,19 @@ private fun Modifier.pointerInputCreateItem(
             // 执行当前手指事件的对应倒计时
             delay(viewConfiguration.longPressTimeoutMillis)
             // 倒计时结束，添加 item 展示
+            var initTime = scrollContext.timeline.calculateMinuteTime(
+              scrollContext,
+              change.position.y
+            )
+            var initPosition = change.position
+            if (initTime.minute % 10 != 0) {
+              // 落点取整 10 分钟
+              initTime = initTime.plusMinutes((initTime.minute % 10).let { if (it < 5) -it else 10 - it })
+              initPosition = initPosition.copy(y = scrollContext.timeline.calculateWeight(initTime) * size.height)
+            }
             touchingItems[change.id] = TouchingItem(
-              initTime = scrollContext.timeline.calculateMinuteTime(
-                scrollContext,
-                change.position.y
-              ),
-              initPosition = change.position,
+              initTime = initTime,
+              initPosition = initPosition,
               nowPosition = mutableStateOf(change.position),
               nowScreenY = mutableFloatStateOf(layoutCoordinates.value!!.localToScreen(change.position).y),
             )
