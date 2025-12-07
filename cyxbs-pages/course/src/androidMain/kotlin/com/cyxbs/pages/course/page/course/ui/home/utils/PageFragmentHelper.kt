@@ -5,7 +5,7 @@ import android.view.View
 import androidx.core.content.edit
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.getSp
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.affair.api.IAffairService
@@ -54,7 +54,7 @@ class PageFragmentHelper<T> where T: IHomePageFragment, T: CoursePageFragment {
        * 观察第几周，因为如果是初次进入应用，会因为得不到周数而不主动翻页，所以只能观察该数据
        * 但这是因为主页课表比较特殊而采取观察，其他界面可以直接使用 *VpFragment 的 mNowWeek 变量
        */
-      launch {
+      launchByLifecycleScope {
         val nowWeek = SchoolCalendar.observeWeekOfTerm().first()
         if (nowWeek == week) {
           // 判断周数，只对当前周进行动画
@@ -165,7 +165,7 @@ class PageFragmentHelper<T> where T: IHomePageFragment, T: CoursePageFragment {
     if (!ILessonService.isUseLocalSaveLesson) {
       val noLessonImage = ivNoLesson.drawable
       val noLessonText = tvNoLesson.text
-      launch {
+      launchByLifecycleScope {
         if (!NetworkUtil.isAvailableExact()) {
           ivNoLesson.setImageResource(com.cyxbs.components.config.R.drawable.config_ic_404)
           tvNoLesson.text = "联网才能查看课表哦~"

@@ -8,7 +8,7 @@ import com.cyxbs.pages.course.api.ICourseService
 import com.cyxbs.pages.course.widget.helper.show.CourseNowTimeHelper
 import com.cyxbs.components.utils.extensions.lazyUnlock
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -56,7 +56,7 @@ abstract class CourseWeekFragment : CoursePageFragment() {
     if (nowWeek == null || nowWeek <= ICourseService.maxWeek + 1) {
       // 因为开学第一周的数据来自其他地方，存在此时没有被加载的情况，所以采用观察的形式
       // nowWeek 是可能返回负数的，这点需要额外注意一下
-      launch {
+      launchByLifecycleScope {
         val firstDate = SchoolCalendar.observeFirstMonDay().first()
         val date = firstDate.plusWeeks(mWeek - 1)
         setMonth(date)

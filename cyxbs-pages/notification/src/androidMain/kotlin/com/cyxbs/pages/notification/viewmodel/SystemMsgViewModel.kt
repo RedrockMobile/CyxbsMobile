@@ -19,7 +19,7 @@ class SystemMsgViewModel : BaseViewModel() {
    * 如果是null则是改变所有消息的可读状态
    */
   fun changeMsgStatus(bean: ChangeReadStatusToBean) {
-    launch {
+    launchByViewModelScope {
       SystemMessageRepository.changeMsgStatus(bean)
     }
   }

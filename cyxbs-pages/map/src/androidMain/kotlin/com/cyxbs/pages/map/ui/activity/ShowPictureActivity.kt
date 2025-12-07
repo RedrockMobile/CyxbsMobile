@@ -16,7 +16,7 @@ import com.cyxbs.pages.map.widget.MapDialog
 import com.cyxbs.pages.map.widget.OnSelectListener
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.utils.extensions.doPermissionAction
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
@@ -79,7 +79,7 @@ class ShowPictureActivity : BaseActivity() {
                                 Manifest.permission.WRITE_EXTERNAL_STORAGE
                             ) {
                                 doAfterGranted {
-                                    launch(Dispatchers.IO) {
+                                    launchByLifecycleScope(Dispatchers.IO) {
                                         val bitmap = suspendCancellableCoroutine {
                                             val future = Glide.with(this@ShowPictureActivity)
                                                 .asBitmap()

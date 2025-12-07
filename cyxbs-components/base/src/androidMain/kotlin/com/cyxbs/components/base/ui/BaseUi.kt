@@ -8,7 +8,7 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.withStarted
 import com.cyxbs.components.base.utils.RxjavaLifecycle
 import com.cyxbs.components.base.utils.ToastUtils
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.utils.BindView
 import io.reactivex.rxjava3.disposables.Disposable
 import kotlinx.coroutines.Job
@@ -155,7 +155,7 @@ interface BaseUi : ToastUtils, RxjavaLifecycle {
   fun <T> Flow<T>.collectLaunch(
     owner: LifecycleOwner = getViewLifecycleOwner(),
     action: suspend (value: T) -> Unit
-  ): Job = owner.launch {
+  ): Job = owner.launchByLifecycleScope {
     collect { action.invoke(it) }
   }
 
@@ -169,9 +169,9 @@ interface BaseUi : ToastUtils, RxjavaLifecycle {
   fun <T> Flow<T>.collectSuspend(
     owner: LifecycleOwner = getViewLifecycleOwner(),
     action: suspend (value: T) -> Unit
-  ): Job = owner.launch {
+  ): Job = owner.launchByLifecycleScope {
     owner.withStarted {
-      owner.launch {
+      owner.launchByLifecycleScope {
         collect { action.invoke(it) }
       }
     }

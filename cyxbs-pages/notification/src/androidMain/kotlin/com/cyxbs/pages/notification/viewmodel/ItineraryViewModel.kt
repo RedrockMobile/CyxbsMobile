@@ -35,7 +35,7 @@ class ItineraryViewModel : BaseViewModel() {
      * 传入行程id和该行程在rv数据中的索引，取消该行程的提醒
      */
     fun cancelItineraryReminder(itineraryId: Int, index: Int) {
-        launch {
+        launchByViewModelScope {
             ItineraryRepository.cancelItineraryReminder(itineraryId).onFailure {
                 "取消失败".toast()
                 _cancelReminderIsSuccessfulState.postValue(Pair(index, false))
@@ -51,7 +51,7 @@ class ItineraryViewModel : BaseViewModel() {
      */
     fun changeItineraryReadStatus(unReadIdList: List<Int>, receivedOrSend: Boolean) {
         if (unReadIdList.isEmpty()) return
-        launch {
+        launchByViewModelScope {
             ItineraryRepository.changeItineraryReadStatus(unReadIdList, receivedOrSend)
         }
     }
@@ -68,7 +68,7 @@ class ItineraryViewModel : BaseViewModel() {
         remindTime: Int,
         info: ReceivedItineraryMsgBean
     ) {
-        launch {
+        launchByViewModelScope {
             ItineraryRepository.addAffair(remindTime, info).onFailure {
                 "添加失败".toast()
                 _add2scheduleIsSuccessfulState.postValue(Pair(index, false))

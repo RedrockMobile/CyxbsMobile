@@ -43,13 +43,13 @@ class ChargeViewModel : BaseViewModel() {
             }
             .setSchedulers()
             .doOnError {
-                launch {
+                launchByViewModelScope {
                     loadFailed.emit(true)
                 }
             }
             .safeSubscribeBy {
                 if (it == null) {
-                    launch {
+                    launchByViewModelScope {
                         loadFailed.emit(true)
                     }
                 }

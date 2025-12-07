@@ -30,7 +30,7 @@ import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseFragment
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.invisible
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.extensions.pressToZoomOut
 import com.cyxbs.components.utils.extensions.visible
 
@@ -112,7 +112,7 @@ class MapViewFragment : BaseFragment() {
 
                             override fun onPositive() {
                                 DataSet.savePictureVersion(data.pictureVersion)
-                                launch {
+                                launchByLifecycleScope {
                                     mMapLayout.loadNewMap(data.mapUrl)
                                 }
                             }
@@ -121,7 +121,7 @@ class MapViewFragment : BaseFragment() {
             } else {
                 // 地图不存在直接下载地图
                 DataSet.savePictureVersion(data.pictureVersion)
-                launch {
+                launchByLifecycleScope {
                     mMapLayout.loadNewMap(data.mapUrl)
                 }
             }

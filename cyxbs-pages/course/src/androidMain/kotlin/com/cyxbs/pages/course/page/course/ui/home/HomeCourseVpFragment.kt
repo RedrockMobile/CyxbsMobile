@@ -10,7 +10,7 @@ import com.cyxbs.pages.course.page.course.ui.home.viewmodel.HomeCourseViewModel
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
 import com.cyxbs.pages.course.widget.fragment.page.CoursePageFragment
 import com.cyxbs.components.utils.extensions.gone
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import kotlinx.coroutines.flow.first
 
@@ -69,7 +69,7 @@ class HomeCourseVpFragment : HomeCourseVpLinkFragment() {
      * 观察第几周，因为如果是初次进入应用，会因为得不到周数而不主动翻页，所以只能观察该数据
      * 但这是因为主页课表比较特殊而采取观察，其他界面可以直接使用 [mNowWeek] 变量
      */
-    launch {
+    launchByLifecycleScope {
       val nowWeek = SchoolCalendar.observeWeekOfTerm().first()
       // 初次加载时移到对应的周数
       // 这里课表的翻页不建议带有动画，因为数据过多会较卡

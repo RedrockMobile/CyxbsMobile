@@ -28,7 +28,7 @@ abstract class CommonBaseViewModel : ViewModel(), ToastUtils {
     context: CoroutineContext = EmptyCoroutineContext,
     start: CoroutineStart = CoroutineStart.DEFAULT,
     action: suspend (value: T) -> Unit
-  ): Job = launch(
+  ): Job = launchByViewModelScope(
     context = context,
     start = start,
   ) {
@@ -38,7 +38,7 @@ abstract class CommonBaseViewModel : ViewModel(), ToastUtils {
   /**
    * ViewModel 下开启协程
    */
-  protected fun launch(
+  protected fun launchByViewModelScope(
     context: CoroutineContext = EmptyCoroutineContext,
     start: CoroutineStart = CoroutineStart.DEFAULT,
     block: suspend CoroutineScope.() -> Unit

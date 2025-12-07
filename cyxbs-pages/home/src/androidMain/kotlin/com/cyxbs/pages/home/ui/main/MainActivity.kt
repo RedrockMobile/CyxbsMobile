@@ -8,7 +8,7 @@ import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.g985892345.provider.api.annotation.KClassProvider
@@ -40,7 +40,7 @@ class MainActivity : BaseActivity() {
   }
 
   private fun initPing() {
-    launch {
+    launchByLifecycleScope {
       RedrockNetwork.tryPingNetWork()?.onFailure {
         toast("后端服务暂不可用")
       }
