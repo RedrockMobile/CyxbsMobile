@@ -255,7 +255,7 @@ private fun TouchingItems(
           val y1 = scrollContext.timeline.calculateWeight(item.initTime) * constraints.maxHeight
           val y2 =
             layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
-          touchTimeState.value = scrollContext.timeline.calculateMinuteTime(scrollContext, y2)!!
+          touchTimeState.value = scrollContext.timeline.calculateMinuteTime(scrollContext, y2)
           val height = abs(y2 - y1).roundToInt()
           val placeable = measurable.measure(Constraints.fixed(width, height))
           val x = (item.initPosition.x / width).toInt() * constraints.maxWidth / 7
@@ -343,7 +343,7 @@ private fun Modifier.pointerInputCreateItem(
               initTime = scrollContext.timeline.calculateMinuteTime(
                 scrollContext,
                 change.position.y
-              )!!,
+              ),
               initPosition = change.position,
               nowPosition = mutableStateOf(change.position),
               nowScreenY = mutableFloatStateOf(layoutCoordinates.value!!.localToScreen(change.position).y),
@@ -358,7 +358,7 @@ private fun Modifier.pointerInputCreateItem(
               touchingItems.remove(change.id)?.let { item ->
                 item.onMoveEnd(!change.isConsumed)
                 val nowTime =
-                  scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)!!
+                  scrollContext.timeline.calculateMinuteTime(scrollContext, change.position.y)
                 val touchedItem = TouchedItem(
                   id = change.id.value,
                   dayOfWeek = DayOfWeek((item.initPosition.x / (size.width / 7)).toInt() + 1),
@@ -390,8 +390,9 @@ private fun Modifier.pointerInputCreateItem(
             change.consume()
             touchingItems[change.id]?.let { item ->
               item.nowPosition.value = change.position
+              val nowY = change.position.y.coerceIn(0F, size.height.toFloat())
               item.nowScreenY.floatValue =
-                layoutCoordinates.value!!.localToScreen(change.position).y
+                layoutCoordinates.value!!.localToScreen(Offset(0F, nowY)).y
               scrollContext.edgeScroll.tryEdgeScroll(
                 key = "LongPressCreate_$item",
                 screenTopY = item.nowScreenY.floatValue,

@@ -166,7 +166,7 @@ data class CourseTimeline(
   /**
    * 计算 [height] 在时间轴上的 [MinuteTime]
    */
-  fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime? {
+  fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime {
     data.fastForEach {
       scrollContext.timelineCoordinatesMap[it]?.let { coordinates ->
         val y1 = coordinates.positionInParent().y
@@ -176,7 +176,12 @@ data class CourseTimeline(
         }
       }
     }
-    return null
+    if (height < scrollContext.timelineCoordinatesMap[data.first()]!!.positionInParent().y) {
+      return data.first().startTime
+    } else if (height > scrollContext.timelineCoordinatesMap[data.last()]!!.positionInParent().y) {
+      return data.last().endTime
+    }
+    throw IllegalStateException("无法寻找高度对应时间，不应该出现的异常, height=$height, timeline=$data")
   }
 }
 
