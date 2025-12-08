@@ -258,7 +258,8 @@ fun SearchBar(modifier: Modifier = Modifier) {
               color = 0xFF94969E.dark(0xFF8C8C8C),
               text = getHotWord(viewmodel.mapInfo.value?.hotWord),
               fontSize = 14.sp,
-              maxLines = 1
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
             )
           }
           innerTextField()
@@ -592,7 +593,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
         .take(1)
         .collect {
           // 这里如果立即执行会导致图片加载很奇怪，推测是立即执行时布局还在调整，故这里延迟200ms
-          delay(200)
+          delay(150)
           viewmodel.mapInfo.value?.let {
             argument.placeSearch?.let { placeSearch ->
               viewmodel.placeSearch(this, placeSearch)
