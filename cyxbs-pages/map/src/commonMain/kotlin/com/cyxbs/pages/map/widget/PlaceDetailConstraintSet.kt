@@ -87,7 +87,7 @@ private fun PlaceDetailConstraintSet.wh100vInfinity() {
     end.linkTo(parent.end)
   }
   scope.constrain(detailAboutText) {
-    top.linkTo(detailShare.bottom, 10.dp)
+    top.linkTo(detailShare.bottom)
     bottom.linkTo(detailAboutList.top)
     start.linkTo(parent.start)
   }

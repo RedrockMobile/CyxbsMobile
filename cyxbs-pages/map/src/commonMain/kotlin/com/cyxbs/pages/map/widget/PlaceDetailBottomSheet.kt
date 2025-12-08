@@ -336,7 +336,7 @@ private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: Plac
 private fun DetailAboutTextCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
   placeDetails.tags?.let {
     Text(
-      modifier = modifier,
+      modifier = modifier.padding(top = 10.dp),
       text = "关于该地点",
       fontSize = 17.sp,
       color = LocalAppColors.current.tvLv2

@@ -60,6 +60,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.util.BackHandler
@@ -277,6 +278,10 @@ fun SearchBar(modifier: Modifier = Modifier) {
       }
     }
   )
+  LaunchedEffect(viewmodel.searchText.value) {
+    delay(500)
+    viewmodel.search()
+  }
 }
 
 fun getHotWord(text: String? = null): String {
@@ -327,21 +332,6 @@ fun MapFunctionImageCompose(modifier: Modifier = Modifier) {
         painter = painterResource(if (viewmodel.mapWidgetState.isLock) Res.drawable.map_ic_lock else Res.drawable.map_ic_unlock),
         contentDescription = null
       )
-    }
-  }
-}
-
-@Composable
-fun SearchCompose(modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  Box(
-    modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg)
-  )
-  BackHandler {
-    if (viewmodel.mapSearchPagerState.value == 1) {
-      viewmodel.mapSearchPagerState.value = 0
-    } else {
-      MainNavController.popBackStack()
     }
   }
 }
@@ -431,7 +421,10 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
               msg = "收藏"
             ) {
               expandedCollect.value = true
-              viewmodel.changeLockStatus()
+              if (viewmodel.mapWidgetState.isLock) {
+                toast("已解除锁定")
+                viewmodel.mapWidgetState.isLock = false
+              }
               viewmodel.showCollectList(scope)
             }
           }

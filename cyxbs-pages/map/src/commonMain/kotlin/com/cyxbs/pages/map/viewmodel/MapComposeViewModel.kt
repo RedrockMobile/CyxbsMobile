@@ -25,6 +25,7 @@ import com.cyxbs.pages.map.widget.AnchorItemState
 import com.cyxbs.pages.map.widget.MapWidgetState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -91,6 +92,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 搜索框内容
   val searchText = mutableStateOf("")
+  val searchResultList = mutableStateListOf<PlaceItem>()
+  val searchHistory = mutableStateListOf<PlaceItem>()
 
   // 收藏列表
   val collectListState = mutableStateListOf<String>()
@@ -101,6 +104,52 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     getButtonInfo()
     if (IAccountService::class.impl().isLogin()) {
       getCollect()
+    }
+  }
+
+  // 搜索功能
+  fun search() {
+    searchResultList.clear()
+    if (searchText.value.isEmpty()) return
+    mapInfo.value?.let { mapInfo ->
+      val resultList = mapInfo.placeList.filter { placeItem ->
+        placeItem.placeName.contains(searchText.value, true)
+      }
+      searchResultList.addAll(resultList)
+    }
+  }
+
+  fun searchToPlace(placeItem: PlaceItem, scope: CoroutineScope) {
+    getPlaceDetails(placeItem.placeId)
+    mapInfo.value?.let { mapInfo ->
+      if (mapContainer.value == IntSize.Zero) return
+      val getOffset = calculatePlaceInMap(
+        Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
+        mapContainer.value,
+        IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
+      )
+      scope.launch {
+        resetMap(this)
+        anchorItemStateList.filter {
+          it.visible
+        }.forEach { anchorItemState ->
+          launch {
+            anchorItemState.animateClose(300)
+            anchorItemState.visible = false
+          }
+        }
+        launch {
+          bottomSheetState.collapse()
+        }
+        launch {
+          anchorItemState.placeId = placeItem.placeId
+          updateAnchorState(getOffset, true)
+        }
+        launch {
+          delay(500)
+          searchText.value = ""
+        }
+      }
     }
   }
 
@@ -245,6 +294,28 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         getCollect()
       }
     }
+  }
+
+  fun getSearchHistory() {
+    MapDataRepository.getSearchHistory()?.let {
+      searchHistory.clear()
+      searchHistory.addAll(it)
+    }
+  }
+
+  fun addSearchHistory(placeItem: PlaceItem) {
+    searchHistory.add(placeItem)
+    MapDataRepository.saveSearchHistory(searchHistory)
+  }
+
+  fun deleteSearchHistory(placeItem: PlaceItem) {
+    searchHistory.remove(placeItem)
+    MapDataRepository.saveSearchHistory(searchHistory)
+  }
+
+  fun clearSearchHistory() {
+    searchHistory.clear()
+    MapDataRepository.saveSearchHistory(searchHistory)
   }
 
   fun closeAnchorList(scope: CoroutineScope) {
