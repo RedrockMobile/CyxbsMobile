@@ -593,7 +593,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
         .take(1)
         .collect {
           // 这里如果立即执行会导致图片加载很奇怪，推测是立即执行时布局还在调整，故这里延迟200ms
-          delay(150)
+          delay(200)
           viewmodel.mapInfo.value?.let {
             argument.placeSearch?.let { placeSearch ->
               viewmodel.placeSearch(this, placeSearch)

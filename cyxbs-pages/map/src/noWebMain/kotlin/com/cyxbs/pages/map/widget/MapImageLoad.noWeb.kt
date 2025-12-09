@@ -38,7 +38,9 @@ actual fun MapImageLoad(
       modifier = Modifier
         .fillMaxSize()
         .onSizeChanged {
-          mapWidgetState.container = it
+          if (mapWidgetState.container != it) {
+            mapWidgetState.container = it
+          }
         }
         .pointerInput(Unit) {
           mapWidgetState.stop()
