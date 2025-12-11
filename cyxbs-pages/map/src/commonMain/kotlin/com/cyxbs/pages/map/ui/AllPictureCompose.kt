@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -15,6 +14,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,11 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_share_blue
@@ -43,6 +44,8 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun AllPictureCompose(modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val showState = remember { mutableStateOf(false) }
+  val loginDialogState = rememberLoginDialogState()
   Column(
     modifier = modifier.background(LocalAppColors.current.topBg)
   ) {
@@ -72,7 +75,11 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
         modifier = Modifier
           .padding(end = 15.dp)
           .clickableSingle {
-            toast("功能待开发")
+            loginDialogState.doIfLogin(
+              msg = "上传图片"
+            ) {
+              showState.value = true
+            }
           }
           .padding(top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -114,4 +121,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
       }
     }
   }
+  UploadPhotoDialog(showState)
+  UploadPhotoResult(viewmodel.uploadPhotoResultState)
+  UploadingPhotoProgressDialog()
 }

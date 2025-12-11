@@ -6,7 +6,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -46,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -59,16 +56,15 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.util.BackHandler
+import com.cyxbs.pages.map.util.MapImageHelper
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
-import com.cyxbs.pages.map.util.getImage
-import com.cyxbs.pages.map.util.isMapLocalExist
-import com.cyxbs.pages.map.util.loadImage
+import com.cyxbs.pages.map.util.getImageFile
+import com.cyxbs.pages.map.util.isFileExist
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
@@ -87,7 +83,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.imageResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 
@@ -105,7 +100,7 @@ class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::cla
 
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
-    viewModel(MapComposeViewModel::class)
+    viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
     MapCompose(parcel.argument)
     MapDestination()
     MapProgressDialog()
@@ -515,11 +510,12 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
       // 如果不是更新地图，就走正常流程，否则就直接下载地图
       if (!viewmodel.isUpdateStart.value) {
         // 本地没有就直接下载,如果本地没有版本号信息也直接走下载
-        if (!isMapLocalExist() || MapDataRepository.getMapVersion() == null) {
+        if (!isFileExist() || MapDataRepository.getMapVersion() == null) {
           viewmodel.progressDialogState.value = true
-          value = loadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
+          MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
             viewmodel.downloadProgress.value = bytesRead.toFloat() / contentLength.toFloat()
           }
+          value = getImageFile()
           if (value == null) {
             viewmodel.downloadFailedDialogState.value = true
             viewmodel.progressDialogState.value = false
@@ -532,7 +528,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           // 如果有，则先核对版本，版本对就直接拿缓存，不对就走更新
           MapDataRepository.getMapInfo()?.let {
             if (it.pictureVersion == MapDataRepository.getMapVersion()) {
-              value = getImage()
+              value = getImageFile()
             } else {
               viewmodel.updateMapDialogState.value = true
             }
@@ -540,9 +536,10 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
         }
       } else {
         viewmodel.progressDialogState.value = true
-        value = loadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
+        MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
           viewmodel.downloadProgress.value = bytesRead.toFloat() / contentLength.toFloat()
         }
+        value = getImageFile()
         if (value == null) {
           viewmodel.downloadFailedDialogState.value = true
           viewmodel.progressDialogState.value = false
@@ -584,8 +581,8 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   // 初次加载的focus地点
   LaunchedEffect(Unit) {
     launch {
-      isImageLocalExist.value = isMapLocalExist()
-      localImage.value = getImage()
+      isImageLocalExist.value = isFileExist()
+      localImage.value = getImageFile()
     }
     launch {
       snapshotFlow { viewmodel.mapContainer.value }

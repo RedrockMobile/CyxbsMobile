@@ -7,13 +7,11 @@ import androidx.compose.ui.unit.IntSize
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.ButtonInfoItem
-import com.cyxbs.pages.map.model.bean.FavoritePlaceSimple
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceDetails
 import com.cyxbs.pages.map.model.bean.PlaceItem
@@ -21,8 +19,15 @@ import com.cyxbs.pages.map.util.calculateClickBuildingInMap
 import com.cyxbs.pages.map.util.calculateClickTagInMap
 import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculatePlaceInMap
+import com.cyxbs.pages.map.util.getMilliseconds
 import com.cyxbs.pages.map.widget.AnchorItemState
 import com.cyxbs.pages.map.widget.MapWidgetState
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.readBytes
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,7 +39,7 @@ import kotlinx.coroutines.launch
  * @Date : 2025/11/18 10:48
  */
 
-expect class MapComposeViewModel : CommonMapComposeViewModel
+expect class MapComposeViewModel() : CommonMapComposeViewModel
 
 abstract class CommonMapComposeViewModel : BaseViewModel() {
 
@@ -97,6 +102,12 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 收藏列表
   val collectListState = mutableStateListOf<String>()
+
+  // 上传图片完成的dialog的状态
+  val uploadPhotoResultState = mutableStateOf(false)
+  val uploadingPhotoState = mutableStateOf(false)
+  var successImageCount = 0
+  var failedImageCount = 0
 
 
   init {
@@ -278,8 +289,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         toast("添加收藏失败~")
         null
       }?.let {
-        toast("收藏成功!")
-        getCollect()
+        if (it.isSuccess()) {
+          toast("收藏成功!")
+          getCollect()
+        }
       }
     }
   }
@@ -290,8 +303,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         toast("删除收藏失败~")
         null
       }?.let {
-        toast("已取消收藏!")
-        getCollect()
+        if (it.isSuccess()) {
+          toast("已取消收藏!")
+          getCollect()
+        }
       }
     }
   }
@@ -300,6 +315,43 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     MapDataRepository.getSearchHistory()?.let {
       searchHistory.clear()
       searchHistory.addAll(it)
+    }
+  }
+
+  // 上传图片
+  fun uploadPhoto(imageList: List<PlatformFile>?) {
+    launch {
+      imageList?.let { imageList ->
+        uploadingPhotoState.value = true
+        uploadPhotoResultState.value = false
+        for (i in imageList.indices) {
+          val file = imageList[i]
+          val fileName = getMilliseconds().toString() + "${i}.jpg"
+          val fileBytes = file.readBytes()
+          val multipartBody = MultiPartFormDataContent(
+            formData {
+              append("place_id", placeDetailsId.value)
+              append("file", fileBytes, Headers.build {
+                append(HttpHeaders.ContentType, "image/jpeg")
+                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+              })
+            }
+          )
+          MapRepository.uploadPhoto(multipartBody).getOrElse { throwable: Throwable ->
+            toast("上传第${i}张图片失败！")
+            failedImageCount++
+            null
+          }?.let {
+            if (it.isSuccess()) {
+              successImageCount++
+            } else {
+              failedImageCount++
+            }
+          }
+        }
+        uploadingPhotoState.value = false
+        uploadPhotoResultState.value = true
+      }
     }
   }
 

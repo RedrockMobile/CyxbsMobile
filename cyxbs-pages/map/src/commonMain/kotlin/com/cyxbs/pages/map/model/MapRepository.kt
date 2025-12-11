@@ -1,15 +1,13 @@
 package com.cyxbs.pages.map.model
 
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.pages.map.model.bean.ButtonInfo
-import com.cyxbs.pages.map.model.bean.FavoritePlaceSimple
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceDetails
-import com.cyxbs.pages.map.model.bean.PlaceSearch
 import com.cyxbs.pages.map.model.network.MapService
+import de.jensklingenberg.ktorfit.http.Body
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 
@@ -73,7 +71,8 @@ object MapRepository {
 
   suspend fun deleteCollect(placeId: String): Result<ApiStatus> {
     return runCatchingCoroutine {
-      service.deleteCollect(MultiPartFormDataContent(
+      service.deleteCollect(
+        MultiPartFormDataContent(
         formData {
           append("place_id", placeId)
         }
@@ -88,6 +87,14 @@ object MapRepository {
       service.placeSearch(placeSearch)
     }.mapCatching {
       it.data.placeId
+    }
+  }
+
+  suspend fun uploadPhoto(@Body body: MultiPartFormDataContent): Result<ApiStatus> {
+    return runCatchingCoroutine {
+      service.uploadPhoto(body)
+    }.mapCatching {
+      it
     }
   }
 }

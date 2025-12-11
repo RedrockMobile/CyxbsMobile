@@ -25,6 +25,7 @@ import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.navigation.NAV_ABOUT
 import com.cyxbs.components.config.navigation.NAV_FOOD
+import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
@@ -42,6 +43,9 @@ import com.cyxbs.pages.login.api.LoginNavArgument
 // 在这里注册你的 Compose 页面用于 desktop 端的测试
 // 如果你的页面没有返回键，则按 ESC 键进行返回
 private val itemList = listOf(
+  ActionItem("地图") {
+    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_MAP"))
+  },
   ActionItem("我的课表") {
     MainNavController.navigate(CourseNavArgument)
   },

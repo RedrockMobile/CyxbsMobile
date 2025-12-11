@@ -93,6 +93,7 @@ fun SearchResultCompose(modifier: Modifier = Modifier) {
         modifier = Modifier
           .clickableSingle {
             viewmodel.mapSearchPagerState.value = 0
+            viewmodel.addHot(placeItem.placeId)
             viewmodel.addSearchHistory(placeItem)
             viewmodel.searchToPlace(placeItem, scope)
           }

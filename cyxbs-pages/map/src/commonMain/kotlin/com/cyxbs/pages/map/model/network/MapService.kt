@@ -8,16 +8,12 @@ import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceDetails
 import com.cyxbs.pages.map.model.bean.PlaceSearch
 import de.jensklingenberg.ktorfit.http.Body
-import de.jensklingenberg.ktorfit.http.DELETE
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.GET
 import de.jensklingenberg.ktorfit.http.HTTP
-import de.jensklingenberg.ktorfit.http.Multipart
 import de.jensklingenberg.ktorfit.http.PATCH
 import de.jensklingenberg.ktorfit.http.POST
-import de.jensklingenberg.ktorfit.http.Part
-import de.jensklingenberg.ktorfit.http.Query
 import io.ktor.client.request.forms.MultiPartFormDataContent
 
 /**
@@ -29,14 +25,14 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 interface MapService {
 
   @GET("magipoke-stumap/basic")
-  suspend fun getMapInfo() : ApiWrapper<MapInfo> // 获取地图基本信息
+  suspend fun getMapInfo(): ApiWrapper<MapInfo> // 获取地图基本信息
 
   @FormUrlEncoded
   @POST("magipoke-stumap/detailsite")
-  suspend fun getPlaceDetails(@Field("place_id") placeId: String) : ApiWrapper<PlaceDetails> // 获取建筑的详细信息
+  suspend fun getPlaceDetails(@Field("place_id") placeId: String): ApiWrapper<PlaceDetails> // 获取建筑的详细信息
 
   @GET("magipoke-stumap/button")
-  suspend fun getButtonInfo() : ApiWrapper<ButtonInfo> // 获取按钮信息
+  suspend fun getButtonInfo(): ApiWrapper<ButtonInfo> // 获取按钮信息
 
   @FormUrlEncoded
   @POST("magipoke-stumap/addhot")
@@ -54,5 +50,8 @@ interface MapService {
 
   @FormUrlEncoded
   @POST("magipoke-stumap/placesearch")
-  suspend fun placeSearch(@Field("place_search") placeSearch: String): ApiWrapper<PlaceSearch>
+  suspend fun placeSearch(@Field("place_search") placeSearch: String): ApiWrapper<PlaceSearch> // 搜索地点
+
+  @POST("magipoke-stumap/rockmap/upload")
+  suspend fun uploadPhoto(@Body body: MultiPartFormDataContent): ApiStatus // 上传图片
 }

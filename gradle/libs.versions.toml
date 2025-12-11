@@ -190,6 +190,10 @@ kotlinpoet = "2.2.0"
 scale = "1.1.1-beta.3"
 # coil kmp网络图片加载框架 https://github.com/coil-kt/coil
 coil = "3.3.0"
+# filekit 跨平台的文件操作三方库 https://github.com/vinceglb/FileKit
+filekit = "0.12.0"
+# 文件操作库 https://github.com/square/okio
+okio = "3.16.2"
 
 [libraries]
 ####################################################################################################
@@ -320,6 +324,10 @@ scale-sampling-decoder = { module = "com.jvziyaoyao.scale:sampling-decoder", ver
 scale-image-viewer = { module = "com.jvziyaoyao.scale:image-viewer", version.ref = "scale" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit" }
+filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
+filekit-coil = { module = "io.github.vinceglb:filekit-coil", version.ref = "filekit" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
 ####################################### 公有依赖，大部分模块使用 #######################################
 eventBus = { module = "org.greenrobot:eventbus", version.ref = "eventBus" }

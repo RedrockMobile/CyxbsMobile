@@ -39,23 +39,21 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
-import com.cyxbs.components.utils.extensions.logg
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.pages.map.model.bean.PlaceDetails
-import com.cyxbs.pages.map.ui.MapShowPictureArgument
+import com.cyxbs.pages.map.ui.UploadPhotoDialog
+import com.cyxbs.pages.map.ui.UploadPhotoResult
+import com.cyxbs.pages.map.ui.UploadingPhotoProgressDialog
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_detail_more
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_like
-import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_my_favorite
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_no_like
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_share
 import org.jetbrains.compose.resources.painterResource
@@ -311,10 +309,17 @@ private fun ImageBannerCompose(modifier: Modifier = Modifier, placeDetails: Plac
 
 @Composable
 private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
+  val viewmodel = viewModel(MapComposeViewModel::class)
+  val showState = remember { mutableStateOf(false) }
+  val loginDialogState = rememberLoginDialogState()
   Row(
     modifier = modifier
       .clickableSingle {
-        toast("功能待开发")
+        loginDialogState.doIfLogin(
+          msg = "上传图片"
+        ) {
+          showState.value = true
+        }
       }
       .padding(top = 10.dp),
     verticalAlignment = Alignment.CenterVertically
@@ -330,6 +335,9 @@ private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: Plac
       color = LocalAppColors.current.tvLv4
     )
   }
+  UploadPhotoDialog(showState)
+  UploadPhotoResult(viewmodel.uploadPhotoResultState)
+  UploadingPhotoProgressDialog()
 }
 
 @Composable

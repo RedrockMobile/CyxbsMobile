@@ -15,6 +15,9 @@ kotlin {
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(libs.okio)
+      implementation(libs.filekit.core)
+      implementation(libs.filekit.dialogs.compose)
       implementation(projects.cyxbsComponents.account.api)
     }
     androidMain.dependencies {

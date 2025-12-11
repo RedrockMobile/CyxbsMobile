@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
@@ -17,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.model.bean.MapInfo
+import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_local
@@ -72,7 +74,17 @@ fun MapWidgetCompose(
         if (mapWidgetState.scale >= 6f) {
           viewmodel.resetMap(coroutineScope)
         } else {
-          viewmodel.animateMapToPosition(coroutineScope, offset)
+          val mapRatio = mapInfo.mapWidth.toFloat() / mapInfo.mapHeight.toFloat()
+          val originOffset = calculateOriginPosition(
+            mapWidgetState.center,
+            mapWidgetState.offset,
+            offset,
+            mapWidgetState.scale
+          ) - Offset(
+            0f,
+            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / mapRatio) / 2f
+          )
+          viewmodel.animateMapToPosition(coroutineScope, originOffset)
         }
       }
     },

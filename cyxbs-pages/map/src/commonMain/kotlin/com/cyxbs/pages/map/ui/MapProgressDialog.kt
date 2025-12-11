@@ -59,7 +59,8 @@ fun MapProgressDialog() {
           )
           LinearProgressIndicator(
             progress = viewmodel.downloadProgress.value,
-            modifier = Modifier.padding(top = 30.dp, start = 37.dp, end = 37.dp).fillMaxWidth().height(10.dp),
+            modifier = Modifier.padding(top = 30.dp, start = 37.dp, end = 37.dp).fillMaxWidth()
+              .height(10.dp),
             color = Color(0xFF4B44E5),
             backgroundColor = Color(0xFFE7EFFD),
             strokeCap = StrokeCap.Round

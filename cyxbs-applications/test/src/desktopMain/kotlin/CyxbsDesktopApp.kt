@@ -9,6 +9,7 @@ import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
+import io.github.vinceglb.filekit.FileKit
 
 /**
  * .
@@ -20,6 +21,7 @@ import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProvider
 fun main() = runApp {
   TestKtProviderInitializer.tryInitKtProvider()
   InitialManager.init(isMainProcess = true)
+  FileKit.init(appId = "com.mredrock.cyxbs")
   launchApplication {
     val width = 800
     val height = 600
