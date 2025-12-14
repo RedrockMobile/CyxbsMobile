@@ -80,15 +80,16 @@ private class MobileLinkMovableItemExtension(
   val itemKeyImpl: MobileLinkLessonItem
 ) : IMovableItemExtension {
   override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
-    return true // todo 测试功能
+    return false
   }
 }
 
 private class MobileLinkCourseBottomSheetDialogExtension(
   val itemKeyImpl: MobileLinkLessonItem
 ) : CourseBottomSheetDialogExtension {
-  override val courseBottomSheetDialogContent: @Composable (() -> Unit) = {
-    LessonBottomSheetDialog(itemKeyImpl.lesson, false)
+  @Composable
+  override fun CourseBottomSheetDialogContent() {
+    LessonBottomSheetDialog(itemKeyImpl.lesson, true)
   }
 }
 

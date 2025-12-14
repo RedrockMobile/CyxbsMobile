@@ -19,6 +19,7 @@ import kotlin.concurrent.Volatile
  */
 class AffairIdModelEditorImpl(
   override val idModel: AffairIdModelImpl,
+  val cancelEdit: () -> Unit,
   val commitAction: suspend AffairIdModelEditorImpl.(Boolean) -> Result<AffairIdModelEditor.EditResult>,
 ) : AffairIdModelEditor {
   override var remindTime = idModel.remindTime.value
@@ -161,8 +162,18 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return Result.failure(IllegalStateException("提交修改后不可再修改"))
     return commitMutex.withLock {
       commitAction.invoke(this, needUpload).onSuccess {
+        cancelEdit.invoke()
         enableModify = false // 提交成功后不可再修改
       }
     }
+  }
+
+  override fun cancelEdit() {
+    if (!enableModify()) return
+    if (commitMutex.isLocked) {
+      throw IllegalStateException("正在 commit 中，无法取消")
+    }
+    cancelEdit.invoke()
+    enableModify = false // 提交成功后不可再修改
   }
 }

@@ -4,10 +4,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.LessonByWeeks
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
@@ -37,62 +40,44 @@ import org.jetbrains.compose.resources.painterResource
  */
 @Composable
 fun LessonBottomSheetDialog(lesson: LessonByWeeks, enableShowLinkIcon: Boolean) {
-  Column(
-    modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
-  ) {
-    TitleWithLinkIcon(lesson.course, enableShowLinkIcon)
-    ClassroomWithTeacher(lesson.classroom, lesson.teacher)
-    TwoTextLine("周期", lesson.rawWeek)
-    TwoTextLine("时间", "${lesson.dayOfWeek.toChinese()} ${lesson.beginTime}-${lesson.finalTime}")
-    TwoTextLine("课程类型", lesson.type)
+  SelectionContainer {
+    Column(
+      modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+    ) {
+      TitleWithLinkIcon(lesson.course, enableShowLinkIcon)
+      ClassroomWithTeacher(lesson.classroom, lesson.teacher)
+      TwoTextLine("周期", lesson.rawWeek)
+      TwoTextLine("时间", "${lesson.dayOfWeek.toChinese()} ${lesson.beginTime}-${lesson.finalTime}")
+      TwoTextLine("课程类型", lesson.type)
+    }
   }
 }
 
 @Composable
 private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
-  Layout(
+  Row(
     modifier = Modifier.fillMaxWidth(),
-    content = {
-      Text(
-        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
-        text = title,
-        fontSize = 22.sp,
-        color = LocalAppColors.current.tvLv2,
-        fontWeight = FontWeight.Bold,
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(
+      modifier = Modifier.weight(1F).basicMarquee(iterations = Int.MAX_VALUE),
+      text = title,
+      fontSize = 22.sp,
+      color = LocalAppColors.current.tvLv2,
+      fontWeight = FontWeight.Bold,
+    )
+    if (enableShowLinkIcon) {
+      Image(
+        contentDescription = "关联人的课程",
+        contentScale = ContentScale.Inside,
+        painter = painterResource(Res.drawable.course_ic_item_header_link_double),
+        modifier = Modifier.padding(start = 16.dp).clickableNoIndicator {
+          // todo 跳转到搜索课表界面并打开关联人的课表
+          toast("todo：跳转到搜索课表界面并打开关联人的课表")
+        },
       )
-      if (enableShowLinkIcon) {
-        Image(
-          contentDescription = "关联人的课程",
-          contentScale = ContentScale.Inside,
-          painter = painterResource(Res.drawable.course_ic_item_header_link_double),
-          modifier = Modifier.clickableNoIndicator {
-            // todo 跳转到搜索课表界面并打开关联人的课表
-          },
-        )
-      }
-    },
-    measurePolicy = { measurables, constraints ->
-      val icon = measurables.getOrNull(1)?.measure(
-        Constraints(
-          maxWidth = constraints.maxWidth,
-          maxHeight = constraints.maxHeight,
-        )
-      )
-      val textTitle = measurables[0].measure(
-        Constraints(
-          maxWidth = constraints.maxWidth - (icon?.width?.plus(16.dp.roundToPx()) ?: 0),
-          maxHeight = constraints.maxHeight,
-        )
-      )
-      layout(constraints.maxWidth, textTitle.height) {
-        textTitle.placeRelative(0, 0)
-        icon?.placeRelative(
-          constraints.maxWidth - icon.width,
-          (textTitle.height - icon.height) / 2
-        )
-      }
     }
-  )
+  }
 }
 
 @Composable

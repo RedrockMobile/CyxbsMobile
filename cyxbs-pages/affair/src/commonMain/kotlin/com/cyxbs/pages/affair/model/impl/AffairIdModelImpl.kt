@@ -73,13 +73,14 @@ class AffairIdModelImpl(
   override fun createEditor(): AffairIdModelEditor? {
     if (affairIdModelEditorFlow.compareAndSet(null, Unit)) {
       // 确保线程安全
-      return AffairIdModelEditorImpl(idModel = this) {
+      return AffairIdModelEditorImpl(
+        idModel = this,
+        cancelEdit = { affairIdModelEditorFlow.value = null }
+      ) {
         EditAffairUtils.commit(
           editor = this,
           needUpload = it,
-        ).onSuccess {
-          affairIdModelEditorFlow.value = null
-        }
+        )
       }
     }
     return null

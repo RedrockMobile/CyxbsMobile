@@ -21,38 +21,40 @@ import kotlinx.coroutines.supervisorScope
 object SyncAffairUtils {
 
   suspend fun syncAffair(affairs: List<AffairEntity>, groupModel: AffairGroupModelImpl) {
-    // 本地数据与远端数据都有数据，但数据存在差异，需要进行比较
-    // 先通过 remoteId 整合起来比较单个事务
-    val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId.value }
-    oldMap.remove(0) // 本地临时事务不参与更新
-    val newMap = affairs.associateByTo(LinkedHashMap()) { it.remoteId }
-    val newMapIterator = newMap.iterator()
-    while (newMapIterator.hasNext()) {
-      val newItem = newMapIterator.next()
-      val oldItem = oldMap.remove(newItem.key)
-      if (oldItem != null) {
-        // newMap 和 oldMap 都包含相同 id 的事务
-        newMapIterator.remove() // 从 newMap 中移除
-        if (newItem.value == oldItem.entity) continue // 如果 entity 相等，则无需更新
-        // 同步本地数据为远端数据
-        val editor = oldItem.createEditorSuspend()
-        syncAffairEntity(editor, newItem.value)
-        editor.commit(needUpload = false).onFailure {
-          // 在同步为远端事务时正常来说不应该会出现失败的情况，
-          // 并且这里 needUpload = false 也不会是请求失败，只可能是事务本身出现了问题，我们抛弃该事务的更新
-          if (isDebug()) {
-            showExceptionDialog(
-              RuntimeException(
-                "同步远端事务失败, remote = ${newItem.value}, local = $oldItem",
-                it
-              )
-            )
+    supervisorScope {
+      // 本地数据与远端数据都有数据，但数据存在差异，需要进行比较
+      // 先通过 remoteId 整合起来比较单个事务
+      val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId.value }
+      oldMap.remove(0) // 本地临时事务不参与更新
+      val newMap = affairs.associateByTo(LinkedHashMap()) { it.remoteId }
+      val newMapIterator = newMap.iterator()
+      while (newMapIterator.hasNext()) {
+        val newItem = newMapIterator.next()
+        val oldItem = oldMap.remove(newItem.key)
+        if (oldItem != null) {
+          // newMap 和 oldMap 都包含相同 id 的事务
+          newMapIterator.remove() // 从 newMap 中移除
+          if (newItem.value == oldItem.entity) continue // 如果 entity 相等，则无需更新
+          // 同步本地数据为远端数据
+          launch {
+            val editor = oldItem.createEditorSuspend()
+            syncAffairEntity(editor, newItem.value)
+            editor.commit(needUpload = false).onFailure {
+              // 在同步为远端事务时正常来说不应该会出现失败的情况，
+              // 并且这里 needUpload = false 也不会是请求失败，只可能是事务本身出现了问题，我们抛弃该事务的更新
+              if (isDebug()) {
+                showExceptionDialog(
+                  RuntimeException(
+                    "同步远端事务失败, remote = ${newItem.value}, local = $oldItem",
+                    it
+                  )
+                )
+              }
+            }
           }
         }
       }
-    }
-    // 剩余的 newMap 为新增的数据，oldMap 为被删除的数据
-    supervisorScope {
+      // 剩余的 newMap 为新增的数据，oldMap 为被删除的数据
       oldMap.forEach {
         launch {
           val editor = it.value.createEditorSuspend()
@@ -62,13 +64,15 @@ object SyncAffairUtils {
           )
         }
       }
-    }
-    newMap.forEach {
-      val editor = groupModel.createAddAffairEditor(
-        remoteId = it.value.remoteId
-      )
-      syncAffairEntity(editor, it.value)
-      editor.commit(needUpload = false) // 不上传
+      newMap.forEach {
+        val editor = groupModel.createAddAffairEditor(
+          remoteId = it.value.remoteId
+        )
+        syncAffairEntity(editor, it.value)
+        launch {
+          editor.commit(needUpload = false) // 不上传
+        }
+      }
     }
   }
 

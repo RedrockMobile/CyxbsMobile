@@ -52,7 +52,8 @@ import kotlin.math.max
  */
 interface CourseBottomSheetDialogExtension : CourseItemExtension {
 
-  val courseBottomSheetDialogContent: @Composable () -> Unit
+  @Composable
+  fun CourseBottomSheetDialogContent()
 }
 
 @Stable
@@ -175,7 +176,7 @@ private fun CourseBottomSheetDialogContent(
       state = pagerState,
       modifier = Modifier.fillMaxWidth().weight(1F),
     ) {
-      itemDialogContents[it % itemDialogContents.size].courseBottomSheetDialogContent()
+      itemDialogContents[it % itemDialogContents.size].CourseBottomSheetDialogContent()
     }
     // 底部的圆点指示器
     Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {

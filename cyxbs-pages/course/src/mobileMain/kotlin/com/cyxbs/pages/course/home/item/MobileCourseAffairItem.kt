@@ -16,6 +16,7 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.home.dialog.CourseBottomSheetDialogExtension
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
+import com.cyxbs.pages.course.home.dialog.compose.AffairBottomSheetDialog
 import com.cyxbs.pages.course.home.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
@@ -148,8 +149,9 @@ private class MobileCourseAffairMovableItemExtension(
 private class MobileCourseAffairCourseBottomSheetDialogExtension(
   val itemKeyImpl: MobileCourseAffairItem
 ) : CourseBottomSheetDialogExtension {
-  override val courseBottomSheetDialogContent: @Composable (() -> Unit) = {
-
+  @Composable
+  override fun CourseBottomSheetDialogContent() {
+    AffairBottomSheetDialog(itemKeyImpl.affairDateModel)
   }
 }
 

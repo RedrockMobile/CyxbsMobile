@@ -17,6 +17,7 @@ import com.cyxbs.pages.course.home.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
+import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -87,12 +88,17 @@ class MobileSelfLessonItemExtensionGroup(
 
 private class MobileSelfMovableItemExtension(
   val itemKeyImpl: MobileSelfLessonItem
-) : IMovableItemExtension
+) : IMovableItemExtension {
+  override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
+    return false
+  }
+}
 
 private class MobileSelfCourseBottomSheetDialogExtension(
   val itemKeyImpl: MobileSelfLessonItem
 ) : CourseBottomSheetDialogExtension {
-  override val courseBottomSheetDialogContent: @Composable (() -> Unit) = {
+  @Composable
+  override fun CourseBottomSheetDialogContent() {
     LessonBottomSheetDialog(itemKeyImpl.lesson, false)
   }
 }

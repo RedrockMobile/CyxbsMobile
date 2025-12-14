@@ -138,9 +138,13 @@ interface AffairIdModelEditor {
 
   fun enableModify(): Boolean // 能否修改
 
+  // 提交
   suspend fun commit(
     needUpload: Boolean = true, // 是否需要上传到后端，正常情况下都需要上传，不上传仅提供给同步使用
   ): Result<EditResult>
+
+  // 取消本次编辑
+  fun cancelEdit()
 
   sealed interface EditResult {
     object Success : EditResult
