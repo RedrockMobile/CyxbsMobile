@@ -6,22 +6,21 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.dialog.CourseBottomSheetDialogExtension
 import com.cyxbs.pages.course.home.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.home.dialog.compose.LessonBottomSheetDialog
+import com.cyxbs.pages.course.home.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.home.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.home.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
-import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
-import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -36,29 +35,27 @@ import kotlin.time.Duration.Companion.seconds
  * @date 2025/3/22
  */
 @Stable
-data class MobileLinkLessonItem(
-  override val page: Int, // 为 0 则表示整学期，否则表示第几周
-  override val lesson: LessonByWeeks,
-) : LinkLessonItem {
+class MobileLinkLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
+  lesson: LessonByWeeks
+) : LinkLessonItem(whatTime, coroutineScope, lesson) {
   @ImplProvider
   companion object Companion : LinkLessonItemFactory {
-    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
-      return MobileLinkLessonItem(page, lesson)
+    override fun createLinkLessonItem(
+      whatTime: CourseItemWhatTime,
+      coroutineScope: CoroutineScope,
+      lesson: LessonByWeeks
+    ): LinkLessonItem {
+      return MobileLinkLessonItem(whatTime, coroutineScope, lesson)
     }
   }
-
-  override val whatTime = CourseItemWhatTime.Fixed(
-    page = page,
-    dayOfWeek = lesson.dayOfWeek,
-    beginTime = lesson.beginTime,
-    finalTime = lesson.finalTime,
-  )
 
   override val extension = MobileLinkLessonItemExtensionGroup(this)
 
   @Composable
   override fun CourseItemContent() {
-    val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
+    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
     val itemState = itemState
     CourseDefaultItemContent(
       itemState = itemState,
@@ -67,26 +64,9 @@ data class MobileLinkLessonItem(
       textColor = 0xFF06A3FC.dark(0xFFF0F0F2),
       backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
     ) {
-      fun collectCoveredItems(
-        set: MutableSet<CourseItem>,
-        data: OverlapResult,
-      ): Set<CourseItem> {
-        data.coveredItemList.fastForEach {
-          val item = it.result.itemState.item
-          if (item.whatTime.now.beginTime < whatTime.now.finalTime && item.whatTime.now.finalTime > whatTime.now.beginTime) {
-            set.add(item)
-          }
-          collectCoveredItems(set, it.result)
-        }
-        return set
-      }
-      val overlap = itemState.overlap
-      dialogContents.value =
-        if (overlap == null) listOf(extension)
-        else collectCoveredItems(linkedSetOf(this), overlap)
-          .mapNotNull { it.extension as? CourseBottomSheetDialogExtension }
+      bottomSheetDialogState.showDialog(itemState.overlap)
     }
-    MobileCourseBottomSheetDialog(dialogContents = dialogContents)
+    MobileCourseBottomSheetDialog(bottomSheetDialogState)
   }
 }
 
@@ -118,7 +98,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
   @Composable
   override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
-    val dialogContents = remember { mutableStateOf(emptyList<CourseBottomSheetDialogExtension>()) }
+    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -128,7 +108,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
       finalTime = itemKeyImpl.lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        dialogContents.value = listOf(itemKeyImpl.extension)
+        bottomSheetDialogState.showDialog(itemKeyImpl.extension)
       },
       onClickContent = {
         // todo 跳转到地图页
@@ -137,7 +117,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
 //        }
       },
     )
-    MobileCourseBottomSheetDialog(dialogContents = dialogContents)
+    MobileCourseBottomSheetDialog(bottomSheetDialogState)
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()

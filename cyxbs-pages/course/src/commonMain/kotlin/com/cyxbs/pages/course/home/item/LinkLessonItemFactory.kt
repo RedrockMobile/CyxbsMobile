@@ -5,6 +5,8 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItem
 import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -17,7 +19,8 @@ import com.cyxbs.pages.course.view.item.CourseItem
 interface LinkLessonItemFactory {
 
   fun createLinkLessonItem(
-    page: Int,
+    whatTime: CourseItemWhatTime,
+    coroutineScope: CoroutineScope,
     lesson: LessonByWeeks,
   ): LinkLessonItem
 
@@ -29,7 +32,9 @@ interface LinkLessonItemFactory {
 }
 
 @Stable
-interface LinkLessonItem : CourseItem {
-  val page: Int
-  val lesson: LessonByWeeks
+abstract class LinkLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
+  val lesson: LessonByWeeks,
+) : CourseItem(whatTime, coroutineScope) {
 }

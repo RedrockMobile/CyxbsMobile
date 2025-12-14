@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @ImplProvider
 object AffairService2Impl : IAffairService2 {
-  override fun observeAffairModelStateFlow(): StateFlow<AffairGroupModel?> {
+  override fun observeAffairGroupModel(): StateFlow<AffairGroupModel?> {
     return AffairRepository2.getAffairModelStateFlow()
   }
 }

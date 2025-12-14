@@ -1,17 +1,12 @@
 package com.cyxbs.pages.affair.model.editor
 
 import com.cyxbs.components.config.time.MinuteTimePair
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.affair.model.impl.AffairIdModelImpl
 import com.cyxbs.pages.affair.model.impl.AffairWhatTimeModelImpl
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlinx.collections.immutable.toImmutableMap
-import kotlinx.collections.immutable.toPersistentList
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -65,29 +60,6 @@ class AffairIdModelEditorImpl(
   }
 
 
-  private var isPostRunnable = false
-
-  // 通知下游编辑态数据更新
-  fun sendValueByEditorStateFlow() {
-    if (isPostRunnable) return
-    isPostRunnable = true
-    appCoroutineScope.launch(Dispatchers.Main) {
-      isPostRunnable = false
-      // 延后一个 runnable 执行，防止同一堆栈中多次调用导致下游多次消费
-      idModel.whatTimeDate.valueByEditorStateFlow.tryEmit(
-        this@AffairIdModelEditorImpl to whatTimeDate.entries.associateByTo(
-          destination = LinkedHashMap(),
-          keySelector = { entry ->
-            entry.key.whatTimeModel
-          },
-          valueTransform = { entry ->
-            entry.value.map { it.dateModel }.toPersistentList()
-          }
-        ).toImmutableMap()
-      )
-    }
-  }
-
   override fun setRemindTime(remindTime: Int): String? {
     if (!enableModify()) return "提交修改后不可再修改"
     if (remindTime < 0) return "remindTime 不能小于 0"
@@ -119,7 +91,6 @@ class AffairIdModelEditorImpl(
       val whatTimeModelEditor = AffairWhatTimeModelEditorImpl(this, whatTimeModel)
       whatTimeDate[whatTimeModelEditor] = mutableListOf()
       incrementAddList.add(whatTimeModelEditor)
-      sendValueByEditorStateFlow()
       return whatTimeModelEditor
     }
     return null
@@ -137,7 +108,6 @@ class AffairIdModelEditorImpl(
         if (!incrementAddList.remove(whatTime)) {
           incrementRemoveList.add(whatTime)
         }
-        sendValueByEditorStateFlow()
         return true
       }
     }
@@ -155,7 +125,6 @@ class AffairIdModelEditorImpl(
       incrementRemoveList.removeAll(incrementAddList)
       incrementAddList.clear()
       whatTimeDate.clear()
-      sendValueByEditorStateFlow()
     }
   }
 
@@ -179,7 +148,6 @@ class AffairIdModelEditorImpl(
       whatTimeDate.keys.forEach {
         it.reset()
       }
-      sendValueByEditorStateFlow()
     }
   }
 

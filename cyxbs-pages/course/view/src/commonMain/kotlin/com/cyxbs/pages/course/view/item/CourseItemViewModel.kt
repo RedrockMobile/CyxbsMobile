@@ -10,16 +10,20 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePage
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 
@@ -35,60 +39,47 @@ class CourseItemViewModel : BaseViewModel() {
 
   // key 为 dateKey = page * 7 + dayOfWeek.ordinal
   // value 为 hierarchyIndex，表示需要刷新的层级
-  private val refreshDateMap = HashMap<Int, ItemHierarchy<*>>()
+  private val refreshDateSet = HashSet<Int>()
   private val refreshDateMapSynchronized = SynchronizedObject()
 
-  fun <Item : CourseItem> createOverlay(comparator: Comparator<Item>): ItemHierarchy<Item> {
-    return ItemHierarchy(
-      hierarchyIndex = itemHierarchyList.size,
-      comparator = comparator,
-    ).also {
+  fun <Item : CourseItem> createOverlay(): ItemHierarchy<Item> {
+    return ItemHierarchy<Item>().also {
       itemHierarchyList.add(it)
     }
   }
 
-  private fun tryRefresh(dateKey: Int, itemHierarchy: ItemHierarchy<*>) {
+  private fun tryRefresh(dateKey: Int) {
     synchronized(refreshDateMapSynchronized) {
-      if (refreshDateMap.isEmpty()) {
+      if (refreshDateSet.isEmpty()) {
         // 切换到下一次消息队列中执行刷新逻辑
         viewModelScope.launch(Dispatchers.Main) {
           refreshInternal()
         }
       }
-      val old = refreshDateMap[dateKey]
-      if (old == null || old.hierarchyIndex > itemHierarchy.hierarchyIndex) {
-        refreshDateMap[dateKey] = itemHierarchy
-      }
+      refreshDateSet.add(dateKey)
     }
   }
 
   private fun refreshInternal() {
     synchronized(refreshDateMapSynchronized) {
-      refreshDateMap.forEach { (dateKey, itemHierarchy) ->
-        var upperOverCover = itemHierarchy.getLastUpperOverCover(dateKey).toMutableList()
-        for (i in itemHierarchy.hierarchyIndex..itemHierarchyList.lastIndex) {
-          val hierarchy = itemHierarchyList[i]
-          upperOverCover = hierarchy.refresh(dateKey, upperOverCover)
+      refreshDateSet.forEach { dateKey ->
+        val upperOverCover = mutableListOf<OverlapCover>()
+        itemHierarchyList.forEach {
+          it.refresh(dateKey, upperOverCover)
         }
       }
-      refreshDateMap.clear()
+      refreshDateSet.clear()
     }
   }
 
   @Stable
-  inner class ItemHierarchy<Item : CourseItem>(
-    val hierarchyIndex: Int,
-    val comparator: Comparator<Item>,
-  ) {
+  inner class ItemHierarchy<Item : CourseItem> {
 
     // key 为 dateKey = page * 7 + dayOfWeek.ordinal
     private inner class DateKeyValue {
-      val itemWrapperList: MutableList<ItemWrapper> = mutableListOf<ItemWrapper>()
+      val itemWrapperList: MutableList<ItemHierarchyWhatTime<Item>> = mutableListOf()
       val itemStateListStateFlow: MutableStateFlow<List<CourseItemState>> =
         MutableStateFlow(emptyList())
-
-      // 上一次更新时的上一层的覆盖结果
-      var lastUpperOverCover: List<OverlapCover> = emptyList()
     }
 
     private val dateKeyValueMap = LinkedHashMap<Int, DateKeyValue>()
@@ -99,60 +90,64 @@ class CourseItemViewModel : BaseViewModel() {
 
     private val dateItemsMapSynchronized = SynchronizedObject()
 
-    private val itemWrapperMap: HashMap<Item, ItemWrapper> = HashMap()
+    private val itemWrapperMap: HashMap<ItemHierarchyWhatTime<Item>, ItemWrapper> = HashMap()
 
-    private fun getItemWrapper(item: Item): ItemWrapper {
+    private fun getItemWrapper(item: ItemHierarchyWhatTime<Item>): ItemWrapper {
       return itemWrapperMap.getOrPut(item) { ItemWrapper(item) }
     }
 
-    internal fun getLastUpperOverCover(dateKey: Int): List<OverlapCover> {
-      return getDateKeyValue(dateKey).lastUpperOverCover
-    }
-
     // 添加一个 item
-    fun add(item: Item) {
+    fun add(whatTime: ItemHierarchyWhatTime<Item>) {
       synchronized(dateItemsMapSynchronized) {
-        if (itemWrapperMap.containsKey(item)) return
-        val dateKey = item.whatTime.now.page * 7 + item.whatTime.now.dayOfWeek.ordinal
-        val list = getDateKeyValue(dateKey).itemWrapperList
-        val index = getItemAfterIndex(item, list)
-        list.add(index, getItemWrapper(item))
-        tryRefresh(dateKey, this)
+        if (itemWrapperMap.containsKey(whatTime)) return
+        itemWrapperMap[whatTime] = ItemWrapper(whatTime)
+        val fixed = whatTime.now.value
+        if (fixed.page < 0) return // 负数表示展示不添加进 itemWrapperList
+        val dateKey = fixed.page * 7 + fixed.dayOfWeek.ordinal
+        val itemWrapperList = getDateKeyValue(dateKey).itemWrapperList
+        val index = getIndex(whatTime, itemWrapperList) // 保证有序插入
+        itemWrapperList.add(index, whatTime)
+        tryRefresh(dateKey)
       }
     }
 
     // 移除一个 item
-    fun remove(item: Item, whatTime: CourseItemWhatTime.Fixed = item.whatTime.now) {
+    fun remove(
+      whatTime: ItemHierarchyWhatTime<Item>,
+      fixed: CourseItemWhatTime.Fixed = whatTime.now.value
+    ) {
       synchronized(dateItemsMapSynchronized) {
-        val itemWrapper = itemWrapperMap.remove(item) ?: return
-        val dateKey = whatTime.page * 7 + whatTime.dayOfWeek.ordinal
-        itemWrapper.clear()
-        getDateKeyValue(dateKey).itemWrapperList.remove(itemWrapper)
-        tryRefresh(dateKey, this)
+        val itemWrapper = itemWrapperMap.remove(whatTime) ?: return
+        itemWrapper.onClear()
+        if (fixed.page < 0) return // 负数表示展示未添加进 itemWrapperList
+        val dateKey = fixed.page * 7 + fixed.dayOfWeek.ordinal
+        getDateKeyValue(dateKey).itemWrapperList.remove(whatTime)
+        tryRefresh(dateKey)
       }
     }
 
     // 重置所有 item 数据
     // 支持相等数据的自动迁移
-    fun reset(item: List<Item>) {
+    fun reset(whatTimeList: List<ItemHierarchyWhatTime<Item>>) {
       synchronized(dateItemsMapSynchronized) {
-        if (item.isEmpty()) {
+        if (whatTimeList.isEmpty()) {
           // 如果需要清空列表，则删除所有数据
           dateKeyValueMap.forEach { (dateKey, dateKeyValue) ->
             if (dateKeyValue.itemWrapperList.isNotEmpty()) {
-              tryRefresh(dateKey, this)
+              tryRefresh(dateKey)
               dateKeyValue.itemWrapperList.forEach {
-                it.clear()
-                itemWrapperMap.remove(it.item)
+                itemWrapperMap.remove(it)?.onClear()
               }
               dateKeyValue.itemWrapperList.clear()
             }
           }
         } else {
-          val newItemListMap =
-            item.groupByTo(LinkedHashMap()) { it.whatTime.now.page * 7 + it.whatTime.now.dayOfWeek.ordinal }
+          val newItemListMap = whatTimeList.groupByTo(LinkedHashMap()) {
+            val fixed = it.now.value
+            fixed.page * 7 + fixed.dayOfWeek.ordinal
+          }
           dateKeyValueMap.forEach { (dateKey, dateKeyValue) ->
-            val newItemList = newItemListMap.remove(dateKey)?.sortedWith(comparator)
+            val newItemList = newItemListMap.remove(dateKey)?.apply { sort() }  // 排序
             if (newItemList != null) {
               // 新旧数据都包含同一天
               // 我们尝试判断数据是否发生了变化
@@ -161,7 +156,7 @@ class CourseItemViewModel : BaseViewModel() {
                 // 按顺序比对 item 是否一致
                 for ((index, itemWrapper) in dateKeyValue.itemWrapperList.withIndex()) {
                   val newItem = newItemList[index]
-                  if (itemWrapper.item != newItem) {
+                  if (itemWrapper != newItem) {
                     isChanged = true
                     break
                   }
@@ -172,36 +167,39 @@ class CourseItemViewModel : BaseViewModel() {
                 if (dateKeyValue.itemWrapperList.isNotEmpty()) {
                   // 移除旧数据
                   dateKeyValue.itemWrapperList.forEach {
-                    if (!newItemList.contains(it.item)) {
-                      it.clear() // newItemSet 中不包含说明已经被移除
-                      itemWrapperMap.remove(it.item)
+                    if (!newItemList.contains(it)) {
+                      // newItemSet 中不包含说明已经被移除
+                      itemWrapperMap.remove(it)?.onClear()
                     }
                   }
                   dateKeyValue.itemWrapperList.clear()
                 }
                 // 添加新数据
-                dateKeyValue.itemWrapperList.addAll(newItemList.map { getItemWrapper(it) })
-                tryRefresh(dateKey, this)
+                newItemList.forEach { getItemWrapper(it) }
+                dateKeyValue.itemWrapperList.addAll(newItemList)
+                tryRefresh(dateKey)
               }
             } else {
               if (dateKeyValue.itemWrapperList.isNotEmpty()) {
                 // 新数据中不包含当天数据，但旧数据中包含
                 // 我们清空当天的旧数据
                 dateKeyValue.itemWrapperList.forEach {
-                  it.clear()
-                  itemWrapperMap.remove(it.item)
+                  itemWrapperMap.remove(it)?.onClear()
                 }
                 dateKeyValue.itemWrapperList.clear()
-                tryRefresh(dateKey, this)
+                tryRefresh(dateKey)
               }
             }
           }
           newItemListMap.forEach { (dateKey, itemList) ->
-            // 剩下的为新增的数据
-            val newItemList = itemList.sortedWith(comparator)
+            // 剩下的为新增的 dateKey 对应数据
+            val newItemList = itemList.apply { sort() } // 排序
             // 添加新数据
-            getDateKeyValue(dateKey).itemWrapperList.addAll(newItemList.map { getItemWrapper(it) })
-            tryRefresh(dateKey, this)
+            newItemList.forEach { getItemWrapper(it) }
+            if (dateKey >= 0) { // < 0 则延后添加进 itemWrapperList
+              getDateKeyValue(dateKey).itemWrapperList.addAll(newItemList)
+              tryRefresh(dateKey)
+            }
           }
         }
       }
@@ -210,17 +208,16 @@ class CourseItemViewModel : BaseViewModel() {
     /**
      * @param dateKey 页面日期编号，page * 7 + dayOfWeek.ordinal
      * @param upperOverCover 上一层的覆盖
-     * @return 放回当前最底层 Item 的覆盖
      */
     internal fun refresh(
       dateKey: Int,
       upperOverCover: MutableList<OverlapCover>
-    ): MutableList<OverlapCover> {
+    ) {
       synchronized(dateItemsMapSynchronized) {
         val dateKeyValue = getDateKeyValue(dateKey)
-        dateKeyValue.lastUpperOverCover = upperOverCover.toMutableList() // 保存上一层的覆盖副本
         dateKeyValue.itemStateListStateFlow.value = Snapshot.withMutableSnapshot { // 多次更新一起提交
-          dateKeyValue.itemWrapperList.asReversed().map { itemWrapper ->
+          dateKeyValue.itemWrapperList.asReversed().map { whatTime ->
+            val itemWrapper = getItemWrapper(whatTime)
             itemWrapper.itemState.updateOverlap(
               itemWrapper.itemState.createOverlapResult(
                 coveredList = upperOverCover,
@@ -229,7 +226,6 @@ class CourseItemViewModel : BaseViewModel() {
             itemWrapper.itemState
           }.asReversed()
         }
-        return upperOverCover
       }
     }
 
@@ -272,13 +268,16 @@ class CourseItemViewModel : BaseViewModel() {
      *                         ↑
      * ```
      */
-    private fun getItemAfterIndex(item: Item, list: List<ItemWrapper>): Int {
+    private fun getIndex(
+      item: ItemHierarchyWhatTime<Item>,
+      list: List<ItemHierarchyWhatTime<Item>>
+    ): Int {
       var start = 0
       var end = list.size - 1
       while (start <= end) {
         val half = (start + end) ushr 1 // 算术移位，防止溢出
         val nowItem = list[half]
-        if (comparator.compare(item, nowItem.item) >= 0) {
+        if (item >= nowItem) {
           start = half + 1
         } else {
           end = half - 1
@@ -288,33 +287,39 @@ class CourseItemViewModel : BaseViewModel() {
     }
 
     private inner class ItemWrapper(
-      val item: Item,
+      val whatTime: ItemHierarchyWhatTime<Item>,
     ) {
 
-      val itemState = CourseItemState(item)
+      // 绑定在 viewModelScope 之下的子协程作用域
+      private val coroutineScope = CoroutineScope(
+        viewModelScope.coroutineContext
+            + SupervisorJob(viewModelScope.coroutineContext[Job])
+      )
 
-      private val whatTime: CourseItemWhatTime = item.whatTime
-      private var lastFixed = whatTime.now
-
-      private var changeableJob: Job? = null
+      val itemState = CourseItemState(whatTime.createItem(coroutineScope))
 
       init {
-        if (whatTime is CourseItemWhatTime.Changeable) {
-          changeableJob = appCoroutineScope.launch {
-            whatTime.observe().collect {
-              if (it != lastFixed) {
-                remove(item, lastFixed)
-                add(item)
-                lastFixed = it
-              }
-            }
+        var lastFixed = whatTime.now.value
+        whatTime.now.onEach {
+          if (it != lastFixed) {
+            remove(whatTime, lastFixed)
+            add(whatTime)
+            lastFixed = it
           }
-        }
+        }.launchIn(coroutineScope)
       }
 
-      fun clear() {
-        changeableJob?.cancel()
+      fun onClear() {
+        coroutineScope.cancel()
       }
     }
   }
+}
+
+
+abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Comparable<ItemHierarchyWhatTime<Item>> {
+  abstract override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
+  abstract fun createItem(coroutineScope: CoroutineScope): Item
+  abstract override fun equals(other: Any?): Boolean
+  abstract override fun hashCode(): Int
 }

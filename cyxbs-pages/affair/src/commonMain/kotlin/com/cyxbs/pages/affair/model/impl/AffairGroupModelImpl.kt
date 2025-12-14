@@ -4,13 +4,12 @@ import com.cyxbs.pages.affair.api.AffairGroupModel
 import com.cyxbs.pages.affair.api.AffairIdModel
 import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.bean.AffairEntity
-import com.cyxbs.pages.affair.bean.AffairWhatTime
-import com.cyxbs.pages.affair.bean.AffairWhenBean
-import com.cyxbs.pages.affair.net.AddAffairRequest
-import com.cyxbs.pages.affair.repos.AffairRepository2
+import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -25,80 +24,65 @@ class AffairGroupModelImpl(
   entityList: List<AffairEntity>,
 ) : AffairGroupModel {
 
-  override val itemList = MutableStateFlow(
+
+  private val _itemList = MutableStateFlow(
     entityList.map {
       createAffairItemModelImpl(it)
     }.toPersistentList()
   )
+  override val itemList: StateFlow<PersistentList<AffairIdModelImpl>> = _itemList
+
+  override val addedAffair = MutableSharedFlow<AffairIdModel>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+
+  override val deletedAffair = MutableSharedFlow<AffairIdModel>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
 
   @OptIn(ExperimentalUuidApi::class)
-  override suspend fun addAffair(
-    remindTime: Int,
-    title: String,
-    content: String,
+  override fun createAddAffairEditor(
     remoteId: Int,
-    action: suspend (AffairIdModelEditor) -> Unit
-  ): Result<AffairIdModel> {
+  ): AffairIdModelEditor {
     if (remoteId > 0 && itemList.value.any { it.remoteId.value == remoteId }) {
-      return Result.failure(IllegalStateException("remoteId 已存在, $remoteId"))
+      throw IllegalStateException("remoteId 已存在, $remoteId")
     }
     val entity = AffairEntity(
       remoteId = remoteId,
       localId = Uuid.random().toString(),
-      title = title,
-      content = content,
-      remindTime = remindTime,
+      title = "标题",
+      content = "内容",
+      remindTime = 0,
       whatTime = emptyList(),
     )
     val model = createAffairItemModelImpl(entity)
-    val editor = model.createEditorSuspend()
-    action(editor)
-    editor.commit(needUpload = false)
-    if (model.whatTimeDate.value.isEmpty()) {
-      // 添加的数据无效
-      return Result.failure(IllegalStateException("whatTimeDate 为空，数据无效, $entity"))
-    }
-    if (remoteId <= 0) {
-      return AffairRepository2.addAffair(
-        stuNum = stuNum,
-        localId = entity.localId,
-        request = AddAffairRequest(
-          remindTime = entity.remindTime,
-          title = entity.title,
-          content = entity.content,
-          whenList = model.whatTimeDate.value.map { entry ->
-            AffairWhenBean(
-              entry.key.timePair.value.first.minuteOfDay,
-              entry.key.timePair.value.second.minuteOfDay,
-              entry.value.map { it.date.value })
-          },
-        ),
-        allowLocal = true,
-        needShowException = true,
-      ).onSuccess {
-        model.remoteId.value = it.remoteId
-        model.entity = it
-      }.onSuccess {
-        itemList.update {
-          it.add(model)
-        }
-      }.map {
-        model
-      }
-    } else {
-      itemList.update {
-        it.add(model)
-      }
-      return Result.success(model)
-    }
+    return model.createEditor()!!
   }
 
-  fun createAffairItemModelImpl(
+  fun addAffairInternal(idModel: AffairIdModelImpl) {
+    _itemList.value = itemList.value.add(idModel)
+    addedAffair.tryEmit(idModel)
+  }
+
+  fun removeAffairInternal(idModel: AffairIdModelImpl) {
+    _itemList.value = itemList.value.remove(idModel)
+    deletedAffair.tryEmit(idModel)
+  }
+
+  private fun createAffairItemModelImpl(
     entity: AffairEntity,
   ): AffairIdModelImpl {
     return AffairIdModelImpl(
       groupModel = this,
       entity = entity,
     )
+  }
+
+  override fun toString(): String {
+    return "AffairGroupModelImpl(stuNum=$stuNum" +
+        ", itemList=${itemList.value}" +
+        ")"
   }
 }

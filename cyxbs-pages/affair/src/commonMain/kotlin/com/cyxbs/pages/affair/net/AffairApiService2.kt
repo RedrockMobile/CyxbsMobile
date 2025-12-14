@@ -28,7 +28,7 @@ interface AffairApiService2 {
 
   @POST("magipoke-reminder/Person/getTimeTransaction")
   @Headers("App-Version:74")
-  suspend fun getAffair(): ApiWrapper<List<AffairBean2>>
+  suspend fun getAffair(): ApiWrapper<GetAffairResponse>
 
   @POST("magipoke-reminder/Person/editTimeTransaction")
   suspend fun updateAffair(
@@ -43,6 +43,12 @@ interface AffairApiService2 {
     remoteId: Int
   ): ApiStatus
 }
+
+@Serializable
+data class GetAffairResponse(
+  @SerialName("data")
+  val data: List<AffairBean2>,
+)
 
 @Serializable
 data class AddAffairRequest(

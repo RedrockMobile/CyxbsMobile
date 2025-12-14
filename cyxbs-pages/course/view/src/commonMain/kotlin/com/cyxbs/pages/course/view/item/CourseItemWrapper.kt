@@ -43,7 +43,7 @@ import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
 import kotlin.math.roundToInt
@@ -68,14 +68,14 @@ class CourseItemWrapper<T : CourseItem>(
 val LocalCourseItemState = staticCompositionLocalOf<CourseItemState> { error("未初始化") }
 
 // CourseItem 自身引用将作为 Compose 重组的 key()
-// 更新后应尽量保证等价的 item 前后属于同一个对象
-interface CourseItem {
-
-  // item 的时间信息
-  val whatTime: CourseItemWhatTime
+// 更新后应保证等价的 item 前后属于同一个对象
+abstract class CourseItem(
+  val whatTime: CourseItemWhatTime, // item 的时间信息
+  val coroutineScope: CoroutineScope, // item 所在的协程作用域
+) {
 
   // item 支持的扩展功能
-  val extension: CourseItemExtension
+  abstract val extension: CourseItemExtension
 
   // item 所在的页面上下文
   val coursePage: LocalCoursePageContext
@@ -91,40 +91,18 @@ interface CourseItem {
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
    */
   @Composable
-  fun CourseItemContent()
+  abstract fun CourseItemContent()
 }
 
-sealed interface CourseItemWhatTime {
-
-  val now: Fixed
+interface CourseItemWhatTime {
+  val now: StateFlow<Fixed>
 
   data class Fixed(
     val page: Int, // 为 0 则表示整学期，否则表示第几周
     val dayOfWeek: DayOfWeek,
     val beginTime: MinuteTime,
     val finalTime: MinuteTime,
-  ) : CourseItemWhatTime {
-    override val now: Fixed
-      get() = this
-  }
-
-  class Changeable(
-    fixed: Fixed,
-  ) : CourseItemWhatTime {
-
-    private val flow = MutableStateFlow(fixed)
-
-    override val now: Fixed
-      get() = flow.value
-
-    fun update(now: Fixed) {
-      flow.value = now
-    }
-
-    fun observe(): StateFlow<Fixed> {
-      return flow
-    }
-  }
+  )
 }
 
 @Composable
@@ -134,7 +112,7 @@ fun CourseDefaultItemContent(
     persistentListOf(
       LayoutItemModifier, // 布局
       LongPressMoveItemModifier, // 长按移动 item
-      PressScaleItemModifier, // 点击弹 Q 动画，需要在长按移动 item 之后
+      PressScaleItemModifier, // 点击 Q 弹动画，需要在长按移动 item 之后
       RoundedShadowItemModifier, // 圆角+阴影
     )
   },
@@ -156,10 +134,12 @@ fun CourseDefaultItemContent(
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemRange = MinuteTimePair(
-          itemState.item.whatTime.now.beginTime,
-          itemState.item.whatTime.now.finalTime
-        ),
+        itemRange = Snapshot.withoutReadObservation {
+          MinuteTimePair(
+            itemState.item.whatTime.now.value.beginTime,
+            itemState.item.whatTime.now.value.finalTime
+          )
+        },
         enableShowCoverTip = itemState.overlap?.coveredItemList?.isNotEmpty() == true,
         timeline = itemState.item.coursePage.timeline,
         topText = topText,
@@ -204,6 +184,7 @@ private fun CourseShowRange(
     }.drawWithContent {
       drawContent()
       if (enableShowCoverTip) {
+        // 右上角的重叠标志
         drawRoundRect(
           color = textColor,
           topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),

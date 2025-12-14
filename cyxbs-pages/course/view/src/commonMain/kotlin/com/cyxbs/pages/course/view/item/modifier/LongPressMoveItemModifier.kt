@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -229,8 +228,9 @@ class LongPressMoveControllerImpl(
   // 自身 showRange 转换器（包含自身完全不显示的情况）
   private val selfShowRangeTransformerForAll = CourseItemState.ShowRangeTransformer { _, overlap ->
     // 被长按的 item 即使被覆盖也完整展示
-    val beginTime = overlap.itemState.item.whatTime.now.beginTime
-    val finalTime = overlap.itemState.item.whatTime.now.finalTime
+    val whatTimeFixed = overlap.itemState.item.whatTime.now.value
+    val beginTime = whatTimeFixed.beginTime
+    val finalTime = whatTimeFixed.finalTime
     listOf(MinuteTimePair(beginTime, finalTime))
   }
 
@@ -238,8 +238,9 @@ class LongPressMoveControllerImpl(
   private val selfShowRangeTransformerForEmpty =
     CourseItemState.ShowRangeTransformer { show, overlap ->
       show.ifEmpty {
-        val beginTime = overlap.itemState.item.whatTime.now.beginTime
-        val finalTime = overlap.itemState.item.whatTime.now.finalTime
+        val whatTimeFixed = overlap.itemState.item.whatTime.now.value
+        val beginTime = whatTimeFixed.beginTime
+        val finalTime = whatTimeFixed.finalTime
         listOf(MinuteTimePair(beginTime, finalTime))
       }
     }

@@ -7,6 +7,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.showExceptionDialog
 import com.cyxbs.components.utils.extensions.toast
@@ -28,6 +29,7 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.sync.Mutex
@@ -51,6 +53,9 @@ object AffairRepository2 {
   private val affairItemModelMap = HashMap<String, AffairGroupModelImpl>()
   private val affairItemModelFlow = MutableStateFlow<AffairGroupModel?>(null)
 
+  // 同一时间内只有有一个协程触发本地临时事务的上传
+  private val uploadLocalAffairMutex = Mutex()
+
   init {
     IAccountService::class.impl()
       .stuNumFlow
@@ -64,7 +69,7 @@ object AffairRepository2 {
         if (stuNum != null) {
           requestAffair(stuNum)
         }
-      }
+      }.launchIn(appCoroutineScope)
   }
 
   private inline fun editAffairList(
@@ -108,7 +113,7 @@ object AffairRepository2 {
       AffairApiService2::class.impl().getAffair()
     }.mapCatching {
       it.throwApiExceptionIfFail()
-      it.data
+      it.data.data
     }.mapCatching { beanList ->
       editAffairList(stuNum) { oldAffairList ->
         beanList.map { bean ->
@@ -141,7 +146,7 @@ object AffairRepository2 {
   @OptIn(ExperimentalUuidApi::class)
   suspend fun addAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
-    localId: String = Uuid.random().toString(), // 生成本地唯一 localId
+    localId: String, // 生成本地唯一 localId
     request: AddAffairRequest,
     allowLocal: Boolean,
     needShowException: Boolean,
@@ -193,9 +198,12 @@ object AffairRepository2 {
     needShowException: Boolean,
   ): Result<Any> {
     if (affair.remoteId == 0 && affair.localId.isNotEmpty()) {
-      // localId 等于 0 且 localId 不为空 则说明是本地临时事务
+      // remoteId 等于 0 且 localId 不为空 则说明是本地临时事务
       LocalAddAffairRepository.update(stuNum, affair)
       return Result.success(Unit)
+    } else if (affair.remoteId == 0 && affair.localId.isEmpty()) {
+      return Result.failure(
+        IllegalArgumentException("remoteId 为 0，localId 为空，该事务应该作为新增而非修改"))
     }
     return runCatchingCoroutine {
       AffairApiService2::class.impl().updateAffair(
@@ -286,9 +294,6 @@ object AffairRepository2 {
     }
   }
 
-  // 同一时间内只有有一个协程触发本地临时事务的上传
-  private val uploadLocalAffairMutex = Mutex()
-
   private suspend fun uploadLocalAffair(
     stuNum: String, // 当前登陆人的学号，仅用于检测请求返回时学号是否发生改变，防止出现请求返回时已退出登陆或已切换账号
   ): Result<Unit> {
@@ -370,7 +375,7 @@ object AffairRepository2 {
       }.onFailure {
         accountSettings.remove(SETTING_KEY_AFFAIR)
         if (isDebug()) {
-          toast("加载磁盘中的事务异常, ${it.message}")
+          toast("加载磁盘中的事务异常, ${it.message}, json = $json")
           showExceptionDialog(it)
         }
       }.getOrNull()

@@ -6,16 +6,15 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
 /**
  * 事务数据类
- * - 添加事务使用 [AffairGroupModel.addAffair]
- * - 删除事务使用 [AffairIdModel.delete]
- * - 修改事务使用 [AffairIdModel.edit]
+ * - 添加事务使用 [AffairGroupModel.createAddAffairEditor]
+ * - 删除事务使用 [AffairIdModelEditor.clear]
+ * - 修改事务使用 [AffairIdModelEditor]
  *
  * 事务包含两颗树：
  * - model 树：每个 model 结点在应用生命周期内对象不会改变，且其属性通过 StateFlow 供外界进行观察
@@ -56,19 +55,15 @@ import kotlinx.coroutines.flow.merge
 interface AffairGroupModel {
   val stuNum: String
   val itemList: StateFlow<ImmutableList<AffairIdModel>>
+  val addedAffair: Flow<AffairIdModel>
+  val deletedAffair: Flow<AffairIdModel>
 
   /**
-   * 添加新的事务，并上传到远端
-   *
-   * 删除请调用 [AffairIdModelEditor.clear]
+   * 创建添加事务的 editor，使用 [AffairIdModelEditor.commit] 后上传到远端
    */
-  suspend fun addAffair(
-    remindTime: Int, // 提醒时间
-    title: String,
-    content: String,
-    remoteId: Int = 0, // 如果大于等于 0，则认为是后端新下发的数据，就仅本地新增，不上传到后端
-    action: suspend (AffairIdModelEditor) -> Unit
-  ): Result<AffairIdModel>
+  fun createAddAffairEditor(
+    remoteId: Int = 0, // 正常情况下新增事务为 0，不为 0 仅提供给同步使用
+  ): AffairIdModelEditor
 }
 
 // 单个事务，id 为唯一值
@@ -78,13 +73,16 @@ interface AffairIdModel {
   val enable: StateFlow<Boolean>
   // 非后端返回 id，此 id 为客户端上的唯一 id
   val localId: String
-  // 后端 id，如果 <= 0，则说明是本地临时事务
-  val remoteId: MutableStateFlow<Int>
+  // 后端 id，如果 = 0，则说明是本地临时事务
+  val remoteId: StateFlow<Int>
   val remindTime: EditorStateFlow<AffairIdModelEditor, Int>
   val title: EditorStateFlow<AffairIdModelEditor, String>
   val content: EditorStateFlow<AffairIdModelEditor, String>
 
-  val whatTimeDate: EditorStateFlow<AffairIdModelEditor, out ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
+  val whatTimeDate: StateFlow<ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
+
+  // 新增的 AffairDateModel
+  val addedDateModel: Flow<AffairDateModel>
 
   fun createEditor(): AffairIdModelEditor?
 
@@ -141,7 +139,7 @@ interface AffairIdModelEditor {
   fun enableModify(): Boolean // 能否修改
 
   suspend fun commit(
-    needUpload: Boolean = true, // 是否需要上传到后端
+    needUpload: Boolean = true, // 是否需要上传到后端，正常情况下都需要上传，不上传仅提供给同步使用
   ): Result<EditResult>
 
   sealed interface EditResult {

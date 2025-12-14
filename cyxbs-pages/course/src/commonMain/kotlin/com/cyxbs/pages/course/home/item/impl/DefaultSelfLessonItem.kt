@@ -11,6 +11,7 @@ import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * .
@@ -19,23 +20,21 @@ import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
  * @date 2025/9/23
  */
 @Stable
-data class DefaultSelfLessonItem(
-  override val page: Int,
-  override val lesson: LessonByWeeks,
-) : SelfLessonItem {
+class DefaultSelfLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
+  lesson: LessonByWeeks
+) : SelfLessonItem(whatTime, coroutineScope, lesson) {
 
   companion object Companion : SelfLessonItemFactory {
-    override fun createSelfLessonItem(page: Int, lesson: LessonByWeeks): SelfLessonItem {
-      return DefaultSelfLessonItem(page, lesson)
+    override fun createSelfLessonItem(
+      whatTime: CourseItemWhatTime,
+      coroutineScope: CoroutineScope,
+      lesson: LessonByWeeks
+    ): SelfLessonItem {
+      return DefaultSelfLessonItem(whatTime, coroutineScope, lesson)
     }
   }
-
-  override val whatTime = CourseItemWhatTime.Fixed(
-    page = page,
-    dayOfWeek = lesson.dayOfWeek,
-    beginTime = lesson.beginTime,
-    finalTime = lesson.finalTime,
-  )
 
   override val extension = DefaultSelfLessonItemExtensionGroup(this)
 

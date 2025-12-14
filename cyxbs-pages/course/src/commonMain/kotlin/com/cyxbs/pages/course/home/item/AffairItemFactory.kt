@@ -3,8 +3,10 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.home.item.impl.DefaultAffairItem
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -17,7 +19,8 @@ import com.cyxbs.pages.course.home.item.impl.DefaultAffairItem
 interface AffairItemFactory {
 
   fun createAffairItemModel(
-    page: Int,
+    whatTime: ItemHierarchyWhatTime<CourseAffairItem>,
+    coroutineScope: CoroutineScope,
     affairDateModel: AffairDateModel,
   ): CourseAffairItem
 
@@ -29,7 +32,9 @@ interface AffairItemFactory {
 }
 
 @Stable
-interface CourseAffairItem : CourseItem {
-  val page: Int
-  val affairDateModel: AffairDateModel
+abstract class CourseAffairItem(
+  whatTime: ItemHierarchyWhatTime<CourseAffairItem>,
+  coroutineScope: CoroutineScope,
+  val affairDateModel: AffairDateModel,
+) : CourseItem(whatTime, coroutineScope) {
 }

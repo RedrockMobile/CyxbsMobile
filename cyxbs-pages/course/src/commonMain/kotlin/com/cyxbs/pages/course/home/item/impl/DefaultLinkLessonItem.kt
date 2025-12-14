@@ -10,6 +10,7 @@ import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * .
@@ -18,22 +19,21 @@ import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
  * @date 2025/9/23
  */
 @Stable
-data class DefaultLinkLessonItem(
-  override val page: Int, // 为 0 则表示整学期，否则表示第几周
-  override val lesson: LessonByWeeks,
-) : LinkLessonItem {
+class DefaultLinkLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
+  lesson: LessonByWeeks
+) : LinkLessonItem(whatTime, coroutineScope, lesson) {
+
   companion object Companion : LinkLessonItemFactory {
-    override fun createLinkLessonItem(page: Int, lesson: LessonByWeeks): LinkLessonItem {
-      return DefaultLinkLessonItem(page, lesson)
+    override fun createLinkLessonItem(
+      whatTime: CourseItemWhatTime,
+      coroutineScope: CoroutineScope,
+      lesson: LessonByWeeks
+    ): LinkLessonItem {
+      return DefaultLinkLessonItem(whatTime, coroutineScope, lesson)
     }
   }
-
-  override val whatTime = CourseItemWhatTime.Fixed(
-    page = page,
-    dayOfWeek = lesson.dayOfWeek,
-    beginTime = lesson.beginTime,
-    finalTime = lesson.finalTime,
-  )
 
   override val extension = DefaultLinkLessonItemExtensionGroup(this)
 

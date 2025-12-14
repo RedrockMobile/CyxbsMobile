@@ -15,6 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -26,13 +29,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.components.view.ui.rememberBottomSheetState
+import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
+import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.math.hypot
@@ -46,22 +52,72 @@ import kotlin.math.max
  */
 interface CourseBottomSheetDialogExtension : CourseItemExtension {
 
-  val courseBottomSheetDialogContent : @Composable () -> Unit
+  val courseBottomSheetDialogContent: @Composable () -> Unit
 }
 
+@Stable
+@Composable
+fun rememberCourseBottomSheetDialogState(): CourseBottomSheetDialogState {
+  return remember {
+    CourseBottomSheetDialogState()
+  }
+}
+
+@Stable
+class CourseBottomSheetDialogState {
+
+  val dialogContents: MutableState<List<CourseBottomSheetDialogExtension>> =
+    mutableStateOf(emptyList())
+
+  fun showDialog(extension: CourseBottomSheetDialogExtension) {
+    dialogContents.value = listOf(extension)
+  }
+
+  fun showDialog(overlapResult: OverlapResult?) {
+    if (overlapResult == null) {
+      dialogContents.value = emptyList()
+    } else {
+      dialogContents.value = collectCoveredItems(
+        rootItemState = overlapResult.itemState,
+        otherOverlap = overlapResult,
+        set = linkedSetOf(overlapResult.itemState)
+      ).mapNotNull { it.item.extension as? CourseBottomSheetDialogExtension }
+    }
+  }
+
+  private fun collectCoveredItems(
+    rootItemState: CourseItemState,
+    otherOverlap: OverlapResult,
+    set: MutableSet<CourseItemState>,
+  ): Set<CourseItemState> {
+    otherOverlap.coveredItemList.fastForEach {
+      val itemState = it.result.itemState
+      val itemWhatTimeFixed = itemState.item.whatTime.now.value
+      val rootWhatTimeFixed = rootItemState.item.whatTime.now.value
+      if (itemWhatTimeFixed.beginTime < rootWhatTimeFixed.finalTime
+        && itemWhatTimeFixed.finalTime > rootWhatTimeFixed.beginTime
+      ) {
+        set.add(itemState)
+      }
+      collectCoveredItems(rootItemState, it.result, set)
+    }
+    return set
+  }
+
+}
 
 /**
  * 移动端课表 item 点击后出现的 BottomSheetDialog
  */
 @Composable
 fun MobileCourseBottomSheetDialog(
-  dialogContents: MutableState<List<CourseBottomSheetDialogExtension>>,
+  state: CourseBottomSheetDialogState,
   contentWrapper: @Composable (@Composable () -> Unit) -> Unit = { it.invoke() }, // 可用于传递 contextProvider
 ) {
-  if (dialogContents.value.isNotEmpty()) {
+  if (state.dialogContents.value.isNotEmpty()) {
     Window(
       dismissOnBackPress = {
-        dialogContents.value = emptyList()
+        state.dialogContents.value = emptyList()
       }
     ) {
       contentWrapper.invoke {
@@ -87,7 +143,7 @@ fun MobileCourseBottomSheetDialog(
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(LocalAppColors.current.whiteBlack)
             ) {
-              CourseBottomSheetDialogContent(dialogContents.value)
+              CourseBottomSheetDialogContent(state.dialogContents.value)
             }
           }
         }
@@ -98,7 +154,7 @@ fun MobileCourseBottomSheetDialog(
             // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
           }
           bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
-          dialogContents.value = emptyList()
+          state.dialogContents.value = emptyList()
         }
       }
     }

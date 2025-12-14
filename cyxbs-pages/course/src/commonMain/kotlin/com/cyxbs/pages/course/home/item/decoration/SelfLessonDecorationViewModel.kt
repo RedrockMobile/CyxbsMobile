@@ -2,17 +2,21 @@ package com.cyxbs.pages.course.home.item.decoration
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.SelfLessonItem
 import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -32,14 +36,6 @@ class SelfLessonDecorationViewModel(
   val hierarchy: CourseItemViewModel.ItemHierarchy<SelfLessonItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
-  companion object {
-    val Comparable = compareBy<SelfLessonItem> { -it.page } // page 越小越在上
-      .thenBy { -it.lesson.week[0] } // 起始周越小越在上
-      .thenBy { -it.lesson.dayOfWeek.ordinal } // dayOfWeek 越小越在上
-      .thenBy { it.lesson.beginTime } // beginTime 越大越在上
-      .thenBy { it.lesson.finalTime } // finalTime 越大越在上
-  }
-
   private val itemFactory = SelfLessonItemFactory.get()
 
   init {
@@ -53,16 +49,16 @@ class SelfLessonDecorationViewModel(
         hierarchy.reset(buildList {
           it?.forEach { lesson ->
             // 添加进整学期
-            add(itemFactory.createSelfLessonItem(0, lesson))
+            add(SelfLessonWhatTime(0, lesson))
             // 添加进每周
             lesson.week.forEach { week ->
-              add(itemFactory.createSelfLessonItem(week, lesson))
+              add(SelfLessonWhatTime(week, lesson))
             }
           }
         })
       }.catch {
 
-      }.launchIn(appCoroutineScope)
+      }.launchIn(viewModelScope)
   }
 
   private fun createLessonFlow(stuNum: String?): Flow<List<LessonByWeeks>?> = flow {
@@ -108,5 +104,51 @@ class SelfLessonDecorationViewModel(
   @Composable
   override fun CoursePageContent() {
     hierarchy.CoursePageItemListContent()
+  }
+}
+
+private data class SelfLessonWhatTime(
+  val page: Int,
+  val lesson: LessonByWeeks,
+) : ItemHierarchyWhatTime<SelfLessonItem>() {
+  override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
+    CourseItemWhatTime.Fixed(
+      page = page,
+      dayOfWeek = lesson.dayOfWeek,
+      beginTime = lesson.beginTime,
+      finalTime = lesson.finalTime,
+    )
+  )
+
+  override fun createItem(coroutineScope: CoroutineScope): SelfLessonItem {
+    return SelfLessonItemFactory.get().createSelfLessonItem(
+      whatTime = this,
+      coroutineScope = coroutineScope,
+      lesson = lesson,
+    )
+  }
+
+  override fun compareTo(other: ItemHierarchyWhatTime<SelfLessonItem>): Int {
+    return 0.compareBy(other) {
+      -it.now.value.page // page 越小越在上
+    }.compareBy(other) {
+      -((other as? SelfLessonWhatTime)?.lesson?.week?.get(0) ?: 0) // 起始周越小越在上
+    }.compareBy(other) {
+      -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
+    }.compareBy(other) {
+      it.now.value.beginTime.value // beginTime 越大越在上
+    }.compareBy(other) {
+      it.now.value.finalTime.value // finalTime 越大越在上
+    }
+  }
+
+  private inline fun Int.compareBy(
+    other: ItemHierarchyWhatTime<SelfLessonItem>,
+    compare: (ItemHierarchyWhatTime<SelfLessonItem>) -> Int
+  ): Int {
+    if (this != 0) return this
+    val a = compare.invoke(this@SelfLessonWhatTime)
+    val b = compare.invoke(other)
+    return a - b
   }
 }

@@ -34,5 +34,13 @@ class AffairWhatTimeModelImpl(
         dateModelEditor.dateModel.enable.valueStateFlow.value = false
       }
     }
+    editor.incrementRemoveList.clear()
+    editor.incrementAddList.clear()
+  }
+
+  override fun toString(): String {
+    return "AffairWhatTimeModelImpl(enable=${enable.value}" +
+        ", timePair=${timePair.value}" +
+        ")"
   }
 }

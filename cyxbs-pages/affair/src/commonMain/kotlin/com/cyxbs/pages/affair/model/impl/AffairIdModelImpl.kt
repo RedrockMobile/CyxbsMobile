@@ -1,14 +1,17 @@
 package com.cyxbs.pages.affair.model.impl
 
+import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairIdModel
 import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.bean.AffairEntity
-import com.cyxbs.pages.affair.model.UpdateAffair
+import com.cyxbs.pages.affair.model.EditAffairUtils
 import com.cyxbs.pages.affair.model.editor.AffairIdModelEditorImpl
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
@@ -41,9 +44,9 @@ class AffairIdModelImpl(
       valueFlow = MutableStateFlow(entity.content),
     )
 
-  override val whatTimeDate: EditorStateFlowImpl<AffairIdModelEditor, ImmutableMap<AffairWhatTimeModelImpl, ImmutableList<AffairDateModelImpl>>> =
-    EditorStateFlowImpl(
-      valueFlow = entity.whatTime.associateTo(LinkedHashMap()) {
+  override val whatTimeDate: MutableStateFlow<ImmutableMap<AffairWhatTimeModelImpl, ImmutableList<AffairDateModelImpl>>> =
+    MutableStateFlow(
+      entity.whatTime.associateTo(LinkedHashMap()) {
         val whatTimeModel = AffairWhatTimeModelImpl(
           idModel = this,
           timePair = it.timePair,
@@ -56,8 +59,13 @@ class AffairIdModelImpl(
           )
         }
         whatTimeModel to dateList.toPersistentList()
-      }.toPersistentMap().let { MutableStateFlow(it) }
+      }.toPersistentMap()
     )
+
+  override val addedDateModel = MutableSharedFlow<AffairDateModel>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
 
   // 用于在创建 AffairIdModelEditorImpl 时上锁
   private val affairIdModelEditorFlow = MutableStateFlow<Any?>(null)
@@ -65,7 +73,14 @@ class AffairIdModelImpl(
   override fun createEditor(): AffairIdModelEditor? {
     if (affairIdModelEditorFlow.compareAndSet(null, Unit)) {
       // 确保线程安全
-      return AffairIdModelEditorImpl(idModel = this) { update(this, it) }
+      return AffairIdModelEditorImpl(idModel = this) {
+        EditAffairUtils.commit(
+          editor = this,
+          needUpload = it,
+        ).onSuccess {
+          affairIdModelEditorFlow.value = null
+        }
+      }
     }
     return null
   }
@@ -80,16 +95,14 @@ class AffairIdModelImpl(
     }
   }
 
-  // 更新数据
-  private suspend fun update(
-    editor: AffairIdModelEditorImpl,
-    needUpload: Boolean,
-  ): Result<AffairIdModelEditor.EditResult> {
-    return UpdateAffair.update(
-      editor = editor,
-      needUpload = needUpload,
-    ).onSuccess {
-      affairIdModelEditorFlow.value = null
-    }
+  override fun toString(): String {
+    return "AffairIdModelImpl(enable=${enable.value}" +
+        ", localId=$localId" +
+        ", remoteId=${remoteId.value}" +
+        ", remindTime=${remindTime.value}" +
+        ", title=${title.value}" +
+        ", content=${content.value}" +
+        ", whatTimeDate=${whatTimeDate.value}" +
+        ")"
   }
 }

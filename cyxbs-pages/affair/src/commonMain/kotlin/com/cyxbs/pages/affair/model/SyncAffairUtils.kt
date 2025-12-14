@@ -23,9 +23,7 @@ object SyncAffairUtils {
   suspend fun syncAffair(affairs: List<AffairEntity>, groupModel: AffairGroupModelImpl) {
     // 本地数据与远端数据都有数据，但数据存在差异，需要进行比较
     // 先通过 remoteId 整合起来比较单个事务
-    val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) {
-      it.remoteId.value.coerceAtLeast(0)
-    }
+    val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId.value }
     oldMap.remove(0) // 本地临时事务不参与更新
     val newMap = affairs.associateByTo(LinkedHashMap()) { it.remoteId }
     val newMapIterator = newMap.iterator()
@@ -66,14 +64,11 @@ object SyncAffairUtils {
       }
     }
     newMap.forEach {
-      groupModel.addAffair(
-        title = it.value.title,
-        content = it.value.content,
-        remindTime = it.value.remindTime,
-        remoteId = it.value.remoteId, // 不上传
-      ) { editor ->
-        syncAffairEntity(editor, it.value)
-      }
+      val editor = groupModel.createAddAffairEditor(
+        remoteId = it.value.remoteId
+      )
+      syncAffairEntity(editor, it.value)
+      editor.commit(needUpload = false) // 不上传
     }
   }
 

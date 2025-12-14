@@ -196,7 +196,7 @@ value class Date(
   }
 
   fun toStringMonthDay(): String {
-    return "$year-${monthNumber.toString().padStart(2, '0')}-" +
+    return "${monthNumber.toString().padStart(2, '0')}-" +
         dayOfMonth.toString().padStart(2, '0')
   }
 

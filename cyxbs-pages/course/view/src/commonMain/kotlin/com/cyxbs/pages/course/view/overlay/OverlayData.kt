@@ -70,8 +70,8 @@ fun CourseItemState.createOverlapResult(
   coveredList: MutableList<OverlapCover>,
 ): OverlapResult {
   val itemState = this
-  val itemBeginTime = itemState.item.whatTime.now.beginTime
-  val itemFinalTime = itemState.item.whatTime.now.finalTime
+  val itemBeginTime = itemState.item.whatTime.now.value.beginTime
+  val itemFinalTime = itemState.item.whatTime.now.value.finalTime
   val itemOverlap = OverlapResult(itemState)
   val showRangeList = itemOverlap.showRangeList
   var index = 0
@@ -80,7 +80,7 @@ fun CourseItemState.createOverlapResult(
   }
   if (index == coveredList.size) {
     // 当前 item 比所有的都大
-    val range = MinuteTimePair(itemState.item.whatTime.now.beginTime, itemFinalTime)
+    val range = MinuteTimePair(itemBeginTime, itemFinalTime)
     showRangeList.add(range)
     coveredList.add(OverlapCover(range, itemOverlap))
   } else {

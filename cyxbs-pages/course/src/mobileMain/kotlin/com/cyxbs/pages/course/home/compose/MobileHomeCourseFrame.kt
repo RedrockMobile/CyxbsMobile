@@ -23,7 +23,7 @@ import com.cyxbs.pages.course.home.item.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.home.item.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
-import com.cyxbs.pages.course.view.item.touch.LongPressCreateDecoration
+import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -109,23 +109,17 @@ private fun getDecoration(): ImmutableList<CoursePageDecoration> {
   val courseItemViewModel = viewModel { CourseItemViewModel() }
   val selfLessonDecoration = viewModel {
     SelfLessonDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay(
-        comparator = SelfLessonDecorationViewModel.Comparable
-      )
+      hierarchy = courseItemViewModel.createOverlay()
     )
   }
   val linkLessonDecoration = viewModel {
     LinkLessonDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay(
-        comparator = LinkLessonDecorationViewModel.Comparable
-      )
+      hierarchy = courseItemViewModel.createOverlay()
     )
   }
   val affairDecoration = viewModel {
     AffairDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay(
-        comparator = AffairDecorationViewModel.Comparable
-      )
+      hierarchy = courseItemViewModel.createOverlay()
     )
   }
   return remember {
@@ -133,7 +127,7 @@ private fun getDecoration(): ImmutableList<CoursePageDecoration> {
       selfLessonDecoration, // 自己的课程
       affairDecoration, // 自己的事务
       linkLessonDecoration, // 关联人的课程
-      LongPressCreateDecoration(), // 长按创建事务
+      CreateAffairDecorationViewModel(), // 长按创建事务
     )
   }
 }

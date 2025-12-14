@@ -5,13 +5,11 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.page.LocalCoursePage
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.flow.collectLatest
@@ -44,31 +42,28 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   }
   val beginTimeAnimatable = remember {
     Animatable(
-      initialValue = itemState.item.whatTime.now.beginTime.minuteOfDay,
+      initialValue = itemState.item.whatTime.now.value.beginTime.minuteOfDay,
       typeConverter = Int.VectorConverter,
     )
   }
   val finalTimeAnimatable = remember {
     Animatable(
-      initialValue = itemState.item.whatTime.now.finalTime.minuteOfDay,
+      initialValue = itemState.item.whatTime.now.value.finalTime.minuteOfDay,
       typeConverter = Int.VectorConverter,
     )
   }
   LaunchedEffect(timeline.beginDayOfWeek) {
-    val whatTime = itemState.item.whatTime
-    if (whatTime is CourseItemWhatTime.Changeable) {
-      whatTime.observe().collectLatest {
-        supervisorScope {
-          val newIndex = calculateIndex(itemState, timeline).toFloat()
-          if (newIndex != indexAnimatable.value) {
-            launch { indexAnimatable.animateTo(newIndex) }
-          }
-          if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
-            launch { beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay) }
-          }
-          if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
-            launch { finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay) }
-          }
+    itemState.item.whatTime.now.collectLatest {
+      supervisorScope {
+        val newIndex = calculateIndex(itemState, timeline).toFloat()
+        if (newIndex != indexAnimatable.value) {
+          launch { indexAnimatable.animateTo(newIndex) }
+        }
+        if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
+          launch { beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay) }
+        }
+        if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
+          launch { finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay) }
         }
       }
     }
@@ -92,9 +87,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
 }
 
 private fun calculateIndex(itemState: CourseItemState, timeline: CourseTimeline): Int {
-  Snapshot.withoutReadObservation {
-    val itemDayOfWeekOrdinal = itemState.item.whatTime.now.dayOfWeek.ordinal
-    val beginDayOfWeekOrdinal = timeline.beginDayOfWeek.ordinal
-    return (itemDayOfWeekOrdinal + 7 - beginDayOfWeekOrdinal) % 7
-  }
+  val itemDayOfWeekOrdinal = itemState.item.whatTime.now.value.dayOfWeek.ordinal
+  val beginDayOfWeekOrdinal = timeline.beginDayOfWeek.ordinal
+  return (itemDayOfWeekOrdinal + 7 - beginDayOfWeekOrdinal) % 7
 }

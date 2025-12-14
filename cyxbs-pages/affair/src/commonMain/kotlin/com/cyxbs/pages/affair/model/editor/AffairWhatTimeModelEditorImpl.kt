@@ -6,7 +6,6 @@ import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.affair.model.impl.AffairDateModelImpl
 import com.cyxbs.pages.affair.model.impl.AffairWhatTimeModelImpl
-import kotlin.collections.get
 
 /**
  * .
@@ -54,7 +53,7 @@ class AffairWhatTimeModelEditorImpl(
       )
       dateList.add(dateModelEditor)
       incrementAddList.add(dateModelEditor)
-      idModelEditor.sendValueByEditorStateFlow()
+      idModelEditor.idModel.addedDateModel.tryEmit(dateModel)
       return dateModelEditor
     }
     return null
@@ -73,7 +72,6 @@ class AffairWhatTimeModelEditorImpl(
       if (!incrementAddList.remove(date)) {
         incrementRemoveList.add(date)
       }
-      idModelEditor.sendValueByEditorStateFlow()
       return true
     }
     return false
@@ -92,7 +90,6 @@ class AffairWhatTimeModelEditorImpl(
       }
       dateList.clear()
       incrementAddList.clear()
-      idModelEditor.sendValueByEditorStateFlow()
     }
   }
 
@@ -122,7 +119,6 @@ class AffairWhatTimeModelEditorImpl(
       if (!incrementRemoveList.remove(date)) {
         incrementAddList.add(date)
       }
-      idModelEditor.sendValueByEditorStateFlow()
       return true
     }
     return false

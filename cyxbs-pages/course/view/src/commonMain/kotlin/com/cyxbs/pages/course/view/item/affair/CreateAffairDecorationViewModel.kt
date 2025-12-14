@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.item.touch
+package com.cyxbs.pages.course.view.item.affair
 
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.time.MinuteTime
@@ -52,11 +53,11 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchedItem
+import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchingItem
 import com.cyxbs.pages.course.view.item.modifier.PressScaleController
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.cyxbs.pages.course.view.item.modifier.pressScale
-import com.cyxbs.pages.course.view.item.touch.LongPressCreateDecoration.TouchedItem
-import com.cyxbs.pages.course.view.item.touch.LongPressCreateDecoration.TouchingItem
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
@@ -78,7 +79,7 @@ import kotlin.math.roundToInt
  * @date 2025/5/17
  */
 @Stable
-class LongPressCreateDecoration : CoursePageDecoration {
+class CreateAffairDecorationViewModel : BaseViewModel(), CoursePageDecoration {
 
   @Composable
   override fun CoursePageContent() {
@@ -232,7 +233,6 @@ private fun TouchedItems(
         ).pressScale(PressScaleController) // 点击后的 Q 弹动画
           .then(RoundedShadowItemModifier.createModifier())
           .background(0xFFE9EDF2.dark(0xFF202223))
-
       )
     }
   }

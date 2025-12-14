@@ -38,4 +38,11 @@ class AffairDateModelImpl(
     }
     date.valueStateFlow.value = editor.date
   }
+
+  override fun toString(): String {
+    return "AffairDateModelImpl(enable=${enable.value}" +
+        ", whatTime=${whatTime.value.timePair.value}" +
+        ", date=${date.value}" +
+        ")"
+  }
 }

@@ -1,8 +1,8 @@
 package com.cyxbs.pages.course.home.item.decoration
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.LinkLessonItem
 import com.cyxbs.pages.course.home.item.LinkLessonItemFactory
@@ -10,7 +10,11 @@ import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -28,16 +32,6 @@ class LinkLessonDecorationViewModel(
   val hierarchy: CourseItemViewModel.ItemHierarchy<LinkLessonItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
-  companion object {
-    val Comparable = compareBy<LinkLessonItem> { -it.page } // page 越小越在上
-      .thenBy { -it.lesson.week[0] } // 起始周越小越在上
-      .thenBy { -it.lesson.dayOfWeek.ordinal } // dayOfWeek 越小越在上
-      .thenBy { it.lesson.beginTime } // beginTime 越大越在上
-      .thenBy { it.lesson.finalTime } // finalTime 越大越在上
-  }
-
-  private val itemFactory = LinkLessonItemFactory.get()
-
   init {
     LinkLessonRepository.state.map {
       it.linkNum
@@ -51,7 +45,7 @@ class LinkLessonDecorationViewModel(
       resetData(it)
     }.catch {
 
-    }.launchIn(appCoroutineScope)
+    }.launchIn(viewModelScope)
   }
 
   private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>> {
@@ -66,10 +60,10 @@ class LinkLessonDecorationViewModel(
     hierarchy.reset(buildList {
       data.forEach { lesson ->
         // 添加进整学期
-        add(itemFactory.createLinkLessonItem(0, lesson))
+        add(LinkLessonWhatTime(0, lesson))
         // 添加进每周
         lesson.week.forEach { week ->
-          add(itemFactory.createLinkLessonItem(week, lesson))
+          add(LinkLessonWhatTime(week, lesson))
         }
       }
     })
@@ -78,5 +72,51 @@ class LinkLessonDecorationViewModel(
   @Composable
   override fun CoursePageContent() {
     hierarchy.CoursePageItemListContent()
+  }
+}
+
+private data class LinkLessonWhatTime(
+  val page: Int,
+  val lesson: LessonByWeeks,
+) : ItemHierarchyWhatTime<LinkLessonItem>() {
+  override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
+    CourseItemWhatTime.Fixed(
+      page = page,
+      dayOfWeek = lesson.dayOfWeek,
+      beginTime = lesson.beginTime,
+      finalTime = lesson.finalTime,
+    )
+  )
+
+  override fun createItem(coroutineScope: CoroutineScope): LinkLessonItem {
+    return LinkLessonItemFactory.get().createLinkLessonItem(
+      whatTime = this,
+      coroutineScope = coroutineScope,
+      lesson = lesson,
+    )
+  }
+
+  override fun compareTo(other: ItemHierarchyWhatTime<LinkLessonItem>): Int {
+    return 0.compareBy(other) {
+      -it.now.value.page // page 越小越在上
+    }.compareBy(other) {
+      -((other as? LinkLessonWhatTime)?.lesson?.week?.get(0) ?: 0) // 起始周越小越在上
+    }.compareBy(other) {
+      -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
+    }.compareBy(other) {
+      it.now.value.beginTime.value // beginTime 越大越在上
+    }.compareBy(other) {
+      it.now.value.finalTime.value // finalTime 越大越在上
+    }
+  }
+
+  private inline fun Int.compareBy(
+    other: ItemHierarchyWhatTime<LinkLessonItem>,
+    compare: (ItemHierarchyWhatTime<LinkLessonItem>) -> Int
+  ): Int {
+    if (this != 0) return this
+    val a = compare.invoke(this@LinkLessonWhatTime)
+    val b = compare.invoke(other)
+    return a - b
   }
 }
