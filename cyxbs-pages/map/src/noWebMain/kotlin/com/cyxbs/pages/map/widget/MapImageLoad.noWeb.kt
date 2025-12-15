@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -16,10 +19,10 @@ import androidx.compose.ui.unit.IntSize
 import com.cyxbs.pages.map.util.actualOffset
 import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculateRatio
+import com.cyxbs.pages.map.util.detectTransformGestures
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvas
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvasViewPort
 import com.jvziyaoyao.scale.image.sampling.rememberSamplingDecoder
-import com.cyxbs.pages.map.util.detectTransformGestures
 
 @Composable
 actual fun MapImageLoad(
@@ -34,6 +37,50 @@ actual fun MapImageLoad(
   val (samplingDecoder) = rememberSamplingDecoder(inputStream)
   samplingDecoder?.let { samplingDecoder ->
     val ratio = calculateRatio(samplingDecoder.intrinsicSize)
+    val viewPort by remember {
+      derivedStateOf {
+        if (mapWidgetState.container.width > 0 && mapWidgetState.container.height > 0) {
+          // 拿到容器的宽高以及中心坐标
+          val weight = mapWidgetState.container.width.toFloat()
+          val height = weight / ratio
+          val center = mapWidgetState.center
+          /*
+          计算当前区域原本大小下的位置,screen=center+offset+scale*(local-center)
+          故反推就是:local=(screen-center-offset) / scale + center
+          因为当前需要高清切片的矩形位置是(0,0,weight,height),根据这个计算而来
+           */
+          val leftTopOrigin = calculateOriginPosition(
+            center,
+            mapWidgetState.offset,
+            Offset(0f, 0f),
+            mapWidgetState.scale
+          ) - Offset(
+            0f,
+            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
+          )
+          val rightBottomOrigin = calculateOriginPosition(
+            center,
+            mapWidgetState.offset,
+            Offset(weight, height),
+            mapWidgetState.scale
+          ) - Offset(
+            0f,
+            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
+          )
+          // 将区域原本的位置/weight或者height,进行归一化,因为参数传的是需要高清的切片占原来整个图的相对位置(0f-1f)
+          val leftVisual = (leftTopOrigin.x / weight).coerceIn(0f, 1f)
+          val rightVisual = (rightBottomOrigin.x / weight).coerceIn(0f, 1f)
+          val topVisual = (leftTopOrigin.y / height).coerceIn(0f, 1f)
+          val bottomVisual = (rightBottomOrigin.y / height).coerceIn(0f, 1f)
+          SamplingCanvasViewPort(
+            scale = mapWidgetState.scale,
+            visualRect = Rect(leftVisual, topVisual, rightVisual, bottomVisual)
+          )
+        } else {
+          null
+        }
+      }
+    }
     Box(
       modifier = Modifier
         .fillMaxSize()
@@ -85,45 +132,10 @@ actual fun MapImageLoad(
           }
           .align(Alignment.Center)
       ) {
-        if (mapWidgetState.container.width > 0 && mapWidgetState.container.height > 0) {
-          // 拿到容器的宽高以及中心坐标
-          val weight = mapWidgetState.container.width.toFloat()
-          val height = weight / ratio
-          val center = mapWidgetState.center
-          /*
-          计算当前区域原本大小下的位置,screen=center+offset+scale*(local-center)
-          故反推就是:local=(screen-center-offset) / scale + center
-          因为当前需要高清切片的矩形位置是(0,0,weight,height),根据这个计算而来
-           */
-          val leftTopOrigin = calculateOriginPosition(
-            center,
-            mapWidgetState.offset,
-            Offset(0f, 0f),
-            mapWidgetState.scale
-          ) - Offset(
-            0f,
-            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
-          )
-          val rightBottomOrigin = calculateOriginPosition(
-            center,
-            mapWidgetState.offset,
-            Offset(weight, height),
-            mapWidgetState.scale
-          ) - Offset(
-            0f,
-            (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / ratio) / 2f
-          )
-          // 将区域原本的位置/weight或者height,进行归一化,因为参数传的是需要高清的切片占原来整个图的相对位置(0f-1f)
-          val leftVisual = (leftTopOrigin.x / weight).coerceIn(0f, 1f)
-          val rightVisual = (rightBottomOrigin.x / weight).coerceIn(0f, 1f)
-          val topVisual = (leftTopOrigin.y / height).coerceIn(0f, 1f)
-          val bottomVisual = (rightBottomOrigin.y / height).coerceIn(0f, 1f)
+        viewPort?.let { viewPort ->
           SamplingCanvas(
             samplingDecoder = samplingDecoder,
-            viewPort = SamplingCanvasViewPort(
-              scale = mapWidgetState.scale,
-              visualRect = Rect(leftVisual, topVisual, rightVisual, bottomVisual)
-            )
+            viewPort = viewPort
           )
           anchorContent()
         }

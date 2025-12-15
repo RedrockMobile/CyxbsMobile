@@ -124,7 +124,7 @@ fun AnchorItem(
       if (mapWidgetState.scale != 0f) 1f / mapWidgetState.scale else 1f
     )
   }
-  AnchorImage(
+  Image(
     modifier = Modifier
       .offset {
         IntOffset(
@@ -142,14 +142,7 @@ fun AnchorItem(
       // 这里要在scale变换后调用，如果放在前面则会扩大点击区域
       .clickableSingle {
         onClick()
-      }
-  )
-}
-
-@Composable
-fun AnchorImage(modifier: Modifier = Modifier) {
-  Image(
-    modifier = modifier,
+      },
     painter = painterResource(Res.drawable.map_ic_local),
     contentDescription = null
   )

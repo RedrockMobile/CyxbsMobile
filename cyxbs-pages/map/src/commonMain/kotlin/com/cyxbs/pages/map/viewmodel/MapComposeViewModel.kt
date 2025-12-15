@@ -394,6 +394,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
       anchorItemStateList.clear()
       mapInfo.value?.let { mapInfo ->
         // 后端返回list不是顺序的,只能遍历了
+        val tmpList: MutableList<AnchorItemState> = mutableListOf()
         collectListState.forEach {
           mapInfo.placeList.find { placeItem ->
             it == placeItem.placeId
@@ -403,7 +404,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
               mapContainer.value,
               IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
             )
-            anchorItemStateList.add(
+            tmpList.add(
               AnchorItemState(
                 initialPosition = getOffset,
                 placeId = placeItem.placeId
@@ -411,6 +412,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
             )
           }
         }
+        anchorItemStateList.addAll(tmpList)
       }
       resetMap(this)
       val newDuration = if (collectListState.size <= 5) 100 else 50
@@ -435,6 +437,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
       anchorItemStateList.clear()
       // 从地图信息中寻找匹配的建筑
       mapInfo.value?.let { mapInfo ->
+        val tmpList: MutableList<AnchorItemState> = mutableListOf()
         mapInfo.placeList.forEach { placeItem ->
           if (item < buttonInfoItem.placeIdList.size && placeItem.placeId == buttonInfoItem.placeIdList[item]) {
             val getOffset = calculatePlaceInMap(
@@ -442,7 +445,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
               mapContainer.value,
               IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
             )
-            anchorItemStateList.add(
+            tmpList.add(
               AnchorItemState(
                 initialPosition = getOffset,
                 placeId = placeItem.placeId
@@ -451,6 +454,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
             item++
           }
         }
+        anchorItemStateList.addAll(tmpList)
       }
       resetMap(this)
       val newDuration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
