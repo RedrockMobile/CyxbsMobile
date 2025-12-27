@@ -4,7 +4,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.course.home.compose.MobileHomeCourseFrame
 import com.cyxbs.pages.course.view.data.CourseDayDataPool
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * .
@@ -17,7 +17,7 @@ object NextItemHeaderUtils {
   fun find(
     nowTime: MinuteTimeDate,
     frame: MobileHomeCourseFrame,
-  ): BottomSheetItemHeader? {
+  ): CourseBottomSheetHeaderExtension? {
     return findDayItem(nowTime, frame) ?: findDayItem(
       MinuteTimeDate(
         date = nowTime.date.plusDays(1),
@@ -31,31 +31,34 @@ object NextItemHeaderUtils {
   private fun findDayItem(
     nowTime: MinuteTimeDate,
     frame: MobileHomeCourseFrame,
-  ): BottomSheetItemHeader? {
+  ): CourseBottomSheetHeaderExtension? {
     val dayOfWeek = nowTime.date.dayOfWeek
-    return findMinDayItemFromDayDataPool(
-      nowTime,
-      frame.providerGroup.getWeekDataPool(frame.getPage(nowTime.date)).get(dayOfWeek)
-    )
+//    return findMinDayItemFromDayDataPool(
+//      nowTime,
+//      frame.providerGroup.getWeekDataPool(frame.getPage(nowTime.date)).get(dayOfWeek)
+//    )
+    // todo 待实现寻找下一节课程
+    return null
   }
 
   private fun findMinDayItemFromDayDataPool(
     nowTime: MinuteTimeDate,
     dayDataPool: CourseDayDataPool,
-  ): BottomSheetItemHeader? {
-    var minItem: CourseItemModel? = null
+  ): CourseBottomSheetHeaderExtension? {
+    var minWrapper: CourseItemWrapper<*>? = null
     for (itemOverlap in dayDataPool.state.value.asReversed()) {
-      val item = itemOverlap.item
-      if (item !is BottomSheetItemHeader) continue
-      if (nowTime.time in item.beginTime..item.finalTime) {
+      val wrapper = itemOverlap.wrapper
+      val item = wrapper.item
+      if (item !is CourseBottomSheetHeaderExtension) continue
+      if (nowTime.time in wrapper.beginTime..wrapper.finalTime) {
         return item
       }
-      if (item.beginTime < nowTime.time) continue // 略过小于的时间段
-      if (minItem == null || item.beginTime < minItem.beginTime) {
-        minItem = item
+      if (wrapper.beginTime < nowTime.time) continue // 略过小于的时间段
+      if (minWrapper == null || wrapper.beginTime < minWrapper.beginTime) {
+        minWrapper = wrapper
         continue
       }
     }
-    return minItem as BottomSheetItemHeader?
+    return minWrapper?.item as CourseBottomSheetHeaderExtension?
   }
 }

@@ -22,7 +22,7 @@ object LessonServiceImpl2 : ILessonService2 {
   ): Flow<List<LessonByWeeks>> {
     return LessonRepository.observeLesson(
       stuNum = stuNum,
-      needCache = needCache,
+      needOldData = needCache,
       needRequest = needRequest,
     )
   }

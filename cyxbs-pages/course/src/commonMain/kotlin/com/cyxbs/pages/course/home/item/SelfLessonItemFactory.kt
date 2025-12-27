@@ -3,8 +3,10 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItemModel
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.home.item.impl.DefaultSelfLessonItem
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * SelfLessonItem 工厂，由具体平台实现
@@ -17,20 +19,23 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
  */
 interface SelfLessonItemFactory {
 
-  fun createSelfLessonItemModel(
-    page: Int,
-    lesson: LessonByWeeks,
-  ): SelfLessonItemModel
-
+  fun createSelfLessonItem(
+    whatTime: CourseItemWhatTime,
+    coroutineScope: CoroutineScope,
+    lesson: LessonByWeeks
+  ): SelfLessonItem
 
   companion object {
     fun get(): SelfLessonItemFactory {
-      return SelfLessonItemFactory::class.implOrNull() ?: DefaultSelfLessonItemModel
+      return SelfLessonItemFactory::class.implOrNull() ?: DefaultSelfLessonItem
     }
   }
 }
 
 @Stable
-interface SelfLessonItemModel : CourseItemModel {
+abstract class SelfLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
   val lesson: LessonByWeeks
+) : CourseItem(whatTime, coroutineScope) {
 }

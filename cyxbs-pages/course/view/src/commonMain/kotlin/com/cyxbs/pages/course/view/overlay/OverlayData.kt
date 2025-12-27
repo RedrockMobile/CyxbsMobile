@@ -3,7 +3,9 @@ package com.cyxbs.pages.course.view.overlay
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * 重叠的数据
@@ -11,27 +13,44 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
  * @author 985892345
  * @date 2025/2/15
  */
+
+class OverlapCover(
+  val range: MinuteTimePair,
+  val result: OverlapResult,
+)
+
+class OverlapResult(
+  val itemState: CourseItemState,
+) {
+
+  // 能够展示的区域
+  val showRangeList: MutableList<MinuteTimePair> = mutableListOf()
+
+  // 被覆盖的区域
+  // 其 CourseItemCover#result 为上层 item
+  val coveredRangeList: MutableList<OverlapCover> = mutableListOf()
+
+  // 覆盖的 item 集合，只保存了直接覆盖的子 item，如果需要查找所有覆盖的 item，需要进行递归收集
+  // 其 CourseItemCover#result 为下层 item
+  val coveredItemList: MutableList<OverlapCover> = mutableListOf()
+}
+
+
 @Stable
 class CourseItemOverlap(
-  val item: CourseItemModel,
+  val wrapper: CourseItemWrapper<*>,
   val showRangeList: List<CourseItemRange>, // 能够展示区域
 ) {
   // ItemCover 类型会在判断 equal 时使父子构成循环引用，所以需要单独分离
-  val coveredRangeList: MutableList<CourseItemCover> = mutableListOf() // 被覆盖的区域
+
+  // 被覆盖的区域
+  // 其 CourseItemCover#itemOverlap 为上层 item
+  val coveredRangeList: MutableList<CourseItemCover> = mutableListOf()
 
   // 覆盖的 item 集合，只保存了直接覆盖的子 item，如果需要查找所有覆盖的 item，需要进行递归收集
+  // 其 CourseItemCover#itemOverlap 为下层 item
   val coveredItemList: MutableList<CourseItemCover> = mutableListOf()
 
-  companion object {
-    fun transformOverlap(items: List<CourseItemModel>): List<CourseItemOverlap> {
-      val coveredList = mutableListOf<CourseItemCover>()
-      return items
-        .asReversed()
-        .map {
-          transform(it, coveredList)
-        }.asReversed()
-    }
-  }
 }
 
 @Stable
@@ -47,168 +66,186 @@ data class CourseItemCover(
 )
 
 
-private fun transform(
-  item: CourseItemModel,
-  coveredList: MutableList<CourseItemCover>,
-): CourseItemOverlap {
-  val showRangeList = mutableListOf<CourseItemRange>()
-  val itemOverlap = CourseItemOverlap(item, showRangeList)
+fun CourseItemState.createOverlapResult(
+  coveredList: MutableList<OverlapCover>,
+): OverlapResult {
+  val itemState = this
+  val itemBeginTime = itemState.item.whatTime.now.value.beginTime
+  val itemFinalTime = itemState.item.whatTime.now.value.finalTime
+  val itemOverlap = OverlapResult(itemState)
+  val showRangeList = itemOverlap.showRangeList
   var index = 0
-  while (index < coveredList.size && coveredList[index].range.final <= item.beginTime) {
+  while (index < coveredList.size && coveredList[index].range.second <= itemBeginTime) {
     index++ // 找到第一个 [index].final > item.begin 的位置
   }
   if (index == coveredList.size) {
     // 当前 item 比所有的都大
-    val range = CourseItemRange(item.beginTime, item.finalTime)
+    val range = MinuteTimePair(itemBeginTime, itemFinalTime)
     showRangeList.add(range)
-    coveredList.add(CourseItemCover(range, itemOverlap))
+    coveredList.add(OverlapCover(range, itemOverlap))
   } else {
-    // 此时 item.begin < now.final
-    //       ------ ｜     ----?????  ｜   -----??????  ｜
+    // 此时 item.begin < now.range.second
+    //       ------ ｜     ----?????  ｜   ???---?????  ｜
     // ======       ｜  ==========    ｜      ======    ｜
-    var itemBegin = item.beginTime
+    var prevBegin = itemBeginTime
     while (true) {
       val now = coveredList[index]
-      if (now.range.begin >= item.finalTime) {
+      if (now.range.first >= itemFinalTime) {
         // 完全不相交
         //       ------
         // ======
-        showRangeList.add(CourseItemRange(itemBegin, item.finalTime))
+        showRangeList.add(MinuteTimePair(prevBegin, itemFinalTime))
         coveredList.add(
           index,
-          CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+          OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
         )
         break
-      } else if (now.range.begin > itemBegin) {
-        // 此时 itemBegin < now.begin < item.final
+      } else if (now.range.first > prevBegin) {
+        // 此时 prevBegin < now.range.first < item.final
         //    ----?????
         // ==========
-        showRangeList.add(CourseItemRange(itemBegin, now.range.begin))
-        if (now.range.final == item.finalTime) {
+        showRangeList.add(MinuteTimePair(prevBegin, now.range.first))
+        if (now.range.second == itemFinalTime) {
           //    -------
           // ==========
-          val coveredRange = CourseItemRange(now.range.begin, now.range.final)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
+          val coveredRange = MinuteTimePair(now.range.first, now.range.second)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
           coveredList[index] =
-            CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+            OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
           break
-        } else if (now.range.final > item.finalTime) {
+        } else if (now.range.second > itemFinalTime) {
           //    ----------
           // ==========
-          val coveredRange = CourseItemRange(now.range.begin, item.finalTime)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
+          val coveredRange = MinuteTimePair(now.range.first, itemFinalTime)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
           coveredList[index] =
-            CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap)
+            OverlapCover(MinuteTimePair(itemFinalTime, now.range.second), now.result)
           coveredList.add(
             index,
-            CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+            OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
           )
           break
         } else {
           //    ----
           // ==========
-          val coveredRange = CourseItemRange(now.range.begin, now.range.final)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
+          val coveredRange = MinuteTimePair(now.range.first, now.range.second)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
           coveredList.removeAt(index)
           if (index == coveredList.size) {
             // 没有下一个 item，则直接添加到末尾
-            coveredList.add(CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+            coveredList.add(
+              OverlapCover(
+                MinuteTimePair(itemBeginTime, itemFinalTime),
+                itemOverlap
+              )
+            )
+            showRangeList.add(MinuteTimePair(now.range.second, itemFinalTime))
             break
           } else {
+            // 因为前面调用了 coveredList.removeAt(index)
+            // 后续 coveredList 中添加时使用 itemBeginTime
             // 进入下一次 while 循环
-            itemBegin = now.range.final
+            prevBegin = now.range.second
             continue
           }
         }
       } else {
-        // 此时 now.begin ≤ itemBegin < now.final
-        // -----??????
+        // 此时 now.range.first ≤ itemBegin < now.final
+        // ???---?????
         //    ======
-        if (now.range.final == item.finalTime) {
-          // ---------
+        if (now.range.second == itemFinalTime) {
+          // ???------
           //    ======
-          val coveredRange = CourseItemRange(itemBegin, item.finalTime)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
-          if (now.range.begin == itemBegin) {
+          val coveredRange = MinuteTimePair(prevBegin, itemFinalTime)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
+          if (now.range.first == prevBegin) {
             // ------
             // ======
             coveredList.removeAt(index)
             coveredList.add(
               index,
-              CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap)
+              OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
             )
             break
           } else {
             // ---------
             //    ======
             coveredList[index] =
-              CourseItemCover(CourseItemRange(now.range.begin, itemBegin), now.itemOverlap)
-            coveredList.add(index + 1, CourseItemCover(coveredRange, itemOverlap))
+              OverlapCover(MinuteTimePair(now.range.first, prevBegin), now.result)
+            coveredList.add(index + 1, OverlapCover(coveredRange, itemOverlap))
             break
           }
-        } else if (now.range.final > item.finalTime) {
-          // ------------
+        } else if (now.range.second > itemFinalTime) {
+          // ???---------
           //    ======
-          val coveredRange = CourseItemRange(itemBegin, item.finalTime)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
-          if (now.range.begin == itemBegin) {
+          val coveredRange = MinuteTimePair(prevBegin, itemFinalTime)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
+          if (now.range.first == prevBegin) {
             // ---------
             // ======
             coveredList[index] =
-              CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap)
-            coveredList.add(index,
-              CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+              OverlapCover(MinuteTimePair(itemFinalTime, now.range.second), now.result)
+            coveredList.add(
+              index,
+              OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
+            )
             break
           } else {
             // ------------
             //    ======
             coveredList[index] =
-              CourseItemCover(CourseItemRange(now.range.begin, itemBegin), now.itemOverlap)
-            coveredList.add(index + 1, CourseItemCover(coveredRange, itemOverlap))
-            coveredList.add(index + 2,
-              CourseItemCover(CourseItemRange(item.finalTime, now.range.final), now.itemOverlap))
+              OverlapCover(MinuteTimePair(now.range.first, prevBegin), now.result)
+            coveredList.add(index + 1, OverlapCover(coveredRange, itemOverlap))
+            coveredList.add(
+              index + 2,
+              OverlapCover(MinuteTimePair(itemFinalTime, now.range.second), now.result)
+            )
             break
           }
         } else {
-          // now.final < item.final
-          // -------
+          // now.range.second < item.final
+          // ???----
           //    ======
-          val coveredRange = CourseItemRange(itemBegin, now.range.final)
-          itemOverlap.coveredRangeList.add(CourseItemCover(coveredRange, now.itemOverlap))
-          now.itemOverlap.coveredItemList.add(CourseItemCover(coveredRange, itemOverlap))
-          if (now.range.begin == itemBegin) {
+          val coveredRange = MinuteTimePair(prevBegin, now.range.second)
+          itemOverlap.coveredRangeList.add(OverlapCover(coveredRange, now.result))
+          now.result.coveredItemList.add(OverlapCover(coveredRange, itemOverlap))
+          if (now.range.first == prevBegin) {
             // ----
             // ======
             coveredList.removeAt(index)
             if (index == coveredList.size) {
               // 没有下一个 item，则直接添加到末尾
               coveredList.add(
-                CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+                OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
+              )
+              showRangeList.add(MinuteTimePair(now.range.second, itemFinalTime))
               break
             } else {
               // 进入下一次 while 循环
-              itemBegin = now.range.final
+              prevBegin = now.range.second
               continue
             }
           } else {
             // -------
             //    ======
             coveredList[index] =
-              CourseItemCover(CourseItemRange(now.range.begin, itemBegin), now.itemOverlap)
+              OverlapCover(MinuteTimePair(now.range.first, prevBegin), now.result)
             index++
             if (index == coveredList.size) {
               // 没有下一个 item，则直接添加到末尾
               coveredList.add(
-                CourseItemCover(CourseItemRange(item.beginTime, item.finalTime), itemOverlap))
+                OverlapCover(MinuteTimePair(itemBeginTime, itemFinalTime), itemOverlap)
+              )
+              showRangeList.add(MinuteTimePair(now.range.second, itemFinalTime))
               break
             } else {
               // 进入下一次 while 循环
-              itemBegin = now.range.final
+              prevBegin = now.range.second
               continue
             }
           }
@@ -220,60 +257,60 @@ private fun transform(
 }
 
 // 合并区间
-internal fun List<CourseItemRange>.mergeOverlapRange(): List<CourseItemRange> {
-  val coveredList = mutableListOf<CourseItemRange>()
+internal fun List<MinuteTimePair>.mergeOverlapRange(): List<MinuteTimePair> {
+  val coveredList = mutableListOf<MinuteTimePair>()
   fastForEach { item ->
     var index = 0
-    while (index < coveredList.size && coveredList[index].final < item.begin) {
-      index++ // 找到第一个 [index].final >= item.begin 的位置
+    while (index < coveredList.size && coveredList[index].second < item.first) {
+      index++ // 找到第一个 [index].final >= item.first 的位置
     }
     if (index == coveredList.size) {
       // 当前 item 比所有的都大
       coveredList.add(item)
     } else {
-      // 此时 item.begin <= now.final
+      // 此时 item.first <= now.final
       //       ------ ｜     ----?????  ｜   -----??????  ｜
       // ======       ｜  ==========    ｜      ======    ｜
-      var itemBegin = item.begin
+      var itemBegin = item.first
       while (true) {
         val now = coveredList[index]
-        if (now.begin > item.final) {
+        if (now.first > item.second) {
           // 完全不相交
           //        ------
           // ======
           coveredList.add(index, item)
           break
-        } else if (now.begin == item.final) {
+        } else if (now.first == item.second) {
           // 刚好相等
           //       ------
           // ======
-          coveredList[index] = CourseItemRange(itemBegin, now.final)
+          coveredList[index] = MinuteTimePair(itemBegin, now.second)
           break
-        } else if (now.begin >= itemBegin) {
-          // 此时 itemBegin <= now.begin < item.final
+        } else if (now.first >= itemBegin) {
+          // 此时 itemBegin <= now.first < item.second
           //    ----?????
           // ==========
-          if (now.final >= item.final) {
+          if (now.second >= item.second) {
             //    ----------
             // ==========
-            coveredList[index] = CourseItemRange(itemBegin, now.final)
+            coveredList[index] = MinuteTimePair(itemBegin, now.second)
             break
           } else {
             //    -----
             // ==========
             coveredList.removeAt(index)
             if (index == coveredList.size) {
-              coveredList.add(CourseItemRange(itemBegin, item.final))
+              coveredList.add(MinuteTimePair(itemBegin, item.second))
               break
             } else {
               continue
             }
           }
         } else {
-          // 此时 now.begin < itemBegin <= now.final
+          // 此时 now.first < itemBegin <= now.second
           // -----??????
           //    ======
-          if (now.final >= item.final) {
+          if (now.second >= item.second) {
             // ------------
             //    ======
             // 已经被包含了，不需要添加
@@ -283,10 +320,10 @@ internal fun List<CourseItemRange>.mergeOverlapRange(): List<CourseItemRange> {
             //    ======
             coveredList.removeAt(index)
             if (index == coveredList.size) {
-              coveredList.add(CourseItemRange(now.begin, item.final))
+              coveredList.add(MinuteTimePair(now.first, item.second))
               break
             } else {
-              itemBegin = now.begin
+              itemBegin = now.first
               continue
             }
           }

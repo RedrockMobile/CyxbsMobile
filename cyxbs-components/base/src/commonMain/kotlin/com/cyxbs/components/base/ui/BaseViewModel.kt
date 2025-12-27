@@ -24,14 +24,21 @@ abstract class CommonBaseViewModel : ViewModel(), ToastUtils {
   /**
    * 开启协程并收集 Flow
    */
-  protected fun <T> Flow<T>.collectLaunch(action: suspend (value: T) -> Unit): Job = launch {
+  protected fun <T> Flow<T>.collectLaunch(
+    context: CoroutineContext = EmptyCoroutineContext,
+    start: CoroutineStart = CoroutineStart.DEFAULT,
+    action: suspend (value: T) -> Unit
+  ): Job = launchByViewModelScope(
+    context = context,
+    start = start,
+  ) {
     collect{ action.invoke(it) }
   }
 
   /**
    * ViewModel 下开启协程
    */
-  protected fun launch(
+  protected fun launchByViewModelScope(
     context: CoroutineContext = EmptyCoroutineContext,
     start: CoroutineStart = CoroutineStart.DEFAULT,
     block: suspend CoroutineScope.() -> Unit

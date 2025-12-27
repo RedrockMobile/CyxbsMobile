@@ -3,11 +3,13 @@ package com.cyxbs.pages.course.view.week
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,14 +41,15 @@ import kotlinx.datetime.DayOfWeek
 fun CourseWeekCompose(
   weekBeginDate: Date?, // 传递 nul 将不显示号数
   beginDayOfWeek: DayOfWeek,
-  timelineWidth: Dp = 40.dp, // 与 timeline 一致
+  showShadowDayOfWeek: DayOfWeek?, // 星期几展示今日阴影
+  timelineWidth: Dp, // 与 timeline 一致
+  scrollPaddingValues: PaddingValues,
   modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .height(50.dp)
-      .background(LocalAppColors.current.topBg),
+      .height(50.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Text(
@@ -55,20 +59,22 @@ fun CourseWeekCompose(
       color = LocalAppColors.current.tvLv1,
       textAlign = TextAlign.Center,
     )
-    Row(modifier = Modifier.fillMaxSize()) {
+    val layoutDirection = LocalLayoutDirection.current
+    Row(
+      modifier = Modifier.fillMaxSize()
+        .padding(
+          start = scrollPaddingValues.calculateLeftPadding(layoutDirection),
+          end = scrollPaddingValues.calculateRightPadding(layoutDirection),
+        )
+    ) {
       repeat(7) {
-        val showToday by rememberDerivedStateOfStructure(weekBeginDate, beginDayOfWeek) {
-          if (weekBeginDate == null) beginDayOfWeek.add(it) == Today.dayOfWeek else {
-            weekBeginDate.plusDays(it) == Today
-          }
-        }
+        val showToday = showShadowDayOfWeek == beginDayOfWeek.add(it)
         Column(
           modifier = Modifier
             .weight(1F)
             .fillMaxHeight()
             .plusDsl {
               if (showToday) {
-                background(0x93E8F0FC.dark(0x26000101), RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                 background(LocalAppColors.current.tvLv4, RoundedCornerShape(8.dp))
               }
             },

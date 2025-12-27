@@ -66,7 +66,7 @@ class FeedbackEditViewModel: BaseViewModel() {
             }
             .safeSubscribeBy {
                 toast("提交成功  我们会尽快回复")
-                launch {
+                launchByViewModelScope {
                     _finishEvent.emit(Unit)
                 }
             }

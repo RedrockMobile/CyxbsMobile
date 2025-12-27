@@ -3,8 +3,10 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.home.item.impl.DefaultAffairItem
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -17,18 +19,22 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
 interface AffairItemFactory {
 
   fun createAffairItemModel(
-    page: Int,
+    whatTime: ItemHierarchyWhatTime<CourseAffairItem>,
+    coroutineScope: CoroutineScope,
     affairDateModel: AffairDateModel,
-  ): AffairItemModel
+  ): CourseAffairItem
 
   companion object {
     fun get(): AffairItemFactory {
-      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItemModel
+      return AffairItemFactory::class.implOrNull() ?: DefaultAffairItem
     }
   }
 }
 
 @Stable
-interface AffairItemModel : CourseItemModel {
-  val affairDateModel: AffairDateModel
+abstract class CourseAffairItem(
+  whatTime: ItemHierarchyWhatTime<CourseAffairItem>,
+  coroutineScope: CoroutineScope,
+  val affairDateModel: AffairDateModel,
+) : CourseItem(whatTime, coroutineScope) {
 }

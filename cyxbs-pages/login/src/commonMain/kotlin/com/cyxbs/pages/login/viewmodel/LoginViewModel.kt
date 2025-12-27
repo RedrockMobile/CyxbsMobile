@@ -70,7 +70,7 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
     } else {
       isLoginAnim.value = true
       val startTime = Clock.System.now()
-      launch {
+      launchByViewModelScope {
         try {
           if (requestLogin(stuNum, password)) {
             delay(startTime + 2.seconds - Clock.System.now()) // 网络太快会闪一下，像bug，就让它最少待两秒吧

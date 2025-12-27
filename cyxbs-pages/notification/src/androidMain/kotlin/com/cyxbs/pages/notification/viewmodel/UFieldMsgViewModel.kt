@@ -17,7 +17,7 @@ class UFieldMsgViewModel : BaseViewModel() {
     * 改变活动消息的读取状态
     * */
   fun changeUfieldMsgStatus(messageId: Int) {
-    launch {
+    launchByViewModelScope {
       ActivityMessageRepository.changeActivityMsgStatus(messageId)
     }
   }

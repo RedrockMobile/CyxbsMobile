@@ -85,7 +85,7 @@ actual class LoginViewModel actual constructor(argument: LoginNavArgument) :
         ipAddress = NetworkUtil.getWifiIPAddress()
       }
     }
-    launch {
+    launchByViewModelScope {
       //上传设备以及ip信息
       LoginApiService.INSTANCE.recordDeviceInfo(
         DeviceInfoParams(

@@ -16,7 +16,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.SP_COURSE_COMPOSE
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.utils.extensions.launch
+import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.utils.config.PhoneCalendar
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
@@ -142,7 +142,7 @@ class SettingActivity : BaseActivity() {
             return
         }
         mIsInPingNetWork = true
-        launch {
+        launchByLifecycleScope {
             val result = RedrockNetwork.tryPingNetWork()
             if (result != null && result.isSuccess) {
                 //判定magipoke系列接口正常，允许正常退出登陆

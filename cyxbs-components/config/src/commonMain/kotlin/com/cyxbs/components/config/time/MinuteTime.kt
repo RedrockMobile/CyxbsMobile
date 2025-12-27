@@ -89,6 +89,10 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
       val time = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
       return MinuteTime(time.hour, time.minute)
     }
+
+    fun new(minuteOfDay: Int): MinuteTime {
+      return MinuteTime(minuteOfDay / 60, minuteOfDay % 60)
+    }
   }
 }
 

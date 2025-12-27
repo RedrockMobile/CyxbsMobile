@@ -5,6 +5,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.pages.notification.model.ActivityMessageRepository
 import com.cyxbs.pages.notification.model.ItineraryRepository
 import com.cyxbs.pages.notification.model.SystemMessageRepository
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
 /**
@@ -24,7 +25,7 @@ class NotificationViewModel : BaseViewModel() {
      * 刷新所有消息
      */
     fun refreshAllNotification() {
-        launch {
+        launchByViewModelScope {
             refreshState.value = true
             try {
                 supervisorScope {

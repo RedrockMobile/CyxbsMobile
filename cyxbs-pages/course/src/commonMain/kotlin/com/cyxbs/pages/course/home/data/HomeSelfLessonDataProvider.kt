@@ -6,10 +6,10 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.home.item.SelfLessonItemFactory
-import com.cyxbs.pages.course.home.item.SelfLessonItemModel
+import com.cyxbs.pages.course.home.item.SelfLessonItem
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.data.CourseDataProvider
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.days
  * @author 985892345
  * @date 2025/3/10
  */
-object HomeSelfLessonDataProvider : CourseDataProvider() {
+object HomeSelfLessonDataProvider : CourseDataProvider<SelfLessonItem>() {
 
   private val itemFactory = SelfLessonItemFactory.get()
 
@@ -70,7 +70,7 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
       // 观察后续课程的更新
       LessonRepository.observeLesson(
         stuNum = stuNum,
-        needCache = false,
+        needOldData = false,
         needRequest = false,
       ).collect {
         if (it != nowLesson) {
@@ -82,23 +82,24 @@ object HomeSelfLessonDataProvider : CourseDataProvider() {
   }
 
   private fun resetData(data: List<LessonByWeeks>?) {
-    clear()
+    clear() // 对于课程来说每一次更新可以使用全量更新
     data ?: return
     data.forEach { lesson ->
       // 添加进整学期
-      add(itemFactory.createSelfLessonItemModel(0, lesson))
+//      add(itemFactory.createSelfLessonItem(0, lesson))
       // 添加进每周
       lesson.week.forEach { week ->
-        add(itemFactory.createSelfLessonItemModel(week, lesson))
+//        add(itemFactory.createSelfLessonItem(week, lesson))
       }
     }
   }
 
-  override fun compare(a: CourseItemModel, b: CourseItemModel): Int {
-    a as SelfLessonItemModel
-    b as SelfLessonItemModel
+  override fun compare(
+    a: CourseItemWrapper<SelfLessonItem>,
+    b: CourseItemWrapper<SelfLessonItem>,
+  ): Int {
     if (a.page == 0 && b.page == 0) {
-      val weekDiff = a.lesson.week.first() - b.lesson.week.first()
+      val weekDiff = a.item.lesson.week.first() - b.item.lesson.week.first()
       return if (weekDiff != 0) -weekDiff else super.compare(a, b)
     }
     return super.compare(a, b)

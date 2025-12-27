@@ -2,67 +2,61 @@ package com.cyxbs.pages.course.view.item
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
-import androidx.compose.ui.util.fastMapNotNull
-import com.cyxbs.pages.course.view.overlay.CourseItemOverlap
-import com.cyxbs.pages.course.view.overlay.CourseItemRange
+import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * .
+ * [CourseItemWrapper] 对应的 状态，生命周期与页面进行绑定
  *
  * @author 985892345
  * @date 2025/5/4
  */
 @Stable
 class CourseItemState(
-  timeline: CourseTimeline,
-  overlap: CourseItemOverlap,
+  val item: CourseItem,
 ) {
 
-  val item = overlap.item
-
-  var timeline by mutableStateOf(timeline)
-    private set
+  // coursePage 页面上下文
+  // 使用 Flow 明确表示他可能会发生改变
+  private val _coursePageFlow: MutableStateFlow<LocalCoursePageContext?> = MutableStateFlow(null)
+  val coursePageFlow: StateFlow<LocalCoursePageContext?> = _coursePageFlow
 
   // item 重叠数据
-  var overlap by mutableStateOf(overlap)
+  var overlap: OverlapResult? by mutableStateOf(null)
     private set
 
   // item 真实展示区间
   // 通过转换器最后才能确定
-  var realShowRange: List<CourseItemRange> by mutableStateOf(overlap.showRangeList)
+  var realShowRange: List<MinuteTimePair> by mutableStateOf(this.overlap?.showRangeList ?: emptyList())
     private set
 
-  fun update(timeline: CourseTimeline, overlap: CourseItemOverlap) {
-    this.timeline = timeline
+  // 提供给一些场景设置 item 的层级
+  val zIndexState = mutableFloatStateOf(0F)
+
+  fun updateCoursePage(coursePage: LocalCoursePageContext?) {
+    _coursePageFlow.value = coursePage
+  }
+
+  fun updateOverlap(overlap: OverlapResult) {
     this.overlap = overlap
     // 调用 overlap 触发器
-    overlapChangeTriggers = overlapChangeTriggers.mapValues {
+    overlapChangeTriggers = overlapChangeTriggers.mapValuesTo(LinkedHashMap()) {
       it.value.onDispose()
       it.key.onChangeOverlap(overlap)
-    } as LinkedHashMap<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>
+    }
     // 调用 showRange 转换器
-    realShowRange = showRangeTransformers.fold(overlap.showRangeList) { prev, interceptor ->
+    val initialList: List<MinuteTimePair> = overlap.showRangeList
+    realShowRange = showRangeTransformers.fold(initialList) { prev, interceptor ->
       interceptor.transform(prev, overlap)
     }
-  }
-
-  private val dataStoreMap = mutableMapOf<DataStore<*>, Any?>()
-
-  // 用于保存特定的数据
-  fun <T> setData(key: DataStore<T>, data: T?): T? {
-    @Suppress("UNCHECKED_CAST")
-    return dataStoreMap.put(key, data) as T?
-  }
-
-  fun <T> getData(key: DataStore<T>): T? {
-    @Suppress("UNCHECKED_CAST")
-    return dataStoreMap[key] as T?
   }
 
   private val showRangeTransformers = linkedSetOf<ShowRangeTransformer>()
@@ -71,6 +65,7 @@ class CourseItemState(
   // 在每次 overlap 更新时触发转换
   fun addShowRangeTransformer(interceptor: ShowRangeTransformer) {
     if (showRangeTransformers.add(interceptor)) {
+      val overlap = Snapshot.withoutReadObservation { overlap } ?: return
       realShowRange = Snapshot.withoutReadObservation {
         interceptor.transform(realShowRange, overlap)
       }
@@ -79,9 +74,11 @@ class CourseItemState(
 
   fun removeShowRangeTransformer(interceptor: ShowRangeTransformer) {
     if (showRangeTransformers.remove(interceptor)) {
+      val overlap = Snapshot.withoutReadObservation { overlap } ?: return
       // 移除后使用转换器重新计算 realShowRange
       realShowRange = Snapshot.withoutReadObservation {
-        showRangeTransformers.fold(overlap.showRangeList) { prev, now ->
+        val initialList: List<MinuteTimePair> = overlap.showRangeList
+        showRangeTransformers.fold(initialList) { prev, now ->
           now.transform(prev, overlap)
         }
       }
@@ -92,10 +89,10 @@ class CourseItemState(
     linkedMapOf<OverlapChangeTrigger, OverlapChangeTrigger.OnDisposable>()
 
   // overlap 更新触发器，监听 overlap 的更新用于触发一些特定的操作
-  // 在每次 overlap 更新时触发
   fun addOverlapChangeTrigger(trigger: OverlapChangeTrigger) {
     overlapChangeTriggers[trigger]?.onDispose()
-    overlapChangeTriggers[trigger] = trigger.onChangeOverlap(Snapshot.withoutReadObservation { overlap })
+    val overlap = Snapshot.withoutReadObservation { overlap } ?: return
+    overlapChangeTriggers[trigger] = trigger.onChangeOverlap(overlap)
   }
 
   fun removeOverlapChangeTrigger(trigger: OverlapChangeTrigger) {
@@ -104,23 +101,20 @@ class CourseItemState(
 
 
   /**
-   * 配合 [OverlapChangeTrigger] 给被覆盖 item 添加 showRange 监听器的快捷方式
+   * 配合 [OverlapChangeTrigger]、[ShowRangeTransformer] 给被覆盖 item 添加 showRange 监听器的快捷方式
    */
   class CoveredItemShowRangeTransformerTrigger(
-    val pageContext: LocalCoursePageContext,
     val transformer: ShowRangeTransformer,
   ) : OverlapChangeTrigger {
-    override fun onChangeOverlap(overlap: CourseItemOverlap): OverlapChangeTrigger.OnDisposable {
+    override fun onChangeOverlap(overlap: OverlapResult): OverlapChangeTrigger.OnDisposable {
       val coveredItemStateList = mutableListOf<CourseItemState>()
-      val findOnDisposables = overlap.coveredItemList.fastMapNotNull { cover ->
-        pageContext.findItemState(cover.itemOverlap.item) {
-          // 找到被覆盖的 item 添加 showRange 转换器
-          it.addShowRangeTransformer(transformer)
-          coveredItemStateList.add(it)
-        }
+      overlap.coveredItemList.fastForEach { cover ->
+        val itemState = cover.result.itemState
+        // 找到被覆盖的 item 添加 showRange 转换器
+        itemState.addShowRangeTransformer(transformer)
+        coveredItemStateList.add(itemState)
       }
       return OverlapChangeTrigger.OnDisposable {
-        findOnDisposables.fastForEach { it.onDispose() }
         coveredItemStateList.fastForEach {
           it.removeShowRangeTransformer(transformer)
         }
@@ -134,7 +128,7 @@ class CourseItemState(
     /**
      * 监听 item 重叠数据的变化
      */
-    fun onChangeOverlap(overlap: CourseItemOverlap): OnDisposable
+    fun onChangeOverlap(overlap: OverlapResult): OnDisposable
 
     fun interface OnDisposable {
       fun onDispose()
@@ -143,11 +137,8 @@ class CourseItemState(
 
   fun interface ShowRangeTransformer {
     fun transform(
-      prevShow: List<CourseItemRange>,
-      overlap: CourseItemOverlap,
-    ): List<CourseItemRange>
+      prevShow: List<MinuteTimePair>,
+      overlap: OverlapResult,
+    ): List<MinuteTimePair>
   }
-
-  // 用于以 Key-Value 的形式保存数据
-  interface DataStore<T>
 }

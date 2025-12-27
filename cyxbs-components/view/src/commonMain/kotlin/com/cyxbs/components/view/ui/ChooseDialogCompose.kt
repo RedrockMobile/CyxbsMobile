@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,9 +24,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import kotlin.math.max
 
 /**
@@ -38,7 +38,8 @@ import kotlin.math.max
 fun ChooseDialogCompose(
   showState: MutableState<Boolean>,
   modifier: Modifier = Modifier.width(300.dp).wrapContentHeight(),
-  properties: DialogProperties = DialogProperties(),
+  dismissOnBackPress: Boolean = true, // 按返回键时是否关闭
+  dismissOnClickOutside: Boolean = true, // 点击外部时是否关闭
   positiveBtnText: String = "确定",
   negativeBtnText: String? = null, // 如果不需要第二个按钮，则传 null
   btnSize: DpSize = if (max(
@@ -46,25 +47,40 @@ fun ChooseDialogCompose(
       negativeBtnText?.length ?: 0
     ) > 2
   ) DpSize(110.dp, 36.dp) else DpSize(80.dp, 34.dp),
+  scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   onDismissRequest: () -> Unit = { showState.value = false },
   onClickPositiveBtn: () -> Unit = { },
   onClickNegativeBtn: () -> Unit = { },
   content: @Composable ColumnScope.() -> Unit,
 ) {
   if (showState.value) {
-    Dialog(
-      properties = properties,
-      onDismissRequest = onDismissRequest,
+    // 官方的 Dialog 不支持设置背景，而且也不好控制沉浸式
+    // 所以替换为自定义的 Window 来实现弹窗
+    Window(
+      dismissOnBackPress = {
+        if (dismissOnBackPress) {
+          onDismissRequest()
+        }
+      }
     ) {
-      ChooseDialogComposeContent(
-        modifier = modifier,
-        positiveBtnText = positiveBtnText,
-        negativeBtnText = negativeBtnText,
-        btnSize = btnSize,
-        onClickPositiveBtn = onClickPositiveBtn,
-        onClickNegativeBtn = onClickNegativeBtn,
-        content,
-      )
+      Box(
+        modifier = Modifier.fillMaxSize().background(scrimColor).clickableNoIndicator {
+          if (dismissOnClickOutside) {
+            onDismissRequest()
+          }
+        },
+        contentAlignment = Alignment.Center,
+      ) {
+        ChooseDialogComposeContent(
+          modifier = modifier,
+          positiveBtnText = positiveBtnText,
+          negativeBtnText = negativeBtnText,
+          btnSize = btnSize,
+          onClickPositiveBtn = onClickPositiveBtn,
+          onClickNegativeBtn = onClickNegativeBtn,
+          content,
+        )
+      }
     }
   }
 }
@@ -85,7 +101,8 @@ fun ChooseDialogComposeContent(
 ) {
   Box(
     modifier = modifier.clip(RoundedCornerShape(16.dp))
-      .background(LocalAppColors.current.topBg),
+      .background(LocalAppColors.current.topBg)
+      .clickableNoIndicator {/*防止点击穿透*/},
   ) {
     Column(
       modifier = Modifier.fillMaxWidth(),

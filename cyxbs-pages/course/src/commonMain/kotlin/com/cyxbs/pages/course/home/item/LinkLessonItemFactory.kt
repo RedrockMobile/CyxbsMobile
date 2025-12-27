@@ -3,9 +3,10 @@ package com.cyxbs.pages.course.home.item
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.home.item.impl.DefaultAffairItemModel
-import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItemModel
-import com.cyxbs.pages.course.view.item.CourseItemModel
+import com.cyxbs.pages.course.home.item.impl.DefaultLinkLessonItem
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * LinkLessonItem 工厂，由具体平台实现
@@ -17,20 +18,23 @@ import com.cyxbs.pages.course.view.item.CourseItemModel
  */
 interface LinkLessonItemFactory {
 
-  fun createLinkLessonItemModel(
-    page: Int,
+  fun createLinkLessonItem(
+    whatTime: CourseItemWhatTime,
+    coroutineScope: CoroutineScope,
     lesson: LessonByWeeks,
-  ): LinkLessonItemModel
-
+  ): LinkLessonItem
 
   companion object {
     fun get(): LinkLessonItemFactory {
-      return LinkLessonItemFactory::class.implOrNull() ?: DefaultLinkLessonItemModel
+      return LinkLessonItemFactory::class.implOrNull() ?: DefaultLinkLessonItem
     }
   }
 }
 
 @Stable
-interface LinkLessonItemModel : CourseItemModel {
-  val lesson: LessonByWeeks
+abstract class LinkLessonItem(
+  whatTime: CourseItemWhatTime,
+  coroutineScope: CoroutineScope,
+  val lesson: LessonByWeeks,
+) : CourseItem(whatTime, coroutineScope) {
 }

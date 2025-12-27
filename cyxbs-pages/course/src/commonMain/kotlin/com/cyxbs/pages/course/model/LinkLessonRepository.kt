@@ -4,6 +4,7 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
+import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
@@ -29,10 +30,16 @@ import kotlinx.coroutines.launch
 object LinkLessonRepository {
 
   private const val SETTING_KEY_LINK_STU = "link_stu"
+  private const val SETTING_KEY_ENABLE_SHOW_LINK_COURSE = "enable_show_link_course"
   private val EMPTY_LINK_STU = ILinkService2.LinkStu("", "", "", "")
 
   val state: StateFlow<ILinkService2.LinkStu> get() = _state
   private val _state = MutableStateFlow(EMPTY_LINK_STU)
+
+  val enableShow: StateFlow<Boolean> get() = _enableShow
+  private val _enableShow = MutableStateFlow(
+    accountSettings.getBoolean(SETTING_KEY_ENABLE_SHOW_LINK_COURSE, true)
+  )
 
   fun changeLinkStu(linkStuNum: String) {
     appCoroutineScope.launch {
@@ -57,6 +64,12 @@ object LinkLessonRepository {
         _state.emit(it)
       }
     }
+  }
+
+  fun changeVisible() {
+    val newEnableShow = !enableShow.value
+    accountSettings.putBoolean(SETTING_KEY_ENABLE_SHOW_LINK_COURSE, newEnableShow)
+    _enableShow.value = newEnableShow
   }
 
   init {
@@ -101,9 +114,7 @@ object LinkLessonRepository {
         defaultJson.decodeFromString<LinkStuBean>(cache)
       }.onFailure {
         settings.remove(SETTING_KEY_LINK_STU)
-      }.getOrNull().also {
-        logg("link = $it")
-      }
+      }.getOrNull()
     }
   }
 
