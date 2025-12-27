@@ -144,7 +144,7 @@ interface AffairIdModelEditor {
   ): Result<EditResult>
 
   // 取消本次编辑
-  fun cancelEdit()
+  fun cancelEdit(): Boolean
 
   sealed interface EditResult {
     object Success : EditResult

@@ -75,12 +75,17 @@ class AffairIdModelImpl(
       // 确保线程安全
       return AffairIdModelEditorImpl(
         idModel = this,
-        cancelEdit = { affairIdModelEditorFlow.value = null }
+        cancelEdit = {
+          reset()
+          affairIdModelEditorFlow.value = null
+        }
       ) {
         EditAffairUtils.commit(
           editor = this,
           needUpload = it,
-        )
+        ).onSuccess {
+          affairIdModelEditorFlow.value = null
+        }
       }
     }
     return null

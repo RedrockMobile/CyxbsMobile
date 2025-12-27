@@ -19,7 +19,7 @@ import kotlin.concurrent.Volatile
  */
 class AffairIdModelEditorImpl(
   override val idModel: AffairIdModelImpl,
-  val cancelEdit: () -> Unit,
+  val cancelEdit: AffairIdModelEditorImpl.() -> Unit,
   val commitAction: suspend AffairIdModelEditorImpl.(Boolean) -> Result<AffairIdModelEditor.EditResult>,
 ) : AffairIdModelEditor {
   override var remindTime = idModel.remindTime.value
@@ -65,6 +65,7 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return "提交修改后不可再修改"
     if (remindTime < 0) return "remindTime 不能小于 0"
     this.remindTime = remindTime
+    idModel.remindTime.valueByEditorStateFlow.tryEmit(this to remindTime)
     return null
   }
 
@@ -72,12 +73,14 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return "提交修改后不可再修改"
     if (title.isBlank()) return "title 不能为空"
     this.title = title
+    idModel.title.valueByEditorStateFlow.tryEmit(this to title)
     return null
   }
 
   override fun setContent(content: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
     this.content = content
+    idModel.content.valueByEditorStateFlow.tryEmit(this to content)
     return null
   }
 
@@ -162,18 +165,16 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return Result.failure(IllegalStateException("提交修改后不可再修改"))
     return commitMutex.withLock {
       commitAction.invoke(this, needUpload).onSuccess {
-        cancelEdit.invoke()
         enableModify = false // 提交成功后不可再修改
       }
     }
   }
 
-  override fun cancelEdit() {
-    if (!enableModify()) return
-    if (commitMutex.isLocked) {
-      throw IllegalStateException("正在 commit 中，无法取消")
-    }
-    cancelEdit.invoke()
+  override fun cancelEdit(): Boolean {
+    if (!enableModify()) return false
+    if (commitMutex.isLocked) return false
+    cancelEdit.invoke(this)
     enableModify = false // 提交成功后不可再修改
+    return true
   }
 }
