@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -186,6 +187,8 @@ private fun CourseBottomSheetDialogContent(
           val interval = 16.dp.toPx()
           val beginX = size.width / 2 - (itemDialogContents.size - 1) * interval / 2
           val beginY = size.height / 2
+          val path1 = Path()
+          val path2 = Path()
           onDrawBehind {
             val itemCount = itemDialogContents.size
             val currentPage = pagerState.currentPage
@@ -198,7 +201,7 @@ private fun CourseBottomSheetDialogContent(
               drawCircle(Color(0xFF888888), radius, Offset(beginX + it * interval, beginY))
             }
             val relativeOffsetInt = relativeOffset.toInt()
-            val path = getWaterDropIndicator(radius, relativeOffset - relativeOffsetInt, interval)
+            val path = getWaterDropIndicator(path1, path2, radius, relativeOffset - relativeOffsetInt, interval)
             path.translate(Offset(beginX + relativeOffsetInt * interval, beginY))
             drawPath(path, Color(0xFF788EFA))
           }
@@ -210,11 +213,14 @@ private fun CourseBottomSheetDialogContent(
 
 // 基本思路是两个圆点之间的上下方有两个半径很大的圆, 小圆点就在这两个大圆之间被挤压着移动
 private fun getWaterDropIndicator(
+  path1: Path,
+  path2: Path,
   radius: Float,
   fraction: Float, // 0.0 -> 1.0
   interval: Float,
 ): Path {
-  var path = Path()
+  path1.rewind()
+  path2.rewind()
   // 中间大圆的坐标
   val outerX = interval / 2
   val outerY = interval
@@ -222,26 +228,25 @@ private fun getWaterDropIndicator(
   // 绘制当前移动点的圆
   val nowX = fraction * interval
   val nowR = hypot(outerX - nowX, outerY) - outerR
-  path.addRoundRect(RoundRect(Rect(Offset(nowX, 0F), nowR), CornerRadius(nowR)))
+  path1.addRoundRect(RoundRect(Rect(Offset(nowX, 0F), nowR), CornerRadius(nowR)))
   // 绘制跟随移动的圆
   val startMove = 0.6F
   val k = 1 / (1 - startMove)
   val b = 1 - k
   val followX = max(0F, k * fraction + b) * interval
   val followR = hypot(outerX - followX, outerY) - outerR
-  path.addRoundRect(RoundRect(Rect(Offset(followX, 0F), followR), CornerRadius(followR)))
+  path1.addRoundRect(RoundRect(Rect(Offset(followX, 0F), followR), CornerRadius(followR)))
   // 与两个圆上下端点构成的四边形相并
-  val path2 = Path()
   path2.moveTo(nowX, nowR)
   path2.lineTo(nowX, -nowR)
   path2.lineTo(followX, -followR)
   path2.lineTo(followX, followR)
   path2.close()
-  path += path2
+  path1.op(path1, path2, PathOperation.Union)
   // 排除上下两个大圆
-  path2.reset()
+  path2.rewind()
   path2.addRoundRect(RoundRect(Rect(Offset(outerX, outerY), outerR), CornerRadius(outerR)))
   path2.addRoundRect(RoundRect(Rect(Offset(outerX, -outerY), outerR), CornerRadius(outerR)))
-  path -= path2
-  return path
+  path1.op(path1, path2, PathOperation.Difference)
+  return path1
 }

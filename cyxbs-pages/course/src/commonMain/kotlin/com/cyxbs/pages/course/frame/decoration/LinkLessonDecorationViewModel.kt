@@ -9,7 +9,7 @@ import com.cyxbs.pages.course.frame.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.onEach
  * @date 2025/10/18
  */
 class LinkLessonDecorationViewModel(
-  val hierarchy: CourseItemViewModel.ItemHierarchy<LinkLessonItem>,
+  val hierarchy: CourseItemHierarchy<LinkLessonItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
   init {

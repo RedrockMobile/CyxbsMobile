@@ -11,7 +11,7 @@ import com.cyxbs.pages.course.frame.item.SelfLessonItem
 import com.cyxbs.pages.course.frame.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +33,7 @@ import kotlin.time.Duration.Companion.days
  */
 @Stable
 class SelfLessonDecorationViewModel(
-  val hierarchy: CourseItemViewModel.ItemHierarchy<SelfLessonItem>,
+  val hierarchy: CourseItemHierarchy<SelfLessonItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
   private val itemFactory = SelfLessonItemFactory.get()

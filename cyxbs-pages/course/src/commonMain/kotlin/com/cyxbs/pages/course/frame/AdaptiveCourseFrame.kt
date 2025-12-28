@@ -12,11 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.pages.course.frame.header.CourseHeader
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
 import com.cyxbs.pages.course.frame.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.frame.decoration.SelfLessonDecorationViewModel
+import com.cyxbs.pages.course.frame.header.CourseHeader
+import com.cyxbs.pages.course.frame.item.CourseAffairItem
+import com.cyxbs.pages.course.frame.item.LinkLessonItem
+import com.cyxbs.pages.course.frame.item.SelfLessonItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -66,23 +70,20 @@ private fun AdaptiveHomeCourseFrameContent(
 
 @Composable
 private fun getDecoration(): ImmutableList<CoursePageDecoration> {
-  val courseItemViewModel = viewModel { CourseItemViewModel() }
-  val selfLessonDecoration = viewModel {
-    SelfLessonDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay()
-    )
-  }
-  val linkLessonDecoration = viewModel {
-    LinkLessonDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay()
-    )
-  }
-  val affairDecoration = viewModel {
-    AffairDecorationViewModel(
-      hierarchy = courseItemViewModel.createOverlay()
-    )
-  }
+  val selfLessonHierarchy = remember { CourseItemHierarchy<SelfLessonItem>() }
+  val selfLessonDecoration = viewModel { SelfLessonDecorationViewModel(selfLessonHierarchy) }
+
+  val linkLessonHierarchy = remember { CourseItemHierarchy<LinkLessonItem>() }
+  val linkLessonDecoration = viewModel { LinkLessonDecorationViewModel(linkLessonHierarchy) }
+
+  val affairHierarchy = remember { CourseItemHierarchy<CourseAffairItem>() }
+  val affairDecoration = viewModel { AffairDecorationViewModel(affairHierarchy) }
+
   val createAffairDecoration = viewModel { CreateAffairDecorationViewModel() }
+
+
+  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, linkLessonHierarchy, affairHierarchy) }
+
   return remember {
     persistentListOf(
       selfLessonDecoration, // 自己的课程

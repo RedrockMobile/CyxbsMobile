@@ -10,7 +10,7 @@ import com.cyxbs.pages.affair.api.IAffairService2
 import com.cyxbs.pages.course.frame.item.AffairItemFactory
 import com.cyxbs.pages.course.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +29,7 @@ import kotlinx.coroutines.supervisorScope
  * @date 2025/10/18
  */
 class AffairDecorationViewModel(
-  val hierarchy: CourseItemViewModel.ItemHierarchy<CourseAffairItem>,
+  val hierarchy: CourseItemHierarchy<CourseAffairItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
   init {

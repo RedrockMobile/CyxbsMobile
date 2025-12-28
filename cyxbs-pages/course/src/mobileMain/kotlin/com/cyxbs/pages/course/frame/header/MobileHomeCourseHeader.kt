@@ -8,24 +8,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
+import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.max
@@ -98,28 +105,72 @@ private fun MobileHomeCourseOuterHeader(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
 ) {
-  var header by remember(frame) { mutableStateOf<CourseBottomSheetHeaderExtension>(EmptyHeader) }
-  key(header) {
-    header.CourseBottomSheetHeaderContent(modifier)
+  val headerState = remember(frame) { mutableStateOf<CourseBottomSheetHeaderExtension>(EmptyHeader) }
+  key(headerState.value) {
+    headerState.value.CourseBottomSheetHeaderContent(modifier)
   }
+  val courseItemViewModel = viewModel(CourseItemViewModel::class)
   LaunchedEffect(frame) {
-    val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-    var now = localDateTime.toMinuteTimeDate()
-    snapshotFlow { NextItemHeaderUtils.find(now, frame) }
-      .flatMapLatest {
-        if (it == null) flowOf<CourseBottomSheetHeaderExtension?>(null) else flow {
-          emit(it)
-          delay(1.minutes - localDateTime.second.seconds)
-          while (true) {
-            now = now.plusMinutes(1)
-            val next = NextItemHeaderUtils.find(now, frame)
-            if (next != null) emit(next) else break // 如果为 null 则跳出循环
-            delay(1.minutes)
-          }
+    SchoolCalendar.observeFirstMonDay().flatMapLatest { firstDate ->
+      snapshotFlow { Today }.map { firstDate.daysUntil(it) }
+    }.flatMapLatest { dayDiff ->
+      if (dayDiff < 0) return@flatMapLatest flowOf(null)
+      // 今天的所有课表 item
+      val todayList = combine(
+        courseItemViewModel.itemHierarchy.map {
+          it.observe(dayDiff / 7 + 1, DayOfWeek((dayDiff % 7) + 1))
         }
-      }.onEach {
-        header = it ?: EmptyHeader
-      }.launchIn(this)
+      ) {
+        it.toList().flatten()
+      }
+      // 明天的所有课表 item
+      val tomorrowList = combine(
+        courseItemViewModel.itemHierarchy.map {
+          it.observe((dayDiff + 1) / 7 + 1, DayOfWeek(((dayDiff + 1) % 7) + 1))
+        }
+      ) {
+        it.toList().flatten()
+      }
+
+      combine(todayList, tomorrowList) { today, tomorrow ->
+        today to tomorrow
+      }.flatMapLatest { (today, tomorrow) ->
+        // 每隔一分钟轮训一次
+        flow {
+          do {
+            val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val now = localDateTime.toMinuteTimeDate().time
+            emit(now)
+            delay(1.minutes - localDateTime.second.seconds)
+          } while (isActive)
+        }.map { now ->
+          findCourseBottomSheetHeaderExtension(now, today)
+            ?: findCourseBottomSheetHeaderExtension(MinuteTime(0, 0), tomorrow)
+        }
+      }
+    }.collect {
+      headerState.value = it ?: EmptyHeader
+    }
   }
 }
 
+private fun findCourseBottomSheetHeaderExtension(
+  nowTime: MinuteTime,
+  itemStateList: List<CourseItemState>,
+): CourseBottomSheetHeaderExtension? {
+  var minItem: CourseItem? = null
+  for (itemState in itemStateList) {
+    val item = itemState.item
+    val extension = item.extension
+    if (extension !is CourseBottomSheetHeaderExtension) continue
+    if (nowTime in item.whatTime.now.value.beginTime..item.whatTime.now.value.finalTime) {
+      return extension
+    }
+    if (item.whatTime.now.value.beginTime < nowTime) continue // 略过小于的时间段
+    if (minItem == null || item.whatTime.now.value.beginTime < minItem.whatTime.now.value.beginTime) {
+      minItem = item
+      continue
+    }
+  }
+  return minItem?.extension as? CourseBottomSheetHeaderExtension
+}
