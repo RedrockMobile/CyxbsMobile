@@ -56,6 +56,7 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.model.MapDataRepository
@@ -550,6 +551,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
       }
     }
   }
+  viewmodel.maxScale = if (getWindowScreenSize().height / getWindowScreenSize().width > 1.5f) 6f else 2f
   Box(
     modifier = modifier
       .background(Color(0xFFA8BCF1))

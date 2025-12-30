@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -75,10 +76,20 @@ fun PlaceDetailBottomSheet() {
       dismissOnClickOutside = false,
       scrimColor = Color.Transparent
     ) {
+      val ratio = getWindowScreenSize().height / getWindowScreenSize().width
+      val modifier = when {
+        ratio > 1.5 -> {
+          Modifier.fillMaxWidth()
+        }
+        else -> {
+          Modifier
+            .padding(start = 80.dp)
+            .width(getWindowScreenSize().width / 3)
+        }
+      }
       ConstraintLayout(
         constraintSet = createConstraintSet(),
-        modifier = Modifier
-          .fillMaxWidth()
+        modifier = modifier
           .then(bottomSheetDraggable())
           .shadow(
             elevation = 10.dp,
@@ -86,7 +97,8 @@ fun PlaceDetailBottomSheet() {
           )
           .background(LocalAppColors.current.topBg)
           .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-          .padding(start = 16.dp, end = 16.dp),
+          .padding(start = 16.dp, end = 16.dp)
+          .navigationBarsPadding(),
         animateChangesSpec = spring(
           stiffness = Spring.StiffnessMediumLow
         )

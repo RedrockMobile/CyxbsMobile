@@ -45,9 +45,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   companion object {
     const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
-    const val MAX_SCALE = 6f
     const val MIN_SCALE = 1f
   }
+
+  var maxScale = 6f
 
   // 管理map的job
   private var mapAnimationJob: Job? = null
@@ -595,10 +596,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     mapAnimationJob = scope.launch {
       // 执行动画
       launch {
-        mapWidgetState.animateScale(MAX_SCALE)
+        mapWidgetState.animateScale(maxScale)
       }
       launch {
-        mapWidgetState.animateOffset((mapCenter - offset) * 6f)
+        mapWidgetState.animateOffset((mapCenter - offset) * maxScale)
       }
     }
   }

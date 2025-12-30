@@ -3,7 +3,6 @@ package com.cyxbs.pages.map.util
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.map.model.bean.PlaceBuildingItem
 import com.cyxbs.pages.map.model.bean.PlaceItem
 

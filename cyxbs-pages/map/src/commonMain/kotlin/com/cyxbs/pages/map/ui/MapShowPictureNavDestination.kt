@@ -2,6 +2,7 @@ package com.cyxbs.pages.map.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -61,32 +62,36 @@ class MapShowPictureNavDestination : MainNavDestination<MapShowPictureArgument>(
       isScrollInfinite = true,
       initialPage = currentIndex.value
     )
-    Box(
+    Column(
       modifier = Modifier
         .clickableSingle {
           MainNavController.popBackStack()
         }
         .fillMaxSize()
         .background(Color.Black)
-        .systemBarsPadding()
+        .systemBarsPadding(),
+      horizontalAlignment = Alignment.CenterHorizontally
     ) {
       Text(
         modifier = Modifier
-          .padding(top = 15.dp)
-          .align(Alignment.TopCenter),
+          .padding(top = 15.dp),
         text = "${pagerState.currentPage % images.size + 1}/${images.size}",
         color = Color.White
       )
-      BannerCompose(
-        pageCount = images.size,
-        pagerState = pagerState,
+      Box(
         modifier = Modifier.fillMaxSize()
-      ) { index, virtualIndex ->
-        ImageFromUrlCompose(
-          url = images[index],
-          modifier = Modifier.fillMaxWidth(),
-          contentScale = ContentScale.FillWidth
-        )
+      ) {
+        BannerCompose(
+          pageCount = images.size,
+          pagerState = pagerState,
+          modifier = Modifier.fillMaxSize().align(Alignment.Center)
+        ) { index, virtualIndex ->
+          ImageFromUrlCompose(
+            url = images[index],
+            modifier = Modifier.fillMaxWidth(),
+            contentScale = ContentScale.FillWidth
+          )
+        }
       }
     }
   }

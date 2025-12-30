@@ -71,7 +71,7 @@ fun MapWidgetCompose(
         toast("取消锁定后对地图进行操作")
       } else {
         // 如果大于6f,则还原初始
-        if (mapWidgetState.scale >= 6f) {
+        if (mapWidgetState.scale >= viewmodel.maxScale) {
           viewmodel.resetMap(coroutineScope)
         } else {
           val mapRatio = mapInfo.mapWidth.toFloat() / mapInfo.mapHeight.toFloat()
