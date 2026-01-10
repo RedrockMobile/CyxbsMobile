@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.overlay.OverlapResult
@@ -40,6 +41,9 @@ class CourseItemState(
 
   // 提供给一些场景设置 item 的层级
   val zIndexState = mutableFloatStateOf(0F)
+
+  // item 节点坐标
+  val layoutCoordinates: MutableStateFlow<LayoutCoordinates?> = MutableStateFlow(null)
 
   // 是否显示 item 的开始结束时间
   val showBeginFinalTimeAlpha = mutableFloatStateOf(0F)

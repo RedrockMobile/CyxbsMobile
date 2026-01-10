@@ -18,6 +18,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -29,21 +32,29 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.LocalCourseItemState
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * 点击课表 item 弹起的 BottomSheetDialog
@@ -118,50 +129,80 @@ class CourseBottomSheetDialogState {
 @Composable
 private fun MobileCourseBottomSheetDialog(
   state: CourseBottomSheetDialogState,
-  contentWrapper: @Composable (@Composable () -> Unit) -> Unit = { it.invoke() }, // 可用于传递 contextProvider
 ) {
-  if (state.dialogContents.value.isNotEmpty()) {
-    Window(
-      dismissOnBackPress = {
-        state.dialogContents.value = emptyList()
-      }
-    ) {
-      contentWrapper.invoke {
-        BottomSheetCompose(
-          modifier = Modifier,
-          bottomSheetState = state.bottomSheetState,
-          dismissOnClickOutside = true,
-          scrimColor = Color.Transparent,
+  if (state.dialogContents.value.isEmpty()) return
+  val itemState = LocalCourseItemState.current
+  Window(
+    dismissOnBackPress = {
+      state.dialogContents.value = emptyList()
+    }
+  ) {
+    val coroutineScope = rememberCoroutineScope()
+    val lastMarginBottomOffsetJob = rememberWrapper<Job?>(null)
+    val density = LocalDensity.current
+    val height = 280.dp
+    Box {
+      Spacer( // 模拟底部弹窗展开时的显示位置，如果 item 被弹窗遮挡，则将滚轴向上移动
+        modifier = Modifier.align(Alignment.BottomStart)
+          .navigationBarsPadding()
+          .fillMaxWidth()
+          .height(height)
+          .onGloballyPositioned { layoutCoordinate ->
+            // 如果 item 被弹窗遮挡，则将滚轴向上移动
+            val itemCoordinates = itemState.layoutCoordinates.value ?: return@onGloballyPositioned
+            val itemPositionInWindow = itemCoordinates.localToWindow(Offset.Zero)
+            if (itemPositionInWindow.y < 0) return@onGloballyPositioned // 显示在窗口外
+            val layoutPositionInWindow = layoutCoordinate.localToWindow(Offset.Zero)
+            val itemPosition = itemPositionInWindow - layoutPositionInWindow
+            val itemBottomMargin =
+              layoutCoordinate.size.height - itemPosition.y - itemCoordinates.size.height
+            val heightDiff = itemBottomMargin - with(density) { height.toPx() }
+            if (heightDiff > 0) return@onGloballyPositioned
+            lastMarginBottomOffsetJob.value?.cancel() // 取消前一次的移动监听
+            lastMarginBottomOffsetJob.value =
+              snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.onEach {
+                itemState.coursePageFlow.value?.scrollContext?.marginBottom?.intValue =
+                  (it * -heightDiff).roundToInt()
+              }.launchIn(coroutineScope)
+          }
+      )
+      BottomSheetCompose(
+        bottomSheetState = state.bottomSheetState,
+        dismissOnClickOutside = true,
+        scrimColor = Color.Transparent,
+      ) {
+        Box(
+          modifier = Modifier.navigationBarsPadding()
+            .fillMaxWidth()
+            .height(height)
         ) {
-          Box(modifier = Modifier.navigationBarsPadding().fillMaxWidth().height(280.dp)) {
-            Spacer(
-              modifier = Modifier.fillMaxWidth().height(36.dp).background(
-                brush = Brush.verticalGradient(
-                  colors = listOf(Color(0x005369BC), Color(0x205369BC))
-                )
+          Spacer(
+            modifier = Modifier.fillMaxWidth().height(36.dp).background(
+              brush = Brush.verticalGradient(
+                colors = listOf(Color(0x005369BC), Color(0x205369BC))
               )
             )
-            Box(
-              modifier = Modifier.padding(top = 20.dp)
-                .fillMaxSize()
-                .then(bottomSheetDraggable())
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(LocalAppColors.current.whiteBlack)
-            ) {
-              CourseBottomSheetDialogContent(state.dialogContents.value)
-            }
+          )
+          Box(
+            modifier = Modifier.padding(top = 20.dp)
+              .fillMaxSize()
+              .then(bottomSheetDraggable())
+              .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+              .background(LocalAppColors.current.whiteBlack)
+          ) {
+            CourseBottomSheetDialogContent(state.dialogContents.value)
           }
-        }
-        LaunchedEffect(Unit) {
-          try {
-            state.bottomSheetState.expand()
-          } catch (e: CancellationException) {
-            // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
-          }
-          state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
-          state.dialogContents.value = emptyList()
         }
       }
+    }
+    LaunchedEffect(Unit) {
+      try {
+        state.bottomSheetState.expand()
+      } catch (e: CancellationException) {
+        // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
+      }
+      state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
+      state.dialogContents.value = emptyList()
     }
   }
 }
@@ -204,7 +245,13 @@ private fun CourseBottomSheetDialogContent(
               drawCircle(Color(0xFF888888), radius, Offset(beginX + it * interval, beginY))
             }
             val relativeOffsetInt = relativeOffset.toInt()
-            val path = getWaterDropIndicator(path1, path2, radius, relativeOffset - relativeOffsetInt, interval)
+            val path = getWaterDropIndicator(
+              path1,
+              path2,
+              radius,
+              relativeOffset - relativeOffsetInt,
+              interval
+            )
             path.translate(Offset(beginX + relativeOffsetInt * interval, beginY))
             drawPath(path, Color(0xFF788EFA))
           }

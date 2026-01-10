@@ -1,7 +1,6 @@
 package com.cyxbs.components.view.ui
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.MutatePriority
@@ -110,6 +109,9 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Expanded)
@@ -123,6 +125,9 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Collapsed)
@@ -136,6 +141,9 @@ class BottomSheetState(
       // hide 不触发 Scrolling 状态
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Hide)
@@ -283,7 +291,6 @@ private fun BottomSheetContent(
       decayAnimationSpec = decayAnimationSpec,
       snapAnimationSpec = spring(
         stiffness = Spring.StiffnessMediumLow,
-        visibilityThreshold = Int.VisibilityThreshold.toFloat()
       )
     )
   }

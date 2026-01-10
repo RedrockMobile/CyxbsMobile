@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -120,7 +121,9 @@ fun CourseDefaultItemContent(
       modifierList.forEach {
         then(it?.createModifier() ?: Modifier)
       }
-    }.background(backgroundColor)
+    }.background(backgroundColor).onGloballyPositioned {
+      itemState.layoutCoordinates.value = it
+    }
   ) {
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
