@@ -15,7 +15,6 @@ import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.course.dialog.CourseBottomSheetDialogExtension
-import com.cyxbs.pages.course.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialog
 import com.cyxbs.pages.course.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
@@ -101,7 +100,6 @@ class MobileCourseAffairItem(
     ) {
       bottomSheetDialogState.showDialog(itemState.overlap)
     }
-    MobileCourseBottomSheetDialog(bottomSheetDialogState)
   }
 
   override fun toString(): String {
@@ -174,6 +172,5 @@ private class MobileCourseAffairCourseBottomSheetHeaderExtension(
       onClickContent = {
       },
     )
-    MobileCourseBottomSheetDialog(bottomSheetDialogState)
   }
 }

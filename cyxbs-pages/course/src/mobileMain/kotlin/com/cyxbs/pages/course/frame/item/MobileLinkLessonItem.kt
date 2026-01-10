@@ -10,7 +10,6 @@ import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.dialog.CourseBottomSheetDialogExtension
-import com.cyxbs.pages.course.dialog.MobileCourseBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
@@ -66,7 +65,6 @@ class MobileLinkLessonItem(
     ) {
       bottomSheetDialogState.showDialog(itemState.overlap)
     }
-    MobileCourseBottomSheetDialog(bottomSheetDialogState)
   }
 }
 
@@ -118,7 +116,6 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
 //        }
       },
     )
-    MobileCourseBottomSheetDialog(bottomSheetDialogState)
     LaunchedEffect(this) {
       val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       val now = localDateTime.toMinuteTimeDate()

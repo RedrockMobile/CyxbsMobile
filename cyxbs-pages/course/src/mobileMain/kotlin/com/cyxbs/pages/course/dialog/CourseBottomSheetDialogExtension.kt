@@ -60,9 +60,11 @@ interface CourseBottomSheetDialogExtension : CourseItemExtension {
 @Stable
 @Composable
 fun rememberCourseBottomSheetDialogState(): CourseBottomSheetDialogState {
-  return remember {
+  val state = remember {
     CourseBottomSheetDialogState()
   }
+  MobileCourseBottomSheetDialog(state) // 这里注册了 Dialog
+  return state
 }
 
 @Stable
@@ -112,7 +114,7 @@ class CourseBottomSheetDialogState {
  * 移动端课表 item 点击后出现的 BottomSheetDialog
  */
 @Composable
-fun MobileCourseBottomSheetDialog(
+private fun MobileCourseBottomSheetDialog(
   state: CourseBottomSheetDialogState,
   contentWrapper: @Composable (@Composable () -> Unit) -> Unit = { it.invoke() }, // 可用于传递 contextProvider
 ) {
