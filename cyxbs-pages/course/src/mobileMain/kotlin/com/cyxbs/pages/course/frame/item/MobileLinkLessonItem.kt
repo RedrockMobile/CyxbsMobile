@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
@@ -64,6 +65,11 @@ class MobileLinkLessonItem(
       backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
     ) {
       bottomSheetDialogState.showDialog(itemState.overlap)
+    }
+    LaunchedEffect(Unit) {
+      snapshotFlow { bottomSheetDialogState.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+        itemState.showBeginFinalTimeAlpha.floatValue = it
+      }
     }
   }
 }

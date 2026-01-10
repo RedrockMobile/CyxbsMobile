@@ -41,6 +41,9 @@ class CourseItemState(
   // 提供给一些场景设置 item 的层级
   val zIndexState = mutableFloatStateOf(0F)
 
+  // 是否显示 item 的开始结束时间
+  val showBeginFinalTimeAlpha = mutableFloatStateOf(0F)
+
   fun updateCoursePage(coursePage: LocalCoursePageContext?) {
     _coursePageFlow.value = coursePage
   }

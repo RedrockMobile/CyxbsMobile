@@ -34,9 +34,9 @@ import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
-import com.cyxbs.components.view.ui.rememberBottomSheetState
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.overlay.OverlapResult
@@ -72,6 +72,8 @@ class CourseBottomSheetDialogState {
 
   val dialogContents: MutableState<List<CourseBottomSheetDialogExtension>> =
     mutableStateOf(emptyList())
+
+  val bottomSheetState = BottomSheetState()
 
   fun showDialog(extension: CourseBottomSheetDialogExtension) {
     dialogContents.value = listOf(extension)
@@ -125,10 +127,9 @@ private fun MobileCourseBottomSheetDialog(
       }
     ) {
       contentWrapper.invoke {
-        val bottomSheetState = rememberBottomSheetState()
         BottomSheetCompose(
           modifier = Modifier,
-          bottomSheetState = bottomSheetState,
+          bottomSheetState = state.bottomSheetState,
           dismissOnClickOutside = true,
           scrimColor = Color.Transparent,
         ) {
@@ -153,11 +154,11 @@ private fun MobileCourseBottomSheetDialog(
         }
         LaunchedEffect(Unit) {
           try {
-            bottomSheetState.expand()
+            state.bottomSheetState.expand()
           } catch (e: CancellationException) {
             // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
           }
-          bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
+          state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
           state.dialogContents.value = emptyList()
         }
       }

@@ -9,13 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableFloatState
-import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +24,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -37,15 +34,10 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.Wrapper
@@ -57,6 +49,7 @@ import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.T
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchingItem
 import com.cyxbs.pages.course.view.item.modifier.PressScaleController
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
+import com.cyxbs.pages.course.view.item.modifier.drawBeginFinalTimeline
 import com.cyxbs.pages.course.view.item.modifier.pressScale
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
@@ -207,7 +200,6 @@ private fun TouchedItems(
 ) {
   touchedItems.forEach { item ->
     key(item.id) {
-      val leftDistanceState = remember { mutableIntStateOf(0) }
       Box(
         modifier = Modifier.layout { measurable, constraints ->
           val width = constraints.maxWidth / 7
@@ -215,7 +207,6 @@ private fun TouchedItems(
           val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
           val placeable = measurable.measure(Constraints.fixed(width, height))
           val x = item.dayOfWeek.ordinal * constraints.maxWidth / 7
-          leftDistanceState.intValue = x
           layout(placeable.width, placeable.height) {
             placeable.placeRelativeWithLayer(
               x = (x + (width - placeable.width) / 2F).roundToInt(),
@@ -227,9 +218,9 @@ private fun TouchedItems(
             )
           }
         }.drawBeginFinalTimeline(
-          initTime = item.start,
-          touchTimeState = remember { mutableStateOf(item.end) },
-          leftDistanceState = leftDistanceState
+          alpha = item.alphaState,
+          time1 = remember { mutableStateOf(item.start) },
+          time2 = remember { mutableStateOf(item.end) },
         ).pressScale(PressScaleController) // 点击后的 Q 弹动画
           .then(RoundedShadowItemModifier.createModifier())
           .background(0xFFE9EDF2.dark(0xFF202223))
@@ -247,7 +238,6 @@ private fun TouchingItems(
   touchingItems.forEach { (pointerId, item) ->
     key(pointerId.value) {
       val touchTimeState = remember { mutableStateOf(item.initTime) }
-      val leftDistanceState = remember { mutableIntStateOf(0) }
       Box(
         modifier = Modifier.layout { measurable, constraints ->
           scrollContext.scrollState.value // 滚轴滚动时仍然触发布局
@@ -259,7 +249,6 @@ private fun TouchingItems(
           val height = abs(y2 - y1).roundToInt()
           val placeable = measurable.measure(Constraints.fixed(width, height))
           val x = (item.initPosition.x / width).toInt() * constraints.maxWidth / 7
-          leftDistanceState.intValue = x
           layout(width, height) {
             placeable.placeRelative(
               x = (x + (width - placeable.width) / 2F).roundToInt(),
@@ -268,9 +257,9 @@ private fun TouchingItems(
             )
           }
         }.drawBeginFinalTimeline(
-          initTime = item.initTime,
-          touchTimeState = touchTimeState,
-          leftDistanceState = leftDistanceState
+          alpha = remember { mutableFloatStateOf(1F) },
+          time1 = remember { mutableStateOf(item.initTime) },
+          time2 = touchTimeState,
         ).then(RoundedShadowItemModifier.createModifier())
           .background(0xFFE9EDF2.dark(0xFF202223))
       )
@@ -410,83 +399,6 @@ private fun Modifier.pointerInputCreateItem(
             }
           }
         }
-      }
-    }
-  }
-}
-
-// 绘制开始结束时间线
-@Composable
-private fun Modifier.drawBeginFinalTimeline(
-  initTime: MinuteTime,
-  touchTimeState: MutableState<MinuteTime>, // 当前手指触摸的时间
-  leftDistanceState: MutableIntState, // 距离左侧时间轴的左间距
-): Modifier {
-  val localAppColor = LocalAppColors.current
-  val textMeasurer = rememberTextMeasurer()
-  val textStyle = remember {
-    TextStyle(color = localAppColor.tvLv4, fontSize = 8.sp)
-  }
-  val initTimeTextLayoutResult = remember {
-    textMeasurer.measure(initTime.toString(), textStyle)
-  }
-  return drawWithCache {
-    val touchTimeTextLayoutResult =
-      textMeasurer.measure(touchTimeState.value.toString(), textStyle)
-    val durationTextLayoutResult =
-      textMeasurer.measure(
-        abs(initTime.minutesUntil(touchTimeState.value)).toString(),
-        textStyle
-      )
-    val x = -leftDistanceState.intValue.toFloat()
-    onDrawWithContent {
-      drawContent()
-      val beginTextLayoutResult =
-        if (initTime < touchTimeState.value) initTimeTextLayoutResult else touchTimeTextLayoutResult
-      val finalTextLayoutResult =
-        if (initTime < touchTimeState.value) touchTimeTextLayoutResult else initTimeTextLayoutResult
-      drawText(
-        textLayoutResult = beginTextLayoutResult,
-        topLeft = Offset(
-          -beginTextLayoutResult.size.width / 2F,
-          -beginTextLayoutResult.size.height / 2F
-        )
-      )
-      drawText(
-        textLayoutResult = finalTextLayoutResult,
-        topLeft = Offset(
-          -finalTextLayoutResult.size.width / 2F,
-          size.height - finalTextLayoutResult.size.height / 2F
-        )
-      )
-      drawText(
-        textLayoutResult = durationTextLayoutResult,
-        topLeft = Offset(
-          -durationTextLayoutResult.size.width / 2F,
-          (size.height - durationTextLayoutResult.size.height) / 2
-        )
-      )
-      drawLine(
-        color = localAppColor.tvLv4,
-        start = Offset(0F, beginTextLayoutResult.size.height / 2F),
-        end = Offset(0F, (size.height - durationTextLayoutResult.size.height) / 2)
-      )
-      drawLine(
-        color = localAppColor.tvLv4,
-        start = Offset(0F, (size.height + durationTextLayoutResult.size.height) / 2),
-        end = Offset(0F, size.height - finalTextLayoutResult.size.height / 2F)
-      )
-      if (x < 0) {
-        drawLine(
-          color = localAppColor.tvLv4,
-          start = Offset(x, 0F),
-          end = Offset(-beginTextLayoutResult.size.width / 2F, 0F)
-        )
-        drawLine(
-          color = localAppColor.tvLv4,
-          start = Offset(x, size.height),
-          end = Offset(-finalTextLayoutResult.size.width / 2F, size.height)
-        )
       }
     }
   }

@@ -1,10 +1,12 @@
 package com.cyxbs.pages.course.frame.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -29,6 +31,7 @@ import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
 import com.cyxbs.pages.course.view.item.modifier.PressScaleItemModifier
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
+import com.cyxbs.pages.course.view.item.modifier.ShowBeginFinalTimeModifier
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
@@ -92,6 +95,7 @@ class MobileCourseAffairItem(
         persistentListOf(
           LayoutItemModifier, // 布局
           LongPressMoveItemModifier, // 长按移动 item
+          ShowBeginFinalTimeModifier, // 绘制开始结束时间线
           PressScaleItemModifier, // 点击 Q 弹动画，需要在长按移动 item 之后
           RoundedShadowItemModifier, // 圆角+阴影
           AffairBackgroundItemModifier, // 事务背景斜线
@@ -99,6 +103,11 @@ class MobileCourseAffairItem(
       }
     ) {
       bottomSheetDialogState.showDialog(itemState.overlap)
+    }
+    LaunchedEffect(Unit) {
+      snapshotFlow { bottomSheetDialogState.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+        itemState.showBeginFinalTimeAlpha.floatValue = it
+      }
     }
   }
 

@@ -37,6 +37,7 @@ import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
 import com.cyxbs.pages.course.view.item.modifier.PressScaleItemModifier
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
+import com.cyxbs.pages.course.view.item.modifier.ShowBeginFinalTimeModifier
 import com.cyxbs.pages.course.view.page.LocalCoursePage
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
@@ -101,6 +102,7 @@ fun CourseDefaultItemContent(
     persistentListOf(
       LayoutItemModifier, // 布局
       LongPressMoveItemModifier, // 长按移动 item
+      ShowBeginFinalTimeModifier, // 绘制开始结束时间线
       PressScaleItemModifier, // 点击 Q 弹动画，需要在长按移动 item 之后
       RoundedShadowItemModifier, // 圆角+阴影
     )
@@ -142,8 +144,8 @@ fun CourseDefaultItemContent(
 
 @Composable
 private fun CourseShowRange(
-  range: MinuteTimePair,
-  itemRange: MinuteTimePair,
+  range: MinuteTimePair, // 当前显示的区间
+  itemRange: MinuteTimePair, // item 总区间
   enableShowCoverTip: Boolean,
   timeline: CourseTimeline,
   topText: String,
