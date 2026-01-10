@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -54,16 +53,6 @@ import kotlin.math.roundToInt
  * @author 985892345
  * @date 2025/2/14
  */
-@Stable
-class CourseItemWrapper<T : CourseItem>(
-  // todo 属性需要可变，待重新设计
-  val item: T,
-  val page: Int,
-  val dayOfWeek: DayOfWeek,
-  val beginTime: MinuteTime,
-  // 如果 finalTime < beginTime 则表示跨了一天
-  val finalTime: MinuteTime,
-)
 
 val LocalCourseItemState = staticCompositionLocalOf<CourseItemState> { error("未初始化") }
 

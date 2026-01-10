@@ -1,11 +1,8 @@
 package com.cyxbs.pages.course.view.overlay
 
-import androidx.compose.runtime.Stable
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
 
 /**
  * 重叠的数据
@@ -34,36 +31,6 @@ class OverlapResult(
   // 其 CourseItemCover#result 为下层 item
   val coveredItemList: MutableList<OverlapCover> = mutableListOf()
 }
-
-
-@Stable
-class CourseItemOverlap(
-  val wrapper: CourseItemWrapper<*>,
-  val showRangeList: List<CourseItemRange>, // 能够展示区域
-) {
-  // ItemCover 类型会在判断 equal 时使父子构成循环引用，所以需要单独分离
-
-  // 被覆盖的区域
-  // 其 CourseItemCover#itemOverlap 为上层 item
-  val coveredRangeList: MutableList<CourseItemCover> = mutableListOf()
-
-  // 覆盖的 item 集合，只保存了直接覆盖的子 item，如果需要查找所有覆盖的 item，需要进行递归收集
-  // 其 CourseItemCover#itemOverlap 为下层 item
-  val coveredItemList: MutableList<CourseItemCover> = mutableListOf()
-
-}
-
-@Stable
-data class CourseItemRange(
-  val begin: MinuteTime,
-  val final: MinuteTime,
-)
-
-@Stable
-data class CourseItemCover(
-  val range: CourseItemRange,
-  val itemOverlap: CourseItemOverlap,
-)
 
 
 fun CourseItemState.createOverlapResult(

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * [CourseItemWrapper] 对应的 状态，生命周期与页面进行绑定
+ * [CourseItem] 对应的 状态，生命周期与页面进行绑定
  *
  * @author 985892345
  * @date 2025/5/4

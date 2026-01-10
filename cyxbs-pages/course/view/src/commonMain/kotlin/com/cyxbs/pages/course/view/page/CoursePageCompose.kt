@@ -12,11 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
@@ -93,50 +90,11 @@ class LocalCoursePageContext(
   var scrollContext: LocalCourseScrollContext by mutableStateOf(scrollContext)
     private set
 
-  private val itemStateByItem = mutableMapOf<Any, CourseItemState>()
-
-  private val findActionsByItem = mutableMapOf<Any, MutableList<(CourseItemState) -> Unit>>()
-
-  fun findItemState(item: CourseItemWrapper<*>): CourseItemState? = itemStateByItem[item]
-
-  // 用于延迟查找的方法
-  // 如果超时则需要调用 onDispose 进行移除保存的 action 操作
-  fun findItemState(wrapper: CourseItemWrapper<*>, action: (CourseItemState) -> Unit): OnDisposable? {
-    val state = itemStateByItem[wrapper.item]
-    if (state != null) {
-      action(state)
-      return null
-    } else {
-      findActionsByItem.getOrPut(wrapper.item) { mutableListOf() }.add(action)
-      return OnDisposable {
-        val list = findActionsByItem[wrapper.item]
-        if (list != null) {
-          list.remove(action)
-          if (list.isEmpty()) findActionsByItem.remove(wrapper.item)
-        }
-      }
-    }
-  }
-
-  fun putItemState(wrapper: CourseItemWrapper<*>, state: CourseItemState?) {
-    if (state == null) {
-      itemStateByItem.remove(wrapper.item)
-      findActionsByItem.remove(wrapper.item)
-    } else {
-      itemStateByItem[wrapper.item] = state
-      findActionsByItem.remove(wrapper.item)?.fastForEach { it(state) }
-    }
-  }
-
   fun update(
     timeline: CourseTimeline,
     scrollContext: LocalCourseScrollContext,
   ) {
     this.timeline = timeline
     this.scrollContext = scrollContext
-  }
-
-  fun interface OnDisposable {
-    fun onDispose()
   }
 }
