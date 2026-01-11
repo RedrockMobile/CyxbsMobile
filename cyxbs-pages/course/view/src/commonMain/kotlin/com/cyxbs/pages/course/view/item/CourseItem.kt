@@ -21,7 +21,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -34,12 +33,11 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
+import com.cyxbs.pages.course.view.item.modifier.LayoutCoordinateSaveModifier
 import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
 import com.cyxbs.pages.course.view.item.modifier.PressScaleItemModifier
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
-import com.cyxbs.pages.course.view.item.modifier.ShowBeginFinalTimeModifier
-import com.cyxbs.pages.course.view.page.LocalCoursePage
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.collections.immutable.ImmutableList
@@ -68,15 +66,12 @@ abstract class CourseItem(
   // item 支持的扩展功能
   abstract val extension: CourseItemExtension
 
+  // item 当前 Compose 中的状态
+  lateinit var itemState: CourseItemState
+
   // item 所在的页面上下文
   val coursePage: LocalCoursePageContext
-    @Composable
-    get() = LocalCoursePage.current
-
-  // item 当前 Compose 中的状态
-  val itemState: CourseItemState
-    @Composable
-    get() = LocalCourseItemState.current
+    get() = itemState.coursePageFlow.value!!
 
   /**
    * 绘制 item 内容，使用 [CourseDefaultItemContent]
@@ -87,6 +82,12 @@ abstract class CourseItem(
 
 interface CourseItemWhatTime {
   val now: StateFlow<Fixed>
+
+  val beginTime: MinuteTime
+    get() = now.value.beginTime
+
+  val finalTime: MinuteTime
+    get() = now.value.finalTime
 
   data class Fixed(
     val page: Int, // 为 0 则表示整学期，否则表示第几周
@@ -103,7 +104,7 @@ fun CourseDefaultItemContent(
     persistentListOf(
       LayoutItemModifier, // 布局
       LongPressMoveItemModifier, // 长按移动 item
-      ShowBeginFinalTimeModifier, // 绘制开始结束时间线
+      LayoutCoordinateSaveModifier, // 保存 item 的坐标系
       PressScaleItemModifier, // 点击 Q 弹动画，需要在长按移动 item 之后
       RoundedShadowItemModifier, // 圆角+阴影
     )
@@ -121,9 +122,7 @@ fun CourseDefaultItemContent(
       modifierList.forEach {
         then(it?.createModifier() ?: Modifier)
       }
-    }.background(backgroundColor).onGloballyPositioned {
-      itemState.layoutCoordinates.value = it
-    }
+    }.background(backgroundColor)
   ) {
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(

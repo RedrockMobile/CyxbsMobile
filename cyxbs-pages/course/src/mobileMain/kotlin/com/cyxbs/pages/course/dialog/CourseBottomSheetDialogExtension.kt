@@ -1,7 +1,11 @@
 package com.cyxbs.pages.course.dialog
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,26 +36,40 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.plusDsl
-import com.cyxbs.components.utils.compose.rememberWrapper
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.LocalCourseItemState
+import com.cyxbs.pages.course.view.item.drawBeginFinalTimeline
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -63,6 +81,8 @@ import kotlin.math.roundToInt
  * @date 2025/3/29
  */
 interface CourseBottomSheetDialogExtension : CourseItemExtension {
+
+  val itemState: CourseItemState
 
   @Composable
   fun CourseBottomSheetDialogContent()
@@ -85,6 +105,8 @@ class CourseBottomSheetDialogState {
     mutableStateOf(emptyList())
 
   val bottomSheetState = BottomSheetState()
+
+  val currentPageItemFlow: MutableStateFlow<CourseBottomSheetDialogExtension?> = MutableStateFlow(null)
 
   fun showDialog(extension: CourseBottomSheetDialogExtension) {
     dialogContents.value = listOf(extension)
@@ -130,91 +152,215 @@ class CourseBottomSheetDialogState {
 private fun MobileCourseBottomSheetDialog(
   state: CourseBottomSheetDialogState,
 ) {
-  if (state.dialogContents.value.isEmpty()) return
-  val itemState = LocalCourseItemState.current
+  val firstItem = state.dialogContents.value.firstOrNull() ?: return
   Window(
     dismissOnBackPress = {
       state.dialogContents.value = emptyList()
     }
   ) {
-    val coroutineScope = rememberCoroutineScope()
-    val lastMarginBottomOffsetJob = rememberWrapper<Job?>(null)
-    val density = LocalDensity.current
     val height = 280.dp
     Box {
-      Spacer( // 模拟底部弹窗展开时的显示位置，如果 item 被弹窗遮挡，则将滚轴向上移动
-        modifier = Modifier.align(Alignment.BottomStart)
-          .navigationBarsPadding()
-          .fillMaxWidth()
-          .height(height)
-          .onGloballyPositioned { layoutCoordinate ->
-            // 如果 item 被弹窗遮挡，则将滚轴向上移动
-            val itemCoordinates = itemState.layoutCoordinates.value ?: return@onGloballyPositioned
-            val itemPositionInWindow = itemCoordinates.localToWindow(Offset.Zero)
-            if (itemPositionInWindow.y < 0) return@onGloballyPositioned // 显示在窗口外
-            val layoutPositionInWindow = layoutCoordinate.localToWindow(Offset.Zero)
-            val itemPosition = itemPositionInWindow - layoutPositionInWindow
-            val itemBottomMargin =
-              layoutCoordinate.size.height - itemPosition.y - itemCoordinates.size.height
-            val heightDiff = itemBottomMargin - with(density) { height.toPx() }
-            if (heightDiff > 0) return@onGloballyPositioned
-            lastMarginBottomOffsetJob.value?.cancel() // 取消前一次的移动监听
-            lastMarginBottomOffsetJob.value =
-              snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.onEach {
-                itemState.coursePageFlow.value?.scrollContext?.marginBottom?.intValue =
-                  (it * -heightDiff).roundToInt()
-              }.launchIn(coroutineScope)
+      OffsetScroll(state, height)
+      ShowBeginFinalTime(state)
+      BottomSheet(state, height)
+    }
+  }
+}
+
+// 如果 item 被弹窗遮挡，则将滚轴向上移动
+@Composable
+private fun BoxScope.OffsetScroll(
+  state: CourseBottomSheetDialogState,
+  height: Dp,
+) {
+  val layoutCoordinatesFlow = remember { MutableStateFlow<LayoutCoordinates?>(null) }
+  Spacer( // 模拟底部弹窗展开时的显示位置，如果 item 被弹窗遮挡，则将滚轴向上移动
+    modifier = Modifier.align(Alignment.BottomStart)
+      .navigationBarsPadding()
+      .fillMaxWidth()
+      .height(height)
+      .onGloballyPositioned {
+        layoutCoordinatesFlow.value = it
+      }
+  )
+  LaunchedEffect(Unit) {
+    combine(
+      layoutCoordinatesFlow.filterNotNull(),
+      state.currentPageItemFlow.filterNotNull(),
+    ) { layoutCoordinates, extension ->
+      val itemState = extension.itemState
+      val layoutOffsetInWindow = layoutCoordinates.localToWindow(Offset.Zero)
+      val coursePage = itemState.coursePageFlow.value!!
+      val pageHeight = coursePage.layoutCoordinates.size.height
+      val itemBottom = coursePage.timeline.calculateWeightRatio(itemState.item.whatTime.finalTime) * pageHeight
+      val itemBottomInWindow = coursePage.layoutCoordinates.localToWindow(Offset(0F, itemBottom)).y
+      if (itemBottomInWindow < 0) -1F else {
+        // 如果 itemBottomInWindow < 0，则说明 item 已经在窗口外，不需要移动
+        itemBottomInWindow - layoutOffsetInWindow.y
+      }
+    }.filter { it > 0 }.collectLatest { heightDiff ->
+      val itemState = state.currentPageItemFlow.value?.itemState ?: return@collectLatest
+      val marginBottom = itemState.coursePageFlow.value?.scrollContext?.marginBottom ?: return@collectLatest
+      if (state.currentPageItemFlow.value == state.dialogContents.value.firstOrNull()) {
+        // 首个 item 打开时监听 bottomSheetState.fraction
+        snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+          marginBottom.intValue = (it * heightDiff).roundToInt()
+        }
+      } else {
+        // 切换了 item 则单独用动画移动
+        supervisorScope {
+          val oldMarginBottom = marginBottom.intValue
+          val animateJob = launch {
+            animate(
+              initialValue = 0F,
+              targetValue = heightDiff,
+              animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+            ) { value, _ ->
+              marginBottom.intValue = oldMarginBottom + value.roundToInt()
+            }
           }
-      )
-      BottomSheetCompose(
-        bottomSheetState = state.bottomSheetState,
-        dismissOnClickOutside = true,
-        scrimColor = Color.Transparent,
-      ) {
-        Box(
-          modifier = Modifier.navigationBarsPadding()
-            .fillMaxWidth()
-            .height(height)
-        ) {
-          Spacer(
-            modifier = Modifier.fillMaxWidth().height(36.dp).background(
-              brush = Brush.verticalGradient(
-                colors = listOf(Color(0x005369BC), Color(0x205369BC))
-              )
-            )
-          )
-          Box(
-            modifier = Modifier.padding(top = 20.dp)
-              .fillMaxSize()
-              .then(bottomSheetDraggable())
-              .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-              .background(LocalAppColors.current.whiteBlack)
-          ) {
-            CourseBottomSheetDialogContent(state.dialogContents.value)
+          val lastFraction = state.bottomSheetState.fraction
+          snapshotFlow { state.bottomSheetState.fraction }.first { it < lastFraction } // 直到第一次向下移动，所以开始 Collapsed
+          animateJob.cancel() // 如果在切换 item 动画中立马触发关闭，就需要取消动画
+          val nowMarginBottom = oldMarginBottom + heightDiff
+          snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+            marginBottom.intValue = (it * nowMarginBottom).roundToInt()
           }
         }
       }
-    }
-    LaunchedEffect(Unit) {
-      try {
-        state.bottomSheetState.expand()
-      } catch (e: CancellationException) {
-        // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
-      }
-      state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
-      state.dialogContents.value = emptyList()
     }
   }
 }
 
 @Composable
+private fun BottomSheet(
+  state: CourseBottomSheetDialogState,
+  height: Dp,
+) {
+  BottomSheetCompose(
+    bottomSheetState = state.bottomSheetState,
+    dismissOnClickOutside = true,
+    scrimColor = Color.Transparent,
+  ) {
+    Box(
+      modifier = Modifier.navigationBarsPadding()
+        .fillMaxWidth()
+        .height(height)
+    ) {
+      Spacer(
+        modifier = Modifier.fillMaxWidth().height(36.dp).background(
+          brush = Brush.verticalGradient(
+            colors = listOf(Color(0x005369BC), Color(0x205369BC))
+          )
+        )
+      )
+      Box(
+        modifier = Modifier.padding(top = 20.dp)
+          .fillMaxSize()
+          .then(bottomSheetDraggable())
+          .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+          .background(LocalAppColors.current.whiteBlack)
+      ) {
+        CourseBottomSheetDialogContent(state.dialogContents.value, state.currentPageItemFlow)
+      }
+    }
+  }
+  LaunchedEffect(Unit) {
+    try {
+      state.bottomSheetState.expand()
+    } catch (e: CancellationException) {
+      // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
+    }
+    state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
+    state.dialogContents.value = emptyList()
+  }
+}
+
+@Composable
+private fun ShowBeginFinalTime(
+  state: CourseBottomSheetDialogState,
+) {
+  val currentPageItemFlow = state.currentPageItemFlow
+  val alphaState = rememberDerivedStateOfStructure {
+    state.bottomSheetState.fraction.coerceIn(0F, 1F)
+  }
+  val time1 = remember {
+    mutableStateOf(currentPageItemFlow.value?.itemState?.item?.whatTime?.beginTime ?: MinuteTime(0, 0))
+  }
+  val time2 = remember {
+    mutableStateOf(currentPageItemFlow.value?.itemState?.item?.whatTime?.finalTime ?: MinuteTime(0, 0))
+  }
+  val itemRectState = remember {
+    currentPageItemFlow.mapNotNull { it?.itemState }.onEach {
+      time1.value = it.item.whatTime.now.value.beginTime
+      time2.value = it.item.whatTime.now.value.finalTime
+    }.flatMapLatest { itemState ->
+      val layoutCoordinatesFlow = itemState.layoutCoordinates
+      if (layoutCoordinatesFlow.replayCache.firstOrNull()?.isAttached == true) {
+        // 首个 item 一定是有 layoutCoordinates 的
+        // 并且首个 item 还因为滚轴会向上移动，所以必须要通过 localToWindow 获取
+        layoutCoordinatesFlow.map {
+          val offset = it.localToWindow(Offset.Zero)
+          Rect(offset, it.size.toSize())
+        }
+      } else {
+        // 因为下面被重叠遮挡的 item 不一定有 layoutCoordinates，或者 isAttached = false
+        // 所以采用根据开始结束时间手动计算 item 位置
+        val coursePage = itemState.coursePageFlow.value!!
+        val coursePageCoordinates = coursePage.layoutCoordinates
+        val pageHeight = coursePageCoordinates.size.height
+        val itemTop = coursePage.timeline.calculateWeightRatio(time1.value) * pageHeight
+        val itemBottom = coursePage.timeline.calculateWeightRatio(time2.value) * pageHeight
+        val coursePageOffsetInWindow = coursePageCoordinates.localToWindow(Offset.Zero)
+        val firstItemCoordinates = state.dialogContents.value[0].itemState.layoutCoordinates.first()
+        val itemLeft = firstItemCoordinates.localToWindow(Offset.Zero).x // 使用第一个 item 的左间距
+        Rect(
+          left = itemLeft,
+          top = itemTop + coursePageOffsetInWindow.y,
+          right = itemLeft + firstItemCoordinates.size.width,
+          bottom = itemBottom + coursePageOffsetInWindow.y,
+        ).let {
+          flowOf(it)
+        }
+      }
+    }
+  }.collectAsState(null)
+  Spacer(
+    modifier = Modifier.layout { measure, constraints ->
+      val width = itemRectState.value?.width?.roundToInt() ?: 0
+      val height = itemRectState.value?.height?.roundToInt() ?: 0
+      val placeable = measure.measure(Constraints.fixed(width, height))
+      layout(constraints.maxWidth, constraints.maxHeight) {
+        val rect = itemRectState.value ?: return@layout
+        val coordinates = coordinates ?: return@layout
+        val localToWindow = coordinates.localToWindow(Offset.Zero)
+        placeable.place(
+          x = (rect.left - localToWindow.x).roundToInt(),
+          y = (rect.top - localToWindow.y).roundToInt(),
+        )
+      }
+    }.drawBeginFinalTimeline(
+      alpha = alphaState,
+      time1 = time1,
+      time2 = time2,
+    )
+  )
+}
+
+@Composable
 private fun CourseBottomSheetDialogContent(
-  itemDialogContents: List<CourseBottomSheetDialogExtension>
+  itemDialogContents: List<CourseBottomSheetDialogExtension>,
+  currentPageItemFlow: MutableStateFlow<CourseBottomSheetDialogExtension?>,
 ) {
   val pagerState = rememberPagerState(
     initialPage = if (itemDialogContents.size == 1) 0 else itemDialogContents.size * 1000,
   ) {
     if (itemDialogContents.size == 1) 1 else Int.MAX_VALUE
+  }
+  LaunchedEffect(Unit) {
+    snapshotFlow { pagerState.currentPage }.collect {
+      currentPageItemFlow.value = itemDialogContents[pagerState.currentPage % itemDialogContents.size]
+    }
   }
   Column(modifier = Modifier.fillMaxSize()) {
     HorizontalPager(

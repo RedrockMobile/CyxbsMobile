@@ -281,9 +281,12 @@ class CourseItemHierarchy<Item : CourseItem> {
           + SupervisorJob(courseItemViewModel.viewModelScope.coroutineContext[Job])
     )
 
-    val itemState = CourseItemState(whatTime.createItem(coroutineScope))
+    val item = whatTime.createItem(coroutineScope)
+
+    val itemState = CourseItemState(item)
 
     init {
+      item.itemState = itemState
       var lastFixed = whatTime.now.value
       whatTime.now.onEach {
         if (it != lastFixed) {

@@ -36,8 +36,6 @@ class SelfLessonDecorationViewModel(
   val hierarchy: CourseItemHierarchy<SelfLessonItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
-  private val itemFactory = SelfLessonItemFactory.get()
-
   init {
     IAccountService::class.impl()
       .stuNumFlow

@@ -1,7 +1,6 @@
 package com.cyxbs.pages.course.view.timeline
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -17,13 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastForEachIndexed
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -31,6 +29,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -49,76 +48,72 @@ data class CourseTimeline(
   val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
 
-  /**
-   * 根据开始和结束时间计算比例后进行布局的方法
-   * @param parent 父区域的开始和结束时间，如果为 null 则为整个时间轴
-   */
-  fun createLayoutModifier(
-    beginTime: MinuteTime,
-    finalTime: MinuteTime,
-    parent: Pair<MinuteTime, MinuteTime>? = null,
-  ) : Modifier {
-    return Modifier.layout { measurable, constraints ->
-      val weight =
-        if (parent == null) calculateBeginFinalWeight(beginTime, finalTime)
-        else calculateRelativeWeight(beginTime, finalTime, parent.first, parent.second)
-      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
-      val placeable = measurable.measure(
-        Constraints.fixed(constraints.maxWidth, height)
+  @Transient
+  val linkNodeList = mutableListOf<LinkNode>()
+
+  init {
+    var totalInitialWeight = 0F
+    data.fastForEachIndexed { i, it ->
+      totalInitialWeight += it.initialWeight
+      linkNodeList.add(
+        LinkNode(
+          endTime = it.endTime,
+          totalInitialWeight = totalInitialWeight,
+          index = i
+        )
       )
-      layout(placeable.width, placeable.height) {
-        placeable.placeRelative(0, (constraints.maxHeight * weight.x).roundToInt())
+      if (i != 0) {
+        check(data[i - 1].endTime == it.startTime) {
+          "时间段不连续, i = $i, i-1: ${data[i - 1]}, i: $it"
+        }
       }
     }
   }
 
-  /**
-   * 计算 [beginTime] [finalTime] 在整个时间轴上的占比
-   * @return Offset(startWeight, endWeight)
-   */
-  fun calculateBeginFinalWeight(
-    beginTime: MinuteTime,
-    finalTime: MinuteTime,
-  ) : Offset {
-    var startWeight = 0F
-    var endWeight = 0F
-    var allWeight = 0F
-    data.fastForEach {
-      allWeight += it.nowWeight
-      if (beginTime >= it.endTime) {
-        startWeight += it.nowWeight
-      } else if (beginTime >= it.startTime) {
-        startWeight += it.startTime.minutesUntil(beginTime) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
+  inner class LinkNode(
+    val endTime: MinuteTime,
+    val totalInitialWeight: Float,
+    val index: Int,
+  ) {
+    val value = data[index]
+    val totalShowWeightState = derivedStateOfStructure {
+      var sum = 0F
+      for (i in 0..index) {
+        sum += data[i].nowWeight
       }
-      if (finalTime >= it.endTime) {
-        endWeight += it.nowWeight
-      } else if (finalTime >= it.startTime) {
-        endWeight += it.startTime.minutesUntil(finalTime) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
+      sum
     }
-    return Offset(
-      x = startWeight / allWeight,
-      y = endWeight / allWeight,
-    )
   }
 
-  /**
-   * 计算 [time] 在整个时间轴上的占比
-   */
+  val totalInitialWeight: Float
+    get() = linkNodeList.last().totalInitialWeight
+
+  val totalShowWeight: Float
+    get() = linkNodeList.last().totalShowWeightState.value
+
   fun calculateWeight(
     time: MinuteTime
   ): Float {
-    var allWeight = 0F
-    var nowWeight = 0F
-    data.fastForEach {
-      allWeight += it.nowWeight
-      if (time >= it.endTime) {
-        nowWeight += it.nowWeight
-      } else if (time >= it.startTime) {
-        nowWeight += it.startTime.minutesUntil(time) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
+    val index = linkNodeList.binarySearchBy(time) { it.endTime }
+    val weight = if (index >= 0) {
+      linkNodeList[index].totalShowWeightState.value
+    } else {
+      // 二分没找到时返回 -(low + 1)
+      // 此时 low 位置表示 > time 的最小索引
+      val start = linkNodeList.getOrNull(-index - 2)
+      val end = linkNodeList[-index - 1]
+      (start?.totalShowWeightState?.value ?: 0F) +
+          end.value.startTime.minutesUntil(time) /
+          (end.value.startTime.minutesUntil(end.value.endTime)).toFloat() *
+          end.value.nowWeight
     }
-    return nowWeight / allWeight
+    return weight
+  }
+
+  fun calculateWeightRatio(
+    time: MinuteTime
+  ): Float {
+    return calculateWeight(time) / totalShowWeight
   }
 
   /**
@@ -131,54 +126,35 @@ data class CourseTimeline(
     beginTime2: MinuteTime,
     finalTime2: MinuteTime,
   ): Offset {
-    var startWeight1 = 0F
-    var endWeight1 = 0F
-    var startWeight2 = 0F
-    var endWeight2 = 0F
-    data.fastForEach {
-      if (beginTime1 >= it.endTime) {
-        startWeight1 += it.nowWeight
-      } else if (beginTime1 >= it.startTime) {
-        startWeight1 += it.startTime.minutesUntil(beginTime1) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
-      if (finalTime1 >= it.endTime) {
-        endWeight1 += it.nowWeight
-      } else if (finalTime1 >= it.startTime) {
-        endWeight1 += it.startTime.minutesUntil(finalTime1) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
-      if (beginTime2 >= it.endTime) {
-        startWeight2 += it.nowWeight
-      } else if (beginTime2 >= it.startTime) {
-        startWeight2 += it.startTime.minutesUntil(beginTime2) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
-      if (finalTime2 >= it.endTime) {
-        endWeight2 += it.nowWeight
-      } else if (finalTime2 >= it.startTime) {
-        endWeight2 += it.startTime.minutesUntil(finalTime2) / (it.startTime.minutesUntil(it.endTime)).toFloat() * it.nowWeight
-      }
-    }
+    val beginTime1Weight = calculateWeight(beginTime1)
+    val finalTime1Weight = calculateWeight(finalTime1)
+    val beginTime2Weight = calculateWeight(beginTime2)
+    val finalTime2Weight = calculateWeight(finalTime2)
     return Offset(
-      x = (startWeight1 - startWeight2) / (endWeight2 - startWeight2),
-      y = (endWeight1 - startWeight2) / (endWeight2 - startWeight2),
+      x = (beginTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),
+      y = (finalTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),
     )
   }
 
   /**
    * 计算 [height] 在时间轴上的 [MinuteTime]
+   * @param height 相对于
    */
   fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime {
+    var top = 0F
     data.fastForEach {
       scrollContext.timelineCoordinatesMap[it]?.let { coordinates ->
-        val y1 = coordinates.positionInParent().y
-        val y2 = y1 + coordinates.size.height
+        val y1 = top
+        val y2 = top + coordinates.size.height
         if (height in y1..y2) {
           return it.startTime.plusMinutes(((it.startTime.minutesUntil(it.endTime)) * (height - y1) / (y2 - y1)).roundToInt())
         }
+        top = y2
       }
     }
-    if (height < scrollContext.timelineCoordinatesMap[data.first()]!!.positionInParent().y) {
+    if (height < 0) {
       return data.first().startTime
-    } else if (height > scrollContext.timelineCoordinatesMap[data.last()]!!.positionInParent().y) {
+    } else if (height > top) {
       return data.last().endTime
     }
     throw IllegalStateException("无法寻找高度对应时间，不应该出现的异常, height=$height, timeline=$data")
@@ -216,11 +192,7 @@ fun CourseTimeline.Content(
         it.apply { Content() }
       }
     }
-    Box(
-      modifier = Modifier.fillMaxSize()
-    ) {
-      content()
-    }
+    content()
   }
 }
 
@@ -246,7 +218,7 @@ private fun Modifier.drawNowTimeLine(
     val radius = 3.dp.toPx()
     val start = 2.dp.toPx() + radius
     val end = size.width - 2.dp.toPx()
-    val y = timeline.calculateWeight(nowTimeState.value) * size.height
+    val y = timeline.calculateWeightRatio(nowTimeState.value) * size.height
     drawCircle(
       color = Color.Gray,
       radius = radius,

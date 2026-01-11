@@ -1,16 +1,21 @@
 package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
@@ -55,24 +60,32 @@ fun CoursePageCompose(
     verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
-    val courseScroll = LocalCourseScroll.current
-    val pageContext = remember {
-      LocalCoursePageContext(
-        page = page,
-        timeline = timeline,
-        scrollContext = courseScroll,
-      )
-    }.apply {
-      update(
-        timeline = timeline,
-        scrollContext = courseScroll,
-      )
-    }
-    CompositionLocalProvider(
-      LocalCoursePage provides pageContext,
+    val layoutCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    Box(
+      modifier = Modifier.fillMaxSize().onGloballyPositioned {
+        layoutCoordinatesState.value = it
+      }
     ) {
-      decorations.fastForEachReversed { decoration ->
-        decoration.CoursePageContent()
+      val courseScroll = LocalCourseScroll.current
+      val pageContext = remember {
+        LocalCoursePageContext(
+          page = page,
+          timeline = timeline,
+          scrollContext = courseScroll,
+          layoutCoordinatesState = layoutCoordinatesState,
+        )
+      }.apply {
+        update(
+          timeline = timeline,
+          scrollContext = courseScroll,
+        )
+      }
+      CompositionLocalProvider(
+        LocalCoursePage provides pageContext,
+      ) {
+        decorations.fastForEachReversed { decoration ->
+          decoration.CoursePageContent()
+        }
       }
     }
   }
@@ -82,6 +95,7 @@ class LocalCoursePageContext(
   val page: Int,
   timeline: CourseTimeline,
   scrollContext: LocalCourseScrollContext, // 滚轴 context
+  val layoutCoordinatesState: State<LayoutCoordinates?>,
 ) {
 
   var timeline: CourseTimeline by mutableStateOf(timeline)
@@ -89,6 +103,9 @@ class LocalCoursePageContext(
 
   var scrollContext: LocalCourseScrollContext by mutableStateOf(scrollContext)
     private set
+
+  val layoutCoordinates: LayoutCoordinates
+    get() = layoutCoordinatesState.value!!
 
   fun update(
     timeline: CourseTimeline,

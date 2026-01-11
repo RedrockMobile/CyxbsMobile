@@ -134,12 +134,8 @@ internal fun CourseScrollCompose(
     measurePolicy = remember(timeline) {
       { measurables, constraints ->
         var widthConsume = 0
-        var initialWeight = 0F
-        var nowWeight = 0F
-        timeline.data.fastForEach {
-          initialWeight += it.initialWeight
-          nowWeight += it.nowWeight
-        }
+        val initialWeight = timeline.totalInitialWeight
+        val nowWeight = timeline.totalShowWeight
         val startPadding = scrollPaddingValues.calculateStartPadding(layoutDirection).roundToPx()
         val endPadding = scrollPaddingValues.calculateEndPadding(layoutDirection).roundToPx()
         val topPadding = scrollPaddingValues.calculateTopPadding().roundToPx()
@@ -162,7 +158,6 @@ internal fun CourseScrollCompose(
         }
         layout(constraints.maxWidth, height + topPadding + bottomPadding) {
           var start = startPadding
-          coordinates
           placeables.fastForEach {
             it.placeRelative(x = start, y = topPadding)
             start += it.width

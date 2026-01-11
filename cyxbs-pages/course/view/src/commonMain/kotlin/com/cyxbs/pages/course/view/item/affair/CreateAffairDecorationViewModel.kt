@@ -47,9 +47,9 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchedItem
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchingItem
+import com.cyxbs.pages.course.view.item.drawBeginFinalTimeline
 import com.cyxbs.pages.course.view.item.modifier.PressScaleController
 import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
-import com.cyxbs.pages.course.view.item.modifier.drawBeginFinalTimeline
 import com.cyxbs.pages.course.view.item.modifier.pressScale
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
@@ -203,14 +203,15 @@ private fun TouchedItems(
       Box(
         modifier = Modifier.layout { measurable, constraints ->
           val width = constraints.maxWidth / 7
-          val weight = timeline.calculateBeginFinalWeight(item.start, item.end)
-          val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+          val beginWeightRatio = timeline.calculateWeightRatio(item.start)
+          val finalWeightRatio = timeline.calculateWeightRatio(item.end)
+          val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt()
           val placeable = measurable.measure(Constraints.fixed(width, height))
           val x = item.dayOfWeek.ordinal * constraints.maxWidth / 7
           layout(placeable.width, placeable.height) {
             placeable.placeRelativeWithLayer(
               x = (x + (width - placeable.width) / 2F).roundToInt(),
-              y = (weight.x * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
+              y = (beginWeightRatio * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
               zIndex = 1F,
               layerBlock = {
                 alpha = item.alphaState.floatValue
@@ -242,7 +243,7 @@ private fun TouchingItems(
         modifier = Modifier.layout { measurable, constraints ->
           scrollContext.scrollState.value // 滚轴滚动时仍然触发布局
           val width = constraints.maxWidth / 7
-          val y1 = scrollContext.timeline.calculateWeight(item.initTime) * constraints.maxHeight
+          val y1 = scrollContext.timeline.calculateWeightRatio(item.initTime) * constraints.maxHeight
           val y2 =
             layoutCoordinates.value!!.screenToLocal(Offset(0F, item.nowScreenY.floatValue)).y
           touchTimeState.value = scrollContext.timeline.calculateMinuteTime(scrollContext, y2)
@@ -336,7 +337,7 @@ private fun Modifier.pointerInputCreateItem(
             if (initTime.minute % 10 != 0) {
               // 落点取整 10 分钟
               initTime = initTime.plusMinutes((initTime.minute % 10).let { if (it < 5) -it else 10 - it })
-              initPosition = initPosition.copy(y = scrollContext.timeline.calculateWeight(initTime) * size.height)
+              initPosition = initPosition.copy(y = scrollContext.timeline.calculateWeightRatio(initTime) * size.height)
             }
             touchingItems[change.id] = TouchingItem(
               initTime = initTime,

@@ -69,17 +69,15 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     }
   }
   return Modifier.layout { measurable, constraints ->
-    val weightOffset = timeline.calculateBeginFinalWeight(
-      beginTime = MinuteTime.new(beginTimeAnimatable.value),
-      finalTime = MinuteTime.new(finalTimeAnimatable.value)
-    )
+    val beginWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(beginTimeAnimatable.value))
+    val finalWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(finalTimeAnimatable.value))
     val width = constraints.maxWidth / 7
-    val height = (constraints.maxHeight * (weightOffset.y - weightOffset.x)).roundToInt()
+    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt()
     val placeable = measurable.measure(Constraints.fixed(width, height))
     layout(width, height) {
       placeable.placeRelative(
         x = (indexAnimatable.value * constraints.maxWidth / 7 + (width - placeable.width) / 2F).roundToInt(),
-        y = (weightOffset.x * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
+        y = (beginWeightRatio * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
         zIndex = itemState.zIndexState.floatValue,
       )
     }

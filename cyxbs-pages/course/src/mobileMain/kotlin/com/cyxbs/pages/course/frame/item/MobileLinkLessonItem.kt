@@ -5,7 +5,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
@@ -66,11 +65,6 @@ class MobileLinkLessonItem(
     ) {
       bottomSheetDialogState.showDialog(itemState.overlap)
     }
-    LaunchedEffect(Unit) {
-      snapshotFlow { bottomSheetDialogState.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
-        itemState.showBeginFinalTimeAlpha.floatValue = it
-      }
-    }
   }
 }
 
@@ -91,6 +85,10 @@ private class MobileLinkMovableItemExtension(
 private class MobileLinkCourseBottomSheetDialogExtension(
   val itemKeyImpl: MobileLinkLessonItem
 ) : CourseBottomSheetDialogExtension {
+
+  override val itemState: CourseItemState
+    get() = itemKeyImpl.itemState
+
   @Composable
   override fun CourseBottomSheetDialogContent() {
     LessonBottomSheetDialog(itemKeyImpl.lesson, true)

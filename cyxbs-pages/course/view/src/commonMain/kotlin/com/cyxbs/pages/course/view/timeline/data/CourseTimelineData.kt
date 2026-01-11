@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.unit.TextUnit
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.serialization.Serializable
 
 /**
@@ -22,7 +21,7 @@ sealed interface CourseTimelineData {
   val startTime: MinuteTime
   val endTime: MinuteTime
   val nowWeight: Float
-  val initialWeight: Float
+  val initialWeight: Float // 需要是一个不变的固定值
 
   @Composable
   fun ColumnScope.Content()

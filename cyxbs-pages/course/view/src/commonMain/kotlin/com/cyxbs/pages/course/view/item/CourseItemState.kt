@@ -9,8 +9,11 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.pages.course.view.item.modifier.LongPressMoveState
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -42,11 +45,17 @@ class CourseItemState(
   // 提供给一些场景设置 item 的层级
   val zIndexState = mutableFloatStateOf(0F)
 
-  // item 节点坐标
-  val layoutCoordinates: MutableStateFlow<LayoutCoordinates?> = MutableStateFlow(null)
+  // item 节点坐标系
+  // 如果 item 被重叠完全遮挡，则可能并不存在 layoutCoordinates，或者 layoutCoordinates.isAttached = false
+  // 使用 SharedFlow 是为了不去重，因为每次 item 位置改变都会回调，但 layoutCoordinates 对象不变
+  val layoutCoordinates: MutableSharedFlow<LayoutCoordinates> = MutableSharedFlow(
+    replay = 1,
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
 
-  // 是否显示 item 的开始结束时间
-  val showBeginFinalTimeAlpha = mutableFloatStateOf(0F)
+  // 长按移动状态
+  val longPressMoveState = MutableStateFlow<LongPressMoveState>(LongPressMoveState.Idle)
 
   fun updateCoursePage(coursePage: LocalCoursePageContext?) {
     _coursePageFlow.value = coursePage
