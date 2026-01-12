@@ -63,8 +63,8 @@ class LocalCourseScrollContext(
   var scrollState by mutableStateOf(scrollState)
     private set
 
-  // 底部间距
-  val marginBottom = mutableIntStateOf(0)
+  // 因为底部弹窗的弹出而需要偏移的底部间距
+  val marginBottomForBottomSheet = mutableIntStateOf(0)
 
   // 边缘滚动处理
   val edgeScroll = EdgeScroll(scrollContext = this)
@@ -117,7 +117,7 @@ internal fun CourseScrollCompose(
         innerCoordinatesState.value = it
       }.offset {
         // 在课程弹窗时，如果 item 被弹窗遮挡，则会设置 marginBottom 将滚轴向上移动
-        IntOffset(x = 0, y = -context.marginBottom.intValue)
+        IntOffset(x = 0, y = -context.marginBottomForBottomSheet.intValue)
       },
     content = {
       context.update(

@@ -1,8 +1,10 @@
 package com.cyxbs.pages.course.dialog
 
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -183,7 +185,8 @@ private fun BoxScope.OffsetScroll(
       }
   )
   LaunchedEffect(Unit) {
-    val marginBottomState = state.dialogContents.value.first().itemState.coursePage.scrollContext.marginBottom
+    val scrollContext = state.dialogContents.value.first().itemState.coursePage.scrollContext
+    val marginBottomState = scrollContext.marginBottomForBottomSheet
     combine(
       layoutCoordinatesFlow.filterNotNull(),
       state.currentPageItemFlow.filterNotNull()
@@ -197,30 +200,34 @@ private fun BoxScope.OffsetScroll(
       }
     }.filter { it > 0 }.map {
       it + marginBottomState.intValue
-    }.collectLatest { newMargin ->
-      if (state.currentPageItemFlow.value == state.dialogContents.value.firstOrNull()) {
-        // 首个 item 打开时监听 bottomSheetState.fraction
-        snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
-          marginBottomState.intValue = (it * newMargin).roundToInt()
-        }
-      } else {
-        // 切换了 item 则单独用动画移动
-        supervisorScope {
-          val animateJob = launch {
+    }.collectLatest { heightDiff ->
+      supervisorScope {
+        val animateJob = launch {
+          scrollContext.scrollState.scroll(MutatePriority.Default) {
+            var prevValue = marginBottomState.intValue
             animate(
-              initialValue = marginBottomState.intValue.toFloat(),
-              targetValue = newMargin,
+              initialValue = prevValue,
+              targetValue = heightDiff.roundToInt(),
+              typeConverter = Int.VectorConverter,
               animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
             ) { value, _ ->
-              marginBottomState.intValue = value.roundToInt()
+              val valueDiff = (value - prevValue).toFloat()
+              // 优先让滚轴消耗，消耗不了再设置底部间距
+              marginBottomState.intValue += (valueDiff - scrollBy(valueDiff)).roundToInt()
+              prevValue = value
             }
           }
-          val lastFraction = state.bottomSheetState.fraction
-          snapshotFlow { state.bottomSheetState.fraction }.first { it < lastFraction } // 直到第一次向下移动，所以开始 Collapsed
-          animateJob.cancel() // 如果在切换 item 动画中立马触发关闭，就需要取消动画
-          snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
-            marginBottomState.intValue = (it * newMargin).roundToInt()
-          }
+        }
+
+        // 直到第一次向下移动
+        var lastFraction = 0F
+        snapshotFlow { state.bottomSheetState.fraction }.first { now ->
+          (now < lastFraction).also { lastFraction = now }
+        }
+        animateJob.cancel() // 如果在切换 item 动画中立马触发关闭，就需要取消动画
+        val margin = marginBottomState.intValue / lastFraction
+        snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+          marginBottomState.intValue = (it * margin).roundToInt()
         }
       }
     }
