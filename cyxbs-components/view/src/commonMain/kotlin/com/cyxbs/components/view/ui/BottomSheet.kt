@@ -218,7 +218,9 @@ private fun BottomSheetBackgroundCompose(
       .plusDsl {
         if (dismissOnBackPress) {
           val enable by rememberDerivedStateOfStructure {
-            bottomSheetState.state == BottomSheetValueState.Expanded
+            // 因为 onPostFling 执行的动画比较缓慢，就会导致短时间内不是 Expanded
+            // 最好的方式就是判断当前展开是否比较多，大于一定区间后都拦截返回键
+            bottomSheetState.fraction > 0.5F
           }
           backHandler(enabled = enable) {
             coroutineScope.launch {
