@@ -33,6 +33,9 @@ class CourseItemState(
   private val _coursePageFlow: MutableStateFlow<LocalCoursePageContext?> = MutableStateFlow(null)
   val coursePageFlow: StateFlow<LocalCoursePageContext?> = _coursePageFlow
 
+  val coursePage: LocalCoursePageContext
+    get() = coursePageFlow.value!!
+
   // item 重叠数据
   var overlap: OverlapResult? by mutableStateOf(null)
     private set
@@ -48,11 +51,14 @@ class CourseItemState(
   // item 节点坐标系
   // 如果 item 被重叠完全遮挡，则可能并不存在 layoutCoordinates，或者 layoutCoordinates.isAttached = false
   // 使用 SharedFlow 是为了不去重，因为每次 item 位置改变都会回调，但 layoutCoordinates 对象不变
-  val layoutCoordinates: MutableSharedFlow<LayoutCoordinates> = MutableSharedFlow(
+  val layoutCoordinatesFlow: MutableSharedFlow<LayoutCoordinates?> = MutableSharedFlow<LayoutCoordinates?>(
     replay = 1,
     extraBufferCapacity = 1,
     onBufferOverflow = BufferOverflow.DROP_OLDEST
-  )
+  ).also { it.tryEmit(null) }
+
+  val layoutCoordinates: LayoutCoordinates?
+    get() = layoutCoordinatesFlow.replayCache.firstOrNull()
 
   // 长按移动状态
   val longPressMoveState = MutableStateFlow<LongPressMoveState>(LongPressMoveState.Idle)

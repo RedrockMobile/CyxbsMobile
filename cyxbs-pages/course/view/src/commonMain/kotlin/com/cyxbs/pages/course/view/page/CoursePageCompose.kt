@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +23,8 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
  * .
@@ -60,26 +61,24 @@ fun CoursePageCompose(
     verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
-    val layoutCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val courseScroll = LocalCourseScroll.current
+    val pageContext = remember {
+      LocalCoursePageContext(
+        page = page,
+        timeline = timeline,
+        scrollContext = courseScroll,
+      )
+    }.apply {
+      update(
+        timeline = timeline,
+        scrollContext = courseScroll,
+      )
+    }
     Box(
       modifier = Modifier.fillMaxSize().onGloballyPositioned {
-        layoutCoordinatesState.value = it
+        pageContext.layoutCoordinatesFlow.tryEmit(it)
       }
     ) {
-      val courseScroll = LocalCourseScroll.current
-      val pageContext = remember {
-        LocalCoursePageContext(
-          page = page,
-          timeline = timeline,
-          scrollContext = courseScroll,
-          layoutCoordinatesState = layoutCoordinatesState,
-        )
-      }.apply {
-        update(
-          timeline = timeline,
-          scrollContext = courseScroll,
-        )
-      }
       CompositionLocalProvider(
         LocalCoursePage provides pageContext,
       ) {
@@ -95,7 +94,6 @@ class LocalCoursePageContext(
   val page: Int,
   timeline: CourseTimeline,
   scrollContext: LocalCourseScrollContext, // 滚轴 context
-  val layoutCoordinatesState: State<LayoutCoordinates?>,
 ) {
 
   var timeline: CourseTimeline by mutableStateOf(timeline)
@@ -104,8 +102,14 @@ class LocalCoursePageContext(
   var scrollContext: LocalCourseScrollContext by mutableStateOf(scrollContext)
     private set
 
+  val layoutCoordinatesFlow = MutableSharedFlow<LayoutCoordinates>(
+    replay = 1,
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+
   val layoutCoordinates: LayoutCoordinates
-    get() = layoutCoordinatesState.value!!
+    get() = layoutCoordinatesFlow.replayCache.first()
 
   fun update(
     timeline: CourseTimeline,

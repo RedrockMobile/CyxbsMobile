@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.view.item.modifier
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 
@@ -16,8 +17,11 @@ object LayoutCoordinateSaveModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
+    DisposableEffect(itemState) {
+      onDispose { itemState.layoutCoordinatesFlow.tryEmit(null) }
+    }
     return Modifier.onGloballyPositioned {
-      itemState.layoutCoordinates.tryEmit(it)
+      itemState.layoutCoordinatesFlow.tryEmit(it)
     }
   }
 }
