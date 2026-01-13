@@ -7,10 +7,12 @@ import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.util.fastAny
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.time.Clock
 
 /**
@@ -137,4 +140,33 @@ suspend fun PointerInputScope.detectTransformGestures(
 
 fun getMilliseconds(): Long {
   return Clock.System.now().toEpochMilliseconds()
+}
+
+/**
+ * awaitFirstDown去掉了滚轮事件
+ * 这里需要单独判断一下，否则桌面端无法实现放缩
+ */
+suspend fun PointerInputScope.detectScrollZoomGestures(
+  zoomMultiplier: Float = 1.05f,
+  onZoom: (centroid: Offset, zoom: Float) -> Unit
+) {
+  awaitEachGesture {
+    while (true) {
+      val event = awaitPointerEvent()
+      if (event.type == PointerEventType.Scroll) {
+        val change = event.changes.firstOrNull() ?: continue
+        // 如果Ctrl没有被按下则返回
+        if (!event.keyboardModifiers.isCtrlPressed) continue
+
+        val scrollDelta = change.scrollDelta
+        if (scrollDelta.y == 0f) continue
+        val position = change.position
+        // 负值向上滚动放大
+        val zoom = zoomMultiplier.pow(-scrollDelta.y)
+        onZoom(position, zoom)
+
+        change.consume()
+      }
+    }
+  }
 }

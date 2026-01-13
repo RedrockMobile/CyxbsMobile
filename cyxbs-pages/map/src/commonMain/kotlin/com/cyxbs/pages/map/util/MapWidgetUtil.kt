@@ -52,16 +52,6 @@ fun calculateOriginPosition(
   )
 }
 
-// 地图上坐标 -> 本地盒子坐标
-fun calculateLocalPosition(
-  center: Offset,
-  offset: Offset,
-  mapOffset: Offset,
-  scale: Float
-) : Offset {
-  return (mapOffset - center) * scale + center + offset
-}
-
 fun calculateRatio(
   containerSize: Size
 ) : Float = containerSize.width.run {

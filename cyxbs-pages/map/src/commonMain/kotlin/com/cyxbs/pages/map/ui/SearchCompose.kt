@@ -51,10 +51,13 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 @Composable
-fun SearchCompose(modifier: Modifier = Modifier) {
+fun SearchCompose(
+  modifier: Modifier = Modifier,
+  needPlaceList: Boolean = false
+) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   Box(
-    modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg)
+    modifier = modifier
   ) {
     if (viewmodel.searchText.value.isNotEmpty()) {
       SearchResultCompose(
@@ -62,7 +65,8 @@ fun SearchCompose(modifier: Modifier = Modifier) {
       )
     } else {
       SearchHistoryCompose(
-        modifier = Modifier.padding(top = 12.dp)
+        modifier = Modifier.padding(top = 12.dp),
+        needPlaceList = needPlaceList
       )
     }
   }
@@ -122,7 +126,10 @@ fun SearchResultCompose(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SearchHistoryCompose(modifier: Modifier = Modifier) {
+fun SearchHistoryCompose(
+  modifier: Modifier = Modifier,
+  needPlaceList: Boolean = false
+) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val scope = rememberCoroutineScope()
   val showState = remember { mutableStateOf(false) }
@@ -135,7 +142,7 @@ fun SearchHistoryCompose(modifier: Modifier = Modifier) {
     ) {
       Text(
         modifier = Modifier.padding(start = 16.dp),
-        text = "历史记录",
+        text = "历史搜索",
         fontSize = 15.sp,
         color = 0xFF778AA9.dark(0xFFA1A1A2)
       )

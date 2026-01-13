@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.IntSize
 import com.cyxbs.pages.map.util.actualOffset
 import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculateRatio
+import com.cyxbs.pages.map.util.detectScrollZoomGestures
 import com.cyxbs.pages.map.util.detectTransformGestures
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvas
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvasViewPort
@@ -87,6 +88,25 @@ actual fun MapImageLoad(
         .onSizeChanged {
           if (mapWidgetState.container != it) {
             mapWidgetState.container = it
+          }
+        }
+        .pointerInput(Unit) {
+          mapWidgetState.stop()
+          // 检测desktop下的滚轮放缩
+          detectScrollZoomGestures { centroid, zoom ->
+            if (mapWidgetState.isLock) return@detectScrollZoomGestures
+            val oldScale = mapWidgetState.scale
+            // 放大比例的约束范围
+            val newScale = (oldScale * zoom).coerceIn(1f, 15f)
+            val ratioScale = newScale / oldScale
+            // 手指相对容器中心的OffSet
+            val offCenter = centroid - mapWidgetState.center
+            val realOffset = mapWidgetState.offset * ratioScale + offCenter * (1f - ratioScale)
+
+            onMapWidgetStateChange(
+              newScale,
+              actualOffset(ratio, mapWidgetState.container, realOffset, newScale)
+            )
           }
         }
         .pointerInput(Unit) {

@@ -83,7 +83,7 @@ fun PlaceDetailBottomSheet() {
         }
         else -> {
           Modifier
-            .padding(start = 80.dp)
+            .padding(start = 30.dp)
             .width(getWindowScreenSize().width / 3)
         }
       }

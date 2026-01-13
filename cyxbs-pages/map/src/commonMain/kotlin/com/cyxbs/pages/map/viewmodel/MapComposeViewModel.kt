@@ -87,6 +87,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   val placeDetailsId = mutableStateOf<String>("999")
   val bottomSheetState = BottomSheetState(hideable = true)
 
+  // desktop下的搜索栏bottomSheet
+  val searchBottomSheetState = BottomSheetState(hideable = false)
+
   // 地图主页与所有图片页的切换(0表示地图主页，1表示所有图片页)
   val mapPagerState = mutableStateOf(0)
 
@@ -141,6 +144,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
       )
       scope.launch {
+        launch {
+          searchBottomSheetState.collapse()
+        }
         resetMap(this)
         anchorItemStateList.filter {
           it.visible
@@ -217,6 +223,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
       )
       scope.launch {
+        launch {
+          searchBottomSheetState.collapse()
+        }
         animateMapToPosition(this, getOffset)
         anchorItemStateList.filter {
           it.visible
@@ -357,6 +366,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   fun addSearchHistory(placeItem: PlaceItem) {
+    searchHistory.removeAll { it.placeId == placeItem.placeId }
     searchHistory.add(placeItem)
     MapDataRepository.saveSearchHistory(searchHistory)
   }
@@ -431,6 +441,12 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     val duration = if (anchorItemStateList.size <= 5) 100 else 50
     anchorListJob?.cancel()
     anchorListJob = scope.launch {
+      launch {
+        searchBottomSheetState.collapse()
+      }
+      launch {
+        bottomSheetState.collapse()
+      }
       if (anchorItemState.scale != 0f) anchorItemState.animateClose()
       anchorItemStateList.forEach { anchorItemState ->
         if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
@@ -472,6 +488,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     scope.launch {
       launch {
         animateMapToPosition(scope, anchorItemState.position)
+      }
+      launch {
+        searchBottomSheetState.collapse()
       }
       launch {
         bottomSheetState.expand()
@@ -532,6 +551,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     if (isFind) getPlaceDetails(placeId)
     // 启动动画
     scope.launch {
+      launch {
+        searchBottomSheetState.collapse()
+      }
       if (isFind) {
         animateMapToPosition(this, realOffset)
       }

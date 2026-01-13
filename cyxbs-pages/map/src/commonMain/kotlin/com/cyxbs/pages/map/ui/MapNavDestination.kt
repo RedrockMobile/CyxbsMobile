@@ -69,6 +69,7 @@ import com.cyxbs.pages.map.util.isFileExist
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
+import com.cyxbs.pages.map.widget.SearchBottomSheet
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_compass
@@ -103,15 +104,20 @@ class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::cla
   override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
     viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
     MapCompose(parcel.argument)
-    MapDestination()
     MapProgressDialog()
     DownloadFailedDialog()
     MapUpdateDialog()
+    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
+    when {
+      ratio > 1.5f -> WH100vInfinityCompose()
+      ratio <= 1.5f -> WH100v150Compose()
+    }
   }
 }
 
+// 竖屏
 @Composable
-fun MapDestination() {
+fun WH100vInfinityCompose() {
   val viewmodel = viewModel(MapComposeViewModel::class)
   AnimatedContent(
     targetState = viewmodel.mapPagerState.value,
@@ -128,7 +134,7 @@ fun MapDestination() {
     if (targetPage == 1) {
       AllPictureCompose(Modifier.fillMaxSize())
     } else {
-      MapContent()
+      MapContent(Modifier.fillMaxWidth())
     }
   }
   BackHandler {
@@ -140,12 +146,49 @@ fun MapDestination() {
   }
 }
 
+// desktop/横屏
+@Composable
+fun WH100v150Compose() {
+  Column {
+    BackIconCompose(
+      modifier = Modifier
+        .padding(start = 12.dp, top = 12.dp)
+        .width(32.dp)
+        .height(32.dp)
+    )
+    MapFunctionImageCompose(
+      modifier = Modifier
+        .padding(top = 32.dp)
+        .background(Color.Transparent)
+    )
+  }
+  SearchBottomSheet()
+  PlaceDetailBottomSheet()
+}
+
+@Composable
+fun BackIconCompose(modifier: Modifier = Modifier) {
+  val viewmodel = viewModel(MapComposeViewModel::class)
+  Image(
+    modifier = modifier
+      .clickableNoIndicator {
+        if (viewmodel.mapSearchPagerState.value == 1) {
+          viewmodel.mapSearchPagerState.value = 0
+        } else {
+          MainNavController.popBackStack()
+        }
+      }
+      .padding(start = 10.dp, end = 10.dp),
+    painter = painterResource(ConfigRes.configIcBack()),
+    contentDescription = null
+  )
+}
+
 @Composable
 fun MapContent(modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   Column(
-    modifier = Modifier
-      .fillMaxWidth()
+    modifier = modifier
   ) {
     Row(
       modifier = Modifier
@@ -154,21 +197,11 @@ fun MapContent(modifier: Modifier = Modifier) {
         .statusBarsPadding(),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Image(
+      BackIconCompose(
         modifier = Modifier
           .padding(start = 6.dp, top = 6.dp)
           .width(30.dp)
           .height(30.dp)
-          .clickableNoIndicator {
-            if (viewmodel.mapSearchPagerState.value == 1) {
-              viewmodel.mapSearchPagerState.value = 0
-            } else {
-              MainNavController.popBackStack()
-            }
-          }
-          .padding(start = 10.dp, end = 10.dp),
-        painter = painterResource(ConfigRes.configIcBack()),
-        contentDescription = null
       )
       SearchBar(
         modifier = Modifier
@@ -191,9 +224,9 @@ fun MapContent(modifier: Modifier = Modifier) {
     ) { targetPage ->
       if (targetPage == 1) {
         SearchCompose(
-          Modifier
-            .padding(start = 6.dp, top = 6.dp, end = 16.dp)
+          modifier = Modifier
             .fillMaxSize()
+            .background(LocalAppColors.current.topBg)
         )
       } else {
         Column(
@@ -551,7 +584,8 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
       }
     }
   }
-  viewmodel.maxScale = if (getWindowScreenSize().height / getWindowScreenSize().width > 1.5f) 6f else 2f
+  viewmodel.maxScale =
+    if (getWindowScreenSize().height / getWindowScreenSize().width > 1.5f) 6f else 2f
   Box(
     modifier = modifier
       .background(Color(0xFFA8BCF1))
