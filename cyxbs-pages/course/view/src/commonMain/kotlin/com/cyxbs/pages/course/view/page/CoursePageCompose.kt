@@ -1,7 +1,9 @@
 package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,17 +13,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemWrapper
 import com.cyxbs.pages.course.view.timeline.Content
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
  * .
@@ -71,11 +74,17 @@ fun CoursePageCompose(
         scrollContext = courseScroll,
       )
     }
-    CompositionLocalProvider(
-      LocalCoursePage provides pageContext,
+    Box(
+      modifier = Modifier.fillMaxSize().onGloballyPositioned {
+        pageContext.layoutCoordinatesFlow.tryEmit(it)
+      }
     ) {
-      decorations.fastForEachReversed { decoration ->
-        decoration.CoursePageContent()
+      CompositionLocalProvider(
+        LocalCoursePage provides pageContext,
+      ) {
+        decorations.fastForEachReversed { decoration ->
+          decoration.CoursePageContent()
+        }
       }
     }
   }
@@ -93,40 +102,14 @@ class LocalCoursePageContext(
   var scrollContext: LocalCourseScrollContext by mutableStateOf(scrollContext)
     private set
 
-  private val itemStateByItem = mutableMapOf<Any, CourseItemState>()
+  val layoutCoordinatesFlow = MutableSharedFlow<LayoutCoordinates>(
+    replay = 1,
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
 
-  private val findActionsByItem = mutableMapOf<Any, MutableList<(CourseItemState) -> Unit>>()
-
-  fun findItemState(item: CourseItemWrapper<*>): CourseItemState? = itemStateByItem[item]
-
-  // 用于延迟查找的方法
-  // 如果超时则需要调用 onDispose 进行移除保存的 action 操作
-  fun findItemState(wrapper: CourseItemWrapper<*>, action: (CourseItemState) -> Unit): OnDisposable? {
-    val state = itemStateByItem[wrapper.item]
-    if (state != null) {
-      action(state)
-      return null
-    } else {
-      findActionsByItem.getOrPut(wrapper.item) { mutableListOf() }.add(action)
-      return OnDisposable {
-        val list = findActionsByItem[wrapper.item]
-        if (list != null) {
-          list.remove(action)
-          if (list.isEmpty()) findActionsByItem.remove(wrapper.item)
-        }
-      }
-    }
-  }
-
-  fun putItemState(wrapper: CourseItemWrapper<*>, state: CourseItemState?) {
-    if (state == null) {
-      itemStateByItem.remove(wrapper.item)
-      findActionsByItem.remove(wrapper.item)
-    } else {
-      itemStateByItem[wrapper.item] = state
-      findActionsByItem.remove(wrapper.item)?.fastForEach { it(state) }
-    }
-  }
+  val layoutCoordinates: LayoutCoordinates
+    get() = layoutCoordinatesFlow.replayCache.first()
 
   fun update(
     timeline: CourseTimeline,
@@ -134,9 +117,5 @@ class LocalCoursePageContext(
   ) {
     this.timeline = timeline
     this.scrollContext = scrollContext
-  }
-
-  fun interface OnDisposable {
-    fun onDispose()
   }
 }

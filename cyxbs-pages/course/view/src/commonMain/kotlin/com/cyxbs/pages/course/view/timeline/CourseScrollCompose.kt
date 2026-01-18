@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,6 +30,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastMapIndexed
@@ -60,6 +63,9 @@ class LocalCourseScrollContext(
   var scrollState by mutableStateOf(scrollState)
     private set
 
+  // 因为底部弹窗的弹出而需要偏移的底部间距
+  val marginBottomForBottomSheet = mutableIntStateOf(0)
+
   // 边缘滚动处理
   val edgeScroll = EdgeScroll(scrollContext = this)
 
@@ -91,6 +97,14 @@ internal fun CourseScrollCompose(
 ) {
   val outerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
   val innerCoordinatesState = remember { mutableStateOf<LayoutCoordinates?>(null) }
+  val context = remember {
+    LocalCourseScrollContext(
+      timeline = timeline,
+      scrollState = verticalScrollState,
+      outerCoordinatesState = outerCoordinatesState,
+      innerCoordinatesState = innerCoordinatesState,
+    )
+  }
   Layout(
     modifier = modifier
       .onGloballyPositioned {
@@ -101,21 +115,15 @@ internal fun CourseScrollCompose(
       .multiPointerScroll(verticalScrollState)
       .onGloballyPositioned {
         innerCoordinatesState.value = it
+      }.offset {
+        // 在课程弹窗时，如果 item 被弹窗遮挡，则会设置 marginBottom 将滚轴向上移动
+        IntOffset(x = 0, y = -context.marginBottomForBottomSheet.intValue)
       },
     content = {
-      val context = remember {
-        LocalCourseScrollContext(
-          timeline = timeline,
-          scrollState = verticalScrollState,
-          outerCoordinatesState = outerCoordinatesState,
-          innerCoordinatesState = innerCoordinatesState,
-        )
-      }.apply {
-        update(
-          timeline = timeline,
-          scrollState = verticalScrollState,
-        )
-      }
+      context.update(
+        timeline = timeline,
+        scrollState = verticalScrollState,
+      )
       CompositionLocalProvider(
         LocalCourseScroll provides context
       ) {
@@ -126,12 +134,8 @@ internal fun CourseScrollCompose(
     measurePolicy = remember(timeline) {
       { measurables, constraints ->
         var widthConsume = 0
-        var initialWeight = 0F
-        var nowWeight = 0F
-        timeline.data.fastForEach {
-          initialWeight += it.initialWeight
-          nowWeight += it.nowWeight
-        }
+        val initialWeight = timeline.totalInitialWeight
+        val nowWeight = timeline.totalShowWeight
         val startPadding = scrollPaddingValues.calculateStartPadding(layoutDirection).roundToPx()
         val endPadding = scrollPaddingValues.calculateEndPadding(layoutDirection).roundToPx()
         val topPadding = scrollPaddingValues.calculateTopPadding().roundToPx()
@@ -154,7 +158,6 @@ internal fun CourseScrollCompose(
         }
         layout(constraints.maxWidth, height + topPadding + bottomPadding) {
           var start = startPadding
-          coordinates
           placeables.fastForEach {
             it.placeRelative(x = start, y = topPadding)
             start += it.width

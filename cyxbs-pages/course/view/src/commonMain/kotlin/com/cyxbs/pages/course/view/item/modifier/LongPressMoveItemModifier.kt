@@ -49,6 +49,7 @@ object LongPressMoveItemModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
+    if (itemState.item.extension !is IMovableItemExtension) return Modifier
     return Modifier.longPressMove(remember { LongPressMoveControllerImpl(itemState) })
   }
 }
@@ -269,6 +270,11 @@ class LongPressMoveControllerImpl(
 
   override fun enable(transition: MutableState<Offset>): Boolean {
     return transition.value == Offset.Zero && itemState.item.extension is IMovableItemExtension
+  }
+
+  override fun updateState(state: LongPressMoveState) {
+    super.updateState(state)
+    itemState.longPressMoveState.value = state
   }
 
   override fun onStartLongPress(pointer: PointerInputChange) {

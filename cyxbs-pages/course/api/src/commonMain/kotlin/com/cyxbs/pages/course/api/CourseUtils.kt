@@ -18,7 +18,7 @@ object CourseUtils {
       4 -> MinuteTime(11, 10) // 第四节课开始
       5 -> MinuteTime(14, 0) // 第五节课开始
       6 -> MinuteTime(14, 55) // 第六节课开始
-      7 -> MinuteTime(16, 10) // 第七节课开始
+      7 -> MinuteTime(16, 15) // 第七节课开始
       8 -> MinuteTime(17, 10) // 第八节课开始
       9 -> MinuteTime(19, 0) // 第九节课开始
       10 -> MinuteTime(19, 55) // 第十节课开始

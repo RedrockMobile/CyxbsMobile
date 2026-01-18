@@ -1,7 +1,6 @@
 package com.cyxbs.components.view.ui
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.MutatePriority
@@ -110,6 +109,9 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Expanded)
@@ -123,6 +125,9 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Collapsed)
@@ -136,6 +141,9 @@ class BottomSheetState(
       // hide 不触发 Scrolling 状态
       scrollableState.animateScrollBy(
         value = now - target,
+        spring(
+          stiffness = Spring.StiffnessMediumLow,
+        )
       )
     }
     setState(BottomSheetValueState.Hide)
@@ -210,7 +218,9 @@ private fun BottomSheetBackgroundCompose(
       .plusDsl {
         if (dismissOnBackPress) {
           val enable by rememberDerivedStateOfStructure {
-            bottomSheetState.state == BottomSheetValueState.Expanded
+            // 因为 onPostFling 执行的动画比较缓慢，就会导致短时间内不是 Expanded
+            // 最好的方式就是判断当前展开是否比较多，大于一定区间后都拦截返回键
+            bottomSheetState.fraction > 0.5F
           }
           backHandler(enabled = enable) {
             coroutineScope.launch {
@@ -283,7 +293,6 @@ private fun BottomSheetContent(
       decayAnimationSpec = decayAnimationSpec,
       snapAnimationSpec = spring(
         stiffness = Spring.StiffnessMediumLow,
-        visibilityThreshold = Int.VisibilityThreshold.toFloat()
       )
     )
   }

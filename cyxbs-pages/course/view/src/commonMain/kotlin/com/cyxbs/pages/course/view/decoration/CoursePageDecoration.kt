@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import com.cyxbs.pages.course.view.page.LocalCoursePage
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
-import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
 
 /**
  * 绘制在课表上的装饰物，同时也能拦截触摸事件
@@ -22,7 +21,7 @@ interface CoursePageDecoration {
   /**
    * 绘制在课表 scroll 内层
    *
-   * 使用 [LocalCoursePage]、[LocalCourseScroll] 获取更多参数
+   * 使用 [coursePage] 获取更多参数
    */
   @Composable
   fun CoursePageContent()

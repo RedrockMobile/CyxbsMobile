@@ -1,8 +1,7 @@
 package com.cyxbs.pages.course.viewmodel
 
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.pages.course.api.IAdaptiveHomeCourseFrame
+import com.cyxbs.pages.course.frame.AdaptiveCourseFrame
 
 /**
  * .
@@ -12,6 +11,6 @@ import com.cyxbs.pages.course.api.IAdaptiveHomeCourseFrame
  */
 class AdaptiveCourseFrameViewModel : BaseViewModel() {
 
-  // 由 course 模块实现
-  val frame = IAdaptiveHomeCourseFrame::class.impl()
+  // 课表主页框架
+  val frame = AdaptiveCourseFrame()
 }
