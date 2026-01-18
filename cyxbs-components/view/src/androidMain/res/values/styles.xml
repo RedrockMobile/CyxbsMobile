@@ -1,18 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="viewFullScreenDialog" parent="Theme.AppCompat.Dialog">
-        <!--dialog是否有边框-->
-        <item name="android:windowFrame">@null</item>
-        <!--dialog是否悬浮在activity上,设置为false，相当于布局在activity中，例如软键盘，可以顶起false的dialog-->
-        <!--但是如果设置 true，会导致-->
-        <item name="android:windowIsFloating">false</item>
 
-        <item name="android:windowIsTranslucent">true</item>
-        <!--去除dialog最底部的灰色背景-->
-        <item name="colorBackgroundFloating">@android:color/transparent</item>
-        <!--去除dialog默认白色背景-->
-        <item name="android:background">@android:color/transparent</item>
-        <!--是否加遮罩（对话框出现时，背景变暗。为true则充许变暗）-->
-        <item name="android:backgroundDimEnabled">false</item>
-    </style>
 </resources>
