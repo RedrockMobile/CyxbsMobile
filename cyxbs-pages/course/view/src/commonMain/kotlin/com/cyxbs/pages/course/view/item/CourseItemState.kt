@@ -124,6 +124,8 @@ class CourseItemState(
 
   /**
    * 配合 [OverlapChangeTrigger]、[ShowRangeTransformer] 给被覆盖 item 添加 showRange 监听器的快捷方式
+   *
+   * 是提供给被覆盖的 CourseItemState 使用的，不是修改当前 item 的
    */
   class CoveredItemShowRangeTransformerTrigger(
     val transformer: ShowRangeTransformer,

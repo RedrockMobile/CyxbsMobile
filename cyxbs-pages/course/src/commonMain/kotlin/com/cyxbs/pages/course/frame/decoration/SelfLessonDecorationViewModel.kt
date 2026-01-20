@@ -40,9 +40,10 @@ class SelfLessonDecorationViewModel(
     IAccountService::class.impl()
       .stuNumFlow
       .flatMapLatest {
-//        createLessonFlow(it)
-        createLessonFlow("2024210480")
-//        createLessonFlow("2022211292")
+        if (it == "2020214988") {
+          // 老登因为没有课程，所以在这里单独 mock 成其他人的课程
+          createLessonFlow("2024210480")
+        } else createLessonFlow(it)
       }.onEach {
         hierarchy.reset(buildList {
           it?.forEach { lesson ->

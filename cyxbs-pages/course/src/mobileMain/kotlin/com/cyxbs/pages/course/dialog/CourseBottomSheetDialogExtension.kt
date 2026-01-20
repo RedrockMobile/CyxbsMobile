@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.view.ui.BottomSheetCompose
@@ -68,6 +69,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -163,6 +165,7 @@ private fun MobileCourseBottomSheetDialog(
     Box {
       OffsetScroll(state, height)
       ShowBeginFinalTime(state)
+      CurrentItemShowTop(state)
       BottomSheet(state, height)
     }
   }
@@ -320,6 +323,50 @@ private fun ShowBeginFinalTime(
       time2 = time2,
     )
   )
+}
+
+@Composable
+private fun CurrentItemShowTop(
+  state: CourseBottomSheetDialogState,
+) {
+  LaunchedEffect(Unit) {
+    var lastItem: CourseItemState? = null
+    val showAllInterceptor = CourseItemState.ShowRangeTransformer { _, overlap ->
+      // item 全部显示出来
+      val whatTimeFixed = overlap.itemState.item.whatTime.now.value
+      val beginTime = whatTimeFixed.beginTime
+      val finalTime = whatTimeFixed.finalTime
+      listOf(MinuteTimePair(beginTime, finalTime))
+    }
+    fun reset() {
+      lastItem?.zIndexState?.floatValue--
+      lastItem?.removeShowRangeTransformer(showAllInterceptor)
+      lastItem = null
+    }
+    fun setItem() {
+      if (lastItem != null) return
+      val item = state.currentPageItemFlow.value?.itemState
+      lastItem = item
+      item?.zIndexState?.floatValue++ // 置顶展示
+      item?.addShowRangeTransformer(showAllInterceptor)
+    }
+    launch {
+      state.currentPageItemFlow.onCompletion {
+        reset() // 协程作用域被取消时调用，此时 Compose 组件被移除
+      }.collect {
+        reset()
+        setItem()
+      }
+    }
+    launch {
+      // 因为底部弹窗关闭时存在动画，导致需要一定时间才会触发 onCompletion 的 reset
+      // 所以单独监听滚动距离来检测是否需要 reset
+      // todo 后续想办法修下这个弹窗关闭动画过长的问题
+      snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+        if (it < 0.2F) reset() else setItem()
+      }
+    }
+  }
 }
 
 @Composable

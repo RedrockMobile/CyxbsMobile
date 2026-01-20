@@ -235,7 +235,7 @@ class LongPressMoveControllerImpl(
     listOf(MinuteTimePair(beginTime, finalTime))
   }
 
-  // 自身 showRange 转换器（自在自身完全不显示时处理）
+  // 自身 showRange 转换器（只在自身完全不显示时处理）
   private val selfShowRangeTransformerForEmpty =
     CourseItemState.ShowRangeTransformer { show, overlap ->
       show.ifEmpty {
