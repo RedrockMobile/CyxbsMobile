@@ -10,9 +10,10 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.dialog.CourseBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
-import com.cyxbs.pages.course.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
@@ -52,11 +53,11 @@ class MobileSelfLessonItem(
     }
   }
 
-  override val extension = MobileSelfLessonItemExtensionGroup(this)
+  override val extension = MobileSelfLessonItemExtensionGroupItem(this)
 
   @Composable
   override fun CourseItemContent() {
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     val itemState = itemState
     CourseDefaultItemContent(
       itemState = itemState,
@@ -73,7 +74,7 @@ class MobileSelfLessonItem(
         else -> 0xFFDDE3F8.dark(0x269BB2FF)
       },
     ) {
-      bottomSheetDialogState.showDialog(itemState.overlap)
+      itemBottomSheetDialog.showDialog(itemState.overlap)
     }
   }
 
@@ -84,10 +85,10 @@ class MobileSelfLessonItem(
   }
 }
 
-class MobileSelfLessonItemExtensionGroup(
+class MobileSelfLessonItemExtensionGroupItem(
   val itemKeyImpl: MobileSelfLessonItem
 ) : IMovableItemExtension by MobileSelfMovableItemExtension(itemKeyImpl),
-  CourseBottomSheetDialogExtension by MobileSelfCourseBottomSheetDialogExtension(itemKeyImpl),
+  CourseItemBottomSheetDialogExtension by MobileSelfCourseItemBottomSheetDialogExtension(itemKeyImpl),
   CourseBottomSheetHeaderExtension by MobileSelfCourseBottomSheetHeaderExtension(itemKeyImpl)
 
 private class MobileSelfMovableItemExtension(
@@ -98,15 +99,15 @@ private class MobileSelfMovableItemExtension(
   }
 }
 
-private class MobileSelfCourseBottomSheetDialogExtension(
+private class MobileSelfCourseItemBottomSheetDialogExtension(
   val itemKeyImpl: MobileSelfLessonItem
-) : CourseBottomSheetDialogExtension {
+) : CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
     get() = itemKeyImpl.itemState
 
   @Composable
-  override fun CourseBottomSheetDialogContent() {
+  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
     LessonBottomSheetDialog(itemKeyImpl.lesson, false)
   }
 }
@@ -117,7 +118,7 @@ private class MobileSelfCourseBottomSheetHeaderExtension(
   @Composable
   override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -127,7 +128,7 @@ private class MobileSelfCourseBottomSheetHeaderExtension(
       finalTime = itemKeyImpl.lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        bottomSheetDialogState.showDialog(itemKeyImpl.extension)
+        itemBottomSheetDialog.showDialog(itemKeyImpl.extension)
       },
       onClickContent = {
         // todo 跳转到地图页

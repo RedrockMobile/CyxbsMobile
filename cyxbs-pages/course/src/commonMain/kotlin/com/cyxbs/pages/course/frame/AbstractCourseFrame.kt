@@ -10,6 +10,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -51,6 +52,15 @@ import kotlinx.datetime.DayOfWeek
 @Stable
 abstract class AbstractCourseFrame {
 
+  companion object {
+
+    internal val LocalAbstractCourseFrame = staticCompositionLocalOf<AbstractCourseFrame> { error("未设置 AbstractCourseFrame") }
+
+    @get:Composable
+    val current: AbstractCourseFrame
+      get() = LocalAbstractCourseFrame.current
+  }
+
   // 课表时间轴
   open val timeline: CourseTimeline = CourseTimeline()
 
@@ -62,8 +72,11 @@ abstract class AbstractCourseFrame {
     PagerState(initialPage) { maxPage }
   }
 
-  // 最大显示页数，添加整学期页
-  open val maxPage: Int get() = 22
+  // 课表最大周数
+  open val maxWeak: Int get() = 21
+
+  // 最大显示页数
+  open val maxPage: Int get() = maxWeak + 1 // 因为第一页为整学期页，所以加1
 
   // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   open val initialPage: Int
@@ -129,7 +142,7 @@ internal fun createBaseCoursePageDecorations(): ImmutableList<CoursePageDecorati
 
   val createAffairDecoration = viewModel { CreateAffairDecorationViewModel() }
 
-  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, linkLessonHierarchy, affairHierarchy) }
+  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, affairHierarchy, linkLessonHierarchy) }
 
   return remember {
     persistentListOf(

@@ -71,7 +71,6 @@ class AffairIdModelEditorImpl(
 
   override fun setTitle(title: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
-    if (title.isBlank()) return "title 不能为空"
     this.title = title
     idModel.title.valueByEditorStateFlow.tryEmit(this to title)
     return null

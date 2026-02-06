@@ -9,9 +9,10 @@ import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.dialog.CourseBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
-import com.cyxbs.pages.course.dialog.rememberCourseBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
@@ -50,11 +51,11 @@ class MobileLinkLessonItem(
     }
   }
 
-  override val extension = MobileLinkLessonItemExtensionGroup(this)
+  override val extension = MobileLinkLessonItemExtensionGroupItem(this)
 
   @Composable
   override fun CourseItemContent() {
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     val itemState = itemState
     CourseDefaultItemContent(
       itemState = itemState,
@@ -63,15 +64,15 @@ class MobileLinkLessonItem(
       textColor = 0xFF06A3FC.dark(0xFFF0F0F2),
       backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
     ) {
-      bottomSheetDialogState.showDialog(itemState.overlap)
+      itemBottomSheetDialog.showDialog(itemState.overlap)
     }
   }
 }
 
-class MobileLinkLessonItemExtensionGroup(
+class MobileLinkLessonItemExtensionGroupItem(
   val itemKeyImpl: MobileLinkLessonItem
 ) : IMovableItemExtension by MobileLinkMovableItemExtension(itemKeyImpl)
-  , CourseBottomSheetDialogExtension by MobileLinkCourseBottomSheetDialogExtension(itemKeyImpl)
+  , CourseItemBottomSheetDialogExtension by MobileLinkCourseItemBottomSheetDialogExtension(itemKeyImpl)
   , CourseBottomSheetHeaderExtension by MobileLinkCourseBottomSheetHeaderExtension(itemKeyImpl)
 
 private class MobileLinkMovableItemExtension(
@@ -82,15 +83,15 @@ private class MobileLinkMovableItemExtension(
   }
 }
 
-private class MobileLinkCourseBottomSheetDialogExtension(
+private class MobileLinkCourseItemBottomSheetDialogExtension(
   val itemKeyImpl: MobileLinkLessonItem
-) : CourseBottomSheetDialogExtension {
+) : CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
     get() = itemKeyImpl.itemState
 
   @Composable
-  override fun CourseBottomSheetDialogContent() {
+  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
     LessonBottomSheetDialog(itemKeyImpl.lesson, true)
   }
 }
@@ -101,7 +102,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
   @Composable
   override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     CourseItemBottomSheetHeader(
       modifier = modifier,
       state = state,
@@ -111,7 +112,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
       finalTime = itemKeyImpl.lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        bottomSheetDialogState.showDialog(itemKeyImpl.extension)
+        itemBottomSheetDialog.showDialog(itemKeyImpl.extension)
       },
       onClickContent = {
         // todo 跳转到地图页

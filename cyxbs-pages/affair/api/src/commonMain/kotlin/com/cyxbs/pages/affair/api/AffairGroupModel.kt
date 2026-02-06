@@ -84,7 +84,7 @@ interface AffairIdModel {
   // 新增的 AffairDateModel
   val addedDateModel: Flow<AffairDateModel>
 
-  fun createEditor(): AffairIdModelEditor?
+  fun tryCreateEditor(): AffairIdModelEditor?
 
   suspend fun createEditorSuspend(): AffairIdModelEditor
 }

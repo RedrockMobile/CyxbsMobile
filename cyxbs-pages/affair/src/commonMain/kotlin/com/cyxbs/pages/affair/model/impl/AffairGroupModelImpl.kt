@@ -58,7 +58,7 @@ class AffairGroupModelImpl(
       whatTime = emptyList(),
     )
     val model = createAffairItemModelImpl(entity)
-    return model.createEditor()!!
+    return model.tryCreateEditor()!!
   }
 
   fun addAffairInternal(idModel: AffairIdModelImpl) {

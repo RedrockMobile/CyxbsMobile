@@ -16,10 +16,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerId
@@ -63,8 +63,8 @@ class LocalCourseScrollContext(
   var scrollState by mutableStateOf(scrollState)
     private set
 
-  // 因为底部弹窗的弹出而需要偏移的底部间距
-  val marginBottomForBottomSheet = mutableIntStateOf(0)
+  // scroll 整个布局的偏移量
+  val marginBottom = SnapshotStateMap<String, Int>()
 
   // 边缘滚动处理
   val edgeScroll = EdgeScroll(scrollContext = this)
@@ -117,7 +117,8 @@ internal fun CourseScrollCompose(
         innerCoordinatesState.value = it
       }.offset {
         // 在课程弹窗时，如果 item 被弹窗遮挡，则会设置 marginBottom 将滚轴向上移动
-        IntOffset(x = 0, y = -context.marginBottomForBottomSheet.intValue)
+        val y = -context.marginBottom.values.sum()
+        IntOffset(x = 0, y = y)
       },
     content = {
       context.update(

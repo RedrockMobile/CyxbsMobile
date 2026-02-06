@@ -49,8 +49,8 @@ fun ChooseDialogCompose(
   ) DpSize(110.dp, 36.dp) else DpSize(80.dp, 34.dp),
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   onDismissRequest: () -> Unit = { showState.value = false },
-  onClickPositiveBtn: () -> Unit = { },
-  onClickNegativeBtn: () -> Unit = { },
+  onClickPositiveBtn: () -> Unit = { showState.value = false },
+  onClickNegativeBtn: () -> Unit = { showState.value = false },
   content: @Composable ColumnScope.() -> Unit,
 ) {
   if (showState.value) {

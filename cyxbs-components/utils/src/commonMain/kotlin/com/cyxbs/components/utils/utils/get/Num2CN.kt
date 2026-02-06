@@ -18,7 +18,7 @@ object Num2CN {
     /**
      * 汉字
      */
-    private var CN_CHARS = arrayOf("零", "一", "二", "三", "四",
+    val CN_CHARS = arrayOf("零", "一", "二", "三", "四",
             "五", "六", "七", "八", "九")
 
     /**

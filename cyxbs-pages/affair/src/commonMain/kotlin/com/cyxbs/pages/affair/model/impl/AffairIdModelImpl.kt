@@ -70,7 +70,7 @@ class AffairIdModelImpl(
   // 用于在创建 AffairIdModelEditorImpl 时上锁
   private val affairIdModelEditorFlow = MutableStateFlow<Any?>(null)
 
-  override fun createEditor(): AffairIdModelEditor? {
+  override fun tryCreateEditor(): AffairIdModelEditor? {
     if (affairIdModelEditorFlow.compareAndSet(null, Unit)) {
       // 确保线程安全
       return AffairIdModelEditorImpl(
@@ -93,7 +93,7 @@ class AffairIdModelImpl(
 
   override suspend fun createEditorSuspend(): AffairIdModelEditor {
     while (true) {
-      val editor = createEditor()
+      val editor = tryCreateEditor()
       if (editor != null) {
         return editor
       }

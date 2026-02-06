@@ -2,13 +2,15 @@ package com.cyxbs.pages.course.view.item
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewModelScope
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePage
@@ -20,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.datetime.DayOfWeek
@@ -28,6 +31,7 @@ import kotlinx.datetime.DayOfWeek
  * 课表 item 层级，用于控制 item 重叠关系
  * - [add]: 添加一个 item
  * - [remove]: 移除一个 item
+ * - [replace]: 替换 item 的 fixed
  * - [reset]: 重置所有 item
  * - [CoursePageItemListContent]: 展示 item
  *
@@ -94,12 +98,38 @@ class CourseItemHierarchy<Item : CourseItem> {
     fixed: CourseItemWhatTime.Fixed = whatTime.now.value
   ) {
     synchronized(dateItemsMapSynchronized) {
+      if (whatTimeListWhenNoCourseItemViewModel.remove(whatTime)) {
+        return
+      }
       val itemWrapper = itemWrapperMap.remove(whatTime) ?: return
       itemWrapper.onClear()
       if (fixed.page < 0) return // 负数表示展示未添加进 itemWrapperList
       val dateKey = fixed.page * 7 + fixed.dayOfWeek.ordinal
       getDateKeyValue(dateKey).itemWrapperList.remove(whatTime)
       courseItemViewModel?.tryRefresh(dateKey)
+    }
+  }
+
+  // 替换 item 的 fixed
+  fun replace(
+    whatTime: ItemHierarchyWhatTime<Item>,
+    oldFixed: CourseItemWhatTime.Fixed,
+    newFixed: CourseItemWhatTime.Fixed,
+  ) {
+    synchronized(dateItemsMapSynchronized) {
+      if (whatTimeListWhenNoCourseItemViewModel.contains(whatTime)) return // 还未添加进 itemWrapperList
+      if (!itemWrapperMap.containsKey(whatTime)) return
+      if (oldFixed.page >= 0) {
+        val oldDateKey = oldFixed.page * 7 + oldFixed.dayOfWeek.ordinal
+        getDateKeyValue(oldDateKey).itemWrapperList.remove(whatTime)
+        courseItemViewModel?.tryRefresh(oldDateKey)
+      }
+      if (newFixed.page < 0) return // 负数表示展示不添加进 itemWrapperList
+      val newDateKey = newFixed.page * 7 + newFixed.dayOfWeek.ordinal
+      val itemWrapperList = getDateKeyValue(newDateKey).itemWrapperList
+      val index = getIndex(whatTime, itemWrapperList) // 保证有序插入
+      itemWrapperList.add(index, whatTime)
+      courseItemViewModel?.tryRefresh(newDateKey)
     }
   }
 
@@ -222,24 +252,30 @@ class CourseItemHierarchy<Item : CourseItem> {
   // 显示所有 item
   @Composable
   fun CoursePageItemListContent() {
-    DayOfWeek.entries.forEach {
-      DayOfWeekCompose(it)
-    }
-  }
-
-  @Composable
-  private fun DayOfWeekCompose(
-    dayOfWeek: DayOfWeek,
-  ) {
     val pageContext = LocalCoursePage.current
-    val overlayResultList by observe(pageContext.page, dayOfWeek).collectAsState()
-    overlayResultList.fastForEach { itemState ->
+    val courseItemStateListState = remember { mutableStateOf(emptyList<CourseItemState>()) }
+    courseItemStateListState.value.fastForEach { itemState ->
       key(itemState) {
         CompositionLocalProvider(LocalCourseItemState provides itemState) {
           itemState.updateCoursePage(pageContext)
           itemState.item.CourseItemContent()
         }
       }
+    }
+    LaunchedEffect(pageContext.page) {
+      // 这里不能以 DayOfWeek 维度来拆分成多个子 Compose 函数
+      // 必须要整合所有 DayOfWeek 到一个 state 里面 (courseItemStateListState)
+      // 原因在于分开后 DayOfWeek 的每次遍历都会认为是一个新的 group
+      // 如果一个 item 从 周一 移动到 周二，则会认为是 周一 group 下的 item 被移除，周二 group 下新增了 item (即使两次 item 是同一个对象)
+      // 使用了 key(item) 来判断也是如此，因为 key 是在每个 group 下的判断
+      // 结论：每次循环都会生成一个新的 group，如果想让 item 能正常的移动，就需要在同一个 group 下，即只能用一层循环
+      combine(
+        DayOfWeek.entries.map {
+          observe(pageContext.page, it)
+        }
+      ) {
+        courseItemStateListState.value = it.toList().flatten()
+      }.launchIn(this)
     }
   }
 
@@ -290,8 +326,7 @@ class CourseItemHierarchy<Item : CourseItem> {
       var lastFixed = whatTime.now.value
       whatTime.now.onEach {
         if (it != lastFixed) {
-          remove(whatTime, lastFixed)
-          add(whatTime)
+          replace(whatTime, lastFixed, it)
           lastFixed = it
         }
       }.launchIn(coroutineScope)

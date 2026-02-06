@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.frame.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -12,11 +13,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.dialog.CourseBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialog
-import com.cyxbs.pages.course.dialog.rememberCourseBottomSheetDialogState
+import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
@@ -33,9 +37,16 @@ import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * .
@@ -69,7 +80,7 @@ class MobileCourseAffairItem(
       affairDateModel.date.mergeFlow
     ) { firstDate, whatTimeModel, date ->
       affairWhatTime.now.value = CourseItemWhatTime.Fixed(
-        page = firstDate.daysUntil(affairDateModel.date.value) / 7 + 1,
+        page = firstDate.daysUntil(date) / 7 + 1,
         dayOfWeek = date.dayOfWeek,
         beginTime = whatTimeModel.timePair.value.first,
         finalTime = whatTimeModel.timePair.value.second,
@@ -77,16 +88,16 @@ class MobileCourseAffairItem(
     }.launchIn(coroutineScope)
   }
 
-  override val extension = MobileCourseAffairItemExtensionGroup(this)
+  override val extension = MobileCourseItemAffairItemExtensionGroup(this)
 
   @Composable
   override fun CourseItemContent() {
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
     val itemState = itemState
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     CourseDefaultItemContent(
       itemState = itemState,
-      topText = affairDateModel.idModel.title.collectAsState().value,
-      bottomText = affairDateModel.idModel.content.collectAsState().value,
+      topText = affairDateModel.idModel.title.mergeFlow.collectAsState("").value,
+      bottomText = affairDateModel.idModel.content.mergeFlow.collectAsState("").value,
       textColor = LocalAppColors.current.tvLv2,
       backgroundColor = Color.Transparent,
       modifierList = remember {
@@ -100,7 +111,7 @@ class MobileCourseAffairItem(
         )
       }
     ) {
-      bottomSheetDialogState.showDialog(itemState.overlap)
+      itemBottomSheetDialog.showDialog(itemState.overlap)
     }
   }
 
@@ -132,11 +143,11 @@ private object AffairBackgroundItemModifier : CourseItemModifier {
   }
 }
 
-class MobileCourseAffairItemExtensionGroup(
+class MobileCourseItemAffairItemExtensionGroup(
   val itemKeyImpl: MobileCourseAffairItem
-) : IMovableItemExtension by MobileCourseAffairMovableItemExtension(itemKeyImpl)
-  , CourseBottomSheetDialogExtension by MobileCourseAffairCourseBottomSheetDialogExtension(itemKeyImpl)
-  , CourseBottomSheetHeaderExtension by MobileCourseAffairCourseBottomSheetHeaderExtension(itemKeyImpl)
+) : IMovableItemExtension by MobileCourseAffairMovableItemExtension(itemKeyImpl),
+  CourseItemBottomSheetDialogExtension by MobileCourseAffairCourseItemBottomSheetDialogExtension(itemKeyImpl),
+  CourseBottomSheetHeaderExtension by MobileCourseAffairCourseBottomSheetHeaderExtension(itemKeyImpl)
 
 private class MobileCourseAffairMovableItemExtension(
   val itemKeyImpl: MobileCourseAffairItem
@@ -146,16 +157,21 @@ private class MobileCourseAffairMovableItemExtension(
   }
 }
 
-private class MobileCourseAffairCourseBottomSheetDialogExtension(
+private class MobileCourseAffairCourseItemBottomSheetDialogExtension(
   val itemKeyImpl: MobileCourseAffairItem
-) : CourseBottomSheetDialogExtension {
+) : CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
     get() = itemKeyImpl.itemState
 
   @Composable
-  override fun CourseBottomSheetDialogContent() {
-    AffairBottomSheetDialog(itemKeyImpl.affairDateModel)
+  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
+    AffairBottomSheetDialog(
+      courseBottomSheetDialogState = state,
+      affairBottomSheetDialogState = AffairBottomSheetDialogState(
+        currentForm = AffairBottomSheetDialogState.CurrentForm.Show(itemKeyImpl.affairDateModel)
+      )
+    )
   }
 }
 
@@ -164,19 +180,37 @@ private class MobileCourseAffairCourseBottomSheetHeaderExtension(
 ) : CourseBottomSheetHeaderExtension {
   @Composable
   override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
-    val bottomSheetDialogState = rememberCourseBottomSheetDialogState()
+    val state = remember(this) { mutableStateOf("") }
+    val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     CourseItemBottomSheetHeader(
       modifier = modifier,
-      state = remember(this) { mutableStateOf("下个事务") },
+      state = state,
       title = itemKeyImpl.affairDateModel.idModel.title.collectAsState().value,
       content = itemKeyImpl.affairDateModel.idModel.content.collectAsState().value,
       beginTime = itemKeyImpl.affairDateModel.whatTime.value.timePair.value.first,
       finalTime = itemKeyImpl.affairDateModel.whatTime.value.timePair.value.second,
       onClickTitle = {
-        bottomSheetDialogState.showDialog(itemKeyImpl.extension)
+        itemBottomSheetDialog.showDialog(itemKeyImpl.extension)
       },
       onClickContent = {
       },
     )
+    LaunchedEffect(this) {
+      itemKeyImpl.whatTime.now.collectLatest { fixed ->
+        val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val now = localDateTime.toMinuteTimeDate()
+        if (now.date.dayOfWeek == fixed.dayOfWeek) {
+          if (now.time < fixed.beginTime) {
+            state.value = "下个事务"
+            delay((fixed.beginTime.minuteOfDay - now.minuteOfDay).minutes + localDateTime.second.seconds)
+          }
+          state.value = "进行中..."
+          // 后续会显示下一节课，会重新触发重组，不用再 delay
+        } else {
+          // 只有明天课程才会进入该分支
+          state.value = "明天"
+        }
+      }
+    }
   }
 }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisallowComposableCalls
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import kotlin.reflect.KProperty
 
 /**
@@ -17,13 +18,41 @@ import kotlin.reflect.KProperty
 @Stable
 data class Wrapper<T>(var value: T)
 @Stable
-data class IntWrapper(var value: Int)
+data class IntWrapper(var value: Int) {
+  companion object {
+    val Saver: Saver<IntWrapper, Int> = Saver(
+      save = { it.value },
+      restore = { IntWrapper(it) }
+    )
+  }
+}
 @Stable
-data class LongWrapper(var value: Long)
+data class LongWrapper(var value: Long) {
+  companion object {
+    val Saver: Saver<LongWrapper, Long> = Saver(
+      save = { it.value },
+      restore = { LongWrapper(it) }
+    )
+  }
+}
 @Stable
-data class FloatWrapper(var value: Float)
+data class FloatWrapper(var value: Float) {
+  companion object {
+    val Saver: Saver<FloatWrapper, Float> = Saver(
+      save = { it.value },
+      restore = { FloatWrapper(it) }
+    )
+  }
+}
 @Stable
-data class DoubleWrapper(var value: Double)
+data class DoubleWrapper(var value: Double) {
+  companion object {
+    val Saver: Saver<DoubleWrapper, Double> = Saver(
+      save = { it.value },
+      restore = { DoubleWrapper(it) }
+    )
+  }
+}
 
 @Composable
 fun <T> rememberWrapper(value: T): Wrapper<T> = remember { Wrapper(value) }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -24,11 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.add
-import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.plusDsl
-import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -83,7 +80,7 @@ fun CourseWeekCompose(
         ) {
           Text(
             modifier = Modifier,
-            text = getWeekStr(beginDayOfWeek.add(it)),
+            text = beginDayOfWeek.add(it).toChinese(),
             fontSize = if (weekBeginDate != null) 12.sp else 13.sp,
             color = if (showToday) LocalAppColors.current.whiteBlack else LocalAppColors.current.tvLv1,
             textAlign = TextAlign.Center,
@@ -100,18 +97,5 @@ fun CourseWeekCompose(
         }
       }
     }
-  }
-}
-
-private fun getWeekStr(dayOfWeek: DayOfWeek): String {
-  return when (dayOfWeek) {
-    DayOfWeek.MONDAY -> "周一"
-    DayOfWeek.TUESDAY -> "周二"
-    DayOfWeek.WEDNESDAY -> "周三"
-    DayOfWeek.THURSDAY -> "周四"
-    DayOfWeek.FRIDAY -> "周五"
-    DayOfWeek.SATURDAY -> "周六"
-    DayOfWeek.SUNDAY -> "周天"
-    else -> error("???")
   }
 }

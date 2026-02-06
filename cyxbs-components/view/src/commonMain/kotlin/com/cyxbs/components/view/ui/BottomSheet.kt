@@ -87,6 +87,9 @@ class BottomSheetState(
   var state: BottomSheetValueState by mutableStateOf(stateFlowInternal.value)
     private set
 
+  // 用户是否可滚动
+  val userScrollEnabled = mutableStateOf(true)
+
   // 小于 0 时表示处于 hide 状态
   val fraction by derivedStateOfStructure {
     val showHeight = showHeight.floatValue
@@ -350,6 +353,7 @@ private class BottomSheetScopeImpl(
 ) : BottomSheetScope {
   override fun bottomSheetDraggable(): Modifier = Modifier.composed {
     draggable(
+      enabled = bottomSheetState.userScrollEnabled.value,
       orientation = Orientation.Vertical,
       state = rememberDraggableState {
         val min = bottomSheetState.peekHeight
@@ -392,6 +396,7 @@ private class BottomSheetNestedScrollConnection(
 ) : NestedScrollConnection {
 
   override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+    if (!bottomSheetState.userScrollEnabled.value) return super.onPreScroll(available, source)
     val min = bottomSheetState.peekHeight
     val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
@@ -411,6 +416,7 @@ private class BottomSheetNestedScrollConnection(
     available: Offset,
     source: NestedScrollSource
   ): Offset {
+    if (!bottomSheetState.userScrollEnabled.value) return super.onPostScroll(consumed, available, source)
     val min = bottomSheetState.peekHeight
     val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
@@ -426,6 +432,7 @@ private class BottomSheetNestedScrollConnection(
   }
 
   override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+    if (!bottomSheetState.userScrollEnabled.value) return super.onPostFling(consumed, available)
     val max = bottomSheetState.showMaxHeight.floatValue
     val old = bottomSheetState.showHeight.floatValue
     if (old == max) return available.copy(x = 0F) // 完全展开时继续保持展开状态

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,10 +24,14 @@ class AdaptiveCourseFrame : AbstractCourseFrame() {
 
   @Composable
   fun HomeCourseContent(modifier: Modifier) {
-    AdaptiveHomeCourseFrameContent(
-      modifier = modifier,
-      frame = this,
-    )
+    CompositionLocalProvider(
+      LocalAbstractCourseFrame provides this
+    ) {
+      AdaptiveHomeCourseFrameContent(
+        modifier = modifier,
+        frame = this,
+      )
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -16,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
+import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
+import com.cyxbs.pages.course.dialog.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.frame.bottomsheet.MobileHomeBottomSheet
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -54,10 +57,14 @@ class MobileHomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
 
   @Composable
   override fun HomeCourseContent(modifier: Modifier, bottomBarHeight: Dp) {
-    MobileHomeCourseFrameContent(
-      modifier = modifier,
-      frame = this,
-    )
+    CompositionLocalProvider(
+      LocalAbstractCourseFrame provides this
+    ) {
+      MobileHomeCourseFrameContent(
+        modifier = modifier,
+        frame = this,
+      )
+    }
     SideEffect {
       set(bottomBarHeight)
     }
@@ -70,22 +77,28 @@ private fun MobileHomeCourseFrameContent(
   frame: MobileHomeCourseFrame,
 ) {
   val decorations = createBaseCoursePageDecorations()
-  MobileHomeBottomSheet(
-    modifier = modifier,
-    frame = frame,
-    header = { MobileHomeCourseHeader(modifier = Modifier, frame = frame) },
+  // item 点击后出现的 BottomSheetDialog
+  val itemBottomSheetDialog = rememberCourseItemBottomSheetDialogState()
+  CompositionLocalProvider(
+    LocalCourseItemBottomSheetDialog provides itemBottomSheetDialog
   ) {
-    HorizontalPager(
-      modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg).graphicsLayer {
-        alpha = frame.bottomSheetState.fraction
-      },
-      state = frame.pagerState,
-      pageContent = { page ->
-        frame.HomeCoursePageContent(
-          page = page,
-          decorations = decorations,
-        )
-      },
-    )
+    MobileHomeBottomSheet(
+      modifier = modifier,
+      frame = frame,
+      header = { MobileHomeCourseHeader(modifier = Modifier, frame = frame) },
+    ) {
+      HorizontalPager(
+        modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg).graphicsLayer {
+          alpha = frame.bottomSheetState.fraction
+        },
+        state = frame.pagerState,
+        pageContent = { page ->
+          frame.HomeCoursePageContent(
+            page = page,
+            decorations = decorations,
+          )
+        },
+      )
+    }
   }
 }
