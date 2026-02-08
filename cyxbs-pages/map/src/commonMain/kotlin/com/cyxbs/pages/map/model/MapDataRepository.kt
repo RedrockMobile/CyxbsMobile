@@ -2,6 +2,7 @@ package com.cyxbs.pages.map.model
 
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.sp.PreferencesSettings
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.model.bean.ButtonInfo
 import com.cyxbs.pages.map.model.bean.MapInfo
@@ -14,9 +15,9 @@ import com.cyxbs.pages.map.model.bean.PlaceItem
  * @Date : 2025/11/24 18:51
  */
 
-object MapDataRepository {
+val mapSettings = PreferencesSettings.get("MapSettings")
 
-  private val mapSettings = MapSettings()
+object MapDataRepository {
 
   private const val SETTING_KEY_MAP_INFO = "map_info" // 地图基本信息
   private const val SETTING_KEY_MAP_BUTTON_INFO = "map_button_info" // 地图按钮信息

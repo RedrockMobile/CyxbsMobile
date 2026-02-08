@@ -69,55 +69,75 @@ import org.jetbrains.compose.resources.painterResource
 fun PlaceDetailBottomSheet() {
   val viewmodel = viewModel(MapComposeViewModel::class)
   viewmodel.placeDetails.value?.let { placeDetails ->
-    BottomSheetCompose(
-      bottomSheetState = viewmodel.bottomSheetState,
-      peekHeight = 100.dp,
-      dismissOnBackPress = false,
-      dismissOnClickOutside = false,
-      scrimColor = Color.Transparent
-    ) {
-      val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-      val modifier = when {
-        ratio > 1.5 -> {
-          Modifier.fillMaxWidth()
-        }
-        else -> {
-          Modifier
-            .padding(start = 30.dp)
-            .width(getWindowScreenSize().width / 3)
-        }
-      }
-      ConstraintLayout(
-        constraintSet = createConstraintSet(),
-        modifier = modifier
-          .then(bottomSheetDraggable())
-          .shadow(
-            elevation = 10.dp,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-          )
-          .background(LocalAppColors.current.topBg)
-          .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-          .padding(start = 16.dp, end = 16.dp)
-          .navigationBarsPadding(),
-        animateChangesSpec = spring(
-          stiffness = Spring.StiffnessMediumLow
-        )
+    Box {
+      BottomSheetCompose(
+        modifier = Modifier.navigationBarsPadding(),
+        bottomSheetState = viewmodel.bottomSheetState,
+        peekHeight = 112.dp,
+        dismissOnBackPress = false,
+        dismissOnClickOutside = false,
+        scrimColor = Color.Transparent
       ) {
-        ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
-        PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
-        PlaceAttributeListCompose(
-          modifier = Modifier.layoutId(Element.PlaceAttributeList),
-          placeDetails
-        )
-        PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
-        PlaceNavigationCompose(modifier = Modifier.layoutId(Element.PlaceNavigation), placeDetails)
-        DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
-        DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
-        ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
-        DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
-        DetailAboutTextCompose(modifier = Modifier.layoutId(Element.DetailAboutText), placeDetails)
-        DetailAboutListCompose(modifier = Modifier.layoutId(Element.DetailAboutList), placeDetails)
+        val ratio = getWindowScreenSize().height / getWindowScreenSize().width
+        val modifier = when {
+          ratio > 1.5 -> {
+            Modifier.fillMaxWidth()
+          }
+
+          else -> {
+            Modifier
+              .padding(start = 30.dp)
+              .width(getWindowScreenSize().width / 3)
+          }
+        }
+        ConstraintLayout(
+          constraintSet = createConstraintSet(),
+          modifier = modifier
+            .then(bottomSheetDraggable())
+            .shadow(
+              elevation = 10.dp,
+              shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            )
+            .background(LocalAppColors.current.topBg)
+            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .padding(start = 16.dp, end = 16.dp),
+          animateChangesSpec = spring(
+            stiffness = Spring.StiffnessMediumLow
+          )
+        ) {
+          ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
+          PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
+          PlaceAttributeListCompose(
+            modifier = Modifier.layoutId(Element.PlaceAttributeList),
+            placeDetails
+          )
+          PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
+          PlaceNavigationCompose(
+            modifier = Modifier.layoutId(Element.PlaceNavigation),
+            placeDetails
+          )
+          DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
+          DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
+          ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
+          DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
+          DetailAboutTextCompose(
+            modifier = Modifier.layoutId(Element.DetailAboutText),
+            placeDetails
+          )
+          DetailAboutListCompose(
+            modifier = Modifier.layoutId(Element.DetailAboutList),
+            placeDetails
+          )
+        }
       }
+      Spacer(
+        modifier = Modifier
+          .background(LocalAppColors.current.topBg)
+          .navigationBarsPadding()
+          .fillMaxWidth()
+          .height(0.dp)
+          .align(Alignment.BottomStart)
+      )
     }
   }
 }

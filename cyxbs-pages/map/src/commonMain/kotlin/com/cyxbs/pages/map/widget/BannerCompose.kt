@@ -2,34 +2,27 @@ package com.cyxbs.pages.map.widget
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cyxbs.components.utils.extensions.logg
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlin.math.abs
 import kotlin.math.sign
 
@@ -79,7 +72,7 @@ fun BannerCompose(
   // 这里不能用currentPage，否则走一半就会跳转
   LaunchedEffect(isAutoScroll) {
     if (isAutoScroll) {
-      while (true) {
+      while (isActive) {
         delay(scrollTime)
         if (!pagerState.isScrollInProgress) {
           // 这里判断一下不开启无限循环&&count==2,1的特殊情况
@@ -97,8 +90,8 @@ fun BannerCompose(
                 easing = FastOutSlowInEasing
               )
             )
-          } catch (e: Exception) {
-
+          } catch (e: CancellationException) {
+            // 用户触摸时抛出
           }
         }
       }
@@ -140,44 +133,45 @@ fun BannerIndicatorCompose(
 
   selectedWidth - (selectedWidth - diameter) * (1 - fraction)
    */
-  Row(
-    modifier = modifier.width(totalWidth),
-    horizontalArrangement = Arrangement.spacedBy(space),
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    repeat(count) { index ->
-      Box(
-        modifier = Modifier
-          .height(diameter)
-          .layout { measurable, constraints ->
-            val currentPage = pagerState.currentPage % count
-            val nextPage = (currentPage + 1 * sign(pagerState.currentPageOffsetFraction).toInt() + count) % count
+  Box(
+    modifier = modifier
+      .size(totalWidth, diameter)
+      .drawWithCache {
+        val shadowPx = shadow.toPx()
+        val radiusPx = radius.toPx()
+        val diameterPx = radiusPx * 2
+        val spacePx = space.toPx()
+        onDrawBehind {
+          val currentPage = pagerState.currentPage % count
+          val nextPage =
+            (currentPage + 1 * sign(pagerState.currentPageOffsetFraction).toInt() + count) % count
+          var x = 0f
+          repeat(count) { index ->
+            // 当前指示器的宽度
             val width = when (index) {
               currentPage -> (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction)) + diameter
               nextPage -> selectedWidth - (selectedWidth - diameter) * (1 - abs(pagerState.currentPageOffsetFraction))
               else -> diameter
-            }.roundToPx()
-            val placeable = measurable.measure(
-              constraints.copy(
-                minWidth = width,
-                maxWidth = width
+            }.toPx()
+            // 绘制阴影(不完全)
+            if (shadowPx > 0f) {
+              drawRoundRect(
+                color = shadowColor,
+                topLeft = Offset(x, shadowPx * 0.25f),
+                size = Size(width, diameterPx)
               )
-            )
-            layout(placeable.width, placeable.height) {
-              placeable.place(0,0)
             }
+            // 绘制指示器
+            drawRoundRect(
+              color = indicatorColor,
+              topLeft = Offset(x, 0f),
+              size = Size(width, diameterPx),
+              cornerRadius = CornerRadius(radiusPx, radiusPx)
+            )
+            x += width
+            if (index != count - 1) x += spacePx
           }
-          .shadow(
-            elevation = shadow,
-            shape = CircleShape,
-            clip = false,
-            spotColor = shadowColor
-          )
-          .background(
-            color = indicatorColor,
-            shape = CircleShape
-          )
-      )
-    }
-  }
+        }
+      }
+  )
 }

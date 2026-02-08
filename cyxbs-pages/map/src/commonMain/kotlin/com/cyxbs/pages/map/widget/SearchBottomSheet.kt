@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +67,7 @@ fun SearchBottomSheet() {
       ratio > 1.5 -> {
         Modifier.fillMaxWidth()
       }
+
       else -> {
         Modifier
           .padding(start = 30.dp)
@@ -129,17 +131,14 @@ private fun BottomSearchBar(modifier: Modifier = Modifier) {
         }
       }
       .padding(4.dp),
-    value = viewmodel.searchText.value,
-    onValueChange = {
-      viewmodel.searchText.value = it
-    },
+    state = viewmodel.searchTextFieldState,
     textStyle = TextStyle(
       fontSize = 14.sp,
       color = 0xFF16305C.dark(0xFFF0F0F2)
     ),
-    maxLines = 1,
+    lineLimits = TextFieldLineLimits.SingleLine,
     cursorBrush = SolidColor(0xFF788EFA.dark(0xFFFFFFFF)),
-    decorationBox = { innerTextField ->
+    decorator = { innerTextField ->
       Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -152,7 +151,7 @@ private fun BottomSearchBar(modifier: Modifier = Modifier) {
         Box(
           modifier = Modifier.padding(start = 8.dp, end = 4.dp).weight(1f)
         ) {
-          if (viewmodel.searchText.value.isEmpty()) {
+          if (viewmodel.searchTextFieldState.text.isEmpty()) {
             Text(
               color = 0xFF94969E.dark(0xFF8C8C8C),
               text = getHotWord(viewmodel.mapInfo.value?.hotWord),
@@ -163,12 +162,14 @@ private fun BottomSearchBar(modifier: Modifier = Modifier) {
           }
           innerTextField()
         }
-        if (viewmodel.searchText.value.isNotEmpty()) {
+        if (viewmodel.searchTextFieldState.text.isNotEmpty()) {
           Icon(
             modifier = Modifier
               .padding(start = 4.dp, end = 4.dp)
               .clickableNoIndicator {
-                viewmodel.searchText.value = ""
+                viewmodel.searchTextFieldState.edit {
+                  replace(0, length, "")
+                }
               },
             imageVector = vectorResource(Res.drawable.map_ic_search_clear),
             tint = 0xFF16305C.dark(0xFFF0F0F2),
@@ -178,7 +179,7 @@ private fun BottomSearchBar(modifier: Modifier = Modifier) {
       }
     }
   )
-  LaunchedEffect(viewmodel.searchText.value) {
+  LaunchedEffect(viewmodel.searchTextFieldState.text) {
     delay(500)
     viewmodel.search()
   }

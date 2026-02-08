@@ -1,23 +1,15 @@
 package com.cyxbs.pages.map.ui
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -29,15 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.extensions.logg
-import com.cyxbs.pages.map.util.BackHandler
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_delete
@@ -57,9 +46,15 @@ fun SearchCompose(
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   Box(
-    modifier = modifier
+    modifier = modifier.backHandler {
+      if (viewmodel.mapSearchPagerState.value == 1) {
+        viewmodel.mapSearchPagerState.value = 0
+      } else {
+        MainNavController.popBackStack()
+      }
+    }
   ) {
-    if (viewmodel.searchText.value.isNotEmpty()) {
+    if (viewmodel.searchTextFieldState.text.isNotEmpty()) {
       SearchResultCompose(
         modifier = Modifier.padding(top = 12.dp)
       )
@@ -68,13 +63,6 @@ fun SearchCompose(
         modifier = Modifier.padding(top = 12.dp),
         needPlaceList = needPlaceList
       )
-    }
-  }
-  BackHandler {
-    if (viewmodel.mapSearchPagerState.value == 1) {
-      viewmodel.mapSearchPagerState.value = 0
-    } else {
-      MainNavController.popBackStack()
     }
   }
 }
@@ -154,7 +142,6 @@ fun SearchHistoryCompose(
           .padding(end = 16.dp)
           .clickableSingle {
             showState.value = true
-            logg(showState.value.toString())
           },
         text = "清除全部",
         fontSize = 11.sp,

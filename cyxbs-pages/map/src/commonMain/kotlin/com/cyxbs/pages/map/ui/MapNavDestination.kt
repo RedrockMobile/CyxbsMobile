@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
@@ -53,6 +54,7 @@ import com.cyxbs.components.config.navigation.MainNavDestination
 import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
@@ -60,7 +62,6 @@ import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.model.MapDataRepository
-import com.cyxbs.pages.map.util.BackHandler
 import com.cyxbs.pages.map.util.MapImageHelper
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
@@ -129,6 +130,13 @@ fun WH100vInfinityCompose() {
         slideInHorizontally { width -> -width } togetherWith
             slideOutHorizontally { width -> width }
       }
+    },
+    modifier = Modifier.backHandler {
+      if (viewmodel.mapPagerState.value == 1) {
+        viewmodel.mapPagerState.value = 0
+      } else {
+        MainNavController.popBackStack()
+      }
     }
   ) { targetPage ->
     if (targetPage == 1) {
@@ -137,33 +145,51 @@ fun WH100vInfinityCompose() {
       MapContent(Modifier.fillMaxWidth())
     }
   }
-  BackHandler {
-    if (viewmodel.mapPagerState.value == 1) {
-      viewmodel.mapPagerState.value = 0
-    } else {
-      MainNavController.popBackStack()
-    }
-  }
 }
 
 // desktop/横屏
 @Composable
 fun WH100v150Compose() {
-  Column {
-    BackIconCompose(
-      modifier = Modifier
-        .padding(start = 12.dp, top = 12.dp)
-        .width(32.dp)
-        .height(32.dp)
-    )
-    MapFunctionImageCompose(
-      modifier = Modifier
-        .padding(top = 32.dp)
-        .background(Color.Transparent)
-    )
+  val viewmodel = viewModel(MapComposeViewModel::class)
+  AnimatedContent(
+    targetState = viewmodel.mapPagerState.value,
+    transitionSpec = {
+      if (targetState > initialState) {
+        slideInHorizontally { width -> width } togetherWith
+            slideOutHorizontally { width -> -width }
+      } else {
+        slideInHorizontally { width -> -width } togetherWith
+            slideOutHorizontally { width -> width }
+      }
+    },
+    modifier = Modifier.backHandler {
+      if (viewmodel.mapPagerState.value == 1) {
+        viewmodel.mapPagerState.value = 0
+      } else {
+        MainNavController.popBackStack()
+      }
+    }
+  ) { targetPage ->
+    if (targetPage == 1) {
+      AllPictureCompose(Modifier.fillMaxSize())
+    } else {
+      Column {
+        BackIconCompose(
+          modifier = Modifier
+            .padding(start = 12.dp, top = 12.dp)
+            .width(32.dp)
+            .height(32.dp)
+        )
+        MapFunctionImageCompose(
+          modifier = Modifier
+            .padding(top = 32.dp)
+            .background(Color.Transparent)
+        )
+      }
+      SearchBottomSheet()
+      PlaceDetailBottomSheet()
+    }
   }
-  SearchBottomSheet()
-  PlaceDetailBottomSheet()
 }
 
 @Composable
@@ -260,17 +286,14 @@ fun SearchBar(modifier: Modifier = Modifier) {
         }
       }
       .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-    value = viewmodel.searchText.value,
-    onValueChange = {
-      viewmodel.searchText.value = it
-    },
+    state = viewmodel.searchTextFieldState,
     textStyle = TextStyle(
       fontSize = 14.sp,
       color = 0xFF16305C.dark(0xFFF0F0F2)
     ),
-    maxLines = 1,
+    lineLimits = TextFieldLineLimits.SingleLine,
     cursorBrush = SolidColor(0xFF788EFA.dark(0xFFFFFFFF)),
-    decorationBox = { innerTextField ->
+    decorator = { innerTextField ->
       Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -282,7 +305,7 @@ fun SearchBar(modifier: Modifier = Modifier) {
         Box(
           modifier = Modifier.padding(start = 4.dp, end = 4.dp).weight(1f)
         ) {
-          if (viewmodel.searchText.value.isEmpty()) {
+          if (viewmodel.searchTextFieldState.text.isEmpty()) {
             Text(
               color = 0xFF94969E.dark(0xFF8C8C8C),
               text = getHotWord(viewmodel.mapInfo.value?.hotWord),
@@ -293,12 +316,14 @@ fun SearchBar(modifier: Modifier = Modifier) {
           }
           innerTextField()
         }
-        if (viewmodel.searchText.value.isNotEmpty()) {
+        if (viewmodel.searchTextFieldState.text.isNotEmpty()) {
           Icon(
             modifier = Modifier
               .padding(start = 4.dp, end = 4.dp)
               .clickableNoIndicator {
-                viewmodel.searchText.value = ""
+                viewmodel.searchTextFieldState.edit {
+                  replace(0, length, "")
+                }
               },
             imageVector = vectorResource(Res.drawable.map_ic_search_clear),
             tint = 0xFF16305C.dark(0xFFF0F0F2),
@@ -308,7 +333,7 @@ fun SearchBar(modifier: Modifier = Modifier) {
       }
     }
   )
-  LaunchedEffect(viewmodel.searchText.value) {
+  LaunchedEffect(viewmodel.searchTextFieldState.text) {
     delay(500)
     viewmodel.search()
   }

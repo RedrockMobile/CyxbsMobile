@@ -1,5 +1,6 @@
 package com.cyxbs.pages.map.viewmodel
 
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -100,7 +101,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   val currentSelectedItem = mutableStateOf(999)
 
   // 搜索框内容
-  val searchText = mutableStateOf("")
+  val searchTextFieldState = TextFieldState()
   val searchResultList = mutableStateListOf<PlaceItem>()
   val searchHistory = mutableStateListOf<PlaceItem>()
 
@@ -125,10 +126,10 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 搜索功能
   fun search() {
     searchResultList.clear()
-    if (searchText.value.isEmpty()) return
+    if (searchTextFieldState.text.isEmpty()) return
     mapInfo.value?.let { mapInfo ->
       val resultList = mapInfo.placeList.filter { placeItem ->
-        placeItem.placeName.contains(searchText.value, true)
+        placeItem.placeName.contains(searchTextFieldState.text, true)
       }
       searchResultList.addAll(resultList)
     }
@@ -165,7 +166,9 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         }
         launch {
           delay(500)
-          searchText.value = ""
+          searchTextFieldState.edit {
+            replace(0, length, "")
+          }
         }
       }
     }
@@ -186,7 +189,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 初始化地图信息
   fun initMapInfo() {
-    launch {
+    launchByViewModelScope {
       MapRepository.getMapInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
         MapDataRepository.getMapInfo()
@@ -245,7 +248,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 获取按钮信息
   fun getButtonInfo() {
-    launch {
+    launchByViewModelScope {
       MapRepository.getButtonInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
         MapDataRepository.getButtonInfo()
@@ -259,7 +262,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 获取地点详细信息
   fun getPlaceDetails(placeId: String) {
-    launch {
+    launchByViewModelScope {
       MapRepository.getPlaceDetails(placeId).getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
         MapDataRepository.getPlaceDetails(placeId)
@@ -273,7 +276,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 上传搜索热度
   fun addHot(placeId: String) {
-    launch {
+    launchByViewModelScope {
       MapRepository.addHot(placeId).getOrElse { throwable ->
         toast("上传搜索热度失败~")
       }
@@ -281,7 +284,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   fun getCollect() {
-    launch {
+    launchByViewModelScope {
       MapRepository.getCollect().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
         MapDataRepository.getCollectList()
@@ -294,7 +297,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   fun addCollect(placeId: String) {
-    launch {
+    launchByViewModelScope {
       MapRepository.addCollect(placeId).getOrElse { throwable ->
         toast("添加收藏失败~")
         null
@@ -308,7 +311,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   fun deleteCollect(placeId: String) {
-    launch {
+    launchByViewModelScope {
       MapRepository.deleteCollect(placeId).getOrElse { throwable ->
         toast("删除收藏失败~")
         null
@@ -330,7 +333,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 上传图片
   fun uploadPhoto(imageList: List<PlatformFile>?) {
-    launch {
+    launchByViewModelScope {
       imageList?.let { imageList ->
         uploadingPhotoState.value = true
         uploadPhotoResultState.value = false
