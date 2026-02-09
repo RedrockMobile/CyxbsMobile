@@ -128,19 +128,32 @@ class CourseItemBottomSheetDialogState {
   val imePeekLayoutInWindowBottomFlow = MutableStateFlow(0F)
 
   fun showDialog(extension: CourseItemBottomSheetDialogExtension) {
+    clear()
     dialogContents.value = listOf(extension)
   }
 
   fun showDialog(overlapResult: OverlapResult?) {
     if (overlapResult == null) {
-      dialogContents.value = emptyList()
+      dismissDialog()
     } else {
+      clear()
       dialogContents.value = collectCoveredItems(
         rootItemState = overlapResult.itemState,
         otherOverlap = overlapResult,
         set = linkedSetOf(overlapResult.itemState)
       ).mapNotNull { it.item.extension as? CourseItemBottomSheetDialogExtension }
     }
+  }
+
+  fun dismissDialog() {
+    clear()
+    dialogContents.value = emptyList()
+  }
+
+  private fun clear() {
+    bottomSheetState.userScrollEnabled.value = true
+    currentPageItemFlow.value = null
+    imePeekLayoutInWindowBottomFlow.value = 0F
   }
 
   // 键盘弹出时需要漏出的位置
@@ -179,7 +192,7 @@ private fun MobileCourseBottomSheetDialog(
   state.dialogContents.collectAsState().value.firstOrNull() ?: return
   Window(
     dismissOnBackPress = {
-      state.dialogContents.value = emptyList()
+      state.dismissDialog()
     }
   ) {
     val height = 280.dp
@@ -350,7 +363,7 @@ private fun BottomSheet(
       // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
     }
     state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
-    state.dialogContents.value = emptyList()
+    state.dismissDialog()
   }
   LaunchedEffect(Unit) {
     hasFocusFlow.filter { it }.mapNotNull {
