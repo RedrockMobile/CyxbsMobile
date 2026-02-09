@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.time.Today
@@ -73,7 +74,7 @@ abstract class AbstractCourseFrame {
   }
 
   // 课表最大周数
-  open val maxWeak: Int get() = 21
+  open val maxWeak: Int = defaultSettings.getInt("课表最大周数", 21)
 
   // 最大显示页数
   open val maxPage: Int get() = maxWeak + 1 // 因为第一页为整学期页，所以加1

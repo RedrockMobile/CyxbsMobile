@@ -393,7 +393,7 @@ private fun WeakNumCompose(
       .div(7).plus(1)
       .let { Num2CN.number2ChineseNumber(it) }
   })
-  val maxWeak = AbstractCourseFrame.current.maxPage
+  val maxWeak = AbstractCourseFrame.current.maxWeak
   Row(modifier) {
     Text(
       text = "第",
