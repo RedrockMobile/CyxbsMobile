@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +51,13 @@ data class CourseTimeline(
 
   @Transient
   val linkNodeList = mutableListOf<LinkNode>()
+
+  @Transient
+  val scrollState = ScrollState(0)
+
+  // scroll 整个布局的偏移量
+  @Transient
+  val marginBottom = SnapshotStateMap<String, Int>()
 
   init {
     var totalInitialWeight = 0F
@@ -165,7 +173,6 @@ data class CourseTimeline(
  * 课程时间轴布局
  * @param timelineWidth 时间轴宽度
  * @param enableDrawNowTimeLine 是否绘制当前时间线
- * @param verticalScrollState 垂直滚动状态
  * @param scrollPaddingValues 滚轴内部 padding
  * @param content 时间轴内容
  */
@@ -174,14 +181,12 @@ fun CourseTimeline.Content(
   modifier: Modifier = Modifier,
   timelineWidth: Dp = 40.dp,
   enableDrawNowTimeLine: Boolean = false,
-  verticalScrollState: ScrollState = rememberScrollState(),
   scrollPaddingValues: PaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp),
   content: @Composable () -> Unit
 ) {
   CourseScrollCompose(
     timeline = this,
     modifier = modifier.fillMaxSize(),
-    verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
     Column(

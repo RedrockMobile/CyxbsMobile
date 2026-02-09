@@ -181,19 +181,22 @@ private fun MobileCourseBottomSheetDialog(
     }
   ) {
     val height = 280.dp
-    val imePaddingBottom = remember { mutableIntStateOf(0) }
+    val imeOverlapHeight = remember { mutableIntStateOf(0) }
     Box(
-      modifier = Modifier.imePadding(imePaddingBottom)
+      modifier = Modifier.imePadding(imeOverlapHeight)
     ) {
       ShowBeginFinalTime(state)
       CurrentItemShowTop(state)
-      BottomSheet(state, height, imePaddingBottom)
+      BottomSheet(state, height, imeOverlapHeight)
     }
   }
 }
 
+/**
+ * @param overlapHeight 键盘最终状态与布局重叠的高度
+ */
 private fun Modifier.imePadding(
-  paddingBottom: IntState,
+  overlapHeight: IntState,
   onFraction: ((fraction: Float, imeOffset: Float) -> Unit)? = null
 ): Modifier {
   return layout { measure, constraints ->
@@ -213,13 +216,13 @@ private fun Modifier.imePadding(
           val bottom = maxOf(sourceBottom, targetBottom)
           val imeHeight = bottom - top
           val fraction = (bottom - currentBottom) / imeHeight
-          val offset = paddingBottom.intValue - imeHeight
+          val offset = overlapHeight.intValue - imeHeight
           onFraction?.invoke(fraction, offset)
           placeable.place(x = 0, y = (offset * fraction).roundToInt())
         } else {
           // 键盘完全展开
           val imeHeight = abs(sourceBottom - currentBottom)
-          val offset = paddingBottom.intValue - imeHeight
+          val offset = overlapHeight.intValue - imeHeight
           onFraction?.invoke(1F, offset)
           placeable.place(x = 0, y = offset.roundToInt())
         }
@@ -240,7 +243,7 @@ private fun OffsetScroll(
 ) {
   LaunchedEffect(Unit) {
     val scrollContext = state.dialogContents.value.first().itemState.coursePage.scrollContext
-    val marginBottomState = scrollContext.marginBottom
+    val marginBottomState = scrollContext.timeline.marginBottom
     val marginBottomKey = "MobileCourseBottomSheetDialog#OffsetScroll"
     val initScrollValue = scrollContext.scrollState.value
     var prevItem = state.currentPageItemFlow.value
@@ -289,7 +292,7 @@ private fun OffsetScroll(
 private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
   height: Dp,
-  imePaddingBottom: MutableIntState,
+  imeOverlapHeight: MutableIntState,
 ) {
   val layoutCoordinatesFlow = remember {
     MutableSharedFlow<LayoutCoordinates>(
@@ -350,7 +353,7 @@ private fun BottomSheet(
         layoutCoordinates.positionInWindow().y + layoutCoordinates.size.height - it
       }
     }.collect {
-      imePaddingBottom.intValue = it.roundToInt()
+      imeOverlapHeight.intValue = it.roundToInt()
     }
   }
 }
@@ -412,7 +415,7 @@ private fun CurrentItemShowTop(
   LaunchedEffect(Unit) {
     var lastItem: CourseItemState? = null
     val showAllInterceptor = CourseItemState.ShowRangeTransformer { _, overlap ->
-      // item 全部显示出来
+      // item 被遮挡的区域都显示出来
       val whatTimeFixed = overlap.itemState.item.whatTime.now.value
       val beginTime = whatTimeFixed.beginTime
       val finalTime = whatTimeFixed.finalTime

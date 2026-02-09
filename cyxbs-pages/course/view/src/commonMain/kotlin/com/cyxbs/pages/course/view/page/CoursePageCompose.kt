@@ -50,7 +50,6 @@ fun CoursePageCompose(
   scrollPaddingValues: PaddingValues, // 滚动区域的内边距
   modifier: Modifier = Modifier,
   enableDrawNowTimeLine: Boolean = true,  // 是否绘制当前时间的线
-  verticalScrollState: ScrollState = rememberScrollState(),
   decorations: ImmutableList<CoursePageDecoration>,
 ) {
   // 课表时间轴的绘制
@@ -58,7 +57,6 @@ fun CoursePageCompose(
     modifier = modifier,
     timelineWidth = timelineWidth,
     enableDrawNowTimeLine = enableDrawNowTimeLine,
-    verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
     val courseScroll = LocalCourseScroll.current

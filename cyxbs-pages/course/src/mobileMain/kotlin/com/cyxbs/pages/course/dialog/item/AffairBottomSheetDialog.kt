@@ -1,5 +1,7 @@
 package com.cyxbs.pages.course.dialog.item
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -492,7 +494,8 @@ private fun WeakNumCompose(
   }
   val courseFrame = AbstractCourseFrame.current
   LaunchedEffect(Unit) {
-    snapshotFlow { weakNumText.text }.collect {
+    // 设置 model 周数并跳转对应页
+    snapshotFlow { weakNumText.text }.collectLatest {
       val currentForm = affairState.currentFormState.value
       if (currentForm is CurrentForm.Edit) {
         currentForm.isWeakNumValid.value = it.isNotEmpty()
@@ -515,12 +518,14 @@ private fun WeakNumCompose(
             .weekBeginDate.plusWeeks(num - 1)
             .plusDays(date.dayOfWeekOrdinal)
           currentForm.editor.setDate(newDate)
-          courseFrame.pagerState.animateScrollToPage(courseFrame.getPage(newDate))
+          courseFrame.pagerState.animateScrollToPage(courseFrame.getPage(newDate),
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
         }
       }
     }
   }
   LaunchedEffect(Unit) {
+    // ui 与 model 同步
     snapshotFlow { affairState.currentFormState.value }.drop(1).collect {
       if (it is CurrentForm.Show) {
         weakNumText.setTextAndPlaceCursorAtEnd(
@@ -529,6 +534,9 @@ private fun WeakNumCompose(
             .div(7).plus(1)
             .let { Num2CN.number2ChineseNumber(it) }
         )
+        courseFrame.pagerState.animateScrollToPage(
+          courseFrame.getPage(affairState.currentFormState.value.model.date.value),
+          animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
       }
     }
   }
@@ -542,7 +550,6 @@ private fun DayOfWeakCompose(
   val dayOfWeakText = rememberTextFieldState(remember {
     affairState.currentFormState.value.model.date.value.dayOfWeek.toChinese("")
   })
-  val isValid = remember { mutableStateOf(true) }
   Row(modifier) {
     Text(
       text = "周",
@@ -587,6 +594,7 @@ private fun DayOfWeakCompose(
     )
   }
   LaunchedEffect(Unit) {
+    // 设置 model 星期数
     snapshotFlow { dayOfWeakText.text }.collect {
       val currentForm = affairState.currentFormState.value
       if (currentForm is CurrentForm.Edit) {
@@ -609,6 +617,7 @@ private fun DayOfWeakCompose(
     }
   }
   LaunchedEffect(Unit) {
+    // ui 与 model 同步
     snapshotFlow { affairState.currentFormState.value }.drop(1).collect {
       if (it is CurrentForm.Show) {
         dayOfWeakText.setTextAndPlaceCursorAtEnd(it.model.date.value.dayOfWeek.toChinese(""))
