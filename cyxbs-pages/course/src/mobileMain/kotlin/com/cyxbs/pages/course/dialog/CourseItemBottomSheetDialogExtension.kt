@@ -52,6 +52,7 @@ import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.view.ui.BottomSheetCompose
@@ -98,7 +99,8 @@ interface CourseItemBottomSheetDialogExtension : CourseItemExtension {
   fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState)
 }
 
-val LocalCourseItemBottomSheetDialog = staticCompositionLocalOf<CourseItemBottomSheetDialogState> { error("未初始化") }
+val LocalCourseItemBottomSheetDialog =
+  staticCompositionLocalOf<CourseItemBottomSheetDialogState> { error("未初始化") }
 
 @Stable
 @Composable
@@ -265,7 +267,8 @@ private fun OffsetScroll(
         scrollContext.scrollState.scrollBy(newScrollValue - nowScrollValue)
       }
       val oldMarginBottom = marginBottomState.getOrElse(marginBottomKey) { 0 }
-      val newMarginBottom = (total - (scrollContext.scrollState.value - initScrollValue)).roundToInt().coerceAtLeast(0)
+      val newMarginBottom = (total - (scrollContext.scrollState.value - initScrollValue))
+        .roundToInt().coerceAtLeast(0)
       if (oldMarginBottom != newMarginBottom) {
         if (state.bottomSheetState.state == BottomSheetValueState.Expanded
           && prevItem != state.currentPageItemFlow.value
@@ -302,10 +305,14 @@ private fun BottomSheet(
     )
   }
   val hasFocusFlow = remember { MutableStateFlow(false) }
+  val outerLayoutCoordinates = remember { Wrapper<LayoutCoordinates?>(null) }
   BottomSheetCompose(
     bottomSheetState = state.bottomSheetState,
     dismissOnClickOutside = true,
     scrimColor = Color.Transparent,
+    modifier = Modifier.onGloballyPositioned {
+      outerLayoutCoordinates.value = it
+    }
   ) {
     OffsetScroll(state, layoutCoordinatesFlow)
     Box(
@@ -346,11 +353,12 @@ private fun BottomSheet(
     state.dialogContents.value = emptyList()
   }
   LaunchedEffect(Unit) {
-    hasFocusFlow.filter { it }.map {
-      layoutCoordinatesFlow.first()
-    }.flatMapLatest { layoutCoordinates ->
+    hasFocusFlow.filter { it }.mapNotNull {
+      outerLayoutCoordinates.value
+    }.flatMapLatest { outerLayoutCoordinates ->
+      // 使用 layoutCoordinatesFlow 会少一个导航栏的高度
       state.imePeekLayoutInWindowBottomFlow.map {
-        layoutCoordinates.positionInWindow().y + layoutCoordinates.size.height - it
+        outerLayoutCoordinates.positionInWindow().y + outerLayoutCoordinates.size.height - it
       }
     }.collect {
       imeOverlapHeight.intValue = it.roundToInt()
