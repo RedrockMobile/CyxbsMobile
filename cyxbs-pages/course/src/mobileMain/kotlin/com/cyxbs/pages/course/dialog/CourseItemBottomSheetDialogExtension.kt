@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -479,7 +480,8 @@ private fun CurrentItemShowTop(
 private fun CourseBottomSheetDialogContent(
   state: CourseItemBottomSheetDialogState,
 ) {
-  val itemDialogContents = remember { state.dialogContents.value }
+  val itemDialogContents by state.dialogContents.collectAsState()
+  if (itemDialogContents.isEmpty()) return
   val pagerState = rememberPagerState(
     initialPage = if (itemDialogContents.size == 1) 0 else itemDialogContents.size * 1000,
   ) {
@@ -496,7 +498,9 @@ private fun CourseBottomSheetDialogContent(
       state = pagerState,
       modifier = Modifier.fillMaxWidth().weight(1F),
     ) { page ->
-      itemDialogContents[page % itemDialogContents.size].CourseBottomSheetDialogContent(state)
+      val itemDialogContent = if (itemDialogContents.isEmpty()) null
+      else itemDialogContents[page % itemDialogContents.size]
+      itemDialogContent?.CourseBottomSheetDialogContent(state)
     }
     // 底部的圆点指示器
     Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {

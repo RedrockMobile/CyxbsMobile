@@ -217,7 +217,7 @@ private fun EditTitleWithBtn(
     }
     val focusManager = LocalFocusManager.current
     LaunchedEffect(Unit) {
-      snapshotFlow { affairState.currentFormState.value }.drop(1).collectLatest { form ->
+      snapshotFlow { affairState.currentFormState.value }.collectLatest { form ->
         when (form) {
           is CurrentForm.Show -> {
             courseState.bottomSheetState.userScrollEnabled.value = true

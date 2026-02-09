@@ -164,13 +164,17 @@ private class MobileCourseAffairCourseItemBottomSheetDialogExtension(
   override val itemState: CourseItemState
     get() = itemKeyImpl.itemState
 
+  // AffairBottomSheetDialog 状态
+  // 因为外层 HorizontalPager 在开启无限循环后无法使用 key 来对应页面状态，所以提成一个全局的变量来保存
+  private val affairBottomSheetDialogState = AffairBottomSheetDialogState(
+    currentForm = AffairBottomSheetDialogState.CurrentForm.Show(itemKeyImpl.affairDateModel)
+  )
+
   @Composable
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
     AffairBottomSheetDialog(
       courseBottomSheetDialogState = state,
-      affairBottomSheetDialogState = AffairBottomSheetDialogState(
-        currentForm = AffairBottomSheetDialogState.CurrentForm.Show(itemKeyImpl.affairDateModel)
-      )
+      affairBottomSheetDialogState = affairBottomSheetDialogState
     )
   }
 }
