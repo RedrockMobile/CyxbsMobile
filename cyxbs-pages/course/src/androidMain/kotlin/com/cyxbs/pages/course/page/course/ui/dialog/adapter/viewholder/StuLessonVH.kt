@@ -1,20 +1,20 @@
 package com.cyxbs.pages.course.page.course.ui.dialog.adapter.viewholder
 
 import android.annotation.SuppressLint
+import android.content.DialogInterface
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
-import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.course.R
 import com.cyxbs.pages.course.page.course.data.StuLessonData
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
+import com.cyxbs.pages.map.api.MapNavArgument
 
 /**
  *
@@ -25,7 +25,8 @@ import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
  */
 class StuLessonVH(
   parent: ViewGroup,
-  private val isShowLink: Boolean
+  private val isShowLink: Boolean,
+  val dialog: DialogInterface
 ) : CourseViewHolder<StuLessonData>(parent, R.layout.course_dialog_bottom_lesson_stu) {
   
   private var mData: StuLessonData? = null
@@ -60,9 +61,8 @@ class StuLessonVH(
     mTvClassroom.setOnSingleClickListener {
       val data = mData ?: return@setOnSingleClickListener
       // 跳转至地图界面
-      startActivity(DISCOVER_MAP) {
-        putExtra(COURSE_POS_TO_MAP, data.course.classroom)
-      }
+      dialog.dismiss()
+      MainNavController.navigate(MapNavArgument(data.course.classroom))
     }
   
     mIvLink.setOnSingleClickListener {

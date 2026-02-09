@@ -65,6 +65,7 @@ import kotlinx.coroutines.launch
 @Stable
 class BottomSheetState(
   var onDismissRequest: suspend BottomSheetState.() -> Unit = { collapse() },
+  val hideable: Boolean = false
 ) {
 
   internal val showHeight = mutableFloatStateOf(0F)
@@ -257,7 +258,7 @@ private class BottomSheetSnapLayoutInfoProvider(
   override fun calculateApproachOffset(velocity: Float, decayOffset: Float): Float {
     if (velocity == 0F) return 0F
     // 返回衰减动画应该需要执行的偏移量，decayOffset 是根据衰减动画计算出来可以执行的最大偏移量
-    val min = bottomSheetState.peekHeight
+    val min = if (bottomSheetState.hideable) 0F else bottomSheetState.peekHeight
     val max = bottomSheetState.showMaxHeight.floatValue
     val now = bottomSheetState.showHeight.floatValue
     val new = now - decayOffset
@@ -272,6 +273,10 @@ private class BottomSheetSnapLayoutInfoProvider(
     val min = bottomSheetState.peekHeight
     val max = bottomSheetState.showMaxHeight.floatValue
     val now = bottomSheetState.showHeight.floatValue
+    if (bottomSheetState.hideable && now <= min) {
+      if (now == 0F) return 0F
+      return if (now <= min / 2F) now else now - min
+    }
     if (now == min || now == max) return 0F
     val boundary = (min + max) / 2F
     return if (now <= boundary) now - min else now - max
@@ -299,7 +304,7 @@ private fun BottomSheetContent(
   Box(
     modifier = modifier.fillMaxWidth()
       .onSizeChanged {
-        if (bottomSheetState.showMaxHeight.floatValue == 0F) { // 第一次测量
+        if (bottomSheetState.showMaxHeight.floatValue != it.height.toFloat()) {
           bottomSheetState.showMaxHeight.floatValue = it.height.toFloat()
           if (bottomSheetState.stateFlow.value == BottomSheetValueState.Collapsed) {
             bottomSheetState.showHeight.floatValue = bottomSheetState.peekHeight
@@ -350,7 +355,7 @@ private class BottomSheetScopeImpl(
         val min = bottomSheetState.peekHeight
         val max = bottomSheetState.showMaxHeight.floatValue
         val now = bottomSheetState.showHeight.floatValue
-        val new = (now - it).coerceIn(min, max)
+        val new = (now - it).coerceIn(if (bottomSheetState.hideable) 0f else min, max)
         bottomSheetState.scrollableState.dispatchRawDelta(now - new)
       },
       onDragStarted = {
@@ -366,8 +371,13 @@ private class BottomSheetScopeImpl(
               performFling(velocity)
             }
             bottomSheetState.setState(
-              if (bottomSheetState.fraction == 0F)
-                BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
+              if (bottomSheetState.fraction == 0F) {
+                BottomSheetValueState.Collapsed
+              } else {
+                if (bottomSheetState.fraction < 0F) {
+                  BottomSheetValueState.Hide
+                } else BottomSheetValueState.Expanded
+              }
             )
           }
         }

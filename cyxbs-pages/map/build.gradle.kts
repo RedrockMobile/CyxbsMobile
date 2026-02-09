@@ -9,11 +9,16 @@ useKtProvider() // api 模块服务提供
 kotlin {
   sourceSets {
     commonMain.dependencies {
+      subprojects.forEach { implementation(it) }
       implementation(projects.libCommon) // TODO common 模块不再使用，新模块请依赖 base 和 utils 模块
       implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(libs.okio)
+      implementation(libs.filekit.core)
+      implementation(libs.filekit.dialogs.compose)
+      implementation(projects.cyxbsComponents.account.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
@@ -23,6 +28,10 @@ kotlin {
       // https://github.com/davemorrissey/subsampling-scale-image-view?tab=readme-ov-file
       // 地图加载需要的大图浏览控件
       compileOnly("com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0")
+    }
+    noWebMain.dependencies {
+      implementation(libs.scale.image.viewer)
+      implementation(libs.scale.sampling.decoder)
     }
   }
 }

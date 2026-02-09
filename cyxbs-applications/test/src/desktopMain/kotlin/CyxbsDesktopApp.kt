@@ -6,9 +6,12 @@ import androidx.compose.ui.window.rememberWindowState
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.navigation.MainNavHost
+import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
+import io.github.vinceglb.filekit.FileKit
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * .
@@ -20,6 +23,7 @@ import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProvider
 fun main() = runApp {
   TestKtProviderInitializer.tryInitKtProvider()
   InitialManager.init(isMainProcess = true)
+  FileKit.init(appId = "com.mredrock.cyxbs")
   launchApplication {
     val width = 800
     val height = 600
@@ -27,6 +31,7 @@ fun main() = runApp {
       onCloseRequest = ::exitApplication,
       title = "桌上重邮",
       state = rememberWindowState(width = width.dp, height = height.dp),
+      icon = painterResource(ConfigRes.configIcAppLogo())
 //      resizable = false,
     ) {
       remember {

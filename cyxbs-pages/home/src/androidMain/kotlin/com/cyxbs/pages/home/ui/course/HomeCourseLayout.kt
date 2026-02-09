@@ -15,10 +15,8 @@ import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.crash.CrashDialog
 import com.cyxbs.components.base.utils.Umeng
-import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
-import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.extensions.asFlow
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.invisible
@@ -30,6 +28,7 @@ import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import com.cyxbs.pages.home.ui.course.utils.CourseHeaderHelper
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import kotlinx.coroutines.CoroutineScope
@@ -145,9 +144,7 @@ class HomeCourseLayout(
                 mTvHeaderPlace.text = header.content
                 mTvHeaderPlace.setOnSingleClickListener {
                   // 跳转至地图界面
-                  startActivity(DISCOVER_MAP) {
-                    putExtra(COURSE_POS_TO_MAP, header.content)
-                  }
+                  MainNavController.navigate(MapNavArgument(header.content))
                 }
                 mTvHeaderTitle.setOnSingleClickListener {
                   mCourseService.openBottomSheetDialogByLesson(context, header.item.lesson)

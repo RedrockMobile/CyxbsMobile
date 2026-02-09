@@ -2,6 +2,7 @@ package com.cyxbs.pages.discover.utils
 
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseUi
+import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.route.DISCOVER_CALENDAR
 import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
@@ -14,8 +15,11 @@ import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.discover.R
+import com.cyxbs.pages.map.api.MapNavArgument
 import java.lang.ref.SoftReference
+import kotlin.reflect.KClass
 
 /**
  * @author zixuan
@@ -28,7 +32,7 @@ object MoreFunctionProvider {
     private var homeFunctions: SoftReference<MutableList<Function>> = SoftReference(mutableListOf())
     val functions = listOf(
             Function(R.drawable.discover_ic_other_course, R.string.discover_title_other_course, R.string.discover_detail_other_course, StartActivityAfterLogin("同学课表", DISCOVER_OTHER_COURSE), ClickEvent.CLICK_KBCX_ENTRY),
-            Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartActivityImpl(DISCOVER_MAP), ClickEvent.CLICK_CYDT_ENTRY),
+            Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartNavDestination(MapNavArgument(null)), ClickEvent.CLICK_CYDT_ENTRY),
             Function(R.drawable.discover_ic_no_class, R.string.discover_title_no_class, R.string.discover_detail_no_class, StartActivityAfterLogin("没课约", DISCOVER_NO_CLASS), ClickEvent.CLICK_MKY_ENTRY),
             Function(R.drawable.discover_ic_bus_track, R.string.discover_title_bus_track, R.string.discover_detail_bus_track, StartActivityImpl(DISCOVER_SCHOOL_CAR), ClickEvent.CLICK_XCGJ_ENTRY),
             Function(R.drawable.discover_ic_empty_classroom, R.string.discover_title_empty_classroom, R.string.discover_detail_empty_classroom, StartActivityImpl(DISCOVER_EMPTY_ROOM), ClickEvent.CLICK_YLC_KJS_ENTRY),
@@ -80,6 +84,13 @@ object MoreFunctionProvider {
         override fun startActivity(baseUi: BaseUi) {
             startActivity(routing)
         }
+    }
+
+    class StartNavDestination<T : Any>(private val route: T) : StartActivityAble {
+        override fun startActivity(baseUi: BaseUi) {
+            MainNavController.navigate(route)
+        }
+
     }
 
     class StartActivityAfterLogin(private val msg: String, private val routing: String) : StartActivityAble {

@@ -28,6 +28,9 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
     }
+    desktopMain.dependencies {
+      implementation(libs.filekit.core)
+    }
   }
 }
 

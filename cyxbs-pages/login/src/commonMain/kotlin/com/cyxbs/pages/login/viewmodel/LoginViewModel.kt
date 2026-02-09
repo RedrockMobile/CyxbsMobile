@@ -2,6 +2,7 @@ package com.cyxbs.pages.login.viewmodel
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.input.TextFieldValue
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.init.InitialManager
@@ -46,7 +47,7 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
 
   val stuNum = mutableStateOf("")
 
-  val password = mutableStateOf("")
+  val password = mutableStateOf(TextFieldValue())
 
   val isCheckUserArgument = mutableStateOf(false)
 
@@ -60,7 +61,7 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
   fun clickLogin() {
     if (isLoginAnim.value) return
     val stuNum = stuNum.value
-    val password = password.value
+    val password = password.value.text
     if (!isCheckUserArgument.value) {
       toast("请先同意用户协议吧")
     } else if (stuNum.isEmpty()) {

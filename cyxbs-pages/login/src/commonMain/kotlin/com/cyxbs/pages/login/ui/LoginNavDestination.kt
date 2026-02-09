@@ -214,10 +214,18 @@ private fun StuNumCompose(modifier: Modifier = Modifier) {
   }
 }
 
+private fun getHideText(password: String, cursorPosition: Int) : String {
+  val currentInputPosition = cursorPosition - 1
+  if(password.isEmpty()) return ""
+  val beforeText = if (currentInputPosition == 0) "" else '\u2022'.toString().repeat(currentInputPosition)
+  val afterText = if (currentInputPosition + 1 > password.length) "" else '\u2022'.toString().repeat(password.length - (currentInputPosition + 1))
+  return beforeText + password[currentInputPosition].toString() + afterText
+}
 @Composable
 private fun PasswordCompose(modifier: Modifier = Modifier) {
   val viewModel = viewModel(LoginViewModel::class)
   val oldText = remember { mutableStateOf("") }
+  val currentCursorPosition = remember { mutableStateOf(0) }
   val visualTransformationAll = remember {
     PasswordVisualTransformation()
   }
@@ -226,8 +234,7 @@ private fun PasswordCompose(modifier: Modifier = Modifier) {
     VisualTransformation {
       TransformedText(
         AnnotatedString(
-          '\u2022'.toString().repeat(oldText.value.length) +
-              viewModel.password.value.substringAfter(oldText.value)
+          getHideText(viewModel.password.value.text, currentCursorPosition.value)
         ),
         OffsetMapping.Identity
       )
@@ -248,14 +255,16 @@ private fun PasswordCompose(modifier: Modifier = Modifier) {
       value = viewModel.password.value,
       visualTransformation = visualTransformation.value,
       onValueChange = {
+        val password = it.text
+        currentCursorPosition.value = it.selection.start
         if (visualTransformation.value !== VisualTransformation.None) {
-          if (it.length > viewModel.password.value.length) {
+          if (password.length > viewModel.password.value.text.length) {
             visualTransformation.value = visualTransformationLast
-            oldText.value = viewModel.password.value
+            oldText.value = viewModel.password.value.text
           } else {
             // 删减时隐藏所有字符
             visualTransformation.value = visualTransformationAll
-            oldText.value = it
+            oldText.value = password
           }
         }
         viewModel.password.value = it
