@@ -4,21 +4,25 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.pages.affair.api.AffairDateModel
+import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.IAffairService2
+import com.cyxbs.pages.course.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.frame.item.AffairItemFactory
 import com.cyxbs.pages.course.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
+import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
@@ -29,6 +33,7 @@ import kotlinx.coroutines.supervisorScope
  * @date 2025/10/18
  */
 class AffairDecorationViewModel(
+  val courseFrame: AbstractCourseFrame,
   val hierarchy: CourseItemHierarchy<CourseAffairItem>,
 ) : BaseViewModel(), CoursePageDecoration {
 
@@ -43,7 +48,11 @@ class AffairDecorationViewModel(
           idModels.forEach { idModel ->
             idModel.whatTimeDate.value.forEach { (whatTimeModel, dateModels) ->
               dateModels.forEach { dateModel ->
-                val whatTime = AffairItemWhatTime(isSemester = false, affairDateModel = dateModel)
+                val whatTime = AffairItemWhatTime(
+                  isSemester = false,
+                  affairDateModel = dateModel,
+                  courseFrame = courseFrame
+                )
                 launch {
                   dateModel.enable.mergeFlow.collect {
                     if (it) hierarchy.add(whatTime) else hierarchy.remove(whatTime)
@@ -53,7 +62,11 @@ class AffairDecorationViewModel(
             }
             launch {
               idModel.addedDateModel.collect { dateModel ->
-                val whatTime = AffairItemWhatTime(isSemester = false, affairDateModel = dateModel)
+                val whatTime = AffairItemWhatTime(
+                  isSemester = false,
+                  affairDateModel = dateModel,
+                  courseFrame = courseFrame
+                )
                 launch {
                   dateModel.enable.mergeFlow.collect {
                     if (it) hierarchy.add(whatTime) else hierarchy.remove(whatTime)
@@ -70,16 +83,29 @@ class AffairDecorationViewModel(
   override fun CoursePageContent() {
     hierarchy.CoursePageItemListContent()
   }
+
+  // 查找 CourseItemState
+  suspend fun findCourseItemState(dateModelEditor: AffairDateModelEditor): CourseItemState {
+    return hierarchy.observe(
+      page = courseFrame.getPage(dateModelEditor.date),
+      dayOfWeek = dateModelEditor.date.dayOfWeek,
+    ).mapNotNull { list ->
+      list.firstOrNull {
+        (it.item as CourseAffairItem).affairDateModel === dateModelEditor.dateModel
+      }
+    }.first()
+  }
 }
 
 private data class AffairItemWhatTime(
   val isSemester: Boolean,
   val affairDateModel: AffairDateModel,
+  val courseFrame: AbstractCourseFrame,
 ) : ItemHierarchyWhatTime<CourseAffairItem>() {
 
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
     CourseItemWhatTime.Fixed(
-      page = SchoolCalendar.getFirstMonDay().let {
+      page = courseFrame.beginDate.value.let {
         if (it == null) -1
         else if (isSemester) 0
         else it.daysUntil(affairDateModel.date.value) / 7 + 1

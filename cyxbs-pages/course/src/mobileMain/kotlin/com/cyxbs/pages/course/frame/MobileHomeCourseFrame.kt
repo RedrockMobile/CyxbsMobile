@@ -76,7 +76,7 @@ private fun MobileHomeCourseFrameContent(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
 ) {
-  val decorations = createBaseCoursePageDecorations()
+  val decorations = createBaseCoursePageDecorations(frame)
   // item 点击后出现的 BottomSheetDialog
   val itemBottomSheetDialog = rememberCourseItemBottomSheetDialogState()
   CompositionLocalProvider(

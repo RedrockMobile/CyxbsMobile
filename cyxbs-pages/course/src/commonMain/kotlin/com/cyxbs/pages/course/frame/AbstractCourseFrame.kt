@@ -1,5 +1,7 @@
 package com.cyxbs.pages.course.frame
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -74,20 +76,36 @@ abstract class AbstractCourseFrame {
   }
 
   // 课表最大周数
-  open val maxWeak: Int = defaultSettings.getInt("课表最大周数", 21)
+  open val maxWeek: Int = defaultSettings.getInt("课表最大周数", 21)
 
   // 最大显示页数
-  open val maxPage: Int get() = maxWeak + 1 // 因为第一页为整学期页，所以加1
+  open val maxPage: Int get() = maxWeek + 1 // 因为第一页为整学期页，所以加1
 
   // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   open val initialPage: Int
     get() = getPage(TodayNoEffect)
 
-  open fun getPage(date: Date): Int {
+  // 当前日期是课表的第几周
+  open fun getWeekNum(date: Date): Int {
     val realBeginDate =
       beginDate.value?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
-    val page = (realBeginDate.daysUntil(date) / 7 + 1).coerceAtLeast(0)
+    return realBeginDate.daysUntil(date) / 7 + 1
+  }
+
+  // 指定日期对应页面数
+  fun getPage(date: Date): Int {
+    val page = getWeekNum(date).coerceAtLeast(0)
     return if (page >= maxPage) 0 else page
+  }
+
+  // 滚动到指定日期的页面
+  suspend fun animateScrollToDate(date: Date) {
+    val newPage = getPage(date)
+    if (newPage == pagerState.currentPage) return
+    pagerState.animateScrollToPage(
+      getPage(date),
+      animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+    )
   }
 }
 
@@ -131,7 +149,9 @@ fun AbstractCourseFrame.HomeCoursePageContent(
 }
 
 @Composable
-internal fun createBaseCoursePageDecorations(): ImmutableList<CoursePageDecoration> {
+internal fun createBaseCoursePageDecorations(
+  frame: AbstractCourseFrame
+): ImmutableList<CoursePageDecoration> {
   val selfLessonHierarchy = remember { CourseItemHierarchy<SelfLessonItem>() }
   val selfLessonDecoration = viewModel { SelfLessonDecorationViewModel(selfLessonHierarchy) }
 
@@ -139,7 +159,7 @@ internal fun createBaseCoursePageDecorations(): ImmutableList<CoursePageDecorati
   val linkLessonDecoration = viewModel { LinkLessonDecorationViewModel(linkLessonHierarchy) }
 
   val affairHierarchy = remember { CourseItemHierarchy<CourseAffairItem>() }
-  val affairDecoration = viewModel { AffairDecorationViewModel(affairHierarchy) }
+  val affairDecoration = viewModel { AffairDecorationViewModel(frame, affairHierarchy) }
 
   val createAffairDecoration = viewModel { CreateAffairDecorationViewModel() }
 

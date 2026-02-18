@@ -40,7 +40,7 @@ private fun AdaptiveHomeCourseFrameContent(
   modifier: Modifier,
   frame: AdaptiveCourseFrame,
 ) {
-  val decorations = createBaseCoursePageDecorations()
+  val decorations = createBaseCoursePageDecorations(frame)
   Column(modifier = modifier.background(LocalAppColors.current.topBg)) {
     CourseHeader(
       modifier = Modifier.height(50.dp),

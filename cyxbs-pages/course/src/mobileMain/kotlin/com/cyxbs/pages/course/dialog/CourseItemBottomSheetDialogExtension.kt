@@ -384,24 +384,23 @@ private fun BottomSheet(
 private fun ShowBeginFinalTime(
   state: CourseItemBottomSheetDialogState,
 ) {
-  val currentPageItemFlow = state.currentPageItemFlow
   val alphaState = rememberDerivedStateOfStructure {
     state.bottomSheetState.fraction.coerceIn(0F, 1F)
   }
   val time1 = remember {
     mutableStateOf(
-      currentPageItemFlow.value?.itemState?.item?.whatTime?.beginTime
+      state.currentPageItemFlow.value?.itemState?.item?.whatTime?.beginTime
         ?: MinuteTime(0, 0)
     )
   }
   val time2 = remember {
     mutableStateOf(
-      currentPageItemFlow.value?.itemState?.item?.whatTime?.finalTime
+      state.currentPageItemFlow.value?.itemState?.item?.whatTime?.finalTime
         ?: MinuteTime(0, 0)
     )
   }
   val itemRectState = remember {
-    currentPageItemFlow.mapNotNull { it?.itemState }.onEach {
+    state.currentPageItemFlow.mapNotNull { it?.itemState }.onEach {
       time1.value = it.item.whatTime.now.value.beginTime
       time2.value = it.item.whatTime.now.value.finalTime
     }.flatMapLatest { itemState ->
@@ -494,13 +493,17 @@ private fun CourseBottomSheetDialogContent(
     }
   }
   Column(modifier = Modifier.fillMaxSize()) {
-    HorizontalPager(
-      state = pagerState,
-      modifier = Modifier.fillMaxWidth().weight(1F),
-    ) { page ->
-      val itemDialogContent = if (itemDialogContents.isEmpty()) null
-      else itemDialogContents[page % itemDialogContents.size]
-      itemDialogContent?.CourseBottomSheetDialogContent(state)
+    if (itemDialogContents.size > 1) {
+      HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxWidth().weight(1F),
+      ) { page ->
+        val itemDialogContent = if (itemDialogContents.isEmpty()) null
+        else itemDialogContents[page % itemDialogContents.size]
+        itemDialogContent?.CourseBottomSheetDialogContent(state)
+      }
+    } else {
+      itemDialogContents.firstOrNull()?.CourseBottomSheetDialogContent(state)
     }
     // 底部的圆点指示器
     Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {

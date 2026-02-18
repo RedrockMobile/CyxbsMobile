@@ -1,32 +1,31 @@
 package com.cyxbs.pages.course.dialog.item
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.pager.PageSize
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.byValue
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.Card
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -34,7 +33,6 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -42,9 +40,9 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
@@ -53,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -64,31 +61,37 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.components.view.ui.rememberTextDialog
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
+import com.cyxbs.pages.affair.api.AffairIdModelEditor
+import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
+import com.cyxbs.pages.course.dialog.item.affair.AffairEditWeekText
+import com.cyxbs.pages.course.dialog.item.affair.AffairWeekAndTimeCompose
 import com.cyxbs.pages.course.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
+import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
+import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.isoDayNumber
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * .
@@ -107,13 +110,20 @@ class AffairBottomSheetDialogState(
     val model: AffairDateModel
 
     data class Show(override val model: AffairDateModel) : CurrentForm
-    data class Edit(val editor: AffairDateModelEditor) : CurrentForm {
+    data class Edit(var editor: AffairDateModelEditor) : CurrentForm {
       val isInEditTime = mutableStateOf(false)
-      val isWeakNumValid = mutableStateOf(true)
-      val isDayOfWeakValid = mutableStateOf(true)
       val isHourMinuteValid = mutableStateOf(true)
       override val model: AffairDateModel
         get() = editor.dateModel
+
+      // 原始数据
+      val originModel: AffairDateModel = editor.dateModel
+
+      // 点击保存时的检查
+      val clickSaveCheck = mutableListOf<() -> String?>()
+
+      // 点击上一步时的检查
+      val clickPrevCheck = mutableListOf<() -> String?>()
     }
   }
 }
@@ -137,7 +147,7 @@ fun AffairBottomSheetDialog(
           currentForm = currentForm,
         )
       } else {
-        WeekAndTime(
+        AffairWeekAndTimeCompose(
           modifier = Modifier.padding(top = 8.dp),
           courseState = courseBottomSheetDialogState,
           affairState = affairBottomSheetDialogState,
@@ -269,7 +279,7 @@ private fun ShowStateButtons(
     negativeBtnText = "取消",
     onClickNegativeBtn = { dismiss() },
     onClickPositiveBtn = {
-      // 复杂事务的删除需要单独处理
+      // 复杂事务的删除单独处理，需要考虑删除单个还是删除全部亦或是删除后续
       toast("暂未实现")
     },
   )
@@ -294,7 +304,14 @@ private fun EditStateButtons(
     text = "确定事务编辑完成？",
     negativeBtnText = "返回",
     onClickPositiveBtn = {
-      toast("暂未实现")
+      parentCoroutineScope.launch {
+        currentForm.editor.idModelEditor.commit().onSuccess {
+          when (it) {
+            AffairIdModelEditor.EditResult.Deleted -> toast("事务因缺少时间段，已被认定为删除")
+            AffairIdModelEditor.EditResult.Success -> toast("修改成功")
+          }
+        }
+      }
     },
   )
   Icon(
@@ -305,11 +322,23 @@ private fun EditStateButtons(
     tint = LocalAppColors.current.tvLv2,
     modifier = Modifier.padding(start = 8.dp).clickableNoIndicator {
       if (!currentForm.isInEditTime.value) {
-        completeEditDialog.show()
-      } else if (!currentForm.isHourMinuteValid.value) {
-        toast("时间段不合法")
+        // 保存编辑
+        val error = currentForm.clickSaveCheck.firstNotNullOfOrNull { it() }
+        if (error != null) {
+          toast(error)
+        } else {
+          currentForm.clickSaveCheck.clear()
+          completeEditDialog.show()
+        }
       } else {
-        currentForm.isInEditTime.value = false
+        // 返回上一级
+        val error = currentForm.clickPrevCheck.firstNotNullOfOrNull { it() }
+        if (error != null) {
+          toast(error)
+        } else {
+          currentForm.clickPrevCheck.clear()
+          currentForm.isInEditTime.value = false
+        }
       }
     },
   )
@@ -318,7 +347,10 @@ private fun EditStateButtons(
     negativeBtnText = "返回",
     onClickPositiveBtn = {
       if (currentForm.editor.idModelEditor.cancelEdit()) {
-        affairState.currentFormState.value = CurrentForm.Show(currentForm.editor.dateModel)
+        currentForm.clickPrevCheck.clear()
+        currentForm.clickSaveCheck.clear()
+        courseState.currentPageItemFlow.value = courseState.dialogContents.value[0] // 还原之前的修改
+        affairState.currentFormState.value = CurrentForm.Show(currentForm.originModel)
       }
       dismiss()
     }
@@ -335,6 +367,7 @@ private fun EditStateButtons(
   DisposableEffect(Unit) {
     val oldOnDismiss = courseState.bottomSheetState.onDismissRequest
     courseState.bottomSheetState.onDismissRequest = {
+      // bottomSheet 下滑时弹出一个确认取消编辑的弹窗
       cancelEditDialog.showAndCover(
         onClickPositiveBtnProxy = {
           onClickPositiveBtn.invoke(this)
@@ -351,280 +384,6 @@ private fun EditStateButtons(
   }
 }
 
-@Composable
-private fun WeekAndTime(
-  modifier: Modifier,
-  courseState: CourseItemBottomSheetDialogState,
-  affairState: AffairBottomSheetDialogState,
-) {
-  Row(modifier) {
-    WeakNumCompose(courseState, affairState)
-    DayOfWeakCompose(affairState, modifier = Modifier.padding(start = 8.dp))
-    Text(
-      text = produceState("") {
-        affairState.currentFormState.value.model.whatTime.flatMapLatest { it.timePair }.collect {
-          value = it.toString()
-        }
-      }.value,
-      fontSize = 13.sp,
-      color = LocalAppColors.current.tvLv2,
-      modifier = Modifier.padding(start = 8.dp).clickableNoIndicator {
-        val currentForm = affairState.currentFormState.value
-        if (currentForm is CurrentForm.Edit) {
-          if (!currentForm.isWeakNumValid.value) {
-            toast("周数不合法，请修改后再编辑时间段")
-          } else if (!currentForm.isDayOfWeakValid.value) {
-            toast("星期不合法，请修改后再编辑时间段")
-          } else {
-            currentForm.isInEditTime.value = true
-          }
-        }
-      },
-    )
-  }
-}
-
-@Composable
-private fun WeakNumCompose(
-  courseState: CourseItemBottomSheetDialogState,
-  affairState: AffairBottomSheetDialogState,
-  modifier: Modifier = Modifier,
-) {
-  val weakNumText = rememberTextFieldState(remember {
-    SchoolCalendar.getFirstMonDay()!!.daysUntil(affairState.currentFormState.value.model.date.value)
-      .div(7).plus(1)
-      .let { Num2CN.number2ChineseNumber(it) }
-  })
-  val maxWeak = AbstractCourseFrame.current.maxWeak
-  Row(modifier) {
-    Text(
-      text = "第",
-      fontSize = 13.sp,
-      color = LocalAppColors.current.tvLv2,
-    )
-    BasicTextField(
-      modifier = Modifier.widthIn(min = 10.dp).width(IntrinsicSize.Min),
-      state = weakNumText,
-      readOnly = affairState.currentFormState.value is CurrentForm.Show,
-      cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
-      keyboardOptions = KeyboardOptions(
-        keyboardType = KeyboardType.Number,
-        imeAction = ImeAction.Next,
-      ),
-      textStyle = TextStyle(
-        fontSize = 13.sp,
-        color = LocalAppColors.current.tvLv2,
-        textAlign = TextAlign.Center,
-      ),
-      decorator = { innerTextField ->
-        Column {
-          val currentForm = affairState.currentFormState.value
-          innerTextField()
-          Divider(
-            color = when (currentForm) {
-              is CurrentForm.Show -> Color.Transparent
-              is CurrentForm.Edit if !currentForm.isWeakNumValid.value -> MaterialTheme.colors.error
-              else -> MaterialTheme.colors.onSurface.copy(alpha = 0.12F)
-            }
-          )
-        }
-      },
-      inputTransformation = InputTransformation.byValue { current, proposed ->
-        if (proposed.isEmpty()) return@byValue proposed // 允许完全删除
-        if (current.contains(proposed)) return@byValue proposed // 减少的时候直接通过
-        val char0 = proposed[0]
-        if (char0 == '0') return@byValue current // 首个字符不允许 0 开头
-        if (proposed.length == 1) {
-          if (char0.isDigit()) {
-            // 只输入单个数字字符时
-            return@byValue Num2CN.number2ChineseNumber(char0 - '0')
-          }
-        } else if (proposed.length == 2) {
-          val char1 = proposed[1]
-          if (char0.isDigit() && char1.isDigit()) {
-            // 连续输入两个数字字符
-            return@byValue Num2CN.number2ChineseNumber(proposed.toString().toInt())
-          }
-          if (char0 == '十' && char1.isDigit()) {
-            return@byValue Num2CN.number2ChineseNumber(10 + (char1 - '0'))
-          }
-          val char0Num = Num2CN.CN_CHARS.indexOf(char0.toString())
-          if (char0Num > 0 && char1.isDigit()) {
-            // 首个字符是中文数字，第二个字符是数字
-            val num = char0Num * 10 + (char1 - '0')
-            if (num in 10..maxWeak) {
-              return@byValue Num2CN.number2ChineseNumber(num)
-            }
-          }
-          if (char0.isDigit() && char1 == '十') {
-            // 首个字符是数字，第二个字符是'十'
-            val num = (char0 - '0') * 10
-            if (num in 10..maxWeak) {
-              return@byValue Num2CN.number2ChineseNumber(num)
-            }
-          }
-          val char1Num = Num2CN.CN_CHARS.indexOf(char1.toString())
-          if (char0.isDigit() && char1Num >= 0) {
-            // 首个字符是数字，第二个字符是中文数字
-            val num = (char0 - '0') * 10 + char1Num
-            if (num in 10..maxWeak) {
-              return@byValue Num2CN.number2ChineseNumber(num)
-            }
-          }
-        } else if (proposed.length == 3) {
-          if (char0 == '十') return@byValue current // 首个字符为'十'时不允许存在三个字符
-          val char1 = proposed[1]
-          val char2 = proposed[2]
-          val char0Num = Num2CN.CN_CHARS.indexOf(char0.toString())
-          if (char0Num > 0 && char1 == '十' && char2.isDigit()) {
-            val num = char0Num * 10 + (char2 - '0')
-            if (num in 10..maxWeak) {
-              return@byValue Num2CN.number2ChineseNumber(num)
-            }
-          }
-        }
-        current // 其余情况不允许修改
-      }
-    )
-    Text(
-      text = "周",
-      fontSize = 13.sp,
-      color = LocalAppColors.current.tvLv2,
-    )
-  }
-  val courseFrame = AbstractCourseFrame.current
-  LaunchedEffect(Unit) {
-    // 设置 model 周数并跳转对应页
-    snapshotFlow { weakNumText.text }.collectLatest {
-      val currentForm = affairState.currentFormState.value
-      if (currentForm is CurrentForm.Edit) {
-        currentForm.isWeakNumValid.value = it.isNotEmpty()
-        if (currentForm.isWeakNumValid.value) {
-          val num = if (it.length == 1) {
-            if (it[0] == '十') 10 else {
-              Num2CN.CN_CHARS.indexOf(it[0].toString())
-            }
-          } else if (it.length == 2) {
-            if (it[0] == '十') {
-              10 + Num2CN.CN_CHARS.indexOf(it[1].toString())
-            } else if (it[1] == '十') {
-              Num2CN.CN_CHARS.indexOf(it[0].toString()) * 10
-            } else error("不应该出现的分支, it = $it")
-          } else if (it.length == 3 && it[1] == '十') {
-            Num2CN.CN_CHARS.indexOf(it[0].toString()) * 10 + Num2CN.CN_CHARS.indexOf(it[2].toString())
-          } else error("不应该出现的分支, it = $it")
-          val date = currentForm.editor.date
-          val newDate = SchoolCalendar.getFirstMonDay()!!
-            .weekBeginDate.plusWeeks(num - 1)
-            .plusDays(date.dayOfWeekOrdinal)
-          currentForm.editor.setDate(newDate)
-          courseFrame.pagerState.animateScrollToPage(courseFrame.getPage(newDate),
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-        }
-      }
-    }
-  }
-  LaunchedEffect(Unit) {
-    // ui 与 model 同步
-    snapshotFlow { affairState.currentFormState.value }.drop(1).collect {
-      if (it is CurrentForm.Show) {
-        weakNumText.setTextAndPlaceCursorAtEnd(
-          SchoolCalendar.getFirstMonDay()!!
-            .daysUntil(affairState.currentFormState.value.model.date.value)
-            .div(7).plus(1)
-            .let { Num2CN.number2ChineseNumber(it) }
-        )
-        courseFrame.pagerState.animateScrollToPage(
-          courseFrame.getPage(affairState.currentFormState.value.model.date.value),
-          animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-      }
-    }
-  }
-}
-
-@Composable
-private fun DayOfWeakCompose(
-  affairState: AffairBottomSheetDialogState,
-  modifier: Modifier = Modifier,
-) {
-  val dayOfWeakText = rememberTextFieldState(remember {
-    affairState.currentFormState.value.model.date.value.dayOfWeek.toChinese("")
-  })
-  Row(modifier) {
-    Text(
-      text = "周",
-      fontSize = 13.sp,
-      color = LocalAppColors.current.tvLv2,
-    )
-    BasicTextField(
-      modifier = Modifier.widthIn(min = 10.dp).width(IntrinsicSize.Min),
-      state = dayOfWeakText,
-      readOnly = affairState.currentFormState.value is CurrentForm.Show,
-      cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
-      keyboardOptions = KeyboardOptions(
-        keyboardType = KeyboardType.Number,
-        imeAction = ImeAction.Next,
-      ),
-      textStyle = TextStyle(
-        fontSize = 13.sp,
-        color = LocalAppColors.current.tvLv2,
-        textAlign = TextAlign.Center,
-      ),
-      decorator = { innerTextField ->
-        Column {
-          val currentForm = affairState.currentFormState.value
-          innerTextField()
-          Divider(
-            color = when (currentForm) {
-              is CurrentForm.Show -> Color.Transparent
-              is CurrentForm.Edit if !currentForm.isDayOfWeakValid.value -> MaterialTheme.colors.error
-              else -> MaterialTheme.colors.onSurface.copy(alpha = 0.12F)
-            }
-          )
-        }
-      },
-      inputTransformation = InputTransformation.byValue { current, proposed ->
-        if (proposed.isEmpty()) proposed else {
-          val num = proposed.filter { it.isDigit() }.toString().toIntOrNull()
-          if (num != null && num in 1..7) {
-            DayOfWeek(num).toChinese("")
-          } else current
-        }
-      }
-    )
-  }
-  LaunchedEffect(Unit) {
-    // 设置 model 星期数
-    snapshotFlow { dayOfWeakText.text }.collect {
-      val currentForm = affairState.currentFormState.value
-      if (currentForm is CurrentForm.Edit) {
-        currentForm.isDayOfWeakValid.value = it.isNotEmpty()
-        if (currentForm.isDayOfWeakValid.value) {
-          val date = currentForm.editor.date
-          val num = when (it.toString()) {
-            "一" -> 1
-            "二" -> 2
-            "三" -> 3
-            "四" -> 4
-            "五" -> 5
-            "六" -> 6
-            "日" -> 7
-            else -> error("输入的数字有误: $it")
-          }
-          currentForm.editor.setDate(date.weekBeginDate.plusDays(num - 1))
-        }
-      }
-    }
-  }
-  LaunchedEffect(Unit) {
-    // ui 与 model 同步
-    snapshotFlow { affairState.currentFormState.value }.drop(1).collect {
-      if (it is CurrentForm.Show) {
-        dayOfWeakText.setTextAndPlaceCursorAtEnd(it.model.date.value.dayOfWeek.toChinese(""))
-      }
-    }
-  }
-}
 
 @Composable
 private fun AffairContentEditor(modifier: Modifier, affairState: AffairBottomSheetDialogState) {
@@ -674,261 +433,210 @@ private fun AffairModifyTime(
   courseState: CourseItemBottomSheetDialogState,
   currentForm: CurrentForm.Edit,
 ) {
-  val dateModelEditorList = remember {
-    currentForm.editor.idModelEditor.whatTimeDate.values.toList().flatten().sortedBy {
-      it.date
-    }.toMutableStateList()
-  }
-  val pagerState = rememberPagerState { dateModelEditorList.size }
+  val lastSelectedWhatTimeState = remember { mutableStateOf(currentForm.editor.whatTimeEditor) }
+  val lastSelectedDateModelState = remember { mutableStateOf(currentForm.editor) }
   Column(modifier = modifier.fillMaxSize()) {
-    VerticalPager(
-      modifier = Modifier.weight(1F),
-      state = pagerState,
-      key = { dateModelEditorList[it].hashCode() },
-      beyondViewportPageCount = 1,
-      pageSize = PageSize.Fixed(60.dp),
-      userScrollEnabled = currentForm.isHourMinuteValid.value
-    ) {
-      AffairEditTime(
-        page = it,
-        pageCount = pagerState.pageCount,
-        currentForm = currentForm,
-        dateModelEditor = dateModelEditorList[it],
-        courseState = courseState,
+    TimePairRow(currentForm, lastSelectedWhatTimeState)
+    Divider(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp))
+    DateGrid(
+      courseState = courseState,
+      currentForm = currentForm,
+      lastSelectedWhatTimeState = lastSelectedWhatTimeState,
+      lastSelectedDateModelState = lastSelectedDateModelState,
+    )
+    LaunchedEffect(Unit) {
+      snapshotFlow { lastSelectedWhatTimeState.value }.drop(1).collect {
+        val dateModel = lastSelectedWhatTimeState.value?.dateList?.firstOrNull()
+        if (dateModel != null) {
+          lastSelectedDateModelState.value = dateModel
+        }
+      }
+    }
+    val courseFrame = AbstractCourseFrame.current
+    val affairDecorationViewModel = viewModel<AffairDecorationViewModel>()
+    LaunchedEffect(Unit) {
+      snapshotFlow { lastSelectedDateModelState.value }.drop(1).collectLatest { dateModelEditor ->
+        courseFrame.animateScrollToDate(dateModelEditor.date)
+        currentForm.editor = dateModelEditor
+        // 修改外层选中的 CourseItemState，使开始结束时间和滚轴偏移量发生改变
+        // 通过这种方法获取 itemState 稍微有些 trick
+        val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor)
+        courseState.currentPageItemFlow.value = itemState.item.extension as CourseItemBottomSheetDialogExtension
+      }
+    }
+  }
+}
+
+@Composable
+private fun TimePairRow(
+  currentForm: CurrentForm.Edit,
+  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor?>,
+) {
+  val timePairRowItem = remember {
+    currentForm.editor.idModelEditor.whatTimeDate.keys.toList().toMutableStateList()
+  }
+  LazyRow(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    items(timePairRowItem, key = { it.hashCode() }) { item ->
+      val isSelected = rememberDerivedStateOfStructure {
+        item === lastSelectedWhatTimeState.value
+      }
+      Box(
+        modifier = Modifier.clickable {
+          if (lastSelectedWhatTimeState.value != item) {
+            val error = currentForm.clickPrevCheck.firstNotNullOfOrNull { it() }
+            if (error != null) {
+              toast(error)
+            } else {
+              lastSelectedWhatTimeState.value = item
+            }
+          }
+        }
+      ) {
+        Text(
+          text = item.timePair.toString(),
+          color = if (isSelected.value) Color(0xFFFFA192)
+          else LocalAppColors.current.tvLv2,
+          fontSize = 14.sp,
+          modifier = Modifier.padding(top = 3.dp, end = 3.dp)
+            .background(color = 0xACE8F0FC.dark(0xB32C2C2C), RoundedCornerShape(29.dp))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+        )
+        val isLastOne = rememberDerivedStateOfStructure {
+          timePairRowItem.size == 1
+        }
+        if (!isLastOne.value) {
+          Image(
+            painter = painterResource(Res.drawable.course_ic_affair_time_delete),
+            contentDescription = "删除时间段",
+            modifier = Modifier.align(Alignment.TopEnd).clickable {
+              if (item.idModelEditor.remove(item)) {
+                timePairRowItem.remove(item)
+              }
+            },
+          )
+        }
+      }
+    }
+    item(key = "+") {
+      Image(
+        painter = painterResource(Res.drawable.course_ic_affair_time_add),
+        contentDescription = "添加时间段",
+        modifier = Modifier.padding(start = 6.dp, top = 3.dp).size(19.dp).clickable {
+          toast("添加时间段")
+        }
       )
     }
-    Card(modifier = Modifier) {
-      Box(
-        modifier = Modifier.fillMaxWidth().height(30.dp).clickableNoIndicator {
-          toast("添加新的时间段")
-        },
-        contentAlignment = Alignment.Center
-      ) {
-        Icon(
-          contentDescription = "添加新的时间段",
-          painter = rememberVectorPainter(Icons.Outlined.Add),
-          tint = LocalAppColors.current.tvLv2,
-        )
-      }
-    }
   }
 }
 
 @Composable
-private fun AffairEditTime(
-  page: Int,
-  pageCount: Int,
-  currentForm: CurrentForm.Edit,
-  dateModelEditor: AffairDateModelEditor,
-  courseState: CourseItemBottomSheetDialogState,
-) {
-  Card {
-    Row(
-      modifier = Modifier.fillMaxSize().onGloballyPositioned {
-        courseState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
-      },
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.Center,
-    ) {
-      if (pageCount > 3) {
-        Text(
-          text = "${page + 1}/$pageCount",
-          fontSize = 16.sp,
-          color = LocalAppColors.current.tvLv2
-        )
-      }
-      EditWeekNum(dateModelEditor)
-      EditDayOfWeek(dateModelEditor)
-      EditHourMinute(currentForm, dateModelEditor)
-    }
-  }
-}
-
-@Composable
-private fun EditWeekNum(
-  dateModelEditor: AffairDateModelEditor,
-) {
-  Text(
-    modifier = Modifier.padding(start = 12.dp),
-    text = "第",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-  val weekNumText = rememberTextFieldState(remember {
-    SchoolCalendar.getFirstMonDay()!!.daysUntil(dateModelEditor.date)
-      .div(7).plus(1)
-      .toString()
-  })
-  EditTimeNumTextField(
-    modifier = Modifier.width(36.dp),
-    textFieldState = weekNumText,
-    inputRange = 1..21,
-  )
-  Text(
-    text = "周",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-}
-
-@Composable
-private fun EditDayOfWeek(
-  dateModelEditor: AffairDateModelEditor,
-) {
-  Text(
-    modifier = Modifier.padding(start = 12.dp),
-    text = "周",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-  val dayOfWeekText =
-    rememberTextFieldState(dateModelEditor.date.dayOfWeek.isoDayNumber.toString())
-  EditTimeNumTextField(
-    modifier = Modifier.width(24.dp),
-    textFieldState = dayOfWeekText,
-    inputRange = 1..7
-  )
-}
-
-@Composable
-private fun EditHourMinute(
-  currentForm: CurrentForm.Edit,
-  dateModelEditor: AffairDateModelEditor,
-) {
-  val timePair = remember { dateModelEditor.whatTimeEditor!!.whatTimeModel.timePair.value }
-  val beginHourText =
-    rememberTextFieldState(timePair.first.hour.toString())
-  val beginMinuteText =
-    rememberTextFieldState(timePair.first.minute.toString().padStart(2, '0'))
-  val finalHourText =
-    rememberTextFieldState(timePair.second.hour.toString())
-  val finalMinuteText =
-    rememberTextFieldState(timePair.second.minute.toString().padStart(2, '0'))
-  val isBeginHourValid = remember { mutableStateOf(true) }
-  val isBeginMinuteValid = remember { mutableStateOf(true) }
-  val isFinalHourValid = remember { mutableStateOf(true) }
-  val isFinalMinuteValid = remember { mutableStateOf(true) }
-  LaunchedEffect(Unit) {
-    snapshotFlow {
-      arrayOf(beginHourText.text, beginMinuteText.text, finalHourText.text, finalMinuteText.text)
-    }.collect {
-      val beginHour = it[0].toString().toIntOrNull()
-      if (beginHour == null) {
-        isBeginHourValid.value = false
-      }
-      val beginMinute = it[1].toString().toIntOrNull()
-      if (beginMinute == null) {
-        isBeginMinuteValid.value = false
-      }
-      val finalHour = it[2].toString().toIntOrNull()
-      if (finalHour == null) {
-        isFinalHourValid.value = false
-      }
-      val finalMinute = it[3].toString().toIntOrNull()
-      if (finalMinute == null) {
-        isFinalMinuteValid.value = false
-      }
-      if (beginHour != null && beginMinute != null && finalHour != null && finalMinute != null) {
-        isBeginHourValid.value = beginHour <= finalHour
-        isFinalHourValid.value = beginHour <= finalHour
-        isBeginMinuteValid.value = !(beginHour == finalHour && beginMinute >= finalMinute)
-        isFinalMinuteValid.value = !(beginHour == finalHour && beginMinute >= finalMinute)
-      }
-      currentForm.isHourMinuteValid.value =
-        isBeginHourValid.value && isBeginMinuteValid.value && isFinalHourValid.value && isFinalMinuteValid.value
-    }
-  }
-  EditTimeNumTextField(
-    modifier = Modifier.padding(start = 12.dp).width(30.dp),
-    textFieldState = beginHourText,
-    inputRange = 0..23,
-    isValid = isBeginHourValid,
-  )
-  Text(
-    modifier = Modifier,
-    text = ":",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-
-  EditTimeNumTextField(
-    modifier = Modifier.width(36.dp).onFocusChanged {
-      if (!it.hasFocus) {
-        if (beginMinuteText.text.length == 1) {
-          beginMinuteText.setTextAndPlaceCursorAtEnd("0${beginMinuteText.text}")
-        }
-      }
-    },
-    textFieldState = beginMinuteText,
-    inputRange = 0..59,
-    isValid = isBeginMinuteValid,
-  )
-  Text(
-    modifier = Modifier.padding(start = 4.dp),
-    text = "-",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-
-  EditTimeNumTextField(
-    modifier = Modifier.padding(start = 4.dp).width(30.dp),
-    textFieldState = finalHourText,
-    inputRange = 0..23,
-    isValid = isFinalHourValid,
-  )
-  Text(
-    text = ":",
-    fontSize = 20.sp,
-    color = LocalAppColors.current.tvLv2
-  )
-
-  EditTimeNumTextField(
-    modifier = Modifier.width(36.dp).onFocusChanged {
-      if (!it.hasFocus) {
-        if (finalMinuteText.text.length == 1) {
-          finalMinuteText.setTextAndPlaceCursorAtEnd("0${finalMinuteText.text}")
-        }
-      }
-    },
-    textFieldState = finalMinuteText,
-    inputRange = 0..59,
-    isValid = isFinalMinuteValid,
-  )
-}
-
-
-@Composable
-private fun EditTimeNumTextField(
-  textFieldState: TextFieldState,
-  inputRange: IntRange,
-  isValid: State<Boolean> = remember { mutableStateOf(true) },
+private fun DateGrid(
   modifier: Modifier = Modifier,
+  courseState: CourseItemBottomSheetDialogState,
+  currentForm: CurrentForm.Edit,
+  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor?>,
+  lastSelectedDateModelState: MutableState<AffairDateModelEditor>,
 ) {
-  BasicTextField(
-    modifier = modifier,
-    state = textFieldState,
-    cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
-    keyboardOptions = KeyboardOptions(
-      keyboardType = KeyboardType.Number,
-      imeAction = ImeAction.Done,
-    ),
-    textStyle = TextStyle(
-      fontSize = 20.sp,
-      color = LocalAppColors.current.tvLv2,
-      textAlign = TextAlign.Center,
-    ),
-    decorator = { innerTextField ->
-      Column {
-        innerTextField()
-        Divider(
-          color = if (isValid.value) MaterialTheme.colors.onSurface.copy(alpha = 0.12F)
-          else MaterialTheme.colors.error
-        )
-      }
+  val dateList = remember(lastSelectedWhatTimeState.value) {
+    (lastSelectedWhatTimeState.value?.dateList ?: emptyList()).toMutableStateList()
+  }
+  FlowRow(
+    modifier = modifier.onGloballyPositioned {
+      courseState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
     },
-    inputTransformation = InputTransformation.byValue { current, proposed ->
-      if (proposed.isEmpty()) proposed
-      else proposed.toString().toIntOrNull()?.takeIf { it in inputRange }?.toString() ?: current
+    itemVerticalAlignment = Alignment.CenterVertically
+  ) {
+    dateList.fastForEach { item ->
+      key(item) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.padding(top = 3.dp, end = 3.dp)
+            .background(color = 0xACE8F0FC.dark(0xB32C2C2C), RoundedCornerShape(29.dp))
+            .height(IntrinsicSize.Min)
+            .clickable {
+              if (lastSelectedDateModelState.value != item) {
+                val error = currentForm.clickPrevCheck.firstNotNullOfOrNull { it() }
+                if (error != null) {
+                  toast(error)
+                } else {
+                  lastSelectedDateModelState.value = item
+                }
+              }
+            }
+        ) {
+          val isSelected = rememberDerivedStateOfStructure {
+            item === lastSelectedDateModelState.value
+          }
+          val dateState = remember { mutableStateOf(item.date) }
+          val weekNumIsError = remember { mutableStateOf(false) }
+          val dayOfWeekIsError = remember { mutableStateOf(false) }
+          AffairEditWeekText(
+            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+            dateState = dateState,
+            weekNumIsError = weekNumIsError,
+            dayOfWeekIsError = dayOfWeekIsError,
+            fontSize = 11.sp,
+            color = if (isSelected.value) Color(0xFFFFA192) else LocalAppColors.current.tvLv2,
+            readOnly = !isSelected.value,
+            weekNumDayOfWeekPadding = 3.dp,
+          )
+          Spacer(
+            modifier = Modifier.padding(vertical = 8.dp).fillMaxHeight().width(1.dp)
+              .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12F))
+          )
+          Icon(
+            contentDescription = "删除日期",
+            painter = rememberVectorPainter(Icons.Outlined.Delete),
+            tint = MaterialTheme.colors.onSurface.copy(alpha = 0.3F),
+            modifier = Modifier.padding(start = 4.dp, end = 5.dp).size(16.dp).clickable {
+              if (item.whatTimeEditor?.remove(item) == true) {
+                dateList.remove(item)
+              }
+            },
+          )
+          DisposableEffect(Unit) {
+            val check = {
+              if (weekNumIsError.value) {
+                "周数不合法，请先修改"
+              } else if (dayOfWeekIsError.value) {
+                "星期不合法，请先修改"
+              } else null
+            }
+            currentForm.clickPrevCheck.add(check)
+            onDispose {
+              currentForm.clickPrevCheck.remove(check)
+            }
+          }
+          LaunchedEffect(Unit) {
+            snapshotFlow { dateState.value }.collect {
+              item.setDate(it)
+            }
+          }
+        }
+      }
     }
-  )
+    Image(
+      painter = painterResource(Res.drawable.course_ic_affair_time_add),
+      contentDescription = "添加日期",
+      modifier = Modifier.padding(start = 6.dp, top = 3.dp).size(18.dp).clickable {
+        val whatTimeModel = lastSelectedWhatTimeState.value
+        if (whatTimeModel != null) {
+          val nowDate = lastSelectedDateModelState.value.date
+          var diff = 1
+          while (true) {
+            val dateModel = whatTimeModel.add(nowDate.plusDays(diff))
+            if (dateModel != null) {
+              // 找到第一天能添加的日期
+              dateList.add(dateModel)
+              break
+            }
+            diff++ // 正常来说一直往后递增，一定会有能加进去的日期，这里就不考虑最后一周的问题
+          }
+        }
+      }
+    )
+  }
 }
