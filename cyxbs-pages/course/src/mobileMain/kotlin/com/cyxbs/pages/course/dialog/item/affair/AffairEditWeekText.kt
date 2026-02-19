@@ -210,8 +210,10 @@ private fun WeekNumCompose(
         val newDate = courseFrame.beginDate.value!!
           .plusWeeks(num - 1)
           .plusDays(date.dayOfWeekOrdinal)
-        dateState.value = newDate
-        courseFrame.animateScrollToDate(newDate)
+        if (date != newDate) {
+          dateState.value = newDate
+          courseFrame.animateScrollToDate(newDate)
+        }
       }
     }
   }

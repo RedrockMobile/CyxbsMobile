@@ -18,6 +18,7 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -109,7 +110,8 @@ fun CourseItemState.observeItemRectInWindow(): Flow<Rect> {
     } else {
       // 此时 item 可能已经不可见，比如被上方重叠的 item 遮挡完了
       // 使用 coursePage.layoutCoordinatesFlow 进行计算
-      coursePage.layoutCoordinatesFlow
+      coursePageFlow.filterNotNull()
+        .flatMapLatest { it.layoutCoordinatesFlow }
         .filter { it.isAttached } // 需要确保 isAttached，防止 page 已经不可见
         .map { pageCoordinates ->
           // 手动计算 item 的位置，跟 courseItemLayout 计算逻辑保持一致

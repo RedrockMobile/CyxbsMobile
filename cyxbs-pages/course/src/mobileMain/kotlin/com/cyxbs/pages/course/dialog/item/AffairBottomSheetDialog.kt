@@ -66,10 +66,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.ui.rememberTextDialog
 import com.cyxbs.pages.affair.api.AffairDateModel
@@ -107,23 +110,93 @@ class AffairBottomSheetDialogState(
   val currentFormState = mutableStateOf(currentForm)
 
   sealed interface CurrentForm {
-    val model: AffairDateModel
+    val date: Date
 
-    data class Show(override val model: AffairDateModel) : CurrentForm
+    val whatTime: MinuteTimePair
+
+    val title: String
+
+    val content: String
+
+    data class Show(private val model: AffairDateModel) : CurrentForm {
+      override val date: Date
+        get() = model.date.value
+      override val whatTime: MinuteTimePair
+        get() = model.whatTime.value.timePair.value
+      override val title: String
+        get() = model.idModel.title.value
+      override val content: String
+        get() = model.idModel.content.value
+
+      fun createEdit(): Edit? {
+        val editor = model.idModel.tryCreateEditor()
+        if (editor != null) {
+          val dateModelEditor = editor.whatTimeDate.firstNotNullOfOrNull { entry ->
+            if (entry.key.whatTimeModel == model.whatTime.value)
+              entry.value.find { it.dateModel == model }
+            else null
+          }
+          if (dateModelEditor != null) {
+            return Edit(dateModelEditor)
+          } else {
+            toast("出现异常，当前 model 无法找到对应 editor")
+          }
+        } else {
+          toast("出现异常，当前 model 无法创建 editor")
+        }
+        return null
+      }
+    }
+
     data class Edit(var editor: AffairDateModelEditor) : CurrentForm {
       val isInEditTime = mutableStateOf(false)
       val isHourMinuteValid = mutableStateOf(true)
-      override val model: AffairDateModel
-        get() = editor.dateModel
+      override val date: Date
+        get() = editor.date
+      override val whatTime: MinuteTimePair
+        get() = editor.whatTimeEditor!!.timePair
+      override val title: String
+        get() = editor.idModelEditor.title
+      override val content: String
+        get() = editor.idModelEditor.content
 
       // 原始数据
-      val originModel: AffairDateModel = editor.dateModel
+      private val originModel: AffairDateModel = editor.dateModel
 
       // 点击保存时的检查
       val clickSaveCheck = mutableListOf<() -> String?>()
 
       // 点击上一步时的检查
       val clickPrevCheck = mutableListOf<() -> String?>()
+
+      // 点击其他时间时的检查
+      val clickSwitchTimeCheck = mutableListOf<() -> String?>()
+
+      // 取消编辑
+      fun cancelEdit(): Show? {
+        if (editor.idModelEditor.cancelEdit()) {
+          clickSaveCheck.clear()
+          clickPrevCheck.clear()
+          clickSwitchTimeCheck.clear()
+          return Show(originModel)
+        }
+        return null
+      }
+
+      // 提交
+      suspend fun commit(): Show? {
+        return editor.idModelEditor.commit().onSuccess {
+          when (it) {
+            AffairIdModelEditor.EditResult.Deleted -> toast("事务已被删除")
+            AffairIdModelEditor.EditResult.Success -> toast("修改成功")
+          }
+        }.map {
+          clickSaveCheck.clear()
+          clickPrevCheck.clear()
+          clickSwitchTimeCheck.clear()
+          Show(editor.dateModel)
+        }.getOrNull()
+      }
     }
   }
 }
@@ -134,31 +207,29 @@ fun AffairBottomSheetDialog(
   courseBottomSheetDialogState: CourseItemBottomSheetDialogState,
   affairBottomSheetDialogState: AffairBottomSheetDialogState,
 ) {
-  SelectionContainer {
-    Column(
-      modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
-    ) {
-      EditTitleWithBtn(courseBottomSheetDialogState, affairBottomSheetDialogState)
-      val currentForm = affairBottomSheetDialogState.currentFormState.value
-      if (currentForm is CurrentForm.Edit && currentForm.isInEditTime.value) {
-        AffairModifyTime(
-          modifier = Modifier.padding(top = 8.dp),
-          courseState = courseBottomSheetDialogState,
-          currentForm = currentForm,
-        )
-      } else {
-        AffairWeekAndTimeCompose(
-          modifier = Modifier.padding(top = 8.dp),
-          courseState = courseBottomSheetDialogState,
-          affairState = affairBottomSheetDialogState,
-        )
-        AffairContentEditor(
-          modifier = Modifier.padding(top = 8.dp).onGloballyPositioned {
-            courseBottomSheetDialogState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
-          },
-          affairState = affairBottomSheetDialogState
-        )
-      }
+  Column(
+    modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+  ) {
+    EditTitleWithBtn(courseBottomSheetDialogState, affairBottomSheetDialogState)
+    val currentForm = affairBottomSheetDialogState.currentFormState.value
+    if (currentForm is CurrentForm.Edit && currentForm.isInEditTime.value) {
+      AffairModifyTime(
+        modifier = Modifier.padding(top = 8.dp),
+        courseState = courseBottomSheetDialogState,
+        currentForm = currentForm,
+      )
+    } else {
+      AffairWeekAndTimeCompose(
+        modifier = Modifier.padding(top = 8.dp),
+        courseState = courseBottomSheetDialogState,
+        affairState = affairBottomSheetDialogState,
+      )
+      AffairContentEditor(
+        modifier = Modifier.padding(top = 8.dp).onGloballyPositioned {
+          courseBottomSheetDialogState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
+        },
+        affairState = affairBottomSheetDialogState
+      )
     }
   }
 }
@@ -172,8 +243,9 @@ private fun EditTitleWithBtn(
     val currentForm = affairState.currentFormState.value
     currentForm is CurrentForm.Show || (currentForm is CurrentForm.Edit && currentForm.isInEditTime.value)
   }
-  val model = affairState.currentFormState.value.model
-  val textFieldState = rememberTextFieldState(initialText = model.idModel.title.value)
+  val textFieldState = rememberTextFieldState(initialText = remember {
+    affairState.currentFormState.value.title
+  })
   val focusRequester = remember { FocusRequester() }
   val coroutineScope = rememberCoroutineScope()
   Row(
@@ -232,7 +304,7 @@ private fun EditTitleWithBtn(
           is CurrentForm.Show -> {
             courseState.bottomSheetState.userScrollEnabled.value = true
             focusRequester.freeFocus()
-            textFieldState.setTextAndPlaceCursorAtEnd(form.model.idModel.title.value)
+            textFieldState.setTextAndPlaceCursorAtEnd(form.title)
           }
 
           is CurrentForm.Edit -> {
@@ -259,18 +331,14 @@ private fun ShowStateButtons(
     tint = LocalAppColors.current.tvLv2,
     modifier = Modifier.padding(start = 8.dp).clickableNoIndicator {
       // 编辑事务
-      val model = affairState.currentFormState.value.model
-      val editor = model.idModel.tryCreateEditor()
-      if (editor != null) {
-        affairState.currentFormState.value = CurrentForm.Edit(
-          editor.whatTimeDate.firstNotNullOf { entry ->
-            if (entry.key.whatTimeModel == model.whatTime.value)
-              entry.value.find { it.dateModel == model }
-            else null
-          }
-        )
-        // 进入编辑模式后将弹窗的内容设置为仅当前 item
-        courseState.dialogContents.value = listOf(courseState.currentPageItemFlow.value!!)
+      val currentForm = affairState.currentFormState.value
+      if (currentForm is CurrentForm.Show) {
+        val edit = currentForm.createEdit()
+        if (edit != null) {
+          affairState.currentFormState.value = edit
+          // 进入编辑模式后将弹窗的内容设置为仅当前 item
+          courseState.dialogContents.value = listOf(courseState.currentPageItemFlow.value!!)
+        }
       }
     },
   )
@@ -305,11 +373,10 @@ private fun EditStateButtons(
     negativeBtnText = "返回",
     onClickPositiveBtn = {
       parentCoroutineScope.launch {
-        currentForm.editor.idModelEditor.commit().onSuccess {
-          when (it) {
-            AffairIdModelEditor.EditResult.Deleted -> toast("事务因缺少时间段，已被认定为删除")
-            AffairIdModelEditor.EditResult.Success -> toast("修改成功")
-          }
+        val show = currentForm.commit()
+        if (show != null) {
+          affairState.currentFormState.value = show
+          dismiss()
         }
       }
     },
@@ -337,6 +404,7 @@ private fun EditStateButtons(
           toast(error)
         } else {
           currentForm.clickPrevCheck.clear()
+          currentForm.clickSwitchTimeCheck.clear()
           currentForm.isInEditTime.value = false
         }
       }
@@ -346,11 +414,10 @@ private fun EditStateButtons(
     text = "确定取消编辑？",
     negativeBtnText = "返回",
     onClickPositiveBtn = {
-      if (currentForm.editor.idModelEditor.cancelEdit()) {
-        currentForm.clickPrevCheck.clear()
-        currentForm.clickSaveCheck.clear()
+      val show = currentForm.cancelEdit()
+      if (show != null) {
         courseState.currentPageItemFlow.value = courseState.dialogContents.value[0] // 还原之前的修改
-        affairState.currentFormState.value = CurrentForm.Show(currentForm.originModel)
+        affairState.currentFormState.value = show
       }
       dismiss()
     }
@@ -387,8 +454,9 @@ private fun EditStateButtons(
 
 @Composable
 private fun AffairContentEditor(modifier: Modifier, affairState: AffairBottomSheetDialogState) {
-  val model = remember { affairState.currentFormState.value.model }
-  val textFieldState = rememberTextFieldState(model.idModel.content.value)
+  val textFieldState = rememberTextFieldState(initialText = remember {
+    affairState.currentFormState.value.content
+  })
   val readOnly = rememberDerivedStateOfStructure {
     affairState.currentFormState.value is CurrentForm.Show
   }
@@ -417,7 +485,7 @@ private fun AffairContentEditor(modifier: Modifier, affairState: AffairBottomShe
     snapshotFlow { affairState.currentFormState.value }.drop(1).collectLatest { form ->
       when (form) {
         is CurrentForm.Show -> {
-          textFieldState.setTextAndPlaceCursorAtEnd(form.model.idModel.title.value)
+          textFieldState.setTextAndPlaceCursorAtEnd(form.title)
         }
 
         is CurrentForm.Edit -> {
@@ -433,7 +501,7 @@ private fun AffairModifyTime(
   courseState: CourseItemBottomSheetDialogState,
   currentForm: CurrentForm.Edit,
 ) {
-  val lastSelectedWhatTimeState = remember { mutableStateOf(currentForm.editor.whatTimeEditor) }
+  val lastSelectedWhatTimeState = remember { mutableStateOf(currentForm.editor.whatTimeEditor!!) }
   val lastSelectedDateModelState = remember { mutableStateOf(currentForm.editor) }
   Column(modifier = modifier.fillMaxSize()) {
     TimePairRow(currentForm, lastSelectedWhatTimeState)
@@ -470,7 +538,7 @@ private fun AffairModifyTime(
 @Composable
 private fun TimePairRow(
   currentForm: CurrentForm.Edit,
-  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor?>,
+  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor>,
 ) {
   val timePairRowItem = remember {
     currentForm.editor.idModelEditor.whatTimeDate.keys.toList().toMutableStateList()
@@ -486,7 +554,7 @@ private fun TimePairRow(
       Box(
         modifier = Modifier.clickable {
           if (lastSelectedWhatTimeState.value != item) {
-            val error = currentForm.clickPrevCheck.firstNotNullOfOrNull { it() }
+            val error = currentForm.clickSwitchTimeCheck.firstNotNullOfOrNull { it() }
             if (error != null) {
               toast(error)
             } else {
@@ -537,11 +605,11 @@ private fun DateGrid(
   modifier: Modifier = Modifier,
   courseState: CourseItemBottomSheetDialogState,
   currentForm: CurrentForm.Edit,
-  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor?>,
+  lastSelectedWhatTimeState: MutableState<AffairWhatTimeModelEditor>,
   lastSelectedDateModelState: MutableState<AffairDateModelEditor>,
 ) {
   val dateList = remember(lastSelectedWhatTimeState.value) {
-    (lastSelectedWhatTimeState.value?.dateList ?: emptyList()).toMutableStateList()
+    lastSelectedWhatTimeState.value.dateList.toMutableStateList()
   }
   FlowRow(
     modifier = modifier.onGloballyPositioned {
@@ -553,12 +621,12 @@ private fun DateGrid(
       key(item) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.padding(top = 3.dp, end = 3.dp)
+          modifier = Modifier.padding(top = 2.dp, bottom = 3.dp, end = 3.dp)
             .background(color = 0xACE8F0FC.dark(0xB32C2C2C), RoundedCornerShape(29.dp))
             .height(IntrinsicSize.Min)
             .clickable {
               if (lastSelectedDateModelState.value != item) {
-                val error = currentForm.clickPrevCheck.firstNotNullOfOrNull { it() }
+                val error = currentForm.clickSwitchTimeCheck.firstNotNullOfOrNull { it() }
                 if (error != null) {
                   toast(error)
                 } else {
@@ -574,7 +642,7 @@ private fun DateGrid(
           val weekNumIsError = remember { mutableStateOf(false) }
           val dayOfWeekIsError = remember { mutableStateOf(false) }
           AffairEditWeekText(
-            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             dateState = dateState,
             weekNumIsError = weekNumIsError,
             dayOfWeekIsError = dayOfWeekIsError,
@@ -591,27 +659,41 @@ private fun DateGrid(
             contentDescription = "删除日期",
             painter = rememberVectorPainter(Icons.Outlined.Delete),
             tint = MaterialTheme.colors.onSurface.copy(alpha = 0.3F),
-            modifier = Modifier.padding(start = 4.dp, end = 5.dp).size(16.dp).clickable {
+            modifier = Modifier.padding(start = 3.dp, end = 5.dp).size(16.dp).clickable {
               if (item.whatTimeEditor?.remove(item) == true) {
+                val index = dateList.indexOf(item)
+                if (item === lastSelectedDateModelState.value) {
+                  lastSelectedDateModelState.value = dateList.getOrNull(index + 1) ?: dateList.getOrNull(index - 1) ?: item
+                }
                 dateList.remove(item)
               }
             },
           )
           DisposableEffect(Unit) {
-            val check = {
+            val checkBack = {
               if (weekNumIsError.value) {
-                "周数不合法，请先修改"
+                "周数不合法，请先修改再返回"
               } else if (dayOfWeekIsError.value) {
-                "星期不合法，请先修改"
+                "星期不合法，请先修改再返回"
               } else null
             }
-            currentForm.clickPrevCheck.add(check)
+            val checkSwitch = {
+              if (weekNumIsError.value) {
+                "周数不合法，请先修改再切换"
+              } else if (dayOfWeekIsError.value) {
+                "星期不合法，请先修改再切换"
+              } else null
+            }
+            currentForm.clickPrevCheck.add(checkBack)
+            currentForm.clickSwitchTimeCheck.add(checkSwitch)
             onDispose {
-              currentForm.clickPrevCheck.remove(check)
+              currentForm.clickPrevCheck.remove(checkBack)
+              currentForm.clickSwitchTimeCheck.remove(checkSwitch)
             }
           }
           LaunchedEffect(Unit) {
             snapshotFlow { dateState.value }.collect {
+              logg("date = $it")
               item.setDate(it)
             }
           }
@@ -621,22 +703,34 @@ private fun DateGrid(
     Image(
       painter = painterResource(Res.drawable.course_ic_affair_time_add),
       contentDescription = "添加日期",
-      modifier = Modifier.padding(start = 6.dp, top = 3.dp).size(18.dp).clickable {
+      modifier = Modifier.padding(start = 6.dp, top = 2.dp, bottom = 3.dp).size(18.dp).clickable {
         val whatTimeModel = lastSelectedWhatTimeState.value
-        if (whatTimeModel != null) {
-          val nowDate = lastSelectedDateModelState.value.date
-          var diff = 1
-          while (true) {
-            val dateModel = whatTimeModel.add(nowDate.plusDays(diff))
-            if (dateModel != null) {
-              // 找到第一天能添加的日期
-              dateList.add(dateModel)
-              break
-            }
-            diff++ // 正常来说一直往后递增，一定会有能加进去的日期，这里就不考虑最后一周的问题
+        val nowDate = lastSelectedDateModelState.value.date
+        var diff = 1
+        while (true) {
+          val dateModel = whatTimeModel.add(nowDate.plusDays(diff))
+          if (dateModel != null) {
+            // 找到第一天能添加的日期
+            dateList.add(dateModel)
+            lastSelectedDateModelState.value = dateModel
+            break
           }
+          diff++ // 正常来说一直往后递增，一定会有能加进去的日期，这里就不考虑最后一周的问题
         }
       }
     )
+  }
+  DisposableEffect(Unit) {
+    val checkSwitch = {
+      if (dateList.isEmpty()) {
+        "${lastSelectedWhatTimeState.value.timePair} 内对应的日期为空"
+      } else null
+    }
+    currentForm.clickPrevCheck.add(checkSwitch)
+    currentForm.clickSwitchTimeCheck.add(checkSwitch)
+    onDispose {
+      currentForm.clickPrevCheck.remove(checkSwitch)
+      currentForm.clickSwitchTimeCheck.remove(checkSwitch)
+    }
   }
 }
