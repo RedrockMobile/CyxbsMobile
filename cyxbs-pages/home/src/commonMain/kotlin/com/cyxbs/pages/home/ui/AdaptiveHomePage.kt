@@ -29,6 +29,7 @@ import com.cyxbs.components.config.navigation.NAV_ABOUT
 import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.config.navigation.NAV_FOOD
 import com.cyxbs.components.config.navigation.NAV_MAP
+import com.cyxbs.components.config.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
@@ -71,6 +72,9 @@ private val itemList = listOf(
 
 
 
+  ActionItem("校车查询"){
+    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_SCHOOL_CAR"))
+  },
   // 退出登陆放到最后，其他测试页面放到上面👆
   ActionItem("退出登录") {
     IAccountEditService::class.impl().onLogout()
