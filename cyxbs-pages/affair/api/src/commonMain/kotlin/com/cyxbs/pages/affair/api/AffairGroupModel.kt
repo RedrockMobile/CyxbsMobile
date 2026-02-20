@@ -6,8 +6,8 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
@@ -185,5 +185,5 @@ abstract class EditorStateFlow<Value>(
   val valueFlow: StateFlow<Value>,
   val valueByEditorFlow: Flow<Value>,
 ) : StateFlow<Value> by valueFlow {
-  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it })
+  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it }).distinctUntilChanged()
 }

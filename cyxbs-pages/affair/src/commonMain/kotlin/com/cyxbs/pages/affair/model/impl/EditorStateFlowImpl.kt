@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class EditorStateFlowImpl<Value>(
   valueFlow: MutableStateFlow<Value>,
   valueByEditorFlow: MutableSharedFlow<Value> = MutableSharedFlow(
-    extraBufferCapacity = 1,
+    replay = 1,
     onBufferOverflow = BufferOverflow.DROP_OLDEST,
   ),
 ) : EditorStateFlow<Value>(
