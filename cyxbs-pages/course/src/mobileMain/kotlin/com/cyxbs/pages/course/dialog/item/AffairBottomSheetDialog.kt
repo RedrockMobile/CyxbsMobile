@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -82,8 +81,9 @@ import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
+import com.cyxbs.pages.course.dialog.item.affair.AffairEditCompose
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditWeekText
-import com.cyxbs.pages.course.dialog.item.affair.AffairWeekAndTimeCompose
+import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose
 import com.cyxbs.pages.course.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
@@ -160,6 +160,12 @@ class AffairBottomSheetDialogState(
       override val content: String
         get() = editor.idModelEditor.content
 
+      // 编辑状态
+      val editState = mutableStateOf(EditState.EditBasic)
+
+      // 编辑时间段
+      val editTimePair = mutableStateOf<AffairWhatTimeModelEditor?>(null)
+
       // 原始数据
       private val originModel: AffairDateModel = editor.dateModel
 
@@ -198,6 +204,10 @@ class AffairBottomSheetDialogState(
         }.getOrNull()
       }
     }
+
+    enum class EditState {
+      EditBasic, EditTime
+    }
   }
 }
 
@@ -210,25 +220,16 @@ fun AffairBottomSheetDialog(
   Column(
     modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
   ) {
-    EditTitleWithBtn(courseBottomSheetDialogState, affairBottomSheetDialogState)
-    val currentForm = affairBottomSheetDialogState.currentFormState.value
-    if (currentForm is CurrentForm.Edit && currentForm.isInEditTime.value) {
-      AffairModifyTime(
-        modifier = Modifier.padding(top = 8.dp),
-        courseState = courseBottomSheetDialogState,
+    when (val currentForm = affairBottomSheetDialogState.currentFormState.value) {
+      is CurrentForm.Show -> AffairShowCompose(
         currentForm = currentForm,
-      )
-    } else {
-      AffairWeekAndTimeCompose(
-        modifier = Modifier.padding(top = 8.dp),
         courseState = courseBottomSheetDialogState,
         affairState = affairBottomSheetDialogState,
       )
-      AffairContentEditor(
-        modifier = Modifier.padding(top = 8.dp).onGloballyPositioned {
-          courseBottomSheetDialogState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
-        },
-        affairState = affairBottomSheetDialogState
+      is CurrentForm.Edit -> AffairEditCompose(
+        currentForm = currentForm,
+        courseState = courseBottomSheetDialogState,
+        affairState = affairBottomSheetDialogState,
       )
     }
   }

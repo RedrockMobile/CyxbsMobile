@@ -40,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -76,14 +77,14 @@ class MobileCourseAffairItem(
     // 观察事务时间更新
     combine(
       SchoolCalendar.observeFirstMonDay(),
-      affairDateModel.whatTime.mergeFlow,
+      affairDateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
       affairDateModel.date.mergeFlow
-    ) { firstDate, whatTimeModel, date ->
+    ) { firstDate, timePair, date ->
       affairWhatTime.now.value = CourseItemWhatTime.Fixed(
         page = firstDate.daysUntil(date) / 7 + 1,
         dayOfWeek = date.dayOfWeek,
-        beginTime = whatTimeModel.timePair.value.first,
-        finalTime = whatTimeModel.timePair.value.second,
+        beginTime = timePair.first,
+        finalTime = timePair.second,
       )
     }.launchIn(coroutineScope)
   }

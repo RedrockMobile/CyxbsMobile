@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -25,7 +26,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -79,7 +80,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -125,7 +125,7 @@ class CourseItemBottomSheetDialogState {
   val currentPageItemFlow: MutableStateFlow<CourseItemBottomSheetDialogExtension?> =
     MutableStateFlow(null)
 
-  // 键盘弹出时需要漏出的位置
+  // 键盘弹出时需要漏出的位置，0 的话视为完全顶起
   val imePeekLayoutInWindowBottomFlow = MutableStateFlow(0F)
 
   fun showDialog(extension: CourseItemBottomSheetDialogExtension) {
@@ -211,11 +211,13 @@ private fun MobileCourseBottomSheetDialog(
 /**
  * @param overlapHeight 键盘最终状态与布局重叠的高度
  */
+@Composable
 private fun Modifier.imePadding(
   overlapHeight: IntState,
   onFraction: ((fraction: Float, imeOffset: Float) -> Unit)? = null
 ): Modifier {
-  return layout { measure, constraints ->
+  return if (overlapHeight.intValue == 0) imePadding()
+  else layout { measure, constraints ->
     val placeable = measure.measure(constraints)
     layout(placeable.width, placeable.height) {
       val ime = WindowInsetsRulers.Ime
@@ -266,11 +268,12 @@ private fun OffsetScroll(
     layoutCoordinatesFlow.filterNotNull().map {
       it.positionInWindow().y
     }.combine(
-      state.currentPageItemFlow.filterNotNull().map {
-        it.itemState.observeItemRectInWindow().first()
-          // 这里需要减去 margin 转换为初始坐标，在被重叠的 item 显示时有用
-          .translate(0F, marginBottomState.getOrElse(marginBottomKey) { 0 }.toFloat())
-      }
+      state.currentPageItemFlow.filterNotNull()
+        .map {
+          it.itemState.observeItemRectInWindow(true).first() // 这里只获取一次，调用 refreshScrollOffset 以触发刷新
+            // 这里需要减去 margin 转换为初始坐标，在被重叠的 item 显示时有用
+            .translate(0F, marginBottomState.getOrElse(marginBottomKey) { 0 }.toFloat())
+        }
     ) { layoutOffsetInWindow, itemRectInWindow ->
       itemRectInWindow.bottom - layoutOffsetInWindow
     }.collectLatest {
@@ -372,7 +375,8 @@ private fun BottomSheet(
     }.flatMapLatest { outerLayoutCoordinates ->
       // 使用 layoutCoordinatesFlow 会少一个导航栏的高度
       state.imePeekLayoutInWindowBottomFlow.map {
-        outerLayoutCoordinates.positionInWindow().y + outerLayoutCoordinates.size.height - it
+        if (it == 0F) 0F // 对于 0 我们特殊处理，认为 ime 应该完全顶起，重叠高度为 0
+        else outerLayoutCoordinates.positionInWindow().y + outerLayoutCoordinates.size.height - it
       }
     }.collect {
       imeOverlapHeight.intValue = it.roundToInt()
@@ -387,23 +391,23 @@ private fun ShowBeginFinalTime(
   val alphaState = rememberDerivedStateOfStructure {
     state.bottomSheetState.fraction.coerceIn(0F, 1F)
   }
-  val time1 = remember {
-    mutableStateOf(
-      state.currentPageItemFlow.value?.itemState?.item?.whatTime?.beginTime
-        ?: MinuteTime(0, 0)
-    )
+
+  val time1 = produceState(MinuteTime(0, 0)) {
+    state.currentPageItemFlow.filterNotNull().flatMapLatest {
+      it.itemState.item.whatTime.now
+    }.collect {
+      value = it.beginTime
+    }
   }
-  val time2 = remember {
-    mutableStateOf(
-      state.currentPageItemFlow.value?.itemState?.item?.whatTime?.finalTime
-        ?: MinuteTime(0, 0)
-    )
+  val time2 = produceState(MinuteTime(0, 0)) {
+    state.currentPageItemFlow.filterNotNull().flatMapLatest {
+      it.itemState.item.whatTime.now
+    }.collect {
+      value = it.finalTime
+    }
   }
   val itemRectState = remember {
-    state.currentPageItemFlow.mapNotNull { it?.itemState }.onEach {
-      time1.value = it.item.whatTime.now.value.beginTime
-      time2.value = it.item.whatTime.now.value.finalTime
-    }.flatMapLatest { itemState ->
+    state.currentPageItemFlow.mapNotNull { it?.itemState }.flatMapLatest { itemState ->
       itemState.observeItemRectInWindow()
     }
   }.collectAsState(null)

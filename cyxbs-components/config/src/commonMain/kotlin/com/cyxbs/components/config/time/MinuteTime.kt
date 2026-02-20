@@ -108,6 +108,10 @@ value class MinuteTimePair(val value: Long) {
   val second: MinuteTime
     get() = MinuteTime(value.toInt())
 
+  fun durationMinute(): Int {
+    return first.minutesUntil(second)
+  }
+
   override fun toString(): String {
     return "$first-$second"
   }

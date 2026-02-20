@@ -53,7 +53,7 @@ internal fun AffairEditWeekText(
   dateState: MutableState<Date>,
   weekNumIsError: MutableState<Boolean>,
   dayOfWeekIsError: MutableState<Boolean>,
-  readOnly: Boolean,
+  readOnly: Boolean = false,
   fontSize: TextUnit = 13.sp,
   color: Color = LocalAppColors.current.tvLv2,
   weekNumDayOfWeekPadding: Dp = 8.dp,

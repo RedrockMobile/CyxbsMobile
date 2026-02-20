@@ -102,10 +102,11 @@ private fun calculateIndex(itemState: CourseItemState, timeline: CourseTimeline)
 /**
  * 获取 item 在屏幕中的坐标
  * 会跟随 item 的位置移动而实时改变
+ * @param forceCalculate 是否强制实时计算 item 的坐标位置，一般用于当前 item 还未完全变成对应时间的情况
  */
-fun CourseItemState.observeItemRectInWindow(): Flow<Rect> {
+fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Flow<Rect> {
   return layoutCoordinatesFlow.flatMapLatest { itemCoordinates ->
-    if (itemCoordinates != null && itemCoordinates.isAttached) {
+    if (itemCoordinates != null && itemCoordinates.isAttached && !forceCalculate) {
       flowOf(Rect(itemCoordinates.positionInWindow(), itemCoordinates.size.toSize()))
     } else {
       // 此时 item 可能已经不可见，比如被上方重叠的 item 遮挡完了

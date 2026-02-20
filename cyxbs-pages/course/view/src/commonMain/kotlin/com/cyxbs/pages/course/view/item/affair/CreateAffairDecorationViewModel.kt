@@ -45,6 +45,7 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchedItem
 import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.TouchingItem
 import com.cyxbs.pages.course.view.item.drawBeginFinalTimeline
@@ -73,6 +74,10 @@ import kotlin.math.roundToInt
  */
 @Stable
 class CreateAffairDecorationViewModel : BaseViewModel(), CoursePageDecoration {
+
+  companion object {
+    val MIN_MINUTE_INTERVAL = 20 // 最小分钟间隔
+  }
 
   @Composable
   override fun CoursePageContent() {
@@ -363,12 +368,12 @@ private fun Modifier.pointerInputCreateItem(
                   end = maxOf(item.initTime, nowTime),
                 )
                 touchedItems.add(touchedItem)
-                if (abs(item.initTime.minutesUntil(nowTime)) < 10) {
-                  // 暂定小于 10 分钟的事务不支持
+                if (abs(item.initTime.minutesUntil(nowTime)) < MIN_MINUTE_INTERVAL) {
+                  // 暂定小于 MIN_MINUTE_INTERVAL 分钟的事务不支持
                   launch { touchedItem.clear() }.invokeOnCompletion {
                     touchedItems.remove(touchedItem)
                   }
-                  toast("不支持创建小于 10 分钟的事务")
+                  toast("不支持创建小于 $MIN_MINUTE_INTERVAL 分钟的事务")
                 }
               }
             }
