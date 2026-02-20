@@ -6,6 +6,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -75,9 +76,9 @@ interface AffairIdModel {
   val localId: String
   // 后端 id，如果 = 0，则说明是本地临时事务
   val remoteId: StateFlow<Int>
-  val remindTime: EditorStateFlow<AffairIdModelEditor, Int>
-  val title: EditorStateFlow<AffairIdModelEditor, String>
-  val content: EditorStateFlow<AffairIdModelEditor, String>
+  val remindTime: EditorStateFlow<Int>
+  val title: EditorStateFlow<String>
+  val content: EditorStateFlow<String>
 
   val whatTimeDate: StateFlow<ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
 
@@ -93,25 +94,25 @@ interface AffairIdModel {
 // 其下包含多个日期 AffairItemModel
 interface AffairWhatTimeModel {
   // 返回 false 时表示该 AffairWhatTimeModel 已经被删除
-  val enable: EditorStateFlow<AffairWhatTimeModelEditor, Boolean>
+  val enable: EditorStateFlow<Boolean>
 
   val idModel: AffairIdModel
 
-  val timePair: EditorStateFlow<AffairWhatTimeModelEditor, MinuteTimePair>
+  val timePair: EditorStateFlow<MinuteTimePair>
 }
 
 // 事务日期，作为整个事务的叶子结点
 // 其对象在整个应用生命周期内不会改变，可用于绑定 Compose 结点
 interface AffairDateModel {
   // 返回 false 时表示该 AffairLeafModel 已经被删除
-  val enable: EditorStateFlow<AffairDateModelEditor, Boolean>
+  val enable: EditorStateFlow<Boolean>
 
   val idModel: AffairIdModel
 
   // whatTime 是可能会发生改变的，例如从原先的 whatTimeList 中分裂出新的 whatTime
-  val whatTime: EditorStateFlow<AffairDateModelEditor, AffairWhatTimeModel>
+  val whatTime: EditorStateFlow<AffairWhatTimeModel>
 
-  val date: EditorStateFlow<AffairDateModelEditor, Date>
+  val date: EditorStateFlow<Date>
 }
 
 //////////////////////////////////////// Editor ////////////////////////////////////////
@@ -180,9 +181,9 @@ interface AffairDateModelEditor {
 }
 
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
-abstract class EditorStateFlow<Editor, Value>(
+abstract class EditorStateFlow<Value>(
   val valueFlow: StateFlow<Value>,
-  val valueByEditorFlow: Flow<Pair<Editor, Value>>
+  val valueByEditorFlow: Flow<Value>,
 ) : StateFlow<Value> by valueFlow {
-  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it.second })
+  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it })
 }

@@ -65,21 +65,21 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return "提交修改后不可再修改"
     if (remindTime < 0) return "remindTime 不能小于 0"
     this.remindTime = remindTime
-    idModel.remindTime.valueByEditorStateFlow.tryEmit(this to remindTime)
+    idModel.remindTime.valueByEditorStateFlow.tryEmit(remindTime)
     return null
   }
 
   override fun setTitle(title: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
     this.title = title
-    idModel.title.valueByEditorStateFlow.tryEmit(this to title)
+    idModel.title.valueByEditorStateFlow.tryEmit(title)
     return null
   }
 
   override fun setContent(content: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
     this.content = content
-    idModel.content.valueByEditorStateFlow.tryEmit(this to content)
+    idModel.content.valueByEditorStateFlow.tryEmit(content)
     return null
   }
 
@@ -106,7 +106,7 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       if (whatTimeDate.contains(whatTime)) {
         whatTime.clear()
-        whatTime.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(whatTime to false)
+        whatTime.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         whatTimeDate.remove(whatTime)
         if (!incrementAddList.remove(whatTime)) {
           incrementRemoveList.add(whatTime)
@@ -122,7 +122,7 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       whatTimeDate.keys.forEach {
         it.clear()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         incrementRemoveList.add(it)
       }
       incrementRemoveList.removeAll(incrementAddList)
@@ -139,13 +139,13 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       incrementAddList.forEach {
         it.reset()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         whatTimeDate.remove(it)
       }
       incrementAddList.clear()
       incrementRemoveList.forEach {
         whatTimeDate[it] = mutableListOf()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to true)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(true)
       }
       incrementRemoveList.clear()
       whatTimeDate.keys.forEach {

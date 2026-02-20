@@ -26,7 +26,7 @@ class AffairDateModelEditorImpl(
       return "该日期已存在"
     }
     this.date = date
-    dateModel.date.valueByEditorStateFlow.tryEmit(this to date)
+    dateModel.date.valueByEditorStateFlow.tryEmit(date)
     return null
   }
 

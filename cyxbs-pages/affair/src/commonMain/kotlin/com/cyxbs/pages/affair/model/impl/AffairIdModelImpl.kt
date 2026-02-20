@@ -31,15 +31,15 @@ class AffairIdModelImpl(
     get() = entity.localId
 
   override val remoteId: MutableStateFlow<Int> = MutableStateFlow(entity.remoteId)
-  override val remindTime: EditorStateFlowImpl<AffairIdModelEditor, Int> =
+  override val remindTime: EditorStateFlowImpl<Int> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.remindTime),
     )
-  override val title: EditorStateFlowImpl<AffairIdModelEditor, String> =
+  override val title: EditorStateFlowImpl<String> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.title),
     )
-  override val content: EditorStateFlowImpl<AffairIdModelEditor, String> =
+  override val content: EditorStateFlowImpl<String> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.content),
     )

@@ -17,11 +17,11 @@ class AffairWhatTimeModelImpl(
   override val idModel: AffairIdModel,
   timePair: MinuteTimePair,
 ) : AffairWhatTimeModel {
-  override val enable: EditorStateFlowImpl<AffairWhatTimeModelEditor, Boolean> =
+  override val enable: EditorStateFlowImpl<Boolean> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(true)
     )
-  override val timePair: EditorStateFlowImpl<AffairWhatTimeModelEditor, MinuteTimePair> =
+  override val timePair: EditorStateFlowImpl<MinuteTimePair> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(timePair),
     )

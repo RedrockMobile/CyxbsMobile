@@ -13,13 +13,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * @author 985892345
  * @date 2025/10/1
  */
-class EditorStateFlowImpl<Editor, Value>(
+class EditorStateFlowImpl<Value>(
   valueFlow: MutableStateFlow<Value>,
-  valueByEditorFlow: MutableSharedFlow<Pair<Editor, Value>> = MutableSharedFlow(
+  valueByEditorFlow: MutableSharedFlow<Value> = MutableSharedFlow(
     extraBufferCapacity = 1,
     onBufferOverflow = BufferOverflow.DROP_OLDEST,
   ),
-) : EditorStateFlow<Editor, Value>(
+) : EditorStateFlow<Value>(
   valueFlow,
   valueByEditorFlow.debounce(10.milliseconds)
 ) {
