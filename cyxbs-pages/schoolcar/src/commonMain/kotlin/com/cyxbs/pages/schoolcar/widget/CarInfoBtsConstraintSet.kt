@@ -24,7 +24,10 @@ enum class CarInfoBtsElement {
 	//站点模式特有元素
 	SiteName,
 	SiteList,
-	SwitchLineButton
+	SwitchLineButton,
+
+	// Empty模式时的提示
+	ErrorInfo
 }
 
 
@@ -42,7 +45,7 @@ class CarInfoBtsConstraintSet(
 	val siteList = scope.createRefFor(CarInfoBtsElement.SiteList)
 	val switchLineButton = scope.createRefFor(CarInfoBtsElement.SwitchLineButton)
 	val routeList = scope.createRefFor(CarInfoBtsElement.RouteList)
-
+	val errorInfo = scope.createRefFor(CarInfoBtsElement.ErrorInfo)
 
 	fun createConstrain() {
 		// 后续可根据这个进行适配
@@ -58,7 +61,10 @@ class CarInfoBtsConstraintSet(
 private fun CarInfoBtsConstraintSet.wh100vInfinity() {
 	wh100vInfinityCommonConstraints()
 	when (displayMode) {
-		CarInfoBtsDisplayMode.Empty -> {}
+		CarInfoBtsDisplayMode.Empty -> {
+			wh100vInfinityEmptyMode()
+		}
+
 		is CarInfoBtsDisplayMode.LineOverview -> wh100vInfinityLineMode()
 		is CarInfoBtsDisplayMode.SiteOverView -> wh100vInfinitySiteMode()
 	}
@@ -97,6 +103,17 @@ private fun CarInfoBtsConstraintSet.wh100vInfinityLineMode() {
 		constrain(lineTypeTags) {
 			end.linkTo(parent.end, 16.dp)
 			top.linkTo(lineRunTime.bottom, 8.dp)
+		}
+	}
+}
+
+
+// 竖屏的空内容模式
+private fun CarInfoBtsConstraintSet.wh100vInfinityEmptyMode() {
+	with(scope) {
+		constrain(errorInfo) {
+			linkTo(lineSelector.bottom, parent.bottom)
+			linkTo(parent.start, parent.end)
 		}
 	}
 }

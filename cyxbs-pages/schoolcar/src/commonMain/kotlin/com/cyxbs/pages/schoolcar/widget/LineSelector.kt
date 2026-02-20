@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.utils.compose.dark
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_0
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -29,12 +31,22 @@ import org.jetbrains.compose.resources.painterResource
  * date : 2026/2/19 18:37
  */
 @Stable
-data class LineSelectorItem(
-	val id: Int,
-	val name: String,
-	val unSelectRes: DrawableResource,
-	val selectRes: DrawableResource
-)
+sealed interface LineSelectorItem {
+	val id: Int
+
+	data class LineSelectorItemLine(
+		override val id: Int,
+		val name: String,
+		val unSelectRes: DrawableResource,
+		val selectRes: DrawableResource
+	) : LineSelectorItem
+
+	object Guide : LineSelectorItem {
+		override val id: Int
+			get() = -1
+
+	}
+}
 
 // 线路选择器
 @Composable
@@ -44,21 +56,23 @@ fun LineSelectorCompose(
 	selectedId: Int?,
 	onClick: (LineSelectorItem) -> Unit
 ) {
-
-	LazyRow(
-		modifier = modifier.padding(top = 16.dp, bottom = 12.dp),
-		contentPadding = PaddingValues(horizontal = 16.dp),
-		horizontalArrangement = Arrangement.spacedBy(39.dp)
-	) {
-		items(items = list, key = { it.id }) {
-			LineSelectorItemCompose(
-				isSelect = it.id == selectedId,
-				item = it,
-				onClick = onClick
-			)
+	Column(modifier) {
+		LazyRow(
+			modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+			contentPadding = PaddingValues(horizontal = 16.dp),
+			horizontalArrangement = Arrangement.spacedBy(39.dp)
+		) {
+			items(items = list, key = { it.id }) {
+				LineSelectorItemCompose(
+					isSelect = (it is LineSelectorItem.LineSelectorItemLine) && (it.id == selectedId),
+					item = it,
+					onClick = onClick
+				)
+			}
 		}
+		Spacer(modifier = Modifier.fillMaxWidth().background(0x17F2F3F8.dark(0x67676733)))
 	}
-	Spacer(modifier = Modifier.fillMaxWidth().background(0x17F2F3F8.dark(0x67676733)))
+
 }
 
 
@@ -69,6 +83,25 @@ fun LineSelectorItemCompose(
 	onClick: (LineSelectorItem) -> Unit,
 	modifier: Modifier = Modifier
 ) {
+	val textColor = if (isSelect) {
+		0xFF4A44E4.dark(0xFF5852FF)
+	} else {
+		0xFF94A6C4.dark(0xFFB1B1B2)
+	}
+	val iconRes: DrawableResource
+	val name: String
+
+	when (item) {
+		is LineSelectorItem.LineSelectorItemLine -> {
+			iconRes = if (isSelect) item.selectRes else item.unSelectRes
+			name = item.name
+		}
+
+		is LineSelectorItem.Guide -> {
+			iconRes = Res.drawable.schoolcar_ic_car_icon_0
+			name = "乘车指南"
+		}
+	}
 
 	Column(
 		modifier = modifier.clickable {
@@ -77,18 +110,14 @@ fun LineSelectorItemCompose(
 		horizontalAlignment = Alignment.CenterHorizontally
 	) {
 		Image(
-			painter = painterResource(if (isSelect) item.selectRes else item.unSelectRes),
+			painter = painterResource(iconRes),
 			contentDescription = null
 		)
 		Text(
 			modifier = Modifier.padding(top = 6.dp),
-			text = item.name,
+			text = name,
 			fontSize = 10.sp,
-			color = if (isSelect) {
-				0xFF4A44E4.dark(0xFF5852FF)
-			} else {
-				0xFF94A6C4.dark(0xFFB1B1B2)
-			}
+			color = textColor
 		)
 	}
 }

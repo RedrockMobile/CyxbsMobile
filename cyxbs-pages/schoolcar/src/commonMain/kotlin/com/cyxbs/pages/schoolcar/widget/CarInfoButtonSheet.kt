@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,8 @@ import org.jetbrains.compose.resources.painterResource
 fun CarInfoButtonSheet() {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	val selectedId by viewModel.selectedLineId
+	val selectedSiteId by viewModel.selectedStationId
+
 	val list by viewModel.lineSelectorItem
 	Box {
 		BottomSheetCompose(
@@ -63,6 +67,8 @@ fun CarInfoButtonSheet() {
 			ConstraintLayout(
 				modifier = Modifier
 					.then(bottomSheetDraggable())
+					// 给一个最小高度，不然如果内容为空的话bts内容高度不足会导致锚点计算失败
+					.heightIn(min = 140.dp)
 					.shadow(
 						elevation = 10.dp,
 						shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
@@ -83,7 +89,10 @@ fun CarInfoButtonSheet() {
 				)
 				val mode = viewModel.displayMode.value
 				when (mode) {
-					is CarInfoBtsDisplayMode.Empty -> {}
+					is CarInfoBtsDisplayMode.Empty -> {
+						ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
+					}
+
 					is CarInfoBtsDisplayMode.LineOverview -> {
 						TittleCompose(
 							mode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
@@ -123,10 +132,24 @@ fun CarInfoButtonSheet() {
 			}
 		}
 	}
-	LaunchedEffect(selectedId) {
-		viewModel.bottomSheetState.expand()
-	}
 
+	// 选择线路/选择站点的时候自动展开
+	LaunchedEffect(selectedId, selectedSiteId) {
+		if (selectedId != -1 || selectedSiteId != null) {
+			viewModel.bottomSheetState.expand()
+		}
+	}
+}
+
+@Composable
+fun ErrorInfoCompose(modifier: Modifier = Modifier) {
+	Text(
+		modifier = modifier,
+		text = SchoolCarViewModel.NETWORK_ERROR_INFO,
+		fontSize = 22.sp,
+		fontWeight = FontWeight.Bold,
+		color = 0xFF112C54.dark(0xFFF0F0F2)
+	)
 }
 
 @Composable

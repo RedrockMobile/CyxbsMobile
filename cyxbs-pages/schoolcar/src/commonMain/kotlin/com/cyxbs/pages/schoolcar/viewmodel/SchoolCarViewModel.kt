@@ -5,18 +5,15 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
-import com.cyxbs.pages.schoolcar.ui.SchoolCarDetailNavArgument
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode
 import com.cyxbs.pages.schoolcar.widget.LineSelectorItem
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_0
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1_select
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_2
@@ -43,13 +40,17 @@ class SchoolCarViewModel : BaseViewModel() {
 	}
 
 	// 数据源
-	private val carLineInfo: MutableState<CarLineJson?> = mutableStateOf(null)
+	val carLineInfo: MutableState<CarLineJson?> = mutableStateOf(null)
 
+	// 校车轨迹的页面状态，0表示地图页，1表示乘车指南页
+	val schoolCarPage = mutableStateOf(0)
 
 	//====================== 底部bottomSheetState的相关状态====================
-	val bottomSheetState = BottomSheetState(hideable = false)
+	val bottomSheetState by lazy {
+		BottomSheetState()
+	}
 
-	// 底部导航栏的线路选择器
+	// 底部导航栏的线路选择器的列表
 	val lineSelectorItem = derivedStateOf {
 		generateSelectorList(carLineInfo.value)
 	}
@@ -59,12 +60,6 @@ class SchoolCarViewModel : BaseViewModel() {
 
 	// 选中的站点 ID
 	val selectedStationId: MutableState<Int?> = mutableStateOf(null)
-
-
-	// 当前选中的线路
-	val currentSelectLine = derivedStateOf {
-		lineSelectorItem.value.firstOrNull { it.id == selectedLineId.value }
-	}
 
 	val displayMode = derivedStateOf {
 		val info = carLineInfo.value ?: return@derivedStateOf CarInfoBtsDisplayMode.Empty
@@ -114,7 +109,7 @@ class SchoolCarViewModel : BaseViewModel() {
 
 		info.lines.forEach { line ->
 			list.add(
-				LineSelectorItem(
+				LineSelectorItem.LineSelectorItemLine(
 					id = line.id,
 					name = line.name,
 					unSelectRes = getUnselectIconResource(line.id),
@@ -124,15 +119,7 @@ class SchoolCarViewModel : BaseViewModel() {
 		}
 
 		// 添加乘车指南
-		val guideId = -1
-		list.add(
-			LineSelectorItem(
-				id = guideId,
-				name = "乘车指南",
-				unSelectRes = Res.drawable.schoolcar_ic_car_icon_0,
-				selectRes = Res.drawable.schoolcar_ic_car_icon_0
-			)
-		)
+		list.add(LineSelectorItem.Guide)
 		return list
 	}
 
@@ -171,14 +158,28 @@ class SchoolCarViewModel : BaseViewModel() {
 	// 切换底部表单的选中项
 	fun toggleSelectLine(line: LineSelectorItem) {
 		if (line.id == -1) {
-			MainNavController.navigate(SchoolCarDetailNavArgument)
+			schoolCarPage.value = 1
 			return
 		}
 		selectedLineId.value = line.id
 	}
 
+	// 从乘车指南页返回
+	fun backFromDetail() {
+		schoolCarPage.value = 0
+	}
+
 	fun toggleCurrentLine(availableLine: List<CarLine>) {
-		selectedLineId.value = (selectedLineId.value!! + 1) / availableLine.size
+		val currentId = selectedLineId.value ?: return
+		// 1. 找到当前线路在可用列表中的索引
+		val currentIndex = availableLine.indexOfFirst { it.id == currentId }
+		if (currentIndex == -1) return
+
+		// 2. 计算下一个索引（取模实现循环）
+		val nextIndex = (currentIndex + 1) % availableLine.size
+
+		// 3. 取出对应的 ID
+		selectedLineId.value = availableLine[nextIndex].id
 	}
 
 

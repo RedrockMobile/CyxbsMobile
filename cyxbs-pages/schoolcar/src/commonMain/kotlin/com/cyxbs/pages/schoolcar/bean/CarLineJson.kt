@@ -1,4 +1,5 @@
 package com.cyxbs.pages.schoolcar.bean
+import androidx.compose.runtime.Stable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -9,6 +10,7 @@ import kotlinx.serialization.Serializable
  * email : qq2420226433@outlook.com
  *  * date : 2026/2/18 22:31
  *  */
+@Stable
 @Serializable
 data class CarLineJson(
 	@SerialName("bus_info_version")

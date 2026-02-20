@@ -58,7 +58,7 @@ fun RouteListCompose(modifier: Modifier = Modifier, siteId: Int = -1, line: CarL
 		itemsIndexed(items = line.stations, key = { index, item ->
 			item.id
 		}) { index, item ->
-			val textColor = getTextColor(index, selectIndex, lineId)
+			val textColor = getTextColorByLine(index, selectIndex, lineId)
 
 			// tips：这里顺序不能换，一定是先起点，再终点，再选中的站点，最后再是common
 			when (index) {
@@ -73,7 +73,7 @@ fun RouteListCompose(modifier: Modifier = Modifier, siteId: Int = -1, line: CarL
 
 // 根据线路id生成对应的颜色
 @Composable
-private fun getTextColor(currentIndex: Int, selectIndex: Int, lineId: Int): Color {
+fun getTextColorByLine(currentIndex: Int, selectIndex: Int, lineId: Int): Color {
 	// 如果当前的item不是所选中的item，直接返回默认颜色
 	if (currentIndex != selectIndex) {
 		return 0xFF2A4E84.dark(0xFFB1B1B2)
@@ -111,3 +111,4 @@ fun RouteListItem(icon: RouteListIcon, site: CarStation, textColor: Color) {
 		)
 	}
 }
+
