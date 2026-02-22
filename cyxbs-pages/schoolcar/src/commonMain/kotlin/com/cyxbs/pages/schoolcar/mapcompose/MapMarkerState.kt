@@ -28,7 +28,6 @@ import org.jetbrains.compose.resources.DrawableResource
 @Stable
 data class MapMarkerState(
 	/*
-			mine -> 用户
 			car_1_1 -> 校车一号线第一辆
 			site_2 -> 2号站点
 	 */
@@ -61,14 +60,6 @@ sealed interface MarkerType {
 	) : MarkerType {
 		override val zIndex: Float
 			get() = 50f
-	}
-
-	// 用户
-	object Mine : MarkerType {
-		override val id: Int
-			get() = -1
-		override val zIndex: Float
-			get() = 100f
 	}
 }
 

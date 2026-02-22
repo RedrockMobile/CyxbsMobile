@@ -10,7 +10,7 @@ import androidx.compose.runtime.Stable
  */
 @Stable
 data class CameraState(
-	val lat: Double = 29.531876,
+	val lat: Double = 29.530040,
 	val lng: Double = 106.606789,
-	val zoom: Float = 17f
+	val zoom: Float = 16.05f
 )

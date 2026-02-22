@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schoolcar.mapcompose
 
 import android.content.Context
+import android.view.animation.LinearInterpolator
 import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.model.BitmapDescriptor
@@ -8,8 +9,9 @@ import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.Marker
 import com.amap.api.maps.model.MarkerOptions
+import com.amap.api.maps.model.animation.Animation
+import com.amap.api.maps.model.animation.ScaleAnimation
 import com.amap.api.maps.utils.overlay.MovingPointOverlay
-import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.R
 
 /**
@@ -22,15 +24,15 @@ import com.cyxbs.pages.schoolcar.R
 class AndroidSchoolCarMapRenderer(
 	private val context: Context,
 	private val aMap: AMap,
-	private val onEvent: (MapEvent) -> Unit
+	private val onEvent: (MapEvent) -> Unit,
 ) {
-	//ID to Marker
+	//UID to Marker
 	private val markerCache = mutableMapOf<String, Marker>()
 
-	//ID to car
+	//UID to car
 	private val movingOverlayCache = mutableMapOf<String, MovingPointOverlay>()
 
-	//ID  to markerState
+	//UID  to markerState
 	private val dataCache = mutableMapOf<String, MapMarkerState>()
 
 	private val backgroundCache = getMarkerBackGroundDescriptors()
@@ -40,8 +42,16 @@ class AndroidSchoolCarMapRenderer(
 	private val carCache = getCarMakerDescriptors()
 
 
-	private val mineCache =
-		BitmapDescriptorFactory.fromBitmap(context.getBitmapBySvg(R.drawable.schoolcar_ic_my))
+	private var backgroundHighlightMarker: Marker? = null
+
+	private val highlightAnimate by lazy {
+		ScaleAnimation(0.8F, 1F, 0.8F, 1F).apply {
+			setInterpolator(LinearInterpolator())
+			setDuration(3000)
+			repeatMode = Animation.REVERSE
+			repeatCount = Animation.INFINITE
+		}
+	}
 
 	init {
 		setupListeners()
@@ -50,8 +60,8 @@ class AndroidSchoolCarMapRenderer(
 	private fun setupListeners() {
 		// 点击 Marker
 		aMap.setOnMarkerClickListener { marker ->
-			val uid = markerCache.entries.find { it.value == marker }?.key
-			val data = dataCache[uid]
+			val uid = marker.`object` as? String
+			val data = uid?.let { dataCache[it] }
 			if (data != null) {
 				onEvent(MapEvent.MarkerClick(data))
 			}
@@ -70,11 +80,23 @@ class AndroidSchoolCarMapRenderer(
 			LatLng(state.lat, state.lng),
 			state.zoom
 		)
-		aMap.animateCamera(update)
+		aMap.animateCamera(update, 400, null)
 	}
 
 	// 刷新
-	fun render(newList: List<MapMarkerState>, lineId: Int?) {
+	// 根据MarkerList + currentLineId + 高亮背景站点id来刷新地图marker显示
+	fun render(
+		newList: List<MapMarkerState>,
+		currentLineId: Int?,
+		highlightStationId: Int?
+	) {
+		val safeLineId = currentLineId ?: -1
+		backgroundHighlightMarker?.let { bgMarker ->
+			if (bgMarker.isVisible) {
+				val resIndex = (safeLineId + 1).takeIf { it in backgroundCache.indices } ?: 1
+				bgMarker.setIcon(backgroundCache[resIndex])
+			}
+		}
 		val newUids = newList.map { it.uid }.toSet()
 		val currentUids = markerCache.keys.toSet()
 
@@ -84,21 +106,31 @@ class AndroidSchoolCarMapRenderer(
 
 		newList.forEach { item ->
 			if (markerCache.containsKey(item.uid)) {
-				updateMarker(item, lineId) // 如果已经在marker中了，则更新marker
+				updateMarker(item, safeLineId) // 如果已经在marker中了，则更新marker
 			} else {
-				addMarker(item, lineId) // 没有的话就添加
+				addMarker(item, safeLineId) // 没有的话就添加
 			}
 
 			dataCache[item.uid] = item
 		}
+		if (highlightStationId != null) {
+			val targetUid = "site_$highlightStationId"
+			val targetData = newList.find { it.uid == targetUid }
+			if (targetData != null) {
+				showBackgroundForSite(targetData, safeLineId)
+			} else {
+				hideBackground()
+			}
+		} else {
+			hideBackground()
+		}
 	}
 
-	private fun addMarker(item: MapMarkerState, lineId: Int?) {
+	private fun addMarker(item: MapMarkerState, currentLineId: Int) {
 		val latLng = LatLng(item.lat, item.lng)
 
-		val safeLineId = lineId ?: -1 // 未选择线路的话id 为 -1， 1号线id 为 0
 
-		val res = calculateResId(item, safeLineId)
+		val res = calculateRes(item, currentLineId)
 
 		val options = MarkerOptions()
 			.position(latLng)
@@ -108,6 +140,7 @@ class AndroidSchoolCarMapRenderer(
 			.visible(item.visible)
 
 		val marker = aMap.addMarker(options) ?: return
+		marker.`object` = item.uid
 		markerCache[item.uid] = marker
 
 		// 如果不是站点，创建平滑移动层
@@ -117,8 +150,7 @@ class AndroidSchoolCarMapRenderer(
 		}
 	}
 
-	private fun updateMarker(newItem: MapMarkerState, lineId: Int?) {
-		log("HIIR", lineId.toString())
+	private fun updateMarker(newItem: MapMarkerState, currentLineId: Int) {
 		val marker = markerCache[newItem.uid] ?: return
 		val newLatLng = LatLng(newItem.lat, newItem.lng)
 		marker.isVisible = newItem.visible
@@ -126,8 +158,7 @@ class AndroidSchoolCarMapRenderer(
 
 		// 如果多了线路，但没有添加新的线路资源，默认用一号线的资源
 		if (newItem.type is MarkerType.Site) {
-			val safeLineId = lineId ?: -1
-			val res = calculateResId(newItem, safeLineId)
+			val res = calculateRes(newItem, currentLineId)
 			marker.setIcon(res)
 		}
 		if (marker.position == newLatLng) return
@@ -139,7 +170,7 @@ class AndroidSchoolCarMapRenderer(
 			overlay.stopMove()
 			val currentPos = overlay.position ?: marker.position
 			overlay.setPoints(listOf(currentPos, newLatLng))
-			val duration = if (newItem.type is MarkerType.Mine) 2 else 3
+			val duration = 3
 			overlay.setTotalDuration(duration)
 			overlay.startSmoothMove()
 			if (newItem.rotation != 0f) {
@@ -168,8 +199,8 @@ class AndroidSchoolCarMapRenderer(
 		backgroundCache.forEach { it.recycle() }
 		siteCache.forEach { it.recycle() }
 		carCache.forEach { it.recycle() }
-		mineCache.recycle()
 
+		backgroundHighlightMarker?.remove()
 	}
 
 
@@ -209,19 +240,48 @@ class AndroidSchoolCarMapRenderer(
 	}
 
 
-
-	private fun calculateResId(item: MapMarkerState, safeLineId: Int = -1): BitmapDescriptor {
+	private fun calculateRes(item: MapMarkerState, safeLineId: Int = -1): BitmapDescriptor {
 		return when (item.type) {
 			is MarkerType.Car -> {
 				val index = item.type.type.takeIf { it in carCache.indices } ?: 0
 				carCache[index]
 			}
-			is MarkerType.Mine -> mineCache
+
 			is MarkerType.Site -> {
 				val index = (safeLineId + 1).takeIf { it in siteCache.indices } ?: 1
 				siteCache[index]
 			}
 		}
 	}
+
+	private fun showBackgroundForSite(siteData: MapMarkerState?, currentLineId: Int) {
+		siteData ?: return
+		val resIndex = (currentLineId + 1).takeIf { it in backgroundCache.indices } ?: 1
+		val bgRes = backgroundCache[resIndex]
+		if (backgroundHighlightMarker == null) {
+			// 第一次点击，初始化这个唯一的背景 Marker
+			val options = MarkerOptions()
+				.position(LatLng(siteData.lat, siteData.lng))
+				.icon(bgRes)
+				.anchor(0.5f, 0.5f)
+				.zIndex(40f)
+				.visible(true)
+			backgroundHighlightMarker = aMap.addMarker(options)
+			backgroundHighlightMarker?.setAnimation(highlightAnimate)
+		} else {
+			// 已经存在，直接瞬间移动过去并更新配置
+			backgroundHighlightMarker?.apply {
+				position = LatLng(siteData.lat, siteData.lng)
+				setIcon(bgRes)
+				isVisible = true
+				startAnimation()
+			}
+		}
+	}
+
+	fun hideBackground() {
+		backgroundHighlightMarker?.isVisible = false
+	}
+
 }
 

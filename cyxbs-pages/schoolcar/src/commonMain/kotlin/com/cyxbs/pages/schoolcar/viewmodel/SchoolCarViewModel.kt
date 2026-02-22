@@ -15,6 +15,7 @@ import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
 import com.cyxbs.pages.schoolcar.mapcompose.CameraState
+import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.MarkerType
 import com.cyxbs.pages.schoolcar.model.CarDataModel
@@ -100,8 +101,6 @@ class SchoolCarViewModel : BaseViewModel() {
 				)
 			}
 		}
-
-
 		if (schoolCarPage.value == 0) {
 			_realtimeCarLocations.forEach { car ->
 				if (currentLId != null && car.type != currentLId) return@forEach
@@ -115,7 +114,6 @@ class SchoolCarViewModel : BaseViewModel() {
 				)
 			}
 		}
-
 		list
 	}
 
@@ -135,6 +133,7 @@ class SchoolCarViewModel : BaseViewModel() {
 	/**
 	 * 选中的线路Id!=null + selectedStationId!= null 则为站点模式
 	 * 选中的线路Id!=null + selectedStationId == null 则为线路模式
+	 * 关于模式的切换后面给了3个方法
 	 */
 	// 选中的线路 ID
 	val selectedLineId: MutableState<Int?> = mutableStateOf(null)
@@ -240,9 +239,12 @@ class SchoolCarViewModel : BaseViewModel() {
 			schoolCarPage.value = 1
 			return
 		}
+		if (line.id == selectedLineId.value) {
+			changeToEmptyMode()
+			return
+		}
 		// 恢复线路模式
-		selectedStationId.value = null
-		selectedLineId.value = line.id
+		changeToLineMode(line.id)
 	}
 
 	// 站点模式下切换线路
@@ -280,8 +282,18 @@ class SchoolCarViewModel : BaseViewModel() {
 	}
 
 	// 从地图返回
-	fun backFromMap() {
+	fun onMapEvent(event: MapEvent) {
+		when (event) {
+			is MapEvent.MapClick -> {
+				changeToEmptyMode()
+			}
 
+			is MapEvent.MarkerClick -> {
+				if (event.marker.type is MarkerType.Site) {
+					changeToSiteMode(event.marker.type.id, event.marker.lat, event.marker.lng)
+				}
+			}
+		}
 	}
 
 	private fun getUnselectIconResource(id: Int): DrawableResource {
@@ -323,4 +335,31 @@ class SchoolCarViewModel : BaseViewModel() {
 				}
 			}
 	}
+
+	private fun focusOnPoint(lat: Double, lng: Double) {
+		cameraState.value = CameraState(lat, lng, 17f)
+	}
+
+	private fun cameraRecover() {
+		cameraState.value = CameraState()
+	}
+
+	// 对显示模式切换的封装，用这来控制显示模式的切换，以防状态错误
+	private fun changeToLineMode(lineId: Int) {
+		selectedLineId.value = lineId
+		selectedStationId.value = null
+		cameraRecover()
+	}
+
+	private fun changeToSiteMode(siteId: Int, lat: Double, lng: Double) {
+		selectStation(siteId)
+		focusOnPoint(lat, lng)
+	}
+
+	private fun changeToEmptyMode(){
+		selectedLineId.value = null
+		selectedStationId.value = null
+		cameraRecover()
+	}
+
 }

@@ -99,7 +99,8 @@ fun SchoolCarPage() {
 		markers = viewModel.markers.value,
 		cameraState = viewModel.cameraState.value,
 		currentLine = viewModel.selectedLineId.value,
-		onEvent = {}
+		selectSiteId = viewModel.selectedStationId.value,
+		onEvent = viewModel::onMapEvent
 	)
 	CarInfoButtonSheet()
 	SchoolCarMapFunctionButtonCompose()

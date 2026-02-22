@@ -19,5 +19,6 @@ expect fun PlatformSchoolCarMapCompose(
 	markers: List<MapMarkerState>,
 	cameraState: CameraState,
 	currentLine: Int?,
+	selectSiteId: Int?,
 	onEvent: (MapEvent) -> Unit
 )
