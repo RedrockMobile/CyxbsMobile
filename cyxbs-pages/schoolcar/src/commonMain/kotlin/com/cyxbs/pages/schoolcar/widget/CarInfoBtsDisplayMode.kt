@@ -20,6 +20,9 @@ sealed class CarInfoBtsDisplayMode {
 		val availableLines: List<CarLine> // 所有可以达到该站点的线路
 	) : CarInfoBtsDisplayMode()
 
-	// 空状态（初始状态）
+	// 错误状态
+	object ErrorOverView : CarInfoBtsDisplayMode()
+
+	// 空状态: 当没有选择线路时显示的
 	object Empty : CarInfoBtsDisplayMode()
 }

@@ -11,12 +11,12 @@ import kotlinx.serialization.Serializable
  */
 
 @Serializable
-data class CarLocation(
+data class CarLocationJson(
 	// 默认空列表，防止 JSON 返回 null 导致奔溃
-	val data: List<CarData> = emptyList()
+	val data: List<CarLocation> = emptyList()
 )
 @Serializable
-data class CarData(
+data class CarLocation(
 
 	@SerialName("lat")
 	var lat: Double = 0.0,// 维度
@@ -25,10 +25,10 @@ data class CarData(
 	var lng: Double = 0.0, // 经度
 
 	@SerialName("id")
-	var id: Int = 0, // id
+	var id: Int = 0, // id 表示这是第几号车
 
 	@SerialName("type")
-	var type: Int = 0,
+	var type: Int = 0, // type + 1 为线路号
 
 	@SerialName("update_at")
 	var upDate: Long = 0L

@@ -1,7 +1,5 @@
 package com.cyxbs.pages.schoolcar.widget
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,13 +50,13 @@ fun CarInfoButtonSheet() {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	val selectedId by viewModel.selectedLineId
 	val selectedSiteId by viewModel.selectedStationId
-
+	val peekHeight by viewModel.peekHeight
 	val list by viewModel.lineSelectorItem
 	Box {
 		BottomSheetCompose(
 			modifier = Modifier.navigationBarsPadding(),
 			bottomSheetState = viewModel.bottomSheetState,
-			peekHeight = 94.dp,
+			peekHeight = peekHeight,
 			dismissOnBackPress = false,
 			dismissOnClickOutside = false,
 			scrimColor = Color.Transparent
@@ -75,9 +72,7 @@ fun CarInfoButtonSheet() {
 					)
 					.background(LocalAppColors.current.topBg)
 					.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-				animateChangesSpec = spring(
-					stiffness = Spring.StiffnessMediumLow
-				),
+
 				constraintSet = createConstraintSet(viewModel.displayMode.value)
 			) {
 				ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
@@ -89,7 +84,7 @@ fun CarInfoButtonSheet() {
 				)
 				val mode = viewModel.displayMode.value
 				when (mode) {
-					is CarInfoBtsDisplayMode.Empty -> {
+					is CarInfoBtsDisplayMode.ErrorOverView -> {
 						ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
 					}
 
@@ -124,10 +119,13 @@ fun CarInfoButtonSheet() {
 
 						LineChangeButtonCompose(
 							modifier = Modifier.layoutId(CarInfoBtsElement.SwitchLineButton),
+							lineName = mode.currentLine.name,
 							avaibleLines = mode.availableLines,
 							onClick = viewModel::toggleCurrentLine
 						)
 					}
+
+					is CarInfoBtsDisplayMode.Empty -> {}
 				}
 			}
 		}
@@ -155,15 +153,26 @@ fun ErrorInfoCompose(modifier: Modifier = Modifier) {
 @Composable
 fun LineChangeButtonCompose(
 	avaibleLines: List<CarLine>,
+	lineName: String,
 	modifier: Modifier = Modifier,
 	onClick: (List<CarLine>) -> Unit
 ) {
 	val selectable = avaibleLines.size > 1
 	val backgroundColor = if (selectable) 0xFF2921D1.dark(0xFF2921D1) else 0xFFE8F0FC.dark(0xFFC3D4EE)
+	val textColor = if (selectable) 0xFFFFFFFF.dark(0xFFF0F0F2) else 0xFF112C54.dark(0xFFF0F0F2)
 	Row(
 		modifier = modifier.clip(RoundedCornerShape(16.dp)).background(backgroundColor)
-			.clickable(selectable) { onClick(avaibleLines) }
+			.padding(horizontal = 12.dp, vertical = 5.dp)
+			.clickable(selectable) { onClick(avaibleLines) },
+		verticalAlignment = Alignment.CenterVertically,
+		horizontalArrangement = Arrangement.spacedBy(4.dp)
 	) {
+		Text(
+			text = lineName,
+			fontWeight = FontWeight.Bold,
+			fontSize = 14.sp,
+			color = textColor
+		)
 		Image(
 			painter = painterResource(if (selectable) Res.drawable.schoolcar_ic_bts_btn_change_select else Res.drawable.schoolcar_ic_bts_btn_change_no_select),
 			contentDescription = null
@@ -202,7 +211,7 @@ fun TypeItemCompose(msg: String, backgroundColor: Color, textColor: Color) {
 @Composable
 fun RuntimeCompose(runtime: String, modifier: Modifier = Modifier) {
 	Row(modifier) {
-		Text(text = "运行时间: ${runtime}", color = 0xFF112C54.dark(0xFFF0F0F2), fontSize = 12.sp)
+		Text(text = "运行时间: $runtime", color = 0xFF112C54.dark(0xFFF0F0F2), fontSize = 12.sp)
 	}
 }
 

@@ -61,12 +61,10 @@ class CarInfoBtsConstraintSet(
 private fun CarInfoBtsConstraintSet.wh100vInfinity() {
 	wh100vInfinityCommonConstraints()
 	when (displayMode) {
-		CarInfoBtsDisplayMode.Empty -> {
-			wh100vInfinityEmptyMode()
-		}
-
+		is CarInfoBtsDisplayMode.Empty -> {}
 		is CarInfoBtsDisplayMode.LineOverview -> wh100vInfinityLineMode()
 		is CarInfoBtsDisplayMode.SiteOverView -> wh100vInfinitySiteMode()
+		is CarInfoBtsDisplayMode.ErrorOverView -> wh100vInfinityErrorMode()
 	}
 }
 
@@ -109,7 +107,7 @@ private fun CarInfoBtsConstraintSet.wh100vInfinityLineMode() {
 
 
 // 竖屏的空内容模式
-private fun CarInfoBtsConstraintSet.wh100vInfinityEmptyMode() {
+private fun CarInfoBtsConstraintSet.wh100vInfinityErrorMode() {
 	with(scope) {
 		constrain(errorInfo) {
 			linkTo(lineSelector.bottom, parent.bottom)
@@ -127,11 +125,11 @@ private fun CarInfoBtsConstraintSet.wh100vInfinitySiteMode() {
 		}
 		constrain(siteList) {
 			start.linkTo(parent.start)
-			top.linkTo(siteName.bottom, 22.dp)
+			top.linkTo(siteName.bottom, 16.dp)
 		}
 		constrain(switchLineButton) {
 			end.linkTo(parent.end, 10.dp)
-			top.linkTo(siteName.top, 10.dp)
+			top.linkTo(siteName.top, 4.dp)
 		}
 	}
 }

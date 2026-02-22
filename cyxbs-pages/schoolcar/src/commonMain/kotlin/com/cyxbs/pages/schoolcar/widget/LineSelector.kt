@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.utils.compose.dark
@@ -70,7 +72,10 @@ fun LineSelectorCompose(
 				)
 			}
 		}
-		Spacer(modifier = Modifier.fillMaxWidth().background(0x17F2F3F8.dark(0x67676733)))
+		Spacer(
+			modifier = Modifier.fillMaxWidth().height(2.dp)
+				.background(0xFFF2F3F8.dark(0xFF676733).copy(0.1F))
+		)
 	}
 
 }
@@ -117,7 +122,8 @@ fun LineSelectorItemCompose(
 			modifier = Modifier.padding(top = 6.dp),
 			text = name,
 			fontSize = 10.sp,
-			color = textColor
+			color = textColor,
+			fontWeight = if (isSelect) FontWeight.Bold else null
 		)
 	}
 }

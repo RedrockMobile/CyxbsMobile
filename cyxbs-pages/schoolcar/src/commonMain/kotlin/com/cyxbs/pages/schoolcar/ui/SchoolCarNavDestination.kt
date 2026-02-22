@@ -4,12 +4,24 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
@@ -17,10 +29,23 @@ import com.cyxbs.components.config.navigation.MainNavDestination
 import com.cyxbs.components.config.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.backHandler
+import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
+import com.cyxbs.pages.schoolcar.mapcompose.PlatformSchoolCarMapCompose
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
 import com.g985892345.provider.api.annotation.ImplProvider
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_map_back
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_positioning
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_zoomexpand
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_zoomout
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * description ： 校车查询页
@@ -68,8 +93,85 @@ class SchoolCarNavDestination :
 
 @Composable
 fun SchoolCarPage() {
+	val viewModel = viewModel(SchoolCarViewModel::class)
+	PlatformSchoolCarMapCompose(
+		modifier = Modifier.fillMaxSize(),
+		markers = viewModel.markers.value,
+		cameraState = viewModel.cameraState.value,
+		currentLine = viewModel.selectedLineId.value,
+		onEvent = {}
+	)
 	CarInfoButtonSheet()
+	SchoolCarMapFunctionButtonCompose()
+	LaunchedEffect(Unit) {
+		val bottomSheetState = viewModel.bottomSheetState
+		snapshotFlow {
+			bottomSheetState.fraction.coerceIn(0F, 1F)
+		}.onEach {
+			// 定位按钮随着bts的变化而变化
+			viewModel.offsetYRadio.floatValue = it
+		}.launchIn(this)
+	}
 }
+
+@Composable
+fun SchoolCarMapFunctionButtonCompose() {
+	val windowScreenSize = getWindowScreenSize()
+	val heigh = windowScreenSize.height / 5
+
+
+	Box(Modifier.fillMaxSize()) {
+		ZoomButtonCompose(Modifier.align(Alignment.TopEnd).padding(top = heigh, end = 16.dp))
+		// 返回按钮
+		Image(
+			modifier = Modifier.align(Alignment.TopStart).systemBarsPadding()
+				.padding(top = 5.dp, start = 25.dp)
+				.clickableNoIndicator {
+					MainNavController.popBackStack()
+				},
+			painter = painterResource(Res.drawable.schoolcar_ic_map_back),
+			contentDescription = null
+		)
+	}
+}
+
+@Composable
+fun ZoomButtonCompose(modifier: Modifier = Modifier) {
+	val viewModel = viewModel(SchoolCarViewModel::class)
+	val screenHeight = getWindowScreenSize().height
+	val btsFraction = viewModel.offsetYRadio.floatValue
+	// 屏幕总高 - 顶部Margin - 两个缩放按钮高度 - 按钮间距 - 自身高度 - bts折叠高度 - bts上方留白
+	val maxTranslateY =
+		screenHeight - (screenHeight / 5) - (48.dp * 2) - 18.dp - 48.dp - viewModel.peekHeight.value - 45.dp
+
+	Column(
+		modifier = modifier,
+		verticalArrangement = Arrangement.spacedBy(18.dp)
+	) {
+		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomexpand)
+		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout)
+
+		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
+			val safeOffset = maxOf(0f, maxTranslateY.toPx())
+			translationY = safeOffset * (1f - btsFraction)
+		}, res = Res.drawable.schoolcar_ic_positioning)
+	}
+}
+
+@Composable
+fun FunctionButtonItemCompose(modifier: Modifier = Modifier, res: DrawableResource) {
+	Box(
+		modifier = modifier.size(48.dp).clip(RoundedCornerShape(90.dp))
+			.background(0xFFFFFFFF.dark(0xFF000000).copy(alpha = 0.7f))
+	) {
+		Image(
+			modifier = Modifier.size(18.dp).align(Alignment.Center),
+			painter = painterResource(res),
+			contentDescription = null
+		)
+	}
+}
+
 
 @Composable
 fun SchoolCarDetailPage() {

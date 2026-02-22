@@ -322,10 +322,10 @@ class SchoolCarsSmoothMove(
 
     return buildList {
       schoolCarActivity?.let {
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_car_1))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_car_2))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_car_3))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_car_4))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_car_1))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_car_2))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_car_3))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_car_4))
         add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.mipmap.schoolcar_ic_school_car))
       }
     }
@@ -335,11 +335,11 @@ class SchoolCarsSmoothMove(
   private fun getSiteMakerBitmaps():List<Bitmap>{
     return buildList {
       schoolCarActivity?.let {
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_site_0))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_site_1))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_site_2))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_site_3))
-        add(getBitmapBySvg(R.drawable.schoolcar_car_ic_site_4))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_site_0))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_site_1))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_site_2))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_site_3))
+        add(getBitmapBySvg(R.drawable.schoolcar_ic_site_4))
       }
     }
   }
@@ -368,11 +368,11 @@ class SchoolCarsSmoothMove(
   private fun getMarkerBackGroundBitmaps():List<Bitmap>{
     return buildList {
       schoolCarActivity?.let {
-        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_car_ic_background_0))
-        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_car_ic_background_1))
-        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_car_ic_background_2))
-        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_car_ic_background_3))
-        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_car_ic_background_4))
+        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_ic_background_0))
+        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_ic_background_1))
+        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_ic_background_2))
+        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_ic_background_3))
+        add(BitmapFactory.decodeResource(schoolCarActivity.resources, R.drawable.schoolcar_ic_background_4))
       }
     }
   }

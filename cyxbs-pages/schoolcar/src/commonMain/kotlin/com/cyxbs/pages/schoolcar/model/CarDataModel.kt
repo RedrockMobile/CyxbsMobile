@@ -3,6 +3,7 @@ package com.cyxbs.pages.schoolcar.model
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.PreferencesSettings
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 
@@ -36,6 +37,7 @@ object CarDataModel {
 			}.onFailure {
 				carData.remove(DATA_KEY_LINE_INFO)
 				if (isDebug()) toast("线路转换异常, ${it.message}")
+				log("HIIR", it.message.toString())
 			}.getOrNull()
 		}
 	}
