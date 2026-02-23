@@ -14,7 +14,7 @@ import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
-import com.cyxbs.pages.schoolcar.mapcompose.CameraState
+import com.cyxbs.pages.schoolcar.mapcompose.CameraEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.MarkerType
@@ -32,6 +32,8 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_ic
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4_select
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.jetbrains.compose.resources.DrawableResource
 
 /**
@@ -64,7 +66,8 @@ class SchoolCarViewModel : BaseViewModel() {
 	// 轮询查询校车位置的Job
 	private var pollingJob: Job? = null
 
-	val cameraState = mutableStateOf(CameraState())
+	private val cameraEventFlowInternal = Channel<CameraEvent>(Channel.BUFFERED)
+	val cameraEventFlow = cameraEventFlowInternal.receiveAsFlow()
 
 
 	val markers = derivedStateOf {
@@ -336,12 +339,28 @@ class SchoolCarViewModel : BaseViewModel() {
 			}
 	}
 
-	private fun focusOnPoint(lat: Double, lng: Double) {
-		cameraState.value = CameraState(lat, lng, 17f)
+	fun zoomExpand() {
+		launchByViewModelScope {
+			cameraEventFlowInternal.send(CameraEvent.ZoomExpand)
+		}
+	}
+
+	fun zoomOut() {
+		launchByViewModelScope {
+			cameraEventFlowInternal.send(CameraEvent.ZoomOut)
+		}
+	}
+
+	fun focusOnPoint(lat: Double, lng: Double) {
+		launchByViewModelScope {
+			cameraEventFlowInternal.send(CameraEvent.Focus(lat, lng, 17f))
+		}
 	}
 
 	private fun cameraRecover() {
-		cameraState.value = CameraState()
+		launchByViewModelScope {
+			cameraEventFlowInternal.send(CameraEvent.Focus())
+		}
 	}
 
 	// 对显示模式切换的封装，用这来控制显示模式的切换，以防状态错误
@@ -356,7 +375,7 @@ class SchoolCarViewModel : BaseViewModel() {
 		focusOnPoint(lat, lng)
 	}
 
-	private fun changeToEmptyMode(){
+	private fun changeToEmptyMode() {
 		selectedLineId.value = null
 		selectedStationId.value = null
 		cameraRecover()

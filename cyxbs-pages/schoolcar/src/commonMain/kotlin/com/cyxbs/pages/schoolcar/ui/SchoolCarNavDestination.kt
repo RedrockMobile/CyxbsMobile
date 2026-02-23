@@ -97,7 +97,7 @@ fun SchoolCarPage() {
 	PlatformSchoolCarMapCompose(
 		modifier = Modifier.fillMaxSize(),
 		markers = viewModel.markers.value,
-		cameraState = viewModel.cameraState.value,
+		cameraEventFlow = viewModel.cameraEventFlow,
 		currentLine = viewModel.selectedLineId.value,
 		selectSiteId = viewModel.selectedStationId.value,
 		onEvent = viewModel::onMapEvent
@@ -149,21 +149,28 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 		modifier = modifier,
 		verticalArrangement = Arrangement.spacedBy(18.dp)
 	) {
-		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomexpand)
-		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout)
+		FunctionButtonItemCompose(
+			res = Res.drawable.schoolcar_ic_zoomexpand,
+			onClick = viewModel::zoomExpand
+		)
+		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout, onClick = viewModel::zoomOut)
 
 		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
 			val safeOffset = maxOf(0f, maxTranslateY.toPx())
 			translationY = safeOffset * (1f - btsFraction)
-		}, res = Res.drawable.schoolcar_ic_positioning)
+		}, res = Res.drawable.schoolcar_ic_positioning,{})
 	}
 }
 
 @Composable
-fun FunctionButtonItemCompose(modifier: Modifier = Modifier, res: DrawableResource) {
+fun FunctionButtonItemCompose(
+	modifier: Modifier = Modifier,
+	res: DrawableResource,
+	onClick: () -> Unit
+) {
 	Box(
 		modifier = modifier.size(48.dp).clip(RoundedCornerShape(90.dp))
-			.background(0xFFFFFFFF.dark(0xFF000000).copy(alpha = 0.7f))
+			.background(0xFFFFFFFF.dark(0xFF000000).copy(alpha = 0.7f)).clickableNoIndicator { onClick() }
 	) {
 		Image(
 			modifier = Modifier.size(18.dp).align(Alignment.Center),

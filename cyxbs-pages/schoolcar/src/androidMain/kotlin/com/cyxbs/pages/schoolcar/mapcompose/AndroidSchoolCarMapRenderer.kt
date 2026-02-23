@@ -73,16 +73,6 @@ class AndroidSchoolCarMapRenderer(
 		}
 	}
 
-	fun updateCamera(state: CameraState) {
-		if (state.lat == 0.0 && state.lng == 0.0) return
-
-		val update = CameraUpdateFactory.newLatLngZoom(
-			LatLng(state.lat, state.lng),
-			state.zoom
-		)
-		aMap.animateCamera(update, 400, null)
-	}
-
 	// 刷新
 	// 根据MarkerList + currentLineId + 高亮背景站点id来刷新地图marker显示
 	fun render(
@@ -283,5 +273,30 @@ class AndroidSchoolCarMapRenderer(
 		backgroundHighlightMarker?.isVisible = false
 	}
 
+	fun doCameraEvent(event: CameraEvent) {
+		when (event) {
+			is CameraEvent.Focus -> doFocus(event)
+			CameraEvent.ZoomExpand -> doZoomExpand()
+			CameraEvent.ZoomOut -> doZoomOut()
+		}
+	}
+
+	fun doFocus(event: CameraEvent.Focus) {
+		if (event.lat == 0.0 && event.lng == 0.0) return
+
+		val update = CameraUpdateFactory.newLatLngZoom(
+			LatLng(event.lat, event.lng),
+			event.zoom
+		)
+		aMap.animateCamera(update, 400, null)
+	}
+
+	fun doZoomExpand() {
+		aMap.animateCamera( CameraUpdateFactory.zoomIn())
+	}
+
+	fun doZoomOut() {
+		aMap.animateCamera( CameraUpdateFactory.zoomOut())
+	}
 }
 

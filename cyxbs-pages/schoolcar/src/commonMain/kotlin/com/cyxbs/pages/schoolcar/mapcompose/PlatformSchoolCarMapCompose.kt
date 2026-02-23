@@ -2,6 +2,8 @@ package com.cyxbs.pages.schoolcar.mapcompose
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 
 /**
  * description ： 地图的主体
@@ -17,7 +19,7 @@ import androidx.compose.ui.Modifier
 expect fun PlatformSchoolCarMapCompose(
 	modifier: Modifier = Modifier,
 	markers: List<MapMarkerState>,
-	cameraState: CameraState,
+	cameraEventFlow: Flow<CameraEvent>,
 	currentLine: Int?,
 	selectSiteId: Int?,
 	onEvent: (MapEvent) -> Unit

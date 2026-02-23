@@ -12,19 +12,22 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.amap.api.maps.AMapOptions
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.BitmapDescriptor
 import com.amap.api.maps.model.BitmapDescriptorFactory
+import com.amap.api.maps.model.CameraPosition
+import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MyLocationStyle
-import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.R
+import kotlinx.coroutines.flow.Flow
 
 @Composable
 actual fun PlatformSchoolCarMapCompose(
 	modifier: Modifier,
 	markers: List<MapMarkerState>,
-	cameraState: CameraState,
+	cameraEventFlow: Flow<CameraEvent>,
 	currentLine: Int?,
 	selectSiteId: Int?,
 	onEvent: (MapEvent) -> Unit
@@ -34,7 +37,15 @@ actual fun PlatformSchoolCarMapCompose(
 	val mapView = remember {
 		MapsInitializer.updatePrivacyShow(context, true, true)
 		MapsInitializer.updatePrivacyAgree(context, true)
-		TextureMapView(context).apply { onCreate(Bundle()) }
+
+		val defaultLatLng = LatLng(CameraStateDefault.lat, CameraStateDefault.lng) // 你的默认坐标
+		val defaultZoom = CameraStateDefault.zoom
+		val cameraPosition = CameraPosition(defaultLatLng, defaultZoom, 0f, 0f)
+		val options = AMapOptions().apply {
+			camera(cameraPosition)
+		}
+
+		TextureMapView(context, options).apply { onCreate(Bundle()) }
 	}
 
 	val renderer = remember(mapView) {
@@ -76,11 +87,13 @@ actual fun PlatformSchoolCarMapCompose(
 
 	// 当 markers 列表变化时，通知渲染器更新
 	LaunchedEffect(markers, currentLine, selectSiteId) {
-		renderer.render(markers,currentLine,selectSiteId)
+		renderer.render(markers, currentLine, selectSiteId)
 	}
 	// 当摄像头状态变化时，更新摄像头
-	LaunchedEffect(cameraState) {
-		renderer.updateCamera(cameraState)
+	LaunchedEffect(Unit) {
+		cameraEventFlow.collect {
+			renderer.doCameraEvent(it)
+		}
 	}
 
 	AndroidView(
