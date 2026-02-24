@@ -3,7 +3,7 @@ package com.cyxbs.pages.schoolcar.model
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
-import com.cyxbs.pages.schoolcar.bean.CarLocation
+import com.cyxbs.pages.schoolcar.bean.CarLocationJson
 import com.cyxbs.pages.schoolcar.network.SchoolCarApiService
 import com.cyxbs.pages.schoolcar.utils.md5Hex
 import kotlin.time.Clock
@@ -40,7 +40,7 @@ object SchoolCarRepository {
 		s: String = md5Hex(Clock.System.now().epochSeconds.toString() + "." + "Redrock"),
 		t: String = Clock.System.now().epochSeconds.toString(),
 		r: String = md5Hex(((Clock.System.now().toEpochMilliseconds() - 1) / 1000).toString())
-	): Result<CarLocation> {
+	): Result<CarLocationJson> {
 		return runCatchingCoroutine {
 			service.getCarLocation(
 				"Redrock", s, t, r

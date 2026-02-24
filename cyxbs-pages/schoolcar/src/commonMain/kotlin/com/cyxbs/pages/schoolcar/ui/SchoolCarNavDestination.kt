@@ -158,7 +158,7 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
 			val safeOffset = maxOf(0f, maxTranslateY.toPx())
 			translationY = safeOffset * (1f - btsFraction)
-		}, res = Res.drawable.schoolcar_ic_positioning,{})
+		}, res = Res.drawable.schoolcar_ic_positioning,viewModel::positioning)
 	}
 }
 

@@ -276,8 +276,9 @@ class AndroidSchoolCarMapRenderer(
 	fun doCameraEvent(event: CameraEvent) {
 		when (event) {
 			is CameraEvent.Focus -> doFocus(event)
-			CameraEvent.ZoomExpand -> doZoomExpand()
-			CameraEvent.ZoomOut -> doZoomOut()
+			is CameraEvent.ZoomExpand -> doZoomExpand()
+			is CameraEvent.ZoomOut -> doZoomOut()
+			is CameraEvent.Positioning -> doPositioning()
 		}
 	}
 
@@ -292,11 +293,29 @@ class AndroidSchoolCarMapRenderer(
 	}
 
 	fun doZoomExpand() {
-		aMap.animateCamera( CameraUpdateFactory.zoomIn())
+		aMap.animateCamera(CameraUpdateFactory.zoomIn())
 	}
 
 	fun doZoomOut() {
-		aMap.animateCamera( CameraUpdateFactory.zoomOut())
+		aMap.animateCamera(CameraUpdateFactory.zoomOut())
+	}
+
+	fun doPositioning() {
+		val validLocation = aMap.myLocation?.takeIf {
+			it.latitude != 0.0 || it.longitude != 0.0
+		}
+		val cameraUpdate = if (validLocation != null) {
+			CameraUpdateFactory.newLatLngZoom(
+				LatLng(validLocation.latitude, validLocation.longitude),
+				17f
+			)
+		} else {
+			CameraUpdateFactory.newLatLngZoom(
+				LatLng(CameraStateDefault.lat, CameraStateDefault.lng),
+				CameraStateDefault.zoom
+			)
+		}
+		aMap.animateCamera(cameraUpdate)
 	}
 }
 

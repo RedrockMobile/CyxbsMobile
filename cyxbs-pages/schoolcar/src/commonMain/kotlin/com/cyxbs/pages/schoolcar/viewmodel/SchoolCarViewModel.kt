@@ -4,7 +4,6 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
@@ -33,6 +32,8 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_ic
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4_select
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.receiveAsFlow
 import org.jetbrains.compose.resources.DrawableResource
 
@@ -61,53 +62,45 @@ class SchoolCarViewModel : BaseViewModel() {
 	val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
 
 	//================== 关于地图的一些数据==================================
-	private val _realtimeCarLocations = mutableStateListOf<CarLocation>()
+	private val _realtimeCarLocations = mutableStateOf<List<CarLocation>>(emptyList())
 
 	// 轮询查询校车位置的Job
-	private var pollingJob: Job? = null
+	private var carLocationJob: Job? = null
 
 	private val cameraEventFlowInternal = Channel<CameraEvent>(Channel.BUFFERED)
 	val cameraEventFlow = cameraEventFlowInternal.receiveAsFlow()
 
 
 	val markers = derivedStateOf {
-		val list = mutableListOf<MapMarkerState>()
-		val info = carLineInfo.value ?: return@derivedStateOf list
-
+		val currentPage = schoolCarPage.value
+		if (currentPage != 0) return@derivedStateOf emptyList()
+		val info = carLineInfo.value ?: return@derivedStateOf emptyList<MapMarkerState>()
+		val carLocations = _realtimeCarLocations.value
 		val currentLId = selectedLineId.value
-		if (currentLId == null) {
-			// 没有选中线路的时候，先展示所有的站点
-			val allStations = info.lines.flatMap { it.stations }.distinctBy { it.id }
-			allStations.forEach { station ->
-				list.add(
-					MapMarkerState(
-						uid = "site_${station.id}",
-						type = MarkerType.Site(station.id),
-						lat = station.lat,
-						lng = station.lng,
-						rotation = 0f
+
+		buildList {
+			// 添加站点信息
+			val displayLines =
+				if (currentLId == null) info.lines else info.lines.filter { it.id == currentLId }
+
+			displayLines.flatMap { it.stations }
+				.distinctBy { it.id }
+				.forEach { station ->
+					add(
+						MapMarkerState(
+							uid = "site_${station.id}",
+							type = MarkerType.Site(station.id),
+							lat = station.lat,
+							lng = station.lng,
+							rotation = 0f
+						)
 					)
-				)
-			}
-		} else {
-			// 如果有选中路线，就展示当前路线的marker
-			val line = info.lines.find { it.id == currentLId }
-			line?.stations?.forEach { station ->
-				list.add(
-					MapMarkerState(
-						uid = "site_${station.id}",
-						type = MarkerType.Site(station.id),
-						lat = station.lat,
-						lng = station.lng,
-						rotation = 0f
-					)
-				)
-			}
-		}
-		if (schoolCarPage.value == 0) {
-			_realtimeCarLocations.forEach { car ->
-				if (currentLId != null && car.type != currentLId) return@forEach
-				list.add(
+				}
+
+			val displayCar =
+				if (currentLId == null) carLocations else carLocations.filter { it.type == currentLId }
+			displayCar.forEach { car ->
+				add(
 					MapMarkerState(
 						uid = "car_${car.type}_${car.id}",
 						type = MarkerType.Car(car.id, car.type),
@@ -116,8 +109,8 @@ class SchoolCarViewModel : BaseViewModel() {
 					)
 				)
 			}
+
 		}
-		list
 	}
 
 
@@ -207,6 +200,7 @@ class SchoolCarViewModel : BaseViewModel() {
 
 	init {
 		initCarLineInfo()
+		startPollingLocation()
 	}
 
 	// 初始化校车信息
@@ -240,6 +234,7 @@ class SchoolCarViewModel : BaseViewModel() {
 	fun toggleSelectLine(line: LineSelectorItem) {
 		if (line.id == -1) {
 			schoolCarPage.value = 1
+			stopPollingLocation()
 			return
 		}
 		if (line.id == selectedLineId.value) {
@@ -282,6 +277,7 @@ class SchoolCarViewModel : BaseViewModel() {
 	// 从乘车指南页返回
 	fun backFromDetail() {
 		schoolCarPage.value = 0
+		startPollingLocation()
 	}
 
 	// 从地图返回
@@ -357,6 +353,13 @@ class SchoolCarViewModel : BaseViewModel() {
 		}
 	}
 
+	fun positioning() {
+		launchByViewModelScope {
+			cameraEventFlowInternal.send(CameraEvent.Positioning)
+		}
+	}
+
+
 	private fun cameraRecover() {
 		launchByViewModelScope {
 			cameraEventFlowInternal.send(CameraEvent.Focus())
@@ -379,6 +382,30 @@ class SchoolCarViewModel : BaseViewModel() {
 		selectedLineId.value = null
 		selectedStationId.value = null
 		cameraRecover()
+	}
+
+	private fun startPollingLocation(interval: Long = 3000, reLocation: Long = 5000) {
+		carLocationJob?.cancel()
+
+		carLocationJob = launchByViewModelScope {
+			while (true) {
+				ensureActive()
+				val result = model.getCarLocation().getOrNull()
+
+				if (result != null) {
+					_realtimeCarLocations.value = result.data
+					delay(interval)
+				} else {
+					// 失败多等一会
+					delay(reLocation)
+				}
+			}
+		}
+	}
+
+	fun stopPollingLocation() {
+		carLocationJob?.cancel()
+		carLocationJob = null
 	}
 
 }

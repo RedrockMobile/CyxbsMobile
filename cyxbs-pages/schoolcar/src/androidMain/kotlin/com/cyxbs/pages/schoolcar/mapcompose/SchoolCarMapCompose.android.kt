@@ -1,18 +1,30 @@
 package com.cyxbs.pages.schoolcar.mapcompose
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.amap.api.location.AMapLocationClient
+import com.amap.api.location.AMapLocationClientOption
+import com.amap.api.location.AMapLocationListener
 import com.amap.api.maps.AMapOptions
+import com.amap.api.maps.AMapUtils
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.BitmapDescriptor
@@ -20,6 +32,8 @@ import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.CameraPosition
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MyLocationStyle
+import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.R
 import kotlinx.coroutines.flow.Flow
 
@@ -34,6 +48,40 @@ actual fun PlatformSchoolCarMapCompose(
 ) {
 	val context = LocalContext.current
 	val lifecycle = LocalLifecycleOwner.current.lifecycle
+	val applicationContext = LocalContext.current.applicationContext
+
+	// 需要的权限
+	val locationPermissions = arrayOf(
+		Manifest.permission.ACCESS_FINE_LOCATION,
+		Manifest.permission.ACCESS_COARSE_LOCATION
+	)
+
+	var isLocationGranted by remember {
+		mutableStateOf(
+			locationPermissions.all {
+				ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+			}
+		)
+	}
+
+	val permissionLauncher = rememberLauncherForActivityResult(
+		contract = ActivityResultContracts.RequestMultiplePermissions()
+	) { permissions ->
+		isLocationGranted = permissions.values.all { it }
+		if (isLocationGranted && isDebug()) {
+			log("HIIR", "定位权限已获取")
+		} else {
+			log("HIIR", "定位权限被拒绝")
+		}
+	}
+
+	// 每次进入界面先来一波权限权限申请
+	LaunchedEffect(Unit) {
+		if (!isLocationGranted) {
+			permissionLauncher.launch(locationPermissions)
+		}
+	}
+
 	val mapView = remember {
 		MapsInitializer.updatePrivacyShow(context, true, true)
 		MapsInitializer.updatePrivacyAgree(context, true)
@@ -55,33 +103,55 @@ actual fun PlatformSchoolCarMapCompose(
 		AndroidSchoolCarMapRenderer(context, mapView.map, onEvent)
 	}
 
+	val locationClient = remember {
+		AMapLocationClient(applicationContext)
+	}
+	val locationListener = remember(mapView) {
+		AMapLocationListener { location ->
+			val center = LatLng(29.531876, 106.606789)
+			val myLatLng = LatLng(location.latitude, location.longitude)
+			val distance = AMapUtils.calculateLineDistance(center, myLatLng)
+			if (distance > 2000) {
+				mapView.map.isMyLocationEnabled = false
+			}
+		}
+	}
+
+	// 定位服务的相关事件
+	LaunchedEffect(isLocationGranted, mapView) {
+		if (isLocationGranted) {
+			val myLocationStyle = initLocationType()
+			mapView.map.myLocationStyle = myLocationStyle
+			mapView.map.isMyLocationEnabled = true
+
+			locationClient.apply {
+				setLocationOption(AMapLocationClientOption())
+				setLocationListener(locationListener)
+			}
+			locationClient.startLocation()
+
+		} else {
+			// 权限被回收的时候关闭个人位置显示
+			mapView.map.isMyLocationEnabled = false
+			locationClient.stopLocation()
+		}
+	}
+
+
 	DisposableEffect(lifecycle, mapView) {
 		val observer = LifecycleEventObserver { _, event ->
 			when (event) {
-				Lifecycle.Event.ON_RESUME -> {
-					mapView.onResume()
-				}
-
-				Lifecycle.Event.ON_PAUSE -> {
-					mapView.onPause()
-				}
-
-				Lifecycle.Event.ON_DESTROY -> {
-					mapView.onDestroy()
-					renderer.onDestroy()
-				}
-
-				Lifecycle.Event.ON_CREATE -> {}
+				Lifecycle.Event.ON_RESUME -> mapView.onResume()
+				Lifecycle.Event.ON_PAUSE -> mapView.onPause()
 				else -> {}
 			}
 		}
 		lifecycle.addObserver(observer)
-
 		onDispose {
 			lifecycle.removeObserver(observer)
-			// 在该MapCompose被移除的时候一定要调用销毁函数，不然进入详情页的时候并不会走ON_DESTROY，map资源没有被正确释放
 			mapView.onDestroy()
 			renderer.onDestroy()
+			locationClient.onDestroy()
 		}
 	}
 
@@ -89,7 +159,8 @@ actual fun PlatformSchoolCarMapCompose(
 	LaunchedEffect(markers, currentLine, selectSiteId) {
 		renderer.render(markers, currentLine, selectSiteId)
 	}
-	// 当摄像头状态变化时，更新摄像头
+
+	// 接收摄像头事件
 	LaunchedEffect(Unit) {
 		cameraEventFlow.collect {
 			renderer.doCameraEvent(it)
