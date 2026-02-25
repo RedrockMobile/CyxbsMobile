@@ -160,8 +160,7 @@ class AndroidSchoolCarMapRenderer(
 			overlay.stopMove()
 			val currentPos = overlay.position ?: marker.position
 			overlay.setPoints(listOf(currentPos, newLatLng))
-			val duration = 3
-			overlay.setTotalDuration(duration)
+			overlay.setTotalDuration(2)
 			overlay.startSmoothMove()
 			if (newItem.rotation != 0f) {
 				marker.rotateAngle = newItem.rotation

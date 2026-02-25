@@ -83,7 +83,7 @@ fun getTextColorByLine(currentIndex: Int, selectIndex: Int, lineId: Int): Color 
 	return when (lineId + 1) {
 		1 -> 0xFFFF45B9.dark(0xFFFF45B9)
 		2 -> 0xFFFDA962.dark(0xFFFDA962)
-		3 -> 0xFF6FCAFC.dark(0xFFFDA962)
+		3 -> 0xFF6FCAFC.dark(0xFF6FCAFC)
 		4 -> 0xFF80E7C8.dark(0xFF80E7C8)
 		else -> 0xFF2A4E84.dark(0xF0F0F2B2)
 	}

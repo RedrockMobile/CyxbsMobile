@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -16,6 +15,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,11 +32,20 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.schoolcar.bean.CarLine
+import com.cyxbs.pages.schoolcar.viewmodel.CommonSchoolCarViewModel
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.Empty
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.ErrorOverView
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.LineOverview
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.SiteOverView
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_bts_btn_change_no_select
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_bts_btn_change_select
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -49,9 +58,9 @@ import org.jetbrains.compose.resources.painterResource
 fun CarInfoButtonSheet() {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	val selectedId by viewModel.selectedLineId
-	val selectedSiteId by viewModel.selectedStationId
 	val peekHeight by viewModel.peekHeight
 	val list by viewModel.lineSelectorItem
+
 	Box {
 		BottomSheetCompose(
 			modifier = Modifier.navigationBarsPadding(),
@@ -64,15 +73,12 @@ fun CarInfoButtonSheet() {
 			ConstraintLayout(
 				modifier = Modifier
 					.then(bottomSheetDraggable())
-					// 给一个最小高度，不然如果内容为空的话bts内容高度不足会导致锚点计算失败
-					.heightIn(min = 140.dp)
 					.shadow(
 						elevation = 10.dp,
 						shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
 					)
-					.background(LocalAppColors.current.topBg)
-					.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-
+					.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+					.background(LocalAppColors.current.topBg),
 				constraintSet = createConstraintSet(viewModel.displayMode.value)
 			) {
 				ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
@@ -82,13 +88,12 @@ fun CarInfoButtonSheet() {
 					selectedId,
 					viewModel::toggleSelectLine
 				)
-				val mode = viewModel.displayMode.value
-				when (mode) {
-					is CarInfoBtsDisplayMode.ErrorOverView -> {
+				when (val mode = viewModel.displayMode.value) {
+					is ErrorOverView -> {
 						ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
 					}
 
-					is CarInfoBtsDisplayMode.LineOverview -> {
+					is LineOverview -> {
 						TittleCompose(
 							mode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
 						)
@@ -105,7 +110,7 @@ fun CarInfoButtonSheet() {
 						)
 					}
 
-					is CarInfoBtsDisplayMode.SiteOverView -> {
+					is SiteOverView -> {
 						TittleCompose(
 							mode.site.name,
 							modifier = Modifier.layoutId(CarInfoBtsElement.SiteName)
@@ -120,30 +125,60 @@ fun CarInfoButtonSheet() {
 						LineChangeButtonCompose(
 							modifier = Modifier.layoutId(CarInfoBtsElement.SwitchLineButton),
 							lineName = mode.currentLine.name,
-							avaibleLines = mode.availableLines,
+							availableLines = mode.availableLines,
 							onClick = viewModel::toggleCurrentLine
 						)
 					}
 
-					is CarInfoBtsDisplayMode.Empty -> {}
+					is Empty -> {}
 				}
 			}
 		}
 	}
 
 	// 选择线路/选择站点的时候自动展开
-	LaunchedEffect(selectedId, selectedSiteId) {
-		if (selectedId != -1 || selectedSiteId != null) {
-			viewModel.bottomSheetState.expand()
+	LaunchedEffect(Unit) {
+		snapshotFlow {
+			viewModel.displayMode.value
+		}.onEach {
+			try {
+				viewModel.isBtsAnimate.value = true
+				when (it) {
+					is Empty -> {
+						viewModel.bottomSheetState.collapse()
+					}
+
+					else -> {
+						// 延迟一小会，等待compose完成重新测量
+						delay(50)
+						viewModel.bottomSheetState.expand()
+					}
+				}
+			} finally {
+				viewModel.isBtsAnimate.value = false
+			}
+		}.launchIn(this)
+	}
+
+	// 监听当用户处于Empty模式的时候上滑选择最近的站点
+	LaunchedEffect(Unit) {
+		viewModel.bottomSheetState.stateFlow.collect {
+			if (it == BottomSheetValueState.Scrolling &&
+				viewModel.displayMode.value is Empty &&
+				!viewModel.isBtsAnimate.value
+			) {
+				viewModel.selectClosedSite()
+			}
 		}
 	}
+
 }
 
 @Composable
 fun ErrorInfoCompose(modifier: Modifier = Modifier) {
 	Text(
 		modifier = modifier,
-		text = SchoolCarViewModel.NETWORK_ERROR_INFO,
+		text = CommonSchoolCarViewModel.NETWORK_ERROR_INFO,
 		fontSize = 22.sp,
 		fontWeight = FontWeight.Bold,
 		color = 0xFF112C54.dark(0xFFF0F0F2)
@@ -152,18 +187,18 @@ fun ErrorInfoCompose(modifier: Modifier = Modifier) {
 
 @Composable
 fun LineChangeButtonCompose(
-	avaibleLines: List<CarLine>,
+	availableLines: List<CarLine>,
 	lineName: String,
 	modifier: Modifier = Modifier,
 	onClick: (List<CarLine>) -> Unit
 ) {
-	val selectable = avaibleLines.size > 1
+	val selectable = availableLines.size > 1
 	val backgroundColor = if (selectable) 0xFF2921D1.dark(0xFF2921D1) else 0xFFE8F0FC.dark(0xFFC3D4EE)
 	val textColor = if (selectable) 0xFFFFFFFF.dark(0xFFF0F0F2) else 0xFF112C54.dark(0xFFF0F0F2)
 	Row(
 		modifier = modifier.clip(RoundedCornerShape(16.dp)).background(backgroundColor)
 			.padding(horizontal = 12.dp, vertical = 5.dp)
-			.clickable(selectable) { onClick(avaibleLines) },
+			.clickable(selectable) { onClick(availableLines) },
 		verticalAlignment = Alignment.CenterVertically,
 		horizontalArrangement = Arrangement.spacedBy(4.dp)
 	) {

@@ -8,11 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
+import com.cyxbs.pages.schoolcar.bean.CarStation
 import com.cyxbs.pages.schoolcar.mapcompose.CameraEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
@@ -43,7 +43,12 @@ import org.jetbrains.compose.resources.DrawableResource
  * email : qq2420226433@outlook.com
  * date : 2026/2/18 21:21
  */
-class SchoolCarViewModel : BaseViewModel() {
+expect class SchoolCarViewModel() : CommonSchoolCarViewModel {
+	// 返回-1表示没有最近的站点
+	override fun getClosedSite(): CarStation?
+}
+
+abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	companion object {
 		const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
 	}
@@ -85,13 +90,13 @@ class SchoolCarViewModel : BaseViewModel() {
 
 			displayLines.flatMap { it.stations }
 				.distinctBy { it.id }
-				.forEach { station ->
+				.forEach { site ->
 					add(
 						MapMarkerState(
-							uid = "site_${station.id}",
-							type = MarkerType.Site(station.id),
-							lat = station.lat,
-							lng = station.lng,
+							uid = "site_${site.id}",
+							type = MarkerType.Site(site.id),
+							lat = site.lat,
+							lng = site.lng,
 							rotation = 0f
 						)
 					)
@@ -115,6 +120,9 @@ class SchoolCarViewModel : BaseViewModel() {
 
 
 	//====================== 底部bottomSheetState的相关状态====================
+
+	var isBtsAnimate = mutableStateOf(false)
+
 	val bottomSheetState by lazy {
 		BottomSheetState()
 	}
@@ -127,20 +135,20 @@ class SchoolCarViewModel : BaseViewModel() {
 	}
 
 	/**
-	 * 选中的线路Id!=null + selectedStationId!= null 则为站点模式
-	 * 选中的线路Id!=null + selectedStationId == null 则为线路模式
+	 * 选中的线路Id!=null + selectedSiteId!= null 则为站点模式
+	 * 选中的线路Id!=null + selectedSiteId == null 则为线路模式
 	 * 关于模式的切换后面给了3个方法
 	 */
 	// 选中的线路 ID
 	val selectedLineId: MutableState<Int?> = mutableStateOf(null)
 
 	// 选中的站点 ID
-	val selectedStationId: MutableState<Int?> = mutableStateOf(null)
+	val selectedSiteId: MutableState<Int?> = mutableStateOf(null)
 
 	val displayMode = derivedStateOf {
 		val info = carLineInfo.value ?: return@derivedStateOf CarInfoBtsDisplayMode.ErrorOverView
 
-		val sId = selectedStationId.value // 站点ID
+		val sId = selectedSiteId.value // 站点ID
 		val lId = selectedLineId.value    // 线路ID
 
 		if (sId != null) {
@@ -179,23 +187,19 @@ class SchoolCarViewModel : BaseViewModel() {
 		info: CarLineJson?,
 	): List<LineSelectorItem> {
 		if (info == null) return emptyList()
-
-		val list = mutableListOf<LineSelectorItem>()
-
-		info.lines.forEach { line ->
-			list.add(
-				LineSelectorItem.LineSelectorItemLine(
-					id = line.id,
-					name = line.name,
-					unSelectRes = getUnselectIconResource(line.id),
-					selectRes = getSelectIconResource(line.id)
+		return buildList {
+			info.lines.forEach { line ->
+				add(
+					LineSelectorItem.LineSelectorItemLine(
+						id = line.id,
+						name = line.name,
+						unSelectRes = getUnselectIconResource(line.id),
+						selectRes = getSelectIconResource(line.id)
+					)
 				)
-			)
+			}
+			add(LineSelectorItem.Guide)
 		}
-
-		// 添加乘车指南
-		list.add(LineSelectorItem.Guide)
-		return list
 	}
 
 	init {
@@ -220,7 +224,6 @@ class SchoolCarViewModel : BaseViewModel() {
 					}
 				}
 				.onFailure {
-					log("HIIR", it.message.toString())
 					if (carLineInfo.value == null) {
 						toast(NETWORK_ERROR_INFO)
 					} else {
@@ -254,7 +257,7 @@ class SchoolCarViewModel : BaseViewModel() {
 		selectedLineId.value = availableLine[nextIndex].id
 	}
 
-	fun selectStation(stationId: Int) {
+	fun selectSite(stationId: Int) {
 		val info = carLineInfo.value ?: return
 
 		val availableLines = info.lines.filter { line ->
@@ -270,7 +273,7 @@ class SchoolCarViewModel : BaseViewModel() {
 			selectedLineId.value = availableLines.first().id
 		}
 
-		selectedStationId.value = stationId
+		selectedSiteId.value = stationId
 	}
 
 
@@ -369,22 +372,22 @@ class SchoolCarViewModel : BaseViewModel() {
 	// 对显示模式切换的封装，用这来控制显示模式的切换，以防状态错误
 	private fun changeToLineMode(lineId: Int) {
 		selectedLineId.value = lineId
-		selectedStationId.value = null
+		selectedSiteId.value = null
 		cameraRecover()
 	}
 
 	private fun changeToSiteMode(siteId: Int, lat: Double, lng: Double) {
-		selectStation(siteId)
+		selectSite(siteId)
 		focusOnPoint(lat, lng)
 	}
 
 	private fun changeToEmptyMode() {
 		selectedLineId.value = null
-		selectedStationId.value = null
+		selectedSiteId.value = null
 		cameraRecover()
 	}
 
-	private fun startPollingLocation(interval: Long = 3000, reLocation: Long = 5000) {
+	private fun startPollingLocation(interval: Long = 2000, reLocation: Long = 5000) {
 		carLocationJob?.cancel()
 
 		carLocationJob = launchByViewModelScope {
@@ -396,7 +399,6 @@ class SchoolCarViewModel : BaseViewModel() {
 					_realtimeCarLocations.value = result.data
 					delay(interval)
 				} else {
-					// 失败多等一会
 					delay(reLocation)
 				}
 			}
@@ -408,4 +410,10 @@ class SchoolCarViewModel : BaseViewModel() {
 		carLocationJob = null
 	}
 
+	fun selectClosedSite() {
+		val closedSite = getClosedSite() ?: return
+		changeToSiteMode(closedSite.id, closedSite.lat, closedSite.lng)
+	}
+
+	abstract fun getClosedSite(): CarStation?
 }

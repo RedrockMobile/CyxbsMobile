@@ -35,6 +35,7 @@ import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import com.cyxbs.pages.schoolcar.mapcompose.PlatformSchoolCarMapCompose
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
@@ -99,7 +100,7 @@ fun SchoolCarPage() {
 		markers = viewModel.markers.value,
 		cameraEventFlow = viewModel.cameraEventFlow,
 		currentLine = viewModel.selectedLineId.value,
-		selectSiteId = viewModel.selectedStationId.value,
+		selectSiteId = viewModel.selectedSiteId.value,
 		onEvent = viewModel::onMapEvent
 	)
 	CarInfoButtonSheet()
@@ -157,8 +158,9 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 
 		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
 			val safeOffset = maxOf(0f, maxTranslateY.toPx())
-			translationY = safeOffset * (1f - btsFraction)
-		}, res = Res.drawable.schoolcar_ic_positioning,viewModel::positioning)
+			translationY =
+				if (viewModel.displayMode.value == CarInfoBtsDisplayMode.Empty) safeOffset else safeOffset * (1f - btsFraction)
+		}, res = Res.drawable.schoolcar_ic_positioning, viewModel::positioning)
 	}
 }
 

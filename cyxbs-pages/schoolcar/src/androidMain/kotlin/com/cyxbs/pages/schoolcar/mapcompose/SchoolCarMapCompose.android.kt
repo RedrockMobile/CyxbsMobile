@@ -20,11 +20,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.amap.api.location.AMapLocationListener
 import com.amap.api.maps.AMapOptions
-import com.amap.api.maps.AMapUtils
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.BitmapDescriptor
@@ -35,6 +35,7 @@ import com.amap.api.maps.model.MyLocationStyle
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.R
+import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import kotlinx.coroutines.flow.Flow
 
 @Composable
@@ -49,7 +50,7 @@ actual fun PlatformSchoolCarMapCompose(
 	val context = LocalContext.current
 	val lifecycle = LocalLifecycleOwner.current.lifecycle
 	val applicationContext = LocalContext.current.applicationContext
-
+	val viewModel = viewModel(SchoolCarViewModel::class)
 	// 需要的权限
 	val locationPermissions = arrayOf(
 		Manifest.permission.ACCESS_FINE_LOCATION,
@@ -108,32 +109,31 @@ actual fun PlatformSchoolCarMapCompose(
 	}
 	val locationListener = remember(mapView) {
 		AMapLocationListener { location ->
-			val center = LatLng(29.531876, 106.606789)
-			val myLatLng = LatLng(location.latitude, location.longitude)
-			val distance = AMapUtils.calculateLineDistance(center, myLatLng)
-			if (distance > 2000) {
-				mapView.map.isMyLocationEnabled = false
-			}
+			viewModel.updateLocation(location)
 		}
 	}
 
-	// 定位服务的相关事件
-	LaunchedEffect(isLocationGranted, mapView) {
+	// 用于控制是否定位
+	LaunchedEffect(isLocationGranted) {
 		if (isLocationGranted) {
-			val myLocationStyle = initLocationType()
-			mapView.map.myLocationStyle = myLocationStyle
-			mapView.map.isMyLocationEnabled = true
-
 			locationClient.apply {
 				setLocationOption(AMapLocationClientOption())
 				setLocationListener(locationListener)
 			}
 			locationClient.startLocation()
-
 		} else {
-			// 权限被回收的时候关闭个人位置显示
-			mapView.map.isMyLocationEnabled = false
 			locationClient.stopLocation()
+		}
+	}
+
+	// 监听是否开启定位地图
+	LaunchedEffect(viewModel.enableMyLocation.value, isLocationGranted, mapView) {
+		if (viewModel.enableMyLocation.value && isLocationGranted) {
+			val myLocationStyle = initLocationType()
+			mapView.map.myLocationStyle = myLocationStyle
+			mapView.map.isMyLocationEnabled = true
+		} else {
+			mapView.map.isMyLocationEnabled = false
 		}
 	}
 
@@ -154,6 +154,7 @@ actual fun PlatformSchoolCarMapCompose(
 			locationClient.onDestroy()
 		}
 	}
+
 
 	// 当 markers 列表变化时，通知渲染器更新
 	LaunchedEffect(markers, currentLine, selectSiteId) {
