@@ -12,6 +12,7 @@ import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.animation.Animation
 import com.amap.api.maps.model.animation.ScaleAnimation
 import com.amap.api.maps.utils.overlay.MovingPointOverlay
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.R
 
 /**
@@ -43,6 +44,10 @@ class AndroidSchoolCarMapRenderer(
 
 
 	private var backgroundHighlightMarker: Marker? = null
+
+	private var prevHighlightStation: Int? = null
+
+	private var prevSelectLine: Int? = null
 
 	private val highlightAnimate by lazy {
 		ScaleAnimation(0.8F, 1F, 0.8F, 1F).apply {
@@ -81,45 +86,42 @@ class AndroidSchoolCarMapRenderer(
 		highlightStationId: Int?
 	) {
 		val safeLineId = currentLineId ?: -1
-		backgroundHighlightMarker?.let { bgMarker ->
-			if (bgMarker.isVisible) {
-				val resIndex = (safeLineId + 1).takeIf { it in backgroundCache.indices } ?: 1
-				bgMarker.setIcon(backgroundCache[resIndex])
+		val newMap = newList.associateBy { it.uid }
+		val iterator = dataCache.iterator()
+		while (iterator.hasNext()) {
+			val entry = iterator.next()
+			if (!newMap.containsKey(entry.key)) {
+				removeMarker(entry.key)
+				iterator.remove()
 			}
 		}
-		val newUids = newList.map { it.uid }.toSet()
-		val currentUids = markerCache.keys.toSet()
-
-		(currentUids - newUids).forEach { uid ->
-			removeMarker(uid)// 移除老marker
-		}
-
-		newList.forEach { item ->
-			if (markerCache.containsKey(item.uid)) {
-				updateMarker(item, safeLineId) // 如果已经在marker中了，则更新marker
+		newList.forEach { newState ->
+			val oldState = dataCache[newState.uid]
+			if (oldState == null) {
+				addMarker(newState, safeLineId)
 			} else {
-				addMarker(item, safeLineId) // 没有的话就添加
+				updateMarker(newState, safeLineId)
 			}
-
-			dataCache[item.uid] = item
+			dataCache[newState.uid] = newState
 		}
-		if (highlightStationId != null) {
-			val targetUid = "site_$highlightStationId"
-			val targetData = newList.find { it.uid == targetUid }
-			if (targetData != null) {
+
+		val highlightChanged = highlightStationId != prevHighlightStation
+		val lineChanged = currentLineId != prevSelectLine
+		if (highlightChanged || lineChanged) {
+			if (highlightStationId != null) {
+				val targetUid = "site_$highlightStationId"
+				val targetData = newMap[targetUid]
 				showBackgroundForSite(targetData, safeLineId)
 			} else {
 				hideBackground()
 			}
-		} else {
-			hideBackground()
 		}
+		prevHighlightStation = highlightStationId
+		prevSelectLine = currentLineId
 	}
 
 	private fun addMarker(item: MapMarkerState, currentLineId: Int) {
 		val latLng = LatLng(item.lat, item.lng)
-
-
 		val res = calculateRes(item, currentLineId)
 
 		val options = MarkerOptions()
@@ -142,28 +144,34 @@ class AndroidSchoolCarMapRenderer(
 
 	private fun updateMarker(newItem: MapMarkerState, currentLineId: Int) {
 		val marker = markerCache[newItem.uid] ?: return
-		val newLatLng = LatLng(newItem.lat, newItem.lng)
-		marker.isVisible = newItem.visible
-		marker.zIndex = newItem.type.zIndex
+		val oldItem = dataCache[newItem.uid] ?: return
 
-		// 如果多了线路，但没有添加新的线路资源，默认用一号线的资源
-		if (newItem.type is MarkerType.Site) {
-			val res = calculateRes(newItem, currentLineId)
-			marker.setIcon(res)
+		if (oldItem.visible != newItem.visible) {
+			marker.isVisible = newItem.visible
 		}
-		if (marker.position == newLatLng) return
-		// 站点的直接把站点的位置移动到新位置
+
 		if (newItem.type is MarkerType.Site) {
-			marker.position = newLatLng
+			log("HIIR", "${currentLineId},${prevSelectLine}")
+			if (currentLineId != prevSelectLine) {
+				val res = calculateRes(newItem, currentLineId)
+				marker.setIcon(res)
+			}
+
+			val newLatLng = LatLng(newItem.lat, newItem.lng)
+			if (marker.position != newLatLng) {
+				marker.position = newLatLng
+			}
 		} else {
-			val overlay = movingOverlayCache[newItem.uid] ?: return
-			overlay.stopMove()
-			val currentPos = overlay.position ?: marker.position
-			overlay.setPoints(listOf(currentPos, newLatLng))
-			overlay.setTotalDuration(2)
-			overlay.startSmoothMove()
-			if (newItem.rotation != 0f) {
-				marker.rotateAngle = newItem.rotation
+			val newLatLng = LatLng(newItem.lat, newItem.lng)
+			if (marker.position != newLatLng) {
+				val overlay = movingOverlayCache[newItem.uid]
+				if (overlay != null) {
+					overlay.stopMove()
+					val currentPos = overlay.position ?: marker.position
+					overlay.setPoints(listOf(currentPos, newLatLng))
+					overlay.setTotalDuration(2)
+					overlay.startSmoothMove()
+				}
 			}
 		}
 	}
@@ -173,7 +181,6 @@ class AndroidSchoolCarMapRenderer(
 		movingOverlayCache.remove(uid)
 		markerCache[uid]?.remove()
 		markerCache.remove(uid)
-		dataCache.remove(uid)
 	}
 
 	fun onDestroy() {

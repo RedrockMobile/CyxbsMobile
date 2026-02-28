@@ -9,7 +9,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -32,10 +35,10 @@ import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import com.cyxbs.pages.schoolcar.mapcompose.PlatformSchoolCarMapCompose
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
-import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
@@ -99,18 +102,24 @@ fun SchoolCarPage() {
 		modifier = Modifier.fillMaxSize(),
 		markers = viewModel.markers.value,
 		cameraEventFlow = viewModel.cameraEventFlow,
-		currentLine = viewModel.selectedLineId.value,
-		selectSiteId = viewModel.selectedSiteId.value,
+		currentLine = viewModel.btsState.selectedLineId.value,
+		selectSiteId = viewModel.btsState.selectedSiteId.value,
 		onEvent = viewModel::onMapEvent
 	)
-	CarInfoButtonSheet()
+	CarInfoButtonSheet(
+		state = viewModel.btsState,
+		toggleSelectLine = viewModel::toggleSelectLine,
+		toggleCurrentLine = viewModel::toggleCurrentLine,
+		onSelectClosedSite = viewModel::selectClosedSite
+	)
 	SchoolCarMapFunctionButtonCompose()
 	LaunchedEffect(Unit) {
-		val bottomSheetState = viewModel.bottomSheetState
+		val bottomSheetState = viewModel.btsState.bottomSheetState
 		snapshotFlow {
 			bottomSheetState.fraction.coerceIn(0F, 1F)
 		}.onEach {
 			// 定位按钮随着bts的变化而变化
+			log("HI-IR","fraction： ${it}")
 			viewModel.offsetYRadio.floatValue = it
 		}.launchIn(this)
 	}
@@ -141,10 +150,13 @@ fun SchoolCarMapFunctionButtonCompose() {
 fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	val screenHeight = getWindowScreenSize().height
-	val btsFraction = viewModel.offsetYRadio.floatValue
+
 	// 屏幕总高 - 顶部Margin - 两个缩放按钮高度 - 按钮间距 - 自身高度 - bts折叠高度 - bts上方留白
+	val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+	val realPeekHeight = viewModel.btsState.peekHeight + navBarHeight
+
 	val maxTranslateY =
-		screenHeight - (screenHeight / 5) - (48.dp * 2) - 18.dp - 48.dp - viewModel.peekHeight.value - 45.dp
+		screenHeight - (screenHeight / 5) - (48.dp * 2) - 18.dp - 48.dp - realPeekHeight - 45.dp
 
 	Column(
 		modifier = modifier,
@@ -157,9 +169,9 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout, onClick = viewModel::zoomOut)
 
 		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
+			val btsFraction = viewModel.offsetYRadio.floatValue
 			val safeOffset = maxOf(0f, maxTranslateY.toPx())
-			translationY =
-				if (viewModel.displayMode.value == CarInfoBtsDisplayMode.Empty) safeOffset else safeOffset * (1f - btsFraction)
+			translationY = safeOffset * (1f - btsFraction)
 		}, res = Res.drawable.schoolcar_ic_positioning, viewModel::positioning)
 	}
 }

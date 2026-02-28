@@ -186,5 +186,5 @@ private fun initLocationType(): MyLocationStyle = MyLocationStyle().apply {
 	strokeWidth(0f)
 	radiusFillColor(Color.alpha(0))
 	myLocationIcon(descriptor)
-	myLocationType(MyLocationStyle.LOCATION_TYPE_FOLLOW_NO_CENTER)
+	myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
 }

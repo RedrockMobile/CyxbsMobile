@@ -38,9 +38,9 @@ class FoodViewModel() : BaseViewModel() {
 
 	val diningProperty = mutableStateListOf<DiningTag>()
 
+	val welcomePicture = mutableStateOf("")
 	/**
 	 * 	是否显示描述页
-	 * 	没招了ChooseDialogCompose需要传入一个State
 	 */
 
 	val showDescribe = mutableStateOf(false)
@@ -277,6 +277,7 @@ class FoodViewModel() : BaseViewModel() {
 			diningNumber.addAll(data.eatNum2DiningTag())
 			diningProperty.addAll(data.eatProperty2DiningTag())
 			diningArea.addAll(data.eatArea2DiningTag())
+			welcomePicture.value = data.picture
 		}
 	}
 

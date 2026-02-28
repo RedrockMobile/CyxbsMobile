@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -52,7 +54,7 @@ fun RouteListCompose(modifier: Modifier = Modifier, siteId: Int = -1, line: CarL
 	val lineLen = line.stations.size
 	val lineId = line.id
 	LazyRow(
-		modifier = modifier,
+		modifier = modifier.height(180.dp),
 		contentPadding = PaddingValues(16.dp),
 	) {
 		itemsIndexed(items = line.stations, key = { index, item ->

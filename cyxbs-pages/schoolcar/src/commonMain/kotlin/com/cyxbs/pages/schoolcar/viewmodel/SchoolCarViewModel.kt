@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
@@ -19,23 +18,13 @@ import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.MarkerType
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
-import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode
+import com.cyxbs.pages.schoolcar.widget.CarInfoBtsState
 import com.cyxbs.pages.schoolcar.widget.LineSelectorItem
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1_select
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_2
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_2_select
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_3
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_3_select
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4_select
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.receiveAsFlow
-import org.jetbrains.compose.resources.DrawableResource
 
 /**
  * description ： 校车查询页的ViewModel
@@ -60,6 +49,8 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	// 数据源
 	val carLineInfo: MutableState<CarLineJson?> = mutableStateOf(null)
 
+	val btsState = CarInfoBtsState(100.dp, carLineInfo)
+
 	// 校车轨迹的页面状态，0表示地图页，1表示乘车指南页
 	val schoolCarPage = mutableStateOf(0)
 
@@ -81,7 +72,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		if (currentPage != 0) return@derivedStateOf emptyList()
 		val info = carLineInfo.value ?: return@derivedStateOf emptyList<MapMarkerState>()
 		val carLocations = _realtimeCarLocations.value
-		val currentLId = selectedLineId.value
+		val currentLId = btsState.selectedLineId.value
 
 		buildList {
 			// 添加站点信息
@@ -115,90 +106,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 				)
 			}
 
-		}
-	}
-
-
-	//====================== 底部bottomSheetState的相关状态====================
-
-	var isBtsAnimate = mutableStateOf(false)
-
-	val bottomSheetState by lazy {
-		BottomSheetState()
-	}
-
-	val peekHeight = mutableStateOf(94.dp)
-
-	// 底部导航栏的线路选择器的列表
-	val lineSelectorItem = derivedStateOf {
-		generateSelectorList(carLineInfo.value)
-	}
-
-	/**
-	 * 选中的线路Id!=null + selectedSiteId!= null 则为站点模式
-	 * 选中的线路Id!=null + selectedSiteId == null 则为线路模式
-	 * 关于模式的切换后面给了3个方法
-	 */
-	// 选中的线路 ID
-	val selectedLineId: MutableState<Int?> = mutableStateOf(null)
-
-	// 选中的站点 ID
-	val selectedSiteId: MutableState<Int?> = mutableStateOf(null)
-
-	val displayMode = derivedStateOf {
-		val info = carLineInfo.value ?: return@derivedStateOf CarInfoBtsDisplayMode.ErrorOverView
-
-		val sId = selectedSiteId.value // 站点ID
-		val lId = selectedLineId.value    // 线路ID
-
-		if (sId != null) {
-			val station = info.lines.flatMap { it.stations }.find { it.id == sId }
-
-			//如果当前选中的线路有这个站点就优先用选中line，否则就找到有该站点line的一条
-			val contextLine = info.lines.find { it.id == lId }
-
-			if (station != null && contextLine != null) {
-				// 计算所有经过此站点的线路
-				val availableLines = info.lines.filter { line ->
-					line.stations.any { it.id == sId }
-				}
-
-				return@derivedStateOf CarInfoBtsDisplayMode.SiteOverView(
-					site = station,
-					currentLine = contextLine,
-					availableLines = availableLines
-				)
-			}
-		}
-
-		if (lId != null) {
-			val line = info.lines.find { it.id == lId }
-			if (line != null) {
-				return@derivedStateOf CarInfoBtsDisplayMode.LineOverview(line)
-			}
-		}
-
-		CarInfoBtsDisplayMode.Empty
-	}
-
-
-	// 根据目前加载的CarLineJson生成选择器的源数据列表
-	private fun generateSelectorList(
-		info: CarLineJson?,
-	): List<LineSelectorItem> {
-		if (info == null) return emptyList()
-		return buildList {
-			info.lines.forEach { line ->
-				add(
-					LineSelectorItem.LineSelectorItemLine(
-						id = line.id,
-						name = line.name,
-						unSelectRes = getUnselectIconResource(line.id),
-						selectRes = getSelectIconResource(line.id)
-					)
-				)
-			}
-			add(LineSelectorItem.Guide)
 		}
 	}
 
@@ -240,7 +147,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 			stopPollingLocation()
 			return
 		}
-		if (line.id == selectedLineId.value) {
+		if (line.id == btsState.selectedLineId.value) {
 			changeToEmptyMode()
 			return
 		}
@@ -250,11 +157,11 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	// 站点模式下切换线路
 	fun toggleCurrentLine(availableLine: List<CarLine>) {
-		val currentId = selectedLineId.value ?: return
+		val currentId = btsState.selectedLineId.value ?: return
 		val currentIndex = availableLine.indexOfFirst { it.id == currentId }
 		if (currentIndex == -1) return
 		val nextIndex = (currentIndex + 1) % availableLine.size
-		selectedLineId.value = availableLine[nextIndex].id
+		btsState.selectedLineId.value = availableLine[nextIndex].id
 	}
 
 	fun selectSite(stationId: Int) {
@@ -265,15 +172,15 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		}
 
 		if (availableLines.isEmpty()) return
-		val currentLId = selectedLineId.value
+		val currentLId = btsState.selectedLineId.value
 		val isCurrentLineValid = availableLines.any { it.id == currentLId }
 
 		// 如果当前选择的线路里面没有这个站点，我们就要切换线路了
 		if (!isCurrentLineValid) {
-			selectedLineId.value = availableLines.first().id
+			btsState.selectedLineId.value = availableLines.first().id
 		}
 
-		selectedSiteId.value = stationId
+		btsState.selectedSiteId.value = stationId
 	}
 
 
@@ -297,29 +204,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 			}
 		}
 	}
-
-	private fun getUnselectIconResource(id: Int): DrawableResource {
-		// id=0 对应 一号线
-		return when (id + 1) {
-			1 -> Res.drawable.schoolcar_ic_car_icon_1
-			2 -> Res.drawable.schoolcar_ic_car_icon_2
-			3 -> Res.drawable.schoolcar_ic_car_icon_3
-			4 -> Res.drawable.schoolcar_ic_car_icon_4
-			else -> Res.drawable.schoolcar_ic_car_icon_1
-		}
-	}
-
-	private fun getSelectIconResource(id: Int): DrawableResource {
-		// id=0 对应 一号线
-		return when (id + 1) {
-			1 -> Res.drawable.schoolcar_ic_car_icon_1_select
-			2 -> Res.drawable.schoolcar_ic_car_icon_2_select
-			3 -> Res.drawable.schoolcar_ic_car_icon_3_select
-			4 -> Res.drawable.schoolcar_ic_car_icon_4_select
-			else -> Res.drawable.schoolcar_ic_car_icon_1_select
-		}
-	}
-
 
 	/**
 	 * 加载、保存网络的线路数据
@@ -371,8 +255,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	// 对显示模式切换的封装，用这来控制显示模式的切换，以防状态错误
 	private fun changeToLineMode(lineId: Int) {
-		selectedLineId.value = lineId
-		selectedSiteId.value = null
+		btsState.changeToLineMode(lineId)
 		cameraRecover()
 	}
 
@@ -382,8 +265,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	}
 
 	private fun changeToEmptyMode() {
-		selectedLineId.value = null
-		selectedSiteId.value = null
+		btsState.changeToEmptyMode()
 		cameraRecover()
 	}
 

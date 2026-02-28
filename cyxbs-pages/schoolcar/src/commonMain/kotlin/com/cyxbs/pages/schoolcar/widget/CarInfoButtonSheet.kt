@@ -6,7 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -27,15 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.viewmodel.CommonSchoolCarViewModel
-import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.Empty
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.ErrorOverView
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.LineOverview
@@ -55,119 +58,117 @@ import org.jetbrains.compose.resources.painterResource
  * date : 2026/2/19 10:09
  */
 @Composable
-fun CarInfoButtonSheet() {
-	val viewModel = viewModel(SchoolCarViewModel::class)
-	val selectedId by viewModel.selectedLineId
-	val peekHeight by viewModel.peekHeight
-	val list by viewModel.lineSelectorItem
-
-	Box {
-		BottomSheetCompose(
-			modifier = Modifier.navigationBarsPadding(),
-			bottomSheetState = viewModel.bottomSheetState,
-			peekHeight = peekHeight,
-			dismissOnBackPress = false,
-			dismissOnClickOutside = false,
-			scrimColor = Color.Transparent
-		) {
-			ConstraintLayout(
-				modifier = Modifier
-					.then(bottomSheetDraggable())
-					.shadow(
-						elevation = 10.dp,
-						shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-					)
-					.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-					.background(LocalAppColors.current.topBg),
-				constraintSet = createConstraintSet(viewModel.displayMode.value)
-			) {
-				ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
-				LineSelectorCompose(
-					modifier = Modifier.layoutId(layoutId = CarInfoBtsElement.LineSelector),
-					list,
-					selectedId,
-					viewModel::toggleSelectLine
+fun CarInfoButtonSheet(
+	state: CarInfoBtsState,
+	toggleSelectLine: (LineSelectorItem) -> Unit,
+	toggleCurrentLine: (List<CarLine>) -> Unit,
+	onSelectClosedSite: () -> Unit
+) {
+	val selectedId by state.selectedLineId
+	val peekHeight = state.peekHeight
+	val list by state.lineSelectorItem
+	val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+		val realPeekHeight = peekHeight + navBarHeight
+	BottomSheetCompose(
+		bottomSheetState = state.bottomSheetState,
+		peekHeight = realPeekHeight,
+		dismissOnBackPress = false,
+		dismissOnClickOutside = false,
+		scrimColor = Color.Transparent
+	) {
+		ConstraintLayout(
+			modifier = Modifier
+				.then(bottomSheetDraggable())
+				.heightIn(min = realPeekHeight + 2.dp)
+				.shadow(
+					elevation = 10.dp,
+					shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
 				)
-				when (val mode = viewModel.displayMode.value) {
-					is ErrorOverView -> {
-						ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
-					}
-
-					is LineOverview -> {
-						TittleCompose(
-							mode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
-						)
-						RuntimeCompose(mode.line.runTime, Modifier.layoutId(CarInfoBtsElement.LineRunTime))
-						LineTypeCompose(
-							sendType = mode.line.sendType,
-							runType = mode.line.runType,
-							modifier = Modifier.layoutId(CarInfoBtsElement.LineTypeTags)
-						)
-						RouteListCompose(
-							modifier = Modifier.layoutId(CarInfoBtsElement.RouteList),
-							siteId = -1,
-							line = mode.line
-						)
-					}
-
-					is SiteOverView -> {
-						TittleCompose(
-							mode.site.name,
-							modifier = Modifier.layoutId(CarInfoBtsElement.SiteName)
-						)
-
-						RouteListCompose(
-							modifier = Modifier.layoutId(CarInfoBtsElement.SiteList),
-							siteId = mode.site.id,
-							line = mode.currentLine
-						)
-
-						LineChangeButtonCompose(
-							modifier = Modifier.layoutId(CarInfoBtsElement.SwitchLineButton),
-							lineName = mode.currentLine.name,
-							availableLines = mode.availableLines,
-							onClick = viewModel::toggleCurrentLine
-						)
-					}
-
-					is Empty -> {}
+				.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+				.background(LocalAppColors.current.topBg)
+				.navigationBarsPadding(),
+			constraintSet = createConstraintSet(state.displayMode.value)
+		) {
+			ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
+			LineSelectorCompose(
+				modifier = Modifier.layoutId(layoutId = CarInfoBtsElement.LineSelector),
+				list,
+				selectedId,
+				toggleSelectLine
+			)
+			when (val mode = state.displayMode.value) {
+				is ErrorOverView -> {
+					ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
 				}
+
+				is LineOverview -> {
+					TittleCompose(
+						mode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
+					)
+					RuntimeCompose(mode.line.runTime, Modifier.layoutId(CarInfoBtsElement.LineRunTime))
+					LineTypeCompose(
+						sendType = mode.line.sendType,
+						runType = mode.line.runType,
+						modifier = Modifier.layoutId(CarInfoBtsElement.LineTypeTags)
+					)
+					RouteListCompose(
+						modifier = Modifier.layoutId(CarInfoBtsElement.RouteList),
+						siteId = -1,
+						line = mode.line
+					)
+				}
+
+				is SiteOverView -> {
+					TittleCompose(
+						mode.site.name,
+						modifier = Modifier.layoutId(CarInfoBtsElement.SiteName)
+					)
+
+					RouteListCompose(
+						modifier = Modifier.layoutId(CarInfoBtsElement.SiteList),
+						siteId = mode.site.id,
+						line = mode.currentLine
+					)
+
+					LineChangeButtonCompose(
+						modifier = Modifier.layoutId(CarInfoBtsElement.SwitchLineButton),
+						lineName = mode.currentLine.name,
+						availableLines = mode.availableLines,
+						onClick = toggleCurrentLine
+					)
+				}
+
+				is Empty -> {}
 			}
 		}
 	}
-
 	// 选择线路/选择站点的时候自动展开
-	LaunchedEffect(Unit) {
-		snapshotFlow {
-			viewModel.displayMode.value
-		}.onEach {
-			try {
-				viewModel.isBtsAnimate.value = true
-				when (it) {
-					is Empty -> {
-						viewModel.bottomSheetState.collapse()
-					}
-
-					else -> {
-						// 延迟一小会，等待compose完成重新测量
-						delay(50)
-						viewModel.bottomSheetState.expand()
-					}
+	LaunchedEffect(state.displayMode.value){
+		try {
+			delay(64)
+			state.isStateChanging.value = true
+			when (state.displayMode.value) {
+				is Empty -> {
+					state.bottomSheetState.collapse()
 				}
-			} finally {
-				viewModel.isBtsAnimate.value = false
+
+				else -> {
+					state.bottomSheetState.expand()
+				}
 			}
-		}.launchIn(this)
+		} finally {
+			state.isStateChanging.value = false
+		}
 	}
 
 	// 监听当用户处于Empty模式的时候上滑选择最近的站点
 	LaunchedEffect(Unit) {
-		viewModel.bottomSheetState.stateFlow.collect {
+		state.bottomSheetState.stateFlow.collect {
 			if (it == BottomSheetValueState.Scrolling &&
-				viewModel.displayMode.value is Empty &&
-				!viewModel.isBtsAnimate.value
+				state.displayMode.value is Empty &&
+				!state.isStateChanging.value
 			) {
-				viewModel.selectClosedSite()
+				onSelectClosedSite()
 			}
 		}
 	}
