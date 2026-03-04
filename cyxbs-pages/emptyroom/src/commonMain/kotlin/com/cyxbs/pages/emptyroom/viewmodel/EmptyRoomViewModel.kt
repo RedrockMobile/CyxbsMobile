@@ -51,7 +51,7 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
     var selectedBuildNum by mutableStateOf<Int?>(2)
     val selectedSections = mutableStateListOf<Int>().apply { add(1) }//节次是多选
     //返回数据
-    var roomResult by mutableStateOf<List<String>>(emptyList())
+    var roomResult by mutableStateOf<List<String>?>(null)
    //判断加载状态
     var isLoading by mutableStateOf(false)
 
@@ -89,10 +89,8 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
         val result = getEmptyRoomData(bean)
 
         isLoading = false
-        println("EmptyRoomDebug: $result")
         //如果成功，取回 List；如果失败（网络错误等），赋值为空列表
         roomResult = result.getOrNull() ?: emptyList()
-
 
     }
 
@@ -108,12 +106,13 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
     }
 }
 
-//用于接受数据的Int
+//用于接受数据compose函数改变的数据，并且做数据判断
 data class QueryParam(
     val week: Int?,
     val day: Int?,
     val build: Int?,
     val sections: List<Int>
 ) {
+    //判断数据有没有发生变化，如果改变，就触发网络请求
     fun isReady() = week != null && day != null && build != null && sections.isNotEmpty()
 }

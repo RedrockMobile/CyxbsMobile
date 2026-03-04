@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,8 +39,11 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -68,6 +75,62 @@ import org.jetbrains.compose.resources.painterResource
  * date : 2026/3/3 15:34
  */
 
+/**
+ * 所有的静态常量集中定义，避免在重组时重复创建对象
+ */
+
+//周次
+private val WEEK_ITEMS = (1..25).toList()
+private val CHINESE_NUM_LIST = listOf(
+    "一",
+    "二",
+    "三",
+    "四",
+    "五",
+    "六",
+    "七",
+    "八",
+    "九",
+    "十",
+    "十一",
+    "十二",
+    "十三",
+    "十四",
+    "十五",
+    "十六",
+    "十七",
+    "十八",
+    "十九",
+    "二十",
+    "二十一",
+    "二十二",
+    "二十三",
+    "二十四",
+    "二十五"
+)
+
+
+//星期
+private val WEEKDAY_ITEMS = (1..7).toList()
+private val WEEKDAY_NAME_LIST = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+//节次
+private val SECTION_ITEMS = (1..6).toList()
+
+//教学楼配置
+private val BUILDING_ITEMS = listOf(2, 3, 4, 5, 8)
+private val BUILDING_MAP = mapOf(2 to "二教", 3 to "三教", 4 to "四教", 5 to "五教", 8 to "八教")
+
+//楼层
+private val FLOOR_NAME_MAP = mapOf(
+    '1' to "一楼",
+    '2' to "二楼",
+    '3' to "三楼",
+    '4' to "四楼",
+    '5' to "五楼",
+    '6' to "六楼"
+)
+
 @ImplProvider(clazz = MainNavDestination::class, name = NAV_EMPTY_ROOM)
 class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomArgument::class) {
     override val needLogin: Boolean = false
@@ -83,16 +146,7 @@ class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomA
 private fun EmptyRoomPage() {
     val viewModel = viewModel(EmptyRoomComposeViewModel::class)
 
-    //加载中的动画
-    val infiniteTransition = rememberInfiniteTransition()
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
+
 
     Column(
         modifier = Modifier
@@ -108,7 +162,7 @@ private fun EmptyRoomPage() {
                 .background(LocalAppColors.current.middleBg),
             verticalAlignment = Alignment.CenterVertically // 垂直居中对齐
         ) {
-            // 增大返回键点击热区
+            // 增大返回键点区域
             IconButton(
                 onClick = { MainNavController.popBackStack() },
                 modifier = Modifier
@@ -124,39 +178,13 @@ private fun EmptyRoomPage() {
             }
 
             UniversalTabSelector(
-                items = (1..25).toList(),
+                items = WEEK_ITEMS,
                 selectedItems = setOfNotNull(viewModel.selectedWeek),
                 isScrollable = true,
                 modifier = Modifier.weight(1f).height(45.dp),
                 onItemToggle = { viewModel.selectedWeek = it },
                 label = {
-                    val chineseNum = listOf(
-                        "一",
-                        "二",
-                        "三",
-                        "四",
-                        "五",
-                        "六",
-                        "七",
-                        "八",
-                        "九",
-                        "十",
-                        "十一",
-                        "十二",
-                        "十三",
-                        "十四",
-                        "十五",
-                        "十六",
-                        "十七",
-                        "十八",
-                        "十九",
-                        "二十",
-                        "二十一",
-                        "二十二",
-                        "二十三",
-                        "二十四",
-                        "二十五"
-                    )
+                    val chineseNum = CHINESE_NUM_LIST
                     "第${chineseNum.getOrElse(it - 1) { it.toString() }}周"
                 }
             )
@@ -164,7 +192,7 @@ private fun EmptyRoomPage() {
 
         //周几
         UniversalTabSelector(
-            items = listOf(1, 2, 3, 4, 5, 6, 7),
+            items = WEEKDAY_ITEMS,
             selectedItems = setOfNotNull(viewModel.selectedWeekDayNum),
             isScrollable = true,
             modifier = Modifier
@@ -172,7 +200,7 @@ private fun EmptyRoomPage() {
                 .height(45.dp)
                 .background(LocalAppColors.current.middleBg).padding(start = 12.dp),
             onItemToggle = { viewModel.selectedWeekDayNum = it },
-            label = { listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")[it - 1] }
+            label = { WEEKDAY_NAME_LIST.getOrElse(it - 1) { it.toString() } }
         )
 
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -181,34 +209,27 @@ private fun EmptyRoomPage() {
                 color = LocalAppColors.current.topBg,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             ) {
-                Box(modifier = Modifier.padding(top = 20.dp, bottom = 105.dp)) {
-                    if (!viewModel.isLoading) {
-                        // 只有在非加载状态下才显示内容
-                        if (viewModel.roomResult.isNotEmpty()) {
-                            ShowContentCompose(viewModel.roomResult)
+                val navBarHeight =
+                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                Box(modifier = Modifier.padding(top = 20.dp, bottom = 105.dp + navBarHeight)) {
+                    //首次加载数据不提示toast
+                    val result = viewModel.roomResult
+
+                    if (!viewModel.isLoading && result != null) {
+
+                        if (result.isNotEmpty()) {
+                            ShowContentCompose(result)
                         } else {
-                            //不要在Composable直接调用 .toast()，
-                            //否则重组一次弹一次。这里应该使用LaunchedEffect
-                            LaunchedEffect(Unit) { "抱歉，数据获取失败".toast() }
+                            LaunchedEffect(result) { "抱歉，暂无空教室".toast() }
                         }
                     }
+
                 }
             }
 
-            //加载动画图片
-            if (viewModel.isLoading) {
-                Image(
-                    painter = painterResource(Res.drawable.emptyroom_ic_querying),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(24.dp)
-                        .offset(y = (-30).dp)
-                        //在lambda中读取动画值，跳过重组阶段，在绘画阶段操作，防止过度重组
-                        .graphicsLayer { rotationZ = rotation }
 
-                )
-            }
+            //加载动画图片
+            refreshCompose(viewModel.isLoading, modifier = Modifier.align(Alignment.Center))
 
 
             //底部面板
@@ -216,6 +237,7 @@ private fun EmptyRoomPage() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .height(105.dp),
                 color = LocalAppColors.current.bottomBg,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -225,9 +247,12 @@ private fun EmptyRoomPage() {
                     modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.Center
                 ) {
+                    val sectionsSet = remember {
+                        derivedStateOf { viewModel.selectedSections.toSet() }
+                    }
                     UniversalTabSelector(
-                        items = listOf(1, 2, 3, 4, 5, 6),
-                        selectedItems = viewModel.selectedSections.toSet(),
+                        items = SECTION_ITEMS,
+                        selectedItems = sectionsSet.value,
                         isScrollable = true,
                         modifier = Modifier.height(45.dp),
                         onItemToggle = { section ->
@@ -241,26 +266,49 @@ private fun EmptyRoomPage() {
                         },
                         label = { "${it * 2 - 1}—${it * 2}" }
                     )
+                    val selectedBuildSet = remember(viewModel.selectedBuildNum) {
+                        setOfNotNull(viewModel.selectedBuildNum)
+                    }
                     UniversalTabSelector(
-                        items = listOf(2, 3, 4, 5, 8),
-                        selectedItems = setOfNotNull(viewModel.selectedBuildNum),
+                        items = BUILDING_ITEMS,
+                        selectedItems = selectedBuildSet,
                         isScrollable = false,
                         modifier = Modifier.height(45.dp),
                         onItemToggle = { viewModel.selectedBuildNum = it },
                         label = {
-                            val buildMap = mapOf(
-                                2 to "二教",
-                                3 to "三教",
-                                4 to "四教",
-                                5 to "五教",
-                                8 to "八教"
-                            )
+                            val buildMap = BUILDING_MAP
                             buildMap[it] ?: "${it}教"
                         }
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+fun refreshCompose(isLoading: Boolean, modifier: Modifier) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+    //加载动画图片
+    if (isLoading) {
+        Image(
+            painter = painterResource(Res.drawable.emptyroom_ic_querying),
+            contentDescription = null,
+            modifier = modifier
+                .size(24.dp)
+                .offset(y = (-30).dp)
+                //在lambda中读取动画值，跳过重组阶段，在绘画阶段操作，防止过度重组
+                .graphicsLayer { rotationZ = rotation }
+
+        )
     }
 }
 
@@ -277,17 +325,31 @@ fun <T> UniversalTabSelector(
     if (isScrollable) {
         LazyRow(
             modifier = modifier.fillMaxWidth(),
-            //这里设为0，间距由 TabItemContent 内部控制
             horizontalArrangement = Arrangement.spacedBy(0.dp),
-            // 侧边起始留白
             contentPadding = PaddingValues(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items(items) { item ->
-                val isSelected = selectedItems.contains(item)
+            items(
+                items = items,
+                //key，帮助 Compose 识别元素
+                key = { it.toString() },
+                //contentType，帮助 LazyRow 在复用池中快速找回对象
+                contentType = { "TabItem" }
+            ) { item ->
+                //这里的 contains 操作在每一帧重组时都会执行
+                // 如果 selectedItems 是被 remember 的，这里性能就很快
+                val isSelected = remember(selectedItems, item) {
+                    selectedItems.contains(item)
+                }
+
                 CustomTabWrapper(
                     onClick = { onItemToggle(item) },
-                    content = { TabItemContent(text = label(item), isSelected = isSelected) }
+                    content = {
+                        TabItemContent(
+                            text = label(item),
+                            isSelected = isSelected
+                        )
+                    }
                 )
             }
         }
@@ -404,14 +466,7 @@ fun ShowContentCompose(rawRoomList: List<String>) {
 }
 
 fun List<String>.groupByFloor(): List<Pair<String, List<String>>> {
-    val floorNameMap = mapOf(
-        '1' to "一楼",
-        '2' to "二楼",
-        '3' to "三楼",
-        '4' to "四楼",
-        '5' to "五楼",
-        '6' to "六楼"
-    )
+    val floorNameMap = FLOOR_NAME_MAP
 
     return this.filter { it.length >= 2 }
         .groupBy { it[1] } //分组(楼层)
