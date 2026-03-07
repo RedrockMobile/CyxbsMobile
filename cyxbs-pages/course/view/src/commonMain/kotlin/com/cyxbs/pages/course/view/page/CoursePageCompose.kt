@@ -89,7 +89,7 @@ fun CoursePageCompose(
 }
 
 class LocalCoursePageContext(
-  val page: Int,
+  val page: Int, // page 并不一定就是周数，需要通过 AbstractCourseFrame#getWeekNumByPage 才能获取周数
   timeline: CourseTimeline,
   scrollContext: LocalCourseScrollContext, // 滚轴 context
 ) {

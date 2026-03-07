@@ -27,9 +27,8 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
-import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -70,7 +69,7 @@ private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
       Image(
         contentDescription = "关联人的课程",
         contentScale = ContentScale.Inside,
-        painter = painterResource(Res.drawable.course_ic_item_header_link_double),
+        painter = painterResource(ILinkService2.icon_link_double),
         modifier = Modifier.padding(start = 16.dp).clickableNoIndicator {
           // todo 跳转到搜索课表界面并打开关联人的课表
           toast("todo：跳转到搜索课表界面并打开关联人的课表")

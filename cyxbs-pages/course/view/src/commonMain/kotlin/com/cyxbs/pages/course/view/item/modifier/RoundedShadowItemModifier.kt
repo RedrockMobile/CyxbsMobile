@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 
@@ -18,7 +19,11 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 object RoundedShadowItemModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
+    val itemState = itemState
     return Modifier.padding(1.dp)
+      .graphicsLayer {
+        alpha = itemState.alphaState.floatValue
+      }
       .background(LocalAppColors.current.topBg, RoundedCornerShape(8.dp)) // 这里是为了有一层底色，在长按拖动重叠后能显示一圈细微的白色边框
       .padding(0.6.dp)
       .shadow(elevation = 0.5.dp, shape = RoundedCornerShape(8.dp))

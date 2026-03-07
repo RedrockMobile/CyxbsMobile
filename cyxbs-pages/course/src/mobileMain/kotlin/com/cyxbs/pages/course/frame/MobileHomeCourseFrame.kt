@@ -24,12 +24,14 @@ import com.cyxbs.pages.course.dialog.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.frame.bottomsheet.MobileHomeBottomSheet
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseAffairItemFactory
+import com.cyxbs.pages.course.frame.item.MobilePlatformCourseCreateAffairItemFactory
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseLinkLessonItemFactory
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseSelfLessonItemFactory
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.frame.HomeCoursePageContent
 import com.cyxbs.pages.course.view.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel
 import com.cyxbs.pages.course.view.frame.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.view.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
@@ -144,11 +146,19 @@ private fun createCoursePageDecorations(
     )
   }
 
+  val createAffairDecoration = viewModel {
+    CreateAffairDecorationViewModel(
+      hierarchy = CourseItemHierarchy(),
+      platformItemFactory = MobilePlatformCourseCreateAffairItemFactory
+    )
+  }
+
   viewModel {
     CourseItemViewModel(
+      createAffairDecoration.hierarchy, // 创建事务在顶层计算重叠，但是布局位置在底层，item 通过 zIndex 显示在课程上
       selfLessonDecoration.hierarchy,
       affairDecoration.hierarchy,
-      linkLessonDecoration.hierarchy
+      linkLessonDecoration.hierarchy,
     )
   }
 
@@ -157,6 +167,7 @@ private fun createCoursePageDecorations(
       selfLessonDecoration, // 自己的课程
       affairDecoration, // 自己的事务
       linkLessonDecoration, // 关联人的课程
+      createAffairDecoration, // 长按创建事务
     )
   }
 }

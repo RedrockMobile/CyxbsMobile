@@ -3,7 +3,6 @@ package com.cyxbs.pages.course.view.item.impl
 import androidx.compose.runtime.Composable
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem

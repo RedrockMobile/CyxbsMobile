@@ -95,6 +95,11 @@ abstract class AbstractCourseFrame {
       animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
     )
   }
+
+  // 获取指定页面是第几周，如果非周数时返回 null，比如整学期
+  fun getWeekNumByPage(page: Int): Int? {
+    return if (page in 1 ..maxWeek) page else null
+  }
 }
 
 @Composable

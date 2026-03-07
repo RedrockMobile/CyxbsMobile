@@ -58,7 +58,7 @@ class AffairGroupModelImpl(
       whatTime = emptyList(),
     )
     val model = createAffairItemModelImpl(entity)
-    return model.tryCreateEditor()!!
+    return model.tryCreateEditor()!! // 添加进 _itemList 由内部 commit() 时进行处理
   }
 
   fun addAffairInternal(idModel: AffairIdModelImpl) {

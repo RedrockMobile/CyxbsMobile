@@ -155,7 +155,6 @@ object AffairRepository2 {
       AffairApiService2::class.impl().addAffair(request)
     }.mapCatching {
       it.throwApiExceptionIfFail()
-      @OptIn(ExperimentalUuidApi::class)
       request.toAffairEntity(localId = localId, remoteId = it.id)
     }.recoverCatching {
       // 上传失败
@@ -165,7 +164,6 @@ object AffairRepository2 {
         )
       } else if (allowLocal) {
         // 添加进本地临时数据中
-        @OptIn(ExperimentalUuidApi::class)
         val newAffair = request.toAffairEntity(localId = localId, remoteId = 0) // 本地临时事务 remoteId 为 0
         LocalAddAffairRepository.add(stuNum, newAffair)
         return@recoverCatching newAffair

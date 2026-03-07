@@ -11,6 +11,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * 如果需要两个 [MinuteTime] 组合，可以使用 [MinuteTimePair]
@@ -64,6 +66,14 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
 
   fun minusHours(hours: Int): MinuteTime {
     return plusHours(-hours)
+  }
+
+  operator fun minus(time: MinuteTime): Duration {
+    return time.minutesUntil(this).minutes
+  }
+
+  operator fun plus(duration: Duration): MinuteTime {
+    return plusMinutes(duration.inWholeMinutes.toInt())
   }
 
   override fun compareTo(other: MinuteTime): Int {

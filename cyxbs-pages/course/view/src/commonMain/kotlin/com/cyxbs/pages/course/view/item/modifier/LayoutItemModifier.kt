@@ -33,8 +33,12 @@ import kotlin.math.roundToInt
  * @date 2025/11/16
  */
 object LayoutItemModifier : CourseItemModifier {
+
+  val enableAnimatable = CourseItemState.ValueKey { true }
+
   @Composable
   override fun createModifier(): Modifier {
+    val itemState = itemState
     return courseItemLayout(itemState)
   }
 }
@@ -66,13 +70,31 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
       supervisorScope {
         val newIndex = calculateIndex(itemState, timeline).toFloat()
         if (newIndex != indexAnimatable.value) {
-          launch { indexAnimatable.animateTo(newIndex) }
+          launch {
+            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+              indexAnimatable.animateTo(newIndex)
+            } else {
+              indexAnimatable.snapTo(newIndex)
+            }
+          }
         }
         if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
-          launch { beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay) }
+          launch {
+            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+              beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay)
+            } else {
+              beginTimeAnimatable.snapTo(it.beginTime.minuteOfDay)
+            }
+          }
         }
         if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
-          launch { finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay) }
+          launch {
+            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+              finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay)
+            } else {
+              finalTimeAnimatable.snapTo(it.finalTime.minuteOfDay)
+            }
+          }
         }
       }
     }
@@ -81,7 +103,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     val beginWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(beginTimeAnimatable.value))
     val finalWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(finalTimeAnimatable.value))
     val width = constraints.maxWidth / 7
-    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt()
+    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(1)
     val placeable = measurable.measure(Constraints.fixed(width, height))
     layout(width, height) {
       placeable.placeRelative(

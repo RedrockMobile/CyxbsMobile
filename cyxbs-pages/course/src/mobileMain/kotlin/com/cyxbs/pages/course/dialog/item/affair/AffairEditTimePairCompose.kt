@@ -24,7 +24,7 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.wheel.WheelSelectBackground
 import com.cyxbs.components.view.wheel.WheelSelectCompose
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
-import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
+import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.collectLatest
 

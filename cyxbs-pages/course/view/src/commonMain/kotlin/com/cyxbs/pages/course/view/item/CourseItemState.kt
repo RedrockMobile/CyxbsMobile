@@ -48,6 +48,9 @@ class CourseItemState(
   // 提供给一些场景设置 item 的层级
   val zIndexState = mutableFloatStateOf(0F)
 
+  // 提供给一些场景设置 item 透明度
+  val alphaState = mutableFloatStateOf(1F)
+
   // item 节点坐标系
   // 如果 item 被重叠完全遮挡，则可能并不存在 layoutCoordinates，或者 layoutCoordinates.isAttached = false
   // 使用 SharedFlow 是为了不去重，因为每次 item 位置改变都会回调，但 layoutCoordinates 对象不变
@@ -146,6 +149,9 @@ class CourseItemState(
     }
   }
 
+  // 提供一个供全局使用的数据存储
+  // 这种分离的存储在关键时很有效果，但不推荐过度使用
+  private val itemStore = hashMapOf<ValueKey<*>, Any>()
 
   fun interface OverlapChangeTrigger {
 
@@ -164,5 +170,29 @@ class CourseItemState(
       prevShow: List<MinuteTimePair>,
       overlap: OverlapResult,
     ): List<MinuteTimePair>
+  }
+
+  class ValueKey<T>(private val default: (CourseItemState) -> T) {
+    // 存储值到 itemState 中
+    fun set(itemState: CourseItemState, value: T) {
+      itemState.itemStore[this] = value as Any
+    }
+
+    // 获取 itemState 中存储的值
+    fun get(itemState: CourseItemState): T {
+      @Suppress("UNCHECKED_CAST")
+      if (contain(itemState)) {
+        return itemState.itemStore[this] as T
+      } else {
+        val value = default.invoke(itemState)
+        set(itemState, value)
+        return value
+      }
+    }
+
+    // 是否存在当前 key
+    fun contain(itemState: CourseItemState): Boolean {
+      return itemState.itemStore.containsKey(this)
+    }
   }
 }

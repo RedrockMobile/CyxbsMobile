@@ -131,8 +131,10 @@ object EditAffairUtils {
       idModel.groupModel.removeAffairInternal(idModel)
     } else {
       if (idModel.remoteId.value == 0) {
+        // 新增的本地临时事务
         idModel.groupModel.addAffairInternal(idModel)
       } else if (idModel.groupModel.itemList.value.all { it.remoteId.value != idModel.remoteId.value }) {
+        // 新增的事务
         idModel.groupModel.addAffairInternal(idModel)
       }
     }

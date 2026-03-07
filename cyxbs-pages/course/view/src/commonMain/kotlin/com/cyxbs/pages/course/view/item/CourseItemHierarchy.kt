@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewModelScope
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePage
@@ -243,6 +242,12 @@ class CourseItemHierarchy<Item : CourseItem> {
     }
   }
 
+  fun getAllWhatTime(): List<ItemHierarchyWhatTime<Item>> {
+    synchronized(dateItemsMapSynchronized) {
+      return itemWrapperMap.keys.toList()
+    }
+  }
+
   fun observe(page: Int, dayOfWeek: DayOfWeek): StateFlow<List<CourseItemState>> {
     val dateKey = page * 7 + dayOfWeek.ordinal
     synchronized(dateItemsMapSynchronized) {
@@ -323,6 +328,7 @@ class CourseItemHierarchy<Item : CourseItem> {
       val item = whatTime.createItem(coroutineScope)
       CourseItemState(item).also {
         item.itemState = it
+        whatTime.itemState = it
       }
     }
 
@@ -347,6 +353,10 @@ class CourseItemHierarchy<Item : CourseItem> {
 // 2. item 的 coroutineScope 统一收口
 abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Comparable<ItemHierarchyWhatTime<Item>> {
   abstract override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
+
+  // 调用 createItem 后才会创建 itemState
+  var itemState: CourseItemState? = null
+
   abstract fun createItem(coroutineScope: CoroutineScope): Item
   abstract override fun equals(other: Any?): Boolean
   abstract override fun hashCode(): Int

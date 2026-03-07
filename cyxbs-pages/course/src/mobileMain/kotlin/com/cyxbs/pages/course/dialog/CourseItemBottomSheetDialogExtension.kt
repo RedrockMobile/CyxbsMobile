@@ -62,8 +62,8 @@ import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.drawBeginFinalTimeline
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
+import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.modifier.observeItemRectInWindow
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
@@ -80,6 +80,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -384,55 +385,33 @@ private fun BottomSheet(
   }
 }
 
+// 显示 item 开始结束时间
 @Composable
 private fun ShowBeginFinalTime(
   state: CourseItemBottomSheetDialogState,
 ) {
-  val alphaState = rememberDerivedStateOfStructure {
-    state.bottomSheetState.fraction.coerceIn(0F, 1F)
-  }
-
-  val time1 = produceState(MinuteTime(0, 0)) {
-    state.currentPageItemFlow.filterNotNull().flatMapLatest {
-      it.itemState.item.whatTime.now
-    }.collect {
-      value = it.beginTime
-    }
-  }
-  val time2 = produceState(MinuteTime(0, 0)) {
-    state.currentPageItemFlow.filterNotNull().flatMapLatest {
-      it.itemState.item.whatTime.now
-    }.collect {
-      value = it.finalTime
-    }
-  }
-  val itemRectState = remember {
-    state.currentPageItemFlow.mapNotNull { it?.itemState }.flatMapLatest { itemState ->
-      itemState.observeItemRectInWindow()
-    }
-  }.collectAsState(null)
-  Spacer(
-    modifier = Modifier.layout { measure, constraints ->
-      val width = itemRectState.value?.width?.roundToInt() ?: 0
-      val height = itemRectState.value?.height?.roundToInt() ?: 0
-      val placeable = measure.measure(Constraints.fixed(width, height))
-      layout(constraints.maxWidth, constraints.maxHeight) {
-        val rect = itemRectState.value ?: return@layout
-        val coordinates = coordinates ?: return@layout
-        val localToWindow = coordinates.localToWindow(Offset.Zero)
-        placeable.place(
-          x = (rect.left - localToWindow.x).roundToInt(),
-          y = (rect.top - localToWindow.y).roundToInt(),
-        )
+  LaunchedEffect(Unit) {
+    var lastItemState: CourseItemState? = null
+    state.currentPageItemFlow.filterNotNull().map {
+      it.itemState
+    }.onCompletion {
+      lastItemState?.let {
+        BeginFinalTimeShowModifier.enableShow.get(it).value = false
       }
-    }.drawBeginFinalTimeline(
-      alpha = alphaState,
-      time1 = time1,
-      time2 = time2,
-    )
-  )
+    }.collectLatest { itemState ->
+      lastItemState?.let {
+        BeginFinalTimeShowModifier.enableShow.get(it).value = false
+      }
+      lastItemState = itemState
+      BeginFinalTimeShowModifier.enableShow.get(itemState).value = true
+      snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+        BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = it
+      }
+    }
+  }
 }
 
+// 点击后的 item 置顶全显示
 @Composable
 private fun CurrentItemShowTop(
   state: CourseItemBottomSheetDialogState,
