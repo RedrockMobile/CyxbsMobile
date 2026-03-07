@@ -163,8 +163,7 @@ private fun findCourseBottomSheetHeaderExtension(
   var minItem: CourseItem? = null
   for (itemState in itemStateList) {
     val item = itemState.item
-    val extension = item.extension
-    if (extension !is CourseBottomSheetHeaderExtension) continue
+    val extension = item.extensions.get(CourseBottomSheetHeaderExtension::class) ?: continue
     if (nowTime in item.whatTime.now.value.beginTime..item.whatTime.now.value.finalTime) {
       return extension
     }
@@ -174,5 +173,5 @@ private fun findCourseBottomSheetHeaderExtension(
       continue
     }
   }
-  return minItem?.extension as? CourseBottomSheetHeaderExtension
+  return minItem?.extensions?.get(CourseBottomSheetHeaderExtension::class)
 }

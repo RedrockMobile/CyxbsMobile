@@ -2,27 +2,21 @@ package com.cyxbs.pages.course.frame.item
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
-import com.cyxbs.pages.course.view.frame.item.LinkLessonItem
-import com.cyxbs.pages.course.view.frame.item.LinkLessonItemFactory
-import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
-import com.g985892345.provider.api.annotation.ImplProvider
-import kotlinx.coroutines.CoroutineScope
+import com.cyxbs.pages.course.view.item.impl.CourseLinkLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItemFactory
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -34,60 +28,36 @@ import kotlin.time.Duration.Companion.seconds
  * .
  *
  * @author 985892345
- * @date 2025/3/22
+ * @date 2026/3/7
  */
-@Stable
-class MobileLinkLessonItem(
-  whatTime: CourseItemWhatTime,
-  coroutineScope: CoroutineScope,
-  lesson: LessonByWeeks
-) : LinkLessonItem(whatTime, coroutineScope, lesson) {
-  @ImplProvider
-  companion object Companion : LinkLessonItemFactory {
-    override fun createLinkLessonItem(
-      whatTime: CourseItemWhatTime,
-      coroutineScope: CoroutineScope,
-      lesson: LessonByWeeks
-    ): LinkLessonItem {
-      return MobileLinkLessonItem(whatTime, coroutineScope, lesson)
-    }
+object MobilePlatformCourseLinkLessonItemFactory : PlatformCourseLinkLessonItemFactory {
+  override fun create(item: CourseLinkLessonItem): PlatformCourseLinkLessonItem {
+    return MobilePlatformCourseLinkLessonItem(item)
   }
+}
 
-  override val extension = MobileLinkLessonItemExtensionGroupItem(this)
+private class MobilePlatformCourseLinkLessonItem(
+  val item: CourseLinkLessonItem
+) : PlatformCourseLinkLessonItem {
+
+  init {
+    item.extensions.add(MobileLinkCourseBottomSheetExtension(item))
+  }
 
   @Composable
-  override fun CourseItemContent() {
+  override fun CourseItemContentWrapper(content: @Composable ((onClick: ((MinuteTimePair) -> Unit)?) -> Unit)) {
     val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
-    val itemState = itemState
-    CourseDefaultItemContent(
-      itemState = itemState,
-      topText = lesson.course,
-      bottomText = lesson.classroomSimplify,
-      textColor = 0xFF06A3FC.dark(0xFFF0F0F2),
-      backgroundColor = 0xFFDFF3FC.dark(0x2690DBFB),
-    ) {
-      itemBottomSheetDialog.showDialog(itemState.overlap)
+    content.invoke {
+      // 点击事件
+      itemBottomSheetDialog.showDialog(item.itemState.overlap)
     }
   }
 }
 
-class MobileLinkLessonItemExtensionGroupItem(
-  val itemKeyImpl: MobileLinkLessonItem
-) : IMovableItemExtension by MobileLinkMovableItemExtension(itemKeyImpl)
-  , CourseItemBottomSheetDialogExtension by MobileLinkCourseItemBottomSheetDialogExtension(itemKeyImpl)
-  , CourseBottomSheetHeaderExtension by MobileLinkCourseBottomSheetHeaderExtension(itemKeyImpl)
 
-private class MobileLinkMovableItemExtension(
-  val itemKeyImpl: MobileLinkLessonItem
-) : IMovableItemExtension {
-  override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
-    return false
-  }
-}
-
-private class MobileLinkCourseItemBottomSheetDialogExtension(
-  val itemKeyImpl: MobileLinkLessonItem
-) : CourseItemBottomSheetDialogExtension {
+private class MobileLinkCourseBottomSheetExtension(
+  val itemKeyImpl: CourseLinkLessonItem
+) : CourseBottomSheetHeaderExtension, CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
     get() = itemKeyImpl.itemState
@@ -96,11 +66,7 @@ private class MobileLinkCourseItemBottomSheetDialogExtension(
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
     LessonBottomSheetDialog(itemKeyImpl.lesson, true)
   }
-}
 
-private class MobileLinkCourseBottomSheetHeaderExtension(
-  val itemKeyImpl: MobileLinkLessonItem
-) : CourseBottomSheetHeaderExtension {
   @Composable
   override fun CourseBottomSheetHeaderContent(modifier: Modifier) {
     val state = remember(this) { mutableStateOf("") }
@@ -114,7 +80,7 @@ private class MobileLinkCourseBottomSheetHeaderExtension(
       finalTime = itemKeyImpl.lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        itemBottomSheetDialog.showDialog(itemKeyImpl.extension)
+        itemBottomSheetDialog.showDialog(this)
       },
       onClickContent = {
         // todo 跳转到地图页

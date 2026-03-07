@@ -49,8 +49,8 @@ object LongPressMoveItemModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
-    if (itemState.item.extension !is IMovableItemExtension) return Modifier
-    return Modifier.longPressMove(remember { LongPressMoveControllerImpl(itemState) })
+    val extension = itemState.item.extensions.get(IMovableItemExtension::class) ?: return Modifier
+    return Modifier.longPressMove(remember { LongPressMoveControllerImpl(itemState, extension) })
   }
 }
 
@@ -224,6 +224,7 @@ fun Modifier.longPressMove(
 // 耦合 CourseItemState
 class LongPressMoveControllerImpl(
   val itemState: CourseItemState,
+  val extension: IMovableItemExtension,
 ) : LongPressMoveController() {
 
   // 自身 showRange 转换器（包含自身完全不显示的情况）
@@ -269,7 +270,7 @@ class LongPressMoveControllerImpl(
     }
 
   override fun enable(transition: MutableState<Offset>): Boolean {
-    return transition.value == Offset.Zero && itemState.item.extension is IMovableItemExtension
+    return transition.value == Offset.Zero
   }
 
   override fun updateState(state: LongPressMoveState) {
@@ -309,8 +310,7 @@ class LongPressMoveControllerImpl(
 
   // 移动过程中判断是否需要展开时间轴折叠部分
   private fun tryExpandTimeline(screenLeftTop: Offset, size: IntSize) {
-    val item = itemState.item.extension as IMovableItemExtension
-    if (!item.enableExpandTimelineWhenMove(itemState)) return
+    if (!extension.enableExpandTimelineWhenMove(itemState)) return
     val pageContext = itemState.coursePageFlow.value ?: return
     val scrollContext = pageContext.scrollContext
     pageContext.timeline.data.asSequence()
@@ -357,8 +357,7 @@ class LongPressMoveControllerImpl(
     screenLeftTop: Offset,
     size: IntSize
   ) {
-    val item = itemState.item.extension as IMovableItemExtension
-    val destinationOffset = item.getMoveDestinationOffset(
+    val destinationOffset = extension.getMoveDestinationOffset(
       upOrCancel = upOrCancel,
       itemState = itemState,
       transition = transition,
@@ -392,7 +391,7 @@ class LongPressMoveControllerImpl(
     }
     try {
       // 由 IMovableItemModel 实现最后动画的移动
-      item.animateMove(itemState, transition, destinationOffset)
+      extension.animateMove(itemState, transition, destinationOffset)
     } finally {
       transition.value = destinationOffset
       if (destinationOffset == Offset.Zero) {

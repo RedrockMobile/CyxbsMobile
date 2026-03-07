@@ -142,7 +142,7 @@ class CourseItemBottomSheetDialogState {
         rootItemState = overlapResult.itemState,
         otherOverlap = overlapResult,
         set = linkedSetOf(overlapResult.itemState)
-      ).mapNotNull { it.item.extension as? CourseItemBottomSheetDialogExtension }
+      ).mapNotNull { it.item.extensions.get(CourseItemBottomSheetDialogExtension::class) }
     }
   }
 

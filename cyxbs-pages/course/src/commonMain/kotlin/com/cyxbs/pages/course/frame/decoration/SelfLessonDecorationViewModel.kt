@@ -7,13 +7,13 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
-import com.cyxbs.pages.course.view.frame.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import com.cyxbs.pages.course.view.item.impl.CourseSelfLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseSelfLessonItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlin.compareTo
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
@@ -34,7 +33,8 @@ import kotlin.time.Duration.Companion.days
  */
 @Stable
 class SelfLessonDecorationViewModel(
-  val hierarchy: CourseItemHierarchy<SelfLessonItem>,
+  val hierarchy: CourseItemHierarchy<CourseSelfLessonItem>,
+  val platformItemFactory: PlatformCourseSelfLessonItemFactory,
 ) : BaseViewModel(), CoursePageDecoration {
 
   init {
@@ -49,10 +49,10 @@ class SelfLessonDecorationViewModel(
         hierarchy.reset(buildList {
           it?.forEach { lesson ->
             // 添加进整学期
-            add(SelfLessonWhatTime(0, lesson))
+            add(SelfLessonWhatTime(0, lesson, platformItemFactory))
             // 添加进每周
             lesson.week.forEach { week ->
-              add(SelfLessonWhatTime(week, lesson))
+              add(SelfLessonWhatTime(week, lesson, platformItemFactory))
             }
           }
         })
@@ -110,7 +110,8 @@ class SelfLessonDecorationViewModel(
 private data class SelfLessonWhatTime(
   val page: Int,
   val lesson: LessonByWeeks,
-) : ItemHierarchyWhatTime<SelfLessonItem>() {
+  val platformItemFactory: PlatformCourseSelfLessonItemFactory, // 创建平台配置 factory 的 key
+) : ItemHierarchyWhatTime<CourseSelfLessonItem>() {
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
     CourseItemWhatTime.Fixed(
       page = page,
@@ -120,15 +121,16 @@ private data class SelfLessonWhatTime(
     )
   )
 
-  override fun createItem(coroutineScope: CoroutineScope): SelfLessonItem {
-    return SelfLessonItemFactory.get().createSelfLessonItem(
+  override fun createItem(coroutineScope: CoroutineScope): CourseSelfLessonItem {
+    return CourseSelfLessonItem(
       whatTime = this,
       coroutineScope = coroutineScope,
       lesson = lesson,
+      platformItemFactory = platformItemFactory,
     )
   }
 
-  override fun compareTo(other: ItemHierarchyWhatTime<SelfLessonItem>): Int {
+  override fun compareTo(other: ItemHierarchyWhatTime<CourseSelfLessonItem>): Int {
     return 0.compareBy(other) {
       -it.now.value.page // page 越小越在上
     }.compareBy(other) {
@@ -143,8 +145,8 @@ private data class SelfLessonWhatTime(
   }
 
   private inline fun Int.compareBy(
-    other: ItemHierarchyWhatTime<SelfLessonItem>,
-    compare: (ItemHierarchyWhatTime<SelfLessonItem>) -> Int
+    other: ItemHierarchyWhatTime<CourseSelfLessonItem>,
+    compare: (ItemHierarchyWhatTime<CourseSelfLessonItem>) -> Int
   ): Int {
     if (this != 0) return this
     val a = compare.invoke(this@SelfLessonWhatTime)

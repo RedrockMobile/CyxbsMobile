@@ -16,13 +16,13 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
 import com.cyxbs.pages.course.frame.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.frame.decoration.SelfLessonDecorationViewModel
+import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseAffairItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseLinkLessonItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseSelfLessonItemFactory
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.frame.HomeCoursePageContent
 import com.cyxbs.pages.course.view.frame.header.CourseFrameHeader
-import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
-import com.cyxbs.pages.course.view.frame.item.LinkLessonItem
-import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -79,16 +79,35 @@ private fun AdaptiveHomeCourseFrameContent(
 private fun createCoursePageDecorations(
   frame: AbstractCourseFrame
 ): ImmutableList<CoursePageDecoration> {
-  val selfLessonHierarchy = remember { CourseItemHierarchy<SelfLessonItem>() }
-  val selfLessonDecoration = viewModel { SelfLessonDecorationViewModel(selfLessonHierarchy) }
+  val selfLessonDecoration = viewModel {
+    SelfLessonDecorationViewModel(
+      hierarchy = CourseItemHierarchy(),
+      platformItemFactory = DefaultPlatformCourseSelfLessonItemFactory,
+    )
+  }
 
-  val linkLessonHierarchy = remember { CourseItemHierarchy<LinkLessonItem>() }
-  val linkLessonDecoration = viewModel { LinkLessonDecorationViewModel(linkLessonHierarchy) }
+  val linkLessonDecoration = viewModel {
+    LinkLessonDecorationViewModel(
+      hierarchy = CourseItemHierarchy(),
+      platformItemFactory = DefaultPlatformCourseLinkLessonItemFactory,
+    )
+  }
 
-  val affairHierarchy = remember { CourseItemHierarchy<CourseAffairItem>() }
-  val affairDecoration = viewModel { AffairDecorationViewModel(frame, affairHierarchy) }
+  val affairDecoration = viewModel {
+    AffairDecorationViewModel(
+      courseFrame = frame,
+      hierarchy = CourseItemHierarchy(),
+      platformItemFactory = DefaultPlatformCourseAffairItemFactory,
+    )
+  }
 
-  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, affairHierarchy, linkLessonHierarchy) }
+  viewModel {
+    CourseItemViewModel(
+      selfLessonDecoration.hierarchy,
+      affairDecoration.hierarchy,
+      linkLessonDecoration.hierarchy
+    )
+  }
 
   return remember {
     persistentListOf(

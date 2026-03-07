@@ -21,9 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
-import com.cyxbs.pages.course.frame.item.MobileSelfLessonItem
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
+import com.cyxbs.pages.course.view.item.impl.CourseAffairItem
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_landmark
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_course_header_time

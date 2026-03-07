@@ -7,14 +7,14 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.IAffairService2
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.view.frame.item.AffairItemFactory
-import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import com.cyxbs.pages.course.view.item.impl.CourseAffairItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseAffairItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -35,6 +35,7 @@ import kotlinx.coroutines.supervisorScope
 class AffairDecorationViewModel(
   val courseFrame: AbstractCourseFrame,
   val hierarchy: CourseItemHierarchy<CourseAffairItem>,
+  val platformItemFactory: PlatformCourseAffairItemFactory,
 ) : BaseViewModel(), CoursePageDecoration {
 
   init {
@@ -51,7 +52,8 @@ class AffairDecorationViewModel(
                 val whatTime = AffairItemWhatTime(
                   isSemester = false,
                   affairDateModel = dateModel,
-                  courseFrame = courseFrame
+                  courseFrame = courseFrame,
+                  platformItemFactory = platformItemFactory
                 )
                 launch {
                   dateModel.enable.mergeFlow.collect {
@@ -65,7 +67,8 @@ class AffairDecorationViewModel(
                 val whatTime = AffairItemWhatTime(
                   isSemester = false,
                   affairDateModel = dateModel,
-                  courseFrame = courseFrame
+                  courseFrame = courseFrame,
+                  platformItemFactory = platformItemFactory
                 )
                 launch {
                   dateModel.enable.mergeFlow.collect {
@@ -101,6 +104,7 @@ private data class AffairItemWhatTime(
   val isSemester: Boolean,
   val affairDateModel: AffairDateModel,
   val courseFrame: AbstractCourseFrame,
+  val platformItemFactory: PlatformCourseAffairItemFactory, // 创建平台配置 factory 的 key
 ) : ItemHierarchyWhatTime<CourseAffairItem>() {
 
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
@@ -117,10 +121,11 @@ private data class AffairItemWhatTime(
   )
 
   override fun createItem(coroutineScope: CoroutineScope): CourseAffairItem {
-    return AffairItemFactory.get().createAffairItemModel(
-      whatTime = this,
+    return CourseAffairItem(
+      affairWhatTime = this,
       coroutineScope = coroutineScope,
       affairDateModel = affairDateModel,
+      platformItemFactory = platformItemFactory,
     )
   }
 

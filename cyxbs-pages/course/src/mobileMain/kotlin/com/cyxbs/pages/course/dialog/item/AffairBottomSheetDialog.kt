@@ -84,8 +84,8 @@ import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentFo
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditCompose
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditWeekText
 import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete
@@ -530,7 +530,7 @@ private fun AffairModifyTime(
         // 修改外层选中的 CourseItemState，使开始结束时间和滚轴偏移量发生改变
         // 通过这种方法获取 itemState 稍微有些 trick
         val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor)
-        courseState.currentPageItemFlow.value = itemState.item.extension as CourseItemBottomSheetDialogExtension
+        courseState.currentPageItemFlow.value = itemState.item.extensions.get(CourseItemBottomSheetDialogExtension::class)
       }
     }
   }

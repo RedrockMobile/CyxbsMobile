@@ -57,8 +57,8 @@ import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete
@@ -310,7 +310,7 @@ private fun DateFlowRow(
       // 通过这种方法获取 itemState 稍微有些 trick
       val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor)
       courseState.currentPageItemFlow.value =
-        itemState.item.extension as CourseItemBottomSheetDialogExtension
+        itemState.item.extensions.get(CourseItemBottomSheetDialogExtension::class)
     }
   }
 }

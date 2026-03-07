@@ -1,51 +1,14 @@
 package com.cyxbs.pages.course.view.item
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.components.config.time.MinuteTimePair
-import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
-import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
-import com.cyxbs.pages.course.view.item.modifier.LayoutCoordinateSaveModifier
-import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
-import com.cyxbs.pages.course.view.item.modifier.LongPressMoveItemModifier
-import com.cyxbs.pages.course.view.item.modifier.PressScaleItemModifier
-import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
-import kotlin.math.roundToInt
+import kotlin.reflect.KClass
 
 /**
  * .
@@ -64,7 +27,7 @@ abstract class CourseItem(
 ) {
 
   // item 支持的扩展功能
-  abstract val extension: CourseItemExtension
+  val extensions = CourseItemExtensionContainer()
 
   // item 当前 Compose 中的状态
   lateinit var itemState: CourseItemState
@@ -80,6 +43,7 @@ abstract class CourseItem(
   abstract fun CourseItemContent()
 }
 
+// item 的时间信息
 interface CourseItemWhatTime {
   val now: StateFlow<Fixed>
 
@@ -97,172 +61,17 @@ interface CourseItemWhatTime {
   )
 }
 
-@Composable
-fun CourseDefaultItemContent(
-  itemState: CourseItemState,
-  modifierList: ImmutableList<CourseItemModifier?> = remember {
-    persistentListOf(
-      LayoutItemModifier, // 布局
-      LongPressMoveItemModifier, // 长按移动 item
-      LayoutCoordinateSaveModifier, // 保存 item 的坐标系
-      PressScaleItemModifier, // 点击 Q 弹动画，需要在长按移动 item 之后
-      RoundedShadowItemModifier, // 圆角+阴影
-    )
-  },
-  topText: String,
-  bottomText: String,
-  textColor: Color,
-  backgroundColor: Color,
-  onClick: ((MinuteTimePair) -> Unit)? = null,
-) {
-  if (itemState.realShowRange.isEmpty()) return
-  Box(
-    modifier = Modifier.plusDsl {
-      // 外界实现 CourseItemModifier 来修改 item 的样式
-      modifierList.forEach {
-        then(it?.createModifier() ?: Modifier)
-      }
-    }.background(backgroundColor)
-  ) {
-    itemState.realShowRange.fastForEach { range ->
-      CourseShowRange(
-        range = range,
-        itemRange = Snapshot.withoutReadObservation {
-          MinuteTimePair(
-            itemState.item.whatTime.now.value.beginTime,
-            itemState.item.whatTime.now.value.finalTime
-          )
-        },
-        enableShowCoverTip = itemState.overlap?.coveredItemList?.isNotEmpty() == true,
-        timeline = itemState.item.coursePage.timeline,
-        topText = topText,
-        bottomText = bottomText,
-        textColor = textColor,
-        onClick = onClick,
-      )
-    }
+// item 的扩展功能
+class CourseItemExtensionContainer {
+
+  private val extensions = mutableListOf<CourseItemExtension>()
+
+  fun add(extension: CourseItemExtension) {
+    extensions.add(extension)
+  }
+
+  fun <T : CourseItemExtension> get(clazz: KClass<T>): T? {
+    @Suppress("UNCHECKED_CAST")
+    return extensions.find { clazz.isInstance(it) } as T?
   }
 }
-
-@Composable
-private fun CourseShowRange(
-  range: MinuteTimePair, // 当前显示的区间
-  itemRange: MinuteTimePair, // item 总区间
-  enableShowCoverTip: Boolean,
-  timeline: CourseTimeline,
-  topText: String,
-  bottomText: String,
-  textColor: Color,
-  onClick: ((MinuteTimePair) -> Unit)? = null,
-) {
-  val weightAnim = remember {
-    Animatable(
-      typeConverter = Offset.VectorConverter,
-      initialValue = calculateWeight(timeline, range, itemRange)
-    )
-  }
-  LaunchedEffect(range, itemRange) {
-    weightAnim.animateTo(calculateWeight(timeline, range, itemRange))
-  }
-  CourseItemTopBottomText(
-    modifier = Modifier.layout { measurable, constraints ->
-      val weight = weightAnim.value
-      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
-      val placeable = measurable.measure(
-        Constraints.fixed(constraints.maxWidth, height)
-      )
-      layout(placeable.width, placeable.height) {
-        placeable.placeRelative(0, (constraints.maxHeight * weight.x).roundToInt())
-      }
-    }.drawWithContent {
-      drawContent()
-      if (enableShowCoverTip) {
-        // 右上角的重叠标志
-        drawRoundRect(
-          color = textColor,
-          topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),
-          size = Size(width = 6.dp.toPx(), height = 2.dp.toPx()),
-          cornerRadius = CornerRadius(1.dp.toPx()),
-        )
-      }
-    }.clickableNoIndicator {
-      onClick?.invoke(range)
-    },
-    topText = topText,
-    bottomText = bottomText,
-    textColor = textColor,
-  )
-}
-
-private fun calculateWeight(
-  timeline: CourseTimeline,
-  range: MinuteTimePair,
-  itemRange: MinuteTimePair,
-): Offset {
-  Snapshot.withoutReadObservation {
-    return timeline.calculateRelativeWeight(
-      beginTime1 = range.first,
-      finalTime1 = range.second,
-      beginTime2 = itemRange.first,
-      finalTime2 = itemRange.second,
-    )
-  }
-}
-
-
-/**
- * 添加统一样式的顶部和底部文字
- */
-@Composable
-fun CourseItemTopBottomText(
-  modifier: Modifier = Modifier,
-  topText: String,
-  bottomText: String,
-  textColor: Color,
-) {
-  Layout(
-    modifier = modifier.fillMaxSize(),
-    content = {
-      Text(
-        text = topText,
-        textAlign = TextAlign.Center,
-        color = textColor,
-        maxLines = 3,
-        overflow = TextOverflow.Ellipsis,
-        fontSize = 11.sp,
-        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 6.dp)
-      )
-      Text(
-        text = bottomText,
-        textAlign = TextAlign.Center,
-        color = textColor,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        fontSize = 11.sp,
-        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 6.dp)
-      )
-    },
-    measurePolicy = { measurables, constraints ->
-      val topPlaceable = measurables[0].measure(
-        constraints.copy(
-          minHeight = 0
-        )
-      )
-      val space = 2.dp.roundToPx()
-      val bottomPlaceable = measurables[1].measure(
-        constraints.copy(
-          minHeight = 0,
-          maxHeight = (constraints.maxHeight - topPlaceable.height - space).coerceAtLeast(0),
-        )
-      )
-      layout(constraints.maxWidth, constraints.maxHeight) {
-        topPlaceable.place(0, 0)
-        if (topPlaceable.height + bottomPlaceable.height + space < constraints.maxHeight) {
-          // 底部文本只有在能放下时才会显示
-          bottomPlaceable.place(0, constraints.maxHeight - bottomPlaceable.height)
-        }
-      }
-    }
-  )
-}
-
