@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.decoration
+package com.cyxbs.pages.course.view.frame.decoration
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -6,14 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
-import com.cyxbs.pages.course.view.item.impl.CourseSelfLessonItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseSelfLessonItemFactory
+import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,15 +26,15 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 /**
- * .
+ * 自己的课程展示
  *
  * @author 985892345
  * @date 2025/10/12
  */
 @Stable
 class SelfLessonDecorationViewModel(
-  val hierarchy: CourseItemHierarchy<CourseSelfLessonItem>,
-  val platformItemFactory: PlatformCourseSelfLessonItemFactory,
+  val hierarchy: CourseItemHierarchy<CourseLessonItem>,
+  val platformItemFactory: PlatformCourseLessonItemFactory,
 ) : BaseViewModel(), CoursePageDecoration {
 
   init {
@@ -61,18 +61,20 @@ class SelfLessonDecorationViewModel(
       }.launchIn(viewModelScope)
   }
 
+  private val lessonService = ILessonService2::class.impl()
+
   private fun createLessonFlow(stuNum: String?): Flow<List<LessonByWeeks>?> = flow {
     if (stuNum == null) {
       emit(null)
     } else {
       // 先获取缓存
-      val cacheLesson = LessonRepository.getCacheLesson(stuNum)
+      val cacheLesson = lessonService.getCacheLesson(stuNum)
       var nowLesson = cacheLesson?.data
       if (nowLesson != null) {
         emit(nowLesson)
       }
       // 进行一次请求
-      LessonRepository.requestLesson(stuNum).onSuccess {
+      lessonService.requestLesson(stuNum).onSuccess {
         if (it != nowLesson) {
           nowLesson = it
           emit(it)
@@ -88,10 +90,10 @@ class SelfLessonDecorationViewModel(
         }
       }
       // 观察后续课程的更新
-      LessonRepository.observeLesson(
+      lessonService.observeLesson(
         stuNum = stuNum,
         needOldData = false,
-        needRequest = false,
+        forceRequest = false,
       ).collect {
         if (it != nowLesson) {
           nowLesson = it
@@ -110,8 +112,8 @@ class SelfLessonDecorationViewModel(
 private data class SelfLessonWhatTime(
   val page: Int,
   val lesson: LessonByWeeks,
-  val platformItemFactory: PlatformCourseSelfLessonItemFactory, // 创建平台配置 factory 的 key
-) : ItemHierarchyWhatTime<CourseSelfLessonItem>() {
+  val platformItemFactory: PlatformCourseLessonItemFactory, // 创建平台配置 factory 的 key
+) : ItemHierarchyWhatTime<CourseLessonItem>() {
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
     CourseItemWhatTime.Fixed(
       page = page,
@@ -121,8 +123,8 @@ private data class SelfLessonWhatTime(
     )
   )
 
-  override fun createItem(coroutineScope: CoroutineScope): CourseSelfLessonItem {
-    return CourseSelfLessonItem(
+  override fun createItem(coroutineScope: CoroutineScope): CourseLessonItem {
+    return CourseLessonItem(
       whatTime = this,
       coroutineScope = coroutineScope,
       lesson = lesson,
@@ -130,7 +132,7 @@ private data class SelfLessonWhatTime(
     )
   }
 
-  override fun compareTo(other: ItemHierarchyWhatTime<CourseSelfLessonItem>): Int {
+  override fun compareTo(other: ItemHierarchyWhatTime<CourseLessonItem>): Int {
     return 0.compareBy(other) {
       -it.now.value.page // page 越小越在上
     }.compareBy(other) {
@@ -145,8 +147,8 @@ private data class SelfLessonWhatTime(
   }
 
   private inline fun Int.compareBy(
-    other: ItemHierarchyWhatTime<CourseSelfLessonItem>,
-    compare: (ItemHierarchyWhatTime<CourseSelfLessonItem>) -> Int
+    other: ItemHierarchyWhatTime<CourseLessonItem>,
+    compare: (ItemHierarchyWhatTime<CourseLessonItem>) -> Int
   ): Int {
     if (this != 0) return this
     val a = compare.invoke(this@SelfLessonWhatTime)

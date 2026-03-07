@@ -14,9 +14,9 @@ import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.impl.CourseSelfLessonItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseSelfLessonItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseSelfLessonItemFactory
+import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -30,15 +30,15 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2026/3/7
  */
-object MobilePlatformCourseSelfLessonItemFactory : PlatformCourseSelfLessonItemFactory {
-  override fun create(item: CourseSelfLessonItem): PlatformCourseSelfLessonItem {
+object MobilePlatformCourseSelfLessonItemFactory : PlatformCourseLessonItemFactory {
+  override fun create(item: CourseLessonItem): PlatformCourseLessonItem {
     return MobilePlatformCourseSelfLessonItem(item)
   }
 }
 
 private class MobilePlatformCourseSelfLessonItem(
-  val item: CourseSelfLessonItem
-) : PlatformCourseSelfLessonItem {
+  val item: CourseLessonItem
+) : PlatformCourseLessonItem {
 
   init {
     item.extensions.add(MobileSelfCourseBottomSheetExtension(item))
@@ -58,7 +58,7 @@ private class MobilePlatformCourseSelfLessonItem(
 
 
 private class MobileSelfCourseBottomSheetExtension(
-  val itemKeyImpl: CourseSelfLessonItem
+  val itemKeyImpl: CourseLessonItem
 ) : CourseBottomSheetHeaderExtension, CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState

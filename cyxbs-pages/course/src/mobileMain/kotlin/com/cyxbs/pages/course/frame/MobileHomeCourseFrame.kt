@@ -22,9 +22,6 @@ import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.frame.bottomsheet.MobileHomeBottomSheet
-import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
-import com.cyxbs.pages.course.frame.decoration.LinkLessonDecorationViewModel
-import com.cyxbs.pages.course.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseAffairItemFactory
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseLinkLessonItemFactory
@@ -32,6 +29,9 @@ import com.cyxbs.pages.course.frame.item.MobilePlatformCourseSelfLessonItemFacto
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.frame.HomeCoursePageContent
+import com.cyxbs.pages.course.view.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.frame.decoration.LinkLessonDecorationViewModel
+import com.cyxbs.pages.course.view.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import com.g985892345.provider.api.annotation.ImplProvider

@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
@@ -19,15 +18,15 @@ import kotlinx.coroutines.CoroutineScope
  * @author 985892345
  * @date 2026/3/7
  */
-class CourseSelfLessonItem(
+class CourseLessonItem(
   whatTime: CourseItemWhatTime,
   coroutineScope: CoroutineScope,
   val lesson: LessonByWeeks,
-  platformItemFactory: PlatformCourseSelfLessonItemFactory,
+  platformItemFactory: PlatformCourseLessonItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 
   init {
-    extensions.add(CourseSelfLessonMovableItemExtension())
+    extensions.add(CourseLessonMovableItemExtension())
   }
 
   // 下层到每个平台的课程配置
@@ -42,7 +41,7 @@ class CourseSelfLessonItem(
 }
 
 @Composable
-private fun CourseSelfLessonItem.Content(
+private fun CourseLessonItem.Content(
   onClick: ((MinuteTimePair) -> Unit)?,
 ) {
   CourseDefaultItemContent(
@@ -65,7 +64,7 @@ private fun CourseSelfLessonItem.Content(
 
 
 // 课程长按移动
-private class CourseSelfLessonMovableItemExtension : IMovableItemExtension {
+private class CourseLessonMovableItemExtension : IMovableItemExtension {
   override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
     return false
   }
@@ -73,18 +72,11 @@ private class CourseSelfLessonMovableItemExtension : IMovableItemExtension {
 
 
 // 下层到每个平台的课程配置
-interface PlatformCourseSelfLessonItemFactory {
-  fun create(item: CourseSelfLessonItem): PlatformCourseSelfLessonItem
+interface PlatformCourseLessonItemFactory {
+  fun create(item: CourseLessonItem): PlatformCourseLessonItem
 }
 
-interface PlatformCourseSelfLessonItem {
+interface PlatformCourseLessonItem {
   @Composable
   fun CourseItemContentWrapper(content: @Composable (onClick: ((MinuteTimePair) -> Unit)?) -> Unit)
-
-  companion object : PlatformCourseSelfLessonItem {
-    @Composable
-    override fun CourseItemContentWrapper(content: @Composable ((onClick: ((MinuteTimePair) -> Unit)?) -> Unit)) {
-      content.invoke { toast("点击事件未实现") }
-    }
-  }
 }

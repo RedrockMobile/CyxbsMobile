@@ -1,11 +1,12 @@
-package com.cyxbs.pages.course.frame.decoration
+package com.cyxbs.pages.course.view.frame.decoration
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.course.api.ILessonService2
+import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.model.LessonRepository
-import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
@@ -23,7 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
- * .
+ * 关联人的课程展示
  *
  * @author 985892345
  * @date 2025/10/18
@@ -33,13 +34,16 @@ class LinkLessonDecorationViewModel(
   val platformItemFactory: PlatformCourseLinkLessonItemFactory,
 ) : BaseViewModel(), CoursePageDecoration {
 
+  private val linkService = ILinkService2::class.impl()
+  private val lessonService = ILessonService2::class.impl()
+
   init {
-    LinkLessonRepository.state.map {
+    linkService.state.map {
       it.linkNum
     }.flatMapLatest {
       createLessonFlow(it)
     }.flatMapLatest { list ->
-      LinkLessonRepository.enableShow.map {
+      linkService.enableShow.map {
         if (it) list else emptyList()
       }
     }.onEach {
@@ -51,7 +55,7 @@ class LinkLessonDecorationViewModel(
 
   private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>> {
     return if (linkStuNum.isEmpty()) flowOf(emptyList())
-    else LessonRepository.observeLesson(
+    else lessonService.observeLesson(
       stuNum = linkStuNum,
       needOldData = true,
     )

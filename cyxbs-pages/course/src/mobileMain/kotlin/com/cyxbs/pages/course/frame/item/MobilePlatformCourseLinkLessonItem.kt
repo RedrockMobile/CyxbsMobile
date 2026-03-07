@@ -41,7 +41,7 @@ private class MobilePlatformCourseLinkLessonItem(
 ) : PlatformCourseLinkLessonItem {
 
   init {
-    item.extensions.add(MobileLinkCourseBottomSheetExtension(item))
+    item.extensions.add(MobileLinkLessonBottomSheetExtension(item))
   }
 
   @Composable
@@ -55,7 +55,7 @@ private class MobilePlatformCourseLinkLessonItem(
 }
 
 
-private class MobileLinkCourseBottomSheetExtension(
+private class MobileLinkLessonBottomSheetExtension(
   val itemKeyImpl: CourseLinkLessonItem
 ) : CourseBottomSheetHeaderExtension, CourseItemBottomSheetDialogExtension {
 

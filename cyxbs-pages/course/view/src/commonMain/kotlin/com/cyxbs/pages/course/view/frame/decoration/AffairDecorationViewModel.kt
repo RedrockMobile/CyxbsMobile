@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.decoration
+package com.cyxbs.pages.course.view.frame.decoration
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope
@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
 /**
- * .
+ * 自己的事务展示
  *
  * @author 985892345
  * @date 2025/10/18

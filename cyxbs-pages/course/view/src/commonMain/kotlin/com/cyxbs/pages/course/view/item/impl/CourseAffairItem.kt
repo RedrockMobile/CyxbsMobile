@@ -122,12 +122,5 @@ interface PlatformCourseAffairItemFactory {
 interface PlatformCourseAffairItem {
   @Composable
   fun CourseItemContentWrapper(content: @Composable (onClick: ((MinuteTimePair) -> Unit)?) -> Unit)
-
-  companion object : PlatformCourseAffairItem {
-    @Composable
-    override fun CourseItemContentWrapper(content: @Composable ((onClick: ((MinuteTimePair) -> Unit)?) -> Unit)) {
-      content.invoke { toast("点击事件未实现") }
-    }
-  }
 }
 
