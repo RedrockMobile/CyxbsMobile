@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.item.impl
+package com.cyxbs.pages.course.view.frame.item.impl
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -8,8 +8,8 @@ import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.frame.item.AffairItemFactory
-import com.cyxbs.pages.course.frame.item.CourseAffairItem
+import com.cyxbs.pages.course.view.frame.item.AffairItemFactory
+import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime

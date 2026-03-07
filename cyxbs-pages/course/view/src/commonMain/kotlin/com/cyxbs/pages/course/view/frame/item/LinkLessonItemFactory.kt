@@ -1,9 +1,9 @@
-package com.cyxbs.pages.course.frame.item
+package com.cyxbs.pages.course.view.frame.item
 
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.frame.item.impl.DefaultLinkLessonItem
+import com.cyxbs.pages.course.view.frame.item.impl.DefaultLinkLessonItem
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import kotlinx.coroutines.CoroutineScope

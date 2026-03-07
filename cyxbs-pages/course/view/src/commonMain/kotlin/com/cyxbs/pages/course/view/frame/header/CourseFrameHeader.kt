@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.header
+package com.cyxbs.pages.course.view.frame.header
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,6 +12,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,14 +25,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
-import com.cyxbs.pages.course.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.model.LinkLessonRepository
-import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_double
-import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_item_header_link_single
+import com.cyxbs.pages.course.api.ILinkService2
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
@@ -46,9 +45,10 @@ import kotlin.math.abs
 // 课表头
 // 默认 fillMaxSize 并向下居中
 @Composable
-fun CourseHeader(
+fun CourseFrameHeader(
   modifier: Modifier,
   frame: AbstractCourseFrame,
+  linkBtnVisibility: Boolean,
 ) {
   Box(modifier = modifier.fillMaxSize()) {
     Row(modifier = Modifier.align(Alignment.BottomStart)) {
@@ -63,11 +63,13 @@ fun CourseHeader(
           .padding(start = 13.dp, bottom = 6.dp)
       )
     }
-    CourseLinkStudentBtn(
-      frame = frame,
-      modifier = Modifier.align(Alignment.BottomEnd)
-        .padding(end = 110.dp, bottom = 2.dp),
-    )
+    if (linkBtnVisibility) {
+      CourseLinkStudentBtn(
+        frame = frame,
+        modifier = Modifier.align(Alignment.BottomEnd)
+          .padding(end = 110.dp, bottom = 2.dp),
+      )
+    }
     CourseHeaderBack(
       frame = frame,
       modifier = Modifier.align(Alignment.BottomEnd)
@@ -147,24 +149,25 @@ private fun CourseLinkStudentBtn(
   modifier: Modifier,
   frame: AbstractCourseFrame,
 ) {
+  val linkService = remember { ILinkService2::class.implOrNull() } ?: return
   // 0 -> 1 -> 0
   val pageFraction by rememberDerivedStateOfStructure(frame) {
     val fraction = frame.pagerState.currentPageOffsetFraction
     1 - minOf(abs(fraction + frame.pagerState.currentPage - frame.initialPage), 1F)
   }
-  if (LinkLessonRepository.state.collectAsState().value.isNotNull()) {
-    val enableShow = LinkLessonRepository.enableShow.collectAsState().value
+  if (linkService.state.collectAsState().value.isNotNull()) {
+    val enableShow = linkService.enableShow.collectAsState().value
     Image(
       contentDescription = if (enableShow) "点击不显示关联人课程" else "点击显示关联人课程",
       contentScale = ContentScale.Inside,
       painter = painterResource(
-        if (enableShow) Res.drawable.course_ic_item_header_link_double
-        else Res.drawable.course_ic_item_header_link_single,
+        if (enableShow) ILinkService2.icon_link_double
+        else ILinkService2.icon_link_single,
       ),
       modifier = modifier.size(32.dp).graphicsLayer {
         translationX = (101.dp * pageFraction).toPx()
       }.clickableNoIndicator {
-        LinkLessonRepository.changeVisible()
+        linkService.changeVisible()
       },
     )
   }

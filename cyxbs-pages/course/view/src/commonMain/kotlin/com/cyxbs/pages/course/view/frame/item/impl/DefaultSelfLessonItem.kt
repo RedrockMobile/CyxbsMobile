@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.item.impl
+package com.cyxbs.pages.course.view.frame.item.impl
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -6,8 +6,8 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.frame.item.SelfLessonItem
-import com.cyxbs.pages.course.frame.item.SelfLessonItemFactory
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension

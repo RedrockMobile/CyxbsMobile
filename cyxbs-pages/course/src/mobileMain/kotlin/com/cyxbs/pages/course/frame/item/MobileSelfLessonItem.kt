@@ -16,6 +16,8 @@ import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime

@@ -1,6 +1,10 @@
 package com.cyxbs.pages.course.api
 
+import cyxbsmobile.cyxbs_pages.course.api.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.course.api.generated.resources.course_ic_item_header_link_double
+import cyxbsmobile.cyxbs_pages.course.api.generated.resources.course_ic_item_header_link_single
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.DrawableResource
 
 /**
  * .
@@ -11,6 +15,18 @@ import kotlinx.coroutines.flow.StateFlow
 interface ILinkService2 {
 
   val state: StateFlow<LinkStu>
+
+  val enableShow: StateFlow<Boolean>
+
+  fun changeVisible()
+
+  companion object {
+    val icon_link_double: DrawableResource
+      get() = Res.drawable.course_ic_item_header_link_double
+
+    val icon_link_single: DrawableResource
+      get() = Res.drawable.course_ic_item_header_link_single
+  }
 
   data class LinkStu(
     val selfNum: String, // 自己的学号

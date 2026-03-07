@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame
+package com.cyxbs.pages.course.view.frame
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -20,7 +19,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
@@ -28,21 +26,11 @@ import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
-import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
-import com.cyxbs.pages.course.frame.decoration.LinkLessonDecorationViewModel
-import com.cyxbs.pages.course.frame.decoration.SelfLessonDecorationViewModel
-import com.cyxbs.pages.course.frame.item.CourseAffairItem
-import com.cyxbs.pages.course.frame.item.LinkLessonItem
-import com.cyxbs.pages.course.frame.item.SelfLessonItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
-import com.cyxbs.pages.course.view.item.affair.CreateAffairDecorationViewModel
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.week.CourseWeekCompose
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
 
@@ -57,7 +45,7 @@ abstract class AbstractCourseFrame {
 
   companion object {
 
-    internal val LocalAbstractCourseFrame = staticCompositionLocalOf<AbstractCourseFrame> { error("未设置 AbstractCourseFrame") }
+    val LocalAbstractCourseFrame = staticCompositionLocalOf<AbstractCourseFrame> { error("未设置 AbstractCourseFrame") }
 
     @get:Composable
     val current: AbstractCourseFrame
@@ -144,33 +132,6 @@ fun AbstractCourseFrame.HomeCoursePageContent(
       timelineWidth = timelineWidth,
       scrollPaddingValues = scrollPaddingValues,
       decorations = decorations,
-    )
-  }
-}
-
-@Composable
-internal fun createBaseCoursePageDecorations(
-  frame: AbstractCourseFrame
-): ImmutableList<CoursePageDecoration> {
-  val selfLessonHierarchy = remember { CourseItemHierarchy<SelfLessonItem>() }
-  val selfLessonDecoration = viewModel { SelfLessonDecorationViewModel(selfLessonHierarchy) }
-
-  val linkLessonHierarchy = remember { CourseItemHierarchy<LinkLessonItem>() }
-  val linkLessonDecoration = viewModel { LinkLessonDecorationViewModel(linkLessonHierarchy) }
-
-  val affairHierarchy = remember { CourseItemHierarchy<CourseAffairItem>() }
-  val affairDecoration = viewModel { AffairDecorationViewModel(frame, affairHierarchy) }
-
-  val createAffairDecoration = viewModel { CreateAffairDecorationViewModel() }
-
-  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, affairHierarchy, linkLessonHierarchy) }
-
-  return remember {
-    persistentListOf(
-      selfLessonDecoration, // 自己的课程
-      affairDecoration, // 自己的事务
-      linkLessonDecoration, // 关联人的课程
-      createAffairDecoration, // 长按创建事务
     )
   }
 }

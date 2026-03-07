@@ -23,6 +23,8 @@ import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
+import com.cyxbs.pages.course.view.frame.item.AffairItemFactory
+import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
@@ -166,7 +168,8 @@ private class MobileCourseAffairCourseItemBottomSheetDialogExtension(
     get() = itemKeyImpl.itemState
 
   // AffairBottomSheetDialog 状态
-  // 因为外层 HorizontalPager 在开启无限循环后无法使用 key 来对应页面状态，所以提成一个全局的变量来保存
+  // 因为外层 HorizontalPager 在开启无限循环后无法使用 key 来对应页面状态，在开启编辑后因为重组状态就会丢失
+  // 所以提成一个全局的变量来保存状态
   private val affairBottomSheetDialogState = AffairBottomSheetDialogState(
     currentForm = AffairBottomSheetDialogState.CurrentForm.Show(itemKeyImpl.affairDateModel)
   )

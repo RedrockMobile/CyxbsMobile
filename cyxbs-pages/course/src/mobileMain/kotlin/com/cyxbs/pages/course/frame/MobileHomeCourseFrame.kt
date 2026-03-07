@@ -9,19 +9,34 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.frame.bottomsheet.MobileHomeBottomSheet
+import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.frame.decoration.LinkLessonDecorationViewModel
+import com.cyxbs.pages.course.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.frame.HomeCoursePageContent
+import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
+import com.cyxbs.pages.course.view.frame.item.LinkLessonItem
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
+import com.cyxbs.pages.course.view.item.CourseItemHierarchy
+import com.cyxbs.pages.course.view.item.CourseItemViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * 移动端主页课表框架
@@ -76,7 +91,7 @@ private fun MobileHomeCourseFrameContent(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
 ) {
-  val decorations = createBaseCoursePageDecorations(frame)
+  val decorations = createCoursePageDecorations(frame)
   // item 点击后出现的 BottomSheetDialog
   val itemBottomSheetDialog = rememberCourseItemBottomSheetDialogState()
   CompositionLocalProvider(
@@ -100,5 +115,29 @@ private fun MobileHomeCourseFrameContent(
         },
       )
     }
+  }
+}
+
+@Composable
+private fun createCoursePageDecorations(
+  frame: AbstractCourseFrame
+): ImmutableList<CoursePageDecoration> {
+  val selfLessonHierarchy = remember { CourseItemHierarchy<SelfLessonItem>() }
+  val selfLessonDecoration = viewModel { SelfLessonDecorationViewModel(selfLessonHierarchy) }
+
+  val linkLessonHierarchy = remember { CourseItemHierarchy<LinkLessonItem>() }
+  val linkLessonDecoration = viewModel { LinkLessonDecorationViewModel(linkLessonHierarchy) }
+
+  val affairHierarchy = remember { CourseItemHierarchy<CourseAffairItem>() }
+  val affairDecoration = viewModel { AffairDecorationViewModel(frame, affairHierarchy) }
+
+  val courseItemViewModel = viewModel { CourseItemViewModel(selfLessonHierarchy, affairHierarchy, linkLessonHierarchy) }
+
+  return remember {
+    persistentListOf(
+      selfLessonDecoration, // 自己的课程
+      affairDecoration, // 自己的事务
+      linkLessonDecoration, // 关联人的课程
+    )
   }
 }

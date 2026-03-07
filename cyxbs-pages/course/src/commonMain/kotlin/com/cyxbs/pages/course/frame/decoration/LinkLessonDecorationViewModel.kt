@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.frame.item.LinkLessonItem
-import com.cyxbs.pages.course.frame.item.LinkLessonItemFactory
+import com.cyxbs.pages.course.view.frame.item.LinkLessonItem
+import com.cyxbs.pages.course.view.frame.item.LinkLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration

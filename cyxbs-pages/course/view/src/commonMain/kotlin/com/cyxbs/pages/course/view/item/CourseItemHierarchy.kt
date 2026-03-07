@@ -77,6 +77,7 @@ class CourseItemHierarchy<Item : CourseItem> {
     synchronized(dateItemsMapSynchronized) {
       val courseItemViewModel = courseItemViewModel
       if (courseItemViewModel == null) {
+        // 还不存在 courseItemViewModel，延后添加
         whatTimeListWhenNoCourseItemViewModel.add(whatTime)
         return
       }
@@ -317,12 +318,15 @@ class CourseItemHierarchy<Item : CourseItem> {
           + SupervisorJob(courseItemViewModel.viewModelScope.coroutineContext[Job])
     )
 
-    val item = whatTime.createItem(coroutineScope)
-
-    val itemState = CourseItemState(item)
+    // itemState 会在触发 refresh 后才会被懒加载
+    val itemState by lazy {
+      val item = whatTime.createItem(coroutineScope)
+      CourseItemState(item).also {
+        item.itemState = it
+      }
+    }
 
     init {
-      item.itemState = itemState
       var lastFixed = whatTime.now.value
       whatTime.now.onEach {
         if (it != lastFixed) {
@@ -338,7 +342,9 @@ class CourseItemHierarchy<Item : CourseItem> {
   }
 }
 
-
+// 这里包了一层有两个目的：
+// 1. 懒加载 item 对象，减少创建
+// 2. item 的 coroutineScope 统一收口
 abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Comparable<ItemHierarchyWhatTime<Item>> {
   abstract override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
   abstract fun createItem(coroutineScope: CoroutineScope): Item

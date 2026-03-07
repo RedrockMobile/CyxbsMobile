@@ -7,8 +7,8 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.course.frame.item.SelfLessonItem
-import com.cyxbs.pages.course.frame.item.SelfLessonItemFactory
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItem
+import com.cyxbs.pages.course.view.frame.item.SelfLessonItemFactory
 import com.cyxbs.pages.course.model.LessonRepository
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlin.compareTo
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 

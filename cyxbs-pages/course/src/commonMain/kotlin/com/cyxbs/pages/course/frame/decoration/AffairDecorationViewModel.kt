@@ -7,9 +7,9 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.IAffairService2
-import com.cyxbs.pages.course.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.frame.item.AffairItemFactory
-import com.cyxbs.pages.course.frame.item.CourseAffairItem
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.frame.item.AffairItemFactory
+import com.cyxbs.pages.course.view.frame.item.CourseAffairItem
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemState

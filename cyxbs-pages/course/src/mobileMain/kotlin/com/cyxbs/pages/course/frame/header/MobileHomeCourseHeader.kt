@@ -18,6 +18,7 @@ import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
+import com.cyxbs.pages.course.view.frame.header.CourseFrameHeader
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemViewModel
@@ -75,8 +76,9 @@ fun MobileHomeCourseHeader(
     }
     if (headerVisibility != false) { // 展开和滚动时显示
       // 主页课表内层 header
-      CourseHeader(
+      CourseFrameHeader(
         frame = frame,
+        linkBtnVisibility = true,
         modifier = Modifier.graphicsLayer {
           alpha = max(frame.bottomSheetState.fraction * 2 - 1, 0F)
         }

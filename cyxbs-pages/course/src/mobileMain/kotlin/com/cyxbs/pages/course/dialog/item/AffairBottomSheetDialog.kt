@@ -84,7 +84,7 @@ import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentFo
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditCompose
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditWeekText
 import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose
-import com.cyxbs.pages.course.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.frame.decoration.AffairDecorationViewModel
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
