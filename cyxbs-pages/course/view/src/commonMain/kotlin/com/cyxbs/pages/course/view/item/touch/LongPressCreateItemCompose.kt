@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastForEach
+import com.cyxbs.components.utils.utils.VibratorUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -73,6 +74,8 @@ private fun Modifier.pointerInputCreateItem(
           longPressMap[change.id] = launch {
             // 执行当前手指事件的对应倒计时
             delay(viewConfiguration.longPressTimeoutMillis)
+            // 触发震动
+            VibratorUtil.longPress()
             // 倒计时结束，添加 item 展示
             val item = onCreate(change.position, size)
             if (item != null) {

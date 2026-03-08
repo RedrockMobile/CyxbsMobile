@@ -34,6 +34,7 @@ import com.cyxbs.components.utils.compose.getValue
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
 import com.cyxbs.components.utils.compose.setValue
+import com.cyxbs.components.utils.utils.VibratorUtil
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
@@ -297,6 +298,8 @@ class LongPressMoveControllerImpl(
 
   override fun onStartLongPress(pointer: PointerInputChange) {
     super.onStartLongPress(pointer)
+    // 触发震动
+    VibratorUtil.longPress()
     // 解除自身被覆盖的区域
     itemState.addShowRangeTransformer(selfShowRangeTransformerForAll)
     // 展示被覆盖的 item
