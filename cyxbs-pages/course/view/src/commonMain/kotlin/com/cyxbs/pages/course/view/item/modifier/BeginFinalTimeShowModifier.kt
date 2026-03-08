@@ -5,7 +5,7 @@ import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -18,10 +18,11 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier.enableShow
+import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier.visibilityLock
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
@@ -32,7 +33,7 @@ import kotlin.math.abs
 /**
  * item 显示开始结束时间
  *
- * 默认不显示，可使用 [enableShow] 开启
+ * 默认不显示，可使用 [visibilityLock] 开启
  *
  * @author 985892345
  * @date 2026/3/7
@@ -40,8 +41,8 @@ import kotlin.math.abs
 object BeginFinalTimeShowModifier : CourseItemModifier {
 
   // 显示开始结束时间，默认不显示
-  val enableShow = CourseItemState.ValueKey {
-    mutableStateOf(false)
+  val visibilityLock = CourseItemState.ValueKey {
+    Lock()
   }
 
   // 透明度，默认与 itemState#alphaState 同步
@@ -57,7 +58,7 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
-    return if (!enableShow.get(itemState).value) Modifier else {
+    return if (!visibilityLock.get(itemState).isLocked()) Modifier else {
       LaunchedEffect(Unit) {
         // 同步 item 自身的 alpha
         snapshotFlow { itemState.alphaState.value }.collect {
@@ -91,6 +92,26 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
         alpha = alphaState.get(itemState),
         timePair = timePairState,
       )
+    }
+  }
+
+  class Lock {
+    private val count = mutableIntStateOf(0)
+
+    private val isLocked = derivedStateOfStructure { count.intValue > 0 }
+
+    fun lock(): Runnable {
+      count.intValue++
+      var isUnlock = false
+      return Runnable {
+        if (isUnlock) return@Runnable
+        isUnlock = true
+        count.intValue--
+      }
+    }
+
+    fun isLocked(): Boolean {
+      return isLocked.value
     }
   }
 }

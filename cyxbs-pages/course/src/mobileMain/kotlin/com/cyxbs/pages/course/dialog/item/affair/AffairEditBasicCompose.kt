@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.dialog.item.affair
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
@@ -114,21 +116,41 @@ private fun EditContent(
   val textFieldState = rememberTextFieldState(initialText = remember {
     currentForm.content
   })
-  BasicTextField(
-    modifier = modifier.fillMaxWidth(),
-    state = textFieldState,
-    cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
-    keyboardOptions = KeyboardOptions(
-      keyboardType = KeyboardType.Text,
-    ),
-    textStyle = TextStyle(
-      fontSize = 15.sp,
-      color = LocalAppColors.current.tvLv2
-    ),
-  )
+  Box(modifier = modifier.fillMaxWidth()) {
+    BasicTextField(
+      modifier = Modifier.fillMaxWidth(),
+      state = textFieldState,
+      cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
+      keyboardOptions = KeyboardOptions(
+        keyboardType = KeyboardType.Text,
+      ),
+      textStyle = TextStyle(
+        fontSize = 15.sp,
+        color = LocalAppColors.current.tvLv2
+      ),
+    )
+    if (rememberDerivedStateOfStructure { textFieldState.text.isEmpty() }.value) {
+      Text(
+        text = "请输入内容",
+        fontSize = 15.sp,
+        color = LocalAppColors.current.tvLv2.copy(alpha = 0.3F),
+      )
+    }
+  }
   LaunchedEffect(Unit) {
     snapshotFlow { textFieldState.text }.collect {
       currentForm.editor.idModelEditor.setContent(it.toString())
+    }
+  }
+  DisposableEffect(Unit) {
+    val check = {
+      if (textFieldState.text.isEmpty()) {
+        "标题为空，请修改后再保存"
+      } else null
+    }
+    currentForm.clickSaveCheck.add(check)
+    onDispose {
+      currentForm.clickSaveCheck.remove(check)
     }
   }
 }

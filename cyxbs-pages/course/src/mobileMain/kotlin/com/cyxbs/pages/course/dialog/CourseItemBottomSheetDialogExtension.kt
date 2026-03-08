@@ -25,8 +25,8 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -47,16 +47,13 @@ import androidx.compose.ui.layout.WindowInsetsRulers
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.Wrapper
 import com.cyxbs.components.utils.compose.plusDsl
-import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
@@ -67,6 +64,7 @@ import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.modifier.observeItemRectInWindow
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,7 +78,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -391,21 +388,23 @@ private fun ShowBeginFinalTime(
   state: CourseItemBottomSheetDialogState,
 ) {
   LaunchedEffect(Unit) {
-    var lastItemState: CourseItemState? = null
+    var unlockRunnable: Runnable? = null
+    var isLockWhenBegin: Boolean? = null
     state.currentPageItemFlow.filterNotNull().map {
       it.itemState
     }.onCompletion {
-      lastItemState?.let {
-        BeginFinalTimeShowModifier.enableShow.get(it).value = false
-      }
+      unlockRunnable?.run()
     }.collectLatest { itemState ->
-      lastItemState?.let {
-        BeginFinalTimeShowModifier.enableShow.get(it).value = false
+      unlockRunnable?.run()
+      if (isLockWhenBegin == null) {
+        isLockWhenBegin = BeginFinalTimeShowModifier.visibilityLock.get(itemState).isLocked()
       }
-      lastItemState = itemState
-      BeginFinalTimeShowModifier.enableShow.get(itemState).value = true
-      snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
-        BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = it
+      unlockRunnable = BeginFinalTimeShowModifier.visibilityLock.get(itemState).lock()
+      if (!isLockWhenBegin) {
+        // 最开始没有锁定，说明已经在展示开始结束时间了，那就不主动关联上透明度变化
+        snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
+          BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = it
+        }
       }
     }
   }
@@ -486,7 +485,12 @@ private fun CourseBottomSheetDialogContent(
         itemDialogContent?.CourseBottomSheetDialogContent(state)
       }
     } else {
-      itemDialogContents.firstOrNull()?.CourseBottomSheetDialogContent(state)
+      val itemDialogContent = itemDialogContents.firstOrNull()
+      if (itemDialogContent != null) {
+        key(itemDialogContent.hashCode()) {
+          itemDialogContent.CourseBottomSheetDialogContent(state)
+        }
+      }
     }
     // 底部的圆点指示器
     Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {

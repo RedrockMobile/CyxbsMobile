@@ -10,19 +10,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTimePair
-import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.affair.api.AffairDateModel
+import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
-import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlin.math.roundToInt
@@ -34,21 +34,22 @@ import kotlin.math.roundToInt
  * @date 2026/3/7
  */
 class CourseAffairItem(
-  val affairWhatTime: ItemHierarchyWhatTime<CourseAffairItem>,
+  whatTime: CourseItemWhatTime,
   coroutineScope: CoroutineScope,
+  val courseFrame: AbstractCourseFrame,
   val affairDateModel: AffairDateModel,
   platformItemFactory: PlatformCourseAffairItemFactory,
-) : CourseItem(affairWhatTime, coroutineScope) {
+) : CourseItem(whatTime, coroutineScope) {
 
   init {
     // 观察事务时间更新
     combine(
-      SchoolCalendar.observeFirstMonDay(),
+      courseFrame.beginDate.filterNotNull(),
       affairDateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
       affairDateModel.date.mergeFlow
-    ) { firstDate, timePair, date ->
-      affairWhatTime.now.value = CourseItemWhatTime.Fixed(
-        page = firstDate.daysUntil(date) / 7 + 1,
+    ) { beginDate, timePair, date ->
+      whatTime.now.value = CourseItemWhatTime.Fixed(
+        page = courseFrame.getPage(date)!!,
         dayOfWeek = date.dayOfWeek,
         beginTime = timePair.first,
         finalTime = timePair.second,

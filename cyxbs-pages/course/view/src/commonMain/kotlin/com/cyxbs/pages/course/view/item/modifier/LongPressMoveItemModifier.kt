@@ -39,6 +39,7 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlin.math.min
@@ -414,27 +415,31 @@ class LongPressMoveControllerImpl(
         it.zIndexState.floatValue += 1F
       }
     }
+    val itemLayoutAnimUnlock = LayoutItemModifier.animLock.get(itemState).lock()
     try {
       // 由 IMovableItemModel 实现最后动画的移动
       if (destinationOffset == Offset.Zero) {
         runAnimateMove(transition, Offset.Zero)
       } else {
-        supervisorScope {
-          launch { runAnimateMove(transition, destinationOffset) }
-          launch {
-            // 执行位置偏移动画的同时执行高度的偏移的动画
-            // 因为课表时间轴的不均匀，原位置到新位置相同时间差但高度不一定一样
-            heightAnimatable.animateTo(calculateNewHeight(newBeginTime))
+        try {
+          supervisorScope {
+            launch { runAnimateMove(transition, destinationOffset) }
+            launch {
+              // 执行位置偏移动画的同时执行高度的偏移的动画
+              // 因为课表时间轴的不均匀，原位置到新位置相同时间差但高度不一定一样
+              heightAnimatable.animateTo(calculateNewHeight(newBeginTime))
+            }
           }
+          val now = itemState.item.whatTime.now.value
+          // 修改 item 时间段至对应时间
+          extension.changeWhatTime(
+            itemState = itemState,
+            newBeginTime = newBeginTime,
+            newDayOfWeek = now.dayOfWeek.add((destinationOffset.x / size.width).roundToInt())
+          )
+        } finally {
+          transition.value = Offset.Zero // 修改时间后把偏移量重置
         }
-        val now = itemState.item.whatTime.now.value
-        // 修改 item 时间段至对应时间
-        itemState.item.whatTime.now.value = now.copy(
-          dayOfWeek = now.dayOfWeek.add((destinationOffset.x / size.width).roundToInt()),
-          beginTime = newBeginTime,
-          finalTime = newBeginTime + (now.finalTime - now.beginTime)
-        )
-        transition.value = Offset.Zero // 修改时间后把偏移量重置
       }
     } finally {
       // 结束移动后开始结束时间的展示不再进行实时计算
@@ -444,6 +449,10 @@ class LongPressMoveControllerImpl(
         itemState.removeOverlapChangeTrigger(overlapChangeTriggerForEmptyCovered)
         itemState.removeShowRangeTransformer(selfShowRangeTransformerForEmpty)
         topItemStateList.forEach { it.zIndexState.floatValue -= 1F }
+      }
+      itemState.item.coroutineScope.launch {
+        delay(500)
+        itemLayoutAnimUnlock.run() // 因为我们无法确定位置改变的动画是否完全结束，所以 delay 一下
       }
     }
   }

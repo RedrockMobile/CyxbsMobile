@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -22,21 +20,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
-import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.plusDsl
-import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
 import com.cyxbs.pages.course.view.item.modifier.LayoutCoordinateSaveModifier
@@ -47,7 +39,6 @@ import com.cyxbs.pages.course.view.item.modifier.RoundedShadowItemModifier
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -86,13 +77,18 @@ fun CourseDefaultItemContent(
             itemState.item.whatTime.now.value.finalTime
           )
         },
-        enableShowCoverTip = itemState.overlap?.coveredItemList?.isNotEmpty() == true,
         timeline = itemState.item.coursePage.timeline,
-        topText = topText,
-        bottomText = bottomText,
-        textColor = textColor,
-        onClick = onClick,
-      )
+        coverTipColor = if (itemState.overlap?.coveredItemList?.isNotEmpty() == true) textColor else Color.Transparent,
+      ) {
+        CourseItemTopBottomText(
+          modifier = it.clickableNoIndicator {
+            onClick?.invoke(range)
+          },
+          topText = topText,
+          bottomText = bottomText,
+          textColor = textColor,
+        )
+      }
     }
   }
 }
@@ -107,15 +103,13 @@ fun createCourseDefaultModifierList() = persistentListOf(
 )
 
 @Composable
-private fun CourseShowRange(
+fun CourseShowRange(
   range: MinuteTimePair, // 当前显示的区间
   itemRange: MinuteTimePair, // item 总区间
-  enableShowCoverTip: Boolean,
   timeline: CourseTimeline,
-  topText: String,
-  bottomText: String,
-  textColor: Color,
-  onClick: ((MinuteTimePair) -> Unit)? = null,
+  coverTipColor: Color,
+  enableAnim: Boolean = true,
+  content: @Composable (Modifier) -> Unit,
 ) {
   val weightAnim = remember {
     Animatable(
@@ -124,10 +118,15 @@ private fun CourseShowRange(
     )
   }
   LaunchedEffect(range, itemRange) {
-    weightAnim.animateTo(calculateWeight(timeline, range, itemRange))
+    if (enableAnim) {
+      weightAnim.animateTo(calculateWeight(timeline, range, itemRange))
+    } else {
+      val weight = calculateWeight(timeline, range, itemRange)
+      weightAnim.snapTo(weight)
+    }
   }
-  CourseItemTopBottomText(
-    modifier = Modifier.layout { measurable, constraints ->
+  content.invoke(
+    Modifier.layout { measurable, constraints ->
       val weight = weightAnim.value
       val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
       val placeable = measurable.measure(
@@ -138,21 +137,16 @@ private fun CourseShowRange(
       }
     }.drawWithContent {
       drawContent()
-      if (enableShowCoverTip) {
+      if (coverTipColor != Color.Transparent) {
         // 右上角的重叠标志
         drawRoundRect(
-          color = textColor,
+          color = coverTipColor,
           topLeft = Offset(x = size.width - 12.dp.toPx(), y = 4.dp.toPx()),
           size = Size(width = 6.dp.toPx(), height = 2.dp.toPx()),
           cornerRadius = CornerRadius(1.dp.toPx()),
         )
       }
-    }.clickableNoIndicator {
-      onClick?.invoke(range)
-    },
-    topText = topText,
-    bottomText = bottomText,
-    textColor = textColor,
+    }
   )
 }
 

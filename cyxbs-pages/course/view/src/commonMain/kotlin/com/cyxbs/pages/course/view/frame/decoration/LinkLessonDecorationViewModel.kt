@@ -116,14 +116,4 @@ private data class LinkLessonWhatTime(
       it.now.value.finalTime.value // finalTime 越大越在上
     }
   }
-
-  private inline fun Int.compareBy(
-    other: ItemHierarchyWhatTime<CourseLinkLessonItem>,
-    compare: (ItemHierarchyWhatTime<CourseLinkLessonItem>) -> Int
-  ): Int {
-    if (this != 0) return this
-    val a = compare.invoke(this@LinkLessonWhatTime)
-    val b = compare.invoke(other)
-    return a - b
-  }
 }

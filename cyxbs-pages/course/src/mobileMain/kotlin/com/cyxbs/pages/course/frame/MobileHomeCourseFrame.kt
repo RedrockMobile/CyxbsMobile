@@ -148,14 +148,17 @@ private fun createCoursePageDecorations(
 
   val createAffairDecoration = viewModel {
     CreateAffairDecorationViewModel(
-      hierarchy = CourseItemHierarchy(),
-      platformItemFactory = MobilePlatformCourseCreateAffairItemFactory
+      courseFrame = frame,
+      touchingHierarchy = CourseItemHierarchy(),
+      touchedHierarchy = CourseItemHierarchy(),
+      platformItemFactory = MobilePlatformCourseCreateAffairItemFactory,
     )
   }
 
   viewModel {
     CourseItemViewModel(
-      createAffairDecoration.hierarchy, // 创建事务在顶层计算重叠，但是布局位置在底层，item 通过 zIndex 显示在课程上
+      createAffairDecoration.touchingHierarchy, // 创建事务在顶层计算重叠，但是布局位置在底层，item 通过 zIndex 显示在课程上
+      createAffairDecoration.touchedHierarchy, // 触摸后的等待添加的事务
       selfLessonDecoration.hierarchy,
       affairDecoration.hierarchy,
       linkLessonDecoration.hierarchy,

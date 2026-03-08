@@ -361,4 +361,26 @@ abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Co
   abstract fun createItem(coroutineScope: CoroutineScope): Item
   abstract override fun equals(other: Any?): Boolean
   abstract override fun hashCode(): Int
+
+  override fun compareTo(other: ItemHierarchyWhatTime<Item>): Int {
+    return 0.compareBy(other) {
+      -it.now.value.page // page 越小越在上
+    }.compareBy(other) {
+      -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
+    }.compareBy(other) {
+      it.now.value.beginTime.value // beginTime 越大越在上
+    }.compareBy(other) {
+      it.now.value.finalTime.value // finalTime 越大越在上
+    }
+  }
+
+  protected inline fun Int.compareBy(
+    other: ItemHierarchyWhatTime<Item>,
+    compare: (ItemHierarchyWhatTime<Item>) -> Int
+  ): Int {
+    if (this != 0) return this
+    val a = compare.invoke(this@ItemHierarchyWhatTime)
+    val b = compare.invoke(other)
+    return a - b
+  }
 }

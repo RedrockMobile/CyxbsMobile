@@ -72,6 +72,7 @@ class AffairWhatTimeModelEditorImpl(
       if (!incrementAddList.remove(date)) {
         incrementRemoveList.add(date)
       }
+      idModelEditor.idModel.removedDateModel.tryEmit(date.dateModel)
       return true
     }
     return false
@@ -87,6 +88,7 @@ class AffairWhatTimeModelEditorImpl(
         }
         it.dateModel.enable.valueByEditorStateFlow.tryEmit(false)
         it.whatTimeEditor = null
+        idModelEditor.idModel.removedDateModel.tryEmit(it.dateModel)
       }
       dateList.clear()
       incrementAddList.clear()
@@ -134,6 +136,7 @@ class AffairWhatTimeModelEditorImpl(
         nowDateList.remove(it)
         it.dateModel.enable.valueByEditorStateFlow.tryEmit(false)
         it.whatTimeEditor = null
+        idModelEditor.idModel.removedDateModel.tryEmit(it.dateModel)
       }
       incrementAddList.clear()
       // 移除的都添加回来
@@ -146,6 +149,7 @@ class AffairWhatTimeModelEditorImpl(
           it.dateModel.enable.valueByEditorStateFlow.tryEmit(true)
         }
         it.whatTimeEditor = this
+        idModelEditor.idModel.addedDateModel.tryEmit(it.dateModel)
       }
       incrementRemoveList.clear()
       // 下层节点重置

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -12,8 +13,10 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.toSize
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.LocalCoursePage
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -34,12 +37,32 @@ import kotlin.math.roundToInt
 object LayoutItemModifier : CourseItemModifier {
 
   // 是否启动时间信息改变后的动画，默认不开启
-  val enableAnim = CourseItemState.ValueKey { false }
+  val animLock = CourseItemState.ValueKey { Lock() }
 
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
     return courseItemLayout(itemState)
+  }
+
+  class Lock {
+    private val count = mutableIntStateOf(0)
+
+    private val isLocked = derivedStateOfStructure { count.intValue > 0 }
+
+    fun lock(): Runnable {
+      count.intValue++
+      var isUnlock = false
+      return Runnable {
+        if (isUnlock) return@Runnable
+        isUnlock = true
+        count.intValue--
+      }
+    }
+
+    fun isLocked(): Boolean {
+      return isLocked.value
+    }
   }
 }
 
@@ -71,7 +94,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
         val newIndex = calculateIndex(itemState).toFloat()
         if (newIndex != indexAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnim.get(itemState)) {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
               indexAnimatable.animateTo(newIndex)
             } else {
               indexAnimatable.snapTo(newIndex)
@@ -80,7 +103,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
         }
         if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnim.get(itemState)) {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
               beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay)
             } else {
               beginTimeAnimatable.snapTo(it.beginTime.minuteOfDay)
@@ -89,7 +112,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
         }
         if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnim.get(itemState)) {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
               finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay)
             } else {
               finalTimeAnimatable.snapTo(it.finalTime.minuteOfDay)

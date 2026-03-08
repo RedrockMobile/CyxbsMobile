@@ -46,11 +46,14 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
   }
 
   fun plusMinutes(minutes: Int): MinuteTime {
-    val hourDiff = (minute + minutes) / 60
-    return MinuteTime(
-      (hour + hourDiff) % 24,
-      (minute + minutes) % 60,
-    )
+    var newMinuteOfDay = minuteOfDay + minutes
+    while (newMinuteOfDay < 0) {
+      newMinuteOfDay += 24 * 60
+    }
+    while (newMinuteOfDay >= 24 * 60) {
+      newMinuteOfDay -= 24 * 60
+    }
+    return new(newMinuteOfDay)
   }
 
   fun minusMinutes(minutes: Int): MinuteTime {
@@ -105,7 +108,8 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
     }
 
     fun new(minuteOfDay: Int): MinuteTime {
-      return MinuteTime(minuteOfDay / 60, minuteOfDay % 60)
+      val newMinuteOfDay = minuteOfDay % (24 * 60)
+      return MinuteTime(newMinuteOfDay / 60, newMinuteOfDay % 60)
     }
   }
 }

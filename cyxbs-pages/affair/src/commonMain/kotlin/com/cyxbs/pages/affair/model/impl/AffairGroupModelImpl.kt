@@ -44,7 +44,11 @@ class AffairGroupModelImpl(
 
   @OptIn(ExperimentalUuidApi::class)
   override fun createAddAffairEditor(
+    title: String,
+    content: String,
     remoteId: Int,
+    cancelCallback: (() -> Unit)?,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)?
   ): AffairIdModelEditor {
     if (remoteId > 0 && itemList.value.any { it.remoteId.value == remoteId }) {
       throw IllegalStateException("remoteId 已存在, $remoteId")
@@ -52,23 +56,33 @@ class AffairGroupModelImpl(
     val entity = AffairEntity(
       remoteId = remoteId,
       localId = Uuid.random().toString(),
-      title = "标题",
-      content = "内容",
+      title = title,
+      content = content,
       remindTime = 0,
       whatTime = emptyList(),
     )
     val model = createAffairItemModelImpl(entity)
-    return model.tryCreateEditor()!! // 添加进 _itemList 由内部 commit() 时进行处理
+    return model.tryCreateEditor(
+      cancelCallback = cancelCallback,
+      commitCallback = commitCallback,
+    )!! // 添加进 _itemList 由内部 commit() 时进行处理
   }
 
-  fun addAffairInternal(idModel: AffairIdModelImpl) {
-    _itemList.value = itemList.value.add(idModel)
-    addedAffair.tryEmit(idModel)
-  }
-
-  fun removeAffairInternal(idModel: AffairIdModelImpl) {
-    _itemList.value = itemList.value.remove(idModel)
-    deletedAffair.tryEmit(idModel)
+  @OptIn(ExperimentalUuidApi::class)
+  override fun createAffairIdModel(
+    title: String,
+    content: String
+  ): AffairIdModel {
+    return createAffairItemModelImpl(
+      entity = AffairEntity(
+        remoteId = 0,
+        localId = Uuid.random().toString(),
+        remindTime = 0,
+        title = title,
+        content = content,
+        whatTime = emptyList(),
+      )
+    )
   }
 
   private fun createAffairItemModelImpl(
@@ -78,6 +92,19 @@ class AffairGroupModelImpl(
       groupModel = this,
       entity = entity,
     )
+  }
+
+  fun addAffairInternal(idModel: AffairIdModelImpl) {
+    _itemList.value = itemList.value.add(idModel)
+    addedAffair.tryEmit(idModel)
+  }
+
+  fun removeAffairInternal(idModel: AffairIdModelImpl) {
+    val newList = itemList.value.remove(idModel)
+    if (newList !== itemList.value) {
+      _itemList.value = newList
+      deletedAffair.tryEmit(idModel)
+    }
   }
 
   override fun toString(): String {

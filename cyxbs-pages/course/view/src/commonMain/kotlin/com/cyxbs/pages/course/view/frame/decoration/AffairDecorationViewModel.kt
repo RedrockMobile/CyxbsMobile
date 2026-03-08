@@ -47,6 +47,7 @@ class AffairDecorationViewModel(
         hierarchy.reset(emptyList())
         supervisorScope {
           idModels.forEach { idModel ->
+            val whatTimeByDateModel = hashMapOf<AffairDateModel, AffairItemWhatTime>()
             idModel.whatTimeDate.value.forEach { (whatTimeModel, dateModels) ->
               dateModels.forEach { dateModel ->
                 val whatTime = AffairItemWhatTime(
@@ -55,11 +56,8 @@ class AffairDecorationViewModel(
                   courseFrame = courseFrame,
                   platformItemFactory = platformItemFactory
                 )
-                launch {
-                  dateModel.enable.mergeFlow.collect {
-                    if (it) hierarchy.add(whatTime) else hierarchy.remove(whatTime)
-                  }
-                }
+                whatTimeByDateModel[dateModel] = whatTime
+                hierarchy.add(whatTime)
               }
             }
             launch {
@@ -70,10 +68,14 @@ class AffairDecorationViewModel(
                   courseFrame = courseFrame,
                   platformItemFactory = platformItemFactory
                 )
-                launch {
-                  dateModel.enable.mergeFlow.collect {
-                    if (it) hierarchy.add(whatTime) else hierarchy.remove(whatTime)
-                  }
+                whatTimeByDateModel[dateModel] = whatTime
+                hierarchy.add(whatTime)
+              }
+            }
+            launch {
+              idModel.removedDateModel.collect { dateModel ->
+                whatTimeByDateModel[dateModel]?.let {
+                  hierarchy.remove(it)
                 }
               }
             }
@@ -90,7 +92,7 @@ class AffairDecorationViewModel(
   // 查找 CourseItemState
   suspend fun findCourseItemState(dateModelEditor: AffairDateModelEditor): CourseItemState {
     return hierarchy.observe(
-      page = courseFrame.getPage(dateModelEditor.date),
+      page = courseFrame.getPage(dateModelEditor.date)!!,
       dayOfWeek = dateModelEditor.date.dayOfWeek,
     ).mapNotNull { list ->
       list.firstOrNull {
@@ -112,7 +114,7 @@ private data class AffairItemWhatTime(
       page = courseFrame.beginDate.value.let {
         if (it == null) -1
         else if (isSemester) 0
-        else it.daysUntil(affairDateModel.date.value) / 7 + 1
+        else courseFrame.getPage(affairDateModel.date.value) ?: -1
       },
       dayOfWeek = affairDateModel.date.value.dayOfWeek,
       beginTime = affairDateModel.whatTime.value.timePair.value.first,
@@ -122,32 +124,11 @@ private data class AffairItemWhatTime(
 
   override fun createItem(coroutineScope: CoroutineScope): CourseAffairItem {
     return CourseAffairItem(
-      affairWhatTime = this,
+      whatTime = this,
       coroutineScope = coroutineScope,
+      courseFrame = courseFrame,
       affairDateModel = affairDateModel,
       platformItemFactory = platformItemFactory,
     )
-  }
-
-  override fun compareTo(other: ItemHierarchyWhatTime<CourseAffairItem>): Int {
-    return 0.compareBy(other) {
-      -it.now.value.page // page 越小越在上
-    }.compareBy(other) {
-      -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
-    }.compareBy(other) {
-      it.now.value.beginTime.value // beginTime 越大越在上
-    }.compareBy(other) {
-      it.now.value.finalTime.value // finalTime 越大越在上
-    }
-  }
-
-  private inline fun Int.compareBy(
-    other: ItemHierarchyWhatTime<CourseAffairItem>,
-    compare: (ItemHierarchyWhatTime<CourseAffairItem>) -> Int
-  ): Int {
-    if (this != 0) return this
-    val a = compare.invoke(this@AffairItemWhatTime)
-    val b = compare.invoke(other)
-    return a - b
   }
 }

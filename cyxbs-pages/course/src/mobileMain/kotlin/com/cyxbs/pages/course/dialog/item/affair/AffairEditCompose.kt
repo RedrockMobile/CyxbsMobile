@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.Icon
+import androidx.compose.material.Text
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -100,23 +101,31 @@ private fun EditTitleWithButton(
     modifier = Modifier.fillMaxWidth(),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    BasicTextField(
-      modifier = Modifier.weight(1F)
-        .focusRequester(focusRequester),
-      state = textFieldState,
-      lineLimits = TextFieldLineLimits.SingleLine,
-      cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
-      keyboardOptions = KeyboardOptions(
-        keyboardType = KeyboardType.Text,
-        imeAction = ImeAction.Next,
-        showKeyboardOnFocus = false,
-      ),
-      textStyle = TextStyle(
-        fontSize = 22.sp,
-        color = LocalAppColors.current.tvLv2,
-        fontWeight = FontWeight.Bold,
-      ),
-    )
+    Box(modifier = Modifier.weight(1F)) {
+      BasicTextField(
+        modifier = Modifier.focusRequester(focusRequester),
+        state = textFieldState,
+        lineLimits = TextFieldLineLimits.SingleLine,
+        cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
+        keyboardOptions = KeyboardOptions(
+          keyboardType = KeyboardType.Text,
+          imeAction = ImeAction.Next,
+          showKeyboardOnFocus = false,
+        ),
+        textStyle = TextStyle(
+          fontSize = 22.sp,
+          color = LocalAppColors.current.tvLv2,
+          fontWeight = FontWeight.Bold,
+        ),
+      )
+      if (rememberDerivedStateOfStructure { textFieldState.text.isEmpty() }.value) {
+        Text(
+          text = "请输入标题",
+          fontSize = 22.sp,
+          color = LocalAppColors.current.tvLv2.copy(alpha = 0.3F),
+        )
+      }
+    }
     EditStateButtons(
       currentForm = currentForm,
       courseState = courseState,
@@ -154,7 +163,13 @@ private fun EditStateButtons(
     onClickPositiveBtn = {
       parentCoroutineScope.launch {
         val show = currentForm.commit()
-        if (show != null) {
+        if (currentForm.isCreateAffair) {
+          // 创建事务时取消编辑则直接关闭 BottomSheet
+          parentCoroutineScope.launch {
+            courseState.bottomSheetState.collapse()
+          }
+          dismiss()
+        } else if (show != null) {
           affairState.currentFormState.value = show
           dismiss()
         }
@@ -209,8 +224,16 @@ private fun EditStateButtons(
     onClickPositiveBtn = {
       val show = currentForm.cancelEdit()
       if (show != null) {
-        courseState.currentPageItemFlow.value = courseState.dialogContents.value[0] // 还原之前的修改
-        affairState.currentFormState.value = show
+        // 还原之前为了展示其他 item 的开始和结束时间做的修改
+        courseState.currentPageItemFlow.value = courseState.dialogContents.value[0]
+        if (currentForm.isCreateAffair) {
+          // 创建事务时取消编辑则直接关闭 BottomSheet
+          parentCoroutineScope.launch {
+            courseState.bottomSheetState.collapse()
+          }
+        } else {
+          affairState.currentFormState.value = show
+        }
       }
       dismiss()
     }

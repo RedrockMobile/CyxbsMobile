@@ -203,7 +203,7 @@ private fun TimePairRow(
             if (endTime < startTime) {
               // 超过一天了
               endTime = whatTimeModelEditor.timePair.first.plusMinutes(-diff)
-              startTime = endTime.plusMinutes(-whatTimeModelEditor.timePair.durationMinute())
+              startTime = endTime.minusMinutes(whatTimeModelEditor.timePair.durationMinute())
               if (endTime < startTime) {
                 // 还是超过一天，说明原有的 whatTimeModelEditor.timePair 太长了
                 startTime = MinuteTime(8, 0).plusMinutes(diff)

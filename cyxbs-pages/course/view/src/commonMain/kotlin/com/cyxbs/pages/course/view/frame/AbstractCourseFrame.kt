@@ -71,27 +71,27 @@ abstract class AbstractCourseFrame {
 
   // 课表初始页，按 beginDate 自动计算(如果有值)，超出 maxPage 时默认显示第一页
   open val initialPage: Int
-    get() = getPage(TodayNoEffect)
+    get() = getPage(TodayNoEffect) ?: 0
 
   // 当前日期是课表的第几周
-  open fun getWeekNum(date: Date): Int {
+  open fun getWeekNum(date: Date): Int? {
     val realBeginDate =
-      beginDate.value?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return 0
+      beginDate.value?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal) ?: return null
     return realBeginDate.daysUntil(date) / 7 + 1
   }
 
   // 指定日期对应页面数
-  fun getPage(date: Date): Int {
-    val page = getWeekNum(date).coerceAtLeast(0)
+  fun getPage(date: Date): Int? {
+    val page = getWeekNum(date)?.coerceAtLeast(0) ?: return null
     return if (page >= maxPage) 0 else page
   }
 
   // 滚动到指定日期的页面
   suspend fun animateScrollToDate(date: Date) {
-    val newPage = getPage(date)
+    val newPage = getPage(date) ?: return
     if (newPage == pagerState.currentPage) return
     pagerState.animateScrollToPage(
-      getPage(date),
+      page = newPage,
       animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
     )
   }

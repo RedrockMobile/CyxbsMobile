@@ -66,7 +66,9 @@ object SyncAffairUtils {
       }
       newMap.forEach {
         val editor = groupModel.createAddAffairEditor(
-          remoteId = it.value.remoteId
+          remoteId = it.value.remoteId,
+          title = it.value.title,
+          content = it.value.content,
         )
         syncAffairEntity(editor, it.value)
         launch {

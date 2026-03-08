@@ -63,8 +63,17 @@ interface AffairGroupModel {
    * 创建添加事务的 editor，使用 [AffairIdModelEditor.commit] 后上传到远端
    */
   fun createAddAffairEditor(
+    title: String,
+    content: String,
     remoteId: Int = 0, // 正常情况下新增事务为 0，不为 0 仅提供给同步使用
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null,
   ): AffairIdModelEditor
+
+  fun createAffairIdModel(
+    title: String,
+    content: String,
+  ): AffairIdModel
 }
 
 // 单个事务，id 为唯一值
@@ -82,12 +91,22 @@ interface AffairIdModel {
 
   val whatTimeDate: StateFlow<ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
 
-  // 新增的 AffairDateModel
+  // 在 AffairWhatTimeModelEditor 中新增的 AffairDateModel
   val addedDateModel: Flow<AffairDateModel>
 
-  fun tryCreateEditor(): AffairIdModelEditor?
+  // 在 AffairWhatTimeModelEditor 中移除的 AffairDateModel
+  val removedDateModel: Flow<AffairDateModel>
 
-  suspend fun createEditorSuspend(): AffairIdModelEditor
+  fun tryCreateEditor(
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null,
+  ): AffairIdModelEditor?
+
+  suspend fun createEditorSuspend(
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null
+  ): AffairIdModelEditor
+
 }
 
 // 事务时间段，timePair 表明了时间段的开始和结束
@@ -137,11 +156,14 @@ interface AffairIdModelEditor {
 
   fun clear() // 清空所有 whatTimeList，如果 editor 提交时 whatTimeList 为空则等同于删除当前事务
 
+  fun findDateModelEditor(dateModel: AffairDateModel): AffairDateModelEditor?
+
   fun enableModify(): Boolean // 能否修改
 
   // 提交
   suspend fun commit(
     needUpload: Boolean = true, // 是否需要上传到后端，正常情况下都需要上传，不上传仅提供给同步使用
+    needAdd: Boolean = true, // 是否添加进事务列表中，正常情况下都会添加，如果你需要 mock 一个事务则很有用
   ): Result<EditResult>
 
   // 取消本次编辑

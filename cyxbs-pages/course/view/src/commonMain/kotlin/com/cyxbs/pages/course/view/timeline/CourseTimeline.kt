@@ -6,13 +6,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -142,6 +140,7 @@ data class CourseTimeline(
     val finalTime1Weight = calculateWeight(finalTime1)
     val beginTime2Weight = calculateWeight(beginTime2)
     val finalTime2Weight = calculateWeight(finalTime2)
+    if (finalTime2Weight - beginTime2Weight == 0F) return Offset.Zero
     return Offset(
       x = (beginTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),
       y = (finalTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),

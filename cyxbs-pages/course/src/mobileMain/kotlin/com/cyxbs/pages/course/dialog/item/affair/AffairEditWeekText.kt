@@ -88,7 +88,7 @@ private fun WeekNumCompose(
 ) {
   val courseFrame = AbstractCourseFrame.current
   val weekNumText = rememberTextFieldState(remember {
-    Num2CN.number2ChineseNumber(courseFrame.getWeekNum(dateState.value))
+    Num2CN.number2ChineseNumber(courseFrame.getWeekNum(dateState.value)!!)
   })
   val maxWeak = courseFrame.maxWeek
   Row(modifier) {
@@ -219,7 +219,7 @@ private fun WeekNumCompose(
   }
   LaunchedEffect(dateState) {
     snapshotFlow { dateState.value }.drop(1).collect { date ->
-      val weekNumStr = Num2CN.number2ChineseNumber(courseFrame.getWeekNum(date))
+      val weekNumStr = Num2CN.number2ChineseNumber(courseFrame.getWeekNum(date)!!)
       if (weekNumStr != weekNumText.text) {
         weekNumText.setTextAndPlaceCursorAtEnd(weekNumStr)
       }
