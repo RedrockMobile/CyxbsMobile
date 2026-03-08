@@ -17,9 +17,16 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier.enableShow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlin.math.abs
 
 /**
@@ -32,12 +39,19 @@ import kotlin.math.abs
  */
 object BeginFinalTimeShowModifier : CourseItemModifier {
 
+  // 显示开始结束时间，默认不显示
   val enableShow = CourseItemState.ValueKey {
     mutableStateOf(false)
   }
 
+  // 透明度，默认与 itemState#alphaState 同步
   val alphaState = CourseItemState.ValueKey {
     mutableFloatStateOf(1F)
+  }
+
+  // 是否根据当 item 的实际展示位置强制计算时间，用于长按整个 item 移动的场景
+  val forceCalculateMinuteTime = CourseItemState.ValueKey {
+    MutableStateFlow(false)
   }
 
   @Composable
@@ -50,18 +64,32 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
           alphaState.get(itemState).floatValue = it
         }
       }
+      val timePairState = produceState(MinuteTimePair(0)) {
+        forceCalculateMinuteTime.get(itemState).flatMapLatest { enable ->
+          if (enable) combine(
+            itemState.layoutCoordinatesFlow.filterNotNull(),
+            itemState.coursePage.layoutCoordinatesFlow,
+            itemState.item.whatTime.now,
+          ) { itemCoordinates, courseCoordinates, whatTime ->
+            val offset = courseCoordinates.localPositionOf(itemCoordinates)
+            val beginMinuteTime = itemState.coursePage.timeline.calculateMinuteTime(
+              itemState.coursePage,
+              offset.y
+            )
+            MinuteTimePair(
+              first = beginMinuteTime,
+              second = beginMinuteTime + (whatTime.finalTime - whatTime.beginTime),
+            )
+          } else itemState.item.whatTime.now.map {
+            MinuteTimePair(it.beginTime, it.finalTime)
+          }
+        }.collect {
+          value = it
+        }
+      }
       Modifier.drawBeginFinalTimeline(
         alpha = alphaState.get(itemState),
-        time1 = produceState(MinuteTime(0, 0)) {
-          itemState.item.whatTime.now.collect {
-            value = it.beginTime
-          }
-        },
-        time2 = produceState(MinuteTime(0, 0)) {
-          itemState.item.whatTime.now.collect {
-            value = it.finalTime
-          }
-        }
+        timePair = timePairState,
       )
     }
   }
@@ -72,23 +100,22 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
 @Composable
 private fun Modifier.drawBeginFinalTimeline(
   alpha: FloatState,
-  time1: State<MinuteTime>,
-  time2: State<MinuteTime>,
+  timePair: State<MinuteTimePair>,
 ): Modifier {
   val localAppColor = LocalAppColors.current
   val textMeasurer = rememberTextMeasurer()
   val textStyle = remember { TextStyle(color = localAppColor.tvLv4, fontSize = 8.sp) }
   val beginTextLayoutResultState = rememberDerivedStateOfStructure {
-    val beginTime = minOf(time1.value, time2.value)
+    val beginTime = minOf(timePair.value.first, timePair.value.second)
     textMeasurer.measure(beginTime.toString(), textStyle)
   }
   val finalTextLayoutResultState = rememberDerivedStateOfStructure {
-    val finalTime = maxOf(time1.value, time2.value)
+    val finalTime = maxOf(timePair.value.first, timePair.value.second)
     textMeasurer.measure(finalTime.toString(), textStyle)
   }
   val durationTextLayoutResultState = rememberDerivedStateOfStructure {
     textMeasurer.measure(
-      abs(time1.value.minutesUntil(time2.value)).toString(),
+      abs(timePair.value.durationMinute()).toString(),
       textStyle
     )
   }

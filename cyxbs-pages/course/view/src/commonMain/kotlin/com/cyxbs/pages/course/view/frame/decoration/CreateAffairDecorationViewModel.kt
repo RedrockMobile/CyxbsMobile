@@ -11,19 +11,21 @@ import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.add
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
+import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseCreateAffairItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateAffairItemFactory
+import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.touch.LongPressCreateItem
 import com.cyxbs.pages.course.view.item.touch.LongPressCreateItemCompose
-import com.cyxbs.pages.course.view.timeline.LocalCourseScroll
-import com.cyxbs.pages.course.view.timeline.LocalCourseScrollContext
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -61,24 +63,23 @@ private fun LongPressCreateCoursePageWrapper(viewModel: CreateAffairDecorationVi
   val coursePage = viewModel.coursePage
   val courseFrame = AbstractCourseFrame.current
   courseFrame.getWeekNumByPage(coursePage.page) ?: return // 仅在有周数的页面才允许创建事务
-  val scrollContext = LocalCourseScroll.current
   val coroutineScope = rememberCoroutineScope()
   LongPressCreateItemCompose(
     onCreate = { beginPosition, size ->
       // 倒计时结束，添加 item 展示
-      var initTime = scrollContext.timeline.calculateMinuteTime(scrollContext, beginPosition.y)
+      var initTime = coursePage.timeline.calculateMinuteTime(coursePage, beginPosition.y)
       var initPosition = beginPosition
       if (initTime.minute % 10 != 0) {
         // 落点取整 10 分钟
         initTime = initTime.plusMinutes((initTime.minute % 10).let { if (it < 5) -it else 10 - it })
-        initPosition = initPosition.copy(y = scrollContext.timeline.calculateWeightRatio(initTime) * size.height)
+        initPosition = initPosition.copy(y = coursePage.timeline.calculateWeightRatio(initTime) * size.height)
       }
       CreateAffairItemWhatTime(
         viewModel = viewModel,
         page = coursePage.page,
         dayOfWeek = coursePage.timeline.beginDayOfWeek.add((initPosition.x / (size.width / 7)).toInt()),
         initMinuteTime = initTime,
-        scrollContext = scrollContext,
+        coursePage = coursePage,
         initPosition = beginPosition,
       ).also {
         viewModel.hierarchy.add(it)
@@ -103,7 +104,7 @@ private data class CreateAffairItemWhatTime(
   val page: Int,
   val dayOfWeek: DayOfWeek,
   val initMinuteTime: MinuteTime,
-  val scrollContext: LocalCourseScrollContext,
+  val coursePage: LocalCoursePageContext,
   override val initPosition: Offset,
 ) : ItemHierarchyWhatTime<CourseCreateAffairItem>(), LongPressCreateItem {
 
@@ -112,13 +113,22 @@ private data class CreateAffairItemWhatTime(
       page = page,
       dayOfWeek = dayOfWeek,
       beginTime = initMinuteTime,
-      finalTime = scrollContext.timeline.calculateMinuteTime(scrollContext, initPosition.y),
+      finalTime = coursePage.timeline.calculateMinuteTime(coursePage, initPosition.y),
     )
   )
 
+  override var itemState: CourseItemState? = null
+    set(value) {
+      field = value
+      if (value != null) {
+        // itemState 初始化
+        BeginFinalTimeShowModifier.enableShow.get(value).value = true // 默认显示开始结束时间
+      }
+    }
+
   override fun createItem(coroutineScope: CoroutineScope): CourseCreateAffairItem {
     return CourseCreateAffairItem(
-      whatTime = this,
+      itemWhatTime = this,
       coroutineScope = coroutineScope,
       platformItemFactory = viewModel.platformItemFactory,
     )
@@ -149,7 +159,7 @@ private data class CreateAffairItemWhatTime(
   override var touchPosition: Offset = initPosition
     set(value) {
       field = value
-      val touchMinuteTime = scrollContext.timeline.calculateMinuteTime(scrollContext, value.y)
+      val touchMinuteTime = coursePage.timeline.calculateMinuteTime(coursePage, value.y)
       now.value = now.value.copy(
         beginTime = minOf(initMinuteTime, touchMinuteTime),
         finalTime = maxOf(initMinuteTime, touchMinuteTime),
@@ -195,11 +205,11 @@ private data class CreateAffairItemWhatTime(
     if (isWaitExpandTimeline) return
     isWaitExpandTimeline = true
     viewModel.viewModelScope.launch {
-      scrollContext.timeline.data.asSequence()
+      coursePage.timeline.data.asSequence()
         .filterIsInstance<MutableTimelineData>()
         .filter { it.state.value == MutableTimelineData.State.Collapse }
         .mapNotNull { time ->
-          scrollContext.timelineCoordinatesMap[time]?.let { coor ->
+          coursePage.scrollContext.timelineCoordinatesMap[time]?.let { coor ->
             val a1 = coor.positionInParent().y
             val a2 = a1 + coor.size.height
             val b1 = minOf(initPosition.y, touchPosition.y)

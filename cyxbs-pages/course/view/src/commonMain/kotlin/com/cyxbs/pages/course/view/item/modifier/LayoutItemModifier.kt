@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.toSize
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.LocalCoursePage
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -34,7 +33,8 @@ import kotlin.math.roundToInt
  */
 object LayoutItemModifier : CourseItemModifier {
 
-  val enableAnimatable = CourseItemState.ValueKey { true }
+  // 是否启动时间信息改变后的动画，默认不开启
+  val enableAnim = CourseItemState.ValueKey { false }
 
   @Composable
   override fun createModifier(): Modifier {
@@ -50,7 +50,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   // 水平位置
   val indexAnimatable = remember {
     Animatable(
-      initialValue = calculateIndex(itemState, timeline).toFloat(),
+      initialValue = calculateIndex(itemState).toFloat(),
     )
   }
   val beginTimeAnimatable = remember {
@@ -68,10 +68,10 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   LaunchedEffect(timeline.beginDayOfWeek) {
     itemState.item.whatTime.now.collectLatest {
       supervisorScope {
-        val newIndex = calculateIndex(itemState, timeline).toFloat()
+        val newIndex = calculateIndex(itemState).toFloat()
         if (newIndex != indexAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+            if (LayoutItemModifier.enableAnim.get(itemState)) {
               indexAnimatable.animateTo(newIndex)
             } else {
               indexAnimatable.snapTo(newIndex)
@@ -80,7 +80,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
         }
         if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+            if (LayoutItemModifier.enableAnim.get(itemState)) {
               beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay)
             } else {
               beginTimeAnimatable.snapTo(it.beginTime.minuteOfDay)
@@ -89,7 +89,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
         }
         if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
           launch {
-            if (LayoutItemModifier.enableAnimatable.get(itemState)) {
+            if (LayoutItemModifier.enableAnim.get(itemState)) {
               finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay)
             } else {
               finalTimeAnimatable.snapTo(it.finalTime.minuteOfDay)
@@ -115,9 +115,9 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   }
 }
 
-private fun calculateIndex(itemState: CourseItemState, timeline: CourseTimeline): Int {
+private fun calculateIndex(itemState: CourseItemState,): Int {
   val itemDayOfWeekOrdinal = itemState.item.whatTime.now.value.dayOfWeek.ordinal
-  val beginDayOfWeekOrdinal = timeline.beginDayOfWeek.ordinal
+  val beginDayOfWeekOrdinal = itemState.coursePage.timeline.beginDayOfWeek.ordinal
   return (itemDayOfWeekOrdinal + 7 - beginDayOfWeekOrdinal) % 7
 }
 
@@ -143,7 +143,7 @@ fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Fl
           val width = pageCoordinates.size.width / 7
           val height =
             (pageCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt()
-          val x = calculateIndex(this, coursePage.timeline) * pageCoordinates.size.width / 7F
+          val x = calculateIndex(this) * pageCoordinates.size.width / 7F
           val y = beginWeightRatio * pageCoordinates.size.height
           val offsetInWindow = pageCoordinates.positionInWindow()
           Rect(

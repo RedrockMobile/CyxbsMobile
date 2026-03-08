@@ -6,7 +6,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.DayOfWeek
 import kotlin.reflect.KClass
 
@@ -45,7 +45,7 @@ abstract class CourseItem(
 
 // item 的时间信息
 interface CourseItemWhatTime {
-  val now: StateFlow<Fixed>
+  val now: MutableStateFlow<Fixed>
 
   val beginTime: MinuteTime
     get() = now.value.beginTime

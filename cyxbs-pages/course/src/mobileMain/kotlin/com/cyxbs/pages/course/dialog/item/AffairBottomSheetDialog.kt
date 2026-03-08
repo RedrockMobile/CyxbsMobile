@@ -86,6 +86,7 @@ import com.cyxbs.pages.course.dialog.item.affair.AffairEditWeekText
 import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose
 import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
 import com.cyxbs.pages.course.view.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete
@@ -339,6 +340,8 @@ private fun ShowStateButtons(
           affairState.currentFormState.value = edit
           // 进入编辑模式后将弹窗的内容设置为仅当前 item
           courseState.dialogContents.value = listOf(courseState.currentPageItemFlow.value!!)
+          // 进入编辑模式后允许 item 位置改变动画
+          LayoutItemModifier.enableAnim.set(courseState.currentPageItemFlow.value!!.itemState, true)
         }
       }
     },
@@ -419,6 +422,8 @@ private fun EditStateButtons(
       if (show != null) {
         courseState.currentPageItemFlow.value = courseState.dialogContents.value[0] // 还原之前的修改
         affairState.currentFormState.value = show
+        // 退出编辑模式后关闭 item 位置改变动画
+        LayoutItemModifier.enableAnim.set(courseState.currentPageItemFlow.value!!.itemState, false)
       }
       dismiss()
     }

@@ -72,6 +72,10 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
     return time.minutesUntil(this).minutes
   }
 
+  operator fun minus(duration: Duration): MinuteTime {
+    return minusMinutes(duration.inWholeMinutes.toInt())
+  }
+
   operator fun plus(duration: Duration): MinuteTime {
     return plusMinutes(duration.inWholeMinutes.toInt())
   }

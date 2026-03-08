@@ -355,7 +355,8 @@ abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Co
   abstract override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
 
   // 调用 createItem 后才会创建 itemState
-  var itemState: CourseItemState? = null
+  // 子类可重写获得 itemState 初始化时机
+  open var itemState: CourseItemState? = null
 
   abstract fun createItem(coroutineScope: CoroutineScope): Item
   abstract override fun equals(other: Any?): Boolean

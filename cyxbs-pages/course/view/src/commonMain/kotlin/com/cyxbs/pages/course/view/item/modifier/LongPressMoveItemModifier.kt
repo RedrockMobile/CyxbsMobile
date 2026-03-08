@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.view.item.modifier
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -26,7 +27,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.config.time.add
 import com.cyxbs.components.utils.compose.getValue
 import com.cyxbs.components.utils.compose.rememberUpdatedWrapper
 import com.cyxbs.components.utils.compose.rememberWrapper
@@ -36,7 +39,9 @@ import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.overlay.mergeOverlapRange
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 长按移动 item
@@ -100,6 +105,7 @@ abstract class LongPressMoveController {
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
     size: IntSize,
+    heightAnimatable: Animatable<Int, *>
   ) {
     try {
       animate(
@@ -117,7 +123,6 @@ abstract class LongPressMoveController {
   open fun updateState(state: LongPressMoveState) {
     this.state = state
   }
-
 }
 
 // 长按移动 item
@@ -132,14 +137,8 @@ fun Modifier.longPressMove(
   var transitionLayoutCoordinate by rememberWrapper<LayoutCoordinates?>(null)
   var screenPosition by remember { mutableStateOf(Offset.Zero) }
   val transition = remember { mutableStateOf(Offset.Zero) }
-  return layout { measure, constraints ->
-    val placeable = measure.measure(constraints)
-    layout(placeable.width, placeable.height) {
-      placeable.place(0, 0,
-        zIndex = if (controllerWrapper.state !is LongPressMoveState.Idle) 1F else 0F,
-      )
-    }
-  }.onGloballyPositioned {
+  val heightAnimatable = remember { Animatable(0, Int.VectorConverter) }
+  return onGloballyPositioned {
     // 得到 translation 变换前的坐标系
     originLayoutCoordinates = it
     if (controllerWrapper.state is LongPressMoveState.Touching) {
@@ -182,7 +181,8 @@ fun Modifier.longPressMove(
             controllerWrapper.onEndLongPress(isChangedToUp, transition, screenPosition, size)
             controllerWrapper.updateState(LongPressMoveState.Animating)
             coroutineScope.launch {
-              controllerWrapper.animateMove(isChangedToUp, transition, screenPosition, size)
+              heightAnimatable.snapTo(size.height)
+              controllerWrapper.animateMove(isChangedToUp, transition, screenPosition, size, heightAnimatable)
             }.invokeOnCompletion {
               // 如果当前 pointerInput 被卸载了，则会发送一个抬起且被消耗的事件
               // 但注意此时 coroutineScope 也即将被取消（虽然 isActive 为 true），launch 是无法执行的
@@ -215,6 +215,23 @@ fun Modifier.longPressMove(
           }
         }
       }
+    }
+  }.layout { measure, constraints ->
+    val newConstraints = if (heightAnimatable.isRunning) {
+      // 因为课表时间轴的不均匀，在长按拖动 item 后，原位置到新位置相同时间差但高度不一定一样
+      // 所以为了更流畅的转变，就添加了一个动画来改变高度，只会在抬手后移动到新位置才会执行高度动画
+      constraints.copy(
+        minHeight = heightAnimatable.value,
+        maxHeight = heightAnimatable.value,
+      )
+    } else {
+      constraints
+    }
+    val placeable = measure.measure(newConstraints)
+    layout(placeable.width, constraints.maxHeight) {
+      placeable.place(0, 0,
+        zIndex = if (controllerWrapper.state !is LongPressMoveState.Idle) 1F else 0F,
+      )
     }
   }
 }
@@ -284,6 +301,8 @@ class LongPressMoveControllerImpl(
     itemState.addShowRangeTransformer(selfShowRangeTransformerForAll)
     // 展示被覆盖的 item
     itemState.addOverlapChangeTrigger(overlapChangeTriggerForAllCovered)
+    // 开始长按移动后，开始和结束时间的展示切换为实时计算的方式
+    BeginFinalTimeShowModifier.forceCalculateMinuteTime.get(itemState).value = true
   }
 
   override fun onMoveLongPress(
@@ -355,14 +374,17 @@ class LongPressMoveControllerImpl(
     upOrCancel: Boolean,
     transition: MutableState<Offset>,
     screenLeftTop: Offset,
-    size: IntSize
+    size: IntSize,
+    heightAnimatable: Animatable<Int, *>,
   ) {
+    val newBeginTime = calculateNewMinuteTime(screenLeftTop)
     val destinationOffset = extension.getMoveDestinationOffset(
       upOrCancel = upOrCancel,
       itemState = itemState,
       transition = transition,
       screenTopLeft = screenLeftTop,
       size = size,
+      newBeginTime = newBeginTime,
     )
     var topItemStateList = emptySet<CourseItemState>()
     if (destinationOffset == Offset.Zero) {
@@ -391,14 +413,58 @@ class LongPressMoveControllerImpl(
     }
     try {
       // 由 IMovableItemModel 实现最后动画的移动
-      extension.animateMove(itemState, transition, destinationOffset)
-    } finally {
-      transition.value = destinationOffset
       if (destinationOffset == Offset.Zero) {
+        runAnimateMove(transition, Offset.Zero)
+      } else {
+        supervisorScope {
+          launch { runAnimateMove(transition, destinationOffset) }
+          launch {
+            // 执行位置偏移动画的同时执行高度的偏移的动画
+            // 因为课表时间轴的不均匀，原位置到新位置相同时间差但高度不一定一样
+            heightAnimatable.animateTo(calculateNewHeight(newBeginTime))
+          }
+        }
+        val now = itemState.item.whatTime.now.value
+        // 修改 item 时间段至对应时间
+        itemState.item.whatTime.now.value = now.copy(
+          dayOfWeek = now.dayOfWeek.add((destinationOffset.x / size.width).roundToInt()),
+          beginTime = newBeginTime,
+          finalTime = newBeginTime + (now.finalTime - now.beginTime)
+        )
+        transition.value = Offset.Zero // 修改时间后把偏移量重置
+      }
+    } finally {
+      // 结束移动后开始结束时间的展示不再进行实时计算
+      BeginFinalTimeShowModifier.forceCalculateMinuteTime.get(itemState).value = false
+      if (destinationOffset == Offset.Zero) {
+        // 在动画前有设置，动画结束后需要移除
         itemState.removeOverlapChangeTrigger(overlapChangeTriggerForEmptyCovered)
         itemState.removeShowRangeTransformer(selfShowRangeTransformerForEmpty)
         topItemStateList.forEach { it.zIndexState.floatValue -= 1F }
       }
     }
+  }
+
+  private suspend fun runAnimateMove(transition: MutableState<Offset>, destinationOffset: Offset) {
+    animate(
+      typeConverter = Offset.VectorConverter,
+      initialValue = transition.value,
+      targetValue = destinationOffset,
+    ) { value, _ ->
+      transition.value = value
+    }
+  }
+
+  private fun calculateNewMinuteTime(screenLeftTop: Offset): MinuteTime {
+    val newPosition = itemState.coursePage.layoutCoordinates.screenToLocal(screenLeftTop)
+    return itemState.coursePage.timeline.calculateMinuteTime(itemState.coursePage, newPosition.y)
+  }
+
+  private fun calculateNewHeight(newBeginTime: MinuteTime): Int {
+    val newFinalTime = newBeginTime + (itemState.item.whatTime.finalTime - itemState.item.whatTime.beginTime)
+    val beginWeightRatio = itemState.coursePage.timeline.calculateWeightRatio(newBeginTime)
+    val finalWeightRatio = itemState.coursePage.timeline.calculateWeightRatio(newFinalTime)
+    val newHeight = (itemState.coursePage.layoutCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(1)
+    return newHeight
   }
 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -23,6 +24,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -65,7 +67,6 @@ data class CourseTimeline(
       totalInitialWeight += it.initialWeight
       linkNodeList.add(
         LinkNode(
-          endTime = it.endTime,
           totalInitialWeight = totalInitialWeight,
           index = i
         )
@@ -79,11 +80,14 @@ data class CourseTimeline(
   }
 
   inner class LinkNode(
-    val endTime: MinuteTime,
     val totalInitialWeight: Float,
     val index: Int,
   ) {
     val value = data[index]
+    val startTime: MinuteTime
+      get() = value.startTime
+    val endTime: MinuteTime
+      get() = value.endTime
     val totalShowWeightState = derivedStateOfStructure {
       var sum = 0F
       for (i in 0..index) {
@@ -111,8 +115,8 @@ data class CourseTimeline(
       val start = linkNodeList.getOrNull(-index - 2)
       val end = linkNodeList[-index - 1]
       (start?.totalShowWeightState?.value ?: 0F) +
-          end.value.startTime.minutesUntil(time) /
-          (end.value.startTime.minutesUntil(end.value.endTime)).toFloat() *
+          end.startTime.minutesUntil(time) /
+          (end.startTime.minutesUntil(end.endTime)).toFloat() *
           end.value.nowWeight
     }
     return weight
@@ -148,24 +152,21 @@ data class CourseTimeline(
    * 计算 [height] 在时间轴上的 [MinuteTime]
    * @param height 相对于
    */
-  fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime {
-    var top = 0F
-    data.fastForEach {
-      scrollContext.timelineCoordinatesMap[it]?.let { coordinates ->
-        val y1 = top
-        val y2 = top + coordinates.size.height
-        if (height in y1..y2) {
-          return it.startTime.plusMinutes(((it.startTime.minutesUntil(it.endTime)) * (height - y1) / (y2 - y1)).roundToInt())
-        }
-        top = y2
-      }
+  fun calculateMinuteTime(coursePage: LocalCoursePageContext, height: Float): MinuteTime {
+    val totalHeight = coursePage.layoutCoordinates.size.height
+    val index = linkNodeList.binarySearchBy(height.roundToInt()) {
+      (it.totalShowWeightState.value / totalShowWeight * totalHeight).roundToInt()
     }
-    if (height < 0) {
-      return data.first().startTime
-    } else if (height > top) {
-      return data.last().endTime
+    return if (index >= 0) {
+      linkNodeList[index].endTime
+    } else {
+      val start = linkNodeList.getOrNull(-index - 2)
+      val end = linkNodeList[-index - 1]
+      val startHeight = (start?.totalShowWeightState?.value ?: 0F) / totalShowWeight * totalHeight
+      val endHeight = end.totalShowWeightState.value / totalShowWeight * totalHeight
+      val diffMinute = ((height - startHeight) / (endHeight - startHeight) * end.startTime.minutesUntil(end.endTime)).roundToInt()
+      end.startTime.plusMinutes(diffMinute)
     }
-    throw IllegalStateException("无法寻找高度对应时间，不应该出现的异常, height=$height, timeline=$data")
   }
 }
 

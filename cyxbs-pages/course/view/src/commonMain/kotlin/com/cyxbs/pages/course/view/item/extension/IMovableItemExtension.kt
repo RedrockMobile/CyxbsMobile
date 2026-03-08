@@ -1,10 +1,9 @@
 package com.cyxbs.pages.course.view.item.extension
 
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animate
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItemState
 
 /**
@@ -22,22 +21,8 @@ interface IMovableItemExtension : CourseItemExtension {
     transition: MutableState<Offset>,
     screenTopLeft: Offset,
     size: IntSize,
-  ): Offset = Offset.Companion.Zero
-
-  // 根据最终目的地的偏移量执行动画
-  suspend fun animateMove(
-    itemState: CourseItemState,
-    transition: MutableState<Offset>,
-    destinationOffset: Offset,
-  ) {
-    animate(
-      typeConverter = Offset.Companion.VectorConverter,
-      initialValue = transition.value,
-      targetValue = destinationOffset,
-    ) { value, _ ->
-      transition.value = value
-    }
-  }
+    newBeginTime: MinuteTime,
+  ): Offset = Offset.Zero
 
   // 在移动过程中是否允许展开时间轴
   fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean = true
