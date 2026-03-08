@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -41,12 +42,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -82,31 +80,7 @@ import org.jetbrains.compose.resources.painterResource
 //周次
 private val WEEK_ITEMS = (1..25).toList()
 private val CHINESE_NUM_LIST = listOf(
-    "一",
-    "二",
-    "三",
-    "四",
-    "五",
-    "六",
-    "七",
-    "八",
-    "九",
-    "十",
-    "十一",
-    "十二",
-    "十三",
-    "十四",
-    "十五",
-    "十六",
-    "十七",
-    "十八",
-    "十九",
-    "二十",
-    "二十一",
-    "二十二",
-    "二十三",
-    "二十四",
-    "二十五"
+    "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五"
 )
 
 
@@ -142,11 +116,28 @@ class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomA
     }
 }
 
+
+/**
+ * 空教室主界面的compose函数
+ */
 @Composable
 private fun EmptyRoomPage() {
     val viewModel = viewModel(EmptyRoomComposeViewModel::class)
 
-
+    //状态转换与缓存，减少不必要的重组
+    val selectedWeekSet = remember(viewModel.selectedWeek) {
+        setOfNotNull(viewModel.selectedWeek)
+    }
+    val selectedWeekDaySet = remember(viewModel.selectedWeekDayNum) {
+        setOfNotNull(viewModel.selectedWeekDayNum)
+    }
+    val selectedBuildNumSet = remember(viewModel.selectedBuildNum) {
+        setOfNotNull(viewModel.selectedBuildNum)
+    }
+    //列表型多选使用derivedStateOf，因为列表的引用没变,remember永远会返回第一次缓存的结果,导致UI不刷新，所以这里使用derivedStateOf
+    val selectedSectionsSet = remember {
+        derivedStateOf { viewModel.selectedSections.toSet() }
+    }
 
     Column(
         modifier = Modifier
@@ -160,9 +151,9 @@ private fun EmptyRoomPage() {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(LocalAppColors.current.middleBg),
-            verticalAlignment = Alignment.CenterVertically // 垂直居中对齐
+            verticalAlignment = Alignment.CenterVertically //垂直居中对齐
         ) {
-            // 增大返回键点区域
+            //增大返回键点区域
             IconButton(
                 onClick = { MainNavController.popBackStack() },
                 modifier = Modifier
@@ -176,10 +167,10 @@ private fun EmptyRoomPage() {
                     tint = Color.Unspecified
                 )
             }
-
+            //多少周
             UniversalTabSelector(
                 items = WEEK_ITEMS,
-                selectedItems = setOfNotNull(viewModel.selectedWeek),
+                selectedItems = selectedWeekSet,
                 isScrollable = true,
                 modifier = Modifier.weight(1f).height(45.dp),
                 onItemToggle = { viewModel.selectedWeek = it },
@@ -193,7 +184,7 @@ private fun EmptyRoomPage() {
         //周几
         UniversalTabSelector(
             items = WEEKDAY_ITEMS,
-            selectedItems = setOfNotNull(viewModel.selectedWeekDayNum),
+            selectedItems = selectedWeekDaySet,
             isScrollable = true,
             modifier = Modifier
                 .fillMaxWidth()
@@ -203,6 +194,7 @@ private fun EmptyRoomPage() {
             label = { WEEKDAY_NAME_LIST.getOrElse(it - 1) { it.toString() } }
         )
 
+        //内容显示
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -229,10 +221,10 @@ private fun EmptyRoomPage() {
 
 
             //加载动画图片
-            refreshCompose(viewModel.isLoading, modifier = Modifier.align(Alignment.Center))
+            RefreshCompose(viewModel.isLoading, modifier = Modifier.align(Alignment.Center))
 
 
-            //底部面板
+            //底部面板(选择第几节课和教学楼)
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -247,12 +239,11 @@ private fun EmptyRoomPage() {
                     modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.Center
                 ) {
-                    val sectionsSet = remember {
-                        derivedStateOf { viewModel.selectedSections.toSet() }
-                    }
+
+                    //第几节课
                     UniversalTabSelector(
                         items = SECTION_ITEMS,
-                        selectedItems = sectionsSet.value,
+                        selectedItems = selectedSectionsSet.value,
                         isScrollable = true,
                         modifier = Modifier.height(45.dp),
                         onItemToggle = { section ->
@@ -266,12 +257,12 @@ private fun EmptyRoomPage() {
                         },
                         label = { "${it * 2 - 1}—${it * 2}" }
                     )
-                    val selectedBuildSet = remember(viewModel.selectedBuildNum) {
-                        setOfNotNull(viewModel.selectedBuildNum)
-                    }
+
+
+                    //教学楼
                     UniversalTabSelector(
                         items = BUILDING_ITEMS,
-                        selectedItems = selectedBuildSet,
+                        selectedItems = selectedBuildNumSet,
                         isScrollable = false,
                         modifier = Modifier.height(45.dp),
                         onItemToggle = { viewModel.selectedBuildNum = it },
@@ -286,8 +277,11 @@ private fun EmptyRoomPage() {
     }
 }
 
+/**
+数据加载过程中的动画compose，实际执行一个图片的旋转逻辑
+ */
 @Composable
-fun refreshCompose(isLoading: Boolean, modifier: Modifier) {
+fun RefreshCompose(isLoading: Boolean, modifier: Modifier) {
     val infiniteTransition = rememberInfiniteTransition()
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -312,7 +306,11 @@ fun refreshCompose(isLoading: Boolean, modifier: Modifier) {
     }
 }
 
-
+/**
+ * 所有Tablayout通用的一个Tab生成器
+ * 可以选择滑动和非滑动版
+ * @param selectedItems 是一个Set类型的数据接收器
+ */
 @Composable
 fun <T> UniversalTabSelector(
     items: List<T>,
@@ -322,8 +320,29 @@ fun <T> UniversalTabSelector(
     modifier: Modifier = Modifier,
     label: (T) -> String = { it.toString() }
 ) {
+
+    //创建滚动状态
+    val listState = rememberLazyListState()
+
+    //监听选中项变化，实现自动定位
+    //当选中的集合发生变化时，触发滚动
+    //只在初始化时使用
+    LaunchedEffect(Unit) {
+        if (isScrollable && selectedItems.isNotEmpty()) {
+            //找到第一个选中项在items列表中的索引
+            val index = items.indexOfFirst { it in selectedItems }
+            //安全性检查,-1作为无用的值
+            if (index != -1) {
+                listState.scrollToItem(
+                    index = index,
+                    scrollOffset = -100 //这里的负偏移量是为了让选中的项稍微靠左/靠中一点，不至于贴着边
+                )
+            }
+        }
+    }
     if (isScrollable) {
         LazyRow(
+            state = listState,
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(0.dp),
             contentPadding = PaddingValues(horizontal = 12.dp),
@@ -331,13 +350,13 @@ fun <T> UniversalTabSelector(
         ) {
             items(
                 items = items,
-                //key，帮助 Compose 识别元素
+                //key,帮助 Compose 识别元素
                 key = { it.toString() },
-                //contentType，帮助 LazyRow 在复用池中快速找回对象
+                //contentType，帮助LazyRow在复用池中快速找回对象
                 contentType = { "TabItem" }
             ) { item ->
-                //这里的 contains 操作在每一帧重组时都会执行
-                // 如果 selectedItems 是被 remember 的，这里性能就很快
+                //判断是否选中
+                //这里的contains操作在每一帧重组时都会执行
                 val isSelected = remember(selectedItems, item) {
                     selectedItems.contains(item)
                 }
@@ -421,6 +440,10 @@ private fun TabItemContent(text: String, isSelected: Boolean) {
     }
 }
 
+/**
+内容显示区的compose函数
+ToDo:这里使用了FlowRow，通过循环模拟实现了网格布局
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ShowContentCompose(rawRoomList: List<String>) {
@@ -465,6 +488,9 @@ fun ShowContentCompose(rawRoomList: List<String>) {
     }
 }
 
+/**
+ * 处理网络请求返回函数的辅助函数
+ */
 fun List<String>.groupByFloor(): List<Pair<String, List<String>>> {
     val floorNameMap = FLOOR_NAME_MAP
 

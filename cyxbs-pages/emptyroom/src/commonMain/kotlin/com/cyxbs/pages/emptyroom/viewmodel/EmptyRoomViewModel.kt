@@ -27,7 +27,6 @@ import kotlin.time.Clock
  * description ： TODO:空教室页的ViewModel
  * author : summer_palace2
  * email : 2992203079qq.com
- * 初始话viewmodel后就会开启FLOW，同时开启过滤，如果发现四个Tab(week,weekDay,class,build)发生变化，就发送网络请求更新数据
  * date : 2026/3/3 16:10
  */
 
@@ -52,23 +51,29 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
     val selectedSections = mutableStateListOf<Int>().apply { add(1) }//节次是多选
     //返回数据
     var roomResult by mutableStateOf<List<String>?>(null)
-   //判断加载状态
+    //判断加载状态
     var isLoading by mutableStateOf(false)
 
     init {
         viewModelScope.launch {
+            //snapshotFlow是冷流，当QueryParam内的参数发生变化，才会发射流
             snapshotFlow {
                 QueryParam(
                     week = selectedWeek,
                     day = selectedWeekDayNum,
                     build = selectedBuildNum,
+                    //sections.toList() 是为了给MutableStateList拍一张快照。因为List内容变了但引用没变,必须转成不可变的List,下游的比较逻辑才有效
                     sections = selectedSections.toList()
                 )
             }
+                //只有当“周、周几、大课节次、教学楼”这四个参数全部不为空时，才允许进入下一步。这保证了不会发送无效请求。
                 .filter { it.isReady() }
-                .distinctUntilChanged() //只有当参数真正改变时才触发
-                .debounce(300) //防抖:300ms后才发请求，防止快速滑动
-                .collectLatest { param -> //如果新请求来了，旧请求还在跑，这里直接取消旧的
+                //比较逻辑:只有当参数真正改变时才触发
+                .distinctUntilChanged()
+                //防抖:300ms后才发请求，防止快速滑动、
+                .debounce(300)
+                //如果新请求来了，旧请求还在跑，这里直接取消旧的
+                .collectLatest { param ->
                     val bean = EmptyRoomBean(
                         week = param.week.toString(),
                         weekday = param.day.toString(),
@@ -83,7 +88,9 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
         }
     }
 
-
+/**
+网络请求相关函数
+ */
     private suspend fun performFetch(bean: EmptyRoomBean) {
         isLoading = true
         val result = getEmptyRoomData(bean)
@@ -93,7 +100,9 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
         roomResult = result.getOrNull() ?: emptyList()
 
     }
-
+/**
+网络请求函数
+ */
     private suspend fun getEmptyRoomData(bean: EmptyRoomBean): Result<List<String>> {
         return runCatchingCoroutine {
             EmptyRoomApiService::class.impl().getEmpyRooms(
@@ -106,13 +115,14 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
     }
 }
 
-//用于接受数据compose函数改变的数据，并且做数据判断
+/**
+ * 用于接受数据compose函数改变的数据，并且做数据判断
+ */
 data class QueryParam(
     val week: Int?,
     val day: Int?,
     val build: Int?,
     val sections: List<Int>
 ) {
-    //判断数据有没有发生变化，如果改变，就触发网络请求
     fun isReady() = week != null && day != null && build != null && sections.isNotEmpty()
 }
