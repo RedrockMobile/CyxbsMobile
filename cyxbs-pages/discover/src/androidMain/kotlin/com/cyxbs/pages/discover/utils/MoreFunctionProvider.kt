@@ -17,7 +17,7 @@ import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.discover.R
-import com.cyxbs.pages.emptyroom.EmptyRoomArgument
+import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
 import com.cyxbs.pages.map.api.MapNavArgument
 import java.lang.ref.SoftReference
 import kotlin.reflect.KClass

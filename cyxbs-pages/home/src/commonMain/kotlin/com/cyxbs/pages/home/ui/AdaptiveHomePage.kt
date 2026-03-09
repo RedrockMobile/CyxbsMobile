@@ -24,6 +24,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.navigation.NAV_ABOUT
+import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.config.navigation.NAV_FOOD
 import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.service.impl
@@ -54,6 +55,9 @@ private val itemList = listOf(
   },
   ActionItem("美食咨询处") {
     MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_FOOD"))
+  },
+  ActionItem("空教室查询") {
+    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_EMPTY_ROOM"))
   },
 
 

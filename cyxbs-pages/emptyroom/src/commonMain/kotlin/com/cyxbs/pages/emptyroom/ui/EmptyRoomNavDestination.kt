@@ -58,7 +58,7 @@ import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.pages.emptyroom.EmptyRoomArgument
+import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
 import com.cyxbs.pages.emptyroom.viewmodel.EmptyRoomComposeViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.emptyroom.generated.resources.Res
