@@ -152,6 +152,7 @@ private fun WeekWithTimePair(
       weekNumIsError = remember { mutableStateOf(false) },
       dayOfWeekIsError = remember { mutableStateOf(false) },
       readOnly = true,
+      enabled = false,
     )
     SelectionContainer {
       Text(

@@ -24,6 +24,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,6 +55,7 @@ internal fun AffairEditWeekText(
   weekNumIsError: MutableState<Boolean>,
   dayOfWeekIsError: MutableState<Boolean>,
   readOnly: Boolean = false,
+  enabled: Boolean = true,
   fontSize: TextUnit = 13.sp,
   color: Color = LocalAppColors.current.tvLv2,
   weekNumDayOfWeekPadding: Dp = 8.dp,
@@ -65,6 +67,7 @@ internal fun AffairEditWeekText(
       fontSize = fontSize,
       color = color,
       readOnly = readOnly,
+      enabled = enabled,
     )
     DayOfWeekCompose(
       dateState = dateState,
@@ -73,6 +76,7 @@ internal fun AffairEditWeekText(
       fontSize = fontSize,
       color = color,
       readOnly = readOnly,
+      enabled = enabled,
     )
   }
 }
@@ -82,6 +86,7 @@ private fun WeekNumCompose(
   dateState: MutableState<Date>,
   weekNumIsError: MutableState<Boolean>,
   readOnly: Boolean,
+  enabled: Boolean,
   modifier: Modifier = Modifier,
   fontSize: TextUnit = 13.sp,
   color: Color = LocalAppColors.current.tvLv2,
@@ -101,6 +106,7 @@ private fun WeekNumCompose(
       modifier = Modifier.widthIn(min = 10.dp).width(IntrinsicSize.Min),
       state = weekNumText,
       readOnly = readOnly,
+      enabled = enabled,
       cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
       keyboardOptions = KeyboardOptions(
         keyboardType = KeyboardType.Number,
@@ -225,6 +231,14 @@ private fun WeekNumCompose(
       }
     }
   }
+  LaunchedEffect(Unit) {
+    snapshotFlow { weekNumText.selection }.collect {
+      // 取消输入框的文本选中
+      weekNumText.edit {
+        selection = TextRange.Zero
+      }
+    }
+  }
 }
 
 @Composable
@@ -232,6 +246,7 @@ private fun DayOfWeekCompose(
   dateState: MutableState<Date>,
   dayOfWeekIsError: MutableState<Boolean>,
   readOnly: Boolean,
+  enabled: Boolean,
   modifier: Modifier = Modifier,
   fontSize: TextUnit = 13.sp,
   color: Color = LocalAppColors.current.tvLv2,
@@ -249,6 +264,7 @@ private fun DayOfWeekCompose(
       modifier = Modifier.widthIn(min = 10.dp).width(IntrinsicSize.Min),
       state = dayOfWeakText,
       readOnly = readOnly,
+      enabled = enabled,
       cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),
       keyboardOptions = KeyboardOptions(
         keyboardType = KeyboardType.Number,
@@ -287,6 +303,7 @@ private fun DayOfWeekCompose(
       if (it.isEmpty()) {
         dayOfWeekIsError.value = true
       } else {
+        dayOfWeekIsError.value = false
         val date = dateState.value
         val num = when (it.toString()) {
           "一" -> 1
@@ -308,6 +325,14 @@ private fun DayOfWeekCompose(
       val newDayOfWeek = date.dayOfWeek.toChinese("")
       if (newDayOfWeek != dayOfWeakText.text) {
         dayOfWeakText.setTextAndPlaceCursorAtEnd(newDayOfWeek)
+      }
+    }
+  }
+  LaunchedEffect(Unit) {
+    snapshotFlow { dayOfWeakText.selection }.collect {
+      // 取消输入框的文本选中
+      dayOfWeakText.edit {
+        selection = TextRange.Zero
       }
     }
   }

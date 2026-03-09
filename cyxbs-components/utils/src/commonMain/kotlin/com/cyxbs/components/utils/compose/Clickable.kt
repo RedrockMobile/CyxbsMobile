@@ -1,8 +1,15 @@
 package com.cyxbs.components.utils.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.util.fastFirstOrNull
 import kotlin.time.Clock
 
 /**
@@ -52,4 +59,33 @@ fun Modifier.clickableSingle(
       lastClickTime = nowClickTime
       onClick()
     }
+}
+
+/**
+ * 在事件分发的初始阶段就触发点击事件
+ * 用于子组件会默认消耗事件但是却不执行啥操作的场景，比如 TextField
+ */
+fun Modifier.clickableInPassInitial(
+  enabled: () -> Boolean = { true },
+  onClick: () -> Unit,
+): Modifier {
+  return pointerInput(Unit) {
+    awaitEachGesture {
+      val firstDown = awaitFirstDown(pass = PointerEventPass.Initial)
+      while (enabled.invoke()) {
+        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+        val pointer = event.changes.fastFirstOrNull { it.id == firstDown.id }
+        if (pointer == null || pointer.isConsumed) break
+        if (pointer.uptimeMillis - firstDown.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) break
+        if (pointer.positionChangeIgnoreConsumed().x > viewConfiguration.touchSlop) break
+        if (pointer.positionChangeIgnoreConsumed().y > viewConfiguration.touchSlop) break
+        if (pointer.changedToUp()) {
+          // 触发点击事件
+          pointer.consume()
+          onClick.invoke()
+          break
+        }
+      }
+    }
+  }
 }

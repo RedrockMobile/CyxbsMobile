@@ -49,6 +49,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.utils.compose.clickableInPassInitial
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.toast
@@ -275,7 +277,7 @@ private fun DateFlowRow(
     Image(
       painter = painterResource(Res.drawable.course_ic_affair_time_add),
       contentDescription = "添加日期",
-      modifier = Modifier.padding(start = 6.dp, top = 2.dp, bottom = 3.dp).size(18.dp).clickable {
+      modifier = Modifier.padding(start = 6.dp, top = 2.dp, bottom = 3.dp).size(18.dp).clickableNoIndicator {
         val whatTimeModel = lastSelectedWhatTimeState.value
         val nowDate = lastSelectedDateModelState.value.date
         var diff = 1
@@ -322,12 +324,17 @@ private fun DateFlowRowItem(
   currentForm: CurrentForm.Edit,
   lastSelectedDateModelState: MutableState<AffairDateModelEditor>,
 ) {
+  val isSelected = rememberDerivedStateOfStructure {
+    dateModelEditor === lastSelectedDateModelState.value
+  }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier.padding(top = 2.dp, bottom = 3.dp, end = 3.dp)
       .background(color = 0xACE8F0FC.dark(0xB32C2C2C), RoundedCornerShape(29.dp))
       .height(IntrinsicSize.Min)
-      .clickable {
+      .clickableInPassInitial( // 在 Initial 过程中触发点击，底层的 TextField 组件会默认消费事件导致无法触发官方的点击
+        enabled = { !isSelected.value }
+      ) {
         if (lastSelectedDateModelState.value != dateModelEditor) {
           val error = currentForm.clickSwitchTimeCheck.firstNotNullOfOrNull { it() }
           if (error != null) {
@@ -338,9 +345,6 @@ private fun DateFlowRowItem(
         }
       }
   ) {
-    val isSelected = rememberDerivedStateOfStructure {
-      dateModelEditor === lastSelectedDateModelState.value
-    }
     val dateState = remember { mutableStateOf(dateModelEditor.date) }
     val weekNumIsError = remember { mutableStateOf(false) }
     val dayOfWeekIsError = remember { mutableStateOf(false) }
@@ -352,6 +356,7 @@ private fun DateFlowRowItem(
       fontSize = 11.sp,
       color = if (isSelected.value) Color(0xFFFFA192) else LocalAppColors.current.tvLv2,
       readOnly = !isSelected.value,
+      enabled = isSelected.value,
       weekNumDayOfWeekPadding = 3.dp,
     )
     Spacer(

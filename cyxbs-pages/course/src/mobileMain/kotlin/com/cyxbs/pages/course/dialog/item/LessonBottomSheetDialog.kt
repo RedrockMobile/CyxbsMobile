@@ -91,7 +91,7 @@ private fun ClassroomWithTeacher(classroom: String, teacher: String) {
         color = LocalAppColors.current.tvLv2,
       )
       Icon(
-        modifier = Modifier.padding(start = 3.dp, bottom = 1.dp).size(12.dp),
+        modifier = Modifier.padding(start = 3.dp).size(12.dp),
         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
         contentDescription = null,
         tint = LocalAppColors.current.tvLv2,
@@ -113,10 +113,11 @@ private fun ClassroomWithTeacher(classroom: String, teacher: String) {
           maxHeight = textTeacher.height,
         )
       )
-      layout(textClassroom.width + icon.width + textTeacher.width, textTeacher.height) {
-        textClassroom.placeRelative(0, 0)
-        icon.placeRelative(textClassroom.width, (textTeacher.height - icon.height) / 2)
-        textTeacher.placeRelative(textClassroom.width + icon.width, 0)
+      val height = textTeacher.height
+      layout(textClassroom.width + icon.width + textTeacher.width, height) {
+        textClassroom.placeRelative(0, (height - textClassroom.height) / 2)
+        icon.placeRelative(textClassroom.width, (height - icon.height) / 2)
+        textTeacher.placeRelative(textClassroom.width + icon.width, (height - textTeacher.height) / 2)
       }
     }
   )

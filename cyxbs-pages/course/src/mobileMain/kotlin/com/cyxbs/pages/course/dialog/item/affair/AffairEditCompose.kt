@@ -103,7 +103,7 @@ private fun EditTitleWithButton(
   ) {
     Box(modifier = Modifier.weight(1F)) {
       BasicTextField(
-        modifier = Modifier.focusRequester(focusRequester),
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
         state = textFieldState,
         lineLimits = TextFieldLineLimits.SingleLine,
         cursorBrush = SolidColor(TextFieldDefaults.textFieldColors().cursorColor(false).value),

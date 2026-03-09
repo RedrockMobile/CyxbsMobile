@@ -71,7 +71,7 @@ class SettingActivity : BaseActivity() {
         mSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)
 
         // 使用 Compose 课表
-        mComposeCourseSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
+        mComposeCourseSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_COMPOSE, true)
         mComposeCourseSwitch.setOnCheckedChangeListener { _, isChecked ->
             defaultSp.edit { putBoolean(SP_COURSE_COMPOSE, isChecked) }
             toast("新课表重启生效")

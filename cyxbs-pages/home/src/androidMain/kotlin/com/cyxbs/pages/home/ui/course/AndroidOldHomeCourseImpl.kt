@@ -24,7 +24,7 @@ import com.g985892345.provider.api.annotation.ImplProvider
 @ImplProvider
 object AndroidOldHomeCourseImpl : IOldHomeCourse {
 
-  override val enable: Boolean = !defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
+  override val enable: Boolean = !defaultSp.getBoolean(SP_COURSE_COMPOSE, true)
 
   override val content: @Composable ((Modifier) -> Unit) = { modifier ->
     val bottomNavViewModel = viewModel(BottomNavViewModel::class)
