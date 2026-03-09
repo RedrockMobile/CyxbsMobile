@@ -49,7 +49,7 @@ class CourseAffairItem(
       affairDateModel.date.mergeFlow
     ) { beginDate, timePair, date ->
       whatTime.now.value = CourseItemWhatTime.Fixed(
-        page = courseFrame.getPage(date)!!,
+        page = courseFrame.getPage(date) ?: -1,
         dayOfWeek = date.dayOfWeek,
         beginTime = timePair.first,
         finalTime = timePair.second,

@@ -37,6 +37,8 @@ class SelfLessonDecorationViewModel(
   val platformItemFactory: PlatformCourseLessonItemFactory,
 ) : BaseViewModel(), CoursePageDecoration {
 
+  private val lessonService = ILessonService2::class.impl()
+
   init {
     IAccountService::class.impl()
       .stuNumFlow
@@ -60,8 +62,6 @@ class SelfLessonDecorationViewModel(
 
       }.launchIn(viewModelScope)
   }
-
-  private val lessonService = ILessonService2::class.impl()
 
   private fun createLessonFlow(stuNum: String?): Flow<List<LessonByWeeks>?> = flow {
     if (stuNum == null) {

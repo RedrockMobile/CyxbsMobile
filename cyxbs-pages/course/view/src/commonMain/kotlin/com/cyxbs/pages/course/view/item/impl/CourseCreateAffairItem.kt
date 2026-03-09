@@ -64,7 +64,7 @@ class CourseCreateAffairItem(
         dateModel.date.mergeFlow
       ) { beginDate, timePair, date ->
         whatTime.now.value = CourseItemWhatTime.Fixed(
-          page = viewModel.courseFrame.getPage(date)!!,
+          page = viewModel.courseFrame.getPage(date) ?: -1,
           dayOfWeek = date.dayOfWeek,
           beginTime = timePair.first,
           finalTime = timePair.second,

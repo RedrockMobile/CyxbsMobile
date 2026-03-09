@@ -50,7 +50,7 @@ class AffairGroupModelImpl(
     cancelCallback: (() -> Unit)?,
     commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)?
   ): AffairIdModelEditor {
-    if (remoteId > 0 && itemList.value.any { it.remoteId.value == remoteId }) {
+    if (remoteId > 0 && itemList.value.any { it.remoteId == remoteId }) {
       throw IllegalStateException("remoteId 已存在, $remoteId")
     }
     val entity = AffairEntity(

@@ -17,7 +17,7 @@ import com.cyxbs.pages.course.view.item.impl.CourseAffairItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseAffairItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -90,15 +90,15 @@ class AffairDecorationViewModel(
   }
 
   // 查找 CourseItemState
-  suspend fun findCourseItemState(dateModelEditor: AffairDateModelEditor): CourseItemState {
+  suspend fun findCourseItemState(dateModelEditor: AffairDateModelEditor): CourseItemState? {
     return hierarchy.observe(
-      page = courseFrame.getPage(dateModelEditor.date)!!,
+      page = courseFrame.getPage(dateModelEditor.date) ?: return null,
       dayOfWeek = dateModelEditor.date.dayOfWeek,
     ).mapNotNull { list ->
       list.firstOrNull {
         (it.item as CourseAffairItem).affairDateModel === dateModelEditor.dateModel
       }
-    }.first()
+    }.firstOrNull()
   }
 }
 

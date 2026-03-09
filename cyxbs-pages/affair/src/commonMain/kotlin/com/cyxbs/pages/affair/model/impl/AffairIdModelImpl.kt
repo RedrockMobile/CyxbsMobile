@@ -29,8 +29,9 @@ class AffairIdModelImpl(
   override val enable: MutableStateFlow<Boolean> = MutableStateFlow(true)
   override val localId: String
     get() = entity.localId
+  override val remoteId: Int
+    get() = entity.remoteId
 
-  override val remoteId: MutableStateFlow<Int> = MutableStateFlow(entity.remoteId)
   override val remindTime: EditorStateFlowImpl<Int> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.remindTime),
@@ -122,7 +123,7 @@ class AffairIdModelImpl(
   override fun toString(): String {
     return "AffairIdModelImpl(enable=${enable.value}" +
         ", localId=$localId" +
-        ", remoteId=${remoteId.value}" +
+        ", remoteId=${remoteId}" +
         ", remindTime=${remindTime.value}" +
         ", title=${title.value}" +
         ", content=${content.value}" +

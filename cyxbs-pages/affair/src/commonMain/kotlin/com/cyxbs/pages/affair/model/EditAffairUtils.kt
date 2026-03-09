@@ -51,7 +51,7 @@ object EditAffairUtils {
           allowLocal = true,
           needShowException = false,
         ).onSuccess {
-          idModel.entity = newEntity
+          idModel.entity = it
           updateModel(editor, needAdd)
         }.map {
           AffairIdModelEditor.EditResult.Success
@@ -131,10 +131,10 @@ object EditAffairUtils {
       idModel.enable.value = false
       idModel.groupModel.removeAffairInternal(idModel)
     } else if (needAdd) {
-      if (idModel.remoteId.value == 0) {
+      if (idModel.remoteId == 0) {
         // 新增的本地临时事务
         idModel.groupModel.addAffairInternal(idModel)
-      } else if (idModel.groupModel.itemList.value.all { it.remoteId.value != idModel.remoteId.value }) {
+      } else if (idModel.groupModel.itemList.value.all { it.remoteId != idModel.remoteId }) {
         // 新增的事务
         idModel.groupModel.addAffairInternal(idModel)
       }
@@ -143,7 +143,7 @@ object EditAffairUtils {
 
   private fun createAffair(editor: AffairIdModelEditor): AffairEntity {
     return AffairEntity(
-      remoteId = editor.idModel.remoteId.value,
+      remoteId = editor.idModel.remoteId,
       localId = editor.idModel.localId,
       remindTime = editor.remindTime,
       title = editor.title,

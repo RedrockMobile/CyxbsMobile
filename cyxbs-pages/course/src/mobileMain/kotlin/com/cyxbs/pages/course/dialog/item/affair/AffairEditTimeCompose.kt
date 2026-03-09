@@ -305,10 +305,10 @@ private fun DateFlowRow(
   LaunchedEffect(Unit) {
     snapshotFlow { lastSelectedDateModelState.value }.drop(1).collectLatest { dateModelEditor ->
       courseFrame.animateScrollToDate(dateModelEditor.date)
-      currentForm.editor = dateModelEditor
       // 修改外层选中的 CourseItemState，使开始结束时间和滚轴偏移量发生改变
       // 通过这种方法获取 itemState 稍微有些 trick
-      val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor)
+      val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor) ?: return@collectLatest
+      currentForm.editor = dateModelEditor
       courseState.currentPageItemFlow.value =
         itemState.item.extensions.get(CourseItemBottomSheetDialogExtension::class)
     }

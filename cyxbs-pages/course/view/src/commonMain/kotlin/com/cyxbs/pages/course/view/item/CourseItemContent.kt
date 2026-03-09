@@ -128,7 +128,7 @@ fun CourseShowRange(
   content.invoke(
     Modifier.layout { measurable, constraints ->
       val weight = weightAnim.value
-      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt()
+      val height = (constraints.maxHeight * (weight.y - weight.x)).roundToInt().coerceAtLeast(1)
       val placeable = measurable.measure(
         Constraints.fixed(constraints.maxWidth, height)
       )

@@ -19,6 +19,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
@@ -257,10 +258,14 @@ private fun OffsetScroll(
   state: CourseItemBottomSheetDialogState,
   layoutCoordinatesFlow: SharedFlow<LayoutCoordinates>
 ) {
+  val marginBottomKey = "MobileCourseBottomSheetDialog#OffsetScroll"
+  val scrollContext = remember {
+    state.dialogContents.value.first().itemState.coursePage.scrollContext
+  }
+  val marginBottomState = remember {
+    scrollContext.timeline.marginBottom
+  }
   LaunchedEffect(Unit) {
-    val scrollContext = state.dialogContents.value.first().itemState.coursePage.scrollContext
-    val marginBottomState = scrollContext.timeline.marginBottom
-    val marginBottomKey = "MobileCourseBottomSheetDialog#OffsetScroll"
     val initScrollValue = scrollContext.scrollState.value
     var prevItem = state.currentPageItemFlow.value
     layoutCoordinatesFlow.filterNotNull().map {
@@ -302,6 +307,12 @@ private fun OffsetScroll(
           marginBottomState[marginBottomKey] = newMarginBottom
         }
       }
+    }
+  }
+  DisposableEffect(Unit) {
+    onDispose {
+      // 在弹窗消失时强制重置 marginBottom
+      marginBottomState[marginBottomKey] = 0
     }
   }
 }

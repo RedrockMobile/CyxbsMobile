@@ -84,7 +84,7 @@ interface AffairIdModel {
   // 非后端返回 id，此 id 为客户端上的唯一 id
   val localId: String
   // 后端 id，如果 = 0，则说明是本地临时事务
-  val remoteId: StateFlow<Int>
+  val remoteId: Int
   val remindTime: EditorStateFlow<Int>
   val title: EditorStateFlow<String>
   val content: EditorStateFlow<String>

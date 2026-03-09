@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -27,6 +28,7 @@ import com.cyxbs.components.view.ui.rememberTextDialog
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
+import kotlinx.coroutines.launch
 
 /**
  * .
@@ -107,13 +109,25 @@ private fun ShowStateButtons(
       }
     },
   )
+  val coroutineScope = rememberCoroutineScope()
   val dialog = rememberTextDialog(
     text = "确定删除该事务吗？",
     negativeBtnText = "取消",
     onClickNegativeBtn = { dismiss() },
     onClickPositiveBtn = {
-      // 复杂事务的删除单独处理，需要考虑删除单个还是删除全部亦或是删除后续
-      toast("暂未实现")
+      // todo 复杂事务的删除单独处理，需要考虑删除单个还是删除全部亦或是删除后续
+      val currentForm = affairState.currentFormState.value
+      if (currentForm is CurrentForm.Show) {
+        val edit = currentForm.createEdit()
+        if (edit != null) {
+          edit.editor.idModelEditor.clear()
+          coroutineScope.launch {
+            edit.commit()
+            dismiss()
+            courseState.bottomSheetState.collapse()
+          }
+        }
+      }
     },
   )
   Icon(

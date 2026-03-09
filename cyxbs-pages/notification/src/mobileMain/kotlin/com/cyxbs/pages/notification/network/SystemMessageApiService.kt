@@ -6,6 +6,7 @@ import com.cyxbs.pages.notification.bean.ChangeReadStatusToBean
 import com.cyxbs.pages.notification.bean.MsgBeanData
 import de.jensklingenberg.ktorfit.http.Body
 import de.jensklingenberg.ktorfit.http.GET
+import de.jensklingenberg.ktorfit.http.Headers
 import de.jensklingenberg.ktorfit.http.PUT
 
 /**
@@ -24,6 +25,7 @@ interface SystemMessageApiService {
    * 改变已读消息状态
    */
   @PUT("message-system/user/msgHasRead")
+  @Headers("Content-Type: application/json")
   suspend fun changeMsgStatus(
     @Body changeBody: ChangeReadStatusToBean
   ): ApiWrapper<ChangeReadStatusFromBean>

@@ -142,15 +142,4 @@ private fun EditContent(
       currentForm.editor.idModelEditor.setContent(it.toString())
     }
   }
-  DisposableEffect(Unit) {
-    val check = {
-      if (textFieldState.text.isEmpty()) {
-        "标题为空，请修改后再保存"
-      } else null
-    }
-    currentForm.clickSaveCheck.add(check)
-    onDispose {
-      currentForm.clickSaveCheck.remove(check)
-    }
-  }
 }

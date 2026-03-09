@@ -6,6 +6,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.ILessonService2
@@ -132,6 +133,11 @@ object LessonRepository {
       mLessonCache[stuNum] = ILessonService2.CacheLesson(requestTime, it)
       if (oldCache?.data != it) {
         mLessonObserveFlowMap[stuNum]?.tryEmit(it)
+      }
+    }.onFailure {
+      if (isDebug()) {
+        toast("请求课表数据异常, ${it.message}")
+        logg("请求课表数据异常: ${it.stackTraceToString()}")
       }
     }
   }
