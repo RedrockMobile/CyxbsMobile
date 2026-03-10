@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.style.TextAlign
@@ -49,7 +51,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
-import com.cyxbs.components.utils.compose.clickableInPassInitial
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
@@ -332,9 +333,7 @@ private fun DateFlowRowItem(
     modifier = Modifier.padding(top = 2.dp, bottom = 3.dp, end = 3.dp)
       .background(color = 0xACE8F0FC.dark(0xB32C2C2C), RoundedCornerShape(29.dp))
       .height(IntrinsicSize.Min)
-      .clickableInPassInitial( // 在 Initial 过程中触发点击，底层的 TextField 组件会默认消费事件导致无法触发官方的点击
-        enabled = { !isSelected.value }
-      ) {
+      .clickable {
         if (lastSelectedDateModelState.value != dateModelEditor) {
           val error = currentForm.clickSwitchTimeCheck.firstNotNullOfOrNull { it() }
           if (error != null) {
@@ -348,17 +347,27 @@ private fun DateFlowRowItem(
     val dateState = remember { mutableStateOf(dateModelEditor.date) }
     val weekNumIsError = remember { mutableStateOf(false) }
     val dayOfWeekIsError = remember { mutableStateOf(false) }
-    AffairEditWeekText(
-      modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-      dateState = dateState,
-      weekNumIsError = weekNumIsError,
-      dayOfWeekIsError = dayOfWeekIsError,
-      fontSize = 11.sp,
-      color = if (isSelected.value) Color(0xFFFFA192) else LocalAppColors.current.tvLv2,
-      readOnly = !isSelected.value,
-      enabled = isSelected.value,
-      weekNumDayOfWeekPadding = 3.dp,
-    )
+    Box(
+      modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+        .width(IntrinsicSize.Min)
+        .height(IntrinsicSize.Min)
+    ) {
+      AffairEditWeekText(
+        modifier = Modifier,
+        dateState = dateState,
+        weekNumIsError = weekNumIsError,
+        dayOfWeekIsError = dayOfWeekIsError,
+        fontSize = 11.sp,
+        color = if (isSelected.value) Color(0xFFFFA192) else LocalAppColors.current.tvLv2,
+        readOnly = !isSelected.value,
+        enabled = isSelected.value,
+        weekNumDayOfWeekPadding = 3.dp,
+      )
+      // 下面这个 Spacer 仅用于阻止把触摸事件分发给 AffairEditWeekText
+      // 因为 AffairEditWeekText 内部的 TextField 默认消费触摸事件，导致上层无法触发点击
+      // 该 Spacer 添加 pointerInput 后，Compose 中触摸事件默认就不会分发给兄弟节点了，以此方法来阻止事件的传递
+      Spacer(modifier = Modifier.fillMaxSize().pointerInput(Unit) {})
+    }
     Spacer(
       modifier = Modifier.padding(vertical = 8.dp).fillMaxHeight().width(1.dp)
         .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12F))
@@ -371,8 +380,11 @@ private fun DateFlowRowItem(
         if (dateModelEditor.whatTimeEditor?.remove(dateModelEditor) == true) {
           val index = dateList.indexOf(dateModelEditor)
           if (dateModelEditor === lastSelectedDateModelState.value) {
-            lastSelectedDateModelState.value =
-              dateList.getOrNull(index + 1) ?: dateList.getOrNull(index - 1) ?: dateModelEditor
+            val newEditor = dateList.getOrNull(index + 1) ?: dateList.getOrNull(index - 1) ?: dateModelEditor
+            lastSelectedDateModelState.value = newEditor
+            if (dateModelEditor === currentForm.editor) {
+              currentForm.editor = newEditor
+            }
           }
           dateList.remove(dateModelEditor)
         }
