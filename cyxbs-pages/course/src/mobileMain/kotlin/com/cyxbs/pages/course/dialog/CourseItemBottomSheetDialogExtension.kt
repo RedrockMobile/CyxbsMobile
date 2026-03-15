@@ -260,8 +260,9 @@ private fun OffsetScroll(
 ) {
   val marginBottomKey = "MobileCourseBottomSheetDialog#OffsetScroll"
   val scrollContext = remember {
-    state.dialogContents.value.first().itemState.coursePage.scrollContext
+    state.dialogContents.value.first().itemState.coursePageFlow.value?.scrollContext
   }
+  if (scrollContext == null) return // 如果是下一周的课程的话，则会有未初始化的情况
   val marginBottomState = remember {
     scrollContext.timeline.marginBottom
   }
