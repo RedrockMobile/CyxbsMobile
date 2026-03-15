@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
@@ -53,23 +54,22 @@ fun MobileHomeCourseHeader(
         }
       }
     }.collectAsState(false)
-    if (headerVisibility != true) { // 折叠和滚动时显示
-      // 主页课表外层 header
-      MobileHomeCourseOuterHeader(
-        frame = frame,
-        modifier = Modifier.graphicsLayer {
-          alpha = max(1 - frame.bottomSheetState.fraction * 2, 0F)
-        },
-      )
-    }
-    if (headerVisibility != false) { // 展开和滚动时显示
+    // 主页课表外层 header
+    MobileHomeCourseOuterHeader(
+      frame = frame,
+      modifier = Modifier.graphicsLayer {
+        alpha = max(1 - frame.bottomSheetState.fraction * 2, 0F)
+      },
+    )
+    if (headerVisibility != false) { // 展开和滚动时才显示，折叠时需要移除掉，把触摸事件透给 MobileHomeCourseOuterHeader
       // 主页课表内层 header
       CourseFrameHeader(
         frame = frame,
         linkBtnVisibility = true,
-        modifier = Modifier.graphicsLayer {
-          alpha = max(frame.bottomSheetState.fraction * 2 - 1, 0F)
-        }
+        modifier = Modifier.pointerInput(Unit) {/*拦截 MobileHomeCourseOuterHeader 点击事件*/}
+          .graphicsLayer {
+            alpha = max(frame.bottomSheetState.fraction * 2 - 1, 0F)
+          }
       )
     }
   }
