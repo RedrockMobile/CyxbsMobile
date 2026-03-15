@@ -132,7 +132,7 @@ private data class SelfLessonWhatTime(
     )
   }
 
-  override fun compareTo(other: ItemHierarchyWhatTime<CourseLessonItem>): Int {
+  override fun compareTo(other: CourseItemWhatTime): Int {
     return 0.compareBy(other) {
       -it.now.value.page // page 越小越在上
     }.compareBy(other) {

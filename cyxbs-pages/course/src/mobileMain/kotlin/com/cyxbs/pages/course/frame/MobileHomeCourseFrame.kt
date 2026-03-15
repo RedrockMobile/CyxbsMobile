@@ -35,7 +35,7 @@ import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewMo
 import com.cyxbs.pages.course.view.frame.decoration.LinkLessonDecorationViewModel
 import com.cyxbs.pages.course.view.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -157,6 +157,7 @@ private fun createCoursePageDecorations(
 
   viewModel {
     CourseItemViewModel(
+      frame,
       createAffairDecoration.touchingHierarchy, // 创建事务在顶层计算重叠，但是布局位置在底层，item 通过 zIndex 显示在课程上
       createAffairDecoration.touchedHierarchy, // 触摸后的等待添加的事务
       selfLessonDecoration.hierarchy,

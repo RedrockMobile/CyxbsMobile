@@ -215,7 +215,7 @@ private data class CreateAffairTouchingItemWhatTime(
       field = value
       if (value != null) {
         // itemState 初始化
-        BeginFinalTimeShowModifier.visibilityLock.get(value).lock() // 默认显示开始结束时间
+        BeginFinalTimeShowModifier.showLock.get(value).lock() // 默认显示开始结束时间
         layoutAnimUnlock = LayoutItemModifier.animLock.get(value).lock()
       }
     }
@@ -334,7 +334,7 @@ private data class CreateAffairTouchedItemWhatTime(
       field = value
       if (value != null) {
         // itemState 初始化
-        BeginFinalTimeShowModifier.visibilityLock.get(value).lock() // 默认显示开始结束时间
+        BeginFinalTimeShowModifier.showLock.get(value).lock() // 默认显示开始结束时间
       }
     }
 

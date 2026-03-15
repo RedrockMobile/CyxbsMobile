@@ -408,10 +408,17 @@ private fun ShowBeginFinalTime(
     }.collectLatest { itemState ->
       unlockRunnable?.run()
       if (isLockWhenBegin == null) {
-        isLockWhenBegin = BeginFinalTimeShowModifier.visibilityLock.get(itemState).isLocked()
+        isLockWhenBegin = BeginFinalTimeShowModifier.showLock.get(itemState).isLocked() // 如果为 true 则说明已经可见
       }
-      unlockRunnable = BeginFinalTimeShowModifier.visibilityLock.get(itemState).lock()
+      unlockRunnable = BeginFinalTimeShowModifier.showLock.get(itemState).lock().let {
+        Runnable {
+          // 包裹一层用于还原 alphaState
+          it.run()
+          BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = 1F
+        }
+      }
       if (!isLockWhenBegin) {
+        BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = 0F
         // 最开始没有锁定，说明已经在展示开始结束时间了，那就不主动关联上透明度变化
         snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
           BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = it

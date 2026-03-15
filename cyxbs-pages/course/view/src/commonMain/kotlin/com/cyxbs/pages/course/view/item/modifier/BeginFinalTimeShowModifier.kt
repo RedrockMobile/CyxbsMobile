@@ -21,7 +21,7 @@ import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier.visibilityLock
+import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier.showLock
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -33,15 +33,15 @@ import kotlin.math.abs
 /**
  * item 显示开始结束时间
  *
- * 默认不显示，可使用 [visibilityLock] 开启
+ * 默认不显示，可使用 [showLock] 开启
  *
  * @author 985892345
  * @date 2026/3/7
  */
 object BeginFinalTimeShowModifier : CourseItemModifier {
 
-  // 显示开始结束时间，默认不显示
-  val visibilityLock = CourseItemState.ValueKey {
+  // 开始结束时间展示锁，默认不显示
+  val showLock = CourseItemState.ValueKey {
     Lock()
   }
 
@@ -58,7 +58,7 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
   @Composable
   override fun createModifier(): Modifier {
     val itemState = itemState
-    return if (!visibilityLock.get(itemState).isLocked()) Modifier else {
+    return if (!showLock.get(itemState).isLocked()) Modifier else {
       LaunchedEffect(Unit) {
         // 同步 item 自身的 alpha
         snapshotFlow { itemState.alphaState.value }.collect {

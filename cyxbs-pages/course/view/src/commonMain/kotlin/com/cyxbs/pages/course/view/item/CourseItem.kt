@@ -44,7 +44,7 @@ abstract class CourseItem(
 }
 
 // item 的时间信息
-interface CourseItemWhatTime {
+interface CourseItemWhatTime : Comparable<CourseItemWhatTime> {
   val now: MutableStateFlow<Fixed>
 
   val beginTime: MinuteTime

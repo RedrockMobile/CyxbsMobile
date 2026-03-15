@@ -79,8 +79,6 @@ class AffairBottomSheetDialogState(
         }
       },
     ) : CurrentForm {
-      val isInEditTime = mutableStateOf(false)
-      val isHourMinuteValid = mutableStateOf(true)
       override val date: Date
         get() = editor.date
       override val whatTime: MinuteTimePair

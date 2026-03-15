@@ -56,7 +56,7 @@ abstract class AbstractCourseFrame {
   open val timeline: CourseTimeline = CourseTimeline()
 
   // 课表起始日期，如果为 null 则不会显示号数
-  open var beginDate: StateFlow<Date?> = SchoolCalendar.observeFirstMonDayNullable()
+  open val beginDate: StateFlow<Date?> = SchoolCalendar.observeFirstMonDayNullable()
 
   // 课表 HorizontalPager 状态
   open val pagerState: PagerState by lazy {

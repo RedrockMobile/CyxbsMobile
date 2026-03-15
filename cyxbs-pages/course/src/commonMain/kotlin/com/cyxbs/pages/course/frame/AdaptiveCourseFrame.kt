@@ -28,7 +28,7 @@ import com.cyxbs.pages.course.view.frame.decoration.LinkLessonDecorationViewMode
 import com.cyxbs.pages.course.view.frame.decoration.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.frame.header.CourseFrameHeader
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
-import com.cyxbs.pages.course.view.item.CourseItemViewModel
+import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -96,6 +96,7 @@ private fun createCoursePageDecorations(
     }
     viewModel {
       CourseItemViewModel(
+        frame,
         lessonDecoration.hierarchy,
       )
     }
@@ -128,6 +129,7 @@ private fun createCoursePageDecorations(
     }
     viewModel {
       CourseItemViewModel(
+        frame,
         selfLessonDecoration.hierarchy,
         affairDecoration.hierarchy,
         linkLessonDecoration.hierarchy
