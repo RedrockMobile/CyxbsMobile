@@ -8,8 +8,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +38,6 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -50,12 +47,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.MainNavDestination
 import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
@@ -123,21 +122,15 @@ class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomA
 @Composable
 private fun EmptyRoomPage() {
     val viewModel = viewModel(EmptyRoomComposeViewModel::class)
+    //订阅所有的Flow并且转换为ComposeState
+    val selectedWeekSet by viewModel.selectedWeekSet.collectAsStateWithLifecycle()
+    val selectedWeekDaySet by viewModel.selectedWeekDaySet.collectAsStateWithLifecycle()
+    val selectedBuildNumSet by viewModel.selectedBuildNumSet.collectAsStateWithLifecycle()
+    val selectedSectionsSet by viewModel.selectedSectionsSet.collectAsStateWithLifecycle()
 
-    //状态转换与缓存，减少不必要的重组
-    val selectedWeekSet = remember(viewModel.selectedWeek) {
-        setOfNotNull(viewModel.selectedWeek)
-    }
-    val selectedWeekDaySet = remember(viewModel.selectedWeekDayNum) {
-        setOfNotNull(viewModel.selectedWeekDayNum)
-    }
-    val selectedBuildNumSet = remember(viewModel.selectedBuildNum) {
-        setOfNotNull(viewModel.selectedBuildNum)
-    }
-    //列表型多选使用derivedStateOf，因为列表的引用没变,remember永远会返回第一次缓存的结果,导致UI不刷新，所以这里使用derivedStateOf
-    val selectedSectionsSet = remember {
-        derivedStateOf { viewModel.selectedSections.toSet() }
-    }
+    val roomResult by viewModel.roomResult.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
 
     Column(
         modifier = Modifier
@@ -173,7 +166,7 @@ private fun EmptyRoomPage() {
                 selectedItems = selectedWeekSet,
                 isScrollable = true,
                 modifier = Modifier.weight(1f).height(45.dp),
-                onItemToggle = { viewModel.selectedWeek = it },
+                onItemToggle = { viewModel.onWeekChange(it) },
                 label = {
                     val chineseNum = CHINESE_NUM_LIST
                     "第${chineseNum.getOrElse(it - 1) { it.toString() }}周"
@@ -190,7 +183,7 @@ private fun EmptyRoomPage() {
                 .fillMaxWidth()
                 .height(45.dp)
                 .background(LocalAppColors.current.middleBg).padding(start = 12.dp),
-            onItemToggle = { viewModel.selectedWeekDayNum = it },
+            onItemToggle = { viewModel.onWeekDayChange(it) },
             label = { WEEKDAY_NAME_LIST.getOrElse(it - 1) { it.toString() } }
         )
 
@@ -203,11 +196,14 @@ private fun EmptyRoomPage() {
             ) {
                 val navBarHeight =
                     WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                Box(modifier = Modifier.padding(top = 20.dp, bottom = 105.dp + navBarHeight)) {
+                Box(
+                    modifier = Modifier.padding(top = 20.dp, bottom = 105.dp)
+                        .navigationBarsPadding()
+                ) {
                     //首次加载数据不提示toast
-                    val result = viewModel.roomResult
+                    val result = roomResult
 
-                    if (!viewModel.isLoading && result != null) {
+                    if (!isLoading && result != null) {
 
                         if (result.isNotEmpty()) {
                             ShowContentCompose(result)
@@ -221,7 +217,7 @@ private fun EmptyRoomPage() {
 
 
             //加载动画图片
-            RefreshCompose(viewModel.isLoading, modifier = Modifier.align(Alignment.Center))
+            RefreshCompose(isLoading, modifier = Modifier.align(Alignment.Center))
 
 
             //底部面板(选择第几节课和教学楼)
@@ -243,17 +239,11 @@ private fun EmptyRoomPage() {
                     //第几节课
                     UniversalTabSelector(
                         items = SECTION_ITEMS,
-                        selectedItems = selectedSectionsSet.value,
+                        selectedItems = selectedSectionsSet,
                         isScrollable = true,
                         modifier = Modifier.height(45.dp),
                         onItemToggle = { section ->
-                            if (viewModel.selectedSections.contains(section)) {
-                                if (viewModel.selectedSections.size > 1) viewModel.selectedSections.remove(
-                                    section
-                                )
-                            } else {
-                                viewModel.selectedSections.add(section)
-                            }
+                            viewModel.toggleSection(section)
                         },
                         label = { "${it * 2 - 1}—${it * 2}" }
                     )
@@ -265,7 +255,7 @@ private fun EmptyRoomPage() {
                         selectedItems = selectedBuildNumSet,
                         isScrollable = false,
                         modifier = Modifier.height(45.dp),
-                        onItemToggle = { viewModel.selectedBuildNum = it },
+                        onItemToggle = { viewModel.onBuildChange(it) },
                         label = {
                             val buildMap = BUILDING_MAP
                             buildMap[it] ?: "${it}教"
@@ -361,15 +351,13 @@ fun <T> UniversalTabSelector(
                     selectedItems.contains(item)
                 }
 
-                CustomTabWrapper(
-                    onClick = { onItemToggle(item) },
-                    content = {
-                        TabItemContent(
-                            text = label(item),
-                            isSelected = isSelected
-                        )
-                    }
+
+                TabItemContent(
+                    text = label(item),
+                    isSelected = isSelected,
+                    {onItemToggle(item)}
                 )
+
             }
         }
     } else {
@@ -379,45 +367,28 @@ fun <T> UniversalTabSelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEach { item ->
-                val isSelected = selectedItems.contains(item)
+                val isSelected = remember(selectedItems, item) {
+                    selectedItems.contains(item)
+                }
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    CustomTabWrapper(
-                        onClick = { onItemToggle(item) },
-                        content = { TabItemContent(text = label(item), isSelected = isSelected) }
-                    )
+
+                    TabItemContent(
+                        text = label(item),
+                        isSelected = isSelected,
+                        { onItemToggle(item) })
+
                 }
             }
         }
     }
 }
 
-/**
- * 自定义点击包裹层:彻底去除水波纹
- */
-@Composable
-private fun CustomTabWrapper(
-    onClick: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clickable(
-                //传入null的indication以彻底去除水波纹点击效果
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        content()
-    }
-}
 
 /**
  * Tab内部内容
  */
 @Composable
-private fun TabItemContent(text: String, isSelected: Boolean) {
+private fun TabItemContent(text: String, isSelected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             //外边距
@@ -427,6 +398,7 @@ private fun TabItemContent(text: String, isSelected: Boolean) {
                 color = if (isSelected) Color(0xFFDDE3F8) else Color.Transparent,
                 shape = RoundedCornerShape(14.dp)
             )
+            .clickableNoIndicator(onClick = onClick)
             //内边距
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center

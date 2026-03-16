@@ -1,27 +1,27 @@
 package com.cyxbs.pages.emptyroom.viewmodel
 
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.viewModelScope
-import com.cyxbs.pages.emptyroom.bean.EmptyRoomBean
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
+import com.cyxbs.pages.emptyroom.bean.EmptyRoomBean
+import com.cyxbs.pages.emptyroom.network.EmptyRoomApiService
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
-import com.cyxbs.pages.emptyroom.network.EmptyRoomApiService
 import kotlin.time.Clock
 
 /**
@@ -34,10 +34,6 @@ import kotlin.time.Clock
 @OptIn(FlowPreview::class)
 class EmptyRoomComposeViewModel : BaseViewModel() {
 
-    //访问日历
-    //几周
-    var week = SchoolCalendar.getWeekOfTerm() ?: 0
-
     //星期几
     private fun getInitialDayOfWeek(): Int {
         val now = Clock.System.now()
@@ -45,36 +41,78 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
         return localDateTime.dayOfWeek.isoDayNumber
     }
 
-    //管理状态
-    var selectedWeek by mutableStateOf<Int?>(week)
-    var selectedWeekDayNum by mutableStateOf<Int?>(getInitialDayOfWeek())
-    var selectedBuildNum by mutableStateOf<Int?>(2)
-    val selectedSections = mutableStateListOf<Int>().apply { add(1) }//节次是多选
+    //私有MutableStateFlow,用于内部修改(通过调用函数)
+    private val _selectedWeek = MutableStateFlow<Int?>(SchoolCalendar.getWeekOfTerm())
+    private val _selectedWeekDayNum = MutableStateFlow<Int?>(getInitialDayOfWeek())
+    private val _selectedBuildNum = MutableStateFlow<Int?>(2)
+    private val _selectedSections = MutableStateFlow<List<Int>>(listOf(1))//节次是多选
+
+
+//SharingStarted.WhileSubscribed(5000)当用户切到后台（Activity 不可见），UI 停止收集流
+//如果用户在5秒内切回来，流依然是热的，直接给值；如果超过5秒，流会“停机”以节省内存和电量，等用户回来时再自动激活
+    val selectedWeekSet = _selectedWeek.map { setOfNotNull(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val selectedWeekDaySet = _selectedWeekDayNum.map { setOfNotNull(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val selectedBuildNumSet = _selectedBuildNum.map { setOfNotNull(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val selectedSectionsSet = _selectedSections.map { it.toSet() } // 将 List<Int> 转换为 Set<Int>
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = setOf(1)
+        )
+
     //返回数据
-    var roomResult by mutableStateOf<List<String>?>(null)
+    private val _roomResult = MutableStateFlow<List<String>?>(null)
+    val roomResult = _roomResult.asStateFlow()
+
     //判断加载状态
-    var isLoading by mutableStateOf(false)
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading = _isLoading.asStateFlow()
+//外部改值
+    fun onWeekChange(week: Int) {
+        _selectedWeek.value = week
+    }
+
+    fun onWeekDayChange(day: Int) {
+        _selectedWeekDayNum.value = day
+    }
+
+    fun onBuildChange(build: Int) {
+        _selectedBuildNum.value = build
+    }
+
+    fun toggleSection(section: Int) {
+        val current = _selectedSections.value
+        _selectedSections.value = if (current.contains(section)) {
+            if (current.size > 1) current - section else current
+        } else {
+            current + section
+        }
+    }
 
     init {
         viewModelScope.launch {
-            //snapshotFlow是冷流，当QueryParam内的参数发生变化，才会发射流
-            snapshotFlow {
-                QueryParam(
-                    week = selectedWeek,
-                    day = selectedWeekDayNum,
-                    build = selectedBuildNum,
-                    //sections.toList() 是为了给MutableStateList拍一张快照。因为List内容变了但引用没变,必须转成不可变的List,下游的比较逻辑才有效
-                    sections = selectedSections.toList()
-                )
+            //直接合并MutableStateFlow
+            combine(
+                _selectedWeek,
+                _selectedWeekDayNum,
+                _selectedBuildNum,
+                _selectedSections
+            ) { week, day, build, sections ->
+                QueryParam(week, day, build, sections)
             }
-                //只有当“周、周几、大课节次、教学楼”这四个参数全部不为空时，才允许进入下一步。这保证了不会发送无效请求。
                 .filter { it.isReady() }
-                //比较逻辑:只有当参数真正改变时才触发
+                //只有参数真的变了才往下走
                 .distinctUntilChanged()
-                //防抖:300ms后才发请求，防止快速滑动、
+                //防抖
                 .debounce(300)
-                //如果新请求来了，旧请求还在跑，这里直接取消旧的
                 .collectLatest { param ->
+                    //转换并请求
                     val bean = EmptyRoomBean(
                         week = param.week.toString(),
                         weekday = param.day.toString(),
@@ -89,21 +127,25 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
         }
     }
 
-/**
-网络请求相关函数
- */
+    /**
+    网络请求相关函数
+     */
     private suspend fun performFetch(bean: EmptyRoomBean) {
-        isLoading = true
+        _isLoading.value = true
+        val bean = EmptyRoomBean(
+            week = bean.week,
+            weekday = bean.weekday,
+            buildNum = bean.buildNum,
+            section = bean.section.map { it - 1 }.sorted().joinToString(",")
+        )
         val result = getEmptyRoomData(bean)
-
-        isLoading = false
-        //如果成功，取回 List；如果失败（网络错误等），赋值为空列表
-        roomResult = result.getOrNull() ?: emptyList()
-
+        _isLoading.value = false
+        _roomResult.value = result.getOrNull() ?: emptyList()
     }
-/**
-网络请求函数
- */
+
+    /**
+    网络请求函数
+     */
     private suspend fun getEmptyRoomData(bean: EmptyRoomBean): Result<List<String>> {
         return runCatchingCoroutine {
             EmptyRoomApiService::class.impl().getEmpyRooms(
