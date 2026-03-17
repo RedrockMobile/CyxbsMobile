@@ -123,10 +123,22 @@ class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomA
 private fun EmptyRoomPage() {
     val viewModel = viewModel(EmptyRoomComposeViewModel::class)
     //订阅所有的Flow并且转换为ComposeState
-    val selectedWeekSet by viewModel.selectedWeekSet.collectAsStateWithLifecycle()
-    val selectedWeekDaySet by viewModel.selectedWeekDaySet.collectAsStateWithLifecycle()
-    val selectedBuildNumSet by viewModel.selectedBuildNumSet.collectAsStateWithLifecycle()
-    val selectedSectionsSet by viewModel.selectedSectionsSet.collectAsStateWithLifecycle()
+    //在Compose收集时定义初始值
+    val selectedWeekSet by viewModel.selectedWeekSet.collectAsStateWithLifecycle(
+        initialValue = emptySet()
+    )
+
+    val selectedWeekDaySet by viewModel.selectedWeekDaySet.collectAsStateWithLifecycle(
+        initialValue = emptySet()
+    )
+
+    val selectedBuildNumSet by viewModel.selectedBuildNumSet.collectAsStateWithLifecycle(
+        initialValue = emptySet()
+    )
+
+    val selectedSectionsSet by viewModel.selectedSectionsSet.collectAsStateWithLifecycle(
+        initialValue = emptySet()
+    )
 
     val roomResult by viewModel.roomResult.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()

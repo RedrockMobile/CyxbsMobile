@@ -9,7 +9,6 @@ import com.cyxbs.pages.emptyroom.bean.EmptyRoomBean
 import com.cyxbs.pages.emptyroom.network.EmptyRoomApiService
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
@@ -44,27 +42,21 @@ class EmptyRoomComposeViewModel : BaseViewModel() {
     //私有MutableStateFlow,用于内部修改(通过调用函数)
     private val _selectedWeek = MutableStateFlow<Int?>(SchoolCalendar.getWeekOfTerm())
     private val _selectedWeekDayNum = MutableStateFlow<Int?>(getInitialDayOfWeek())
-    private val _selectedBuildNum = MutableStateFlow<Int?>(2)
-    private val _selectedSections = MutableStateFlow<List<Int>>(listOf(1))//节次是多选
+    private val _selectedBuildNum = MutableStateFlow<Int?>(null)
+    private val _selectedSections = MutableStateFlow<List<Int>>(emptyList())//节次是多选
 
 
-//SharingStarted.WhileSubscribed(5000)当用户切到后台（Activity 不可见），UI 停止收集流
-//如果用户在5秒内切回来，流依然是热的，直接给值；如果超过5秒，流会“停机”以节省内存和电量，等用户回来时再自动激活
+    //周次
     val selectedWeekSet = _selectedWeek.map { setOfNotNull(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    //星期
     val selectedWeekDaySet = _selectedWeekDayNum.map { setOfNotNull(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    //教学楼
     val selectedBuildNumSet = _selectedBuildNum.map { setOfNotNull(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
-    val selectedSectionsSet = _selectedSections.map { it.toSet() } // 将 List<Int> 转换为 Set<Int>
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = setOf(1)
-        )
+    //节次(多选)
+    val selectedSectionsSet = _selectedSections.map { it.toSet() }
 
     //返回数据
     private val _roomResult = MutableStateFlow<List<String>?>(null)
