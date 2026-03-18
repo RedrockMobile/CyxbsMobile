@@ -58,3 +58,6 @@ const val NAV_MAP = "map"
 
 // 地图-查看图片
 const val NAV_MAP_SHOW_PICTURE = "map_show_picture"
+
+// 空教室
+const val NAV_EMPTY_ROOM = "emptyroom"
