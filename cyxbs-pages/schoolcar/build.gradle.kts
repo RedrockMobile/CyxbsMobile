@@ -16,6 +16,7 @@ kotlin {
 			implementation(projects.cyxbsComponents.utils)
 			implementation(projects.cyxbsComponents.config)
 			implementation(libs.okio)
+			implementation(libs.filekit.core)
 		}
 		androidMain.dependencies {
 			implementation(libs.bundles.projectBase)
@@ -23,6 +24,10 @@ kotlin {
 
 			// https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
 			implementation("com.amap.api:3dmap:latest.integration")
+		}
+		noWebMain.dependencies {
+			implementation(libs.scale.image.viewer)
+			implementation(libs.scale.sampling.decoder)
 		}
 	}
 }

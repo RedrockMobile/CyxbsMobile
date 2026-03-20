@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
@@ -15,9 +16,12 @@ import com.cyxbs.pages.schoolcar.bean.CarStation
 import com.cyxbs.pages.schoolcar.mapcompose.CameraEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
+import com.cyxbs.pages.schoolcar.mapcompose.MapState
 import com.cyxbs.pages.schoolcar.mapcompose.MarkerType
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
+import com.cyxbs.pages.schoolcar.utils.downloadMapImage
+import com.cyxbs.pages.schoolcar.utils.isFileExist
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsState
 import com.cyxbs.pages.schoolcar.widget.LineSelectorItem
 import kotlinx.coroutines.Job
@@ -33,7 +37,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * date : 2026/2/18 21:21
  */
 expect class SchoolCarViewModel() : CommonSchoolCarViewModel {
-	// 返回-1表示没有最近的站点
+	// 返回null表示没有最近的站点
 	override fun getClosedSite(): CarStation?
 }
 
@@ -46,16 +50,26 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		SchoolCarRepository
 	}
 
+
 	// 数据源
 	val carLineInfo: MutableState<CarLineJson?> = mutableStateOf(null)
-
-	val btsState = CarInfoBtsState(100.dp, carLineInfo)
 
 	// 校车轨迹的页面状态，0表示地图页，1表示乘车指南页
 	val schoolCarPage = mutableStateOf(0)
 
 	// 定位按钮在Y上的偏移
 	val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
+
+	// bts的State
+	val btsState = CarInfoBtsState(100.dp, carLineInfo)
+
+	// downloadingDialog
+	val downProgressDialogState = mutableStateOf(!isFileExist())
+	val downProgress = mutableStateOf(0f)
+
+	// map的state
+	val mapState = MapState()
+
 
 	//================== 关于地图的一些数据==================================
 	private val _realtimeCarLocations = mutableStateOf<List<CarLocation>>(emptyList())
@@ -67,11 +81,10 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	val cameraEventFlow = cameraEventFlowInternal.receiveAsFlow()
 
 
-	val markers = derivedStateOf {
+	val stationList = derivedStateOf {
 		val currentPage = schoolCarPage.value
 		if (currentPage != 0) return@derivedStateOf emptyList()
-		val info = carLineInfo.value ?: return@derivedStateOf emptyList<MapMarkerState>()
-		val carLocations = _realtimeCarLocations.value
+		val info = carLineInfo.value ?: return@derivedStateOf emptyList()
 		val currentLId = btsState.selectedLineId.value
 
 		buildList {
@@ -84,38 +97,49 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 				.forEach { site ->
 					add(
 						MapMarkerState(
-							uid = "site_${site.id}",
-							type = MarkerType.Site(site.id),
-							lat = site.lat,
-							lng = site.lng,
-							rotation = 0f
+							id = "site_${site.id}",
+							type = MarkerType.Site(site.name, emptySet()),
+							initialPosition = Offset(site.px.toFloat(), site.py.toFloat()),
+							initialSelect = false,
+							visible = true
 						)
 					)
 				}
-
-			val displayCar =
-				if (currentLId == null) carLocations else carLocations.filter { it.type == currentLId }
-			displayCar.forEach { car ->
-				add(
-					MapMarkerState(
-						uid = "car_${car.type}_${car.id}",
-						type = MarkerType.Car(car.id, car.type),
-						lat = car.lat,
-						lng = car.lng,
-					)
-				)
-			}
-
 		}
 	}
 
+
 	init {
 		initCarLineInfo()
+		checkAndDownloadMap()
 		startPollingLocation()
 	}
 
+	private fun checkAndDownloadMap() {
+		if (isFileExist()) {
+			closeDownLoadProgressDialog()
+			return
+		}
+		launchByViewModelScope {
+			model.getMapConfig().onSuccess { mapStatic ->
+				openDownLoadProgressDialog()
+				try {
+					downloadMapImage(mapStatic.mapUrl) { current, total ->
+						downProgress.value = if (total > 0) current.toFloat() / total.toFloat() else 0f
+					}
+					closeDownLoadProgressDialog()
+				} catch (e: Exception) {
+					closeDownLoadProgressDialog()
+					toast("地图下载失败，请检查网络")
+				}
+			}.onFailure {
+				toast("无法获取地图配置")
+			}
+		}
+	}
+
 	// 初始化校车信息
-	fun initCarLineInfo() {
+	private fun initCarLineInfo() {
 		launchByViewModelScope {
 			val localInfo = CarDataModel.getCarLine()
 			if (localInfo != null) {
@@ -199,7 +223,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 			is MapEvent.MarkerClick -> {
 				if (event.marker.type is MarkerType.Site) {
-					changeToSiteMode(event.marker.type.id, event.marker.lat, event.marker.lng)
+					changeToSiteMode(1, event.marker.position)
 				}
 			}
 		}
@@ -234,9 +258,9 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		}
 	}
 
-	fun focusOnPoint(lat: Double, lng: Double) {
+	fun focusOnPoint(offset: Offset) {
 		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Focus(lat, lng, 17f))
+			cameraEventFlowInternal.send(CameraEvent.Focus(offset.x, offset.y, 15f))
 		}
 	}
 
@@ -259,9 +283,9 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		cameraRecover()
 	}
 
-	private fun changeToSiteMode(siteId: Int, lat: Double, lng: Double) {
+	private fun changeToSiteMode(siteId: Int, offset: Offset) {
 		selectSite(siteId)
-		focusOnPoint(lat, lng)
+		focusOnPoint(offset)
 	}
 
 	private fun changeToEmptyMode() {
@@ -294,7 +318,15 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	fun selectClosedSite() {
 		val closedSite = getClosedSite() ?: return
-		changeToSiteMode(closedSite.id, closedSite.lat, closedSite.lng)
+		changeToSiteMode(closedSite.id, Offset(closedSite.px.toFloat(), closedSite.py.toFloat()))
+	}
+
+	fun openDownLoadProgressDialog() {
+		downProgressDialogState.value = true
+	}
+
+	fun closeDownLoadProgressDialog() {
+		downProgressDialogState.value = false
 	}
 
 	abstract fun getClosedSite(): CarStation?

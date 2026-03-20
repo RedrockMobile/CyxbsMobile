@@ -4,6 +4,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocationJson
+import com.cyxbs.pages.schoolcar.bean.MapStatic
 import com.cyxbs.pages.schoolcar.network.SchoolCarApiService
 import com.cyxbs.pages.schoolcar.utils.md5Hex
 import kotlin.time.Clock
@@ -17,7 +18,6 @@ import kotlin.time.Clock
 
 object SchoolCarRepository {
 	val service = SchoolCarApiService::class.impl()
-
 	suspend fun getCarInfoVersion(): Result<Long> {
 		return runCatchingCoroutine {
 			service.getCarInfoVersion()
@@ -50,4 +50,11 @@ object SchoolCarRepository {
 		}
 	}
 
+	suspend fun getMapConfig(): Result<MapStatic> {
+		return runCatchingCoroutine {
+			service.getMapInfo()
+		}.mapCatching {
+			it.data
+		}
+	}
 }

@@ -4,6 +4,7 @@ import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.pages.schoolcar.bean.CarInfoVersion
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocationJson
+import com.cyxbs.pages.schoolcar.bean.MapStatic
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.GET
@@ -34,4 +35,7 @@ interface SchoolCarApiService {
 		@Field("t") t: String, // 时间戳
 		@Field("r") r: String // 上一秒的时间戳 md5加密
 	): ApiWrapper<CarLocationJson>
+
+	@GET("schoolbus/map/static")
+	suspend fun getMapInfo(): ApiWrapper<MapStatic>
 }

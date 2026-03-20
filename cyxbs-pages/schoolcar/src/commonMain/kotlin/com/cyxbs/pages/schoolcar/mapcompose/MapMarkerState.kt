@@ -1,23 +1,10 @@
 package com.cyxbs.pages.schoolcar.mapcompose
 
 import androidx.compose.runtime.Stable
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_1
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_2
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_3
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_4
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_default
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_2
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_3
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_4
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_mine
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_1
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_2
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_3
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_4
-import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_default
-import org.jetbrains.compose.resources.DrawableResource
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 
 /**
  * description ： 地图上的Marker
@@ -26,40 +13,45 @@ import org.jetbrains.compose.resources.DrawableResource
  * date : 2026/2/21 22:18
  */
 @Stable
-data class MapMarkerState(
-	/*
-			car_1_1 -> 校车一号线第一辆
-			site_2 -> 2号站点
-	 */
-	val uid: String, // 用于唯一标识处一个Marker
+class MapMarkerState(
+	val id: String,// 这个会作为key来区分每个marker
 	val type: MarkerType,
-	val lat: Double, // 维度
-	val lng: Double, // 经度
-	val rotation: Float = 0f,
-	val visible: Boolean = true,
-)
-
-// Marker的Type
-@Stable
-sealed interface MarkerType {
-	val id: Int
-	val zIndex: Float
-
-	// 汽车
-	data class Car(
-		override val id: Int, // 当前线路的第几量车
-		val type: Int, // 线路id
-	) : MarkerType {
-		override val zIndex: Float
-			get() = 10f
+	initialPosition: Offset = Offset.Zero,
+	initialSelect: Boolean = false,
+	visible: Boolean = true,
+) {
+	var position by mutableStateOf(initialPosition)
+	var visible by mutableStateOf(visible)
+	var isSelect by mutableStateOf(initialSelect)
+	fun moveToPos(newPos: Offset) {
+		if (position != newPos) position = newPos
 	}
 
-	// 站点
-	data class Site(
-		override val id: Int,
-	) : MarkerType {
-		override val zIndex: Float
-			get() = 50f
+	fun isBelongToLine(lineId: Int?): Boolean {
+		// 如果传入的id为null说明是全选模式
+		if (lineId == null) return true
+		return when (type) {
+			is MarkerType.Car -> type.lineId == lineId
+			is MarkerType.Site -> type.parentLineIds.contains(lineId)
+			MarkerType.User -> true
+		}
 	}
 }
 
+
+@Stable
+sealed interface MarkerType {
+	// 汽车
+	data class Car(
+		val lineId: Int,
+		val updateAt: Long,
+	) : MarkerType
+
+	// 站点
+	data class Site(
+		val name: String,
+		val parentLineIds: Set<Int> // 该站点所属的所有线路 ID
+	) : MarkerType
+
+	object User : MarkerType
+}

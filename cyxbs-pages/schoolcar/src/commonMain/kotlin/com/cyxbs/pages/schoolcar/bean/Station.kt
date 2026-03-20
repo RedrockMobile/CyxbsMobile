@@ -20,5 +20,9 @@ data class CarStation(
 	@SerialName("lng")
 	val lng: Double, //经度
 	@SerialName("name")
-	val name: String //站点名字
+	val name: String, //站点名字
+	@SerialName("px")
+	val px: Int, // 图片的偏移x
+	@SerialName("py")
+	val py: Int // 图片的偏移y
 )

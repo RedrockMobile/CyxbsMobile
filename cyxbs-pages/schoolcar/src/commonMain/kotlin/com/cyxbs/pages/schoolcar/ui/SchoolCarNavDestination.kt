@@ -35,9 +35,8 @@ import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
-import com.cyxbs.pages.schoolcar.mapcompose.PlatformSchoolCarMapCompose
+import com.cyxbs.pages.schoolcar.mapcompose.SchoolCarMapCompose
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -67,6 +66,7 @@ class SchoolCarNavDestination :
 	override fun DestinationContent(parcel: DestinationParcel<SchoolCarNavArgument>) {
 		viewModel { SchoolCarViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
 		val viewModel = viewModel(SchoolCarViewModel::class)
+		DownLoadProgressDialog()
 		AnimatedContent(
 			targetState = viewModel.schoolCarPage.value,
 			transitionSpec = {
@@ -98,14 +98,7 @@ class SchoolCarNavDestination :
 @Composable
 fun SchoolCarPage() {
 	val viewModel = viewModel(SchoolCarViewModel::class)
-	PlatformSchoolCarMapCompose(
-		modifier = Modifier.fillMaxSize(),
-		markers = viewModel.markers.value,
-		cameraEventFlow = viewModel.cameraEventFlow,
-		currentLine = viewModel.btsState.selectedLineId.value,
-		selectSiteId = viewModel.btsState.selectedSiteId.value,
-		onEvent = viewModel::onMapEvent
-	)
+	SchoolCarMapCompose()
 	CarInfoButtonSheet(
 		state = viewModel.btsState,
 		toggleSelectLine = viewModel::toggleSelectLine,
@@ -118,8 +111,6 @@ fun SchoolCarPage() {
 		snapshotFlow {
 			bottomSheetState.fraction.coerceIn(0F, 1F)
 		}.onEach {
-			// 定位按钮随着bts的变化而变化
-			log("HI-IR","fraction： ${it}")
 			viewModel.offsetYRadio.floatValue = it
 		}.launchIn(this)
 	}

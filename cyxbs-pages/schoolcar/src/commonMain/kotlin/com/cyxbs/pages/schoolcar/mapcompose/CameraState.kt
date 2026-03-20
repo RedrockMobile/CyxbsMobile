@@ -11,20 +11,19 @@ import androidx.compose.runtime.Stable
 // 这个object类是用来初始化摄像头位置的，后续的摄像头事件应该用channel来发送事件
 @Stable
 object  CameraStateDefault{
-	const val lat: Double = 29.530040
-	const val lng: Double = 106.606789
-	const val zoom: Float = 16.05f
+	const val x: Float = 2940f
+	const val y: Float = 1139f
+	const val zoom: Float = 1f
 }
 
 
 @Stable
 sealed interface CameraEvent {
 	data class Focus(
-		val lat: Double = 29.530040,
-		val lng: Double = 106.606789,
-		val zoom: Float = 16.05f
+		val x: Float = 2940f,
+		val y: Float = 1139f,
+		val zoom: Float = 1f
 	) : CameraEvent
-
 	object ZoomExpand : CameraEvent // 放大事件
 	object ZoomOut : CameraEvent // 缩小事件
 	object Positioning : CameraEvent // 回到自己的位置
