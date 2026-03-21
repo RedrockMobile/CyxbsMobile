@@ -4,6 +4,7 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
@@ -13,13 +14,14 @@ import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
 import com.cyxbs.pages.schoolcar.bean.CarStation
+import com.cyxbs.pages.schoolcar.mapcompose.BaseMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.CameraEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
-import com.cyxbs.pages.schoolcar.mapcompose.MapMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.MapState
-import com.cyxbs.pages.schoolcar.mapcompose.MarkerType
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
+import com.cyxbs.pages.schoolcar.ui.CarMarkerState
+import com.cyxbs.pages.schoolcar.ui.StationMarkerState
 import com.cyxbs.pages.schoolcar.utils.downloadMapImage
 import com.cyxbs.pages.schoolcar.utils.isFileExist
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsState
@@ -72,70 +74,64 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 
 	//================== 关于地图的一些数据==================================
-	private val _realtimeCarLocations = mutableStateOf<List<CarLocation>>(emptyList())
-
 	// 轮询查询校车位置的Job
 	private var carLocationJob: Job? = null
+	private val _realtimeCarLocations = mutableStateOf<List<CarLocation>>(emptyList())
 
+	// 站点数据
+	private val allStationMarkers = derivedStateOf {
+		// stationId -> setOf(lineId)
+		val stationMap = mutableMapOf<Int, MutableSet<Int>>()
+		carLineInfo.value?.let { json ->
+			// 组装stationMap
+			json.lines.forEach { line ->
+				line.stations.forEach { station ->
+					stationMap.getOrPut(station.id) { mutableSetOf() }.add(line.id)
+				}
+			}
+			json.lines.flatMap {
+				it.stations
+			}.distinctBy { it.id }.map {
+				StationMarkerState(
+					id = "station_${it.id}",
+					name = it.name,
+					lineIds = stationMap[it.id]?.toSet() ?: emptySet(),
+					position = Offset(it.px.toFloat(), it.py.toFloat()),
+					visible = true
+				)
+			}
+		} ?: emptyList()
+
+	}
+
+	// 所有的车辆数据(CarMarkerState中的id - CarMarkerState)
+	//CarMarkerState中的id格式: car_lineId_id
+	private val carMarkers = mutableStateMapOf<String, CarMarkerState>()
+
+
+	// 摄像头数据流
 	private val cameraEventFlowInternal = Channel<CameraEvent>(Channel.BUFFERED)
 	val cameraEventFlow = cameraEventFlowInternal.receiveAsFlow()
 
 
-	val stationList = derivedStateOf {
-		val currentPage = schoolCarPage.value
-		if (currentPage != 0) return@derivedStateOf emptyList()
-		val info = carLineInfo.value ?: return@derivedStateOf emptyList()
-		val currentLId = btsState.selectedLineId.value
+	// 显示站点
+	val displayStations = derivedStateOf {
+		val selectedLineId = btsState.selectedLineId.value ?: return@derivedStateOf allStationMarkers.value
 
-		buildList {
-			// 添加站点信息
-			val displayLines =
-				if (currentLId == null) info.lines else info.lines.filter { it.id == currentLId }
-
-			displayLines.flatMap { it.stations }
-				.distinctBy { it.id }
-				.forEach { site ->
-					add(
-						MapMarkerState(
-							id = "site_${site.id}",
-							type = MarkerType.Site(site.name, emptySet()),
-							initialPosition = Offset(site.px.toFloat(), site.py.toFloat()),
-							initialSelect = false,
-							visible = true
-						)
-					)
-				}
+		allStationMarkers.value.filter {
+			it.lineIds.contains(selectedLineId)
 		}
 	}
 
+	// 显示的车辆
+	val displayCars = derivedStateOf {
+		val selectedLineId = btsState.selectedLineId.value ?: return@derivedStateOf carMarkers.values
+	}
 
 	init {
 		initCarLineInfo()
 		checkAndDownloadMap()
 		startPollingLocation()
-	}
-
-	private fun checkAndDownloadMap() {
-		if (isFileExist()) {
-			closeDownLoadProgressDialog()
-			return
-		}
-		launchByViewModelScope {
-			model.getMapConfig().onSuccess { mapStatic ->
-				openDownLoadProgressDialog()
-				try {
-					downloadMapImage(mapStatic.mapUrl) { current, total ->
-						downProgress.value = if (total > 0) current.toFloat() / total.toFloat() else 0f
-					}
-					closeDownLoadProgressDialog()
-				} catch (e: Exception) {
-					closeDownLoadProgressDialog()
-					toast("地图下载失败，请检查网络")
-				}
-			}.onFailure {
-				toast("无法获取地图配置")
-			}
-		}
 	}
 
 	// 初始化校车信息
@@ -164,6 +160,30 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		}
 	}
 
+	private fun checkAndDownloadMap() {
+		if (isFileExist()) {
+			closeDownLoadProgressDialog()
+			return
+		}
+		launchByViewModelScope {
+			model.getMapConfig().onSuccess { mapStatic ->
+				openDownLoadProgressDialog()
+				try {
+					downloadMapImage(mapStatic.mapUrl) { current, total ->
+						downProgress.value = if (total > 0) current.toFloat() / total.toFloat() else 0f
+					}
+					closeDownLoadProgressDialog()
+				} catch (_: Exception) {
+					closeDownLoadProgressDialog()
+					toast("地图下载失败，请检查网络")
+				}
+			}.onFailure {
+				toast("无法获取地图配置")
+			}
+		}
+	}
+
+
 	// 切换底部表单的选中项
 	fun toggleSelectLine(line: LineSelectorItem) {
 		if (line.id == -1) {
@@ -190,21 +210,18 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	fun selectSite(stationId: Int) {
 		val info = carLineInfo.value ?: return
-
 		val availableLines = info.lines.filter { line ->
 			line.stations.any { it.id == stationId }
 		}
-
 		if (availableLines.isEmpty()) return
+
 		val currentLId = btsState.selectedLineId.value
 		val isCurrentLineValid = availableLines.any { it.id == currentLId }
 
-		// 如果当前选择的线路里面没有这个站点，我们就要切换线路了
-		if (!isCurrentLineValid) {
-			btsState.selectedLineId.value = availableLines.first().id
-		}
+		val targetLineId = if (!isCurrentLineValid) availableLines.first().id else currentLId
 
-		btsState.selectedSiteId.value = stationId
+		btsState.selectedLineId.value = targetLineId
+		btsState.selectedStationId.value = stationId
 	}
 
 
@@ -214,17 +231,28 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		startPollingLocation()
 	}
 
-	// 从地图返回
-	fun onMapEvent(event: MapEvent) {
+	/**
+	 * 处理地图事件
+	 */
+	fun handleMapEvent(event: MapEvent) {
 		when (event) {
 			is MapEvent.MapClick -> {
 				changeToEmptyMode()
 			}
 
 			is MapEvent.MarkerClick -> {
-				if (event.marker.type is MarkerType.Site) {
-					changeToSiteMode(1, event.marker.position)
-				}
+				handleMarkerClick(event.marker)
+			}
+		}
+	}
+
+	private fun handleMarkerClick(marker: BaseMarkerState) {
+		when (marker) {
+			is StationMarkerState -> {
+				changeToSiteMode(
+					StationMarkerState.getStationIdByString(marker.id)!!,
+					offset = marker.position
+				)
 			}
 		}
 	}
@@ -260,7 +288,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	fun focusOnPoint(offset: Offset) {
 		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Focus(offset.x, offset.y, 15f))
+			cameraEventFlowInternal.send(CameraEvent.Focus(offset.x, offset.y, 6f))
 		}
 	}
 
@@ -273,7 +301,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	private fun cameraRecover() {
 		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Focus())
+			cameraEventFlowInternal.send(CameraEvent.Recover)
 		}
 	}
 

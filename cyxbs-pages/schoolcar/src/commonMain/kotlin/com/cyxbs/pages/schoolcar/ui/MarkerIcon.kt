@@ -1,7 +1,17 @@
-package com.cyxbs.pages.schoolcar.mapcompose
+package com.cyxbs.pages.schoolcar.ui
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_2
@@ -22,13 +32,45 @@ import org.jetbrains.compose.resources.painterResource
  * date : 2026/3/19 22:34
  */
 @Composable
-fun StationIconCompose(state: MapMarkerState, currentSelectLine: Int?) {
-	if (!state.visible) return
+fun StationIconCompose(
+	state: StationMarkerState,
+	currentSelectLine: Int?,
+	isSelect: Boolean = false
+) {
+	if (!state.visible.value) return
 
-	Image(
-		painter = painterResource(getStationResByLineId(currentSelectLine)),
-		contentDescription = null
-	)
+	Box(
+		contentAlignment = Alignment.BottomCenter
+	) {
+		if (isSelect && currentSelectLine != null) {
+			val infiniteTransition = rememberInfiniteTransition()
+			val scale = infiniteTransition.animateFloat(
+				initialValue = 0.8f, targetValue = 1.2f,
+				animationSpec = infiniteRepeatable(
+					animation = tween(1500),
+					repeatMode = RepeatMode.Reverse
+				)
+			)
+
+			Image(
+				modifier = Modifier
+					.graphicsLayer {
+						scaleX = scale.value
+						scaleY = scale.value
+						transformOrigin = TransformOrigin.Center
+						translationY = size.height / 2f
+					},
+				painter = painterResource(getBackGroundByLineId(currentSelectLine)),
+				contentDescription = null
+			)
+		}
+
+
+		Image(
+			painter = painterResource(getStationResByLineId(currentSelectLine)),
+			contentDescription = null
+		)
+	}
 }
 
 fun getStationResByLineId(lineId: Int?): DrawableResource {

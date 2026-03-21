@@ -1,7 +1,10 @@
 package com.cyxbs.pages.schoolcar.mapcompose
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,8 +23,8 @@ import kotlinx.coroutines.launch
 
 @Stable
 class MapState(
-	initialScale: Float = 2.3f,
-	initialOffset: Offset = Offset.Zero,
+	private val initialScale: Float = 2.3f,
+	private val initialOffset: Offset = Offset.Zero,
 	initialContainer: IntSize = IntSize.Zero,
 ) {
 	// 地图的大小
@@ -30,6 +33,9 @@ class MapState(
 	// 这个center既是地图组件的中心点，因为给图片Box设置了Center的对齐，所以这个center也是地图图片Box的中心
 	val center: Offset get() = Offset(container.width / 2f, container.height / 2f)
 
+	// 地图图片的相关数据信息
+	var imageSize: IntSize by mutableStateOf(IntSize.Zero)
+	var ratio: Float by mutableStateOf(0f)
 
 	// 摄像头视角状态
 	val scale get() = scaleAnim.value
@@ -41,13 +47,7 @@ class MapState(
 	private val scaleAnim = Animatable(initialScale)
 	private val offsetAnim = Animatable(initialOffset, Offset.VectorConverter)
 
-	suspend fun animateOffset(newPos: Offset) {
-		offsetAnim.animateTo(newPos)
-	}
 
-	suspend fun animateScale(targetScale: Float) {
-		scaleAnim.animateTo(targetScale)
-	}
 
 	suspend fun setOffset(newPos: Offset) {
 		offsetAnim.snapTo(newPos)
@@ -57,21 +57,37 @@ class MapState(
 		scaleAnim.snapTo(targetScale)
 	}
 
-	// 并行缩放和移动动画
-	suspend fun animateCamera(targetScale: Float, targetOffset: Offset) {
+	/**
+	 * 以动画的方式移动摄像头
+	 */
+	private suspend fun animateCamera(targetScale: Float, targetOffset: Offset) {
 		coroutineScope {
-			launch { scaleAnim.animateTo(targetScale) }
-			launch { offsetAnim.animateTo(targetOffset) }
+			launch {
+				scaleAnim.animateTo(
+					targetScale,
+					animationSpec = spring(
+						dampingRatio = Spring.DampingRatioNoBouncy,
+						stiffness = Spring.StiffnessMediumLow
+					)
+				)
+			}
+			launch {
+				offsetAnim.animateTo(
+					targetOffset,
+					animationSpec = spring(
+						dampingRatio = Spring.DampingRatioNoBouncy,
+						stiffness = Spring.StiffnessMediumLow
+					)
+				)
+			}
 		}
 	}
-
 
 	// 更新平移
 	suspend fun updateTransform(
 		zoomFactor: Float,
 		panDelta: Offset,
 		centroid: Offset,
-		imageAspectRatio: Float
 	) {
 		val oldScale = scale
 		val oldOffset = offset // 拿到当前的位移状态
@@ -87,16 +103,17 @@ class MapState(
 		val zoomOffset = relativeCentroid * (1f - actualRatio)
 
 		val newOffset = (oldOffset * actualRatio) + zoomOffset + panDelta
-		val finalOffset = calculateOffsetWithBounds(newOffset, newScale, imageAspectRatio)
+		val finalOffset = calculateOffsetWithBounds(newOffset, newScale)
 		scaleAnim.snapTo(newScale)
 		offsetAnim.snapTo(finalOffset)
 	}
 
-	// 将无图片边界加入offset的计算
+	/**
+	 * 将图片边界加入offset的计算
+	 */
 	private fun calculateOffsetWithBounds(
 		offset: Offset,
 		scale: Float,
-		imageAspectRatio: Float
 	): Offset {
 		// 容器的高
 		val containerWidth = container.width.toFloat()
@@ -104,7 +121,7 @@ class MapState(
 
 		//图片Box的宽高
 		val baseContentWidth = container.width.toFloat()
-		val baseContentHeight = baseContentWidth / imageAspectRatio
+		val baseContentHeight = baseContentWidth / ratio
 
 		val scaleWith = baseContentWidth * scale //缩放后的理论宽度
 		val scaleHeight = baseContentHeight * scale// 缩放后的理论高度
@@ -119,44 +136,81 @@ class MapState(
 	}
 
 	/**
+	 * 以目前显示屏幕中心为原点缩放
+	 */
+	private suspend fun animateScale(targetScale: Float) {
+		val finalScale = targetScale.coerceIn(2.2f, 10f)
+		val scaleRatio = finalScale / scale
+		val newOffset = offset * scaleRatio
+		val finalOffset = calculateOffsetWithBounds(newOffset, finalScale)
+		animateCamera(finalScale, finalOffset)
+	}
+
+	/**
 	 * 聚焦到原图上的某个像素点
 	 * @param px 原图 X 坐标
 	 * @param py 原图 Y 坐标
-	 * @param intrinsicWidth 原图总宽度
-	 * @param intrinsicHeight 原图总高度
-	 * @param targetScale 聚焦时的目标缩放倍数，默认使用当前缩放
-	 * @param ratio 图片宽高比
+	 * @param targetScale 聚焦时的目标缩放倍数
 	 */
 	suspend fun focusOnImagePoint(
 		px: Float,
 		py: Float,
-		intrinsicWidth: Float,
-		intrinsicHeight: Float,
-		ratio: Float,
 		targetScale: Float = scale,
 	) {
 		val containerWidth = container.width.toFloat()
 		if (containerWidth <= 0f) return
+		// 归一化寻找在图片Box上的坐标
+		val u = px / imageSize.width
+		val v = py / imageSize.height
 
+		val imageBoxHeight = containerWidth / ratio
 
-		val u = px / intrinsicWidth
-		val v = py / intrinsicHeight
+		// 因为平移的中心点是Center
+		val relX = (u - 0.5f) * containerWidth
+		val relY = (v - 0.5f) * imageBoxHeight
 
-		val baseW = containerWidth
-		val baseH = containerWidth / ratio
-
-		val relX = (u - 0.5f) * baseW
-		val relY = (v - 0.5f) * baseH
+		val newScale = targetScale.coerceIn(2.2f, 10f)
 
 		val targetOffset = Offset(
-			x = -(relX * targetScale),
-			y = -(relY * targetScale)
+			x = -(relX * newScale),
+			y = -(relY * newScale)
 		)
-
-		val finalOffset = calculateOffsetWithBounds(targetOffset, targetScale, ratio)
-
-		animateCamera(targetScale, finalOffset)
+		val finalOffset = calculateOffsetWithBounds(targetOffset, newScale)
+		animateCamera(newScale, finalOffset)
 	}
 
+	/**
+	 * 按照屏幕点击位置放大
+	 */
+	suspend fun zoomByPosition(position: Offset) {
+		val relativePosition = center - position
+		// 加入新的缩放前，把该点放到屏幕中心应该走的偏移量
+		val shouldOffset = offset + relativePosition
+
+		val newScale = (scale + 1.5f).coerceIn(2.2f, 10f)
+		val scaleRatio = newScale / scale
+		val targetOffset = shouldOffset * scaleRatio
+		val finalOffset = calculateOffsetWithBounds(targetOffset, newScale)
+
+		animateCamera(newScale, finalOffset)
+	}
+
+
+	// 放大
+	suspend fun zoomExpand() {
+		val targetScale = scale + 1.5f
+		animateScale(targetScale)
+	}
+
+	// 缩小
+	suspend fun zoomOut() {
+		val targetScale = scale - 1.5f
+		animateScale(targetScale)
+	}
+
+	// 摄像头恢复
+	suspend fun cameraRecover() {
+		animateCamera(initialScale, initialOffset)
+	}
 
 }

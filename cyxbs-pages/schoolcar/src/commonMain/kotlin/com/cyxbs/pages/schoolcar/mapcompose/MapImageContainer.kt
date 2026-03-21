@@ -3,7 +3,7 @@ package com.cyxbs.pages.schoolcar.mapcompose
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.flow.Flow
 
 /**  
  * description ： 校车查询的MapCompose组件
@@ -20,6 +20,7 @@ expect fun MapImageContainer(
 	modifier: Modifier,
 	imageBytes: ByteArray?,
 	mapState: MapState,
-	onTransformChange: (offset: Offset, scale: Float, centroid: Offset,imageRatio: Float) -> Unit,
+	cameraEventFlow: Flow<CameraEvent>,
+	onMapEvent: (MapEvent) -> Unit,
 	markerContent: @Composable MapScope.() -> Unit
 )

@@ -36,7 +36,6 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
-import com.cyxbs.pages.schoolcar.mapcompose.SchoolCarMapCompose
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
 import com.g985892345.provider.api.annotation.ImplProvider

@@ -46,13 +46,13 @@ class CarInfoBtsState(val peekHeight: Dp, private val carLineInfo: State<CarLine
 	val selectedLineId: MutableState<Int?> = mutableStateOf(null)
 
 	// 选中的站点 ID
-	val selectedSiteId: MutableState<Int?> = mutableStateOf(null)
+	val selectedStationId: MutableState<Int?> = mutableStateOf(null)
 
 
 	val displayMode = derivedStateOf {
 		val info = carLineInfo.value ?: return@derivedStateOf CarInfoBtsDisplayMode.ErrorOverView
 
-		val sId = selectedSiteId.value // 站点ID
+		val sId = selectedStationId.value // 站点ID
 		val lId = selectedLineId.value    // 线路ID
 
 		if (sId != null) {
@@ -87,12 +87,12 @@ class CarInfoBtsState(val peekHeight: Dp, private val carLineInfo: State<CarLine
 
 	fun changeToEmptyMode() {
 		selectedLineId.value = null
-		selectedSiteId.value = null
+		selectedStationId.value = null
 	}
 
 	fun changeToLineMode(lineId: Int) {
 		selectedLineId.value = lineId
-		selectedSiteId.value = null
+		selectedStationId.value = null
 	}
 
 	// 根据目前加载的CarLineJson生成选择器的源数据列表

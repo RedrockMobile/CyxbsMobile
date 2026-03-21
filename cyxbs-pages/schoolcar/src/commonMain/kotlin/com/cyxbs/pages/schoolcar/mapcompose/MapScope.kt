@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.log
 import kotlinx.coroutines.CoroutineScope
 
@@ -28,6 +29,7 @@ interface MapScope {
 	fun Marker(
 		position: Offset,
 		anchor: Offset = Offset(0.5f, 0.5f),//默认居中对齐
+		onMarkerClick: (() -> Unit)? = null,
 		content: @Composable BoxScope.() -> Unit
 	)
 }
@@ -49,7 +51,6 @@ class MapScopeImpl(
 		val u = px / imageSize.width
 		val v = py / imageSize.height
 
-		log("hiir","(${px},${py})->(${u},${v}),(${boxWidth},${boxHeight})")
 		return Offset(
 			x = u * boxWidth,
 			y = v * boxHeight
@@ -60,24 +61,27 @@ class MapScopeImpl(
 	override fun Marker(
 		position: Offset,
 		anchor: Offset,
+		onMarkerClick: (() -> Unit)?,
 		content: @Composable BoxScope.() -> Unit
 	) {
 		Box(
 			modifier = Modifier
 				.graphicsLayer {
+					// 因为可能会涉及到高频运动的车俩，所以用graphicsLayer来平移定位，让刷新限制在绘制阶段
 					val localPosition = mapToImageScreen(position.x, position.y)
-
 					val offsetX = (localPosition.x - size.width * anchor.x)
 					val offsetY = (localPosition.y - size.height * anchor.y)
 					translationX = offsetX
 					translationY = offsetY
+
+					// 方向缩放
 					val invScale = if (mapState.scale > 0f) 1f / mapState.scale else 1f
 					scaleX = invScale
 					scaleY = invScale
-					// 以传入的 anchor 为中心进行反向缩放
 					transformOrigin = TransformOrigin(anchor.x, anchor.y)
+				}.clickableNoIndicator(enabled = onMarkerClick != null) {
+					onMarkerClick?.invoke()
 				}
-
 		) {
 			content()
 		}

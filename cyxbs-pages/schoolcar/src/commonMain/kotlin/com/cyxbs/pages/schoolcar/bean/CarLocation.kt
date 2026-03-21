@@ -31,5 +31,9 @@ data class CarLocation(
 	var type: Int = 0, // type + 1 为线路号
 
 	@SerialName("update_at")
-	var upDate: Long = 0L
+	var upDate: Long = 0L,
+	@SerialName("px")
+	val px: Int, // 图片的偏移x
+	@SerialName("py")
+	val py: Int // 图片的偏移y
 )

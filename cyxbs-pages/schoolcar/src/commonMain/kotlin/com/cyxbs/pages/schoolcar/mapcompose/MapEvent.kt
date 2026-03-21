@@ -7,6 +7,6 @@ package com.cyxbs.pages.schoolcar.mapcompose
  * date : 2026/2/21 23:04
  */
 sealed class MapEvent {
-	data class MarkerClick(val marker: MapMarkerState) : MapEvent()
+	data class MarkerClick(val marker: BaseMarkerState) : MapEvent()
 	object MapClick : MapEvent()
 }
