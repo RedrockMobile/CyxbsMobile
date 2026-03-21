@@ -17,7 +17,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
-import com.cyxbs.pages.course.view.frame.header.CourseFrameHeader
+import com.cyxbs.pages.course.view.page.CourseFrameHeader
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
 import com.g985892345.provider.api.annotation.ImplProvider

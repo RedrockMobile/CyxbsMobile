@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.frame.decoration
+package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope

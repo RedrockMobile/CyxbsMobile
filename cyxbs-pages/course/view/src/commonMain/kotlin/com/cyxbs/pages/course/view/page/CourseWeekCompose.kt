@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.week
+package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

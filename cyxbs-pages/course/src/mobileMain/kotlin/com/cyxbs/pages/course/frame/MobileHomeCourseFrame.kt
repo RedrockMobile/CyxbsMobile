@@ -28,12 +28,11 @@ import com.cyxbs.pages.course.frame.item.MobilePlatformCourseCreateAffairItemFac
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseLinkLessonItemFactory
 import com.cyxbs.pages.course.frame.item.MobilePlatformCourseSelfLessonItemFactory
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.view.frame.HomeCoursePageContent
-import com.cyxbs.pages.course.view.frame.decoration.AffairDecorationViewModel
-import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel
-import com.cyxbs.pages.course.view.frame.decoration.LinkLessonDecorationViewModel
-import com.cyxbs.pages.course.view.frame.decoration.SelfLessonDecorationViewModel
+import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.decoration.impl.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.impl.CreateAffairDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.impl.LinkLessonDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.impl.SelfLessonDecorationViewModel
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
 import com.g985892345.provider.api.annotation.ImplProvider

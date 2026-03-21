@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.frame.header
+package com.cyxbs.pages.course.view.page
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,7 +30,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.utils.get.Num2CN
 import com.cyxbs.pages.course.api.ILinkService2
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.AbstractCourseFrame
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs

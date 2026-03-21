@@ -8,7 +8,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.utils.extensions.logg
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier

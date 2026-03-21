@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.frame.decoration
+package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -19,8 +19,8 @@ import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairIdModel
 import com.cyxbs.pages.affair.api.IAffairService2
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
+import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.decoration.impl.CreateAffairDecorationViewModel.Companion.MIN_MINUTE_INTERVAL
 import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime

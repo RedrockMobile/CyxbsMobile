@@ -22,7 +22,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.frame.decoration.CreateAffairDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.impl.CreateAffairDecorationViewModel
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemTopBottomText

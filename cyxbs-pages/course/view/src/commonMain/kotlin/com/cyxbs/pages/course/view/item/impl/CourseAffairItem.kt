@@ -12,7 +12,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState

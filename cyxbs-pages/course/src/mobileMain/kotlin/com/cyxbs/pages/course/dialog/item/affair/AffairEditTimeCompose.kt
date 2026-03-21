@@ -60,8 +60,8 @@ import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
-import com.cyxbs.pages.course.view.frame.decoration.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.decoration.impl.AffairDecorationViewModel
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete

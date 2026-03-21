@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.view.frame
+package com.cyxbs.pages.course.view
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -29,7 +29,7 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
-import com.cyxbs.pages.course.view.week.CourseWeekCompose
+import com.cyxbs.pages.course.view.page.CourseWeekCompose
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek

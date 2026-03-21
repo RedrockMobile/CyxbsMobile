@@ -37,7 +37,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.utils.get.Num2CN
-import com.cyxbs.pages.course.view.frame.AbstractCourseFrame
+import com.cyxbs.pages.course.view.AbstractCourseFrame
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.datetime.DayOfWeek
