@@ -19,6 +19,8 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,9 +36,7 @@ import androidx.constraintlayout.compose.ConstraintSet
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.view.ui.BottomSheetCompose
-import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.viewmodel.CommonSchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.Empty
@@ -47,8 +47,6 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_bts_btn_change_no_select
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_bts_btn_change_select
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -68,7 +66,11 @@ fun CarInfoButtonSheet(
 	val peekHeight = state.peekHeight
 	val list by state.lineSelectorItem
 	val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-		val realPeekHeight = peekHeight + navBarHeight
+	val realPeekHeight = peekHeight + navBarHeight
+
+	// UI实际渲染内容，线路模式切换到Empty后，先维持显示内容不变完成关闭动画后在清空内容
+	val render = remember { mutableStateOf(state.displayMode.value) }
+
 	BottomSheetCompose(
 		bottomSheetState = state.bottomSheetState,
 		peekHeight = realPeekHeight,
@@ -87,7 +89,7 @@ fun CarInfoButtonSheet(
 				.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
 				.background(LocalAppColors.current.topBg)
 				.navigationBarsPadding(),
-			constraintSet = createConstraintSet(state.displayMode.value)
+			constraintSet = createConstraintSet()
 		) {
 			ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
 			LineSelectorCompose(
@@ -96,44 +98,44 @@ fun CarInfoButtonSheet(
 				selectedId,
 				toggleSelectLine
 			)
-			when (val mode = state.displayMode.value) {
+			when (val showMode = render.value) {
 				is ErrorOverView -> {
 					ErrorInfoCompose(Modifier.layoutId(CarInfoBtsElement.ErrorInfo))
 				}
 
 				is LineOverview -> {
 					TittleCompose(
-						mode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
+						showMode.line.name, Modifier.layoutId(CarInfoBtsElement.LineTitle)
 					)
-					RuntimeCompose(mode.line.runTime, Modifier.layoutId(CarInfoBtsElement.LineRunTime))
+					RuntimeCompose(showMode.line.runTime, Modifier.layoutId(CarInfoBtsElement.LineRunTime))
 					LineTypeCompose(
-						sendType = mode.line.sendType,
-						runType = mode.line.runType,
+						sendType = showMode.line.sendType,
+						runType = showMode.line.runType,
 						modifier = Modifier.layoutId(CarInfoBtsElement.LineTypeTags)
 					)
 					RouteListCompose(
 						modifier = Modifier.layoutId(CarInfoBtsElement.RouteList),
 						siteId = -1,
-						line = mode.line
+						line = showMode.line
 					)
 				}
 
 				is SiteOverView -> {
 					TittleCompose(
-						mode.site.name,
+						showMode.site.name,
 						modifier = Modifier.layoutId(CarInfoBtsElement.SiteName)
 					)
 
 					RouteListCompose(
 						modifier = Modifier.layoutId(CarInfoBtsElement.SiteList),
-						siteId = mode.site.id,
-						line = mode.currentLine
+						siteId = showMode.site.id,
+						line = showMode.currentLine
 					)
 
 					LineChangeButtonCompose(
 						modifier = Modifier.layoutId(CarInfoBtsElement.SwitchLineButton),
-						lineName = mode.currentLine.name,
-						availableLines = mode.availableLines,
+						lineName = showMode.currentLine.name,
+						availableLines = showMode.availableLines,
 						onClick = toggleCurrentLine
 					)
 				}
@@ -143,16 +145,20 @@ fun CarInfoButtonSheet(
 		}
 	}
 	// 选择线路/选择站点的时候自动展开
-	LaunchedEffect(state.displayMode.value){
+	LaunchedEffect(state.displayMode.value) {
 		try {
-			delay(64)
 			state.isStateChanging.value = true
 			when (state.displayMode.value) {
 				is Empty -> {
+					//切换到empty
 					state.bottomSheetState.collapse()
+					render.value = Empty
 				}
 
 				else -> {
+					render.value = state.displayMode.value
+					//等待一会完成测量
+					delay(100)
 					state.bottomSheetState.expand()
 				}
 			}
@@ -163,16 +169,21 @@ fun CarInfoButtonSheet(
 
 	// 监听当用户处于Empty模式的时候上滑选择最近的站点
 	LaunchedEffect(Unit) {
-		state.bottomSheetState.stateFlow.collect {
-			if (it == BottomSheetValueState.Scrolling &&
-				state.displayMode.value is Empty &&
-				!state.isStateChanging.value
-			) {
-				onSelectClosedSite()
+		var lastFraction = 0f
+		snapshotFlow { state.bottomSheetState.fraction }
+			.collect { currentFraction ->
+				val isPullingUp = currentFraction > lastFraction
+				if (state.displayMode.value is Empty) {
+					if (currentFraction > 0.03f &&
+						isPullingUp &&
+						lastFraction < 0.1f
+					) {
+						onSelectClosedSite()
+					}
+				}
+				lastFraction = currentFraction
 			}
-		}
 	}
-
 }
 
 @Composable
@@ -277,13 +288,12 @@ private fun ShapeTipCompose(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun createConstraintSet(disPlayMode: CarInfoBtsDisplayMode): ConstraintSet {
+private fun createConstraintSet(): ConstraintSet {
 	val windowSize = getWindowScreenSize()
 	return ConstraintSet {
 		CarInfoBtsConstraintSet(
 			scope = this,
 			windowSize = windowSize,
-			displayMode = disPlayMode
 		).createConstrain()
 	}
 }

@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +47,6 @@ class MapState(
 	private val offsetAnim = Animatable(initialOffset, Offset.VectorConverter)
 
 
-
 	suspend fun setOffset(newPos: Offset) {
 		offsetAnim.snapTo(newPos)
 	}
@@ -67,7 +65,7 @@ class MapState(
 					targetScale,
 					animationSpec = spring(
 						dampingRatio = Spring.DampingRatioNoBouncy,
-						stiffness = Spring.StiffnessMediumLow
+						stiffness = Spring.StiffnessLow
 					)
 				)
 			}
@@ -76,7 +74,7 @@ class MapState(
 					targetOffset,
 					animationSpec = spring(
 						dampingRatio = Spring.DampingRatioNoBouncy,
-						stiffness = Spring.StiffnessMediumLow
+						stiffness = Spring.StiffnessLow
 					)
 				)
 			}

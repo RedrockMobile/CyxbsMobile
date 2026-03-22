@@ -1,10 +1,7 @@
 package com.cyxbs.pages.schoolcar.viewmodel
 
-import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
@@ -20,13 +17,13 @@ import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapState
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
-import com.cyxbs.pages.schoolcar.ui.CarMarkerState
 import com.cyxbs.pages.schoolcar.ui.StationMarkerState
 import com.cyxbs.pages.schoolcar.utils.downloadMapImage
 import com.cyxbs.pages.schoolcar.utils.isFileExist
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsState
 import com.cyxbs.pages.schoolcar.widget.LineSelectorItem
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -59,8 +56,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	// 校车轨迹的页面状态，0表示地图页，1表示乘车指南页
 	val schoolCarPage = mutableStateOf(0)
 
-	// 定位按钮在Y上的偏移
-	val offsetYRadio: MutableFloatState = mutableFloatStateOf(0F)
 
 	// bts的State
 	val btsState = CarInfoBtsState(100.dp, carLineInfo)
@@ -104,28 +99,21 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	}
 
-	// 所有的车辆数据(CarMarkerState中的id - CarMarkerState)
-	//CarMarkerState中的id格式: car_lineId_id
-	private val carMarkers = mutableStateMapOf<String, CarMarkerState>()
-
 
 	// 摄像头数据流
-	private val cameraEventFlowInternal = Channel<CameraEvent>(Channel.BUFFERED)
+	private val cameraEventFlowInternal =
+		Channel<CameraEvent>(Channel.BUFFERED, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 	val cameraEventFlow = cameraEventFlowInternal.receiveAsFlow()
 
 
 	// 显示站点
 	val displayStations = derivedStateOf {
-		val selectedLineId = btsState.selectedLineId.value ?: return@derivedStateOf allStationMarkers.value
+		val selectedLineId =
+			btsState.selectedLineId.value ?: return@derivedStateOf allStationMarkers.value
 
 		allStationMarkers.value.filter {
 			it.lineIds.contains(selectedLineId)
 		}
-	}
-
-	// 显示的车辆
-	val displayCars = derivedStateOf {
-		val selectedLineId = btsState.selectedLineId.value ?: return@derivedStateOf carMarkers.values
 	}
 
 	init {
@@ -275,34 +263,24 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	}
 
 	fun zoomExpand() {
-		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.ZoomExpand)
-		}
+		cameraEventFlowInternal.trySend(CameraEvent.ZoomExpand)
 	}
 
 	fun zoomOut() {
-		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.ZoomOut)
-		}
+		cameraEventFlowInternal.trySend(CameraEvent.ZoomOut)
 	}
 
 	fun focusOnPoint(offset: Offset) {
-		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Focus(offset.x, offset.y, 6f))
-		}
+		cameraEventFlowInternal.trySend(CameraEvent.Focus(offset.x, offset.y, 6f))
 	}
 
 	fun positioning() {
-		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Positioning)
-		}
+		cameraEventFlowInternal.trySend(CameraEvent.Positioning)
 	}
 
 
 	private fun cameraRecover() {
-		launchByViewModelScope {
-			cameraEventFlowInternal.send(CameraEvent.Recover)
-		}
+		cameraEventFlowInternal.trySend(CameraEvent.Recover)
 	}
 
 	// 对显示模式切换的封装，用这来控制显示模式的切换，以防状态错误

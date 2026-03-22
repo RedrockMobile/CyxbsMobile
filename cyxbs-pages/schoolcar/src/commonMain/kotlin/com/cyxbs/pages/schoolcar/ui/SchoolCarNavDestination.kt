@@ -9,21 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -44,8 +38,6 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_map_ba
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_positioning
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_zoomexpand
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_zoomout
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -105,14 +97,6 @@ fun SchoolCarPage() {
 		onSelectClosedSite = viewModel::selectClosedSite
 	)
 	SchoolCarMapFunctionButtonCompose()
-	LaunchedEffect(Unit) {
-		val bottomSheetState = viewModel.btsState.bottomSheetState
-		snapshotFlow {
-			bottomSheetState.fraction.coerceIn(0F, 1F)
-		}.onEach {
-			viewModel.offsetYRadio.floatValue = it
-		}.launchIn(this)
-	}
 }
 
 @Composable
@@ -139,15 +123,6 @@ fun SchoolCarMapFunctionButtonCompose() {
 @Composable
 fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 	val viewModel = viewModel(SchoolCarViewModel::class)
-	val screenHeight = getWindowScreenSize().height
-
-	// 屏幕总高 - 顶部Margin - 两个缩放按钮高度 - 按钮间距 - 自身高度 - bts折叠高度 - bts上方留白
-	val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-	val realPeekHeight = viewModel.btsState.peekHeight + navBarHeight
-
-	val maxTranslateY =
-		screenHeight - (screenHeight / 5) - (48.dp * 2) - 18.dp - 48.dp - realPeekHeight - 45.dp
-
 	Column(
 		modifier = modifier,
 		verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -157,12 +132,10 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 			onClick = viewModel::zoomExpand
 		)
 		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout, onClick = viewModel::zoomOut)
-
-		FunctionButtonItemCompose(modifier = Modifier.graphicsLayer {
-			val btsFraction = viewModel.offsetYRadio.floatValue
-			val safeOffset = maxOf(0f, maxTranslateY.toPx())
-			translationY = safeOffset * (1f - btsFraction)
-		}, res = Res.drawable.schoolcar_ic_positioning, viewModel::positioning)
+		FunctionButtonItemCompose(
+			res = Res.drawable.schoolcar_ic_positioning,
+			onClick = viewModel::positioning
+		)
 	}
 }
 

@@ -33,8 +33,7 @@ enum class CarInfoBtsElement {
 
 class CarInfoBtsConstraintSet(
 	val scope: ConstraintSetScope,
-	val windowSize: DpSize,
-	val displayMode: CarInfoBtsDisplayMode
+	val windowSize: DpSize
 ) {
 	val shapeTip = scope.createRefFor(CarInfoBtsElement.ShapeTip)
 	val lineSelector = scope.createRefFor(CarInfoBtsElement.LineSelector)
@@ -60,12 +59,9 @@ class CarInfoBtsConstraintSet(
  */
 private fun CarInfoBtsConstraintSet.wh100vInfinity() {
 	wh100vInfinityCommonConstraints()
-	when (displayMode) {
-		is CarInfoBtsDisplayMode.Empty -> {}
-		is CarInfoBtsDisplayMode.LineOverview -> wh100vInfinityLineMode()
-		is CarInfoBtsDisplayMode.SiteOverView -> wh100vInfinitySiteMode()
-		is CarInfoBtsDisplayMode.ErrorOverView -> wh100vInfinityErrorMode()
-	}
+	wh100vInfinityLineMode()
+	wh100vInfinitySiteMode()
+	wh100vInfinityErrorMode()
 }
 
 // 竖屏的公有元素
