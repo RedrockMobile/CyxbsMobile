@@ -25,10 +25,10 @@ data class CarLocation(
 	var lng: Double = 0.0, // 经度
 
 	@SerialName("id")
-	var id: Int = 0, // id 表示这是第几号车
+	var id: Int = 0, // 唯一id
 
 	@SerialName("type")
-	var type: Int = 0, // type + 1 为线路号
+	var type: Int = 0, // type 为线路id
 
 	@SerialName("update_at")
 	var upDate: Long = 0L,

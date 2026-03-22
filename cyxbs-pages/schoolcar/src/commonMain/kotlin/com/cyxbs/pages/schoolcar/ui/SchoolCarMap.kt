@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.pages.schoolcar.mapcompose.MapImageContainer
@@ -31,12 +30,15 @@ fun SchoolCarMapCompose() {
 		cameraEventFlow = viewModel.cameraEventFlow,
 		onMapEvent = viewModel::handleMapEvent
 	) {
-		val selectStationId =
-			remember(viewModel.btsState.selectedStationId.value) { viewModel.btsState.selectedStationId.value?.let { "station_${it}" } }
+		CarLayer(
+			viewModel.displayCars.value
+		)
+
 		StationLayer(
 			viewModel.displayStations.value,
-			selectStationId,
+			viewModel.btsState.selectedStationId.value,
 			viewModel.btsState.selectedLineId.value,
-			viewModel::handleMapEvent)
+			viewModel::handleMapEvent
+		)
 	}
 }

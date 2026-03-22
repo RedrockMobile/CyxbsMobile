@@ -3,14 +3,13 @@ package com.cyxbs.pages.schoolcar.mapcompose
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.extensions.log
-import kotlinx.coroutines.CoroutineScope
 
 /**  
  * description ： 校车地图组件的Scope
@@ -22,20 +21,24 @@ interface MapScope {
 	// 将原图像素坐标 (px, py) 转换为当前屏幕上图片的 Offset(以左上角为原点)
 	fun mapToImageScreen(px: Float, py: Float): Offset
 
-	/**
-	 * @param position 基于原图的坐标
-	 */
 	@Composable
-	fun Marker(
-		position: Offset,
+	fun StaticMarker(
+		state: StaticMarkerState,
 		anchor: Offset = Offset(0.5f, 0.5f),//默认居中对齐
+		onMarkerClick: (() -> Unit)? = null,
+		content: @Composable BoxScope.() -> Unit
+	)
+
+	@Composable
+	fun MovableMarker(
+		state: MovableMarkerState,
+		anchor: Offset = Offset(0.5f, 0.5f),
 		onMarkerClick: (() -> Unit)? = null,
 		content: @Composable BoxScope.() -> Unit
 	)
 }
 
 class MapScopeImpl(
-	private val coroutineScope: CoroutineScope,
 	private val mapState: MapState,
 	private val imageSize: Size,
 	private val ratio: Float
@@ -58,8 +61,42 @@ class MapScopeImpl(
 	}
 
 	@Composable
-	override fun Marker(
-		position: Offset,
+	override fun StaticMarker(
+		state: StaticMarkerState,
+		anchor: Offset,
+		onMarkerClick: (() -> Unit)?,
+		content: @Composable BoxScope.() -> Unit
+	) {
+		BaseMarker(
+			positionProvider = { state.position },
+			anchor = anchor,
+			onMarkerClick = onMarkerClick,
+			content = content
+		)
+	}
+
+	@Composable
+	override fun MovableMarker(
+		state: MovableMarkerState,
+		anchor: Offset,
+		onMarkerClick: (() -> Unit)?,
+		content: @Composable (BoxScope.() -> Unit)
+	) {
+		LaunchedEffect(state.moveInfo) {
+			state.animateToTarget()
+		}
+		BaseMarker(
+			positionProvider = { state.position },
+			anchor = anchor,
+			onMarkerClick = onMarkerClick,
+			content = content
+		)
+	}
+
+	// BaseMarker，基础的定位
+	@Composable
+	private fun BaseMarker(
+		positionProvider: () -> Offset,
 		anchor: Offset,
 		onMarkerClick: (() -> Unit)?,
 		content: @Composable BoxScope.() -> Unit
@@ -67,13 +104,12 @@ class MapScopeImpl(
 		Box(
 			modifier = Modifier
 				.graphicsLayer {
-					// 因为可能会涉及到高频运动的车俩，所以用graphicsLayer来平移定位，让刷新限制在绘制阶段
+					val position = positionProvider()
 					val localPosition = mapToImageScreen(position.x, position.y)
 					val offsetX = (localPosition.x - size.width * anchor.x)
 					val offsetY = (localPosition.y - size.height * anchor.y)
 					translationX = offsetX
 					translationY = offsetY
-
 					// 方向缩放
 					val invScale = if (mapState.scale > 0f) 1f / mapState.scale else 1f
 					scaleX = invScale
@@ -86,5 +122,4 @@ class MapScopeImpl(
 			content()
 		}
 	}
-
 }

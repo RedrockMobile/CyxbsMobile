@@ -18,16 +18,30 @@ import com.cyxbs.pages.schoolcar.mapcompose.MapScope
 @Composable
 fun MapScope.StationLayer(
 	stationList: List<StationMarkerState>,
-	selectedStationId: String?,
+	selectedStationId: Int?,
 	currentSelectLine: Int?,
 	onMapEvent: (MapEvent) -> Unit
 ) {
 	stationList.forEach { markerState ->
 		key(markerState.id) {
-			Marker(markerState.position, anchor = Offset(0.5f, 1.0f), onMarkerClick = {
+			StaticMarker(markerState, anchor = Offset(0.5f, 1.0f), onMarkerClick = {
 				onMapEvent(MapEvent.MarkerClick(markerState))
 			}) {
 				StationIconCompose(markerState, currentSelectLine, selectedStationId == markerState.id)
+			}
+		}
+	}
+}
+
+// 车辆层
+@Composable
+fun MapScope.CarLayer(
+	carList: List<CarMarkerState>,
+) {
+	carList.forEach { carMarkerState ->
+		key(carMarkerState.id) {
+			MovableMarker(carMarkerState) {
+				CarIconCompose(carMarkerState.lineId)
 			}
 		}
 	}

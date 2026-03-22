@@ -2,6 +2,7 @@ package com.cyxbs.pages.schoolcar.viewmodel
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
@@ -11,12 +12,13 @@ import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
 import com.cyxbs.pages.schoolcar.bean.CarStation
-import com.cyxbs.pages.schoolcar.mapcompose.BaseMarkerState
 import com.cyxbs.pages.schoolcar.mapcompose.CameraEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapEvent
 import com.cyxbs.pages.schoolcar.mapcompose.MapState
+import com.cyxbs.pages.schoolcar.mapcompose.MarkerState
 import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
+import com.cyxbs.pages.schoolcar.ui.CarMarkerState
 import com.cyxbs.pages.schoolcar.ui.StationMarkerState
 import com.cyxbs.pages.schoolcar.utils.downloadMapImage
 import com.cyxbs.pages.schoolcar.utils.isFileExist
@@ -26,7 +28,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
@@ -71,7 +72,9 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	//================== 关于地图的一些数据==================================
 	// 轮询查询校车位置的Job
 	private var carLocationJob: Job? = null
-	private val _realtimeCarLocations = mutableStateOf<List<CarLocation>>(emptyList())
+
+	// 校车数据(markerId - carMarker)
+	private val carMarkersMap = mutableStateMapOf<Int, CarMarkerState>()
 
 	// 站点数据
 	private val allStationMarkers = derivedStateOf {
@@ -88,7 +91,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 				it.stations
 			}.distinctBy { it.id }.map {
 				StationMarkerState(
-					id = "station_${it.id}",
+					id = it.id,
 					name = it.name,
 					lineIds = stationMap[it.id]?.toSet() ?: emptySet(),
 					position = Offset(it.px.toFloat(), it.py.toFloat()),
@@ -113,6 +116,51 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 		allStationMarkers.value.filter {
 			it.lineIds.contains(selectedLineId)
+		}
+	}
+
+	val displayCars = derivedStateOf {
+		val selectedLineId = btsState.selectedLineId.value
+		val allCars = carMarkersMap.values.toList()
+		selectedLineId ?: return@derivedStateOf allCars
+
+		allCars.filter { it.lineId == selectedLineId }
+	}
+
+	// 同步CarMarker标记
+	private fun syncCarMarkers(newLocations: List<CarLocation>) {
+		// 获取到的车辆id
+		val newIds = mutableSetOf<Int>()
+		newLocations.forEach { carLocation ->
+			val lineId = carLocation.type
+			newIds.add(carLocation.id)
+
+			val newPos = Offset(carLocation.px.toFloat(), carLocation.py.toFloat())
+
+			val carMarker = carMarkersMap[carLocation.id]
+			if (carMarker == null) {
+				carMarkersMap[carLocation.id] = CarMarkerState(
+					id = carLocation.id,
+					lineId = lineId,
+					updateAt = carLocation.upDate,
+					position = newPos,
+					visible = true
+				)
+			} else {
+				carMarker.moveToTarget(
+					newPos, 1000
+				)
+				carMarker.updateAt = carLocation.upDate
+			}
+		}
+
+		//移除不再出现在列表中的校车
+		val iterator = carMarkersMap.iterator()
+		while (iterator.hasNext()) {
+			val entry = iterator.next()
+			if (!newIds.contains(entry.key)) {
+				iterator.remove()
+			}
 		}
 	}
 
@@ -234,11 +282,11 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		}
 	}
 
-	private fun handleMarkerClick(marker: BaseMarkerState) {
+	private fun handleMarkerClick(marker: MarkerState) {
 		when (marker) {
 			is StationMarkerState -> {
 				changeToSiteMode(
-					StationMarkerState.getStationIdByString(marker.id)!!,
+					marker.id,
 					offset = marker.position
 				)
 			}
@@ -299,16 +347,14 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		cameraRecover()
 	}
 
-	private fun startPollingLocation(interval: Long = 2000, reLocation: Long = 5000) {
+	private fun startPollingLocation(interval: Long = 1000, reLocation: Long = 3000) {
 		carLocationJob?.cancel()
 
 		carLocationJob = launchByViewModelScope {
 			while (true) {
-				ensureActive()
 				val result = model.getCarLocation().getOrNull()
-
 				if (result != null) {
-					_realtimeCarLocations.value = result.data
+					syncCarMarkers(result.data)
 					delay(interval)
 				} else {
 					delay(reLocation)

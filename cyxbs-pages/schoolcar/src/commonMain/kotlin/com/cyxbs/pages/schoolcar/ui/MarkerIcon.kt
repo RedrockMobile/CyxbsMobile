@@ -17,6 +17,10 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_backgr
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_2
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_3
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_4
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_1
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_2
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_3
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_4
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_0
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_2
@@ -92,4 +96,22 @@ fun getBackGroundByLineId(lineId: Int): DrawableResource {
 		3 -> Res.drawable.schoolcar_ic_background_4
 		else -> Res.drawable.schoolcar_ic_background_1
 	}
+}
+
+fun getCarResByLineId(lineId: Int): DrawableResource {
+	return when (lineId) {
+		0 -> Res.drawable.schoolcar_ic_car_1
+		1 -> Res.drawable.schoolcar_ic_car_2
+		2 -> Res.drawable.schoolcar_ic_car_3
+		3 -> Res.drawable.schoolcar_ic_car_4
+		else -> Res.drawable.schoolcar_ic_car_1
+	}
+}
+
+@Composable
+fun CarIconCompose(lineId: Int) {
+	Image(
+		painter = painterResource(getCarResByLineId(lineId)),
+		contentDescription = null
+	)
 }

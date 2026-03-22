@@ -118,7 +118,7 @@ actual fun MapImageContainer(
 				// ==============Marker的列图层================
 				val mapScopeImpl =
 					remember(coroutineScope, mapState, samplingDecoder.intrinsicSize, ratio) {
-						MapScopeImpl(coroutineScope, mapState, samplingDecoder.intrinsicSize, ratio)
+						MapScopeImpl(mapState, samplingDecoder.intrinsicSize, ratio)
 					}
 				mapScopeImpl.markerContent()
 			}
