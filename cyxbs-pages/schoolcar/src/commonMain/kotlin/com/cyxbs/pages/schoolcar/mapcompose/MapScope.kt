@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.plusDsl
 
 /**  
  * description ： 校车地图组件的Scope
@@ -115,8 +116,12 @@ class MapScopeImpl(
 					scaleX = invScale
 					scaleY = invScale
 					transformOrigin = TransformOrigin(anchor.x, anchor.y)
-				}.clickableNoIndicator(enabled = onMarkerClick != null) {
-					onMarkerClick?.invoke()
+				}.plusDsl {
+					if (onMarkerClick != null) {
+						clickableNoIndicator {
+							onMarkerClick()
+						}
+					}
 				}
 		) {
 			content()

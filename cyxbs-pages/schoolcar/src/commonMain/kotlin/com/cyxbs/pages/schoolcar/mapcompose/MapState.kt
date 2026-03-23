@@ -1,9 +1,11 @@
 package com.cyxbs.pages.schoolcar.mapcompose
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,18 +65,18 @@ class MapState(
 			launch {
 				scaleAnim.animateTo(
 					targetScale,
-					animationSpec = spring(
-						dampingRatio = Spring.DampingRatioNoBouncy,
-						stiffness = Spring.StiffnessLow
+					animationSpec = tween(
+						durationMillis = 600,
+						easing = FastOutSlowInEasing
 					)
 				)
 			}
 			launch {
 				offsetAnim.animateTo(
 					targetOffset,
-					animationSpec = spring(
-						dampingRatio = Spring.DampingRatioNoBouncy,
-						stiffness = Spring.StiffnessLow
+					animationSpec = tween(
+						durationMillis = 600,
+						easing = FastOutSlowInEasing
 					)
 				)
 			}
