@@ -136,18 +136,12 @@ actual fun MapImageContainer(
 					is CameraEvent.Focus -> {
 						mapState.focusOnImagePoint(it.x, it.y, it.zoom)
 					}
-
-					CameraEvent.Positioning -> {
-					}
-
 					CameraEvent.ZoomExpand -> {
 						mapState.zoomExpand()
 					}
-
 					CameraEvent.ZoomOut -> {
 						mapState.zoomOut()
 					}
-
 					CameraEvent.Recover -> {
 						mapState.cameraRecover()
 					}

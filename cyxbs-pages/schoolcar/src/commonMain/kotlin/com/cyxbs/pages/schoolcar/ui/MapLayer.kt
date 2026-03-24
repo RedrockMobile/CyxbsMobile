@@ -27,7 +27,7 @@ fun MapScope.StationLayer(
 			StaticMarker(markerState, anchor = Offset(0.5f, 1.0f), onMarkerClick = {
 				onMapEvent(MapEvent.MarkerClick(markerState))
 			}) {
-				StationIconCompose(markerState, currentSelectLine, selectedStationId == markerState.id)
+				StationIconCompose(currentSelectLine, selectedStationId == markerState.id)
 			}
 		}
 	}
@@ -46,3 +46,6 @@ fun MapScope.CarLayer(
 		}
 	}
 }
+
+@Composable
+expect fun MapScope.UserPositionLayer(user: UserPositionMarkerState)

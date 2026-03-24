@@ -40,5 +40,6 @@ fun SchoolCarMapCompose() {
 			viewModel.btsState.selectedLineId.value,
 			viewModel::handleMapEvent
 		)
+		UserPositionLayer(viewModel.userPositionState)
 	}
 }

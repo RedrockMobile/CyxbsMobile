@@ -20,6 +20,7 @@ import com.cyxbs.pages.schoolcar.model.CarDataModel
 import com.cyxbs.pages.schoolcar.model.SchoolCarRepository
 import com.cyxbs.pages.schoolcar.ui.CarMarkerState
 import com.cyxbs.pages.schoolcar.ui.StationMarkerState
+import com.cyxbs.pages.schoolcar.ui.UserPositionMarkerState
 import com.cyxbs.pages.schoolcar.utils.downloadMapImage
 import com.cyxbs.pages.schoolcar.utils.isFileExist
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsState
@@ -39,9 +40,12 @@ import kotlinx.coroutines.flow.receiveAsFlow
 expect class SchoolCarViewModel() : CommonSchoolCarViewModel {
 	// 返回null表示没有最近的站点
 	override fun getClosedSite(): CarStation?
+	override val isSupportLocation: Boolean
 }
 
 abstract class CommonSchoolCarViewModel : BaseViewModel() {
+
+
 	companion object {
 		const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
 	}
@@ -94,14 +98,17 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 					id = it.id,
 					name = it.name,
 					lineIds = stationMap[it.id]?.toSet() ?: emptySet(),
-					position = Offset(it.px.toFloat(), it.py.toFloat()),
-					visible = true
+					initialPosition = Offset(it.px.toFloat(), it.py.toFloat()),
+					initialVisible = true
 				)
 			}
 		} ?: emptyList()
 
 	}
 
+	val userPositionState = UserPositionMarkerState(
+		Offset.Zero, true, 0f
+	)
 
 	// 摄像头数据流
 	private val cameraEventFlowInternal =
@@ -143,8 +150,8 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 					id = carLocation.id,
 					lineId = lineId,
 					updateAt = carLocation.upDate,
-					position = newPos,
-					visible = true
+					initialPosition = newPos,
+					initialVisible = true
 				)
 			} else {
 				carMarker.moveToTarget(
@@ -323,7 +330,15 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	}
 
 	fun positioning() {
-		cameraEventFlowInternal.trySend(CameraEvent.Positioning)
+		if (isSupportLocation) {
+			cameraEventFlowInternal.trySend(
+				CameraEvent.Focus(
+					userPositionState.position.x,
+					userPositionState.position.y,
+					6f
+				)
+			)
+		}
 	}
 
 
@@ -382,4 +397,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	}
 
 	abstract fun getClosedSite(): CarStation?
+
+	abstract val isSupportLocation: Boolean
 }

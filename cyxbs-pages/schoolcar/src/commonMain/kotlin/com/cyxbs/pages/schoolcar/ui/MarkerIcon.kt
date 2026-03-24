@@ -7,11 +7,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_background_2
@@ -21,6 +23,7 @@ import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_2
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_3
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_4
+import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_mine
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_0
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_1
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_site_2
@@ -37,12 +40,9 @@ import org.jetbrains.compose.resources.painterResource
  */
 @Composable
 fun StationIconCompose(
-	state: StationMarkerState,
 	currentSelectLine: Int?,
 	isSelect: Boolean = false
 ) {
-	if (!state.visible.value) return
-
 	Box(
 		contentAlignment = Alignment.BottomCenter
 	) {
@@ -112,6 +112,15 @@ fun getCarResByLineId(lineId: Int): DrawableResource {
 fun CarIconCompose(lineId: Int) {
 	Image(
 		painter = painterResource(getCarResByLineId(lineId)),
+		contentDescription = null
+	)
+}
+
+@Composable
+fun UserPositionIconCompose() {
+	Image(
+		modifier = Modifier.size(35.dp),
+		painter = painterResource(Res.drawable.schoolcar_ic_mine),
 		contentDescription = null
 	)
 }

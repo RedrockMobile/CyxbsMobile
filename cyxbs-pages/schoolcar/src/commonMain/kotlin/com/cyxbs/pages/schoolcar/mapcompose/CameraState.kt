@@ -17,6 +17,5 @@ sealed interface CameraEvent {
 	) : CameraEvent
 	object ZoomExpand : CameraEvent // 放大事件
 	object ZoomOut : CameraEvent // 缩小事件
-	object Positioning : CameraEvent // 回到自己的位置
 	object Recover: CameraEvent
 }

@@ -6,9 +6,7 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 
 /**  
@@ -22,6 +20,7 @@ interface MarkerState {
 	val id: Any
 	val position: Offset
 	val visible: MutableState<Boolean>
+	val rotation: Float//旋转角度
 }
 
 /**
@@ -31,7 +30,8 @@ interface MarkerState {
 open class StaticMarkerState(
 	override val id: Any,
 	override val position: Offset,
-	initialVisible: Boolean = true
+	initialVisible: Boolean = true,
+	override val rotation: Float = 0f
 ) : MarkerState {
 	override val visible = mutableStateOf(initialVisible)
 }
@@ -43,29 +43,59 @@ open class StaticMarkerState(
 open class MovableMarkerState(
 	override val id: Any,
 	initialPosition: Offset,
-	initialVisible: Boolean = true
+	initialVisible: Boolean = true,
+	initialRotation: Float = 0f
 ) : MarkerState {
+
+	// 实际的位置信息
+	private val positionAnim = Animatable(initialPosition, Offset.VectorConverter)
+
+	// 实际旋转角度
+	private val rotationAnim = Animatable(initialRotation)
+
+
+	override val rotation get() = rotationAnim.value
 	override val visible = mutableStateOf(initialVisible)
 	override val position get() = positionAnim.value
 
-	// 目标信息
-	var moveInfo by mutableStateOf(MarkerMoveInfo(initialPosition, 0))
-		private set
+	val targetPosition = mutableStateOf(MarkerTargetMoveState(initialPosition, 0))
+	val targetRotation = mutableStateOf(MarkerTargetRotationState(initialRotation, 0))
 
 
-	private val positionAnim = Animatable(initialPosition, Offset.VectorConverter)
 	fun moveToTarget(newPos: Offset, duration: Int) {
-		moveInfo = MarkerMoveInfo(newPos, duration)
+		targetPosition.value = MarkerTargetMoveState(newPos, duration)
+	}
+
+	fun rotationToTarget(newRotation: Float, duration: Int) {
+		targetRotation.value = MarkerTargetRotationState(newRotation, duration)
 	}
 
 	// 平滑移动
 	internal suspend fun animateToTarget() {
 		positionAnim.animateTo(
-			targetValue = moveInfo.targetPosition,
-			animationSpec = tween(durationMillis = moveInfo.duration, easing = LinearEasing)
+			targetValue = targetPosition.value.targetPosition,
+			animationSpec = tween(durationMillis = targetPosition.value.duration, easing = LinearEasing)
 		)
 	}
 
+	// 平滑旋转
+	internal suspend fun animateToRotation() {
+		rotationAnim.animateTo(
+			targetValue = targetRotation.value.targetRotation,
+			animationSpec = tween(durationMillis = targetRotation.value.duration)
+		)
+	}
+
+
+	data class MarkerTargetMoveState(
+		val targetPosition: Offset,
+		val duration: Int,
+	)
+
+	data class MarkerTargetRotationState(
+		val targetRotation: Float,
+		val duration: Int
+	)
+
 }
 
-data class MarkerMoveInfo(val targetPosition: Offset, val duration: Int)

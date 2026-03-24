@@ -6,4 +6,7 @@ actual class SchoolCarViewModel : CommonSchoolCarViewModel() {
 	actual override fun getClosedSite(): CarStation? {
 		return null
 	}
+
+	actual override val isSupportLocation: Boolean
+		get() = false
 }

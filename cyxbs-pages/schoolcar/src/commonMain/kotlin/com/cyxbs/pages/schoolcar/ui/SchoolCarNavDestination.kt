@@ -132,10 +132,12 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 			onClick = viewModel::zoomExpand
 		)
 		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout, onClick = viewModel::zoomOut)
-		FunctionButtonItemCompose(
-			res = Res.drawable.schoolcar_ic_positioning,
-			onClick = viewModel::positioning
-		)
+		if (viewModel.isSupportLocation){
+			FunctionButtonItemCompose(
+				res = Res.drawable.schoolcar_ic_positioning,
+				onClick = viewModel::positioning
+			)
+		}
 	}
 }
 

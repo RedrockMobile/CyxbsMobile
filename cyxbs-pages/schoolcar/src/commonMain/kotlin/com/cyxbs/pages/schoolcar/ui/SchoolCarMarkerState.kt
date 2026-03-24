@@ -17,22 +17,22 @@ class StationMarkerState(
 	override val id: Int,
 	val name: String,
 	val lineIds: Set<Int>, // 该站点所属的所有线路 ID
-	position: Offset,
-	visible: Boolean
-) : StaticMarkerState(id, position, visible)
+	initialPosition: Offset,
+	initialVisible: Boolean
+) : StaticMarkerState(id, initialPosition, initialVisible)
 
 @Stable
 class CarMarkerState(
 	override val id: Int,
 	val lineId: Int,
 	var updateAt: Long,
-	position: Offset,
-	visible: Boolean
-) : MovableMarkerState(id, position, visible)
+	initialPosition: Offset,
+	initialVisible: Boolean
+) : MovableMarkerState(id, initialPosition, initialVisible)
 
 @Stable
 class UserPositionMarkerState(
-	id: String,
-	position: Offset,
-	visible: Boolean
-) : MovableMarkerState(id, position, visible)
+	initialPosition: Offset,
+	initialVisible: Boolean,
+	initRotation: Float
+) : MovableMarkerState(-1, initialPosition, initialVisible, initRotation)

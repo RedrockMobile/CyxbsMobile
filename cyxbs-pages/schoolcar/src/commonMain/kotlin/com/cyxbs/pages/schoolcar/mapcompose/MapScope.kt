@@ -70,6 +70,7 @@ class MapScopeImpl(
 	) {
 		BaseMarker(
 			positionProvider = { state.position },
+			visible = state.visible.value,
 			anchor = anchor,
 			onMarkerClick = onMarkerClick,
 			content = content
@@ -83,48 +84,60 @@ class MapScopeImpl(
 		onMarkerClick: (() -> Unit)?,
 		content: @Composable (BoxScope.() -> Unit)
 	) {
-		LaunchedEffect(state.moveInfo) {
+		LaunchedEffect(state.targetPosition.value) {
 			state.animateToTarget()
+		}
+		LaunchedEffect(state.targetRotation.value) {
+			state.animateToRotation()
 		}
 		BaseMarker(
 			positionProvider = { state.position },
+			rotationProvider = { state.rotation },
+			visible = state.visible.value,
 			anchor = anchor,
 			onMarkerClick = onMarkerClick,
 			content = content
 		)
 	}
 
+
 	// BaseMarker，基础的定位
 	@Composable
 	private fun BaseMarker(
 		positionProvider: () -> Offset,
+		rotationProvider: () -> Float = { 0f },
+		visible: Boolean = true,
 		anchor: Offset,
 		onMarkerClick: (() -> Unit)?,
 		content: @Composable BoxScope.() -> Unit
 	) {
-		Box(
-			modifier = Modifier
-				.graphicsLayer {
-					val position = positionProvider()
-					val localPosition = mapToImageScreen(position.x, position.y)
-					val offsetX = (localPosition.x - size.width * anchor.x)
-					val offsetY = (localPosition.y - size.height * anchor.y)
-					translationX = offsetX
-					translationY = offsetY
-					// 方向缩放
-					val invScale = if (mapState.scale > 0f) 1f / mapState.scale else 1f
-					scaleX = invScale
-					scaleY = invScale
-					transformOrigin = TransformOrigin(anchor.x, anchor.y)
-				}.plusDsl {
-					if (onMarkerClick != null) {
-						clickableNoIndicator {
-							onMarkerClick()
+		if (visible) {
+			Box(
+				modifier = Modifier
+					.graphicsLayer {
+						val position = positionProvider()
+						val rotation = rotationProvider()
+						val localPosition = mapToImageScreen(position.x, position.y)
+						val offsetX = (localPosition.x - size.width * anchor.x)
+						val offsetY = (localPosition.y - size.height * anchor.y)
+						translationX = offsetX
+						translationY = offsetY
+						// 反向缩放
+						val invScale = if (mapState.scale > 0f) 1f / mapState.scale else 1f
+						scaleX = invScale
+						scaleY = invScale
+						transformOrigin = TransformOrigin(anchor.x, anchor.y)
+						rotationZ = rotation
+					}.plusDsl {
+						if (onMarkerClick != null) {
+							clickableNoIndicator {
+								onMarkerClick()
+							}
 						}
 					}
-				}
-		) {
-			content()
+			) {
+				content()
+			}
 		}
 	}
 }
