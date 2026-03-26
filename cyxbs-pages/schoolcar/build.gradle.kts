@@ -29,10 +29,10 @@ kotlin {
 			// 移除高德3d map，但是还是使用高德来定位
 			// 因为在国内的定位的经纬度信息是被非线性加密的，为了使转化后的坐标和图片地图对应，所以还是得用高德定位
 			// https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
-			//implementation("com.amap.api:location:latest.integration")
+			implementation("com.amap.api:location:6.5.1")
 
 			//TODO 高德3d地图等待完全移除
-			implementation("com.amap.api:3dmap:latest.integration")
+			compileOnly("com.amap.api:3dmap:latest.integration")
 		}
 		noWebMain.dependencies {
 			implementation(libs.scale.image.viewer)
