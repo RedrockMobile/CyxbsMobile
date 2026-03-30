@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.util.fastAny
 import com.jvziyaoyao.scale.zoomable.util.getMilliseconds
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.pow
 
 /**  
  * description ： 事件分发
@@ -127,5 +130,48 @@ suspend fun PointerInputScope.detectTransformGestures(
 
 		// 这里是事件结束
 		gestureEnd(moveCount != 0)
+	}
+}
+
+/**
+ * 监听鼠标事件，实现鼠标对地图的缩放控制
+ * @param scrollSensitivity 鼠标滚轮灵敏度
+ * @param scrollBase 鼠标滚轮基础
+ */
+suspend fun PointerInputScope.detectMouseScrollTransformGestures(
+	scrollSensitivity: Float = 0.5f,
+	scrollBase: Float = 1.1f,
+	onGesture: (centroid: Offset, zoom: Float) -> Boolean
+) {
+	awaitPointerEventScope {
+		// 因为鼠标滚轮是没有down事件和release事件的，只有 Scroll事件,所以只能开个死循环一直监听了
+		while (true) {
+			val event = awaitPointerEvent()
+
+			// 按住shift或者ctrl均可触发后续回调
+			if (!(event.keyboardModifiers.isCtrlPressed || event.keyboardModifiers.isShiftPressed)) continue
+			if (event.type != PointerEventType.Scroll) continue
+			val scrollChange = event.changes.firstOrNull() ?: continue
+			if (scrollChange.isConsumed) continue
+
+			val centroid = scrollChange.position
+
+			// 顺便滚轮事件中：scrollDelta.y大于0 说明鼠标向下滚动，小于0为向上滚动
+
+
+			// ctrl + 滚轮时滚轮的delta变化在y
+			val dy = scrollChange.scrollDelta.y
+			// shift + 滚轮delta变化在x
+			val dx = scrollChange.scrollDelta.x
+
+			val delta = if (dy != 0f) dy else dx
+			// 因为对于缩放来说，向下滑往往是缩小所以这里需要取反delta
+			val zoomFactor = scrollBase.pow(-delta * scrollSensitivity)
+
+			val isConsumed = onGesture(centroid, zoomFactor)
+			if (isConsumed) {
+				scrollChange.consume()
+			}
+		}
 	}
 }

@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
@@ -30,6 +31,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
+import androidx.compose.runtime.State
 
 /**
  * description ： 校车查询页的ViewModel
@@ -41,6 +43,7 @@ expect class SchoolCarViewModel() : CommonSchoolCarViewModel {
 	// 返回null表示没有最近的站点
 	override fun getClosedSite(): CarStation?
 	override val isSupportLocation: Boolean
+	override val shouldShowUserPositionMarker: State<Boolean>
 }
 
 abstract class CommonSchoolCarViewModel : BaseViewModel() {
@@ -55,25 +58,25 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 	}
 
 
-	// 数据源
+	// 校车站点数据源
 	val carLineInfo: MutableState<CarLineJson?> = mutableStateOf(null)
 
 	// 校车轨迹的页面状态，0表示地图页，1表示乘车指南页
 	val schoolCarPage = mutableStateOf(0)
 
-
 	// bts的State
 	val btsState = CarInfoBtsState(100.dp, carLineInfo)
-
-	// downloadingDialog
-	val downProgressDialogState = mutableStateOf(!isFileExist())
-	val downProgress = mutableStateOf(0f)
 
 	// map的state
 	val mapState = MapState()
 
+	// downloadingDialog
+	val downProgressDialogState = mutableStateOf(!isFileExist())
+	val downProgress = mutableStateOf(0f)
+	val downErrorDialogState = mutableStateOf(false)
 
-	//================== 关于地图的一些数据==================================
+
+	//================== 关于地图上的一些数据==================================
 	// 轮询查询校车位置的Job
 	private var carLocationJob: Job? = null
 
@@ -106,6 +109,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	}
 
+	// 用户位置
 	val userPositionState = UserPositionMarkerState(
 		Offset.Zero, true, 0f
 	)
@@ -126,6 +130,7 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		}
 	}
 
+	// 显示的汽车
 	val displayCars = derivedStateOf {
 		val selectedLineId = btsState.selectedLineId.value
 		val allCars = carMarkersMap.values.toList()
@@ -134,42 +139,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		allCars.filter { it.lineId == selectedLineId }
 	}
 
-	// 同步CarMarker标记
-	private fun syncCarMarkers(newLocations: List<CarLocation>) {
-		// 获取到的车辆id
-		val newIds = mutableSetOf<Int>()
-		newLocations.forEach { carLocation ->
-			val lineId = carLocation.type
-			newIds.add(carLocation.id)
-
-			val newPos = Offset(carLocation.px.toFloat(), carLocation.py.toFloat())
-
-			val carMarker = carMarkersMap[carLocation.id]
-			if (carMarker == null) {
-				carMarkersMap[carLocation.id] = CarMarkerState(
-					id = carLocation.id,
-					lineId = lineId,
-					updateAt = carLocation.upDate,
-					initialPosition = newPos,
-					initialVisible = true
-				)
-			} else {
-				carMarker.moveToTarget(
-					newPos, 1000
-				)
-				carMarker.updateAt = carLocation.upDate
-			}
-		}
-
-		//移除不再出现在列表中的校车
-		val iterator = carMarkersMap.iterator()
-		while (iterator.hasNext()) {
-			val entry = iterator.next()
-			if (!newIds.contains(entry.key)) {
-				iterator.remove()
-			}
-		}
-	}
 
 	init {
 		initCarLineInfo()
@@ -218,16 +187,19 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 					closeDownLoadProgressDialog()
 				} catch (_: Exception) {
 					closeDownLoadProgressDialog()
-					toast("地图下载失败，请检查网络")
+					downErrorDialogState.value = true
 				}
 			}.onFailure {
-				toast("无法获取地图配置")
+				closeDownLoadProgressDialog()
+				downErrorDialogState.value = true
 			}
 		}
 	}
 
 
-	// 切换底部表单的选中项
+	/**
+	 * 切换底部表单的选中项
+	 */
 	fun toggleSelectLine(line: LineSelectorItem) {
 		if (line.id == -1) {
 			schoolCarPage.value = 1
@@ -242,7 +214,9 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		changeToLineMode(line.id)
 	}
 
-	// 站点模式下切换线路
+	/**
+	 * 站点模式下切换线路
+	 */
 	fun toggleCurrentLine(availableLine: List<CarLine>) {
 		val currentId = btsState.selectedLineId.value ?: return
 		val currentIndex = availableLine.indexOfFirst { it.id == currentId }
@@ -315,6 +289,45 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 					toast("线路信息同步失败: ${e.message}")
 				}
 			}
+	}
+
+	/**
+	 * 同步CarMarker标记
+	 */
+	private fun syncCarMarkers(newLocations: List<CarLocation>) {
+		// 获取到的车辆id
+		val newIds = mutableSetOf<Int>()
+		newLocations.forEach { carLocation ->
+			val lineId = carLocation.type
+			newIds.add(carLocation.id)
+
+			val newPos = Offset(carLocation.px.toFloat(), carLocation.py.toFloat())
+
+			val carMarker = carMarkersMap[carLocation.id]
+			if (carMarker == null) {
+				carMarkersMap[carLocation.id] = CarMarkerState(
+					id = carLocation.id,
+					lineId = lineId,
+					updateAt = carLocation.upDate,
+					initialPosition = newPos,
+					initialVisible = true
+				)
+			} else {
+				carMarker.moveToTarget(
+					newPos, 1000
+				)
+				carMarker.updateAt = carLocation.upDate
+			}
+		}
+
+		//移除不再出现在列表中的校车
+		val iterator = carMarkersMap.iterator()
+		while (iterator.hasNext()) {
+			val entry = iterator.next()
+			if (!newIds.contains(entry.key)) {
+				iterator.remove()
+			}
+		}
 	}
 
 	fun zoomExpand() {
@@ -396,7 +409,14 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 		downProgressDialogState.value = false
 	}
 
+	fun onDismissErrorDialog() {
+		downErrorDialogState.value = false
+		MainNavController.popBackStack()
+	}
+
 	abstract fun getClosedSite(): CarStation?
 
 	abstract val isSupportLocation: Boolean
+
+	abstract val shouldShowUserPositionMarker: State<Boolean>
 }

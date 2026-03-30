@@ -7,6 +7,11 @@ import com.cyxbs.pages.schoolcar.bean.GeoLocation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**  
  * description ： 安卓端的定位由高德定位来实现
@@ -15,6 +20,21 @@ import kotlinx.coroutines.flow.asStateFlow
  * date : 2026/3/24 16:41
  */
 class AMapLocationHelper {
+	companion object {
+		const val CENTER_LAT = 29.531876
+		const val CENTER_LNG = 106.60679
+		const val MAX_DISTANCE = 1500f
+		fun calculateDistance(point1: GeoLocation, point2: GeoLocation): Double {
+			val r = 6371000.0
+			val dLat = Math.toRadians(point2.lat - point1.lat)
+			val dLon = Math.toRadians(point2.lng - point1.lng)
+			val a = sin(dLat / 2).pow(2) +
+				cos(Math.toRadians(point1.lat)) * cos(Math.toRadians(point2.lat)) *
+				sin(dLon / 2).pow(2)
+			return 2 * r * atan2(sqrt(a), sqrt(1 - a))
+		}
+
+	}
 	//https://lbs.amap.com/api/android-location-sdk/guide/android-location/getlocation
 	// 官方示例文档
 

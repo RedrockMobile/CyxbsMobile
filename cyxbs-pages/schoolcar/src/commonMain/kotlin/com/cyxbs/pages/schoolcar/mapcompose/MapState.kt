@@ -2,9 +2,7 @@ package com.cyxbs.pages.schoolcar.mapcompose
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -15,7 +13,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/**  
+/**
  * description ： 地图的状态
  * author : HI-IR
  * email : qq2420226433@outlook.com
@@ -66,7 +64,7 @@ class MapState(
 				scaleAnim.animateTo(
 					targetScale,
 					animationSpec = tween(
-						durationMillis = 600,
+						durationMillis = 500,
 						easing = FastOutSlowInEasing
 					)
 				)
@@ -75,7 +73,7 @@ class MapState(
 				offsetAnim.animateTo(
 					targetOffset,
 					animationSpec = tween(
-						durationMillis = 600,
+						durationMillis = 500,
 						easing = FastOutSlowInEasing
 					)
 				)
@@ -83,7 +81,9 @@ class MapState(
 		}
 	}
 
-	// 更新平移
+	//更新
+
+	// 更新手势移动平移
 	suspend fun updateTransform(
 		zoomFactor: Float,
 		panDelta: Offset,
@@ -212,5 +212,6 @@ class MapState(
 	suspend fun cameraRecover() {
 		animateCamera(initialScale, initialOffset)
 	}
+
 
 }

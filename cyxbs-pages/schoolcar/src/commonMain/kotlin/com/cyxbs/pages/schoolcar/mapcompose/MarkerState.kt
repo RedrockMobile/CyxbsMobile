@@ -47,10 +47,8 @@ open class MovableMarkerState(
 	initialRotation: Float = 0f
 ) : MarkerState {
 
-	// 实际的位置信息
 	private val positionAnim = Animatable(initialPosition, Offset.VectorConverter)
 
-	// 实际旋转角度
 	private val rotationAnim = Animatable(initialRotation)
 
 
@@ -70,7 +68,6 @@ open class MovableMarkerState(
 		targetRotation.value = MarkerTargetRotationState(newRotation, duration)
 	}
 
-	// 平滑移动
 	internal suspend fun animateToTarget() {
 		positionAnim.animateTo(
 			targetValue = targetPosition.value.targetPosition,
@@ -78,7 +75,6 @@ open class MovableMarkerState(
 		)
 	}
 
-	// 平滑旋转
 	internal suspend fun animateToRotation() {
 		rotationAnim.animateTo(
 			targetValue = targetRotation.value.targetRotation,

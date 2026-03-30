@@ -58,6 +58,7 @@ class SchoolCarNavDestination :
 		viewModel { SchoolCarViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
 		val viewModel = viewModel(SchoolCarViewModel::class)
 		DownLoadProgressDialog()
+		DownLoadErrorDialog()
 		AnimatedContent(
 			targetState = viewModel.schoolCarPage.value,
 			transitionSpec = {
@@ -71,7 +72,7 @@ class SchoolCarNavDestination :
 			},
 			modifier = Modifier.backHandler {
 				if (viewModel.schoolCarPage.value == 1) {
-					viewModel.schoolCarPage.value = 0
+					viewModel.backFromDetail()
 				} else {
 					MainNavController.popBackStack()
 				}
@@ -132,7 +133,7 @@ fun ZoomButtonCompose(modifier: Modifier = Modifier) {
 			onClick = viewModel::zoomExpand
 		)
 		FunctionButtonItemCompose(res = Res.drawable.schoolcar_ic_zoomout, onClick = viewModel::zoomOut)
-		if (viewModel.isSupportLocation){
+		if (viewModel.shouldShowUserPositionMarker.value){
 			FunctionButtonItemCompose(
 				res = Res.drawable.schoolcar_ic_positioning,
 				onClick = viewModel::positioning

@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -94,6 +95,14 @@ actual fun MapImageContainer(
 							true
 						})
 				}
+				.pointerInput(Unit) {
+					detectMouseScrollTransformGestures { centroid, zoom ->
+						coroutineScope.launch {
+							mapState.updateTransform(zoom, Offset.Zero, centroid)
+						}
+						true
+					}
+				}
 		) {
 
 			//=============地图渲染层级===============
@@ -136,12 +145,15 @@ actual fun MapImageContainer(
 					is CameraEvent.Focus -> {
 						mapState.focusOnImagePoint(it.x, it.y, it.zoom)
 					}
+
 					CameraEvent.ZoomExpand -> {
 						mapState.zoomExpand()
 					}
+
 					CameraEvent.ZoomOut -> {
 						mapState.zoomOut()
 					}
+
 					CameraEvent.Recover -> {
 						mapState.cameraRecover()
 					}

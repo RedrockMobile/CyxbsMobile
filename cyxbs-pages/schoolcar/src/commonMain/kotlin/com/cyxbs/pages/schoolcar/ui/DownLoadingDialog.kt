@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.LinearProgressIndicator
@@ -16,11 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 
 /**  
@@ -88,6 +92,64 @@ fun DownLoadProgressDialogCompose(
 				}
 			}
 		}
+	}
+}
 
+@Composable
+fun DownLoadErrorDialog() {
+	val viewModel = viewModel(SchoolCarViewModel::class)
+	DownLoadErrorDialogCompose(viewModel.downErrorDialogState.value, viewModel::onDismissErrorDialog)
+}
+
+@Composable
+fun DownLoadErrorDialogCompose(
+	showState: Boolean,
+	onDismissRequest: () -> Unit
+) {
+	if (showState) {
+		Dialog(
+			onDismissRequest = onDismissRequest
+		) {
+			Column(
+				horizontalAlignment = Alignment.CenterHorizontally,
+				modifier = Modifier
+					.width(314.dp)
+					.clip(RoundedCornerShape(16.dp))
+					.background(LocalAppColors.current.topBg)
+			) {
+				Text(
+					text = "校车地图下载失败",
+					fontSize = 18.sp,
+					color = LocalAppColors.current.tvLv4,
+					modifier = Modifier.padding(top = 28.dp)
+				)
+				Text(
+					text = "请稍后重试...",
+					fontSize = 16.sp,
+					modifier = Modifier.padding(top = 20.dp),
+					color = LocalAppColors.current.tvLv4
+				)
+
+				Box(
+					modifier = Modifier
+						.padding(top = 17.dp, bottom = 28.dp)
+						.size(80.dp, 40.dp)
+						.clip(RoundedCornerShape(30.dp))
+						.background(
+							color = 0xFF5D5DF7.dark(0xFF4841E2)
+						).clickableNoIndicator {
+							onDismissRequest()
+						}
+				) {
+					Text(
+						modifier = Modifier.align(Alignment.Center),
+						text = "确定",
+						textAlign = TextAlign.Center,
+						fontSize = 14.sp,
+						color = Color.White
+					)
+				}
+			}
+		}
 	}
 }

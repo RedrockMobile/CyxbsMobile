@@ -19,7 +19,7 @@ actual fun MapScope.UserPositionLayer(user: UserPositionMarkerState) {
 		}
 	}
 
-	if (viewModel.hasPermission.value && viewModel.isSupportLocation) {
+	if (viewModel.shouldShowUserPositionMarker.value) {
 		key(user.id) {
 			MovableMarker(
 				user
