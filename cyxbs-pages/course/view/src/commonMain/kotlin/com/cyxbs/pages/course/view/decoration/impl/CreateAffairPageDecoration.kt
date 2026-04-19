@@ -13,10 +13,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.zIndex
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.add
 import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.AffairIdModel
@@ -166,8 +168,8 @@ class CreateAffairPageDecoration(
 }
 
 @Composable
-private fun LongPressCreateCoursePageWrapper(viewModel: CreateAffairPageDecoration) {
-  val coursePage = viewModel.coursePage
+private fun LongPressCreateCoursePageWrapper(decoration: CreateAffairPageDecoration) {
+  val coursePage = decoration.coursePage
   val courseFrame = AbstractCourseFrame.current
   courseFrame.beginDate.collectAsState().value ?: return
   courseFrame.getWeekNumByPage(coursePage.page) ?: return // 仅在有周数的页面才允许创建事务
@@ -177,33 +179,60 @@ private fun LongPressCreateCoursePageWrapper(viewModel: CreateAffairPageDecorati
     onCreate = { beginPosition, size ->
       // 倒计时结束，添加 item 展示
       var initTime = coursePage.timeline.calculateMinuteTime(coursePage, beginPosition.y)
-      var initPosition = beginPosition
       if (initTime.minute % 10 != 0) {
         // 落点取整 10 分钟
         initTime = initTime.plusMinutes((initTime.minute % 10).let { if (it < 5) -it else 10 - it })
-        initPosition =
-          initPosition.copy(y = coursePage.timeline.calculateWeightRatio(initTime) * size.height)
       }
       val touchingItem = TouchingItem(
-        viewModel = viewModel,
+        viewModel = decoration,
         page = coursePage.page,
-        dayOfWeek = coursePage.timeline.beginDayOfWeek.add((initPosition.x / (size.width / 7)).toInt()),
+        dayOfWeek = coursePage.timeline.beginDayOfWeek.add((beginPosition.x / (size.width / 7)).toInt()),
         initMinuteTime = initTime,
         coursePage = coursePage,
         initPosition = beginPosition,
       )
-      viewModel.itemHierarchy.add(
+      decoration.itemHierarchy.add(
         CreateAffairTouchItemWhatTime(
-          viewModel = viewModel,
+          viewModel = decoration,
           item = touchingItem
         )
       )
       touchingItem
     },
-    onTap = {
-      // 手指轻击时清理已有的 item
-      coroutineScope.launch {
-        viewModel.cancelAllTouchedItem()
+    onTap = { position, size ->
+      if (!decoration.itemHierarchy.isEmpty()) {
+        // 手指轻击时清理已有的 item
+        coroutineScope.launch {
+          decoration.cancelAllTouchedItem()
+        }
+      } else {
+        // 手指轻击时如果不存在已有的 item 时，则添加一个
+        // 倒计时结束，添加 item 展示
+        var initTime = coursePage.timeline.calculateMinuteTime(coursePage, position.y)
+        initTime = initTime.minusMinutes(initTime.minute) // 取整点
+        val touchPosition = Offset(0F, coursePage.timeline.calculateWeightRatio(initTime.plusHours(1)) * size.height)
+        val touchingItem = TouchingItem(
+          viewModel = decoration,
+          page = coursePage.page,
+          dayOfWeek = coursePage.timeline.beginDayOfWeek.add((position.x / (size.width / 7)).toInt()),
+          initMinuteTime = initTime,
+          coursePage = coursePage,
+          initPosition = position,
+        )
+        decoration.itemHierarchy.add(
+          CreateAffairTouchItemWhatTime(
+            viewModel = decoration,
+            item = touchingItem
+          )
+        )
+        touchingItem.touchPosition = touchPosition
+        touchingItem.onMoveEnd() // 手动 mock 调用 onMoveEnd
+        // 轻击时只会生成长度为 1 小时的事务，弹个 toast 提示用户需要长按拖动生成更长的事务
+        val count = defaultSettings.getInt("轻击生成事务的次数", 0)
+        defaultSettings.putInt("轻击生成事务的次数", count + 1)
+        if (count <= 4 && count % 2 == 0 || count % 8 == 0) {
+          toastLong("长按空白处再上下拖动也可添加事务哦~")
+        }
       }
     }
   )
@@ -279,10 +308,16 @@ internal class TouchingItem(
   private var itemState: CourseItemState? = null
   private var layoutAnimUnlock: Runnable? = null
 
+  private var itemStateIsNullWhenOnMoveEnd = false
+
   override fun initCourseItemState(itemState: CourseItemState) {
     this.itemState = itemState
     BeginFinalTimeShowModifier.showLock.get(itemState).lock() // 默认显示开始结束时间
     layoutAnimUnlock = LayoutItemModifier.animLock.get(itemState).lock()
+    if (itemStateIsNullWhenOnMoveEnd) {
+      // 在 onMoveEnd 回调时 itemState 为 null，所以这里再回调一次
+      onMoveEnd()
+    }
   }
 
   override var touchPosition: Offset = initPosition
@@ -298,11 +333,17 @@ internal class TouchingItem(
 
   private val clickLock = mutableListOf<MutableTimelineData.ClickLock>()
 
-  override fun onMoveEnd(coroutineScope: CoroutineScope) {
+  override fun onMoveEnd() {
+    val itemState = itemState
+    if (itemState == null) {
+      itemStateIsNullWhenOnMoveEnd = true
+      return
+    }
     clickLock.forEach { it.unlock() }
     clickLock.clear()
     layoutAnimUnlock?.run()
-    val whatTime = itemState?.item?.whatTime as CreateAffairTouchItemWhatTime
+    val coroutineScope = itemState.item.coroutineScope
+    val whatTime = itemState.item.whatTime as CreateAffairTouchItemWhatTime
     if (now.value.finalTime - now.value.beginTime < MIN_MINUTE_INTERVAL.minutes) {
       // 暂定小于 MIN_MINUTE_INTERVAL 分钟的事务不支持
       toast("不支持创建小于 $MIN_MINUTE_INTERVAL 分钟的事务")
@@ -317,7 +358,7 @@ internal class TouchingItem(
           whatTime.cancel()
         } else {
           // 创建成功后则设置 dateModel
-          (itemState?.item as CourseCreateAffairItem).setDateModel(dateModelEditor.dateModel)
+          (itemState.item as CourseCreateAffairItem).setDateModel(dateModelEditor.dateModel)
         }
       }
     }

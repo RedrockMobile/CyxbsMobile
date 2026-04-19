@@ -37,14 +37,14 @@ interface LongPressCreateItem {
   var touchPosition: Offset
 
   // 移动结束，手指抬起或者事件被拦截
-  fun onMoveEnd(coroutineScope: CoroutineScope)
+  fun onMoveEnd()
 }
 
 @Composable
 fun LongPressCreateItemCompose(
   modifier: Modifier = Modifier.fillMaxSize(),
   onCreate: (beginPosition: Offset, size: IntSize) -> LongPressCreateItem?,
-  onTap: () -> Unit, // 手指轻击时可被视为清理已有的 item
+  onTap: (position: Offset, size: IntSize) -> Unit, // 手指轻击时可被视为清理已有的 item
 ) {
   val layoutCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
   Spacer(
@@ -89,7 +89,7 @@ private fun Modifier.pointerInputCreateItem(
           longPressMap.remove(change.id)?.let { job ->
             if (job.isActive) job.cancel() else {
               // 事件被其他消耗或者抬手
-              touchingItems.remove(change.id)?.onMoveEnd(this@supervisorScope)
+              touchingItems.remove(change.id)?.onMoveEnd()
             }
           }
         } else longPressMap[change.id]?.let { job ->
@@ -115,7 +115,7 @@ private fun Modifier.pointerInputCreateItem(
 
 // 手指点击时清理已有的 item
 private fun Modifier.pointerInputClearItem(
-  onTap: () -> Unit,
+  onTap: (position: Offset, size: IntSize) -> Unit,
 ): Modifier = pointerInput(Unit) {
   supervisorScope {
     awaitEachGesture {
@@ -130,7 +130,7 @@ private fun Modifier.pointerInputClearItem(
         && (change.position - down.position).getDistance() < viewConfiguration.touchSlop
       ) {
         // 抬起时间较小时取消所有 items
-        onTap.invoke()
+        onTap.invoke(change.position, size)
       }
     }
   }
