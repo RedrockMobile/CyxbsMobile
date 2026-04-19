@@ -60,13 +60,9 @@ class MobileHomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
     BottomSheetState()
   }
 
-  var peekHeight: Dp by mutableStateOf(70.dp)
+  val peekHeightState = mutableStateOf(70.dp)
 
-  fun set(
-    bottomBarHeight: Dp,
-  ) {
-    peekHeight = 70.dp + bottomBarHeight
-  }
+  val bottomBarHeightState = mutableStateOf(0.dp)
 
   @Composable
   override fun HomeCourseContent(modifier: Modifier, bottomBarHeight: Dp) {
@@ -81,7 +77,7 @@ class MobileHomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
       )
     }
     SideEffect {
-      set(bottomBarHeight)
+      bottomBarHeightState.value = bottomBarHeight
     }
   }
 }
