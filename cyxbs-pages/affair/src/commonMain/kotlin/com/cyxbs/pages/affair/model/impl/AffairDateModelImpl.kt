@@ -19,15 +19,15 @@ class AffairDateModelImpl(
   whatTimeModel: AffairWhatTimeModelImpl,
   date: Date,
 ) : AffairDateModel {
-  override val enable: EditorStateFlowImpl<AffairDateModelEditor, Boolean> =
+  override val enable: EditorStateFlowImpl<Boolean> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(true)
     )
-  override val whatTime: EditorStateFlowImpl<AffairDateModelEditor, AffairWhatTimeModel> =
+  override val whatTime: EditorStateFlowImpl<AffairWhatTimeModel> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(whatTimeModel),
     )
-  override val date: EditorStateFlowImpl<AffairDateModelEditor, Date> =
+  override val date: EditorStateFlowImpl<Date> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(date),
     )

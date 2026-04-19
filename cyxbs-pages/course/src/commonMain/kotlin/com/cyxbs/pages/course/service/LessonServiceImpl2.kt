@@ -17,13 +17,13 @@ object LessonServiceImpl2 : ILessonService2 {
 
   override fun observeLesson(
     stuNum: String?,
-    needCache: Boolean,
-    needRequest: Boolean
+    needOldData: Boolean,
+    forceRequest: Boolean
   ): Flow<List<LessonByWeeks>> {
     return LessonRepository.observeLesson(
       stuNum = stuNum,
-      needOldData = needCache,
-      needRequest = needRequest,
+      needOldData = needOldData,
+      forceRequest = forceRequest,
     )
   }
 

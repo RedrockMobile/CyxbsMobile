@@ -4,8 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import androidx.core.content.edit
 import androidx.fragment.app.Fragment
-import com.cyxbs.components.init.appContext
-import com.cyxbs.components.utils.extensions.getSp
+import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.pages.affair.api.IAffairService
 
 /**
@@ -20,11 +19,11 @@ interface ICourseService {
     /**
      * 课表能显示的最大周数
      */
-    var maxWeek: Int = appContext.getSp("课表").getInt("课表最大周数", 21)
+    var maxWeek: Int = defaultSp.getInt("课表最大周数", 21)
       private set
 
     fun setMaxWeek(maxWeek: Int) {
-      appContext.getSp("课表").edit { putInt("课表最大周数", maxWeek) }
+      defaultSp.edit { putInt("课表最大周数", maxWeek) }
       this.maxWeek = maxWeek
     }
   }

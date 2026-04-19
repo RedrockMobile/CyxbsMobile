@@ -29,17 +29,18 @@ class AffairIdModelImpl(
   override val enable: MutableStateFlow<Boolean> = MutableStateFlow(true)
   override val localId: String
     get() = entity.localId
+  override val remoteId: Int
+    get() = entity.remoteId
 
-  override val remoteId: MutableStateFlow<Int> = MutableStateFlow(entity.remoteId)
-  override val remindTime: EditorStateFlowImpl<AffairIdModelEditor, Int> =
+  override val remindTime: EditorStateFlowImpl<Int> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.remindTime),
     )
-  override val title: EditorStateFlowImpl<AffairIdModelEditor, String> =
+  override val title: EditorStateFlowImpl<String> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.title),
     )
-  override val content: EditorStateFlowImpl<AffairIdModelEditor, String> =
+  override val content: EditorStateFlowImpl<String> =
     EditorStateFlowImpl(
       valueFlow = MutableStateFlow(entity.content),
     )
@@ -63,14 +64,22 @@ class AffairIdModelImpl(
     )
 
   override val addedDateModel = MutableSharedFlow<AffairDateModel>(
-    extraBufferCapacity = 1,
+    extraBufferCapacity = 100, // 这里其实不应该有丢弃的策略，但是同步调用设置监听的话会难管理生命周期，所以容量设大一些防止丢值
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+
+  override val removedDateModel = MutableSharedFlow<AffairDateModel>(
+    extraBufferCapacity = 100,
     onBufferOverflow = BufferOverflow.DROP_OLDEST
   )
 
   // 用于在创建 AffairIdModelEditorImpl 时上锁
   private val affairIdModelEditorFlow = MutableStateFlow<Any?>(null)
 
-  override fun createEditor(): AffairIdModelEditor? {
+  override fun tryCreateEditor(
+    cancelCallback: (() -> Unit)?,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)?
+  ): AffairIdModelEditor? {
     if (affairIdModelEditorFlow.compareAndSet(null, Unit)) {
       // 确保线程安全
       return AffairIdModelEditorImpl(
@@ -78,22 +87,32 @@ class AffairIdModelImpl(
         cancelEdit = {
           reset()
           affairIdModelEditorFlow.value = null
+          cancelCallback?.invoke()
         }
-      ) {
+      ) { needUpload, needAdd ->
         EditAffairUtils.commit(
           editor = this,
-          needUpload = it,
+          needUpload = needUpload,
+          needAdd = needAdd,
         ).onSuccess {
           affairIdModelEditorFlow.value = null
+        }.also {
+          commitCallback?.invoke(it)
         }
       }
     }
     return null
   }
 
-  override suspend fun createEditorSuspend(): AffairIdModelEditor {
+  override suspend fun createEditorSuspend(
+    cancelCallback: (() -> Unit)?,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)?
+  ): AffairIdModelEditor {
     while (true) {
-      val editor = createEditor()
+      val editor = tryCreateEditor(
+        cancelCallback = cancelCallback,
+        commitCallback = commitCallback,
+      )
       if (editor != null) {
         return editor
       }
@@ -104,7 +123,7 @@ class AffairIdModelImpl(
   override fun toString(): String {
     return "AffairIdModelImpl(enable=${enable.value}" +
         ", localId=$localId" +
-        ", remoteId=${remoteId.value}" +
+        ", remoteId=${remoteId}" +
         ", remindTime=${remindTime.value}" +
         ", title=${title.value}" +
         ", content=${content.value}" +

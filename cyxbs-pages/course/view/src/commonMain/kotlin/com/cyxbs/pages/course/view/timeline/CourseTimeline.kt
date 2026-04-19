@@ -6,12 +6,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -22,6 +22,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.CourseTimelineData
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -51,13 +52,19 @@ data class CourseTimeline(
   @Transient
   val linkNodeList = mutableListOf<LinkNode>()
 
+  @Transient
+  val scrollState = ScrollState(0)
+
+  // scroll 整个布局的偏移量
+  @Transient
+  val marginBottom = SnapshotStateMap<String, Int>()
+
   init {
     var totalInitialWeight = 0F
     data.fastForEachIndexed { i, it ->
       totalInitialWeight += it.initialWeight
       linkNodeList.add(
         LinkNode(
-          endTime = it.endTime,
           totalInitialWeight = totalInitialWeight,
           index = i
         )
@@ -71,11 +78,14 @@ data class CourseTimeline(
   }
 
   inner class LinkNode(
-    val endTime: MinuteTime,
     val totalInitialWeight: Float,
     val index: Int,
   ) {
     val value = data[index]
+    val startTime: MinuteTime
+      get() = value.startTime
+    val endTime: MinuteTime
+      get() = value.endTime
     val totalShowWeightState = derivedStateOfStructure {
       var sum = 0F
       for (i in 0..index) {
@@ -103,8 +113,8 @@ data class CourseTimeline(
       val start = linkNodeList.getOrNull(-index - 2)
       val end = linkNodeList[-index - 1]
       (start?.totalShowWeightState?.value ?: 0F) +
-          end.value.startTime.minutesUntil(time) /
-          (end.value.startTime.minutesUntil(end.value.endTime)).toFloat() *
+          end.startTime.minutesUntil(time) /
+          (end.startTime.minutesUntil(end.endTime)).toFloat() *
           end.value.nowWeight
     }
     return weight
@@ -130,6 +140,7 @@ data class CourseTimeline(
     val finalTime1Weight = calculateWeight(finalTime1)
     val beginTime2Weight = calculateWeight(beginTime2)
     val finalTime2Weight = calculateWeight(finalTime2)
+    if (finalTime2Weight - beginTime2Weight == 0F) return Offset.Zero
     return Offset(
       x = (beginTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),
       y = (finalTime1Weight - beginTime2Weight) / (finalTime2Weight - beginTime2Weight),
@@ -140,24 +151,21 @@ data class CourseTimeline(
    * 计算 [height] 在时间轴上的 [MinuteTime]
    * @param height 相对于
    */
-  fun calculateMinuteTime(scrollContext: LocalCourseScrollContext, height: Float): MinuteTime {
-    var top = 0F
-    data.fastForEach {
-      scrollContext.timelineCoordinatesMap[it]?.let { coordinates ->
-        val y1 = top
-        val y2 = top + coordinates.size.height
-        if (height in y1..y2) {
-          return it.startTime.plusMinutes(((it.startTime.minutesUntil(it.endTime)) * (height - y1) / (y2 - y1)).roundToInt())
-        }
-        top = y2
-      }
+  fun calculateMinuteTime(coursePage: LocalCoursePageContext, height: Float): MinuteTime {
+    val totalHeight = coursePage.layoutCoordinates.size.height
+    val index = linkNodeList.binarySearchBy(height.roundToInt()) {
+      (it.totalShowWeightState.value / totalShowWeight * totalHeight).roundToInt()
     }
-    if (height < 0) {
-      return data.first().startTime
-    } else if (height > top) {
-      return data.last().endTime
+    return if (index >= 0) {
+      linkNodeList[index].endTime
+    } else {
+      val start = linkNodeList.getOrNull(-index - 2)
+      val end = linkNodeList[-index - 1]
+      val startHeight = (start?.totalShowWeightState?.value ?: 0F) / totalShowWeight * totalHeight
+      val endHeight = end.totalShowWeightState.value / totalShowWeight * totalHeight
+      val diffMinute = ((height - startHeight) / (endHeight - startHeight) * end.startTime.minutesUntil(end.endTime)).roundToInt()
+      end.startTime.plusMinutes(diffMinute)
     }
-    throw IllegalStateException("无法寻找高度对应时间，不应该出现的异常, height=$height, timeline=$data")
   }
 }
 
@@ -165,7 +173,6 @@ data class CourseTimeline(
  * 课程时间轴布局
  * @param timelineWidth 时间轴宽度
  * @param enableDrawNowTimeLine 是否绘制当前时间线
- * @param verticalScrollState 垂直滚动状态
  * @param scrollPaddingValues 滚轴内部 padding
  * @param content 时间轴内容
  */
@@ -174,14 +181,12 @@ fun CourseTimeline.Content(
   modifier: Modifier = Modifier,
   timelineWidth: Dp = 40.dp,
   enableDrawNowTimeLine: Boolean = false,
-  verticalScrollState: ScrollState = rememberScrollState(),
   scrollPaddingValues: PaddingValues = PaddingValues(top = 4.dp, bottom = 16.dp),
   content: @Composable () -> Unit
 ) {
   CourseScrollCompose(
     timeline = this,
     modifier = modifier.fillMaxSize(),
-    verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
     Column(

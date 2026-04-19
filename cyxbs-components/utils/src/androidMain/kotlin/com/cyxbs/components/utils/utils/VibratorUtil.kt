@@ -12,7 +12,7 @@ import com.cyxbs.components.init.appContext
  * @email 2767465918@qq.com
  * @date 2022/2/2 10:24
  */
-object VibratorUtil {
+actual object VibratorUtil {
   
   /**
    * 根据不同的 Android 版本调用不同的震动方法
@@ -41,5 +41,9 @@ object VibratorUtil {
         vibrator.vibrate(milliseconds)
       }
     }
+  }
+
+  actual fun longPress() {
+    start(36)
   }
 }

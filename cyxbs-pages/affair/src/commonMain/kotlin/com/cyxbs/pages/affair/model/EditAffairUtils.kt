@@ -20,7 +20,8 @@ object EditAffairUtils {
 
   suspend fun commit(
     editor: AffairIdModelEditorImpl,
-    needUpload: Boolean,
+    needUpload: Boolean, // 是否上传到后端
+    needAdd: Boolean, // 是否添加进事务列表中
   ): Result<AffairIdModelEditor.EditResult> {
     val idModel = editor.idModel
     val newEntity = createAffair(editor)
@@ -50,8 +51,8 @@ object EditAffairUtils {
           allowLocal = true,
           needShowException = false,
         ).onSuccess {
-          idModel.entity = newEntity
-          updateModel(editor)
+          idModel.entity = it
+          updateModel(editor, needAdd)
         }.map {
           AffairIdModelEditor.EditResult.Success
         }
@@ -63,7 +64,7 @@ object EditAffairUtils {
           allowLocal = true,
           needShowException = false,
         ).onSuccess {
-          updateModel(editor)
+          updateModel(editor, needAdd)
         }.onFailure {
           editor.reset()
         }.map {
@@ -78,7 +79,7 @@ object EditAffairUtils {
           needShowException = false,
         ).onSuccess {
           idModel.entity = newEntity
-          updateModel(editor)
+          updateModel(editor, needAdd)
         }.onFailure {
           editor.reset()
         }.map {
@@ -89,7 +90,7 @@ object EditAffairUtils {
             "\neditor = $editor\nnewEntity = $newEntity"))
       }
     } else {
-      updateModel(editor)
+      updateModel(editor, needAdd)
       return Result.success(
         if (editor.whatTimeDate.isEmpty() || editor.whatTimeDate.values.all { it.isEmpty() }) {
           AffairIdModelEditor.EditResult.Deleted
@@ -99,7 +100,7 @@ object EditAffairUtils {
   }
 
 
-  private fun updateModel(editor: AffairIdModelEditorImpl) {
+  private fun updateModel(editor: AffairIdModelEditorImpl, needAdd: Boolean) {
     val idModel = editor.idModel
     idModel.remindTime.valueStateFlow.value = editor.remindTime
     idModel.title.valueStateFlow.value = editor.title
@@ -129,10 +130,12 @@ object EditAffairUtils {
       // 事务被移除
       idModel.enable.value = false
       idModel.groupModel.removeAffairInternal(idModel)
-    } else {
-      if (idModel.remoteId.value == 0) {
+    } else if (needAdd) {
+      if (idModel.remoteId == 0) {
+        // 新增的本地临时事务
         idModel.groupModel.addAffairInternal(idModel)
-      } else if (idModel.groupModel.itemList.value.all { it.remoteId.value != idModel.remoteId.value }) {
+      } else if (idModel.groupModel.itemList.value.all { it.remoteId != idModel.remoteId }) {
+        // 新增的事务
         idModel.groupModel.addAffairInternal(idModel)
       }
     }
@@ -140,7 +143,7 @@ object EditAffairUtils {
 
   private fun createAffair(editor: AffairIdModelEditor): AffairEntity {
     return AffairEntity(
-      remoteId = editor.idModel.remoteId.value,
+      remoteId = editor.idModel.remoteId,
       localId = editor.idModel.localId,
       remindTime = editor.remindTime,
       title = editor.title,

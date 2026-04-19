@@ -10,7 +10,9 @@ kotlin {
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.affair.api)
     }
   }
 }

@@ -22,15 +22,17 @@ import kotlinx.serialization.Serializable
 interface AffairApiService2 {
 
   @POST("magipoke-reminder/Person/addTimeTransaction")
+  @Headers("Content-Type: application/json")
   suspend fun addAffair(
     @Body request: AddAffairRequest,
-  ): AddAffairResponse
+  ): ApiWrapper<AddAffairResponse>
 
   @POST("magipoke-reminder/Person/getTimeTransaction")
   @Headers("App-Version:74")
   suspend fun getAffair(): ApiWrapper<GetAffairResponse>
 
   @POST("magipoke-reminder/Person/editTimeTransaction")
+  @Headers("Content-Type: application/json")
   suspend fun updateAffair(
     @Body request: UpdateAffairRequest,
   ): ApiStatus
@@ -66,11 +68,7 @@ data class AddAffairRequest(
 data class AddAffairResponse(
   @SerialName("id")
   val id: Int,
-  @SerialName("info")
-  override val info: String,
-  @SerialName("status")
-  override val status: Int
-) : IApiStatus
+)
 
 @Serializable
 data class UpdateAffairRequest(

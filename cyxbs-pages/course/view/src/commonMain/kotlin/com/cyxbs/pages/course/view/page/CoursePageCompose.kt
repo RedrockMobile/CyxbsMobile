@@ -1,10 +1,8 @@
 package com.cyxbs.pages.course.view.page
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -39,7 +37,6 @@ val LocalCoursePage = compositionLocalOf<LocalCoursePageContext> { error("未初
 /**
  * @param timeline 时间轴
  * @param enableDrawNowTimeLine 是否绘制当前时间线
- * @param verticalScrollState 垂直滚动状态
  * @param decorations 绘制在课表上的装饰物，同时也能拦截触摸事件
  */
 @Composable
@@ -50,15 +47,13 @@ fun CoursePageCompose(
   scrollPaddingValues: PaddingValues, // 滚动区域的内边距
   modifier: Modifier = Modifier,
   enableDrawNowTimeLine: Boolean = true,  // 是否绘制当前时间的线
-  verticalScrollState: ScrollState = rememberScrollState(),
-  decorations: ImmutableList<CoursePageDecoration>,
+  decorations: ImmutableList<CoursePageDecoration<*>>,
 ) {
   // 课表时间轴的绘制
   timeline.Content(
     modifier = modifier,
     timelineWidth = timelineWidth,
     enableDrawNowTimeLine = enableDrawNowTimeLine,
-    verticalScrollState = verticalScrollState,
     scrollPaddingValues = scrollPaddingValues,
   ) {
     val courseScroll = LocalCourseScroll.current
@@ -91,7 +86,7 @@ fun CoursePageCompose(
 }
 
 class LocalCoursePageContext(
-  val page: Int,
+  val page: Int, // page 并不一定就是周数，需要通过 AbstractCourseFrame#getWeekNumByPage 才能获取周数
   timeline: CourseTimeline,
   scrollContext: LocalCourseScrollContext, // 滚轴 context
 ) {

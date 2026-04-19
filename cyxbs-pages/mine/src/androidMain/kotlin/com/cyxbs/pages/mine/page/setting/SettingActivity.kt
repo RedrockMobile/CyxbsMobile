@@ -12,6 +12,7 @@ import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.dailog.ChooseDialog
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.SP_COURSE_COMPOSE
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
@@ -71,7 +72,7 @@ class SettingActivity : BaseActivity() {
         mSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)
 
         // 使用 Compose 课表
-        mComposeCourseSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
+        mComposeCourseSwitch.isChecked = defaultSp.getBoolean(SP_COURSE_COMPOSE, isDebug())
         mComposeCourseSwitch.setOnCheckedChangeListener { _, isChecked ->
             defaultSp.edit { putBoolean(SP_COURSE_COMPOSE, isChecked) }
             toast("新课表重启生效")

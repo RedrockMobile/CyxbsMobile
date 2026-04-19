@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavUri
 import com.cyxbs.components.account.api.IAccountEditService
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeNavArgument
@@ -31,6 +32,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.CourseNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
 
@@ -48,7 +50,12 @@ private val itemList = listOf(
     MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_MAP"))
   },
   ActionItem("我的课表") {
-    MainNavController.navigate(CourseNavArgument)
+    val stuNum = IAccountService::class.impl().stuNum
+    if (stuNum == null) {
+      toast("学号不存在，请检查是否已登陆")
+    } else {
+      MainNavController.navigate(CourseNavArgument(stuNum = stuNum))
+    }
   },
   ActionItem("关于我们") {
     MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_ABOUT"))

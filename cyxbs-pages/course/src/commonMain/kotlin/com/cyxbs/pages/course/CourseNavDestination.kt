@@ -25,7 +25,7 @@ class CourseNavDestination : MainNavDestination<CourseNavArgument>(CourseNavArgu
 
   @Composable
   override fun DestinationContent(parcel: DestinationParcel<CourseNavArgument>) {
-    val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel() }
-    courseFrameViewModel.frame.HomeCourseContent(Modifier.Companion.systemBarsPadding())
+    val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel(parcel.argument.stuNum) }
+    courseFrameViewModel.frame.HomeCourseContent(Modifier.systemBarsPadding())
   }
 }

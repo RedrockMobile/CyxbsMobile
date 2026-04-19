@@ -6,11 +6,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.pages.course.frame.header.CourseHeader
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.course.frame.item.DefaultCourseAffairItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultCourseLessonItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultCourseLinkLessonItemFactory
+import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.HomeCoursePageContent
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
+import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.CourseLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
+import com.cyxbs.pages.course.view.page.CourseFrameHeader
 
 /**
  * 支持自适应宽高的课表框架
@@ -19,14 +34,22 @@ import com.cyxbs.pages.course.frame.header.CourseHeader
  * @date 2025/9/22
  */
 @Stable
-class AdaptiveCourseFrame : AbstractCourseFrame() {
+class AdaptiveCourseFrame(
+  val stuNum: String,
+) : AbstractCourseFrame() {
 
   @Composable
   fun HomeCourseContent(modifier: Modifier) {
-    AdaptiveHomeCourseFrameContent(
-      modifier = modifier,
-      frame = this,
-    )
+    val decorationManager = createCoursePageDecorationManager(this)
+    CompositionLocalProvider(
+      Local provides this,
+      CoursePageDecorationManager.Local provides decorationManager,
+    ) {
+      AdaptiveHomeCourseFrameContent(
+        modifier = modifier,
+        frame = this,
+      )
+    }
   }
 }
 
@@ -35,11 +58,12 @@ private fun AdaptiveHomeCourseFrameContent(
   modifier: Modifier,
   frame: AdaptiveCourseFrame,
 ) {
-  val decorations = createBaseCoursePageDecorations()
+
   Column(modifier = modifier.background(LocalAppColors.current.topBg)) {
-    CourseHeader(
+    CourseFrameHeader(
       modifier = Modifier.height(50.dp),
       frame = frame,
+      linkBtnVisibility = false,
     )
     HorizontalPager(
       modifier = Modifier.fillMaxSize(),
@@ -47,9 +71,41 @@ private fun AdaptiveHomeCourseFrameContent(
       pageContent = { page ->
         frame.HomeCoursePageContent(
           page = page,
-          decorations = decorations,
         )
       },
     )
+  }
+}
+
+@Composable
+private fun createCoursePageDecorationManager(
+  frame: AdaptiveCourseFrame
+): CoursePageDecorationManager {
+  val coroutineScope = rememberCoroutineScope()
+  val selfStuNum = IAccountService::class.impl().stuNum
+  if (selfStuNum != frame.stuNum) {
+    return remember {
+      CoursePageDecorationManager(
+        courseFrame = frame,
+        courseCoroutineScope = coroutineScope,
+        CourseLessonPageDecoration(
+          stuNum = frame.stuNum,
+          platformItemFactory = DefaultCourseLessonItemFactory
+        ),
+      )
+    }
+  } else {
+    return remember {
+      CoursePageDecorationManager(
+        courseFrame = frame,
+        courseCoroutineScope = coroutineScope,
+        SelfLessonPageDecoration(platformItemFactory = DefaultCourseLessonItemFactory), // 自己的课程
+        AffairPageDecoration(
+          courseFrame = frame,
+          platformItemFactory = DefaultCourseAffairItemFactory
+        ), // 自己的事务
+        LinkLessonPageDecoration(platformItemFactory = DefaultCourseLinkLessonItemFactory), // 关联人的课程
+      )
+    }
   }
 }

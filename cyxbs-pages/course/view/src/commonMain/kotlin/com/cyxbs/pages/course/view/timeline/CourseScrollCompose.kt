@@ -16,10 +16,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerId
@@ -53,18 +53,14 @@ val LocalCourseScroll = staticCompositionLocalOf<LocalCourseScrollContext> { err
 
 class LocalCourseScrollContext(
   timeline: CourseTimeline,
-  scrollState: ScrollState,
   val outerCoordinatesState: State<LayoutCoordinates?>,
   val innerCoordinatesState: State<LayoutCoordinates?>,
 ) {
   var timeline by mutableStateOf(timeline)
     private set
 
-  var scrollState by mutableStateOf(scrollState)
-    private set
-
-  // 因为底部弹窗的弹出而需要偏移的底部间距
-  val marginBottomForBottomSheet = mutableIntStateOf(0)
+  val scrollState: ScrollState
+    get() = timeline.scrollState
 
   // 边缘滚动处理
   val edgeScroll = EdgeScroll(scrollContext = this)
@@ -80,10 +76,8 @@ class LocalCourseScrollContext(
 
   fun update(
     timeline: CourseTimeline,
-    scrollState: ScrollState
   ) {
     this.timeline = timeline
-    this.scrollState = scrollState
   }
 }
 
@@ -91,7 +85,6 @@ class LocalCourseScrollContext(
 internal fun CourseScrollCompose(
   timeline: CourseTimeline,
   modifier: Modifier = Modifier,
-  verticalScrollState: ScrollState = rememberScrollState(),
   scrollPaddingValues: PaddingValues,
   content: @Composable () -> Unit,
 ) {
@@ -100,7 +93,6 @@ internal fun CourseScrollCompose(
   val context = remember {
     LocalCourseScrollContext(
       timeline = timeline,
-      scrollState = verticalScrollState,
       outerCoordinatesState = outerCoordinatesState,
       innerCoordinatesState = innerCoordinatesState,
     )
@@ -111,18 +103,18 @@ internal fun CourseScrollCompose(
         outerCoordinatesState.value = it
       }
       .reflexScrollableForMouse()
-      .verticalScroll(state = verticalScrollState)
-      .multiPointerScroll(verticalScrollState)
+      .verticalScroll(state = timeline.scrollState)
+      .multiPointerScroll(timeline.scrollState)
       .onGloballyPositioned {
         innerCoordinatesState.value = it
       }.offset {
         // 在课程弹窗时，如果 item 被弹窗遮挡，则会设置 marginBottom 将滚轴向上移动
-        IntOffset(x = 0, y = -context.marginBottomForBottomSheet.intValue)
+        val y = -timeline.marginBottom.values.sum()
+        IntOffset(x = 0, y = y)
       },
     content = {
       context.update(
         timeline = timeline,
-        scrollState = verticalScrollState,
       )
       CompositionLocalProvider(
         LocalCourseScroll provides context

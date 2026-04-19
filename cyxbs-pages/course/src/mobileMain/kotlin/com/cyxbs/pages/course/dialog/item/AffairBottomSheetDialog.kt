@@ -1,43 +1,23 @@
 package com.cyxbs.pages.course.dialog.item
 
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.Icon
-import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.config.time.toChinese
-import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.utils.utils.get.Num2CN
-import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.pages.affair.api.AffairDateModel
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flattenConcat
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import com.cyxbs.pages.affair.api.AffairDateModelEditor
+import com.cyxbs.pages.affair.api.AffairIdModelEditor.EditResult
+import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
+import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
+import com.cyxbs.pages.course.dialog.item.affair.AffairEditCompose
+import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose
 
 /**
  * .
@@ -45,114 +25,136 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2025/5/25
  */
-@Composable
-fun AffairBottomSheetDialog(affairDateModel: AffairDateModel) {
-  SelectionContainer {
-    Column(
-      modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
-    ) {
-      TitleWithBtn(title = affairDateModel.idModel.title.value)
-      WeekAndTime(modifier = Modifier.padding(top = 8.dp), affairDateModel = affairDateModel)
-      AffairContent(modifier = Modifier.padding(top = 20.dp), affairDateModel = affairDateModel)
-    }
-  }
-}
 
-@Composable
-private fun TitleWithBtn(title: String) {
-  val deleteConfirmDialogState = remember { mutableStateOf(false) }
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(
-      modifier = Modifier.weight(1F).basicMarquee(iterations = Int.MAX_VALUE),
-      text = title,
-      fontSize = 22.sp,
-      color = LocalAppColors.current.tvLv2,
-      fontWeight = FontWeight.Bold,
-    )
-    Icon(
-      contentDescription = "编辑事务",
-      painter = rememberVectorPainter(Icons.Outlined.Settings),
-      tint = LocalAppColors.current.tvLv2,
-      modifier = Modifier.padding(start = 8.dp).clickableNoIndicator {
-        // 编辑面板
-      },
-    )
-    Icon(
-      contentDescription = "删除事务",
-      painter = rememberVectorPainter(Icons.Outlined.Delete),
-      tint = LocalAppColors.current.tvLv2,
-      modifier = Modifier.padding(start = 8.dp).clickableNoIndicator {
-        deleteConfirmDialogState.value = true
-      },
-    )
-  }
-  DeleteAffairDialog(showState = deleteConfirmDialogState)
-}
-
-@Composable
-private fun WeekAndTime(modifier: Modifier, affairDateModel: AffairDateModel) {
-  val text = remember { mutableStateOf("") }
-  Text(
-    text = text.value,
-    fontSize = 13.sp,
-    color = LocalAppColors.current.tvLv2,
-    modifier = modifier,
-  )
-  LaunchedEffect(Unit) {
-    combine(
-      SchoolCalendar.observeFirstMonDayNullable(),
-      affairDateModel.whatTime.map { it.timePair }.flattenConcat(),
-      affairDateModel.date
-    ) { firstDate, timePair, date ->
-      val whichWeek = firstDate?.daysUntil(date)?.div(7)?.plus(1)
-        ?.let { "第${Num2CN.number2ChineseNumber(it)}周" } ?: ""
-      val dayOfWeek = date.dayOfWeek.toChinese()
-      val timePair = timePair.toString()
-      "$whichWeek $dayOfWeek $timePair"
-    }.onEach {
-      text.value = it
-    }.launchIn(this)
-  }
-}
-
-@Composable
-private fun AffairContent(modifier: Modifier, affairDateModel: AffairDateModel) {
-  Text(
-    text = affairDateModel.idModel.content.collectAsState().value,
-    fontSize = 15.sp,
-    color = LocalAppColors.current.tvLv2,
-    modifier = modifier
-  )
-}
-
-
-@Composable
-private fun DeleteAffairDialog(
-  showState: MutableState<Boolean>,
+class AffairBottomSheetDialogState(
+  currentForm: CurrentForm,
 ) {
-  ChooseDialogCompose(
-    showState = showState,
-    positiveBtnText = "确定",
-    negativeBtnText = "取消",
-    onClickPositiveBtn = {
-      toast("todo：删除事务")
-      showState.value = false
-    },
-    onClickNegativeBtn = {
-      showState.value = false
+
+  val currentFormState = mutableStateOf(currentForm)
+
+  sealed interface CurrentForm {
+    val date: Date
+
+    val whatTime: MinuteTimePair
+
+    val title: String
+
+    val content: String
+
+    data class Show(private val model: AffairDateModel) : CurrentForm {
+      override val date: Date
+        get() = model.date.value
+      override val whatTime: MinuteTimePair
+        get() = model.whatTime.value.timePair.value
+      override val title: String
+        get() = model.idModel.title.value
+      override val content: String
+        get() = model.idModel.content.value
+
+      fun createEdit(): Edit? {
+        val editor = model.idModel.tryCreateEditor()
+        if (editor != null) {
+          val dateModelEditor = editor.findDateModelEditor(model)
+          if (dateModelEditor != null) {
+            return Edit(dateModelEditor)
+          } else {
+            toast("出现异常，当前 model 无法找到对应 editor")
+          }
+        } else {
+          toast("出现异常，当前 model 无法创建 editor")
+        }
+        return null
+      }
     }
+
+    data class Edit(
+      var editor: AffairDateModelEditor,
+      val isCreateAffair: Boolean = false, // 是否是创建新事务
+      val commitCallback: (Result<EditResult>) -> Unit = { result ->
+        result.onSuccess {
+          when (it) {
+            EditResult.Deleted -> toast("事务已被删除")
+            EditResult.Success -> toast("修改成功")
+          }
+        }
+      },
+    ) : CurrentForm {
+      override val date: Date
+        get() = editor.date
+      override val whatTime: MinuteTimePair
+        get() = editor.whatTimeEditor!!.timePair
+      override val title: String
+        get() = editor.idModelEditor.title
+      override val content: String
+        get() = editor.idModelEditor.content
+
+      // 编辑状态
+      val editState = mutableStateOf(EditState.EditBasic)
+
+      // 编辑时间段
+      val editTimePair = mutableStateOf<AffairWhatTimeModelEditor?>(null)
+
+      // 原始数据
+      private val originModel: AffairDateModel = editor.dateModel
+
+      // 点击保存时的检查
+      val clickSaveCheck = mutableListOf<() -> String?>()
+
+      // 点击上一步时的检查
+      val clickPrevCheck = mutableListOf<() -> String?>()
+
+      // 点击其他时间时的检查
+      val clickSwitchTimeCheck = mutableListOf<() -> String?>()
+
+      // 取消编辑
+      fun cancelEdit(): Show? {
+        if (editor.idModelEditor.cancelEdit()) {
+          clickSaveCheck.clear()
+          clickPrevCheck.clear()
+          clickSwitchTimeCheck.clear()
+          return Show(originModel)
+        }
+        return null
+      }
+
+      // 提交
+      suspend fun commit(): Show? {
+        return editor.idModelEditor.commit().also {
+          commitCallback.invoke(it)
+        }.map {
+          clickSaveCheck.clear()
+          clickPrevCheck.clear()
+          clickSwitchTimeCheck.clear()
+          Show(editor.dateModel)
+        }.getOrNull()
+      }
+    }
+
+    enum class EditState {
+      EditBasic, EditTime
+    }
+  }
+}
+
+
+@Composable
+fun AffairBottomSheetDialog(
+  courseBottomSheetDialogState: CourseItemBottomSheetDialogState,
+  affairBottomSheetDialogState: AffairBottomSheetDialogState,
+) {
+  Column(
+    modifier = Modifier.fillMaxSize().padding(top = 16.dp, start = 16.dp, end = 16.dp)
   ) {
-    Box(
-      modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 28.dp),
-      contentAlignment = Alignment.Center,
-    ) {
-      Text(
-        text = "确定要删除该事务吗？",
-        color = LocalAppColors.current.tvLv2,
-        fontSize = 14.sp,
+    when (val currentForm = affairBottomSheetDialogState.currentFormState.value) {
+      is CurrentForm.Show -> AffairShowCompose(
+        currentForm = currentForm,
+        courseState = courseBottomSheetDialogState,
+        affairState = affairBottomSheetDialogState,
+      )
+      is CurrentForm.Edit -> AffairEditCompose(
+        currentForm = currentForm,
+        courseState = courseBottomSheetDialogState,
+        affairState = affairBottomSheetDialogState,
       )
     }
   }

@@ -24,7 +24,7 @@ object SyncAffairUtils {
     supervisorScope {
       // 本地数据与远端数据都有数据，但数据存在差异，需要进行比较
       // 先通过 remoteId 整合起来比较单个事务
-      val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId.value }
+      val oldMap = groupModel.itemList.value.associateByTo(LinkedHashMap()) { it.remoteId }
       oldMap.remove(0) // 本地临时事务不参与更新
       val newMap = affairs.associateByTo(LinkedHashMap()) { it.remoteId }
       val newMapIterator = newMap.iterator()
@@ -66,7 +66,9 @@ object SyncAffairUtils {
       }
       newMap.forEach {
         val editor = groupModel.createAddAffairEditor(
-          remoteId = it.value.remoteId
+          remoteId = it.value.remoteId,
+          title = it.value.title,
+          content = it.value.content,
         )
         syncAffairEntity(editor, it.value)
         launch {

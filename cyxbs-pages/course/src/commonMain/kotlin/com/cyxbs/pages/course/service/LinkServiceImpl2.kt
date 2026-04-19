@@ -13,6 +13,14 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @ImplProvider
 object LinkServiceImpl2 : ILinkService2 {
+
   override val state: StateFlow<ILinkService2.LinkStu>
     get() = LinkLessonRepository.state
+
+  override val enableShow: StateFlow<Boolean>
+    get() = LinkLessonRepository.enableShow
+
+  override fun changeVisible() {
+    LinkLessonRepository.changeVisible()
+  }
 }

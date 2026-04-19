@@ -7,6 +7,7 @@ import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
@@ -62,8 +63,17 @@ interface AffairGroupModel {
    * 创建添加事务的 editor，使用 [AffairIdModelEditor.commit] 后上传到远端
    */
   fun createAddAffairEditor(
+    title: String,
+    content: String,
     remoteId: Int = 0, // 正常情况下新增事务为 0，不为 0 仅提供给同步使用
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null,
   ): AffairIdModelEditor
+
+  fun createAffairIdModel(
+    title: String,
+    content: String,
+  ): AffairIdModel
 }
 
 // 单个事务，id 为唯一值
@@ -74,44 +84,54 @@ interface AffairIdModel {
   // 非后端返回 id，此 id 为客户端上的唯一 id
   val localId: String
   // 后端 id，如果 = 0，则说明是本地临时事务
-  val remoteId: StateFlow<Int>
-  val remindTime: EditorStateFlow<AffairIdModelEditor, Int>
-  val title: EditorStateFlow<AffairIdModelEditor, String>
-  val content: EditorStateFlow<AffairIdModelEditor, String>
+  val remoteId: Int
+  val remindTime: EditorStateFlow<Int>
+  val title: EditorStateFlow<String>
+  val content: EditorStateFlow<String>
 
   val whatTimeDate: StateFlow<ImmutableMap<out AffairWhatTimeModel, ImmutableList<AffairDateModel>>>
 
-  // 新增的 AffairDateModel
+  // 在 AffairWhatTimeModelEditor 中新增的 AffairDateModel
   val addedDateModel: Flow<AffairDateModel>
 
-  fun createEditor(): AffairIdModelEditor?
+  // 在 AffairWhatTimeModelEditor 中移除的 AffairDateModel
+  val removedDateModel: Flow<AffairDateModel>
 
-  suspend fun createEditorSuspend(): AffairIdModelEditor
+  fun tryCreateEditor(
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null,
+  ): AffairIdModelEditor?
+
+  suspend fun createEditorSuspend(
+    cancelCallback: (() -> Unit)? = null,
+    commitCallback: ((Result<AffairIdModelEditor.EditResult>) -> Unit)? = null
+  ): AffairIdModelEditor
+
 }
 
 // 事务时间段，timePair 表明了时间段的开始和结束
 // 其下包含多个日期 AffairItemModel
 interface AffairWhatTimeModel {
   // 返回 false 时表示该 AffairWhatTimeModel 已经被删除
-  val enable: EditorStateFlow<AffairWhatTimeModelEditor, Boolean>
+  val enable: EditorStateFlow<Boolean>
 
   val idModel: AffairIdModel
 
-  val timePair: EditorStateFlow<AffairWhatTimeModelEditor, MinuteTimePair>
+  val timePair: EditorStateFlow<MinuteTimePair>
 }
 
 // 事务日期，作为整个事务的叶子结点
 // 其对象在整个应用生命周期内不会改变，可用于绑定 Compose 结点
 interface AffairDateModel {
   // 返回 false 时表示该 AffairLeafModel 已经被删除
-  val enable: EditorStateFlow<AffairDateModelEditor, Boolean>
+  val enable: EditorStateFlow<Boolean>
 
   val idModel: AffairIdModel
 
   // whatTime 是可能会发生改变的，例如从原先的 whatTimeList 中分裂出新的 whatTime
-  val whatTime: EditorStateFlow<AffairDateModelEditor, AffairWhatTimeModel>
+  val whatTime: EditorStateFlow<AffairWhatTimeModel>
 
-  val date: EditorStateFlow<AffairDateModelEditor, Date>
+  val date: EditorStateFlow<Date>
 }
 
 //////////////////////////////////////// Editor ////////////////////////////////////////
@@ -136,11 +156,14 @@ interface AffairIdModelEditor {
 
   fun clear() // 清空所有 whatTimeList，如果 editor 提交时 whatTimeList 为空则等同于删除当前事务
 
+  fun findDateModelEditor(dateModel: AffairDateModel): AffairDateModelEditor?
+
   fun enableModify(): Boolean // 能否修改
 
   // 提交
   suspend fun commit(
     needUpload: Boolean = true, // 是否需要上传到后端，正常情况下都需要上传，不上传仅提供给同步使用
+    needAdd: Boolean = true, // 是否添加进事务列表中，正常情况下都会添加，如果你需要 mock 一个事务则很有用
   ): Result<EditResult>
 
   // 取消本次编辑
@@ -180,9 +203,9 @@ interface AffairDateModelEditor {
 }
 
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
-abstract class EditorStateFlow<Editor, Value>(
+abstract class EditorStateFlow<Value>(
   val valueFlow: StateFlow<Value>,
-  val valueByEditorFlow: Flow<Pair<Editor, Value>>
+  val valueByEditorFlow: Flow<Value>,
 ) : StateFlow<Value> by valueFlow {
-  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it.second })
+  val mergeFlow: Flow<Value> = merge(valueFlow, valueByEditorFlow.map { it }).distinctUntilChanged()
 }

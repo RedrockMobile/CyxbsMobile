@@ -9,4 +9,6 @@ import kotlinx.serialization.Serializable
  * @date 2025/11/16
  */
 @Serializable
-object CourseNavArgument
+class CourseNavArgument(
+  val stuNum: String,
+)

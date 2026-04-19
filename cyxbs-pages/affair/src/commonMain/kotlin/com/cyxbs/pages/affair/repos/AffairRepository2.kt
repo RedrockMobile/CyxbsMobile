@@ -155,8 +155,7 @@ object AffairRepository2 {
       AffairApiService2::class.impl().addAffair(request)
     }.mapCatching {
       it.throwApiExceptionIfFail()
-      @OptIn(ExperimentalUuidApi::class)
-      request.toAffairEntity(localId = localId, remoteId = it.id)
+      request.toAffairEntity(localId = localId, remoteId = it.data.id)
     }.recoverCatching {
       // 上传失败
       if (it is ClientRequestException || it is ApiException) {
@@ -165,7 +164,6 @@ object AffairRepository2 {
         )
       } else if (allowLocal) {
         // 添加进本地临时数据中
-        @OptIn(ExperimentalUuidApi::class)
         val newAffair = request.toAffairEntity(localId = localId, remoteId = 0) // 本地临时事务 remoteId 为 0
         LocalAddAffairRepository.add(stuNum, newAffair)
         return@recoverCatching newAffair
@@ -305,7 +303,7 @@ object AffairRepository2 {
           } else throw e
         }
         // 这里无需异步上传，同步即可
-        LocalDeleteAffairRepository.get(stuNum).forEach { localId ->
+        LocalDeleteAffairRepository.get(stuNum).toSet().forEach { localId ->
           deleteAffair(
             stuNum = stuNum,
             localId = localId,
@@ -317,7 +315,7 @@ object AffairRepository2 {
             LocalDeleteAffairRepository.remove(stuNum, localId)
           }.getOrThrow()
         }
-        LocalUpdateAffairRepository.get(stuNum).forEach { (remoteId, affair) ->
+        LocalUpdateAffairRepository.get(stuNum).toMap().forEach { (remoteId, affair) ->
           updateAffair(
             stuNum = stuNum,
             affair = affair,
@@ -329,7 +327,7 @@ object AffairRepository2 {
             LocalUpdateAffairRepository.remove(stuNum, remoteId)
           }.getOrThrow()
         }
-        LocalAddAffairRepository.get(stuNum).forEach { (localId, affair) ->
+        LocalAddAffairRepository.get(stuNum).toMap().forEach { (localId, affair) ->
           addAffair(
             stuNum = stuNum,
             localId = affair.localId,
@@ -354,7 +352,6 @@ object AffairRepository2 {
             affairItemModelMap[stuNum]?.itemList?.value?.find {
               it.localId == localId
             }?.let {
-              it.remoteId.value = newAffair.remoteId
               it.entity = newAffair
             }
           }.recoverCatching {

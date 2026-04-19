@@ -1,11 +1,11 @@
 package com.cyxbs.pages.course.view.item.extension
 
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animate
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.course.view.item.CourseItemState
+import kotlinx.datetime.DayOfWeek
 
 /**
  * 支持长按移动的 item
@@ -22,21 +22,22 @@ interface IMovableItemExtension : CourseItemExtension {
     transition: MutableState<Offset>,
     screenTopLeft: Offset,
     size: IntSize,
-  ): Offset = Offset.Companion.Zero
+    newBeginTime: MinuteTime,
+  ): Offset = Offset.Zero
 
-  // 根据最终目的地的偏移量执行动画
-  suspend fun animateMove(
+  // 修改 item 时间段
+  suspend fun changeWhatTime(
     itemState: CourseItemState,
-    transition: MutableState<Offset>,
-    destinationOffset: Offset,
+    newBeginTime: MinuteTime,
+    newDayOfWeek: DayOfWeek,
   ) {
-    animate(
-      typeConverter = Offset.Companion.VectorConverter,
-      initialValue = transition.value,
-      targetValue = destinationOffset,
-    ) { value, _ ->
-      transition.value = value
-    }
+    val now = itemState.item.whatTime.now.value
+    // 修改 item 时间段至对应时间
+    itemState.item.whatTime.now.value = now.copy(
+      dayOfWeek = newDayOfWeek,
+      beginTime = newBeginTime,
+      finalTime = newBeginTime + (now.finalTime - now.beginTime)
+    )
   }
 
   // 在移动过程中是否允许展开时间轴

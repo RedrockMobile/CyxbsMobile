@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -12,12 +13,14 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.toSize
 import com.cyxbs.components.config.time.MinuteTime
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.LocalCoursePage
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -32,9 +35,34 @@ import kotlin.math.roundToInt
  * @date 2025/11/16
  */
 object LayoutItemModifier : CourseItemModifier {
+
+  // 是否启动时间信息改变后的动画，默认开启
+  val animLock = CourseItemState.ValueKey { Lock() }
+
   @Composable
   override fun createModifier(): Modifier {
+    val itemState = itemState
     return courseItemLayout(itemState)
+  }
+
+  class Lock {
+    private val count = mutableIntStateOf(0)
+
+    private val isLocked = derivedStateOfStructure { count.intValue > 0 }
+
+    fun lock(): Runnable {
+      count.intValue++
+      var isUnlock = false
+      return Runnable {
+        if (isUnlock) return@Runnable
+        isUnlock = true
+        count.intValue--
+      }
+    }
+
+    fun isLocked(): Boolean {
+      return isLocked.value
+    }
   }
 }
 
@@ -45,7 +73,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   // 水平位置
   val indexAnimatable = remember {
     Animatable(
-      initialValue = calculateIndex(itemState, timeline).toFloat(),
+      initialValue = calculateIndex(itemState).toFloat(),
     )
   }
   val beginTimeAnimatable = remember {
@@ -63,15 +91,33 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   LaunchedEffect(timeline.beginDayOfWeek) {
     itemState.item.whatTime.now.collectLatest {
       supervisorScope {
-        val newIndex = calculateIndex(itemState, timeline).toFloat()
+        val newIndex = calculateIndex(itemState).toFloat()
         if (newIndex != indexAnimatable.value) {
-          launch { indexAnimatable.animateTo(newIndex) }
+          launch {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
+              indexAnimatable.animateTo(newIndex)
+            } else {
+              indexAnimatable.snapTo(newIndex)
+            }
+          }
         }
         if (it.beginTime.minuteOfDay != beginTimeAnimatable.value) {
-          launch { beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay) }
+          launch {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
+              beginTimeAnimatable.animateTo(it.beginTime.minuteOfDay)
+            } else {
+              beginTimeAnimatable.snapTo(it.beginTime.minuteOfDay)
+            }
+          }
         }
         if (it.finalTime.minuteOfDay != finalTimeAnimatable.value) {
-          launch { finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay) }
+          launch {
+            if (!LayoutItemModifier.animLock.get(itemState).isLocked()) {
+              finalTimeAnimatable.animateTo(it.finalTime.minuteOfDay)
+            } else {
+              finalTimeAnimatable.snapTo(it.finalTime.minuteOfDay)
+            }
+          }
         }
       }
     }
@@ -80,7 +126,7 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     val beginWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(beginTimeAnimatable.value))
     val finalWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(finalTimeAnimatable.value))
     val width = constraints.maxWidth / 7
-    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt()
+    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(1)
     val placeable = measurable.measure(Constraints.fixed(width, height))
     layout(width, height) {
       placeable.placeRelative(
@@ -92,24 +138,26 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
   }
 }
 
-private fun calculateIndex(itemState: CourseItemState, timeline: CourseTimeline): Int {
+private fun calculateIndex(itemState: CourseItemState,): Int {
   val itemDayOfWeekOrdinal = itemState.item.whatTime.now.value.dayOfWeek.ordinal
-  val beginDayOfWeekOrdinal = timeline.beginDayOfWeek.ordinal
+  val beginDayOfWeekOrdinal = itemState.coursePage.timeline.beginDayOfWeek.ordinal
   return (itemDayOfWeekOrdinal + 7 - beginDayOfWeekOrdinal) % 7
 }
 
 /**
  * 获取 item 在屏幕中的坐标
  * 会跟随 item 的位置移动而实时改变
+ * @param forceCalculate 是否强制实时计算 item 的坐标位置，一般用于当前 item 还未完全变成对应时间的情况
  */
-fun CourseItemState.observeItemRectInWindow(): Flow<Rect> {
+fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Flow<Rect> {
   return layoutCoordinatesFlow.flatMapLatest { itemCoordinates ->
-    if (itemCoordinates != null && itemCoordinates.isAttached) {
+    if (itemCoordinates != null && itemCoordinates.isAttached && !forceCalculate) {
       flowOf(Rect(itemCoordinates.positionInWindow(), itemCoordinates.size.toSize()))
     } else {
       // 此时 item 可能已经不可见，比如被上方重叠的 item 遮挡完了
       // 使用 coursePage.layoutCoordinatesFlow 进行计算
-      coursePage.layoutCoordinatesFlow
+      coursePageFlow.filterNotNull()
+        .flatMapLatest { it.layoutCoordinatesFlow }
         .filter { it.isAttached } // 需要确保 isAttached，防止 page 已经不可见
         .map { pageCoordinates ->
           // 手动计算 item 的位置，跟 courseItemLayout 计算逻辑保持一致
@@ -118,7 +166,7 @@ fun CourseItemState.observeItemRectInWindow(): Flow<Rect> {
           val width = pageCoordinates.size.width / 7
           val height =
             (pageCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt()
-          val x = calculateIndex(this, coursePage.timeline) * pageCoordinates.size.width / 7F
+          val x = calculateIndex(this) * pageCoordinates.size.width / 7F
           val y = beginWeightRatio * pageCoordinates.size.height
           val offsetInWindow = pageCoordinates.positionInWindow()
           Rect(

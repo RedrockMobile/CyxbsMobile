@@ -32,7 +32,7 @@ class AffairWhatTimeModelEditorImpl(
       return "已有相同时间段"
     }
     this.timePair = timePair
-    whatTimeModel.timePair.valueByEditorStateFlow.tryEmit(this to timePair)
+    whatTimeModel.timePair.valueByEditorStateFlow.tryEmit(timePair)
     return null
   }
 
@@ -67,11 +67,12 @@ class AffairWhatTimeModelEditorImpl(
     idModelEditor.editorWhatTimeDate { whatTimeDate ->
       val dateList = whatTimeDate[this] ?: return false
       if (!dateList.remove(date)) return false
-      date.dateModel.enable.valueByEditorStateFlow.tryEmit(date to false)
+      date.dateModel.enable.valueByEditorStateFlow.tryEmit(false)
       date.whatTimeEditor = null
       if (!incrementAddList.remove(date)) {
         incrementRemoveList.add(date)
       }
+      idModelEditor.idModel.removedDateModel.tryEmit(date.dateModel)
       return true
     }
     return false
@@ -85,8 +86,9 @@ class AffairWhatTimeModelEditorImpl(
         if (!incrementAddList.contains(it)) {
           incrementRemoveList.add(it)
         }
-        it.dateModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.dateModel.enable.valueByEditorStateFlow.tryEmit(false)
         it.whatTimeEditor = null
+        idModelEditor.idModel.removedDateModel.tryEmit(it.dateModel)
       }
       dateList.clear()
       incrementAddList.clear()
@@ -111,10 +113,10 @@ class AffairWhatTimeModelEditorImpl(
       }
       newDateList.add(date)
       date.whatTimeEditor = this
-      date.dateModel.whatTime.valueByEditorStateFlow.tryEmit(date to whatTimeModel)
+      date.dateModel.whatTime.valueByEditorStateFlow.tryEmit(whatTimeModel)
       if (oldWhatTimeModelEditor == null) {
         // 说明已经被移除了
-        date.dateModel.enable.valueByEditorStateFlow.tryEmit(date to true)
+        date.dateModel.enable.valueByEditorStateFlow.tryEmit(true)
       }
       if (!incrementRemoveList.remove(date)) {
         incrementAddList.add(date)
@@ -132,8 +134,9 @@ class AffairWhatTimeModelEditorImpl(
       // 添加的都移除
       incrementAddList.forEach {
         nowDateList.remove(it)
-        it.dateModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.dateModel.enable.valueByEditorStateFlow.tryEmit(false)
         it.whatTimeEditor = null
+        idModelEditor.idModel.removedDateModel.tryEmit(it.dateModel)
       }
       incrementAddList.clear()
       // 移除的都添加回来
@@ -141,11 +144,12 @@ class AffairWhatTimeModelEditorImpl(
         it.whatTimeEditor?.incrementAddList?.remove(it)
         whatTimeDate[it.whatTimeEditor]?.remove(it)
         nowDateList.add(it)
-        it.dateModel.whatTime.valueByEditorStateFlow.tryEmit(it to whatTimeModel)
+        it.dateModel.whatTime.valueByEditorStateFlow.tryEmit(whatTimeModel)
         if (it.whatTimeEditor == null) {
-          it.dateModel.enable.valueByEditorStateFlow.tryEmit(it to true)
+          it.dateModel.enable.valueByEditorStateFlow.tryEmit(true)
         }
         it.whatTimeEditor = this
+        idModelEditor.idModel.addedDateModel.tryEmit(it.dateModel)
       }
       incrementRemoveList.clear()
       // 下层节点重置

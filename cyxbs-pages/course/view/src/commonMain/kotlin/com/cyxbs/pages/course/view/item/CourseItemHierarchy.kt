@@ -4,11 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
-import androidx.lifecycle.viewModelScope
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePage
@@ -18,8 +18,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.datetime.DayOfWeek
@@ -28,6 +30,7 @@ import kotlinx.datetime.DayOfWeek
  * 课表 item 层级，用于控制 item 重叠关系
  * - [add]: 添加一个 item
  * - [remove]: 移除一个 item
+ * - [replace]: 替换 item 的 fixed
  * - [reset]: 重置所有 item
  * - [CoursePageItemListContent]: 展示 item
  *
@@ -37,15 +40,15 @@ import kotlinx.datetime.DayOfWeek
 @Stable
 class CourseItemHierarchy<Item : CourseItem> {
 
-  private var courseItemViewModel: CourseItemViewModel? = null
+  private var decorationManager: CoursePageDecorationManager? = null
   private val whatTimeListWhenNoCourseItemViewModel = mutableListOf<ItemHierarchyWhatTime<Item>>()
 
   // 绑定 CourseItemViewModel
-  fun bindCourseItemViewModel(courseItemViewModel: CourseItemViewModel) {
-    require(this.courseItemViewModel == null) {
-      "不允许重新绑定 CourseItemViewModel，old: ${this.courseItemViewModel}, new: $courseItemViewModel"
+  fun bindCourseItemViewModel(decorationManager: CoursePageDecorationManager) {
+    require(this.decorationManager == null) {
+      "不允许重新绑定 CourseItemViewModel，old: ${this.decorationManager}, new: ${this@CourseItemHierarchy.decorationManager}"
     }
-    this.courseItemViewModel = courseItemViewModel
+    this.decorationManager = decorationManager
     reset(whatTimeListWhenNoCourseItemViewModel)
     whatTimeListWhenNoCourseItemViewModel.clear()
   }
@@ -71,8 +74,9 @@ class CourseItemHierarchy<Item : CourseItem> {
   // 添加一个 item
   fun add(whatTime: ItemHierarchyWhatTime<Item>) {
     synchronized(dateItemsMapSynchronized) {
-      val courseItemViewModel = courseItemViewModel
+      val courseItemViewModel = decorationManager
       if (courseItemViewModel == null) {
+        // 还不存在 courseItemViewModel，延后添加
         whatTimeListWhenNoCourseItemViewModel.add(whatTime)
         return
       }
@@ -94,12 +98,38 @@ class CourseItemHierarchy<Item : CourseItem> {
     fixed: CourseItemWhatTime.Fixed = whatTime.now.value
   ) {
     synchronized(dateItemsMapSynchronized) {
+      if (whatTimeListWhenNoCourseItemViewModel.remove(whatTime)) {
+        return
+      }
       val itemWrapper = itemWrapperMap.remove(whatTime) ?: return
       itemWrapper.onClear()
       if (fixed.page < 0) return // 负数表示展示未添加进 itemWrapperList
       val dateKey = fixed.page * 7 + fixed.dayOfWeek.ordinal
       getDateKeyValue(dateKey).itemWrapperList.remove(whatTime)
-      courseItemViewModel?.tryRefresh(dateKey)
+      decorationManager?.tryRefresh(dateKey)
+    }
+  }
+
+  // 替换 item 的 fixed
+  fun replace(
+    whatTime: ItemHierarchyWhatTime<Item>,
+    oldFixed: CourseItemWhatTime.Fixed,
+    newFixed: CourseItemWhatTime.Fixed,
+  ) {
+    synchronized(dateItemsMapSynchronized) {
+      if (whatTimeListWhenNoCourseItemViewModel.contains(whatTime)) return // 还未添加进 itemWrapperList
+      if (!itemWrapperMap.containsKey(whatTime)) return
+      if (oldFixed.page >= 0) {
+        val oldDateKey = oldFixed.page * 7 + oldFixed.dayOfWeek.ordinal
+        getDateKeyValue(oldDateKey).itemWrapperList.remove(whatTime)
+        decorationManager?.tryRefresh(oldDateKey)
+      }
+      if (newFixed.page < 0) return // 负数表示展示不添加进 itemWrapperList
+      val newDateKey = newFixed.page * 7 + newFixed.dayOfWeek.ordinal
+      val itemWrapperList = getDateKeyValue(newDateKey).itemWrapperList
+      val index = getIndex(whatTime, itemWrapperList) // 保证有序插入
+      itemWrapperList.add(index, whatTime)
+      decorationManager?.tryRefresh(newDateKey)
     }
   }
 
@@ -107,8 +137,8 @@ class CourseItemHierarchy<Item : CourseItem> {
   // 支持相等数据的自动迁移
   fun reset(whatTimeList: List<ItemHierarchyWhatTime<Item>>) {
     synchronized(dateItemsMapSynchronized) {
-      val courseItemViewModel = courseItemViewModel
-      if (courseItemViewModel == null) {
+      val decorationManager = this@CourseItemHierarchy.decorationManager
+      if (decorationManager == null) {
         whatTimeListWhenNoCourseItemViewModel.clear()
         whatTimeListWhenNoCourseItemViewModel.addAll(whatTimeList)
         return
@@ -117,7 +147,7 @@ class CourseItemHierarchy<Item : CourseItem> {
         // 如果需要清空列表，则删除所有数据
         dateKeyValueMap.forEach { (dateKey, dateKeyValue) ->
           if (dateKeyValue.itemWrapperList.isNotEmpty()) {
-            courseItemViewModel.tryRefresh(dateKey)
+            decorationManager.tryRefresh(dateKey)
             dateKeyValue.itemWrapperList.forEach {
               itemWrapperMap.remove(it)?.onClear()
             }
@@ -158,9 +188,9 @@ class CourseItemHierarchy<Item : CourseItem> {
                 dateKeyValue.itemWrapperList.clear()
               }
               // 添加新数据
-              newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, courseItemViewModel) } }
+              newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, decorationManager) } }
               dateKeyValue.itemWrapperList.addAll(newItemList)
-              courseItemViewModel.tryRefresh(dateKey)
+              decorationManager.tryRefresh(dateKey)
             }
           } else {
             if (dateKeyValue.itemWrapperList.isNotEmpty()) {
@@ -170,7 +200,7 @@ class CourseItemHierarchy<Item : CourseItem> {
                 itemWrapperMap.remove(it)?.onClear()
               }
               dateKeyValue.itemWrapperList.clear()
-              courseItemViewModel.tryRefresh(dateKey)
+              decorationManager.tryRefresh(dateKey)
             }
           }
         }
@@ -178,10 +208,10 @@ class CourseItemHierarchy<Item : CourseItem> {
           // 剩下的为新增的 dateKey 对应数据
           val newItemList = itemList.apply { sort() } // 排序
           // 添加新数据
-          newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, courseItemViewModel) } }
+          newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, decorationManager) } }
           if (dateKey >= 0) { // < 0 则延后添加进 itemWrapperList
             getDateKeyValue(dateKey).itemWrapperList.addAll(newItemList) // newItemList 已排序
-            courseItemViewModel.tryRefresh(dateKey)
+            decorationManager.tryRefresh(dateKey)
           }
         }
       }
@@ -212,6 +242,13 @@ class CourseItemHierarchy<Item : CourseItem> {
     }
   }
 
+  fun getAllWhatTime(): List<ItemHierarchyWhatTime<Item>> {
+    synchronized(dateItemsMapSynchronized) {
+      return itemWrapperMap.keys.toList()
+    }
+  }
+
+  // 观察对应页面对应星期数的 item
   fun observe(page: Int, dayOfWeek: DayOfWeek): StateFlow<List<CourseItemState>> {
     val dateKey = page * 7 + dayOfWeek.ordinal
     synchronized(dateItemsMapSynchronized) {
@@ -219,21 +256,31 @@ class CourseItemHierarchy<Item : CourseItem> {
     }
   }
 
-  // 显示所有 item
-  @Composable
-  fun CoursePageItemListContent() {
-    DayOfWeek.entries.forEach {
-      DayOfWeekCompose(it)
+  // 观察整个星期的 item
+  fun observeWeek(page: Int): Flow<List<CourseItemState>> {
+    return combine(
+      DayOfWeek.entries.map {
+        observe(page, it)
+      }
+    ) {
+      it.toList().flatten()
     }
   }
 
+  // 显示所有 item
   @Composable
-  private fun DayOfWeekCompose(
-    dayOfWeek: DayOfWeek,
-  ) {
+  fun CoursePageItemListContent() {
     val pageContext = LocalCoursePage.current
-    val overlayResultList by observe(pageContext.page, dayOfWeek).collectAsState()
-    overlayResultList.fastForEach { itemState ->
+    // 这里不能以 DayOfWeek 维度来拆分成多个子 Compose 函数
+    // 必须要整合所有 DayOfWeek 到一个 state 里面 (courseItemStateListState)
+    // 原因在于分开后 DayOfWeek 的每次遍历都会认为是一个新的 group
+    // 如果一个 item 从 周一 移动到 周二，则会认为是 周一 group 下的 item 被移除，周二 group 下新增了 item (即使两次 item 是同一个对象)
+    // 使用了 key(item) 来判断也是如此，因为 key 是在每个 group 下的判断
+    // 结论：每次循环都会生成一个新的 group，如果想让 item 能正常的移动，就需要在同一个 group 下，即只能用一层循环
+    val courseItemStateListState = remember(pageContext.page) {
+      observeWeek(pageContext.page)
+    }.collectAsState(emptyList())
+    courseItemStateListState.value.fastForEach { itemState ->
       key(itemState) {
         CompositionLocalProvider(LocalCourseItemState provides itemState) {
           itemState.updateCoursePage(pageContext)
@@ -272,26 +319,29 @@ class CourseItemHierarchy<Item : CourseItem> {
 
   private inner class ItemWrapper(
     val whatTime: ItemHierarchyWhatTime<Item>,
-    val courseItemViewModel: CourseItemViewModel,
+    val decorationManager: CoursePageDecorationManager,
   ) {
 
     // 绑定在 viewModelScope 之下的子协程作用域
     private val coroutineScope = CoroutineScope(
-      courseItemViewModel.viewModelScope.coroutineContext
-          + SupervisorJob(courseItemViewModel.viewModelScope.coroutineContext[Job])
+      decorationManager.courseCoroutineScope.coroutineContext
+          + SupervisorJob(decorationManager.courseCoroutineScope.coroutineContext[Job])
     )
 
-    val item = whatTime.createItem(coroutineScope)
-
-    val itemState = CourseItemState(item)
+    // itemState 会在触发 refresh 后才会被懒加载
+    val itemState by lazy {
+      val item = whatTime.createItem(coroutineScope)
+      CourseItemState(item).also {
+        item.itemState = it
+        whatTime.itemState = it
+      }
+    }
 
     init {
-      item.itemState = itemState
       var lastFixed = whatTime.now.value
       whatTime.now.onEach {
         if (it != lastFixed) {
-          remove(whatTime, lastFixed)
-          add(whatTime)
+          replace(whatTime, lastFixed, it)
           lastFixed = it
         }
       }.launchIn(coroutineScope)
@@ -303,10 +353,39 @@ class CourseItemHierarchy<Item : CourseItem> {
   }
 }
 
-
-abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime, Comparable<ItemHierarchyWhatTime<Item>> {
+// 这里包了一层有两个目的：
+// 1. 懒加载 item 对象，减少创建
+// 2. item 的 coroutineScope 统一收口
+abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime {
   abstract override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
+
+  // 调用 createItem 后才会创建 itemState
+  // 子类可重写获得 itemState 初始化时机
+  open var itemState: CourseItemState? = null
+
   abstract fun createItem(coroutineScope: CoroutineScope): Item
   abstract override fun equals(other: Any?): Boolean
   abstract override fun hashCode(): Int
+
+  override fun compareTo(other: CourseItemWhatTime): Int {
+    return 0.compareBy(other) {
+      -it.now.value.page // page 越小越在上
+    }.compareBy(other) {
+      -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
+    }.compareBy(other) {
+      it.now.value.beginTime.value // beginTime 越大越在上
+    }.compareBy(other) {
+      it.now.value.finalTime.value // finalTime 越大越在上
+    }
+  }
+
+  protected inline fun Int.compareBy(
+    other: CourseItemWhatTime,
+    compare: (CourseItemWhatTime) -> Int
+  ): Int {
+    if (this != 0) return this
+    val a = compare.invoke(this@ItemHierarchyWhatTime)
+    val b = compare.invoke(other)
+    return a - b
+  }
 }

@@ -1,6 +1,8 @@
 package com.cyxbs.pages.affair.model.editor
 
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.pages.affair.api.AffairDateModel
+import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.AffairIdModelEditor
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
 import com.cyxbs.pages.affair.model.impl.AffairIdModelImpl
@@ -20,7 +22,7 @@ import kotlin.concurrent.Volatile
 class AffairIdModelEditorImpl(
   override val idModel: AffairIdModelImpl,
   val cancelEdit: AffairIdModelEditorImpl.() -> Unit,
-  val commitAction: suspend AffairIdModelEditorImpl.(Boolean) -> Result<AffairIdModelEditor.EditResult>,
+  val commitAction: suspend AffairIdModelEditorImpl.(needUpload: Boolean, needAdd: Boolean) -> Result<AffairIdModelEditor.EditResult>,
 ) : AffairIdModelEditor {
   override var remindTime = idModel.remindTime.value
   override var title = idModel.title.value
@@ -65,22 +67,21 @@ class AffairIdModelEditorImpl(
     if (!enableModify()) return "提交修改后不可再修改"
     if (remindTime < 0) return "remindTime 不能小于 0"
     this.remindTime = remindTime
-    idModel.remindTime.valueByEditorStateFlow.tryEmit(this to remindTime)
+    idModel.remindTime.valueByEditorStateFlow.tryEmit(remindTime)
     return null
   }
 
   override fun setTitle(title: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
-    if (title.isBlank()) return "title 不能为空"
     this.title = title
-    idModel.title.valueByEditorStateFlow.tryEmit(this to title)
+    idModel.title.valueByEditorStateFlow.tryEmit(title)
     return null
   }
 
   override fun setContent(content: String): String? {
     if (!enableModify()) return "提交修改后不可再修改"
     this.content = content
-    idModel.content.valueByEditorStateFlow.tryEmit(this to content)
+    idModel.content.valueByEditorStateFlow.tryEmit(content)
     return null
   }
 
@@ -107,7 +108,7 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       if (whatTimeDate.contains(whatTime)) {
         whatTime.clear()
-        whatTime.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(whatTime to false)
+        whatTime.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         whatTimeDate.remove(whatTime)
         if (!incrementAddList.remove(whatTime)) {
           incrementRemoveList.add(whatTime)
@@ -123,7 +124,7 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       whatTimeDate.keys.forEach {
         it.clear()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         incrementRemoveList.add(it)
       }
       incrementRemoveList.removeAll(incrementAddList)
@@ -140,18 +141,26 @@ class AffairIdModelEditorImpl(
     editorWhatTimeDate { whatTimeDate ->
       incrementAddList.forEach {
         it.reset()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to false)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(false)
         whatTimeDate.remove(it)
       }
       incrementAddList.clear()
       incrementRemoveList.forEach {
         whatTimeDate[it] = mutableListOf()
-        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(it to true)
+        it.whatTimeModel.enable.valueByEditorStateFlow.tryEmit(true)
       }
       incrementRemoveList.clear()
       whatTimeDate.keys.forEach {
         it.reset()
       }
+    }
+  }
+
+  override fun findDateModelEditor(dateModel: AffairDateModel): AffairDateModelEditor? {
+    return whatTimeDate.firstNotNullOfOrNull { entry ->
+      if (entry.key.whatTimeModel == dateModel.whatTime.value)
+        entry.value.find { it.dateModel == dateModel }
+      else null
     }
   }
 
@@ -161,10 +170,13 @@ class AffairIdModelEditorImpl(
 
   private val commitMutex = Mutex()
 
-  override suspend fun commit(needUpload: Boolean): Result<AffairIdModelEditor.EditResult> {
+  override suspend fun commit(
+    needUpload: Boolean,
+    needAdd: Boolean
+  ): Result<AffairIdModelEditor.EditResult> {
     if (!enableModify()) return Result.failure(IllegalStateException("提交修改后不可再修改"))
     return commitMutex.withLock {
-      commitAction.invoke(this, needUpload).onSuccess {
+      commitAction.invoke(this, needUpload, needAdd).onSuccess {
         enableModify = false // 提交成功后不可再修改
       }
     }

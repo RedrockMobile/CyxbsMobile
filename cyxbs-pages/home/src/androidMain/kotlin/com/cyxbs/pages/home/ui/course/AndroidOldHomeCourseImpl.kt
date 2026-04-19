@@ -7,6 +7,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.sp.SP_COURSE_COMPOSE
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.pages.home.R
@@ -24,7 +25,7 @@ import com.g985892345.provider.api.annotation.ImplProvider
 @ImplProvider
 object AndroidOldHomeCourseImpl : IOldHomeCourse {
 
-  override val enable: Boolean = !defaultSp.getBoolean(SP_COURSE_COMPOSE, false)
+  override val enable: Boolean = !defaultSp.getBoolean(SP_COURSE_COMPOSE, isDebug())
 
   override val content: @Composable ((Modifier) -> Unit) = { modifier ->
     val bottomNavViewModel = viewModel(BottomNavViewModel::class)

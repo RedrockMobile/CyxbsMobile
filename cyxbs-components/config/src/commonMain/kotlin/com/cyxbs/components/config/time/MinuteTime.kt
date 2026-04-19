@@ -11,6 +11,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * 如果需要两个 [MinuteTime] 组合，可以使用 [MinuteTimePair]
@@ -44,11 +46,14 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
   }
 
   fun plusMinutes(minutes: Int): MinuteTime {
-    val hourDiff = (minute + minutes) / 60
-    return MinuteTime(
-      (hour + hourDiff) % 24,
-      (minute + minutes) % 60,
-    )
+    var newMinuteOfDay = minuteOfDay + minutes
+    while (newMinuteOfDay < 0) {
+      newMinuteOfDay += 24 * 60
+    }
+    while (newMinuteOfDay >= 24 * 60) {
+      newMinuteOfDay -= 24 * 60
+    }
+    return new(newMinuteOfDay)
   }
 
   fun minusMinutes(minutes: Int): MinuteTime {
@@ -64,6 +69,18 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
 
   fun minusHours(hours: Int): MinuteTime {
     return plusHours(-hours)
+  }
+
+  operator fun minus(time: MinuteTime): Duration {
+    return time.minutesUntil(this).minutes
+  }
+
+  operator fun minus(duration: Duration): MinuteTime {
+    return minusMinutes(duration.inWholeMinutes.toInt())
+  }
+
+  operator fun plus(duration: Duration): MinuteTime {
+    return plusMinutes(duration.inWholeMinutes.toInt())
   }
 
   override fun compareTo(other: MinuteTime): Int {
@@ -91,7 +108,8 @@ value class MinuteTime(val value: Int) : Comparable<MinuteTime> {
     }
 
     fun new(minuteOfDay: Int): MinuteTime {
-      return MinuteTime(minuteOfDay / 60, minuteOfDay % 60)
+      val newMinuteOfDay = minuteOfDay % (24 * 60)
+      return MinuteTime(newMinuteOfDay / 60, newMinuteOfDay % 60)
     }
   }
 }
@@ -107,6 +125,10 @@ value class MinuteTimePair(val value: Long) {
     get() = MinuteTime((value shr 32).toInt())
   val second: MinuteTime
     get() = MinuteTime(value.toInt())
+
+  fun durationMinute(): Int {
+    return first.minutesUntil(second)
+  }
 
   override fun toString(): String {
     return "$first-$second"
