@@ -1,21 +1,19 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
-import com.cyxbs.components.base.ui.BaseViewModel
+import androidx.compose.runtime.LaunchedEffect
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -24,21 +22,21 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2026/3/7
  */
-class LessonDecorationViewModel(
+class CourseLessonPageDecoration(
   val stuNum: String,
-  val hierarchy: CourseItemHierarchy<CourseLessonItem>,
+  // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseLessonItemFactory,
-) : BaseViewModel(), CoursePageDecoration {
+) : CoursePageDecoration<CourseLessonItem>() {
 
   private val lessonService = ILessonService2::class.impl()
 
-  init {
+  private suspend fun observeLesson() {
     lessonService.observeLesson(
       stuNum = stuNum,
       needOldData = true,
       forceRequest = true,
     ).distinctUntilChanged().onEach {
-      hierarchy.reset(buildList {
+      itemHierarchy.reset(buildList {
         it.forEach { lesson ->
           // 添加进整学期
           add(LessonWhatTime(0, lesson, platformItemFactory))
@@ -48,12 +46,15 @@ class LessonDecorationViewModel(
           }
         }
       })
-    }.launchIn(viewModelScope)
+    }.collect()
   }
 
   @Composable
   override fun CoursePageContent() {
-    hierarchy.CoursePageItemListContent()
+    super.CoursePageContent()
+    LaunchedEffect(Unit) {
+      observeLesson()
+    }
   }
 }
 

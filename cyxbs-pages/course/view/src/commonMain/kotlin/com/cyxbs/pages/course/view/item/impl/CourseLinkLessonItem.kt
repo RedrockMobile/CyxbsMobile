@@ -21,6 +21,7 @@ class CourseLinkLessonItem(
   whatTime: CourseItemWhatTime,
   coroutineScope: CoroutineScope,
   val lesson: LessonByWeeks,
+  // 根据不同平台对 item 进行定制化操作
   platformItemFactory: PlatformCourseLinkLessonItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 

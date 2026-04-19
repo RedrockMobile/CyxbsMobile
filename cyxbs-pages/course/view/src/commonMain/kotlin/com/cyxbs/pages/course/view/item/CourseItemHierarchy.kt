@@ -8,8 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.util.fastForEach
-import androidx.lifecycle.viewModelScope
-import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.overlay.createOverlapResult
 import com.cyxbs.pages.course.view.page.LocalCoursePage
@@ -41,15 +40,15 @@ import kotlinx.datetime.DayOfWeek
 @Stable
 class CourseItemHierarchy<Item : CourseItem> {
 
-  private var courseItemViewModel: CourseItemViewModel? = null
+  private var decorationManager: CoursePageDecorationManager? = null
   private val whatTimeListWhenNoCourseItemViewModel = mutableListOf<ItemHierarchyWhatTime<Item>>()
 
   // 绑定 CourseItemViewModel
-  fun bindCourseItemViewModel(courseItemViewModel: CourseItemViewModel) {
-    require(this.courseItemViewModel == null) {
-      "不允许重新绑定 CourseItemViewModel，old: ${this.courseItemViewModel}, new: $courseItemViewModel"
+  fun bindCourseItemViewModel(decorationManager: CoursePageDecorationManager) {
+    require(this.decorationManager == null) {
+      "不允许重新绑定 CourseItemViewModel，old: ${this.decorationManager}, new: ${this@CourseItemHierarchy.decorationManager}"
     }
-    this.courseItemViewModel = courseItemViewModel
+    this.decorationManager = decorationManager
     reset(whatTimeListWhenNoCourseItemViewModel)
     whatTimeListWhenNoCourseItemViewModel.clear()
   }
@@ -75,7 +74,7 @@ class CourseItemHierarchy<Item : CourseItem> {
   // 添加一个 item
   fun add(whatTime: ItemHierarchyWhatTime<Item>) {
     synchronized(dateItemsMapSynchronized) {
-      val courseItemViewModel = courseItemViewModel
+      val courseItemViewModel = decorationManager
       if (courseItemViewModel == null) {
         // 还不存在 courseItemViewModel，延后添加
         whatTimeListWhenNoCourseItemViewModel.add(whatTime)
@@ -107,7 +106,7 @@ class CourseItemHierarchy<Item : CourseItem> {
       if (fixed.page < 0) return // 负数表示展示未添加进 itemWrapperList
       val dateKey = fixed.page * 7 + fixed.dayOfWeek.ordinal
       getDateKeyValue(dateKey).itemWrapperList.remove(whatTime)
-      courseItemViewModel?.tryRefresh(dateKey)
+      decorationManager?.tryRefresh(dateKey)
     }
   }
 
@@ -123,14 +122,14 @@ class CourseItemHierarchy<Item : CourseItem> {
       if (oldFixed.page >= 0) {
         val oldDateKey = oldFixed.page * 7 + oldFixed.dayOfWeek.ordinal
         getDateKeyValue(oldDateKey).itemWrapperList.remove(whatTime)
-        courseItemViewModel?.tryRefresh(oldDateKey)
+        decorationManager?.tryRefresh(oldDateKey)
       }
       if (newFixed.page < 0) return // 负数表示展示不添加进 itemWrapperList
       val newDateKey = newFixed.page * 7 + newFixed.dayOfWeek.ordinal
       val itemWrapperList = getDateKeyValue(newDateKey).itemWrapperList
       val index = getIndex(whatTime, itemWrapperList) // 保证有序插入
       itemWrapperList.add(index, whatTime)
-      courseItemViewModel?.tryRefresh(newDateKey)
+      decorationManager?.tryRefresh(newDateKey)
     }
   }
 
@@ -138,8 +137,8 @@ class CourseItemHierarchy<Item : CourseItem> {
   // 支持相等数据的自动迁移
   fun reset(whatTimeList: List<ItemHierarchyWhatTime<Item>>) {
     synchronized(dateItemsMapSynchronized) {
-      val courseItemViewModel = courseItemViewModel
-      if (courseItemViewModel == null) {
+      val decorationManager = this@CourseItemHierarchy.decorationManager
+      if (decorationManager == null) {
         whatTimeListWhenNoCourseItemViewModel.clear()
         whatTimeListWhenNoCourseItemViewModel.addAll(whatTimeList)
         return
@@ -148,7 +147,7 @@ class CourseItemHierarchy<Item : CourseItem> {
         // 如果需要清空列表，则删除所有数据
         dateKeyValueMap.forEach { (dateKey, dateKeyValue) ->
           if (dateKeyValue.itemWrapperList.isNotEmpty()) {
-            courseItemViewModel.tryRefresh(dateKey)
+            decorationManager.tryRefresh(dateKey)
             dateKeyValue.itemWrapperList.forEach {
               itemWrapperMap.remove(it)?.onClear()
             }
@@ -189,9 +188,9 @@ class CourseItemHierarchy<Item : CourseItem> {
                 dateKeyValue.itemWrapperList.clear()
               }
               // 添加新数据
-              newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, courseItemViewModel) } }
+              newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, decorationManager) } }
               dateKeyValue.itemWrapperList.addAll(newItemList)
-              courseItemViewModel.tryRefresh(dateKey)
+              decorationManager.tryRefresh(dateKey)
             }
           } else {
             if (dateKeyValue.itemWrapperList.isNotEmpty()) {
@@ -201,7 +200,7 @@ class CourseItemHierarchy<Item : CourseItem> {
                 itemWrapperMap.remove(it)?.onClear()
               }
               dateKeyValue.itemWrapperList.clear()
-              courseItemViewModel.tryRefresh(dateKey)
+              decorationManager.tryRefresh(dateKey)
             }
           }
         }
@@ -209,10 +208,10 @@ class CourseItemHierarchy<Item : CourseItem> {
           // 剩下的为新增的 dateKey 对应数据
           val newItemList = itemList.apply { sort() } // 排序
           // 添加新数据
-          newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, courseItemViewModel) } }
+          newItemList.forEach { itemWrapperMap.getOrPut(it) { ItemWrapper(it, decorationManager) } }
           if (dateKey >= 0) { // < 0 则延后添加进 itemWrapperList
             getDateKeyValue(dateKey).itemWrapperList.addAll(newItemList) // newItemList 已排序
-            courseItemViewModel.tryRefresh(dateKey)
+            decorationManager.tryRefresh(dateKey)
           }
         }
       }
@@ -320,13 +319,13 @@ class CourseItemHierarchy<Item : CourseItem> {
 
   private inner class ItemWrapper(
     val whatTime: ItemHierarchyWhatTime<Item>,
-    val courseItemViewModel: CourseItemViewModel,
+    val decorationManager: CoursePageDecorationManager,
   ) {
 
     // 绑定在 viewModelScope 之下的子协程作用域
     private val coroutineScope = CoroutineScope(
-      courseItemViewModel.viewModelScope.coroutineContext
-          + SupervisorJob(courseItemViewModel.viewModelScope.coroutineContext[Job])
+      decorationManager.courseCoroutineScope.coroutineContext
+          + SupervisorJob(decorationManager.courseCoroutineScope.coroutineContext[Job])
     )
 
     // itemState 会在触发 refresh 后才会被懒加载

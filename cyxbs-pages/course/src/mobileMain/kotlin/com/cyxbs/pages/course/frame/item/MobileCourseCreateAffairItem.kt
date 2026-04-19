@@ -1,6 +1,7 @@
 package com.cyxbs.pages.course.frame.item
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.extensions.toast
@@ -21,13 +22,13 @@ import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateAffairItemFacto
  * @author 985892345
  * @date 2026/3/7
  */
-object MobilePlatformCourseCreateAffairItemFactory : PlatformCourseCreateAffairItemFactory {
+object MobileCourseCreateAffairItemFactory : PlatformCourseCreateAffairItemFactory {
   override fun create(item: CourseCreateAffairItem): PlatformCourseCreateAffairItem {
-    return MobilePlatformCourseCreateAffairItem(item)
+    return MobileCourseCreateAffairItem(item)
   }
 }
 
-class MobilePlatformCourseCreateAffairItem(
+class MobileCourseCreateAffairItem(
   val item: CourseCreateAffairItem,
 ) : PlatformCourseCreateAffairItem {
 
@@ -57,15 +58,13 @@ private class MobileCreateAffairBottomSheetExtension(
 
   @Composable
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
-    val dateModel = remember { item.dateModel } ?: return
-    val idModelEditor = remember { dateModel.idModel.tryCreateEditor() } ?: return
-    val dateModelEditor = remember { idModelEditor.findDateModelEditor(dateModel) } ?: return
+    val dateModel = item.dateModelFlow.collectAsState().value ?: return
     AffairBottomSheetDialog(
       courseBottomSheetDialogState = state,
       affairBottomSheetDialogState = remember {
         AffairBottomSheetDialogState(
           currentForm = AffairBottomSheetDialogState.CurrentForm.Edit(
-            editor = dateModelEditor,
+            editor = dateModel.idModel.tryCreateEditor()!!.findDateModelEditor(dateModel)!!,
             isCreateAffair = true
           ) { result ->
             result.onSuccess {

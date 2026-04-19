@@ -47,7 +47,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
@@ -61,7 +60,8 @@ import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
 import com.cyxbs.pages.course.view.AbstractCourseFrame
-import com.cyxbs.pages.course.view.decoration.impl.AffairDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
+import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
 import cyxbsmobile.cyxbs_pages.course.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_add
 import cyxbsmobile.cyxbs_pages.course.generated.resources.course_ic_affair_time_delete
@@ -304,13 +304,15 @@ private fun DateFlowRow(
     }
   }
   val courseFrame = AbstractCourseFrame.current
-  val affairDecorationViewModel = viewModel<AffairDecorationViewModel>()
+  val decorationManager = CoursePageDecorationManager.current
   LaunchedEffect(Unit) {
     snapshotFlow { lastSelectedDateModelState.value }.drop(1).collectLatest { dateModelEditor ->
       courseFrame.animateScrollToDate(dateModelEditor.date)
       // 修改外层选中的 CourseItemState，使开始结束时间和滚轴偏移量发生改变
       // 通过这种方法获取 itemState 稍微有些 trick
-      val itemState = affairDecorationViewModel.findCourseItemState(dateModelEditor) ?: return@collectLatest
+      val itemState = decorationManager.decorations
+        .firstNotNullOfOrNull { it as? AffairPageDecoration }
+        ?.findCourseItemState(dateModelEditor) ?: return@collectLatest
       currentForm.editor = dateModelEditor
       courseState.currentPageItemFlow.value =
         itemState.item.extensions.get(CourseItemBottomSheetDialogExtension::class)

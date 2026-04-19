@@ -33,13 +33,13 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2026/3/7
  */
-object MobilePlatformCourseAffairItemFactory : PlatformCourseAffairItemFactory {
+object MobileCourseAffairItemFactory : PlatformCourseAffairItemFactory {
   override fun create(item: CourseAffairItem): PlatformCourseAffairItem {
-    return MobilePlatformCourseAffairItem(item)
+    return MobileCourseAffairItem(item)
   }
 }
 
-private class MobilePlatformCourseAffairItem(val item: CourseAffairItem) : PlatformCourseAffairItem {
+private class MobileCourseAffairItem(val item: CourseAffairItem) : PlatformCourseAffairItem {
 
   init {
     item.extensions.add(MobileCourseAffairBottomSheetExtension(item))

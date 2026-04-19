@@ -24,7 +24,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -231,14 +230,6 @@ private fun WeekNumCompose(
       }
     }
   }
-  LaunchedEffect(Unit) {
-    snapshotFlow { weekNumText.selection }.collect {
-      // 取消输入框的文本选中
-      weekNumText.edit {
-        selection = TextRange.Zero
-      }
-    }
-  }
 }
 
 @Composable
@@ -325,14 +316,6 @@ private fun DayOfWeekCompose(
       val newDayOfWeek = date.dayOfWeek.toChinese("")
       if (newDayOfWeek != dayOfWeakText.text) {
         dayOfWeakText.setTextAndPlaceCursorAtEnd(newDayOfWeek)
-      }
-    }
-  }
-  LaunchedEffect(Unit) {
-    snapshotFlow { dayOfWeakText.selection }.collect {
-      // 取消输入框的文本选中
-      dayOfWeakText.edit {
-        selection = TextRange.Zero
       }
     }
   }

@@ -22,7 +22,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.decoration.impl.CreateAffairDecorationViewModel
+import com.cyxbs.pages.course.view.decoration.impl.CreateAffairPageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemTopBottomText
@@ -33,6 +33,7 @@ import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import cyxbsmobile.cyxbs_pages.course.view.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.course.view.generated.resources.view_ic_touch_affair
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -50,37 +51,33 @@ import kotlin.math.roundToInt
 class CourseCreateAffairItem(
   whatTime: CourseItemWhatTime,
   coroutineScope: CoroutineScope,
-  val viewModel: CreateAffairDecorationViewModel,
-  val dateModel: AffairDateModel?, // 如果是 touching 则为 null
+  val viewModel: CreateAffairPageDecoration,
+  // 根据不同平台对 item 进行定制化操作
   platformItemFactory: PlatformCourseCreateAffairItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 
-  init {
-    // 观察事务时间更新
-    if (dateModel != null) {
-      combine(
-        viewModel.courseFrame.beginDate.filterNotNull(),
-        dateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
-        dateModel.date.mergeFlow
-      ) { beginDate, timePair, date ->
-        whatTime.now.value = CourseItemWhatTime.Fixed(
-          page = viewModel.courseFrame.getPage(date) ?: -1,
-          dayOfWeek = date.dayOfWeek,
-          beginTime = timePair.first,
-          finalTime = timePair.second,
-        )
-      }.launchIn(coroutineScope)
-    }
-  }
-
-  init {
-    if (dateModel != null) {
-      extensions.add(CourseCreateAffairMovableItemExtension(this))
-    }
-  }
-
   // 下层到每个平台的课程配置
   private val platform = platformItemFactory.create(this)
+
+  val dateModelFlow = MutableStateFlow<AffairDateModel?>(null)
+
+  fun setDateModel(dateModel: AffairDateModel) {
+    require(this.dateModelFlow.value == null) { "dateModel 不能重复设置"}
+    this.dateModelFlow.value = dateModel
+    extensions.add(CourseCreateAffairMovableItemExtension(this))
+    combine(
+      viewModel.courseFrame.beginDate.filterNotNull(),
+      dateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
+      dateModel.date.mergeFlow
+    ) { beginDate, timePair, date ->
+      whatTime.now.value = CourseItemWhatTime.Fixed(
+        page = viewModel.courseFrame.getPage(date) ?: -1,
+        dayOfWeek = date.dayOfWeek,
+        beginTime = timePair.first,
+        finalTime = timePair.second,
+      )
+    }.launchIn(coroutineScope)
+  }
 
   @Composable
   override fun CourseItemContent() {
@@ -119,7 +116,7 @@ private fun CourseCreateAffairItem.Content(
         coverTipColor = if (itemState.overlap?.coveredItemList?.isNotEmpty() == true) textColor else Color.Transparent,
         enableAnim = false,
       ) {
-        val idModel = dateModel?.idModel
+        val idModel = dateModelFlow.collectAsState().value?.idModel
         val title = idModel?.title?.mergeFlow?.collectAsState("")?.value
         val content = idModel?.content?.mergeFlow?.collectAsState("")?.value
         if (title.isNullOrEmpty() && content.isNullOrEmpty()) {
@@ -166,7 +163,7 @@ private class CourseCreateAffairMovableItemExtension(
     size: IntSize,
     newBeginTime: MinuteTime
   ): Offset {
-    if (item.dateModel == null) return Offset.Zero
+    if (item.dateModelFlow.value == null) return Offset.Zero
     val itemWidth = size.width
     // 一小段距离都会被算成同一分钟，为了让最后修改时间后不会因此而抖动
     // 需要计算出最终 newBeginTime 真正的高度，这才是最终展示的位置
@@ -186,7 +183,7 @@ private class CourseCreateAffairMovableItemExtension(
     newBeginTime: MinuteTime,
     newDayOfWeek: DayOfWeek
   ) {
-    val dateModel = item.dateModel ?: return
+    val dateModel = item.dateModelFlow.value ?: return
     // 修改 dateModelEditor 来触发 whatTime 的更新
     val dateModelEditor = dateModel.idModel.createEditorSuspend().findDateModelEditor(dateModel)!!
     dateModelEditor.setDate(dateModelEditor.date.weekBeginDate.plusDays(newDayOfWeek.ordinal))

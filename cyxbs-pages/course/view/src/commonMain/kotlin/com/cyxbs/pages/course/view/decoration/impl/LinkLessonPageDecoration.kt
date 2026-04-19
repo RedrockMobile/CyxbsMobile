@@ -1,14 +1,12 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
-import com.cyxbs.components.base.ui.BaseViewModel
+import androidx.compose.runtime.LaunchedEffect
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseLinkLessonItem
@@ -17,9 +15,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
@@ -29,15 +27,15 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2025/10/18
  */
-class LinkLessonDecorationViewModel(
-  val hierarchy: CourseItemHierarchy<CourseLinkLessonItem>,
-  val platformItemFactory: PlatformCourseLinkLessonItemFactory,
-) : BaseViewModel(), CoursePageDecoration {
+class LinkLessonPageDecoration(
+  // 根据不同平台对 item 进行定制化操作
+  val platformItemFactory: PlatformCourseLinkLessonItemFactory
+) : CoursePageDecoration<CourseLinkLessonItem>() {
 
   private val linkService = ILinkService2::class.impl()
   private val lessonService = ILessonService2::class.impl()
 
-  init {
+  private suspend fun observeLinkLesson() {
     linkService.state.map {
       it.linkNum
     }.flatMapLatest {
@@ -50,7 +48,7 @@ class LinkLessonDecorationViewModel(
       resetData(it)
     }.catch {
 
-    }.launchIn(viewModelScope)
+    }.collect()
   }
 
   private fun createLessonFlow(linkStuNum: String): Flow<List<LessonByWeeks>> {
@@ -62,7 +60,7 @@ class LinkLessonDecorationViewModel(
   }
 
   private fun resetData(data: List<LessonByWeeks>) {
-    hierarchy.reset(buildList {
+    itemHierarchy.reset(buildList {
       data.forEach { lesson ->
         // 添加进整学期
         add(LinkLessonWhatTime(0, lesson, platformItemFactory))
@@ -76,7 +74,10 @@ class LinkLessonDecorationViewModel(
 
   @Composable
   override fun CoursePageContent() {
-    hierarchy.CoursePageItemListContent()
+    super.CoursePageContent()
+    LaunchedEffect(Unit) {
+      observeLinkLesson()
+    }
   }
 }
 

@@ -13,13 +13,13 @@ import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
  * @author 985892345
  * @date 2026/3/7
  */
-object DefaultPlatformCourseSelfLessonItemFactory : PlatformCourseLessonItemFactory {
+object DefaultCourseSelfLessonItemFactory : PlatformCourseLessonItemFactory {
   override fun create(item: CourseLessonItem): PlatformCourseLessonItem {
-    return DefaultPlatformCourseSelfLessonItem(item)
+    return DefaultCourseSelfLessonItem(item)
   }
 }
 
-private class DefaultPlatformCourseSelfLessonItem(
+private class DefaultCourseSelfLessonItem(
   val item: CourseLessonItem,
 ) : PlatformCourseLessonItem {
   @Composable

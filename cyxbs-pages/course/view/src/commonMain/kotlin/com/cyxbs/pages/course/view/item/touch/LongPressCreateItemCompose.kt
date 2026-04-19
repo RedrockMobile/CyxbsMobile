@@ -42,12 +42,13 @@ interface LongPressCreateItem {
 
 @Composable
 fun LongPressCreateItemCompose(
+  modifier: Modifier = Modifier.fillMaxSize(),
   onCreate: (beginPosition: Offset, size: IntSize) -> LongPressCreateItem?,
   onTap: () -> Unit, // 手指轻击时可被视为清理已有的 item
 ) {
   val layoutCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
   Spacer(
-    modifier = Modifier.fillMaxSize().onGloballyPositioned {
+    modifier = modifier.onGloballyPositioned {
       layoutCoordinates.value = it
     }.pointerInputCreateItem(
       onCreate = onCreate,

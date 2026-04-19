@@ -36,7 +36,7 @@ import kotlin.math.roundToInt
  */
 object LayoutItemModifier : CourseItemModifier {
 
-  // 是否启动时间信息改变后的动画，默认不开启
+  // 是否启动时间信息改变后的动画，默认开启
   val animLock = CourseItemState.ValueKey { Lock() }
 
   @Composable

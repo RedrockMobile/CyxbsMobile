@@ -14,9 +14,9 @@ import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
+import com.cyxbs.pages.course.view.item.impl.CourseLinkLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItemFactory
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -30,24 +30,22 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2026/3/7
  */
-object MobilePlatformCourseSelfLessonItemFactory : PlatformCourseLessonItemFactory {
-  override fun create(item: CourseLessonItem): PlatformCourseLessonItem {
-    return MobilePlatformCourseSelfLessonItem(item)
+object MobileCourseLinkLessonItemFactory : PlatformCourseLinkLessonItemFactory {
+  override fun create(item: CourseLinkLessonItem): PlatformCourseLinkLessonItem {
+    return MobileCourseLinkLessonItem(item)
   }
 }
 
-private class MobilePlatformCourseSelfLessonItem(
-  val item: CourseLessonItem
-) : PlatformCourseLessonItem {
+private class MobileCourseLinkLessonItem(
+  val item: CourseLinkLessonItem
+) : PlatformCourseLinkLessonItem {
 
   init {
-    item.extensions.add(MobileSelfCourseBottomSheetExtension(item))
+    item.extensions.add(MobileLinkLessonBottomSheetExtension(item))
   }
 
   @Composable
-  override fun CourseItemContentWrapper(
-    content: @Composable ((onClick: ((MinuteTimePair) -> Unit)?) -> Unit)
-  ) {
+  override fun CourseItemContentWrapper(content: @Composable ((onClick: ((MinuteTimePair) -> Unit)?) -> Unit)) {
     val itemBottomSheetDialog = LocalCourseItemBottomSheetDialog.current
     content.invoke {
       // 点击事件
@@ -57,8 +55,8 @@ private class MobilePlatformCourseSelfLessonItem(
 }
 
 
-private class MobileSelfCourseBottomSheetExtension(
-  val itemKeyImpl: CourseLessonItem
+private class MobileLinkLessonBottomSheetExtension(
+  val itemKeyImpl: CourseLinkLessonItem
 ) : CourseBottomSheetHeaderExtension, CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
@@ -66,7 +64,7 @@ private class MobileSelfCourseBottomSheetExtension(
 
   @Composable
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
-    LessonBottomSheetDialog(itemKeyImpl.lesson, false)
+    LessonBottomSheetDialog(itemKeyImpl.lesson, true)
   }
 
   @Composable
@@ -82,7 +80,7 @@ private class MobileSelfCourseBottomSheetExtension(
       finalTime = itemKeyImpl.lesson.finalTime,
       enableShowLandmark = true,
       onClickTitle = {
-        itemBottomSheetDialog.showDialog(itemKeyImpl.extensions.get(CourseItemBottomSheetDialogExtension::class)!!)
+        itemBottomSheetDialog.showDialog(this)
       },
       onClickContent = {
         // todo 跳转到地图页
@@ -96,14 +94,14 @@ private class MobileSelfCourseBottomSheetExtension(
       val now = localDateTime.toMinuteTimeDate()
       if (now.date.dayOfWeek == itemKeyImpl.lesson.dayOfWeek) {
         if (now.time < itemKeyImpl.lesson.beginTime) {
-          state.value = "下节课"
+          state.value = "Ta的下节课"
           delay((itemKeyImpl.lesson.beginTime.minuteOfDay - now.minuteOfDay).minutes + localDateTime.second.seconds)
         }
-        state.value = "进行中..."
+        state.value = "Ta的课进行中..."
         // 后续会显示下一节课，会重新触发重组，不用再 delay
       } else {
-        // 只有明天课程才会进入该分支
-        state.value = "明天"
+        // 只有明天课程才会进入改分支
+        state.value = "明天Ta的课"
       }
     }
   }

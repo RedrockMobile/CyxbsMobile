@@ -26,11 +26,11 @@ import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
-import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.page.CoursePageCompose
-import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import com.cyxbs.pages.course.view.page.CourseWeekCompose
-import kotlinx.collections.immutable.ImmutableList
+import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.DayOfWeek
 
@@ -45,11 +45,11 @@ abstract class AbstractCourseFrame {
 
   companion object {
 
-    val LocalAbstractCourseFrame = staticCompositionLocalOf<AbstractCourseFrame> { error("未设置 AbstractCourseFrame") }
+    val Local = staticCompositionLocalOf<AbstractCourseFrame> { error("未设置 AbstractCourseFrame") }
 
     @get:Composable
     val current: AbstractCourseFrame
-      get() = LocalAbstractCourseFrame.current
+      get() = Local.current
   }
 
   // 课表时间轴
@@ -107,7 +107,6 @@ abstract class AbstractCourseFrame {
 @Composable
 fun AbstractCourseFrame.HomeCoursePageContent(
   page: Int,
-  decorations: ImmutableList<CoursePageDecoration>,
 ) {
   val pageBeginDate = beginDate.collectAsState().value?.plusWeeks(page - 1)
     ?.weekBeginDate?.plusDays(timeline.beginDayOfWeek.ordinal)
@@ -138,7 +137,7 @@ fun AbstractCourseFrame.HomeCoursePageContent(
       timeline = timeline,
       timelineWidth = timelineWidth,
       scrollPaddingValues = scrollPaddingValues,
-      decorations = decorations,
+      decorations = CoursePageDecorationManager.current.decorations.toImmutableList(),
     )
   }
 }

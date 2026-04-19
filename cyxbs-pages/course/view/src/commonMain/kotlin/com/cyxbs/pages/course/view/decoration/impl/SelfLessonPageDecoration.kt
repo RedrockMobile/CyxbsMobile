@@ -1,15 +1,14 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
@@ -18,9 +17,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -32,14 +31,14 @@ import kotlin.time.Duration.Companion.days
  * @date 2025/10/12
  */
 @Stable
-class SelfLessonDecorationViewModel(
-  val hierarchy: CourseItemHierarchy<CourseLessonItem>,
+class SelfLessonPageDecoration(
+  // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseLessonItemFactory,
-) : BaseViewModel(), CoursePageDecoration {
+) : CoursePageDecoration<CourseLessonItem>() {
 
   private val lessonService = ILessonService2::class.impl()
 
-  init {
+  private suspend fun observeSelfLesson() {
     IAccountService::class.impl()
       .stuNumFlow
       .flatMapLatest {
@@ -48,7 +47,7 @@ class SelfLessonDecorationViewModel(
           createLessonFlow("2024210480")
         } else createLessonFlow(it)
       }.onEach {
-        hierarchy.reset(buildList {
+        itemHierarchy.reset(buildList {
           it?.forEach { lesson ->
             // 添加进整学期
             add(SelfLessonWhatTime(0, lesson, platformItemFactory))
@@ -60,7 +59,7 @@ class SelfLessonDecorationViewModel(
         })
       }.catch {
 
-      }.launchIn(viewModelScope)
+      }.collect()
   }
 
   private fun createLessonFlow(stuNum: String?): Flow<List<LessonByWeeks>?> = flow {
@@ -105,7 +104,10 @@ class SelfLessonDecorationViewModel(
 
   @Composable
   override fun CoursePageContent() {
-    hierarchy.CoursePageItemListContent()
+    super.CoursePageContent()
+    LaunchedEffect(Unit) {
+      observeSelfLesson()
+    }
   }
 }
 

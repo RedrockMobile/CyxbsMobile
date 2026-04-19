@@ -1,15 +1,13 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
-import com.cyxbs.components.base.ui.BaseViewModel
+import androidx.compose.runtime.LaunchedEffect
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.IAffairService2
-import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.AbstractCourseFrame
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
@@ -17,10 +15,10 @@ import com.cyxbs.pages.course.view.item.impl.CourseAffairItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseAffairItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
@@ -32,19 +30,19 @@ import kotlinx.coroutines.supervisorScope
  * @author 985892345
  * @date 2025/10/18
  */
-class AffairDecorationViewModel(
+class AffairPageDecoration(
   val courseFrame: AbstractCourseFrame,
-  val hierarchy: CourseItemHierarchy<CourseAffairItem>,
+  // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseAffairItemFactory,
-) : BaseViewModel(), CoursePageDecoration {
+) : CoursePageDecoration<CourseAffairItem>() {
 
-  init {
+  private suspend fun observeAffair() {
     IAffairService2::class.impl()
       .observeAffairGroupModel()
       .flatMapLatest { groupModel ->
         groupModel?.itemList ?: flowOf(emptyList())
       }.mapLatest { idModels ->
-        hierarchy.reset(emptyList())
+        itemHierarchy.reset(emptyList())
         supervisorScope {
           idModels.forEach { idModel ->
             val whatTimeByDateModel = hashMapOf<AffairDateModel, AffairItemWhatTime>()
@@ -57,7 +55,7 @@ class AffairDecorationViewModel(
                   platformItemFactory = platformItemFactory
                 )
                 whatTimeByDateModel[dateModel] = whatTime
-                hierarchy.add(whatTime)
+                itemHierarchy.add(whatTime)
               }
             }
             launch {
@@ -69,29 +67,32 @@ class AffairDecorationViewModel(
                   platformItemFactory = platformItemFactory
                 )
                 whatTimeByDateModel[dateModel] = whatTime
-                hierarchy.add(whatTime)
+                itemHierarchy.add(whatTime)
               }
             }
             launch {
               idModel.removedDateModel.collect { dateModel ->
                 whatTimeByDateModel[dateModel]?.let {
-                  hierarchy.remove(it)
+                  itemHierarchy.remove(it)
                 }
               }
             }
           }
         }
-      }.launchIn(viewModelScope)
+      }.collect()
   }
 
   @Composable
   override fun CoursePageContent() {
-    hierarchy.CoursePageItemListContent()
+    super.CoursePageContent()
+    LaunchedEffect(Unit) {
+      observeAffair()
+    }
   }
 
   // 查找 CourseItemState
   suspend fun findCourseItemState(dateModelEditor: AffairDateModelEditor): CourseItemState? {
-    return hierarchy.observe(
+    return itemHierarchy.observe(
       page = courseFrame.getPage(dateModelEditor.date) ?: return null,
       dayOfWeek = dateModelEditor.date.dayOfWeek,
     ).mapNotNull { list ->

@@ -12,14 +12,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
-import com.cyxbs.pages.course.view.page.CourseFrameHeader
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
+import com.cyxbs.pages.course.view.page.CourseFrameHeader
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -101,7 +100,7 @@ private fun MobileHomeCourseOuterHeader(
   key(headerState.value) {
     headerState.value.CourseBottomSheetHeaderContent(modifier)
   }
-  val courseItemViewModel = viewModel(CourseItemViewModel::class)
+  val decorationManager = CoursePageDecorationManager.current
   LaunchedEffect(frame) {
     frame.beginDate.filterNotNull().collectLatest { beginDate ->
       snapshotFlow { Today }.collectLatest { today ->
@@ -113,7 +112,7 @@ private fun MobileHomeCourseOuterHeader(
             headerState.value = HolidayHeader
           } else {
             delay(500) // 防止上游数据因为首次加载的抖动
-            courseItemViewModel.nextItemFlow.collectLatest {
+            decorationManager.nextItemFlow.collectLatest {
               headerState.value = if (it == null) NoLessonHeader else {
                 // MobileCourseNextSearch 保证返回的一定是 CourseBottomSheetHeaderExtension 类型
                 it.item.extensions.get(CourseBottomSheetHeaderExtension::class)!!
@@ -127,7 +126,7 @@ private fun MobileHomeCourseOuterHeader(
 }
 
 @ImplProvider
-object MobileCourseNextSearch : CourseItemViewModel.NextItemSearcher {
+object MobileCourseNextSearch : CoursePageDecorationManager.NextItemSearcher {
   override fun search(sortedList: List<CourseItemState>, now: MinuteTime): CourseItemState? {
     return sortedList.firstOrNull {
       it.item.whatTime.finalTime > now && it.item.extensions.get(CourseBottomSheetHeaderExtension::class) != null

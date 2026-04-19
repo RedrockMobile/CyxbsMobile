@@ -38,6 +38,7 @@ class CourseAffairItem(
   coroutineScope: CoroutineScope,
   val courseFrame: AbstractCourseFrame,
   val affairDateModel: AffairDateModel,
+  // 根据不同平台对 item 进行定制化操作
   platformItemFactory: PlatformCourseAffairItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 

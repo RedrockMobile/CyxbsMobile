@@ -10,12 +10,12 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
@@ -23,21 +23,18 @@ import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.frame.bottomsheet.MobileHomeBottomSheet
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
-import com.cyxbs.pages.course.frame.item.MobilePlatformCourseAffairItemFactory
-import com.cyxbs.pages.course.frame.item.MobilePlatformCourseCreateAffairItemFactory
-import com.cyxbs.pages.course.frame.item.MobilePlatformCourseLinkLessonItemFactory
-import com.cyxbs.pages.course.frame.item.MobilePlatformCourseSelfLessonItemFactory
-import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.frame.item.MobileCourseAffairItemFactory
+import com.cyxbs.pages.course.frame.item.MobileCourseCreateAffairItemFactory
+import com.cyxbs.pages.course.frame.item.MobileCourseLinkLessonItemFactory
+import com.cyxbs.pages.course.frame.item.MobileCourseSelfLessonItemFactory
 import com.cyxbs.pages.course.view.AbstractCourseFrame
-import com.cyxbs.pages.course.view.decoration.impl.AffairDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.CreateAffairDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.LinkLessonDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.SelfLessonDecorationViewModel
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
-import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
+import com.cyxbs.pages.course.view.HomeCoursePageContent
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
+import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.CreateAffairPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
 import com.g985892345.provider.api.annotation.ImplProvider
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 
 /**
  * 移动端主页课表框架
@@ -73,8 +70,10 @@ class MobileHomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
 
   @Composable
   override fun HomeCourseContent(modifier: Modifier, bottomBarHeight: Dp) {
+    val decorationManager = createCoursePageDecorationManager(this)
     CompositionLocalProvider(
-      LocalAbstractCourseFrame provides this
+      Local provides this,
+      CoursePageDecorationManager.Local provides decorationManager,
     ) {
       MobileHomeCourseFrameContent(
         modifier = modifier,
@@ -92,7 +91,6 @@ private fun MobileHomeCourseFrameContent(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
 ) {
-  val decorations = createCoursePageDecorations(frame)
   // item 点击后出现的 BottomSheetDialog
   val itemBottomSheetDialog = rememberCourseItemBottomSheetDialogState()
   CompositionLocalProvider(
@@ -111,7 +109,6 @@ private fun MobileHomeCourseFrameContent(
         pageContent = { page ->
           frame.HomeCoursePageContent(
             page = page,
-            decorations = decorations,
           )
         },
       )
@@ -120,57 +117,18 @@ private fun MobileHomeCourseFrameContent(
 }
 
 @Composable
-private fun createCoursePageDecorations(
+private fun createCoursePageDecorationManager(
   frame: AbstractCourseFrame
-): ImmutableList<CoursePageDecoration> {
-  val selfLessonDecoration = viewModel {
-    SelfLessonDecorationViewModel(
-      hierarchy = CourseItemHierarchy(),
-      platformItemFactory = MobilePlatformCourseSelfLessonItemFactory,
-    )
-  }
-
-  val linkLessonDecoration = viewModel {
-    LinkLessonDecorationViewModel(
-      hierarchy = CourseItemHierarchy(),
-      platformItemFactory = MobilePlatformCourseLinkLessonItemFactory,
-    )
-  }
-
-  val affairDecoration = viewModel {
-    AffairDecorationViewModel(
-      courseFrame = frame,
-      hierarchy = CourseItemHierarchy(),
-      platformItemFactory = MobilePlatformCourseAffairItemFactory
-    )
-  }
-
-  val createAffairDecoration = viewModel {
-    CreateAffairDecorationViewModel(
-      courseFrame = frame,
-      touchingHierarchy = CourseItemHierarchy(),
-      touchedHierarchy = CourseItemHierarchy(),
-      platformItemFactory = MobilePlatformCourseCreateAffairItemFactory,
-    )
-  }
-
-  viewModel {
-    CourseItemViewModel(
-      frame,
-      createAffairDecoration.touchingHierarchy, // 创建事务在顶层计算重叠，但是布局位置在底层，item 通过 zIndex 显示在课程上
-      createAffairDecoration.touchedHierarchy, // 触摸后的等待添加的事务
-      selfLessonDecoration.hierarchy,
-      affairDecoration.hierarchy,
-      linkLessonDecoration.hierarchy,
-    )
-  }
-
+): CoursePageDecorationManager {
+  val coroutineScope = rememberCoroutineScope()
   return remember {
-    persistentListOf(
-      selfLessonDecoration, // 自己的课程
-      affairDecoration, // 自己的事务
-      linkLessonDecoration, // 关联人的课程
-      createAffairDecoration, // 长按创建事务
+    CoursePageDecorationManager(
+      courseFrame = frame,
+      courseCoroutineScope = coroutineScope,
+      CreateAffairPageDecoration(courseFrame = frame, platformItemFactory = MobileCourseCreateAffairItemFactory), // 长按创建事务
+      SelfLessonPageDecoration(platformItemFactory = MobileCourseSelfLessonItemFactory), // 自己的课程
+      AffairPageDecoration(courseFrame = frame, platformItemFactory = MobileCourseAffairItemFactory), // 自己的事务
+      LinkLessonPageDecoration(platformItemFactory = MobileCourseLinkLessonItemFactory), // 关联人的课程
     )
   }
 }

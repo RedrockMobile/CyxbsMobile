@@ -9,27 +9,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseAffairItemFactory
-import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseLessonItemFactory
-import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseLinkLessonItemFactory
-import com.cyxbs.pages.course.frame.item.DefaultPlatformCourseSelfLessonItemFactory
-import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
+import com.cyxbs.pages.course.frame.item.DefaultCourseAffairItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultCourseLessonItemFactory
+import com.cyxbs.pages.course.frame.item.DefaultCourseLinkLessonItemFactory
 import com.cyxbs.pages.course.view.AbstractCourseFrame
-import com.cyxbs.pages.course.view.decoration.impl.AffairDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.LessonDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.LinkLessonDecorationViewModel
-import com.cyxbs.pages.course.view.decoration.impl.SelfLessonDecorationViewModel
+import com.cyxbs.pages.course.view.HomeCoursePageContent
+import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
+import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.CourseLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
 import com.cyxbs.pages.course.view.page.CourseFrameHeader
-import com.cyxbs.pages.course.view.item.CourseItemHierarchy
-import com.cyxbs.pages.course.view.item.viewmodel.CourseItemViewModel
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 
 /**
  * 支持自适应宽高的课表框架
@@ -44,8 +40,10 @@ class AdaptiveCourseFrame(
 
   @Composable
   fun HomeCourseContent(modifier: Modifier) {
+    val decorationManager = createCoursePageDecorationManager(this)
     CompositionLocalProvider(
-      LocalAbstractCourseFrame provides this
+      Local provides this,
+      CoursePageDecorationManager.Local provides decorationManager,
     ) {
       AdaptiveHomeCourseFrameContent(
         modifier = modifier,
@@ -60,7 +58,7 @@ private fun AdaptiveHomeCourseFrameContent(
   modifier: Modifier,
   frame: AdaptiveCourseFrame,
 ) {
-  val decorations = createCoursePageDecorations(frame)
+
   Column(modifier = modifier.background(LocalAppColors.current.topBg)) {
     CourseFrameHeader(
       modifier = Modifier.height(50.dp),
@@ -73,7 +71,6 @@ private fun AdaptiveHomeCourseFrameContent(
       pageContent = { page ->
         frame.HomeCoursePageContent(
           page = page,
-          decorations = decorations,
         )
       },
     )
@@ -81,64 +78,33 @@ private fun AdaptiveHomeCourseFrameContent(
 }
 
 @Composable
-private fun createCoursePageDecorations(
+private fun createCoursePageDecorationManager(
   frame: AdaptiveCourseFrame
-): ImmutableList<CoursePageDecoration> {
+): CoursePageDecorationManager {
+  val coroutineScope = rememberCoroutineScope()
   val selfStuNum = IAccountService::class.impl().stuNum
   if (selfStuNum != frame.stuNum) {
-    val lessonDecoration = viewModel {
-      LessonDecorationViewModel(
-        stuNum = frame.stuNum,
-        hierarchy = CourseItemHierarchy(),
-        platformItemFactory = DefaultPlatformCourseLessonItemFactory,
-      )
-    }
-    viewModel {
-      CourseItemViewModel(
-        frame,
-        lessonDecoration.hierarchy,
-      )
-    }
     return remember {
-      persistentListOf(
-        lessonDecoration,
+      CoursePageDecorationManager(
+        courseFrame = frame,
+        courseCoroutineScope = coroutineScope,
+        CourseLessonPageDecoration(
+          stuNum = frame.stuNum,
+          platformItemFactory = DefaultCourseLessonItemFactory
+        ),
       )
     }
   } else {
-    val selfLessonDecoration = viewModel {
-      SelfLessonDecorationViewModel(
-        hierarchy = CourseItemHierarchy(),
-        platformItemFactory = DefaultPlatformCourseSelfLessonItemFactory,
-      )
-    }
-
-    val linkLessonDecoration = viewModel {
-      LinkLessonDecorationViewModel(
-        hierarchy = CourseItemHierarchy(),
-        platformItemFactory = DefaultPlatformCourseLinkLessonItemFactory,
-      )
-    }
-
-    val affairDecoration = viewModel {
-      AffairDecorationViewModel(
-        courseFrame = frame,
-        hierarchy = CourseItemHierarchy(),
-        platformItemFactory = DefaultPlatformCourseAffairItemFactory,
-      )
-    }
-    viewModel {
-      CourseItemViewModel(
-        frame,
-        selfLessonDecoration.hierarchy,
-        affairDecoration.hierarchy,
-        linkLessonDecoration.hierarchy
-      )
-    }
     return remember {
-      persistentListOf(
-        selfLessonDecoration, // 自己的课程
-        affairDecoration, // 自己的事务
-        linkLessonDecoration, // 关联人的课程
+      CoursePageDecorationManager(
+        courseFrame = frame,
+        courseCoroutineScope = coroutineScope,
+        SelfLessonPageDecoration(platformItemFactory = DefaultCourseLessonItemFactory), // 自己的课程
+        AffairPageDecoration(
+          courseFrame = frame,
+          platformItemFactory = DefaultCourseAffairItemFactory
+        ), // 自己的事务
+        LinkLessonPageDecoration(platformItemFactory = DefaultCourseLinkLessonItemFactory), // 关联人的课程
       )
     }
   }
