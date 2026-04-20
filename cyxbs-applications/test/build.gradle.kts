@@ -112,7 +112,7 @@ tasks.register("buildReleaseAndInstall") {
 }
 
 tasks.all {
-  if (name == "channelRelease") {
+  if (name == "channelRelease" || name == "wasmJsBrowserDevelopmentRun") {
     // 抑制 channelRelease 不能缓存的报错
     notCompatibleWithConfigurationCache("suppres configuration cache")
   }

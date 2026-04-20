@@ -1,6 +1,7 @@
 package com.cyxbs.pages.home.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,7 +110,8 @@ private fun SelectorItem(item: ActionItem, modifier: Modifier = Modifier) {
       .size(74.dp, 29.dp)
       .clip(RoundedCornerShape(8.dp))
       .background(color = 0xFFF5F6F8.dark(0xFF111111))
-      .clickableNoIndicator {
+      .clickable {
+        toast(item.name)
         item.onClick.invoke()
       }
   ) {
