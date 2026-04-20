@@ -248,6 +248,10 @@ class CourseItemHierarchy<Item : CourseItem> {
     }
   }
 
+  fun isEmpty(): Boolean {
+    return itemWrapperMap.isEmpty()
+  }
+
   // 观察对应页面对应星期数的 item
   fun observe(page: Int, dayOfWeek: DayOfWeek): StateFlow<List<CourseItemState>> {
     val dateKey = page * 7 + dayOfWeek.ordinal

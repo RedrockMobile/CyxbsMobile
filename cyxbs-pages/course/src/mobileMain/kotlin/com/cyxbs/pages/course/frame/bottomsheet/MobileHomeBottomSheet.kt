@@ -45,38 +45,42 @@ fun MobileHomeBottomSheet(
     modifier = modifier,
     bottomSheetState = frame.bottomSheetState,
     scrimColor = Color.Transparent,
-    peekHeight = frame.peekHeight,
+    peekHeight = frame.peekHeightState.value + frame.bottomBarHeightState.value, // 底导是覆盖在课表上的
   ) {
-    Column {
-      CourseBottomSheetHeaderBackground(
-        modifier = Modifier.then(bottomSheetDraggable()).clickableNoIndicator {
-          if (frame.bottomSheetState.state == BottomSheetValueState.Collapsed) {
-            coroutineScope.launch { frame.bottomSheetState.expand() }
-          }
+    CourseBottomSheetBackground(
+      headerHeight = frame.peekHeightState.value
+    ) {
+      Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier = Modifier.fillMaxWidth().height(frame.peekHeightState.value)
+            .then(bottomSheetDraggable()).clickableNoIndicator {
+              if (frame.bottomSheetState.state == BottomSheetValueState.Collapsed) {
+                coroutineScope.launch { frame.bottomSheetState.expand() }
+              }
+            }
+        ) {
+          header()
         }
-      ) {
-        header()
+        content()
       }
-      content()
     }
   }
 }
 
 /**
- * 课程头部 BottomSheet 背景
+ * BottomSheet 背景
  */
 @Composable
-private fun CourseBottomSheetHeaderBackground(
-  modifier: Modifier = Modifier,
-  headerHeight: Dp = 70.dp,
+private fun CourseBottomSheetBackground(
+  headerHeight: Dp,
   content: @Composable () -> Unit,
 ) {
   Box(
-    modifier = modifier.fillMaxWidth().height(headerHeight)
+    modifier = Modifier.fillMaxSize()
   ) {
     // 阴影
     Spacer(
-      modifier = Modifier.fillMaxSize().background(
+      modifier = Modifier.fillMaxWidth().height(headerHeight).background(
         brush = Brush.verticalGradient(
           colors = listOf(Color(0x00365789), Color(0x3D365789))
         )

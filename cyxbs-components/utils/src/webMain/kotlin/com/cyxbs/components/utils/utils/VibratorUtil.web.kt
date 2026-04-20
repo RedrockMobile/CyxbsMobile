@@ -11,9 +11,5 @@ actual object VibratorUtil {
 
 @OptIn(ExperimentalWasmJsInterop::class)
 private fun vibrate() {
-  js("""
-    if ('vibrate' in window.navigator) {
-      window.navigator.vibrate(36);
-    }
-  """.trimIndent())
+  js("if ('vibrate' in window.navigator) { window.navigator.vibrate(36); }")
 }

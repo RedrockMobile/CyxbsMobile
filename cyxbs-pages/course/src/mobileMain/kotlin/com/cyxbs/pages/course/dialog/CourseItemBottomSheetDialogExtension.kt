@@ -419,8 +419,8 @@ private fun ShowBeginFinalTime(
         }
       }
       if (!isLockWhenBegin) {
+        // 如果最开始已经锁定，说明已经在展示开始结束时间了，那就不主动关联上透明度变化
         BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = 0F
-        // 最开始没有锁定，说明已经在展示开始结束时间了，那就不主动关联上透明度变化
         snapshotFlow { state.bottomSheetState.fraction.coerceIn(0F, 1F) }.collect {
           BeginFinalTimeShowModifier.alphaState.get(itemState).floatValue = it
         }

@@ -60,9 +60,11 @@ object BeginFinalTimeShowModifier : CourseItemModifier {
     val itemState = itemState
     return if (!showLock.get(itemState).isLocked()) Modifier else {
       LaunchedEffect(Unit) {
-        // 同步 item 自身的 alpha
-        snapshotFlow { itemState.alphaState.value }.collect {
-          alphaState.get(itemState).floatValue = it
+        if (alphaState.get(itemState).floatValue == 1F) {
+          // 如果 alpha 为 1F，则默认为本次显示不会修改 alpha，所以只同步 item 自身的 alpha
+          snapshotFlow { itemState.alphaState.value }.collect {
+            alphaState.get(itemState).floatValue = it
+          }
         }
       }
       val timePairState = produceState(MinuteTimePair(0)) {
