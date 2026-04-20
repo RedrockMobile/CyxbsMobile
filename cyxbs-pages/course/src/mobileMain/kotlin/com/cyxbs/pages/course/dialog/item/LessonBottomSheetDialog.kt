@@ -2,6 +2,7 @@ package com.cyxbs.pages.course.dialog.item
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,10 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.map.api.MapNavArgument
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -85,7 +88,10 @@ private fun ClassroomWithTeacher(classroom: String, teacher: String) {
     modifier = Modifier.padding(top = 8.dp),
     content = {
       Text(
-        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE).clickable {
+          // 跳转到地图页
+          MainNavController.navigate(MapNavArgument(classroom))
+        },
         text = classroom,
         fontSize = 13.sp,
         color = LocalAppColors.current.tvLv2,

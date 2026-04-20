@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
@@ -17,6 +18,7 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
+import com.cyxbs.pages.map.api.MapNavArgument
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -85,10 +87,8 @@ private class MobileSelfCourseBottomSheetExtension(
         itemBottomSheetDialog.showDialog(itemKeyImpl.extensions.get(CourseItemBottomSheetDialogExtension::class)!!)
       },
       onClickContent = {
-        // todo 跳转到地图页
-//        startActivity(DISCOVER_MAP) {
-//          putExtra(COURSE_POS_TO_MAP, header.content)
-//        }
+        // 跳转到地图页
+        MainNavController.navigate(MapNavArgument(itemKeyImpl.lesson.classroom))
       },
     )
     LaunchedEffect(this) {
