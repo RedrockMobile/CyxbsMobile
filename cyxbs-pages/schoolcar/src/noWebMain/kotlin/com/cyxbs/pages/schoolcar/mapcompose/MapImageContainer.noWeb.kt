@@ -22,7 +22,10 @@ import com.cyxbs.pages.schoolcar.utils.calculateAspectRatio
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvas
 import com.jvziyaoyao.scale.image.sampling.SamplingCanvasViewPort
 import com.jvziyaoyao.scale.image.sampling.rememberSamplingDecoder
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -71,6 +74,9 @@ actual fun MapImageContainer(
 			}
 		}
 
+		val gestureChannel = remember {
+			Channel<GestureParams>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+		}
 
 		Box(
 			modifier = modifier
@@ -88,18 +94,13 @@ actual fun MapImageContainer(
 							}
 						},
 						onGesture = { centroid, panDelta, zoom, _, _ ->
-							// 虽然在这里启动协程在运行时会创建很多个协程出来，但是官方就这么写例子的
-							coroutineScope.launch {
-								mapState.updateTransform(zoom, panDelta, centroid)
-							}
+							gestureChannel.trySend(GestureParams(centroid, panDelta, zoom))
 							true
 						})
 				}
 				.pointerInput(Unit) {
 					detectMouseScrollTransformGestures { centroid, zoom ->
-						coroutineScope.launch {
-							mapState.updateTransform(zoom, Offset.Zero, centroid)
-						}
+						gestureChannel.trySend(GestureParams(centroid, Offset.Zero, zoom))
 						true
 					}
 				}
@@ -133,10 +134,17 @@ actual fun MapImageContainer(
 			}
 
 		}
-
 		LaunchedEffect(samplingDecoder.intrinsicSize) {
 			mapState.ratio = samplingDecoder.intrinsicSize.calculateAspectRatio()
 			mapState.imageSize = samplingDecoder.intrinsicSize.toIntSize()
+		}
+
+		// 处理手势对地图的移动
+		LaunchedEffect(gestureChannel) {
+			while (isActive) {
+				val params = gestureChannel.receive()
+				mapState.updateTransform(params.zoom, params.panDelta, params.centroid)
+			}
 		}
 
 		LaunchedEffect(samplingDecoder.intrinsicSize) {
