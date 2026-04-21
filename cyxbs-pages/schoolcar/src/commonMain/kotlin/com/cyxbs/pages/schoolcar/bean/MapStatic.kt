@@ -15,7 +15,7 @@ data class MapStatic(
     @SerialName("map_background_color")
     val mapBackgroundColor: String,
     @SerialName("map_heigth")
-    val mapHeigth: Int,
+    val mapHeight: Int,
     @SerialName("map_url")
     val mapUrl: String,
     @SerialName("map_width")

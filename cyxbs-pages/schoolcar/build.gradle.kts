@@ -24,12 +24,12 @@ kotlin {
 
 			implementation(libs.moko.permissions)
 			// moko-permissions将权限分开了，这是定位权限的依赖
-			implementation(("dev.icerock.moko:permissions-location:0.20.1"))
+			implementation(libs.moko.permissions.location)
 
 			// 移除高德3d map，但是还是使用高德来定位
 			// 因为在国内的定位的经纬度信息是被非线性加密的，为了使转化后的坐标和图片地图对应，所以还是得用高德定位
 			// https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
-			implementation("com.amap.api:location:6.5.1")
+			implementation(libs.amap.location)
 
 			//TODO 高德3d地图等待完全移除
 			compileOnly("com.amap.api:3dmap:latest.integration")

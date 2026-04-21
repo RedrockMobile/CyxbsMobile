@@ -89,6 +89,7 @@ class MapState(
 		panDelta: Offset,
 		centroid: Offset,
 	) {
+		if (ratio <= 0f) return
 		val oldScale = scale
 		val oldOffset = offset // 拿到当前的位移状态
 
@@ -115,6 +116,7 @@ class MapState(
 		offset: Offset,
 		scale: Float,
 	): Offset {
+		if (ratio <= 0f) return Offset.Zero
 		// 容器的高
 		val containerWidth = container.width.toFloat()
 		val containerHeight = container.height.toFloat()
