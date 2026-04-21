@@ -32,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +70,7 @@ import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
 import com.cyxbs.pages.map.widget.SearchBottomSheet
+import com.cyxbs.pages.map.widget.rememberMapUiController
 import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_compass
@@ -393,7 +393,6 @@ fun MapFunctionImageCompose(modifier: Modifier = Modifier) {
 
 @Composable
 fun SymbolListCompose(modifier: Modifier = Modifier) {
-  val scope = rememberCoroutineScope()
   val viewmodel = viewModel(MapComposeViewModel::class)
   val selectedColor = 0xFF2A4E84.dark(0xFFF0F0F2)
   val backgroundColor = 0xFFE8F0FC.dark(0xFF404040)
@@ -423,10 +422,10 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
             .clickAnimation {
               if (viewmodel.mapWidgetState.isLock) viewmodel.changeLockStatus()
               if (viewmodel.currentSelectedItem.value != index) {
-                viewmodel.showAnchorList(scope, index)
+                viewmodel.showAnchorList(index)
                 viewmodel.currentSelectedItem.value = index
               } else {
-                viewmodel.closeAnchorList(scope)
+                viewmodel.closeAnchorList()
                 viewmodel.currentSelectedItem.value = 999
               }
             }
@@ -480,7 +479,7 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
                 toast("已解除锁定")
                 viewmodel.mapWidgetState.isLock = false
               }
-              viewmodel.showCollectList(scope)
+              viewmodel.showCollectList()
             }
           }
           .height(54.dp)
@@ -522,7 +521,7 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
                   .width(135.dp)
                   .clickableSingle {
                     expandedCollect.value = false
-                    viewmodel.focusOnPlace(placeItem, scope)
+                    viewmodel.focusOnPlace(placeItem)
                   },
                 horizontalAlignment = Alignment.CenterHorizontally
               ) {
@@ -560,6 +559,14 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val localImage = remember { mutableStateOf<ByteArray?>(null) }
   val isImageLocalExist = remember { mutableStateOf(false) }
+  val mapUiController = rememberMapUiController(
+    mapWidgetState = viewmodel.mapWidgetState,
+    mainAnchorState = viewmodel.anchorItemState,
+    anchorItemStateList = viewmodel.anchorItemStateList,
+    bottomSheetState = viewmodel.bottomSheetState,
+    searchBottomSheetState = viewmodel.searchBottomSheetState,
+    mapContainer = viewmodel.mapContainer
+  )
   val imageResult by produceState<ByteArray?>(
     null,
     viewmodel.mapInfo.value,
@@ -642,6 +649,23 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   // 初次加载的focus地点
   LaunchedEffect(Unit) {
     launch {
+      viewmodel.mapUiEvent.collect { event ->
+        mapUiController.handleMapUiEvent(
+          event = event,
+          scope = this,
+          mapInfo = viewmodel.mapInfo.value,
+          maxScale = viewmodel.maxScale,
+          collectList = viewmodel.collectListState.toList(),
+          calculatePlaceOffset = viewmodel::calculatePlaceOffset,
+          clearSearchText = {
+            viewmodel.searchTextFieldState.edit {
+              replace(0, length, "")
+            }
+          }
+        )
+      }
+    }
+    launch {
       isImageLocalExist.value = isFileExist()
       localImage.value = getImageFile()
     }
@@ -654,9 +678,9 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           delay(200)
           viewmodel.mapInfo.value?.let {
             argument.placeSearch?.let { placeSearch ->
-              viewmodel.placeSearch(this, placeSearch)
+              viewmodel.placeSearch(placeSearch)
             } ?: run {
-              viewmodel.initFocus(this, it.openSiteId)
+              viewmodel.initFocus(it.openSiteId)
             }
           }
         }

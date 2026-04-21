@@ -22,6 +22,7 @@ import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculatePlaceInMap
 import com.cyxbs.pages.map.util.getMilliseconds
 import com.cyxbs.pages.map.widget.AnchorItemState
+import com.cyxbs.pages.map.widget.MapUiEvent
 import com.cyxbs.pages.map.widget.MapWidgetState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
@@ -29,10 +30,9 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * @Desc : Map的ViewModel
@@ -50,12 +50,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   var maxScale = 6f
-
-  // 管理map的job
-  private var mapAnimationJob: Job? = null
-
-  // 管理anchorList的job
-  private var anchorListJob: Job? = null
 
   // 地图组件状态
   val mapWidgetState = MapWidgetState()
@@ -114,12 +108,23 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   var successImageCount = 0
   var failedImageCount = 0
 
+  private val _mapUiEvent = MutableSharedFlow<MapUiEvent>()
+  val mapUiEvent: SharedFlow<MapUiEvent> = _mapUiEvent.asSharedFlow()
 
   init {
     initMapInfo()
     getButtonInfo()
     if (IAccountService::class.impl().isLogin()) {
       getCollect()
+    }
+  }
+
+  /**
+   * 发送事件
+   */
+  private fun sendMapUiEvent(event: MapUiEvent) {
+    launchByViewModelScope {
+      _mapUiEvent.emit(event)
     }
   }
 
@@ -135,54 +140,25 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
   }
 
-  fun searchToPlace(placeItem: PlaceItem, scope: CoroutineScope) {
+  fun searchToPlace(placeItem: PlaceItem) {
     getPlaceDetails(placeItem.placeId)
-    mapInfo.value?.let { mapInfo ->
-      if (mapContainer.value == IntSize.Zero) return
-      val getOffset = calculatePlaceInMap(
-        Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
-        mapContainer.value,
-        IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
+    sendMapUiEvent(
+      MapUiEvent.SearchToPlace(
+        placeId = placeItem.placeId,
+        placeCenterX = placeItem.placeCenterX.toFloat(),
+        placeCenterY = placeItem.placeCenterY.toFloat()
       )
-      scope.launch {
-        launch {
-          searchBottomSheetState.collapse()
-        }
-        resetMap(this)
-        anchorItemStateList.filter {
-          it.visible
-        }.forEach { anchorItemState ->
-          launch {
-            anchorItemState.animateClose(300)
-            anchorItemState.visible = false
-          }
-        }
-        launch {
-          bottomSheetState.collapse()
-        }
-        launch {
-          anchorItemState.placeId = placeItem.placeId
-          updateAnchorState(getOffset, true)
-        }
-        launch {
-          delay(500)
-          searchTextFieldState.edit {
-            replace(0, length, "")
-          }
-        }
-      }
-    }
+    )
   }
 
   // 从外部跳转而来的placeSearch
-  fun placeSearch(scope: CoroutineScope, placeSearch: String) {
-    // 这里直接使用传进来的scope进行网络请求，防止这个scope在后面执行动画时生命周期已经结束
-    scope.launch {
+  fun placeSearch(placeSearch: String) {
+    launchByViewModelScope {
       MapRepository.placeSearch(placeSearch).getOrElse { throwable ->
         toast("未找到地点，请手动搜索")
         mapInfo.value?.openSiteId
       }?.let {
-        initFocus(scope, it)
+        initFocus(it)
       }
     }
   }
@@ -203,47 +179,38 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   // 初始化聚焦信息
-  fun initFocus(scope: CoroutineScope, placeId: String) {
+  fun initFocus(placeId: String) {
     // 如果初始化时bottomSheet展开的，说明当前是从image页pop回来的，不需要重新focus
     if (bottomSheetState.state == BottomSheetValueState.Expanded) return
     mapInfo.value?.let { mapInfo ->
       mapInfo.placeList.find {
         it.placeId == placeId
       }?.let { placeItem ->
-        focusOnPlace(placeItem, scope)
+        focusOnPlace(placeItem)
       }
     }
   }
 
   // 聚焦于某个地点
-  fun focusOnPlace(placeItem: PlaceItem, scope: CoroutineScope) {
+  fun focusOnPlace(placeItem: PlaceItem) {
     getPlaceDetails(placeItem.placeId)
-    mapInfo.value?.let { mapInfo ->
-      if (mapContainer.value == IntSize.Zero) return
-      val getOffset = calculatePlaceInMap(
-        Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
-        mapContainer.value,
-        IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
+    sendMapUiEvent(
+      MapUiEvent.FocusOnPlace(
+        placeId = placeItem.placeId,
+        placeCenterX = placeItem.placeCenterX.toFloat(),
+        placeCenterY = placeItem.placeCenterY.toFloat()
       )
-      scope.launch {
-        launch {
-          searchBottomSheetState.collapse()
-        }
-        animateMapToPosition(this, getOffset)
-        anchorItemStateList.filter {
-          it.visible
-        }.forEach { anchorItemState ->
-          launch {
-            anchorItemState.animateClose(300)
-            anchorItemState.visible = false
-          }
-        }
-        launch {
-          anchorItemState.placeId = placeItem.placeId
-          updateAnchorState(getOffset, true)
-        }
-      }
-    }
+    )
+  }
+
+  fun calculatePlaceOffset(placeCenterX: Float, placeCenterY: Float): Offset? {
+    val mapInfo = mapInfo.value ?: return null
+    if (mapContainer.value == IntSize.Zero) return null
+    return calculatePlaceInMap(
+      Offset(placeCenterX, placeCenterY),
+      mapContainer.value,
+      IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
+    )
   }
 
   // 获取按钮信息
@@ -384,125 +351,36 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     MapDataRepository.saveSearchHistory(searchHistory)
   }
 
-  fun closeAnchorList(scope: CoroutineScope) {
-    val duration = if (anchorItemStateList.size <= 5) 100 else 50
-    anchorListJob?.cancel()
-    anchorListJob = scope.launch {
-      anchorItemStateList.forEach { anchorItemState ->
-        anchorItemState.animateClose(duration)
-      }
-    }
+  fun closeAnchorList() {
+    sendMapUiEvent(MapUiEvent.CloseAnchorList)
   }
 
-  fun showCollectList(scope: CoroutineScope) {
-    val duration = if (anchorItemStateList.size <= 5) 100 else 50
-    anchorListJob?.cancel()
-    anchorListJob = scope.launch {
-      launch {
-        bottomSheetState.collapse()
-      }
-      if (anchorItemState.scale != 0f) anchorItemState.animateClose()
-      anchorItemStateList.forEach { anchorItemState ->
-        if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
-      }
-      anchorItemStateList.clear()
-      mapInfo.value?.let { mapInfo ->
-        // 后端返回list不是顺序的,只能遍历了
-        val tmpList: MutableList<AnchorItemState> = mutableListOf()
-        collectListState.forEach {
-          mapInfo.placeList.find { placeItem ->
-            it == placeItem.placeId
-          }?.let { placeItem ->
-            val getOffset = calculatePlaceInMap(
-              Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
-              mapContainer.value,
-              IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
-            )
-            tmpList.add(
-              AnchorItemState(
-                initialPosition = getOffset,
-                placeId = placeItem.placeId
-              )
-            )
-          }
-        }
-        anchorItemStateList.addAll(tmpList)
-      }
-      resetMap(this)
-      val newDuration = if (collectListState.size <= 5) 100 else 50
-      anchorItemStateList.forEach { anchorItemState ->
-        anchorItemState.visible = true
-        anchorItemState.animateClick(newDuration)
-      }
-    }
+  fun showCollectList() {
+    sendMapUiEvent(MapUiEvent.ShowCollectAnchors)
   }
 
   // 点击按钮展示anchorList
-  fun showAnchorList(scope: CoroutineScope, index: Int) {
-    var item = 0
+  fun showAnchorList(index: Int) {
     val buttonInfoItem = buttonInfoItemList[index]
-    val duration = if (anchorItemStateList.size <= 5) 100 else 50
-    anchorListJob?.cancel()
-    anchorListJob = scope.launch {
-      launch {
-        searchBottomSheetState.collapse()
-      }
-      launch {
-        bottomSheetState.collapse()
-      }
-      if (anchorItemState.scale != 0f) anchorItemState.animateClose()
-      anchorItemStateList.forEach { anchorItemState ->
-        if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
-      }
-      anchorItemStateList.clear()
-      // 从地图信息中寻找匹配的建筑
-      mapInfo.value?.let { mapInfo ->
-        val tmpList: MutableList<AnchorItemState> = mutableListOf()
-        mapInfo.placeList.forEach { placeItem ->
-          if (item < buttonInfoItem.placeIdList.size && placeItem.placeId == buttonInfoItem.placeIdList[item]) {
-            val getOffset = calculatePlaceInMap(
-              Offset(placeItem.placeCenterX.toFloat(), placeItem.placeCenterY.toFloat()),
-              mapContainer.value,
-              IntSize(mapInfo.mapWidth, mapInfo.mapHeight)
-            )
-            tmpList.add(
-              AnchorItemState(
-                initialPosition = getOffset,
-                placeId = placeItem.placeId
-              )
-            )
-            item++
-          }
-        }
-        anchorItemStateList.addAll(tmpList)
-      }
-      resetMap(this)
-      val newDuration = if (buttonInfoItem.placeIdList.size <= 5) 100 else 50
-      anchorItemStateList.forEach { anchorItemState ->
-        anchorItemState.visible = true
-        anchorItemState.animateClick(newDuration)
-      }
-    }
+    sendMapUiEvent(
+      MapUiEvent.ShowAnchorList(buttonInfoItem.placeIdList)
+    )
   }
 
   // 点击anchorItem
-  fun clickAnchorItem(scope: CoroutineScope, anchorItemState: AnchorItemState) {
-    getPlaceDetails(anchorItemState.placeId)
-    scope.launch {
-      launch {
-        animateMapToPosition(scope, anchorItemState.position)
-      }
-      launch {
-        searchBottomSheetState.collapse()
-      }
-      launch {
-        bottomSheetState.expand()
-      }
-    }
+  fun clickAnchorItem(placeId: String, position: Offset) {
+    getPlaceDetails(placeId)
+    sendMapUiEvent(
+      MapUiEvent.OpenPlaceDetail(
+        placeId = placeId,
+        anchorPositionX = position.x,
+        anchorPositionY = position.y
+      )
+    )
   }
 
   // 点击地图后的判断
-  fun clickPlace(scope: CoroutineScope, offset: Offset, mapInfo: MapInfo) {
+  fun clickPlace(offset: Offset, mapInfo: MapInfo) {
     val mapRatio = mapInfo.mapWidth.toFloat() / mapInfo.mapHeight.toFloat()
     // 这里要减去是因为大图组件高为aspectRatio(ratio)，故只会占在中间一部分，故需要减去顶部的一部分距离
     val originOffset = calculateOriginPosition(
@@ -552,44 +430,13 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     currentSelectedItem.value = 999
     anchorItemState.placeId = placeId // 更新一下对应的placeId
     if (isFind) getPlaceDetails(placeId)
-    // 启动动画
-    scope.launch {
-      launch {
-        searchBottomSheetState.collapse()
-      }
-      if (isFind) {
-        animateMapToPosition(this, realOffset)
-      }
-      // 对于点击建筑标签时，关闭列表动画采用同时进行，对齐之前的代码
-      anchorItemStateList.filter {
-        it.visible
-      }.forEach { anchorItemState ->
-        launch {
-          anchorItemState.animateClose(300)
-          anchorItemState.visible = false
-        }
-      }
-      launch {
-        // 如果找到就启动点击出现的动画并更新状态
-        if (isFind) {
-          launch {
-            updateAnchorState(realOffset, true)
-          }
-          if (bottomSheetState.state == BottomSheetValueState.Hide) {
-            launch {
-              bottomSheetState.collapse()
-            }
-          }
-        } else {
-          launch {
-            updateAnchorState(visible = false)
-          }
-          launch {
-            bottomSheetState.hide() // 老逻辑这里是不会关闭dialog的，这里增加了一个如果没点到就关闭dialog的动画
-          }
-        }
-      }
-    }
+    sendMapUiEvent(
+      MapUiEvent.ClickMapPlace(
+        placeId = placeId.takeIf { isFind },
+        focusOffsetX = realOffset.x.takeIf { isFind },
+        focusOffsetY = realOffset.y.takeIf { isFind }
+      )
+    )
   }
 
   // 改变锁定的状态
@@ -603,30 +450,18 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   }
 
   // 还原地图为初始状态
-  fun resetMap(scope: CoroutineScope) {
-    mapAnimationJob?.cancel()
-    mapAnimationJob = scope.launch {
-      launch {
-        mapWidgetState.animateScale(MIN_SCALE)
-      }
-      launch {
-        mapWidgetState.animateOffset(Offset.Zero)
-      }
-    }
+  fun resetMap() {
+    sendMapUiEvent(MapUiEvent.ResetMap)
   }
 
   // 将地图中心移至某点
-  fun animateMapToPosition(scope: CoroutineScope, offset: Offset) {
-    mapAnimationJob?.cancel()
-    mapAnimationJob = scope.launch {
-      // 执行动画
-      launch {
-        mapWidgetState.animateScale(maxScale)
-      }
-      launch {
-        mapWidgetState.animateOffset((mapCenter - offset) * maxScale)
-      }
-    }
+  fun animateMapToPosition(offset: Offset) {
+    sendMapUiEvent(
+      MapUiEvent.AnimateMapToPosition(
+        offsetX = offset.x,
+        offsetY = offset.y
+      )
+    )
   }
 
   // 跳转导航
@@ -634,19 +469,4 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   open fun jumpToVR() {}
 
-  // 更新锚点的状态
-  private suspend fun updateAnchorState(
-    position: Offset = anchorItemState.position,
-    visible: Boolean,
-    animate: Boolean = true
-  ) {
-    if (anchorItemState.scale != 0f) {
-      anchorItemState.animateClose()
-    }
-    anchorItemState.visible = visible
-    if (animate && visible) {
-      anchorItemState.position = position
-      anchorItemState.animateClick()
-    }
-  }
 }

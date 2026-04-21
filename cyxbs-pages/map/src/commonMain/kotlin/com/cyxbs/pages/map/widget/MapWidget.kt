@@ -60,7 +60,6 @@ fun MapWidgetCompose(
         toast("取消锁定后对地图进行操作")
       } else {
         viewmodel.clickPlace(
-          coroutineScope,
           offset,
           mapInfo
         )
@@ -72,7 +71,7 @@ fun MapWidgetCompose(
       } else {
         // 如果大于6f,则还原初始
         if (mapWidgetState.scale >= viewmodel.maxScale) {
-          viewmodel.resetMap(coroutineScope)
+          viewmodel.resetMap()
         } else {
           val mapRatio = mapInfo.mapWidth.toFloat() / mapInfo.mapHeight.toFloat()
           val originOffset = calculateOriginPosition(
@@ -84,7 +83,7 @@ fun MapWidgetCompose(
             0f,
             (mapWidgetState.container.height.toFloat() - mapWidgetState.container.width.toFloat() / mapRatio) / 2f
           )
-          viewmodel.animateMapToPosition(coroutineScope, originOffset)
+          viewmodel.animateMapToPosition(originOffset)
         }
       }
     },
@@ -94,7 +93,7 @@ fun MapWidgetCompose(
           mapWidgetState,
           anchorItemState
         ) {
-          viewmodel.clickAnchorItem(coroutineScope, anchorItemState)
+          viewmodel.clickAnchorItem(anchorItemState.placeId, anchorItemState.position)
         }
       }
       anchorItemStateList.forEach { anchorItemState ->
@@ -103,7 +102,7 @@ fun MapWidgetCompose(
             mapWidgetState,
             anchorItemState
           ) {
-            viewmodel.clickAnchorItem(coroutineScope, anchorItemState)
+            viewmodel.clickAnchorItem(anchorItemState.placeId, anchorItemState.position)
           }
         }
       }

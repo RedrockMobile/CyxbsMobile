@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,7 +70,6 @@ fun SearchCompose(
 fun SearchResultCompose(modifier: Modifier = Modifier) {
   val textColor = 0xFF234780.dark(0xFFF0F0F2)
   val viewmodel = viewModel(MapComposeViewModel::class)
-  val scope = rememberCoroutineScope()
   LazyColumn(
     modifier = modifier.fillMaxSize()
   ) {
@@ -87,7 +85,7 @@ fun SearchResultCompose(modifier: Modifier = Modifier) {
             viewmodel.mapSearchPagerState.value = 0
             viewmodel.addHot(placeItem.placeId)
             viewmodel.addSearchHistory(placeItem)
-            viewmodel.searchToPlace(placeItem, scope)
+            viewmodel.searchToPlace(placeItem)
           }
           .animateItem(
             fadeInSpec = tween(durationMillis = 500),
@@ -119,7 +117,6 @@ fun SearchHistoryCompose(
   needPlaceList: Boolean = false
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
-  val scope = rememberCoroutineScope()
   val showState = remember { mutableStateOf(false) }
   Column(
     modifier = modifier.fillMaxSize()
@@ -166,7 +163,7 @@ fun SearchHistoryCompose(
               .weight(1f)
               .clickableSingle {
                 viewmodel.mapSearchPagerState.value = 0
-                viewmodel.searchToPlace(placeItem, scope)
+                viewmodel.searchToPlace(placeItem)
               },
             text = placeItem.placeName,
             fontSize = 16.sp,
