@@ -26,8 +26,8 @@ import kotlin.reflect.KClass
  * val accountService = IAccountService::class.impl()
  * ```
  * ## 注意事项
- * - 实现类推荐使用 object 单例
- * - 实现类是 IAccountService 的默认实现时，@ImplProvider 可不提供 clazz 和 name 参数（单要求只能有一个父类或接口）
+ * - 实现类推荐使用 object 单例，若使用 class 则每次 impl() 都会生成一个新的实例
+ * - 实现类是 IAccountService 的默认实现时，@ImplProvider 可不提供 clazz 和 name 参数（但要求只能有一个父类或接口）
  *
  *
  *
@@ -37,10 +37,10 @@ import kotlin.reflect.KClass
  * class MyFragment : BaseFragment() {}
  *
  * // 使用时：
- * val fragment = Fragment::class::impl(NAV_FRAGMENT_页面)
+ * val fragment = Fragment::class.impl(NAV_FRAGMENT_页面)
  * ```
  * ## 注意事项
- * - @ImplProvider clazz 参数只能写 Fragment::class
+ * - @ImplProvider clazz 参数统一写成 Fragment::class
  * - @ImplProvider name  参数统一放在 config 模块 /navigation/NavigationTable.kt 中定义
  *
  *
@@ -59,7 +59,7 @@ import kotlin.reflect.KClass
  * val clazz = MyActivity::class.implClass(NAV_页面)
  * ```
  * ## 注意事项
- * - @KClassProvider clazz 参数只能写 Activity::class 的父类
+ * - @KClassProvider clazz 参数统一写成 Activity::class
  * - @KClassProvider name  参数统一放在 config 模块 /navigation/NavigationTable.kt 中定义
  *
  */
@@ -108,7 +108,7 @@ fun <T : Any> KClass<out T>.allImpl(): Map<String, ImplProviderWrapper<T>> {
  * startActivity(NAV_页面)
  *
  * // 获得 KClass<MyActivity>
- * val clazz = MyActivity::class.implClass(NAV_页面)
+ * val clazz = Activity::class.implClass(NAV_页面)
  * ```
  */
 fun <T : Any> KClass<T>.implClass(name: String): KClass<out T> {

@@ -15,7 +15,7 @@ object Config {
   const val versionName = "6.10.6-alpha" // 线上6.10.5，开发6.10.6-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
-    get() = versionName.substringBeforeLast("-")
+    get() = versionName.substringBefore("-")
 
   val releaseAbiFilters = listOf("arm64-v8a")
   val debugAbiFilters = listOf("arm64-v8a","x86_64")

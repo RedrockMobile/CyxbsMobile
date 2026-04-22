@@ -25,11 +25,16 @@ class CreateGroupViewModel : BaseViewModel(){
         NoClassRepository
             .postNoclassGroup(name,stuNums)
             .map {
-                // 如果重名，就返回-2
-                if (it.info == "exist") NoclassGroupId(-2) else it.data
+                it.data
             }
             .doOnError {
-                _isCreateSuccess.postValue(NoclassGroupId(-1))
+                if (it.message?.contains("\"data\":\"exist\"") == true) {
+                    // 如果重名，就返回-2
+                    // 这里返回的结构不符合规范，暂时使用这种判断来解决
+                    _isCreateSuccess.postValue(NoclassGroupId(-2))
+                } else {
+                    _isCreateSuccess.postValue(NoclassGroupId(-1))
+                }
             }.safeSubscribeBy {
                 _isCreateSuccess.postValue(it)
             }
