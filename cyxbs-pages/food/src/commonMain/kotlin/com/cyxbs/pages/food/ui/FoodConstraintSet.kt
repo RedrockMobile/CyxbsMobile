@@ -14,7 +14,6 @@ import androidx.constraintlayout.compose.Dimension
  */
 
 enum class FoodElement {
-	Topbar,
 	WelcomePicture,
 	DiningArea,
 	DiningNumber,
@@ -27,7 +26,6 @@ class FoodConstraintSet(
 	val scope: ConstraintSetScope,
 	val windowSize: DpSize,
 ) {
-	val topbar = scope.createRefFor(FoodElement.Topbar)
 	val welcomePicture = scope.createRefFor(FoodElement.WelcomePicture)
 	val diningArea = scope.createRefFor(FoodElement.DiningArea)
 	val diningNumber = scope.createRefFor(FoodElement.DiningNumber)
@@ -45,14 +43,8 @@ class FoodConstraintSet(
 //宽度较小，高度较大的手机屏幕
 private fun FoodConstraintSet.wh100vInfinity() {
 	with(scope) {
-		constrain(topbar) {
-			top.linkTo(parent.top)
-			linkTo(parent.start, parent.end)
-			width = Dimension.fillToConstraints
-		}
-
 		constrain(welcomePicture) {
-			top.linkTo(topbar.bottom, 15.dp)
+			top.linkTo(parent.top, 15.dp)
 			linkTo(start = parent.start, end = parent.end, startMargin = 16.dp, endMargin = 16.dp)
 			width = Dimension.fillToConstraints
 			height = Dimension.wrapContent

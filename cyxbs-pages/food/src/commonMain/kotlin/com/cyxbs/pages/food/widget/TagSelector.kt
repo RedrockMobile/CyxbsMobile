@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +36,7 @@ import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_btn_pressed
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_food_main_refresh
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_notification_small
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.ceil
 
 /**
  * description ： 美食咨询处的单选器
@@ -141,20 +143,34 @@ fun TagSelector(
 		}
 
 		Spacer(Modifier.height(14.dp))
+		BoxWithConstraints(Modifier.fillMaxWidth()) {
+			val spacing = 10.dp
+			val minCellWidth = 74.dp
 
-		LazyVerticalGrid(
-			columns = GridCells.Adaptive(74.dp),
-			modifier = Modifier.fillMaxWidth(),
-			verticalArrangement = Arrangement.spacedBy(10.dp),
-			horizontalArrangement = Arrangement.spacedBy(10.dp),
-			userScrollEnabled = false,
-		) {
-			items(
-				items = tagList,
-				key = {
-					it.name
-				}) {
-				SelectorItem(tag = it, onClick = onSelectChange, modifier = Modifier.animateItem())
+			//maxWidth = columns * minCellWidth + (columns -1) * spacing 解一下方程
+			val columns = maxOf(1, ((maxWidth + spacing) / (minCellWidth + spacing)).toInt())
+			val rows = ceil(tagList.size.toDouble() / columns).toInt()
+
+			val itemHeight = 35.dp
+			val gridHeight = if (rows > 0) (itemHeight * rows) + (spacing * (rows - 1)) else 0.dp
+
+			LazyVerticalGrid(
+				columns = GridCells.Adaptive(minCellWidth),
+				modifier = Modifier.fillMaxWidth().height(gridHeight),
+				verticalArrangement = Arrangement.spacedBy(spacing),
+				horizontalArrangement = Arrangement.spacedBy(spacing),
+				userScrollEnabled = false,
+			) {
+				items(
+					items = tagList,
+					key = { it.name }
+				) {
+					SelectorItem(
+						tag = it,
+						onClick = onSelectChange,
+						modifier = Modifier.animateItem()
+					)
+				}
 			}
 		}
 	}

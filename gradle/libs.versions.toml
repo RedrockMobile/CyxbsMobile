@@ -194,7 +194,10 @@ coil = "3.3.0"
 filekit = "0.12.0"
 # 文件操作库 https://github.com/square/okio
 okio = "3.16.2"
-
+# 权限申请的第三方库 https://github.com/icerockdev/moko-permissions
+moko-permissions = "0.20.1"
+# 高德地图的定位 https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
+amap = "6.5.1"
 [libraries]
 ####################################################################################################
 #                                              Android
@@ -328,7 +331,9 @@ filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "file
 filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
 filekit-coil = { module = "io.github.vinceglb:filekit-coil", version.ref = "filekit" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
-
+moko-permissions = {module = "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions"}
+moko-permissions-location = {module = "dev.icerock.moko:permissions-location", version.ref = "moko-permissions"}
+amap-location = { module = "com.amap.api:location", version.ref = "amap" }
 ####################################### 公有依赖，大部分模块使用 #######################################
 eventBus = { module = "org.greenrobot:eventbus", version.ref = "eventBus" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }

@@ -38,6 +38,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.components.view.ui.DialogPositiveBtnCompose
 import com.cyxbs.pages.food.viewmodel.FoodViewModel
@@ -81,10 +82,10 @@ fun FoodDetailDialog() {
 			modifier = Modifier.align(Alignment.CenterHorizontally).size(193.dp, 125.dp)
 				.clip(RoundedCornerShape(6.dp))
 		) {
-			Image(
-				painter = painterResource(Res.drawable.food_ic_food_detail),
-				contentDescription = null,
-				contentScale = ContentScale.FillBounds
+			ImageFromUrlCompose(
+				url = current.picture,
+				contentDescription = current.name,
+				contentScale = ContentScale.FillBounds,
 			)
 			Row(
 				Modifier.clip(RoundedCornerShape(bottomEnd = 6.dp)).background(

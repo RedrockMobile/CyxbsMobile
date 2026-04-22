@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.food.viewmodel.FoodViewModel
 import com.cyxbs.pages.food.widget.FoodDescribeDialog
@@ -56,7 +59,6 @@ import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.food.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_notification
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_toolbar_navigation
-import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_welcome_picture
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -79,18 +81,22 @@ class FoodNavDestination : MainNavDestination<FoodNavArgument>(FoodNavArgument::
 
 @Composable
 fun FoodPage() {
-	ConstraintLayout(
-		modifier = Modifier.fillMaxSize()
-			.background(LocalAppColors.current.topBg)
+	val scrollState = rememberScrollState()
+	Column(
+		Modifier.fillMaxSize().background(LocalAppColors.current.topBg)
 			.systemBarsPadding(),
-		constraintSet = createConstraintSet()
 	) {
-		TopbarCompose(Modifier.layoutId(FoodElement.Topbar))
-		WelcomePictureCompose(Modifier.layoutId(FoodElement.WelcomePicture))
-		DiningAreaCompose(Modifier.layoutId(FoodElement.DiningArea))
-		DiningNumberCompose(Modifier.layoutId(FoodElement.DiningNumber))
-		DiningPropertyCompose(Modifier.layoutId(FoodElement.DiningProperty))
-		MealResultCompose(Modifier.layoutId(FoodElement.MealResult))
+		TopbarCompose(Modifier.fillMaxWidth())
+		ConstraintLayout(
+			modifier = Modifier.fillMaxWidth().verticalScroll(scrollState),
+			constraintSet = createConstraintSet()
+		) {
+			WelcomePictureCompose(Modifier.layoutId(FoodElement.WelcomePicture))
+			DiningAreaCompose(Modifier.layoutId(FoodElement.DiningArea))
+			DiningNumberCompose(Modifier.layoutId(FoodElement.DiningNumber))
+			DiningPropertyCompose(Modifier.layoutId(FoodElement.DiningProperty))
+			MealResultCompose(Modifier.layoutId(FoodElement.MealResult))
+		}
 	}
 	FoodDescribeDialog()
 	FoodSuggestMoreTagsDialog()
@@ -154,11 +160,12 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 
 @Composable
 private fun WelcomePictureCompose(modifier: Modifier = Modifier) {
-	Image(
+	val viewModel = viewModel(FoodViewModel::class)
+	ImageFromUrlCompose(
+		url = viewModel.welcomePicture.value,
 		modifier = modifier.width(410.dp),
-		painter = painterResource(Res.drawable.food_ic_welcome_picture),
 		contentDescription = "welcome",
-		contentScale = ContentScale.Fit
+		contentScale = ContentScale.Fit,
 	)
 }
 
