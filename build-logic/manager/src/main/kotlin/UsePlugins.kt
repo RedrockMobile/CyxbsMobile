@@ -97,7 +97,6 @@ private fun Project.kspMultiplatform(dependencyNotation: Any) {
   dependencies {
     "kspAndroid"(dependencyNotation)
     if (Multiplatform.enableIOS(project)) {
-      "kspIosX64"(dependencyNotation)
       "kspIosArm64"(dependencyNotation)
       "kspIosSimulatorArm64"(dependencyNotation)
     }

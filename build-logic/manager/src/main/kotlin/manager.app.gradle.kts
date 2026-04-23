@@ -81,7 +81,6 @@ android {
 kotlin {
   if (Multiplatform.enableIOS(project)) {
     listOf(
-      iosX64(),
       iosArm64(),
       iosSimulatorArm64()
     ).forEach { iosTarget ->

@@ -22,7 +22,6 @@ kotlin {
     jvm("desktop")
   }
   if (Multiplatform.enableIOS(project)) {
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
   }
@@ -73,7 +72,6 @@ kotlin {
       val iosMain = create("iosMain") {
         dependsOn(commonMain.get())
       }
-      iosX64Main { dependsOn(iosMain) }
       iosArm64Main { dependsOn(iosMain) }
       iosSimulatorArm64Main { dependsOn(iosMain) }
     }
