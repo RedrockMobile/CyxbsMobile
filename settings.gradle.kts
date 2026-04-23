@@ -35,6 +35,9 @@ pluginManagement {
     mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
   }
 }
+plugins {
+  id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // wasmJs 会单独声明仓库，这里需要放开限制
   repositories {
