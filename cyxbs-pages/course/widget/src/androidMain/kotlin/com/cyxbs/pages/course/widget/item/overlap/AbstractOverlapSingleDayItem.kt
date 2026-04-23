@@ -12,15 +12,14 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.util.forEach
 import androidx.core.util.isNotEmpty
+import com.cyxbs.components.utils.extensions.dimen
 import com.cyxbs.pages.course.widget.R
 import com.cyxbs.pages.course.widget.fragment.course.base.FoldImpl
 import com.cyxbs.pages.course.widget.fragment.course.base.OverlapImpl
 import com.cyxbs.pages.course.widget.internal.item.forEachRow
 import com.cyxbs.pages.course.widget.item.single.ISingleDayItem
-import com.cyxbs.components.utils.extensions.dimen
 import com.ndhzs.netlayout.attrs.NetLayoutParams
-import com.ndhzs.netlayout.attrs.SideType
-import com.ndhzs.netlayout.callback.OnWeightChangeListener
+import com.ndhzs.netlayout.callback.OnRowWeightChangeListener
 import com.ndhzs.netlayout.view.NetLayout
 import java.util.Collections
 
@@ -321,17 +320,15 @@ abstract class AbstractOverlapSingleDayItem : IOverlapItem, OverlapHelper.IOverl
   
     // 关联课表与 netLayout 的行比重，主要用于中午和傍晚时间段的折叠，但这里不想过于耦合，所以采取这种写法
     private val mOnWeightChangeListener =
-      OnWeightChangeListener { _, newWeight, which, sideType ->
-        if (sideType == SideType.ROW) {
-          val lp = layoutParams as NetLayoutParams
-          if (which in lp.startRow .. lp.endRow) {
-            if (lp.rowCount != netLayout.rowCount) {
-              // refreshOverlap() 方法中虽然会同步 lp 跟 netLayout，但有点靠后了
-              // 这里会因为不同步在设置比重时出现问题，所以这里先进行同步
-              netLayout.setRowColumnCount(lp.rowCount, lp.columnCount)
-            }
-            netLayout.setRowShowWeight(which - lp.startRow, newWeight)
+      OnRowWeightChangeListener { _, newWeight, row ->
+        val lp = layoutParams as NetLayoutParams
+        if (row in lp.startRow .. lp.endRow) {
+          if (lp.rowCount != netLayout.rowCount) {
+            // refreshOverlap() 方法中虽然会同步 lp 跟 netLayout，但有点靠后了
+            // 这里会因为不同步在设置比重时出现问题，所以这里先进行同步
+            netLayout.setRowColumnCount(lp.rowCount, lp.columnCount)
           }
+          netLayout.setRowShowWeight(row - lp.startRow, newWeight)
         }
       }
   
@@ -341,14 +338,14 @@ abstract class AbstractOverlapSingleDayItem : IOverlapItem, OverlapHelper.IOverl
     override fun onAttachedToWindow() {
       super.onAttachedToWindow()
       val parent = parent as NetLayout
-      parent.addOnWeightChangeListener(mOnWeightChangeListener)
+      parent.addOnRowWeightChangeListener(mOnWeightChangeListener)
       setNetLayoutRow(parent)
       mParent = parent
     }
   
     override fun onDetachedFromWindow() {
       super.onDetachedFromWindow()
-      mParent?.removeOnWeightChangeListener(mOnWeightChangeListener)
+      mParent?.removeOnRowWeightChangeListener(mOnWeightChangeListener)
       mParent = null
     }
   

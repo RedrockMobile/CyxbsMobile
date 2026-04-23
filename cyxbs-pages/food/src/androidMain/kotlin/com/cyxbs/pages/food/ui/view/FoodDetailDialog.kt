@@ -12,9 +12,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
-import com.cyxbs.pages.food.R
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.setImageFromUrl
+import com.cyxbs.pages.food.R
 
 /**
  * Create by bangbangp on 2023/3/15 16:00
@@ -68,7 +68,7 @@ class FoodDetailDialog private constructor(
         val foodName: String = "",
         val imageUrl: String = "",
         val praiseNum:Int = 0,
-        @DrawableRes
+        @param:DrawableRes
         val positiveButtonBackground:Int = 0,
         val praiseIs:Boolean ,
         val width:Int = 0,

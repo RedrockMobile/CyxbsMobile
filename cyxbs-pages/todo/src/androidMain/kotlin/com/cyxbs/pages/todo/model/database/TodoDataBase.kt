@@ -1,13 +1,17 @@
 package com.cyxbs.pages.todo.model.database
 
-import androidx.room.*
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.defaultGson
+import com.cyxbs.components.utils.extensions.getSp
 import com.cyxbs.pages.todo.model.bean.RemindMode
 import com.cyxbs.pages.todo.model.bean.RemindMode.Companion.generateDefaultRemindMode
 import com.cyxbs.pages.todo.model.bean.Todo
-import com.cyxbs.components.utils.extensions.getSp
-import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.defaultGson
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.launch
@@ -33,7 +37,7 @@ abstract class TodoDatabase : RoomDatabase() {
                     TodoDatabase::class.java,
                     "todo_db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(false)
                     .addCallback(getDatabaseCallback())
                     .build()
                 INSTANCE = instance

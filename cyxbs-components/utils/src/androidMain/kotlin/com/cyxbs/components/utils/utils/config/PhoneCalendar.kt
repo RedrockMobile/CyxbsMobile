@@ -14,10 +14,12 @@ import android.provider.CalendarContract.Reminders
 import androidx.annotation.IntRange
 import androidx.fragment.app.FragmentActivity
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appApplication
 import com.cyxbs.components.utils.extensions.doPermissionAction
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.utils.utils.config.PhoneCalendar.Event
+import com.cyxbs.components.utils.utils.config.PhoneCalendar.ACCOUNT_TYPE
+import com.cyxbs.components.utils.utils.config.PhoneCalendar.add
+import com.cyxbs.components.utils.utils.config.PhoneCalendar.getCalendarAccount
 import io.reactivex.rxjava3.core.Completable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Calendar
@@ -517,10 +519,10 @@ object PhoneCalendar {
     val duration: Duration
     
     class Duration(
-      @IntRange(from = 0) val day: Int = 0,
-      @IntRange(from = 0) val hour: Int = 0,
-      @IntRange(from = 0) val minute: Int = 0,
-      @IntRange(from = 0) val second: Int = 0,
+      @param:IntRange(from = 0) val day: Int = 0,
+      @param:IntRange(from = 0) val hour: Int = 0,
+      @param:IntRange(from = 0) val minute: Int = 0,
+      @param:IntRange(from = 0) val second: Int = 0,
     ) {
       // 转变成日历需要的字符串，具体请看：3.3.6
       internal fun toDuration(): String {
@@ -570,7 +572,7 @@ object PhoneCalendar {
     val freq: Freq,
     val interval: Int = 1,
     val until: Calendar? = null,
-    @IntRange(from = 1)
+    @param:IntRange(from = 1)
     val count: Int? = null,
     val byDay: List<ByDay> = emptyList(),
     val byMonthDay: List<Int> = emptyList(),

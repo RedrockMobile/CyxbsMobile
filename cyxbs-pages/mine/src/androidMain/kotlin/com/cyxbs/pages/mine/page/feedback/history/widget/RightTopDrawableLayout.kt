@@ -45,8 +45,8 @@ class RightTopDrawableLayout @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         if (event?.action == MotionEvent.ACTION_UP) {
-            val x = event?.x ?: 0F
-            val y = event?.y ?: 0F
+            val x = event.x
+            val y = event.y
             val circleX = width - rightTopDrawableSize / 2
             val circleY = rightTopDrawableSize / 2
             //如果事件在1.2倍半径区域内视为点击成功

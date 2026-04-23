@@ -2,12 +2,12 @@ package com.cyxbs.pages.electricity.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.cyxbs.pages.electricity.bean.ElecInf
-import com.cyxbs.pages.electricity.network.ApiService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.utils.extensions.setSchedulers
 import com.cyxbs.components.utils.network.ApiGenerator
 import com.cyxbs.components.utils.network.throwApiExceptionIfFail
+import com.cyxbs.pages.electricity.bean.ElecInf
+import com.cyxbs.pages.electricity.network.ApiService
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
@@ -48,10 +48,8 @@ class ChargeViewModel : BaseViewModel() {
                 }
             }
             .safeSubscribeBy {
-                if (it == null) {
-                    launchByViewModelScope {
-                        loadFailed.emit(true)
-                    }
+                launchByViewModelScope {
+                    loadFailed.emit(true)
                 }
                 (chargeInfo as MutableLiveData).value = it
             }

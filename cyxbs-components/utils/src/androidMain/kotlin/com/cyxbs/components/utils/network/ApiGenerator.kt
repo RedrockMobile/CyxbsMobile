@@ -7,11 +7,11 @@ import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.utils.BuildConfig
-import com.cyxbs.components.init.appContext
-import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.config.service.allImpl
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.appContext
+import com.cyxbs.components.utils.BuildConfig
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.google.gson.annotations.SerializedName
@@ -481,7 +481,7 @@ object ApiGenerator {
                         .url(BASE_NORMAL_BACKUP_GET)
                         .build()
                     val call = okHttpClient.newCall(request)
-                    val json = call.execute().body?.string()
+                    val json = call.execute().body.string()
                     val backupUrlStatus = defaultGson.fromJson<ApiWrapper<BackupUrlStatus>>(
                         json,
                         object : TypeToken<ApiWrapper<BackupUrlStatus>>() {}.type

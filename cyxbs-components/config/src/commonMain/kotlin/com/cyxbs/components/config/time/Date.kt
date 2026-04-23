@@ -12,6 +12,7 @@ import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import kotlinx.serialization.KSerializer
@@ -254,7 +255,7 @@ value class Date(
     }
 
     fun lengthOfMonth(date: LocalDate): Int {
-      return lengthOfMonth(date.year, date.dayOfMonth)
+      return lengthOfMonth(date.year, date.day)
     }
 
     fun ofEpochDay(epochDay: Int): Date {
@@ -300,7 +301,7 @@ value class Date(
 }
 
 fun LocalDate.toDate(): Date {
-  return Date(year, monthNumber, dayOfMonth)
+  return Date(year, month.number, day)
 }
 
 object DateSerializer : KSerializer<Date> {
@@ -326,7 +327,6 @@ fun DayOfWeek.toChinese(prefix: String = "周"): String {
     DayOfWeek.FRIDAY -> "五"
     DayOfWeek.SATURDAY -> "六"
     DayOfWeek.SUNDAY -> "日"
-    else -> error("")
   }
 }
 

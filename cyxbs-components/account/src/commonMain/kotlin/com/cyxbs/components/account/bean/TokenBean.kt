@@ -3,10 +3,10 @@ package com.cyxbs.components.account.bean
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.utils.extensions.toast
-import io.ktor.util.decodeBase64String
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.io.encoding.Base64
 
 /**
  * .
@@ -24,7 +24,7 @@ class TokenBean(
   // 从 token 中解码的数据
   @Transient
   val info: TokenInfo = kotlin.runCatching {
-    val str = token.substringBefore(".").decodeBase64String()
+    val str = Base64.decode(token.substringBefore(".")).decodeToString()
     defaultJson.decodeFromString<TokenInfo>(str)
   }.onFailure {
     if (isDebug()) {

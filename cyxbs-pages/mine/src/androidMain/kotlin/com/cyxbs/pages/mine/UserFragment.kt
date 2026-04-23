@@ -28,7 +28,6 @@ import com.cyxbs.components.config.route.UFIELD_CENTER_ENTRY
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.init.MainNavController
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
@@ -45,7 +44,6 @@ import com.cyxbs.pages.notification.api.INotificationService
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 
 /**
  * Created by zzzia on 2018/8/14.
@@ -89,9 +87,7 @@ class UserFragment : BaseFragment() {
             mine_user_iv_center_stamp.setOnSingleClickListener {
                 doIfLogin {
                     // “邮票中心”点击埋点
-                    appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_YPZX_ENTRY)
-                    }
+                    TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_YPZX_ENTRY)
 
                     startActivity(STORE_ENTRY)
                 }
@@ -99,9 +95,7 @@ class UserFragment : BaseFragment() {
             mine_user_iv_center_feedback.setOnSingleClickListener {
                 doIfLogin {
                     // “反馈中心”点击埋点
-                    appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_FKZX_ENTRY)
-                    }
+                    TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_FKZX_ENTRY)
 
                     startActivity(
                         Intent(
@@ -166,9 +160,7 @@ class UserFragment : BaseFragment() {
             mine_user_iv_center_notification.setOnSingleClickListener {
                 if (IAccountService::class.impl().isLogin()) {
                     // 消息中心入口点击埋点
-                    appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_XXZX_ENTRY)
-                    }
+                    TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_XXZX_ENTRY)
                 }
                 ILaunchNotificationService::class.impl().start()
                 // 进入消息中心，移除红点
@@ -177,9 +169,7 @@ class UserFragment : BaseFragment() {
             mine_user_iv_center_activity.setOnSingleClickListener {
                 doIfLogin {
                     // “活动中心”点击埋点
-                    appCoroutineScope.launch {
-                        TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_HDZX_ENTRY)
-                    }
+                    TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_HDZX_ENTRY)
                     startActivity(UFIELD_CENTER_ENTRY)
                 }
             }

@@ -13,8 +13,6 @@
         android:supportsRtl="true"
         android:theme="@style/ConfigAppTheme"
         android:usesCleartextTraffic="true"
-        android:extractNativeLibs="true"
-        tools:replace="networkSecurityConfig"
         tools:targetApi="n">
     </application>
 </manifest>

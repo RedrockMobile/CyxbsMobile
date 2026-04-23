@@ -65,10 +65,16 @@ fun MainNavHost() {
   val navController = rememberNavController()
   MainNavController = navController
   val destinations = remember {
-    MainNavDestination::class.allImpl().mapValues { it.value.get() as MainNavDestination<Any> }
+    MainNavDestination::class.allImpl().mapValues {
+      @Suppress("UNCHECKED_CAST")
+      it.value.get() as MainNavDestination<Any>
+    }
   }
   val dialogs = remember {
-    MainNavDialog::class.allImpl().mapValues { it.value.get() as MainNavDialog<Any> }
+    MainNavDialog::class.allImpl().mapValues {
+      @Suppress("UNCHECKED_CAST")
+      it.value.get() as MainNavDialog<Any>
+    }
   }
   NavHost(
     navController = navController,
