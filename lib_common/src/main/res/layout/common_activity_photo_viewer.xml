@@ -3,8 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/fl_photo_content"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="com.cyxbs.pages.news.ui.activity.PhotoViewerActivity">
+    android:layout_height="match_parent">
 
     <androidx.viewpager.widget.ViewPager
         android:id="@+id/vp_photo"

@@ -21,6 +21,7 @@ kotlin {
             && !it.path.contains("cyxbs-applications")
             && !it.path.contains("cyxbs-compiler")
             && !it.name.startsWith("cyxbs-")
+            && it.name != "lib_common" // lib_common 由其他模块间接依赖
       }.forEach {
         api(it)
       }
