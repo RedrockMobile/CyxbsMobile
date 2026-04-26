@@ -1,11 +1,7 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import rule.ModuleNamespaceCheckRule
 
 plugins {
   id("com.android.application")
-  id("kmp.base")
-  id("kmp.compose")
 }
 
 ProjectChecker.config(project) // 项目检查工具
@@ -75,52 +71,5 @@ android {
   }
   buildFeatures {
     buildConfig = true
-  }
-}
-
-kotlin {
-  if (Multiplatform.enableIOS(project)) {
-    listOf(
-      iosArm64(),
-      iosSimulatorArm64()
-    ).forEach { iosTarget ->
-      iosTarget.binaries.framework {
-        baseName = Config.getBaseName(project)
-        isStatic = true
-      }
-    }
-  }
-  if (Multiplatform.enableWeb(project)) {
-    js {
-      binaries.executable()
-    }
-
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-      binaries.executable()
-    }
-  }
-}
-
-if (Multiplatform.enableDesktop(project)) {
-  compose.desktop {
-    application {
-      mainClass = "CyxbsDesktopAppKt"
-      nativeDistributions {
-        targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-        packageName = Config.getApplicationId(project)
-        packageVersion = Config.composeDesktopVersion
-      }
-      buildTypes {
-        release {
-          proguard {
-            isEnabled.set(true)
-            configurationFiles.from(rootDir.resolve("build-logic")
-              .resolve("manager")
-              .resolve("proguard-rules.pro"))
-          }
-        }
-      }
-    }
   }
 }

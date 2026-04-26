@@ -11,7 +11,7 @@ import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.api.annotation.ImplProvider
-import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
+import com.g985892345.provider.cyxbsmobile.cyxbsapplications.multiplatform.MultiplatformKtProviderInitializer
 import io.github.vinceglb.filekit.FileKit
 import org.jetbrains.compose.resources.painterResource
 
@@ -23,7 +23,7 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 fun main() = runApp {
-  TestKtProviderInitializer.tryInitKtProvider()
+  MultiplatformKtProviderInitializer.tryInitKtProvider()
   InitialManager.init(isMainProcess = true)
   FileKit.init(appId = "com.mredrock.cyxbs")
   launchApplication {

@@ -1,4 +1,4 @@
-import com.android.build.gradle.BaseExtension
+import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
 
 plugins {
   id("kmp.base")
@@ -23,10 +23,6 @@ kotlin {
       implementation(libsEx.`compose-constraintLayout`)
     }
 
-    androidMain.dependencies {
-      implementation(libsEx.`compose-activity`)
-    }
-
     if (Multiplatform.enableDesktop(project)) {
       val desktopMain by getting
       desktopMain.dependencies {
@@ -36,12 +32,9 @@ kotlin {
   }
 }
 
-plugins.withId("com.android.base") {
-  configure<BaseExtension> {
-    buildFeatures.compose = true
-  }
+plugins.withId("com.android.kotlin.multiplatform.library") {
   dependencies {
-    add("debugImplementation", libsEx.`compose-ui-tooling`)
+    add("androidRuntimeClasspath", libsEx.`compose-ui-tooling`)
   }
   configurations.getByName("androidMainImplementation") {
     // 目前第三方的 constraintlayout 在安卓上的实现与 constraintlayout-core 存在依赖冲突
@@ -51,6 +44,7 @@ plugins.withId("com.android.base") {
   kotlin {
     sourceSets {
       androidMain.dependencies {
+        implementation(libsEx.`compose-activity`)
         implementation(libsEx.`compose-constraintLayout-android`)
       }
     }

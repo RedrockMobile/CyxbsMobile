@@ -24,7 +24,7 @@ kotlinJvmTarget = "17"
 #                                            Android
 ####################################################################################################
 # https://developer.android.com/build/releases/gradle-plugin?hl=zh-cn
-agp = "8.13.0"
+agp = "9.2.0"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
@@ -362,6 +362,7 @@ rxjava-kotlin = { module = "io.reactivex.rxjava3:rxkotlin", version.ref = "rxjav
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
+androidMultiplatform = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

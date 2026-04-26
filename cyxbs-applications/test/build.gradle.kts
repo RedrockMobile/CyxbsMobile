@@ -1,5 +1,5 @@
 plugins {
-  id("manager.app")
+  id("manager.app-android")
   alias(libs.plugins.vasdolly) // 腾讯打包插件 https://github.com/Tencent/VasDolly
 }
 
@@ -10,29 +10,23 @@ val excludeList = mutableListOf<String>(
 
 )
 
-kotlin {
-  sourceSets {
-    commonMain.dependencies {
-      // 根 gradle 中包含的所有子模块
-      project.rootProject.subprojects.filter {
-        it.name !in excludeList
-            && it != project
-            && it.name != "debug" // lib_debug 单独依赖
-            && !it.path.contains("cyxbs-applications")
-            && !it.path.contains("cyxbs-compiler")
-            && !it.name.startsWith("cyxbs-")
-            && it.name != "lib_common" // lib_common 由其他模块间接依赖
-      }.forEach {
-        api(it)
-      }
-    }
-    androidMain.dependencies {
-      implementation(libs.bundles.projectBase)
-    }
-    desktopMain.dependencies {
-      implementation(libs.filekit.core)
-    }
+dependencies {
+  // 根 gradle 中包含的所有子模块
+  project.rootProject.subprojects.filter {
+    it.name !in excludeList
+        && it != project
+        && it.name != "debug" // lib_debug 单独依赖
+        && !it.path.contains("cyxbs-applications")
+        && !it.path.contains("cyxbs-compiler")
+        && !it.name.startsWith("cyxbs-")
+        && it.name != "lib_common" // lib_common 由其他模块间接依赖
+  }.forEach {
+    api(it)
   }
+
+  implementation(libs.bundles.projectBase)
+
+  implementation(projects.cyxbsFunctions.debug)
 }
 
 android {
@@ -113,7 +107,7 @@ tasks.register("buildReleaseAndInstall") {
 }
 
 tasks.all {
-  if (name == "channelRelease" || name == "wasmJsBrowserDevelopmentRun") {
+  if (name == "channelRelease" || name == "wasmJsBrowserDevelopmentRun" || name == "buildReleaseAndInstall") {
     // 抑制 channelRelease 不能缓存的报错
     notCompatibleWithConfigurationCache("suppres configuration cache")
   }

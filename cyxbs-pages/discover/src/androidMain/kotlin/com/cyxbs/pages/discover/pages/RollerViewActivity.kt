@@ -9,32 +9,28 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.MediaScannerConnection
-import android.net.Uri
-import android.os.*
-import android.util.Log
+import android.os.Bundle
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.Message
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_BACK
-import android.view.MotionEvent
-import android.webkit.URLUtil
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.cyxbs.components.config.dir.DIR_PHOTO
-import com.cyxbs.components.view.ui.JToolbar
-import com.cyxbs.pages.discover.BuildConfig
-import com.cyxbs.pages.discover.R
-import com.cyxbs.pages.discover.network.RollerViewInfo
-import com.cyxbs.pages.discover.pages.discover.webView.WebViewFactory
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.webView.IAndroidWebView
 import com.cyxbs.components.base.webView.LiteJsWebView
 import com.cyxbs.components.base.webView.WebViewBaseCallBack
+import com.cyxbs.components.config.dir.DIR_PHOTO
 import com.cyxbs.components.utils.extensions.doPermissionAction
 import com.cyxbs.components.utils.extensions.loadBitmap
 import com.cyxbs.components.utils.extensions.saveImage
+import com.cyxbs.components.view.ui.JToolbar
+import com.cyxbs.pages.discover.R
+import com.cyxbs.pages.discover.network.RollerViewInfo
+import com.cyxbs.pages.discover.pages.discover.webView.WebViewFactory
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 
 class RollerViewActivity : BaseActivity() {

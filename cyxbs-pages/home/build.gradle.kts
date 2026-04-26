@@ -29,7 +29,3 @@ kotlin {
   }
 }
 
-dependencies {
-  debugImplementation(projects.cyxbsFunctions.debug)
-}
-
