@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.logger
 
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.logger.bean.TrackingResultBean
 import com.cyxbs.components.utils.logger.event.ClickEvent
@@ -79,7 +79,7 @@ object TrackingUtils {
    * 3. `null` 埋点网络请求异常
    */
   fun toastLoggerWhenDebug(trackingResultBean: TrackingResultBean? = null) {
-    if (BuildConfig.DEBUG) {
+    if (isDebug()) {
       toastLogger(trackingResultBean)
     }
   }

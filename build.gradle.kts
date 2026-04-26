@@ -15,6 +15,7 @@ plugins {
   alias(libs.plugins.composeMultiplatform) apply false
   alias(libs.plugins.ksp) apply false
   alias(libs.plugins.ktProvider) apply false
+  alias(libs.plugins.buildconfig) apply false
 }
 
 // 管理 git 提交规范的脚本

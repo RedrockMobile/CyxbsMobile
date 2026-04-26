@@ -8,7 +8,3 @@ package com.cyxbs.components.config
  */
 actual val appName: String
   get() = "桌上重邮"
-
-actual fun isDebug(): Boolean {
-  return true // todo 后续再配置，考虑使用 buildConfig 插件生成 https://github.com/gmazzo/gradle-buildconfig-plugin
-}

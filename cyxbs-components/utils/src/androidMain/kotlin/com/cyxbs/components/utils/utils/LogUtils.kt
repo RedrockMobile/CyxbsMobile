@@ -1,7 +1,7 @@
 package com.cyxbs.components.utils.utils
 
 import android.util.Log
-import com.cyxbs.components.utils.BuildConfig
+import com.cyxbs.components.config.isDebug
 import kotlin.experimental.and
 
 /**
@@ -11,7 +11,7 @@ import kotlin.experimental.and
  */
 
 object LogUtils {
-    private val DEBUG = BuildConfig.DEBUG
+    private val DEBUG = isDebug()
     private val SHOW_LOG: Byte
     private const val VERBOSE_MASK: Byte = 0x1
     private const val DEBUG_MASK: Byte = 0x2

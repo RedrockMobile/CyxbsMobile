@@ -8,9 +8,3 @@ package com.cyxbs.components.config
  */
 actual val appName: String
   get() = "掌上重邮"
-
-var isIOSDebug = false // 由 applications 模块设置
-
-actual fun isDebug(): Boolean {
-  return isIOSDebug
-}

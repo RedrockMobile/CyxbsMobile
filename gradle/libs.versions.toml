@@ -198,6 +198,8 @@ okio = "3.17.0"
 moko-permissions = "0.20.1"
 # 高德地图的定位 https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
 amap = "11.1.001"
+# 多平台 BuildConfig 生成 https://github.com/gmazzo/gradle-buildconfig-plugin
+buildconfig = "6.0.9"
 
 [libraries]
 ####################################################################################################
@@ -370,6 +372,7 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 vasdolly = { id = "com.tencent.vasdolly" }
 ktProvider = { id = "io.github.985892345.KtProvider", version.ref = "kmp-ktProvider" }
 ktorfit = { id = "de.jensklingenberg.ktorfit", version.ref = "kmp-ktorfit" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 
 [bundles]
 projectBase = [

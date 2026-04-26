@@ -3,9 +3,9 @@ package com.cyxbs.components.base.crash
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import com.cyxbs.components.base.BuildConfig
 import com.cyxbs.components.base.crash.CrashActivity.Companion.NetworkApiResult
 import com.cyxbs.components.base.pages.SecretActivity
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.utils.extensions.toastLong
 import com.g985892345.provider.api.annotation.ImplProvider
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
@@ -47,13 +47,13 @@ object CrashMonitor : UncaughtExceptionHandler {
 
   private fun installRxjavaErrorHandler() {
     RxJavaPlugins.setErrorHandler {
-      if (BuildConfig.DEBUG) throw it
+      if (isDebug()) throw it
     }
   }
 
   private fun handleOtherThread(throwable: Throwable) {
     // 其他线程不处理
-    if (BuildConfig.DEBUG) {
+    if (isDebug()) {
       Log.d("crash", throwable.stackTraceToString())
     }
   }
@@ -88,7 +88,7 @@ object CrashMonitor : UncaughtExceptionHandler {
 
   override fun uncaughtException(t: Thread, e: Throwable) {
     if (t === mainThread) {
-      if (BuildConfig.DEBUG) {
+      if (isDebug()) {
         Log.d("crash", e.stackTraceToString())
         toastLong("触发异常，日志筛选 tag:crash 查看")
       }

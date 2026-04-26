@@ -1,13 +1,21 @@
 package com.cyxbs.components.utils.utils.get
 
+import CyxbsMobile.cyxbs_components.utils.BuildConfig
+
 /**
  * @Desc : App信息
  * @Author : zzx
  * @Date : 2025/10/29 15:24
  */
 
-expect fun getAppVersionCode(): Long
+fun getAppVersionCode(): Long {
+  return BuildConfig.VERSION_CODE
+}
 
-expect fun getAppVersionName(): String
+fun getAppVersionName(): String {
+  return BuildConfig.VERSION_NAME
+}
 
-expect fun getAppUpdateContent(): String
+fun getAppUpdateContent(): String {
+  return BuildConfig.VERSION_UPDATE_CONTENT
+}

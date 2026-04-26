@@ -1,9 +1,9 @@
 package com.cyxbs.pages.course.page.course.bean
 
 import androidx.annotation.WorkerThread
-import com.cyxbs.pages.course.BuildConfig
-import com.cyxbs.pages.course.page.course.room.LessonDataBase
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.pages.course.page.course.room.LessonDataBase
 
 /**
  * 比对课表版本号所必须的变量
@@ -34,7 +34,7 @@ sealed interface ILessonVersion {
     if (newVersionList.size != oldVersionList.size) {
       // 不应该出现这种情况，因为版本号规定形式为：0.0.0
       // 如果出现，可以认为是远端出现问题，所以就不对本地数据进行更新
-      if (BuildConfig.DEBUG) {
+      if (isDebug()) {
         toast("课表接口 version 字段错误：$version\n版本号规定形式为：0.0.0")
       }
       return false
