@@ -64,3 +64,9 @@ const val NAV_SCHOOL_CAR = "school_car"
 
 // 空教室
 const val NAV_EMPTY_ROOM = "emptyroom"
+
+// 没课约主页
+const val NAV_NO_CLASS = "no_class"
+
+// 没课约分组详情
+const val NAV_GROUP_DETAIL = "group_detail"

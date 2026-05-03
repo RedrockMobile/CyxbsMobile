@@ -7,7 +7,6 @@ import com.cyxbs.components.config.route.DISCOVER_CALENDAR
 import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_MAP
-import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_OTHER_COURSE
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.route.DISCOVER_SPORT
@@ -18,6 +17,7 @@ import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
+import com.cyxbs.pages.noclass.api.NoClassArgument
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import java.lang.ref.SoftReference
@@ -35,7 +35,8 @@ object MoreFunctionProvider {
     val functions = listOf(
             Function(R.drawable.discover_ic_other_course, R.string.discover_title_other_course, R.string.discover_detail_other_course, StartActivityAfterLogin("同学课表", DISCOVER_OTHER_COURSE), ClickEvent.CLICK_KBCX_ENTRY),
             Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartNavDestination(MapNavArgument(null)), ClickEvent.CLICK_CYDT_ENTRY),
-            Function(R.drawable.discover_ic_no_class, R.string.discover_title_no_class, R.string.discover_detail_no_class, StartActivityAfterLogin("没课约", DISCOVER_NO_CLASS), ClickEvent.CLICK_MKY_ENTRY),
+            Function(R.drawable.discover_ic_no_class, R.string.discover_title_no_class, R.string.discover_detail_no_class,
+                StartNavDestination(NoClassArgument), ClickEvent.CLICK_MKY_ENTRY),
             Function(R.drawable.discover_ic_bus_track, R.string.discover_title_bus_track, R.string.discover_detail_bus_track, StartNavDestination(SchoolCarNavArgument), ClickEvent.CLICK_XCGJ_ENTRY),
             Function(R.drawable.discover_ic_empty_classroom, R.string.discover_title_empty_classroom, R.string.discover_detail_empty_classroom, StartNavDestination(EmptyRoomArgument), ClickEvent.CLICK_YLC_KJS_ENTRY),
             Function(R.drawable.discover_ic_school_calendar, R.string.discover_title_school_calendar, R.string.discover_detail_school_calendar, StartActivityImpl(DISCOVER_CALENDAR), ClickEvent.CLICK_YLC_XL_ENTRY),
