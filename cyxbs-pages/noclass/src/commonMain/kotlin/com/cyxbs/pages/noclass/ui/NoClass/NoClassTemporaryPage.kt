@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -254,6 +255,11 @@ fun StudentListItem(
     val density = LocalDensity.current
     val deleteBtnWidthPx = with(density) { 82.dp.toPx() }
 
+    //实时捕捉外部传入的 isOpened 状态
+    //因为 pointerInput 是一个协程块，直接使用 isOpened 可能会存在闭包捕获旧值的问题
+    val currentIsOpened by rememberUpdatedState(isOpened)
+
+
     LaunchedEffect(isOpened) {
         if (!isOpened && offsetX.value < 0f) {
             offsetX.animateTo(0f, tween(300))
@@ -279,23 +285,29 @@ fun StudentListItem(
                     detectHorizontalDragGestures(
                         onDragStart = { onOpenMenu() },
                         onHorizontalDrag = { change, dragAmount ->
+
+                            //处理结果
+                            //如果此时全局 ID 锁已经被别人抢走了（currentIsOpened 变成 false）
+                            //那么即便这根手指还在动，我也直接 return，不再更新自己的 offsetX
+
+                            //Todo:当 Item A 发现锁被 Item B 抢走时，它会停止跟随手指。
+                            if (!currentIsOpened) return@detectHorizontalDragGestures
+
                             change.consume()
-                            val newOffset = offsetX.value + dragAmount
                             scope.launch {
                                 offsetX.snapTo(
-                                    newOffset.coerceIn(
-                                        -deleteBtnWidthPx,
-                                        0f
-                                    )
+                                    (offsetX.value + dragAmount).coerceIn(-deleteBtnWidthPx, 0f)
                                 )
                             }
                         },
                         onDragEnd = {
-                            val target =
-                                if (offsetX.value < -deleteBtnWidthPx / 2) -deleteBtnWidthPx else 0f
-                            scope.launch {
-                                offsetX.animateTo(target, tween(300))
-                                if (target == 0f) onCloseMenu()
+                            //只有当我依然持有 ID 锁时，才根据滑动距离判断最终停在哪
+                            if (currentIsOpened) {
+                                val target = if (offsetX.value < -deleteBtnWidthPx * 0.3f) -deleteBtnWidthPx else 0f
+                                scope.launch {
+                                    offsetX.animateTo(target, tween(300))
+                                    if (target == 0f) onCloseMenu()
+                                }
                             }
                         },
                         onDragCancel = {
@@ -309,9 +321,7 @@ fun StudentListItem(
                     )
                 }
                 .clickable {
-                    if (offsetX.value < 0f) {
-                        scope.launch { offsetX.animateTo(0f, tween(300)); onCloseMenu() }
-                    }
+                    if (offsetX.value < 0f) scope.launch { offsetX.animateTo(0f, tween(300)); onCloseMenu() }
                 }
                 .padding(horizontal = 11.dp)
         ) {

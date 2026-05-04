@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -194,11 +195,11 @@ private fun DialogLayer(viewModel: SolidViewModel) {
 
 }
 
-
+//分组列表    处理逻辑链接 https://zcnpvvo6f9jh.feishu.cn/wiki/DfYzwHlR2ipIzSkG0cSctyBDnXJ
 @Composable
 fun GroupListItem(
     group: NoClassGroups,
-    isOpened: Boolean, // 修改：接收布尔值
+    isOpened: Boolean, // 外部判断：openedGroupId == group.id
     onOpenMenu: () -> Unit,
     onCloseMenu: () -> Unit,
     onToggleTop: () -> Unit,
@@ -211,28 +212,38 @@ fun GroupListItem(
     val density = LocalDensity.current
     val menuWidthPx = with(density) { 182.dp.toPx() }
 
+    //实时捕捉外部传入的 isOpened 状态
+    //因为 pointerInput 是一个协程块，直接使用 isOpened 可能会存在闭包捕获旧值的问题
+    val currentIsOpened by rememberUpdatedState(isOpened)
+
+    //监听数据源状态
     LaunchedEffect(group.isOpen) {
         if (!group.isOpen && offsetX.value != 0f) {
-            offsetX.animateTo(0f, tween(300)); onCloseMenu()
+            offsetX.animateTo(0f, tween(300))
+            onCloseMenu()
         }
     }
+
+    //监听全局互斥状态：如果我不再是“被打开的”那个，立即回弹
     LaunchedEffect(isOpened) {
-        // 如果外部状态说“我没被打开”，但我的 UI 还在滑开状态，则回弹
         if (!isOpened && offsetX.value != 0f) {
             offsetX.animateTo(0f, tween(300))
         }
     }
 
     Box(
-        modifier = modifier.fillMaxWidth().height(46.dp).padding(vertical = 1.dp)
+        modifier = modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .padding(vertical = 1.dp)
             .background(Color.White.dark(Color(0xFF000101)))
     ) {
+        //右侧菜单 (置顶、删除) 保持不变
         Row(modifier = Modifier.align(Alignment.CenterEnd).width(182.dp).fillMaxHeight()) {
             Box(
                 modifier = Modifier.width(100.dp).fillMaxHeight().background(Color(0xFF4741E0))
-                    .clickable {
-                        scope.launch { offsetX.animateTo(0f); onCloseMenu(); onToggleTop() }
-                    }, contentAlignment = Alignment.Center
+                    .clickable { scope.launch { offsetX.animateTo(0f); onCloseMenu(); onToggleTop() } },
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (group.isTop) "取消置顶" else "置顶",
@@ -240,48 +251,52 @@ fun GroupListItem(
                     fontSize = 14.sp
                 )
             }
+
             Box(
                 modifier = Modifier.width(82.dp).fillMaxHeight().background(Color(0xFFED535C))
-                    .clickable {
-                        scope.launch { offsetX.animateTo(0f); onCloseMenu(); onDelete() }
-                    }, contentAlignment = Alignment.Center
+                    .clickable { scope.launch { offsetX.animateTo(0f); onCloseMenu(); onDelete() } },
+                contentAlignment = Alignment.Center
             ) { Text(text = "删除", color = Color.White, fontSize = 14.sp) }
         }
 
+        //内容主体
         Box(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                 .background(Color.White.dark(Color(0xFF000101)))
                 .pointerInput(group.id) {
                     detectHorizontalDragGestures(
-                        onDragStart = { onOpenMenu() },
+                        onDragStart = {
+                            //只要开始滑，就去尝试夺取全局 ID 锁
+                            onOpenMenu()
+                        },
                         onHorizontalDrag = { change, dragAmount ->
+                            //处理结果
+                            //如果此时全局 ID 锁已经被别人抢走了（currentIsOpened 变成 false）
+                            //那么即便这根手指还在动，我也直接 return，不再更新自己的 offsetX
+                            if (!currentIsOpened) return@detectHorizontalDragGestures
+
                             change.consume()
                             scope.launch {
                                 offsetX.snapTo(
-                                    (offsetX.value + dragAmount).coerceIn(
-                                        -menuWidthPx,
-                                        0f
-                                    )
+                                    (offsetX.value + dragAmount).coerceIn(-menuWidthPx, 0f)
                                 )
                             }
                         },
                         onDragEnd = {
-                            val target = if (offsetX.value < -menuWidthPx / 2) -menuWidthPx else 0f
-                            scope.launch {
-                                offsetX.animateTo(
-                                    target,
-                                    tween(300)
-                                ); if (target == 0f) onCloseMenu()
+                            //只有当我依然持有 ID 锁时，才根据滑动距离判断最终停在哪
+                            if (currentIsOpened) {
+                                val target =
+                                    if (offsetX.value < -menuWidthPx * 0.2f) -menuWidthPx else 0f
+                                scope.launch {
+                                    offsetX.animateTo(target, tween(300))
+                                    if (target == 0f) onCloseMenu()
+                                }
                             }
                         },
                         onDragCancel = {
-                            scope.launch {
-                                offsetX.animateTo(
-                                    0f,
-                                    tween(300)
-                                ); onCloseMenu()
-                            }
+                            scope.launch { offsetX.animateTo(0f, tween(300)); onCloseMenu() }
                         }
                     )
                 }
@@ -296,10 +311,12 @@ fun GroupListItem(
                 }
                 .padding(horizontal = 11.dp)
         ) {
+            // Row 内容保持不变
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(Res.drawable.noclass_ic_group),
-                    contentDescription = null, tint = Color.Unspecified,
+                    contentDescription = null,
+                    tint = Color.Unspecified,
                     modifier = Modifier.padding(5.dp).size(35.5.dp)
                 )
                 Spacer(Modifier.width(4.dp))
