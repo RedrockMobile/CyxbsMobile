@@ -254,7 +254,15 @@ fun GroupListItem(
 
             Box(
                 modifier = Modifier.width(82.dp).fillMaxHeight().background(Color(0xFFED535C))
-                    .clickable { scope.launch { offsetX.animateTo(0f); onCloseMenu(); onDelete() } },
+                     .clickable {
+
+                        onCloseMenu()
+                        onDelete()
+
+                        scope.launch {
+                            offsetX.snapTo(0f)
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) { Text(text = "删除", color = Color.White, fontSize = 14.sp) }
         }

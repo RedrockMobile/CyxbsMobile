@@ -272,8 +272,15 @@ fun StudentListItem(
     ) {
         Box(
             modifier = Modifier.align(Alignment.CenterEnd).width(82.dp).fillMaxHeight()
-                .background(Color(0xFFED535C)).clickable {
-                    scope.launch { offsetX.animateTo(0f); onCloseMenu(); onDelete() }
+                .background(Color(0xFFED535C))
+                .clickable {
+
+                    onCloseMenu()
+                    onDelete()
+
+                    scope.launch {
+                        offsetX.snapTo(0f)
+                    }
                 },
             contentAlignment = Alignment.Center
         ) { Text(text = "删除", color = Color.White, fontSize = 14.sp) }
@@ -303,7 +310,8 @@ fun StudentListItem(
                         onDragEnd = {
                             //只有当我依然持有 ID 锁时，才根据滑动距离判断最终停在哪
                             if (currentIsOpened) {
-                                val target = if (offsetX.value < -deleteBtnWidthPx * 0.3f) -deleteBtnWidthPx else 0f
+                                val target =
+                                    if (offsetX.value < -deleteBtnWidthPx * 0.3f) -deleteBtnWidthPx else 0f
                                 scope.launch {
                                     offsetX.animateTo(target, tween(300))
                                     if (target == 0f) onCloseMenu()
@@ -321,7 +329,12 @@ fun StudentListItem(
                     )
                 }
                 .clickable {
-                    if (offsetX.value < 0f) scope.launch { offsetX.animateTo(0f, tween(300)); onCloseMenu() }
+                    if (offsetX.value < 0f) scope.launch {
+                        offsetX.animateTo(
+                            0f,
+                            tween(300)
+                        ); onCloseMenu()
+                    }
                 }
                 .padding(horizontal = 11.dp)
         ) {

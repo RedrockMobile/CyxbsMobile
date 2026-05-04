@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.backHandler
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.noclass.api.GroupDetailArgument
 import com.cyxbs.pages.noclass.bean.NoClassGroups
@@ -185,17 +186,15 @@ private fun GroupDetailTopBar(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier.size(24.dp)
-        ) {
-            Icon(
-                painter = painterResource(Res.drawable.noclass_ic_back),
-                contentDescription = null,
-                modifier = Modifier.padding(top = 1.dp),
-                tint = Color.Unspecified
-            )
-        }
+        Icon(
+            painter = painterResource(Res.drawable.noclass_ic_back),
+            contentDescription = null,
+            modifier = Modifier
+                .size(24.dp)
+                .padding(top = 1.dp)
+                .clickableNoIndicator { onBackClick() },
+            tint = Color.Unspecified
+        )
         Text(
             text = title,
             color = LocalAppColors.current.tvLv1,

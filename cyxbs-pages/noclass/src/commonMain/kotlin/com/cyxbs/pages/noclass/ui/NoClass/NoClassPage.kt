@@ -145,18 +145,15 @@ private fun TopBar() {
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        //返回键
-        IconButton(
-            onClick = { MainNavController.popBackStack() },
-            modifier = Modifier.size(24.dp)
-        ) {
-            Icon(
-                painter = painterResource(Res.drawable.noclass_ic_back),
-                contentDescription = null,
-                modifier = Modifier.padding(top = 1.dp),
-                tint = Color.Unspecified
-            )
-        }
+
+        Icon(
+            painter = painterResource(Res.drawable.noclass_ic_back),
+            contentDescription = null,
+            modifier = Modifier.padding(top = 1.dp)
+                .clickableNoIndicator { MainNavController.popBackStack() },
+            tint = Color.Unspecified
+        )
+
 
         //标题
         Text(
@@ -208,10 +205,10 @@ private fun TopBar() {
                         bottom = 2.8.dp
                     ),
 
-            )
-        }
+                )
         }
     }
+}
 
 @Composable
 private fun TabSwitchBar(currentTabIndexState: IntState, onTabSelected: (Int) -> Unit) {
