@@ -9,3 +9,6 @@ import com.cyxbs.components.init.appApplication
  * @date 2025/1/4
  */
 actual val appName: String = appApplication.getString(R.string.config_app_name)
+
+actual val appPlatform: Platform
+  get() = Platform.Android

@@ -11,3 +11,12 @@ package com.cyxbs.components.config
 expect val appName: String
 
 fun isDebug(): Boolean = ConfigApplicationInfoImpl.isDebug()
+
+expect val appPlatform: Platform
+
+enum class Platform {
+  Android,
+  IOS,
+  Web,
+  Desktop,
+}

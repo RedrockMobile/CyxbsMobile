@@ -8,3 +8,6 @@ package com.cyxbs.components.config
  */
 actual val appName: String
   get() = "网上重邮"
+
+actual val appPlatform: Platform
+  get() = Platform.Web
