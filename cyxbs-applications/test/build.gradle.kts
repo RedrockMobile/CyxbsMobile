@@ -26,7 +26,7 @@ dependencies {
 
   implementation(libs.bundles.projectBase)
 
-  implementation(projects.cyxbsFunctions.debug)
+  debugImplementation(projects.cyxbsFunctions.debug)
 }
 
 android {

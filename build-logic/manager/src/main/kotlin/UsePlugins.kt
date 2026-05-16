@@ -93,9 +93,6 @@ fun Project.useNetwork() {
   // Ktorfit 每次使用都要先触发 KSP task 才会生成实现类
   // 这里编译期关联上 KtProvider，以后只需要 XXXApi::class.impl() 就可以直接获取到实现类了
   kspMultiplatform(project(":cyxbs-compiler:ksp-network"))
-  extensions.configure<KtorfitPluginExtension> {
-    compilerPluginVersion.set("2.3.3") // 临时修复 Ktorfit 在 Kotlin 2.3.0 上的问题 https://github.com/Foso/Ktorfit/issues/1010
-  }
 }
 
 private fun Project.kspMultiplatform(dependencyNotation: Any) {

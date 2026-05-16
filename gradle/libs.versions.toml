@@ -24,7 +24,7 @@ kotlinJvmTarget = "17"
 #                                            Android
 ####################################################################################################
 # https://developer.android.com/build/releases/gradle-plugin?hl=zh-cn
-agp = "9.2.0"
+agp = "9.2.1"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
@@ -43,7 +43,7 @@ androidx-fragment = "1.8.9"
 # https://developer.android.com/jetpack/androidx/releases/activity
 androidx-activity = "1.13.0"
 # https://developer.android.com/jetpack/androidx/releases/paging
-androidx-paging = "3.4.2"
+androidx-paging = "3.5.0"
 # https://developer.android.com/jetpack/androidx/releases/room
 androidx-room = "2.8.4"
 # https://developer.android.com/jetpack/androidx/releases/work
@@ -63,7 +63,7 @@ androidx-viewpager2 = "1.1.0"
 # https://developer.android.com/jetpack/androidx/releases/swiperefreshlayout
 androidx-swiperefreshlayout = "1.2.0"
 # https://github.com/material-components/material-components-android
-material = "1.13.0"
+material = "1.14.0"
 # https://github.com/google/flexbox-layout
 flexbox = "3.0.0"
 # https://lottiefiles.com/blog/working-with-lottie/getting-started-with-lottie-animations-in-android-app
@@ -93,21 +93,21 @@ wheelView = "4.1.9"
 #                                              Kotlin
 ####################################################################################################
 # https://github.com/JetBrains/kotlin/releases
-kotlin = "2.3.20"
+kotlin = "2.3.21"
 # https://github.com/google/ksp/releases
 ksp = "2.3.6" # ksp 版本与 kotlin 版本强绑定，升级 kotlin 记得去更 ksp
 # https://github.com/Kotlin/kotlinx.coroutines
-kotlinx-coroutines = "1.10.2"
+kotlinx-coroutines = "1.11.0"
 # https://github.com/Kotlin/kotlinx.collections.immutable
 kotlinx-collections = "0.4.0"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.11.0"
 # https://github.com/Kotlin/kotlinx-datetime
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.8.0"
 # https://github.com/Kotlin/kotlinx-atomicfu
 kotlinx-atomicfu = "0.32.1"
 # https://github.com/ktorio/ktor
-ktor = "3.4.2"
+ktor = "3.5.0"
 ########################################### KMP 第三方依赖 ###########################################
 # https://github.com/eygraber/uri-kmp
 kmp-uri = "0.0.21"
@@ -116,14 +116,14 @@ kmp-ktProvider = "1.5.0" # 985892345 的 kt 多平台跨模块服务提供框架
 # https://github.com/russhwolf/multiplatform-settings
 kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit
-kmp-ktorfit = "2.7.2"
+kmp-ktorfit = "2.7.3"
 
 
 ####################################################################################################
 #                                              Compose
 ####################################################################################################
 # https://github.com/JetBrains/compose-multiplatform/releases
-compose-multiplatform = "1.10.3"
+compose-multiplatform = "1.11.0"
 # https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-navigation-routing.html#setup
 # 官网文档可能更新不及时，版本请看 compose 发布时给出的版本
 compose-navigation = "2.9.2"
@@ -168,7 +168,7 @@ retrofit = "3.0.0"
 # https://github.com/square/okhttp
 okhttp = "5.3.2"
 # https://github.com/google/gson
-gson = "2.13.2"
+gson = "2.14.0"
 # https://github.com/ReactiveX/RxJava
 rxjava = "3.1.12"
 # https://github.com/ReactiveX/RxAndroid
@@ -191,13 +191,13 @@ scale = "1.1.1-beta.3"
 # coil kmp网络图片加载框架 https://github.com/coil-kt/coil
 coil = "3.4.0"
 # filekit 跨平台的文件操作三方库 https://github.com/vinceglb/FileKit
-filekit = "0.13.0"
+filekit = "0.14.1"
 # 文件操作库 https://github.com/square/okio
 okio = "3.17.0"
 # 权限申请的第三方库 https://github.com/icerockdev/moko-permissions
 moko-permissions = "0.20.1"
 # 高德地图的定位 https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
-amap = "11.1.001"
+amap = "11.1.200"
 # 多平台 BuildConfig 生成 https://github.com/gmazzo/gradle-buildconfig-plugin
 buildconfig = "6.0.9"
 
@@ -289,7 +289,7 @@ kmp-ktProvider-gradlePlugin = { module = "io.github.985892345:provider-plugin-gr
 kmp-ktProvider-manager = { module = "io.github.985892345:provider-manager", version.ref = "kmp-ktProvider" }
 kmp-ktProvider-api = { module = "io.github.985892345:provider-api", version.ref = "kmp-ktProvider" }
 kmp-ktorfit = { module = "de.jensklingenberg.ktorfit:ktorfit-lib-light", version.ref = "kmp-ktorfit" }
-kmp-ktorfit-gradlePlugin = { module = "de.jensklingenberg.ktorfit:ktorfit-gradle-plugin", version.ref = "kmp-ktorfit" }
+kmp-ktorfit-gradlePlugin = { module = "de.jensklingenberg.ktorfit:de.jensklingenberg.ktorfit.gradle.plugin", version.ref = "kmp-ktorfit" }
 
 ####################################################################################################
 #                                              Compose
