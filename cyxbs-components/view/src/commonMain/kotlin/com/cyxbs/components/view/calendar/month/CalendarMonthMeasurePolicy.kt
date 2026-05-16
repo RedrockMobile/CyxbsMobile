@@ -8,9 +8,9 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Constraints
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.view.calendar.scroll.HorizontalScrollState
 import com.cyxbs.components.view.calendar.scroll.VerticalScrollState
-import com.cyxbs.components.config.time.Date
 import kotlin.math.roundToInt
 
 /**
@@ -99,15 +99,19 @@ internal class CalendarMonthMeasurePolicy(
   ): Placeable {
     if (itemConstraints.isZero) {
       val width = parentConstraints.maxWidth / 7
-      val placeable = measure(
-        itemIndex,
-        parentConstraints.copy(minWidth = width, maxWidth = width)
-      ).first()
+      val placeable = compose(itemIndex).map {
+        it.measure(
+          parentConstraints.copy(
+            minWidth = width,
+            maxWidth = width
+          )
+        )
+      }.first()
       itemConstraints = Constraints.fixed(width, placeable.height)
       lineHeightState.value = placeable.height.toFloat()
       return placeable
     }
-    return measure(itemIndex, itemConstraints).first()
+    return compose(itemIndex).map { it.measure(itemConstraints) }.first()
   }
 
   /**

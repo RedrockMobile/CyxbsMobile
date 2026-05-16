@@ -1,9 +1,7 @@
-import org.gradle.kotlin.dsl.get
-import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import release.CyxbsReleaseTask
 
 plugins {
-  id("manager.app")
+  id("manager.app-android")
   alias(libs.plugins.vasdolly) // 腾讯打包插件 https://github.com/Tencent/VasDolly
 }
 
@@ -14,51 +12,30 @@ val excludeList = mutableListOf<String>(
 
 )
 
-kotlin {
-  sourceSets {
-    commonMain.dependencies {
-      // 根 gradle 中包含的所有子模块
-      project.rootProject.subprojects.filter {
-        it.name !in excludeList
-            && it != project
-            && it.name != "debug" // lib_debug 单独依赖
-            && !it.path.contains("cyxbs-applications")
-            && !it.path.contains("cyxbs-compiler")
-            && !it.name.startsWith("cyxbs-")
-      }.forEach {
-        api(it)
-      }
-    }
-    androidMain.dependencies {
-      implementation(libs.bundles.projectBase)
-
-      implementation(libs.umeng)
-      implementation(libs.umeng.asms)
-      implementation(libs.umeng.push)
-
-      implementation(libs.vasdolly)
-      implementation(libs.bugly.crash)
-    }
+dependencies {
+  // 根 gradle 中包含的所有子模块
+  project.rootProject.subprojects.filter {
+    it.name !in excludeList
+        && it != project
+        && it.name != "debug" // lib_debug 单独依赖
+        && !it.path.contains("cyxbs-applications")
+        && !it.path.contains("cyxbs-compiler")
+        && !it.name.startsWith("cyxbs-")
+        && it.name != "lib_common" // lib_common 由其他模块间接依赖
+  }.forEach {
+    api(it)
   }
+
+  debugImplementation(projects.cyxbsFunctions.debug)
+
+  implementation(libs.bundles.projectBase)
+  implementation(libs.umeng)
+  implementation(libs.umeng.asms)
+  implementation(libs.umeng.push)
+  implementation(libs.vasdolly)
+  implementation(libs.bugly.crash)
 }
 
-////////////////////////////////////////  导出 iosMain  /////////////////////////////////////////////
-if (Multiplatform.enableIOS(project)) {
-  kotlin {
-    listOf(
-      iosX64(),
-      iosArm64(),
-      iosSimulatorArm64()
-    ).forEach { iosTarget ->
-      NativeBuildType.DEFAULT_BUILD_TYPES.forEach { type ->
-        iosTarget.binaries.getFramework(type).apply {
-          // 这里导出会导出很多东西，增加头文件体积，慎重选择导出的模块，能写在 pro iosMain 就尽量不导出
-//        export(projects.)
-        }
-      }
-    }
-  }
-}
 
 //////////////////////////////////////////  密钥相关  ////////////////////////////////////////////////
 val secretGradleFile = rootDir.resolve("build-logic")

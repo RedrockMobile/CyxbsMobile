@@ -121,9 +121,6 @@ class InsecureSHA1PRNGKeyDerivator private constructor() {
    * @throws NullPointerException - if null is passed to the "seed" argument
    */
   private fun setSeed(seed: ByteArray) {
-    if (seed == null) {
-      throw NullPointerException("seed == null")
-    }
     if (state == NEXT_BYTES) { // first setSeed after NextBytes; restoring hash
       System.arraycopy(
         copies, HASHCOPY_OFFSET,
@@ -162,9 +159,6 @@ class InsecureSHA1PRNGKeyDerivator private constructor() {
     // This is a bug since words are 4 bytes. Android used to keep it this way for backward
     // compatibility.
     val extrabytes = 7 // # of bytes to add in order to computer # of 8 byte words
-    if (bytes == null) {
-      throw NullPointerException("bytes == null")
-    }
     // This is a bug since extraBytes == 7 instead of 3. Android used to keep it this way for
     // backward compatibility.
     lastWord = if (seed[BYTES_OFFSET] == 0)

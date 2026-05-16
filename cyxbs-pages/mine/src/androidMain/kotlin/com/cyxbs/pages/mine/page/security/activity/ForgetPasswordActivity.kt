@@ -10,8 +10,8 @@ import androidx.activity.viewModels
 import androidx.lifecycle.Observer
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.MINE_FORGET_PASSWORD
-import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.components.view.ui.JToolbar
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.security.viewmodel.ForgetPasswordViewModel
 import com.cyxbs.pages.mine.util.ui.ChooseFindTypeDialog
@@ -69,7 +69,7 @@ class ForgetPasswordActivity : BaseActivity() {
         mBtnForgetPasswordConfirm.setOnSingleClickListener {
             if (canClick) {
                 stuNumber = mSecurityEtForgetPassword.text.toString()
-                if (stuNumber != "" && stuNumber != null) {
+                if (stuNumber != "") {
                     mPbSecurityForget.visibility = View.VISIBLE
                     viewModel.checkDefaultPassword(stuNumber) {
                         mPbSecurityForget.visibility = View.GONE

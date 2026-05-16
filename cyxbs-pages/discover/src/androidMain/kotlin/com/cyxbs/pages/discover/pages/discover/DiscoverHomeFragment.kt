@@ -32,7 +32,6 @@ import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
@@ -51,7 +50,6 @@ import com.cyxbs.pages.todo.api.ITodoService
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.ndhzs.slideshow.SlideShow
 import com.ndhzs.slideshow.viewpager.transformer.ScaleInTransformer
-import kotlinx.coroutines.launch
 import java.util.Calendar
 
 
@@ -232,9 +230,7 @@ class DiscoverHomeFragment : BaseFragment() {
                     if (IAccountService::class.impl().isLogin()) {
                         // 发现首页横排按钮点击埋点
                         functions[it].clickEvent?.let {  clickEvent ->
-                            appCoroutineScope.launch {
-                                TrackingUtils.trackClickEvent(clickEvent)
-                            }
+                            TrackingUtils.trackClickEvent2(clickEvent)
                         }
                     }
 

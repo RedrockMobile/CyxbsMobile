@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?><!--suppress ALL -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--移除友盟的自启动功能 https://developer.umeng.com/docs/67966/detail/206987-->
+    <uses-permission
+        android:name="android.permission.RECEIVE_BOOT_COMPLETED"
+        tools:node="remove" />
+
+    <!--    bugly所需权限-->
+    <uses-permission android:name="android.permission.READ_LOGS" />
+
+    <application
+        android:name=".ProApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/config_ic_launcher"
+        android:label="@string/config_app_name"
+        android:networkSecurityConfig="@xml/pro_network_security"
+        android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/config_ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/ConfigAppTheme"
+        android:usesCleartextTraffic="true"
+        tools:replace="networkSecurityConfig"
+        tools:targetApi="n">
+
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
+
+        <!--友盟-->
+        <!--移除友盟自带的关联启动-->
+        <service
+            android:name="com.taobao.accs.ChannelService"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <service
+            android:name="com.taobao.accs.data.MsgDistributeService"
+            android:exported="false"
+            tools:replace="android:exported" />
+
+        <receiver
+            android:name="com.taobao.accs.EventReceiver"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <receiver
+            android:name="com.taobao.accs.ServiceReceiver"
+            android:exported="false"
+            tools:replace="android:exported" />
+
+        <service
+            android:name="org.android.agoo.accs.AgooService"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <service
+            android:name="com.umeng.message.UmengIntentService"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <service
+            android:name="com.umeng.message.XiaomiIntentService"
+            android:exported="false"
+            tools:replace="android:exported" />
+
+        <receiver
+            android:name="com.taobao.agoo.AgooCommondReceiver"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <service
+            android:name="com.umeng.message.UmengMessageIntentReceiverService"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <!--友盟 End-->
+
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="${amap_apikey}"/>
+    </application>
+</manifest>

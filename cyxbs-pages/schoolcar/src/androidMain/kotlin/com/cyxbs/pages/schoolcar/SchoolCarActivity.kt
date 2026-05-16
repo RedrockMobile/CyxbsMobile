@@ -31,6 +31,7 @@ import com.amap.api.maps.model.MyLocationStyle
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.sp.defaultSp
+import com.cyxbs.components.utils.extensions.color
 import com.cyxbs.components.utils.extensions.dp2px
 import com.cyxbs.components.utils.extensions.px2dp
 import com.cyxbs.components.utils.network.ApiWrapper
@@ -152,7 +153,7 @@ class SchoolCarActivity: BaseActivity() {
         location.longitude.let {
           location.latitude.let {
             val update =
-              if (aMap.myLocation.longitude != 0.0 || aMap.myLocation.latitude !== 0.0){
+              if (aMap.myLocation.longitude != 0.0 || aMap.myLocation.latitude != 0.0) {
                 CameraUpdateFactory.newLatLngZoom(LatLng(aMap.myLocation.latitude, aMap.myLocation.longitude), 17f)
               }else{
                 CameraUpdateFactory.newLatLngZoom(LatLng(29.531876, 106.606789), 17f)
@@ -259,7 +260,7 @@ class SchoolCarActivity: BaseActivity() {
       carIconAdapter?: run {
         carIconAdapter = CarIconAdapter(this,mapLines.lines)
 
-        carIconAdapter?.setOnItemListener { position,isIcon ->
+        carIconAdapter.setOnItemListener { position,isIcon ->
           isBeginning = false
           if (isIcon){
             smoothMoveData?.hideCheck()
@@ -302,7 +303,7 @@ class SchoolCarActivity: BaseActivity() {
                     if (vm.line.value != -1) {
                       goneSiteView()
                     }
-                      siteAdapter?.choose(index)
+                      siteAdapter.choose(index)
                   }
                 }
               }
@@ -348,7 +349,7 @@ class SchoolCarActivity: BaseActivity() {
         vm.mapInfo.value?.lines?.forEach { line ->
           if (line.id == arrays[0]) {
             schoolCarCardTvChangeBts.text = line.name
-            schoolCarCardTvChangeBts.setTextColor(resources.getColor(com.cyxbs.components.config.R.color.config_level_one_font_color))
+            schoolCarCardTvChangeBts.setTextColor(com.cyxbs.components.config.R.color.config_level_one_font_color.color)
             schoolCarCardIvChangeBts.setImageResource(R.drawable.schoolcar_bts_btn_change)
             schoolCarCardChangeBts.setBackgroundResource(R.drawable.schoolcar_bts_btn_change_shape)
           }

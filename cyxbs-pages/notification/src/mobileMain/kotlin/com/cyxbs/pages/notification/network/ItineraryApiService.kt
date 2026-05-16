@@ -20,18 +20,6 @@ import de.jensklingenberg.ktorfit.http.Query
  */
 interface ItineraryApiService {
 
-  // 获取notification模块中的发送的行程
-  @GET("magipoke-jwzx/itinerary/allMsg")
-  suspend fun getSentItinerary(
-    @Query("typ") type: String = "sent"
-  ): ApiWrapper<List<SentItineraryMsgBean>>
-
-  // 获取notification模块中的接收的行程
-  @GET("magipoke-jwzx/itinerary/allMsg")
-  suspend fun getReceivedItinerary(
-    @Query("typ") type: String = "received"
-  ): ApiWrapper<List<ReceivedItineraryMsgBean>>
-
   /**
    * 取消itineraryId对应的行程的提醒
    */

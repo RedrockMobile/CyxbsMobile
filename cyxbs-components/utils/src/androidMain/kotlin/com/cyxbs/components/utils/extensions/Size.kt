@@ -1,12 +1,15 @@
 package com.cyxbs.components.utils.extensions
 
 import android.graphics.drawable.Drawable
+import android.util.TypedValue
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import com.cyxbs.components.init.appContext
 import kotlin.math.roundToInt
@@ -43,28 +46,50 @@ val Float.px2dp: Int
   get() = px2dpF.toInt()
 
 val Int.dp2spF: Float
-  get() = appContext.resources.displayMetrics.scaledDensity * this
+  get() = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_SP,
+    this.toFloat(),
+    appContext.resources.displayMetrics
+  )
 
 val Int.dp2sp: Int
-  get() = (dp2spF * this).roundToInt()
+  get() = dp2spF.roundToInt()
 
 val Float.dp2spF: Float
-  get() = appContext.resources.displayMetrics.scaledDensity * this
+  get() = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_SP,
+    this,
+    appContext.resources.displayMetrics
+  )
 
 val Float.dp2sp: Int
-  get() = (dp2spF * this).roundToInt()
+  get() = dp2spF.roundToInt()
 
 val Int.sp2dpF: Float
-  get() = this / appContext.resources.displayMetrics.scaledDensity
+  get() {
+    val spInPx = TypedValue.applyDimension(
+      TypedValue.COMPLEX_UNIT_SP,
+      this.toFloat(),
+      appContext.resources.displayMetrics
+    )
+    return spInPx / appContext.resources.displayMetrics.density
+  }
 
 val Int.sp2dp: Int
-  get() = (sp2dpF * this).roundToInt()
+  get() = sp2dpF.roundToInt()
 
 val Float.sp2dpF: Float
-  get() = this / appContext.resources.displayMetrics.scaledDensity
+  get() {
+    val spInPx = TypedValue.applyDimension(
+      TypedValue.COMPLEX_UNIT_SP,
+      this,
+      appContext.resources.displayMetrics
+    )
+    return spInPx / appContext.resources.displayMetrics.density
+  }
 
 val Float.sp2dp: Int
-  get() = (sp2dpF * this).roundToInt()
+  get() = sp2dpF.roundToInt()
 
 val Int.color: Int
   get() = ContextCompat.getColor(appContext, this)
@@ -78,7 +103,7 @@ val Int.string: String
 
 val Int.stringCompose: String
   @Composable
-  get() = LocalContext.current.getString(this)
+  get() = stringResource(this)
 
 val Int.drawable: Drawable
   get() = AppCompatResources.getDrawable(appContext, this)!!
@@ -92,7 +117,7 @@ val Int.dimen: Float
 
 val Int.dimenCompose: Float
   @Composable
-  get() = LocalContext.current.resources.getDimension(this)
+  get() = LocalResources.current.getDimension(this)
 
 val Int.anim: Animation
   get() = AnimationUtils.loadAnimation(appContext, this)

@@ -1,28 +1,20 @@
+import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   kotlin("multiplatform")
   id(libsEx.plugins.kotlinSerialization)
-  id(libsEx.plugins.kotlinAtomicfu)
 }
 
 kotlin {
 
   compilerOptions {
-    optIn.add("kotlin.time.ExperimentalTime") // 抑制 ExperimentalTime 的警告
-  }
-
-  androidTarget {
-    compilerOptions {
-      jvmTarget.set(JvmTarget.fromTarget(libsEx.versions.kotlinJvmTarget))
-    }
+    optIn.add("kotlin.concurrent.atomics.ExperimentalAtomicApi") // 抑制 ExperimentalAtomicApi 的警告
   }
   if (Multiplatform.enableDesktop(project)) {
     jvm("desktop")
   }
   if (Multiplatform.enableIOS(project)) {
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
   }
@@ -57,9 +49,11 @@ kotlin {
       // atomicfu 显示依赖解决 strictly 0.23.2 问题 https://github.com/Kotlin/kotlinx-atomicfu/issues/469
       implementation(libsEx.`kotlinx-atomicfu`)
     }
-    androidMain.dependencies {
-      implementation(libsEx.`kotlinx-coroutines-android`)
-      implementation(libsEx.`androidx-appcompat`)
+    if (plugins.hasPlugin(KotlinMultiplatformAndroidPlugin::class)) { // 需要确保先引入 android 插件
+      androidMain.dependencies {
+        implementation(libsEx.`kotlinx-coroutines-android`)
+        implementation(libsEx.`androidx-appcompat`)
+      }
     }
     // 桌面端
     if (Multiplatform.enableDesktop(project)) {
@@ -73,7 +67,6 @@ kotlin {
       val iosMain = create("iosMain") {
         dependsOn(commonMain.get())
       }
-      iosX64Main { dependsOn(iosMain) }
       iosArm64Main { dependsOn(iosMain) }
       iosSimulatorArm64Main { dependsOn(iosMain) }
     }
@@ -83,7 +76,9 @@ kotlin {
     val mobileMain = create("mobileMain") {
       dependsOn(commonMain.get())
     }
-    androidMain { dependsOn(mobileMain) }
+    if (plugins.hasPlugin(KotlinMultiplatformAndroidPlugin::class)) {
+      androidMain { dependsOn(mobileMain) }
+    }
     if (Multiplatform.enableIOS(project)) {
       val iosMain by getting {
         dependsOn(mobileMain)
@@ -103,7 +98,9 @@ kotlin {
     val noWebMain = create("noWebMain") {
       dependsOn(commonMain.get())
     }
-    androidMain { dependsOn(noWebMain) }
+    if (plugins.hasPlugin(KotlinMultiplatformAndroidPlugin::class)) {
+      androidMain { dependsOn(noWebMain) }
+    }
     if (Multiplatform.enableIOS(project)) {
       iosMain { dependsOn(noWebMain) }
     }

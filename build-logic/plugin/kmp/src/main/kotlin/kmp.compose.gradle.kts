@@ -1,5 +1,3 @@
-import com.android.build.gradle.BaseExtension
-
 plugins {
   id("kmp.base")
   id(libsEx.plugins.kotlinCompose)
@@ -9,23 +7,18 @@ plugins {
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(compose.runtime)
-      implementation(compose.foundation)
-      implementation(compose.material)
-      implementation(compose.ui)
-      implementation(compose.components.resources)
-      implementation(compose.components.uiToolingPreview)
-      implementation(compose.materialIconsExtended)
+      implementation(libsEx.`compose-runtime`)
+      implementation(libsEx.`compose-foundation`)
+      implementation(libsEx.`compose-material`)
+      implementation(libsEx.`compose-ui`)
+      implementation(libsEx.`compose-resources`)
+      implementation(libsEx.`compose-preview`)
+      implementation(libsEx.`compose-material-icons`)
       implementation(libsEx.`compose-navigation`)
       implementation(libsEx.`compose-lifecycle-runtime-compose`)
       implementation(libsEx.`compose-lifecycle-viewmodel-compose`)
       implementation(libsEx.`compose-savedstate`)
       implementation(libsEx.`compose-constraintLayout`)
-    }
-
-    androidMain.dependencies {
-      implementation(compose.preview)
-      implementation(libsEx.`compose-activity`)
     }
 
     if (Multiplatform.enableDesktop(project)) {
@@ -37,12 +30,9 @@ kotlin {
   }
 }
 
-plugins.withId("com.android.base") {
-  configure<BaseExtension> {
-    buildFeatures.compose = true
-  }
+plugins.withId("com.android.kotlin.multiplatform.library") {
   dependencies {
-    add("debugImplementation", compose.uiTooling)
+    add("androidRuntimeClasspath", libsEx.`compose-ui-tooling`)
   }
   configurations.getByName("androidMainImplementation") {
     // 目前第三方的 constraintlayout 在安卓上的实现与 constraintlayout-core 存在依赖冲突
@@ -52,6 +42,7 @@ plugins.withId("com.android.base") {
   kotlin {
     sourceSets {
       androidMain.dependencies {
+        implementation(libsEx.`compose-activity`)
         implementation(libsEx.`compose-constraintLayout-android`)
       }
     }

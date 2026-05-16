@@ -24,30 +24,30 @@ kotlinJvmTarget = "17"
 #                                            Android
 ####################################################################################################
 # https://developer.android.com/build/releases/gradle-plugin?hl=zh-cn
-agp = "8.13.0"
+agp = "9.2.1"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
 # https://developer.android.com/jetpack/androidx/releases/appcompat
 androidx-appcompat = "1.7.1"
 # https://developer.android.com/jetpack/androidx/releases/lifecycle
-androidx-lifecycle = "2.9.4"
+androidx-lifecycle = "2.10.0"
 # https://developer.android.com/jetpack/androidx/releases/core
-androidx-core-ktx = "1.17.0"
+androidx-core-ktx = "1.18.0"
 # https://developer.android.com/jetpack/androidx/releases/core
 androidx-core-animation = "1.0.0"
 # https://developer.android.com/kotlin/ktx/extensions-list#androidxcollection
-androidx-collection-ktx = "1.5.0"
+androidx-collection-ktx = "1.6.0"
 # https://developer.android.com/jetpack/androidx/releases/fragment
 androidx-fragment = "1.8.9"
 # https://developer.android.com/jetpack/androidx/releases/activity
-androidx-activity = "1.11.0"
+androidx-activity = "1.13.0"
 # https://developer.android.com/jetpack/androidx/releases/paging
-androidx-paging = "3.3.6"
+androidx-paging = "3.5.0"
 # https://developer.android.com/jetpack/androidx/releases/room
-androidx-room = "2.8.1"
+androidx-room = "2.8.4"
 # https://developer.android.com/jetpack/androidx/releases/work
-androidx-work = "2.10.5"
+androidx-work = "2.11.2"
 
 ####################################################################################################
 #                                              控件
@@ -61,14 +61,14 @@ androidx-cardview = "1.0.0"
 # https://developer.android.com/jetpack/androidx/releases/viewpager2
 androidx-viewpager2 = "1.1.0"
 # https://developer.android.com/jetpack/androidx/releases/swiperefreshlayout
-androidx-swiperefreshlayout = "1.1.0"
+androidx-swiperefreshlayout = "1.2.0"
 # https://github.com/material-components/material-components-android
-material = "1.13.0"
+material = "1.14.0"
 # https://github.com/google/flexbox-layout
 flexbox = "3.0.0"
 # https://lottiefiles.com/blog/working-with-lottie/getting-started-with-lottie-animations-in-android-app
 # 最新版本号请查看：https://mvnrepository.com/artifact/com.airbnb.android/lottie
-lottie = "6.6.9"
+lottie = "6.7.1"
 # https://github.com/Baseflow/PhotoView
 # 查看图片的控件，支持双指缩放，但最后更新是 17 年
 photoView = "2.3.0"
@@ -93,61 +93,61 @@ wheelView = "4.1.9"
 #                                              Kotlin
 ####################################################################################################
 # https://github.com/JetBrains/kotlin/releases
-kotlin = "2.2.20"
+kotlin = "2.3.21"
 # https://github.com/google/ksp/releases
-ksp = "2.2.20-2.0.2" # ksp 版本与 kotlin 版本强绑定，升级 kotlin 记得去更 ksp
+ksp = "2.3.6" # ksp 版本与 kotlin 版本强绑定，升级 kotlin 记得去更 ksp
 # https://github.com/Kotlin/kotlinx.coroutines
-kotlinx-coroutines = "1.10.2"
+kotlinx-coroutines = "1.11.0"
 # https://github.com/Kotlin/kotlinx.collections.immutable
 kotlinx-collections = "0.4.0"
 # https://github.com/Kotlin/kotlinx.serialization
-kotlinx-serialization = "1.9.0"
+kotlinx-serialization = "1.11.0"
 # https://github.com/Kotlin/kotlinx-datetime
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.8.0"
 # https://github.com/Kotlin/kotlinx-atomicfu
-kotlinx-atomicfu = "0.29.0"
+kotlinx-atomicfu = "0.32.1"
 # https://github.com/ktorio/ktor
-ktor = "3.3.0"
+ktor = "3.5.0"
 ########################################### KMP 第三方依赖 ###########################################
 # https://github.com/eygraber/uri-kmp
-kmp-uri = "0.0.20"
+kmp-uri = "0.0.21"
 # https://github.com/985892345/KtProvider
 kmp-ktProvider = "1.5.0" # 985892345 的 kt 多平台跨模块服务提供框架
 # https://github.com/russhwolf/multiplatform-settings
 kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit
-kmp-ktorfit = "2.6.4"
+kmp-ktorfit = "2.7.3"
 
 
 ####################################################################################################
 #                                              Compose
 ####################################################################################################
 # https://github.com/JetBrains/compose-multiplatform/releases
-compose-multiplatform = "1.9.0"
+compose-multiplatform = "1.11.0"
 # https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-navigation-routing.html#setup
 # 官网文档可能更新不及时，版本请看 compose 发布时给出的版本
-compose-navigation = "2.9.0"
+compose-navigation = "2.9.2"
 # https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-lifecycle.html
 # 看 compose 发布时给出的版本
-compose-lifecycle = "2.9.4"
+compose-lifecycle = "2.10.0"
 # 看 compose 发布时给出的版本
-compose-savedstate = "1.3.4"
+compose-savedstate = "1.4.0"
+# 看 compose 发布时给出的版本
+compose-material-icons = "1.7.3"
 # 多平台版本，非官方 https://github.com/Lavmee/constraintlayout-compose-multiplatform
-compose-constraintLayout = "0.6.1"
+compose-constraintLayout = "0.7.0"
 # 官方约束布局，但只有安卓版本 https://developer.android.com/jetpack/androidx/releases/constraintlayout
 compose-constraintLayout-android = "1.1.1"
 # https://github.com/alexzhirkevich/compottie
-compose-lottie = "2.0.1"
-# https://github.com/JetBrains/compose-hot-reload
-compose-hotReload = "1.0.0-rc02"
+compose-lottie = "2.1.0"
 
 ####################################################################################################
 #                                               三方库
 ####################################################################################################
 # https://developer.umeng.com/docs/67966/detail/206987
-umeng-common = "9.8.8"
+umeng-common = "9.9.1"
 umeng-asms = "1.8.7.2"
-umeng-push = "6.7.5"
+umeng-push = "6.7.6"
 # https://github.com/Tencent/VasDolly
 vasdolly = "3.0.6"
 # 具体a参考自官方文档 https://bugly.qq.com/v2/index
@@ -156,7 +156,7 @@ bugly = "4.1.9.3"
 # https://github.com/greenrobot/EventBus
 eventBus = "3.3.1"
 # https://github.com/bumptech/glide/releases
-glide = "5.0.5"
+glide = "5.0.7"
 # https://github.com/limuyang2/LPhotoPicker
 # 一个图片选择框架（不知道为什么以前学长会选择这个）
 lPhotoPicker = "2.7"
@@ -166,9 +166,9 @@ ucrop = "2.2.10"
 # https://github.com/square/retrofit
 retrofit = "3.0.0"
 # https://github.com/square/okhttp
-okhttp = "5.1.0"
+okhttp = "5.3.2"
 # https://github.com/google/gson
-gson = "2.13.2"
+gson = "2.14.0"
 # https://github.com/ReactiveX/RxJava
 rxjava = "3.1.12"
 # https://github.com/ReactiveX/RxAndroid
@@ -185,19 +185,22 @@ pandora = "androidx_v2.1.0"
 # 字节很好用调试工具 https://github.com/bytedance/CodeLocator
 codelocator = "2.0.4"
 # https://github.com/square/kotlinpoet
-kotlinpoet = "2.2.0"
+kotlinpoet = "2.3.0"
 # kmp大图浏览 https://github.com/jvziyaoyao/scale
 scale = "1.1.1-beta.3"
 # coil kmp网络图片加载框架 https://github.com/coil-kt/coil
-coil = "3.3.0"
+coil = "3.4.0"
 # filekit 跨平台的文件操作三方库 https://github.com/vinceglb/FileKit
-filekit = "0.12.0"
+filekit = "0.14.1"
 # 文件操作库 https://github.com/square/okio
-okio = "3.16.2"
+okio = "3.17.0"
 # 权限申请的第三方库 https://github.com/icerockdev/moko-permissions
 moko-permissions = "0.20.1"
 # 高德地图的定位 https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
-amap = "6.5.1"
+amap = "11.1.200"
+# 多平台 BuildConfig 生成 https://github.com/gmazzo/gradle-buildconfig-plugin
+buildconfig = "6.0.9"
+
 [libraries]
 ####################################################################################################
 #                                              Android
@@ -286,13 +289,21 @@ kmp-ktProvider-gradlePlugin = { module = "io.github.985892345:provider-plugin-gr
 kmp-ktProvider-manager = { module = "io.github.985892345:provider-manager", version.ref = "kmp-ktProvider" }
 kmp-ktProvider-api = { module = "io.github.985892345:provider-api", version.ref = "kmp-ktProvider" }
 kmp-ktorfit = { module = "de.jensklingenberg.ktorfit:ktorfit-lib-light", version.ref = "kmp-ktorfit" }
-kmp-ktorfit-gradlePlugin = { module = "de.jensklingenberg.ktorfit:ktorfit-gradle-plugin", version.ref = "kmp-ktorfit" }
+kmp-ktorfit-gradlePlugin = { module = "de.jensklingenberg.ktorfit:de.jensklingenberg.ktorfit.gradle.plugin", version.ref = "kmp-ktorfit" }
 
 ####################################################################################################
 #                                              Compose
 ####################################################################################################
 compose-gradlePlugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose-multiplatform" }
 compose-compiler-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
+compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
+compose-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons" }
 compose-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 compose-navigation = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "compose-navigation" }
 
@@ -351,17 +362,18 @@ rxjava-kotlin = { module = "io.reactivex.rxjava3:rxkotlin", version.ref = "rxjav
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
+androidMultiplatform = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinAtomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "kotlinx-atomicfu" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
-composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hotReload" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 vasdolly = { id = "com.tencent.vasdolly" }
 ktProvider = { id = "io.github.985892345.KtProvider", version.ref = "kmp-ktProvider" }
 ktorfit = { id = "de.jensklingenberg.ktorfit", version.ref = "kmp-ktorfit" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 
 [bundles]
 projectBase = [

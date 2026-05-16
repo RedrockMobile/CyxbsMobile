@@ -40,20 +40,20 @@ open class FragmentVpAdapter private constructor(
   constructor(activity: FragmentActivity) : this(activity.supportFragmentManager, activity.lifecycle)
   constructor(fragment: Fragment) : this(fragment.childFragmentManager, fragment.lifecycle)
   
-  protected val mFragments = arrayListOf<() -> Fragment>()
+  protected val mFragmentList = arrayListOf<() -> Fragment>()
   
   open fun add(fragment: () -> Fragment): FragmentVpAdapter {
-    mFragments.add(fragment)
+    mFragmentList.add(fragment)
     return this
   }
   
   open fun add(fragment: Class<out Fragment>): FragmentVpAdapter {
     // 官方源码中在恢复 Fragment 时就是调用的这个反射方法，该方法应该不是很耗性能 :)
-    mFragments.add { fragment.getDeclaredConstructor().newInstance() }
+    mFragmentList.add { fragment.getDeclaredConstructor().newInstance() }
     return this
   }
   
-  override fun getItemCount(): Int = mFragments.size
+  override fun getItemCount(): Int = mFragmentList.size
   
-  override fun createFragment(position: Int): Fragment = mFragments[position].invoke()
+  override fun createFragment(position: Int): Fragment = mFragmentList[position].invoke()
 }

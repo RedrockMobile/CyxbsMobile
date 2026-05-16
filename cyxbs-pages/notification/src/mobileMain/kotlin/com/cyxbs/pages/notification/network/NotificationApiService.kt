@@ -16,10 +16,6 @@ import de.jensklingenberg.ktorfit.http.Query
  *
  */
 interface NotificationApiService {
-    // 获取notification模块中的活动通知消息
-    @GET("magipoke-ufield/message/list/")
-    suspend fun getActivityMessage(): ApiWrapper<List<UfieldMsgBean>>
-
 
     // 获取notification模块中的发送的行程
     @GET("magipoke-jwzx/itinerary/allMsg")

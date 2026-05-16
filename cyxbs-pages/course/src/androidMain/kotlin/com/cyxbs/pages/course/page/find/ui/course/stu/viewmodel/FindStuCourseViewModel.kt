@@ -2,12 +2,12 @@ package com.cyxbs.pages.course.page.find.ui.course.stu.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.cyxbs.pages.course.BuildConfig
+import com.cyxbs.components.base.crash.CrashDialog
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.pages.course.page.course.data.StuLessonData
 import com.cyxbs.pages.course.page.course.data.toStuLessonData
 import com.cyxbs.pages.course.page.course.model.StuLessonRepository
 import com.cyxbs.pages.course.page.find.ui.course.base.BaseFindViewModel
-import com.cyxbs.components.base.crash.CrashDialog
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 
 /**
@@ -37,7 +37,7 @@ class FindStuCourseViewModel : BaseFindViewModel<StuLessonData>() {
           list.groupBy { it.week }
         }.observeOn(AndroidSchedulers.mainThread())
         .doOnError {
-          if (BuildConfig.DEBUG) {
+          if (isDebug()) {
             toast("请求课表出现异常")
             CrashDialog.Builder(it).show()
           }

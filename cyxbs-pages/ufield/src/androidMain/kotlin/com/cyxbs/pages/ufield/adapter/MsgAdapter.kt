@@ -1,24 +1,21 @@
 package com.cyxbs.pages.ufield.adapter
 
 import android.content.Intent
-import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.annotation.RequiresApi
 import androidx.cardview.widget.CardView
-import androidx.core.content.ContextCompat.startActivity
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.extensions.setImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.pages.ufield.R
-import com.cyxbs.pages.ufield.ui.activity.DetailActivity
 import com.cyxbs.pages.ufield.bean.DetailMsg
 import com.cyxbs.pages.ufield.helper.formatNumberToTime
+import com.cyxbs.pages.ufield.ui.activity.DetailActivity
 
 class MsgAdapter : ListAdapter<DetailMsg, RecyclerView.ViewHolder>(
     object : DiffUtil.ItemCallback<DetailMsg>() {
@@ -72,7 +69,7 @@ class MsgAdapter : ListAdapter<DetailMsg, RecyclerView.ViewHolder>(
                     getItemId(absoluteAdapterPosition-1).run {
                         val intent = Intent(view.context, DetailActivity::class.java)
                         intent.putExtra("actID", currentList[absoluteAdapterPosition-1].activityId)
-                        startActivity(view.context, intent, null)
+                        view.context.startActivity(intent, null)
                     }
 
             }

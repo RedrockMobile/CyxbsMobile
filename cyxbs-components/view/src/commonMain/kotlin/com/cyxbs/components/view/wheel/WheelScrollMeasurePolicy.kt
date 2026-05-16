@@ -1,5 +1,6 @@
 package com.cyxbs.components.view.wheel
 
+import androidx.compose.foundation.lazy.layout.LazyLayoutMeasurePolicy
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.ui.layout.MeasureResult
@@ -16,12 +17,10 @@ class WheelScrollMeasurePolicy(
   val items: List<String>,
   val draggedLine: () -> Float,
   val parentHeight: MutableIntState,
-) : (LazyLayoutMeasureScope, Constraints) -> MeasureResult {
+) : LazyLayoutMeasurePolicy {
 
-  override fun invoke(
-    scope: LazyLayoutMeasureScope,
-    constraints: Constraints
-  ): MeasureResult {
+  override fun LazyLayoutMeasureScope.measure(constraints: Constraints): MeasureResult {
+    val scope = this
     val draggedLineValue = draggedLine.invoke()
     val centerIndex = draggedLineValue.roundToInt()
     val layoutWidth = constraints.maxWidth

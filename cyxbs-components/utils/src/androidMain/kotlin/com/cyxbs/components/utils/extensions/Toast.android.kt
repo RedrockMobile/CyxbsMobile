@@ -9,9 +9,9 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.init.appHandler
-import com.cyxbs.components.utils.BuildConfig
 import com.cyxbs.components.utils.R
 
 /**
@@ -67,7 +67,7 @@ private class CyxbsToast {
       text: CharSequence,
       duration: Int,
     ): Toast {
-      if (BuildConfig.DEBUG) {
+      if (isDebug()) {
         val throwable = Throwable() // 获取堆栈信息
         val path = throwable.stackTrace
           .toMutableList()

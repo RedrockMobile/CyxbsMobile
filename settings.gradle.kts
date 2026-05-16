@@ -23,6 +23,8 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 /*
 * 这里每次新建模块都会 include，把它们删掉，因为已经默认 include 了
+*
+* 新建模块直接创建好模块目录，并添加 build.gradle.kts 文件，sync 后会自动引导添加
 * */
 
 pluginManagement {
@@ -31,9 +33,11 @@ pluginManagement {
     gradlePluginPortal()
     mavenCentral()
     google()
-    maven("https://jitpack.io")
     mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
   }
+}
+plugins {
+  id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // wasmJs 会单独声明仓库，这里需要放开限制

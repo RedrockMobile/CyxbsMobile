@@ -6,10 +6,10 @@ import android.view.animation.LayoutAnimationController
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
+import com.cyxbs.components.utils.extensions.anim
 import com.cyxbs.pages.course.page.course.ui.home.viewmodel.HomeCourseViewModel
 import com.cyxbs.pages.course.widget.R
 import com.cyxbs.pages.course.widget.internal.view.course.ICourseViewGroup
-import com.cyxbs.components.utils.extensions.anim
 import com.ndhzs.netlayout.child.OnChildExistListener
 
 /**
@@ -46,8 +46,8 @@ object EnterAnimUtils {
       .observe(
         viewLifecycleOwner,
         object : Observer<Float> {
-          override fun onChanged(t: Float) {
-            if (t > 0.8F) {
+          override fun onChanged(value: Float) {
+            if (value > 0.8F) {
               // 执行一次就取消观察
               viewModel.courseService.bottomSheetSlideOffset.removeObserver(this)
               // 设置入场动画

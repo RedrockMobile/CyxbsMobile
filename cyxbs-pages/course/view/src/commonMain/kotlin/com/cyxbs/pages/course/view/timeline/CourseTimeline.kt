@@ -29,8 +29,6 @@ import kotlinx.coroutines.delay
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -43,20 +41,16 @@ import kotlin.time.Duration.Companion.seconds
  * @date 2025/2/10
  */
 @Stable
-@Serializable
 data class CourseTimeline(
   val data: ImmutableList<CourseTimelineData> = DefaultTimeline,
   val beginDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
 ) {
 
-  @Transient
   val linkNodeList = mutableListOf<LinkNode>()
 
-  @Transient
   val scrollState = ScrollState(0)
 
   // scroll 整个布局的偏移量
-  @Transient
   val marginBottom = SnapshotStateMap<String, Int>()
 
   init {

@@ -6,14 +6,15 @@ import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.utils.BuildConfig
-import com.cyxbs.components.init.appContext
-import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.config.service.allImpl
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.appContext
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
+import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -258,14 +259,14 @@ object ApiGenerator {
             addInterceptor(Interceptor {
                 it.proceed(
                     it.request().newBuilder()
-                        .addHeader("APPVersion", BuildConfig.VERSION_NAME)
+                        .addHeader("APPVersion", getAppVersionName())
                         .build()
                 )
             })
             dns(OkHttpDnsService.dns)
             addInterceptor(logging)
             //这里是在debug模式下方便开发人员简单确认 http 错误码 和 url(magipoke开始切的)
-            if (BuildConfig.DEBUG) {
+            if (isDebug()) {
                 addInterceptor(Interceptor {
                     val request = it.request()
                     Log.d("OKHTTP", "OKHTTP${request.body}")
@@ -363,7 +364,7 @@ object ApiGenerator {
                 it.proceed(
                     it.request()
                         .newBuilder()
-                        .addHeader("version", BuildConfig.VERSION_NAME)
+                        .addHeader("version", getAppVersionName())
                         .build()
                 )
             })
@@ -481,7 +482,7 @@ object ApiGenerator {
                         .url(BASE_NORMAL_BACKUP_GET)
                         .build()
                     val call = okHttpClient.newCall(request)
-                    val json = call.execute().body?.string()
+                    val json = call.execute().body.string()
                     val backupUrlStatus = defaultGson.fromJson<ApiWrapper<BackupUrlStatus>>(
                         json,
                         object : TypeToken<ApiWrapper<BackupUrlStatus>>() {}.type

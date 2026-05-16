@@ -74,8 +74,8 @@ class KspNetworkSymbolProcess(
           )
           .addSuperinterface(
             apiServiceClassName,
-            CodeBlock.builder() // 添加接口代理 by _XXXServiceImpl(Network)
-              .add("%T(%M)", declaration.toClassName(), KTORFIT_INSTANCE)
+            CodeBlock.builder() // 添加接口代理 by Network.createXXXApiService()
+              .add("%M.create%T()", KTORFIT_INSTANCE, apiServiceClassName)
               .build()
           )
           .build()

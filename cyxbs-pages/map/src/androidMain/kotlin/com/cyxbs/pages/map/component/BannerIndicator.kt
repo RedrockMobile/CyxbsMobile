@@ -70,7 +70,7 @@ class BannerIndicator : LinearLayout {
             color = indicatorColor.toInt()
             style = Paint.Style.FILL
             if (isShadow)
-                setShadowLayer(shadowRadius, shadowRadius / 2, shadowRadius / 2, shadowColor.toInt())
+                setShadowLayer(shadowRadius, shadowRadius / 2, shadowRadius / 2, shadowColor)
         }
 
     }

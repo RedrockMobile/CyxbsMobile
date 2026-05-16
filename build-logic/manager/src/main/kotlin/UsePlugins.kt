@@ -1,9 +1,11 @@
 import com.g985892345.provider.plugin.gradle.extensions.KtProviderExtensions
 import com.google.devtools.ksp.gradle.KspExtension
+import de.jensklingenberg.ktorfit.gradle.KtorfitPluginExtension
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.findByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 
@@ -22,10 +24,14 @@ fun Project.useKtProvider(isNeedKsp: Boolean = !name.startsWith("api")) {
     val ktProvider = extensions.getByName("ktProvider") as KtProviderExtensions
     kspMultiplatform(ktProvider.ksp)
   }
-  extensions.configure<KotlinMultiplatformExtension> {
+  // AGP9 后 application 插件不能与 multiplatform 共存
+  // 所以这里需要先判断 KotlinMultiplatformExtension 是否存在
+  extensions.findByType(KotlinMultiplatformExtension::class)?.apply {
     sourceSets.commonMain.dependencies {
       implementation(libsEx.`kmp-ktProvider-api`)
     }
+  } ?: dependencies {
+    "implementation"(libsEx.`kmp-ktProvider-api`)
   }
 }
 
@@ -90,19 +96,29 @@ fun Project.useNetwork() {
 }
 
 private fun Project.kspMultiplatform(dependencyNotation: Any) {
+  val isMultiplatform = extensions.findByType(KotlinMultiplatformExtension::class) != null
   dependencies {
-    "kspAndroid"(dependencyNotation)
-    if (Multiplatform.enableIOS(project)) {
-      "kspIosX64"(dependencyNotation)
-      "kspIosArm64"(dependencyNotation)
-      "kspIosSimulatorArm64"(dependencyNotation)
-    }
-    if (Multiplatform.enableWeb(project)) {
-      "kspJs"(dependencyNotation)
-      "kspWasmJs"(dependencyNotation)
-    }
-    if (Multiplatform.enableDesktop(project)) {
-      "kspDesktop"(dependencyNotation)
+    if (isMultiplatform) {
+      if (configurations.findByName("kspAndroid") != null) {
+        "kspAndroid"(dependencyNotation)
+      }
+      if (configurations.findByName("kspIosArm64") != null) {
+        "kspIosArm64"(dependencyNotation)
+      }
+      if (configurations.findByName("kspIosSimulatorArm64") != null) {
+        "kspIosSimulatorArm64"(dependencyNotation)
+      }
+      if (configurations.findByName("kspJs") != null) {
+        "kspJs"(dependencyNotation)
+      }
+      if (configurations.findByName("kspWasmJs") != null) {
+        "kspWasmJs"(dependencyNotation)
+      }
+      if (configurations.findByName("kspDesktop") != null) {
+        "kspDesktop"(dependencyNotation)
+      }
+    } else {
+      "ksp"(dependencyNotation)
     }
   }
 }

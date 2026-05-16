@@ -11,15 +11,14 @@ import androidx.core.content.edit
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.DialogFragment
 import com.aigestudio.wheelpicker.WheelPicker
+import com.cyxbs.components.config.sp.defaultSp
+import com.cyxbs.components.utils.extensions.setOnSingleClickListener
+import com.cyxbs.pages.electricity.R
 import com.cyxbs.pages.electricity.config.BUILDING_NAMES
 import com.cyxbs.pages.electricity.config.BUILDING_NAMES_HEADER
 import com.cyxbs.pages.electricity.config.SP_BUILDING_FOOT_KEY
 import com.cyxbs.pages.electricity.config.SP_BUILDING_HEAD_KEY
 import com.cyxbs.pages.electricity.config.SP_ROOM_KEY
-import com.cyxbs.pages.electricity.config.*
-import com.cyxbs.pages.electricity.R
-import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 
 
 class ElectricityFeedSettingDialogFragment : DialogFragment() {
@@ -108,7 +107,6 @@ class ElectricityFeedSettingDialogFragment : DialogFragment() {
 
     private fun setCorrectBuildingNum() {
         //防止未停止就确定导致空指针
-        if (wp_dormitory_foot == null || wp_dormitory_head == null) return
         selectBuildingHeadPosition = wp_dormitory_head.currentItemPosition
         selectBuildingFootPosition = wp_dormitory_foot.currentItemPosition
         tv_dormitory_num.text = buildingNames[buildingHeadNames[selectBuildingHeadPosition]]?.get(selectBuildingFootPosition)?.substringAfter("(")?.replace(")", "")

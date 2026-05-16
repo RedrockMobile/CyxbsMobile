@@ -5,18 +5,16 @@ import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.dp2pxF
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.network.RollerViewInfo
 import com.cyxbs.pages.discover.pages.RollerViewActivity
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.shape.ShapeAppearanceModel
-import kotlinx.coroutines.launch
 
 /**
  * Banner adapter
@@ -32,9 +30,7 @@ class RollerViewInfoAdapter(
       iv.setOnSingleClickListener {
         if (IAccountService::class.impl().isLogin()) {
           // banner位的点击埋点
-          appCoroutineScope.launch {
-            TrackingUtils.trackClickEvent(ClickEvent.CLICK_YLC_BANNER_ENTRY)
-          }
+          TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_BANNER_ENTRY)
         }
 
         val data = list[realPosition]

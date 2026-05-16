@@ -1,5 +1,6 @@
 package com.cyxbs.pages.affair.api
 
+import com.cyxbs.components.config.time.SchoolCalendar
 import java.io.Serializable
 
 
@@ -13,14 +14,6 @@ import java.io.Serializable
 
 /**
  * 发送通知的时候需要的学号的集合：前面是学号，后面是是否空闲，true代表空闲
- *
- * beginLesson Int 开始节数，如：1、2 节课以 1 开始；3、4 节课以 3 开始，注意：中午是以 4 开始，傍晚是以 9 开始
- *
- * day Int 星期数，星期一为 0
- *
- * period Int 长度
- *
- * week List<Int> 在哪周，特别注意：整学期的 week 为 0
  */
 
 data class NoClassBean(
@@ -37,6 +30,18 @@ data class NotificationBean(
     val location : String,
 ) : Serializable
 
+/**
+ * 新课标字段：
+ * - date: “2026-3-20”
+ * - start: 480 (分钟数，为 hour * 60 + minute)
+ * - end: 540
+ *
+ * 老课表字段：
+ * - beginLesson: 开始节数，如：1、2 节课以 1 开始；3、4 节课以 3 开始，注意：中午是以 4 开始，傍晚是以 9 开始
+ * - day: 星期数，星期一为 0
+ * - period: 长度
+ * - week: 在哪周，特别注意：整学期的 week 为 0
+ */
 data class DateJson(
     val beginLesson : Int,
     val day : Int,

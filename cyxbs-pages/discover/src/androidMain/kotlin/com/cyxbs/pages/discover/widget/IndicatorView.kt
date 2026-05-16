@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.content.withStyledAttributes
 import com.cyxbs.pages.discover.R
 
 /**
@@ -14,14 +15,12 @@ import com.cyxbs.pages.discover.R
 class IndicatorView(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) :
         View(context, attrs, defStyleAttr) {
     constructor(context: Context?, attrs: AttributeSet?) : this(context, attrs, 0) {
-        val ta = context?.obtainStyledAttributes(attrs, R.styleable.IndicatorView)
-        if (ta != null) {
-            multiple = ta.getFloat(R.styleable.IndicatorView_progressMultiple, 0f)
-            underColor = ta.getColor(R.styleable.IndicatorView_underColor, DEFAULT_UNDER_COLOR)
-            progressColor = ta.getColor(R.styleable.IndicatorView_underColor, DEFAULT_PROGRESS_COLOR)
-            endRadius = ta.getFloat(R.styleable.IndicatorView_endRadius, DEFAULT_RADIUS)
-        }
-        ta?.recycle()
+      context?.withStyledAttributes(attrs, R.styleable.IndicatorView) {
+        multiple = getFloat(R.styleable.IndicatorView_progressMultiple, 0f)
+        underColor = getColor(R.styleable.IndicatorView_underColor, DEFAULT_UNDER_COLOR)
+        progressColor = getColor(R.styleable.IndicatorView_underColor, DEFAULT_PROGRESS_COLOR)
+        endRadius = getFloat(R.styleable.IndicatorView_endRadius, DEFAULT_RADIUS)
+      }
     }
 
     private var multiple = 0.5f
@@ -110,8 +109,8 @@ class IndicatorView(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) 
         canvas.drawRoundRect(
                 0f,
                 0f,
-                mWidth.toFloat(),
-                mHeight.toFloat(),
+                mWidth,
+                mHeight,
                 endRadius,
                 endRadius,
                 paintUnder
@@ -124,7 +123,7 @@ class IndicatorView(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) 
                 0f,
                 //左边距+progress所占倍数+progress*last
                 multiple * mWidth + progress * last,
-                mHeight.toFloat(),
+                mHeight,
                 endRadius,
                 endRadius,
                 paintProgress

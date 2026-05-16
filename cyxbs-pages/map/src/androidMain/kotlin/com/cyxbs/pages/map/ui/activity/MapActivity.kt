@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.lifecycle.Observer
 import com.cyxbs.components.base.ui.BaseActivity
@@ -42,10 +43,24 @@ class MapActivity : BaseActivity() {
     private var favoriteEditFragment = FavoriteEditFragment()
     private var allPictureFragment = AllPictureFragment()
 
+    // 返回按钮回调
+    private val onBackPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            mainFragment.closeSearchFragment()
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.map_activity_map)
+
+        // 注册返回按钮回调
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+        viewModel.searchShowState.observe {
+            onBackPressedCallback.isEnabled = it
+        }
+
         val openString = intent.getStringExtra(COURSE_POS_TO_MAP)
         /**
          * 如果有保存路径且地图存在，则不展示dialog
@@ -124,13 +139,7 @@ class MapActivity : BaseActivity() {
 
     }
 
-    override fun onBackPressed() {
-        if (mainFragment.childFragmentManager.backStackEntryCount != 0) {
-            mainFragment.closeSearchFragment()
-            return
-        }
-        super.onBackPressed()
-    }
+
 
     override fun onDestroy() {
         super.onDestroy()

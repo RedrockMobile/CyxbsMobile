@@ -83,7 +83,7 @@ import kotlin.reflect.KProperty
  * @time 17:34
  */
 class BindView<V : View>(
-  @IdRes val resId: Int,
+  @param:IdRes val resId: Int,
   val findView: (Int) -> V,
   val getLifecycle: () -> Lifecycle,
 ) : ReadOnlyProperty<Any, V> {

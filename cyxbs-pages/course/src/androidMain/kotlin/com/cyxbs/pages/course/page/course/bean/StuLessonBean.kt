@@ -1,14 +1,14 @@
 package com.cyxbs.pages.course.page.course.bean
 
-import com.google.gson.annotations.SerializedName
-import com.cyxbs.pages.course.BuildConfig
-import com.cyxbs.pages.course.page.course.room.ILessonEntity
-import com.cyxbs.pages.course.page.course.room.StuLessonEntity
 import com.cyxbs.components.base.crash.CrashDialog
+import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.utils.network.IApiWrapper
 import com.cyxbs.pages.course.api.utils.checkCourseItem
+import com.cyxbs.pages.course.page.course.room.ILessonEntity
+import com.cyxbs.pages.course.page.course.room.StuLessonEntity
+import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
 /**
@@ -75,7 +75,7 @@ data class StuLessonBean(
         if (checkCourseItem(it.beginLesson, it.period)) {
           true
         } else {
-          if (BuildConfig.DEBUG) {
+          if (isDebug()) {
             // debug 版查他人课表直接显示异常原因
             toast("发生课表数据越界！")
             CrashDialog.Builder(RuntimeException("lesson=$it")).show()
@@ -112,7 +112,7 @@ data class StuLessonBean(
           // 就打开 debug 版查他课表就会自动显示异常原因弹窗
           if (!isNotified) {
             isNotified = true
-            if (BuildConfig.DEBUG) {
+            if (isDebug()) {
               // debug 版查他人课表直接显示异常原因
               toast("发生课表数据异常！")
               CrashDialog.Builder(RuntimeException("lesson=$it", e)).show()

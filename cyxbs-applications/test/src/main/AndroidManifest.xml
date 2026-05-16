@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?><!--suppress ALL -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name=".TestApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/config_ic_launcher"
+        android:label="@string/config_app_name"
+        android:networkSecurityConfig="@xml/test_network_security"
+        android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/config_ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/ConfigAppTheme"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="n">
+    </application>
+</manifest>

@@ -1,7 +1,6 @@
 package com.cyxbs.pages.course.view.timeline.data
 
 import androidx.compose.animation.core.animate
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +20,6 @@ import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastMap
 import androidx.compose.ui.util.fastSumBy
 import com.cyxbs.components.config.serializable.ColorSerializable
-import com.cyxbs.components.config.serializable.FloatStateSerializable
 import com.cyxbs.components.config.serializable.TextUnitSerializable
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.clickableNoIndicator
@@ -38,6 +36,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.roundToInt
 
 /**
@@ -66,7 +65,7 @@ data class MutableTimelineData(
   val expandTextDarkColor: Color = DefaultTimelineLightTextDarkColor,
 ) : CourseTimelineData {
 
-  @Serializable(FloatStateSerializable::class)
+  @Transient
   private var nowWeightState = mutableFloatStateOf(initialWeight)
 
   override val nowWeight: Float
@@ -158,10 +157,13 @@ data class MutableTimelineData(
     }
   }
 
+  @Transient
   private var clickLockCount = 0
 
+  @Transient
   private var scrollUpOrDown: Boolean? = null
 
+  @Transient
   private val _state =
     MutableStateFlow(if (nowWeight == maxWeight) State.Expand else State.Collapse)
   val state: StateFlow<State> = _state

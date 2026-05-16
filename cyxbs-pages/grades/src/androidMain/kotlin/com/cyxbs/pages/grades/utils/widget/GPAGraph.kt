@@ -2,7 +2,15 @@ package com.cyxbs.pages.grades.utils.widget
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -218,7 +226,7 @@ class GpAGraph : View {
             if (mappingData.size >= it + 1) {
                 textPaint.textSize = dp2px(14).toFloat()
                 canvas.drawBitmap(bubble, (it + 1) * segWidth.toFloat() - bubble.width / 2, -1 * mappingData[it] * segHeight.toFloat() - dp2px(24) - bubble.height / 2, textPaint)
-                canvas.drawText(originalData[it].toString(), (it + 1) * segWidth.toFloat(), -1 * mappingData[it] * segHeight.toFloat() - dp2px(21), textPaint)
+                canvas.drawText(originalData[it], (it + 1) * segWidth.toFloat(), -1 * mappingData[it] * segHeight.toFloat() - dp2px(21), textPaint)
             }
         }
     }

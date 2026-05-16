@@ -28,6 +28,9 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
     if (project.name == "lib_common") {
       return // lib_common 未迁移，这里特殊处理，不进行检查
     }
+    if (project.path.contains("cyxbs-applications")) {
+      return // 跳过 cyxbs-applications，一般这里面不会新增模块
+    }
     val sourceSetList = listOf(
       "androidMain",
       "commonMain",

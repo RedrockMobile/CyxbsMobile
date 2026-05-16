@@ -1,3 +1,6 @@
+import com.cyxbs.components.config.ConfigApplicationInfo
+import com.cyxbs.components.config.init.InitialManager
+import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
  * .
@@ -7,11 +10,23 @@
  */
 
 // 在 iOS 项目 AppDelegate#application 调用
-fun initApp() {
+fun doInitApp(isDebug: Boolean) {
+  IOSConfigApplicationInfo.isDebug = isDebug
   initProvider()
+  InitialManager.init(isMainProcess = true)
 }
 
 // 初始化 KtProvider
-// 因为 KSP 只会在最底层源集生成代码，iosMain 是 iosX64、iosArm64、iosSimulatorArm64 共用共同父源集
+// 因为 KSP 只会在最底层源集生成代码，iosMain 是 iosArm64、iosSimulatorArm64 共用共同父源集
 // 所以这里需要在最底层源集初始化 KtProvider
 internal expect fun initProvider()
+
+@ImplProvider
+object IOSConfigApplicationInfo : ConfigApplicationInfo {
+
+  var isDebug = false
+
+  override fun isDebug(): Boolean {
+    return isDebug
+  }
+}

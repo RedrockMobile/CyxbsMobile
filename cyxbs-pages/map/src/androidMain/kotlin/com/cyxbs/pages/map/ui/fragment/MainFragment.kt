@@ -121,6 +121,7 @@ class MainFragment : BaseFragment() {
         transaction?.hide(searchFragment)
         transaction?.show(mapViewFragment)?.commit()
         manager?.popBackStack()
+        viewModel.searchShowState.value = false
     }
 
 
@@ -142,6 +143,7 @@ class MainFragment : BaseFragment() {
         }
         transaction?.show(searchFragment)
         transaction?.addToBackStack("search")?.commit()
+        viewModel.searchShowState.value = true
     }
 
 

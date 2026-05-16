@@ -1,10 +1,14 @@
 package com.cyxbs.pages.schoolcar.database
 
-import androidx.room.*
-import com.google.gson.reflect.TypeToken
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
+import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.pages.schoolcar.bean.Line
 import com.cyxbs.pages.schoolcar.bean.MapLines
-import com.cyxbs.components.utils.extensions.defaultGson
+import com.google.gson.reflect.TypeToken
 
 /**
  *@Author:SnowOwlet
@@ -21,7 +25,7 @@ abstract class MapInfoDataBase : RoomDatabase() {
       Room.databaseBuilder(
         com.cyxbs.components.init.appContext,
         MapInfoDataBase::class.java, "map_info_database"
-      ).fallbackToDestructiveMigration().build()
+      ).fallbackToDestructiveMigration(false).build()
     }
   }
 }

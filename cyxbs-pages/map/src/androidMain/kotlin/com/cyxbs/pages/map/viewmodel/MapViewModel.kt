@@ -109,6 +109,9 @@ class MapViewModel : BaseViewModel() {
     //用于通知mainFragment关闭搜索框
     val closeSearchFragment = MutableLiveData<Boolean>()
 
+    // 搜索 fragment 显示状态
+    val searchShowState = MutableLiveData<Boolean>()
+
     //网络请求失败，使用本地缓存
     val loadFail = MutableLiveData<Unit>()
 

@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.content.ContextCompat.startActivity
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -15,8 +14,8 @@ import com.cyxbs.components.utils.extensions.setImageFromId
 import com.cyxbs.components.utils.extensions.setImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.pages.ufield.R
-import com.cyxbs.pages.ufield.ui.activity.DetailActivity
 import com.cyxbs.pages.ufield.bean.RankBean
+import com.cyxbs.pages.ufield.ui.activity.DetailActivity
 
 class RankAdapter : ListAdapter<RankBean, RankAdapter.ViewHolder>(
     object : DiffUtil.ItemCallback<RankBean>() {
@@ -60,7 +59,7 @@ class RankAdapter : ListAdapter<RankBean, RankAdapter.ViewHolder>(
                 getItemId(absoluteAdapterPosition).run {
                     val intent = Intent(view.context, DetailActivity::class.java)
                     intent.putExtra("actID", currentList[absoluteAdapterPosition].activityId)
-                    startActivity(view.context, intent, null)
+                    view.context.startActivity(intent, null)
                 }
             }
 

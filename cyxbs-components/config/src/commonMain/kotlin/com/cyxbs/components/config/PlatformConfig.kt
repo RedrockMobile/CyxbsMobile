@@ -10,5 +10,4 @@ package com.cyxbs.components.config
 // 应用名称
 expect val appName: String
 
-// 是否处于 debug 包
-expect fun isDebug(): Boolean
+fun isDebug(): Boolean = ConfigApplicationInfoImpl.isDebug()

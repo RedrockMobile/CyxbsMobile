@@ -9,9 +9,6 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
-        maven("https://maven.aliyun.com/repository/public")
-        maven("https://maven.aliyun.com/repository/google")
-        maven("https://jitpack.io")
         mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
     }
 }
