@@ -36,12 +36,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew cyxbs-application:test:wasmJsBrowserDistribution --no-configuration-cache
+        run: ./gradlew cyxbs-application:multiplatform:wasmJsBrowserDistribution --no-configuration-cache
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: cyxbs-applications/test/build/dist/wasmJs/productionExecutable
+          path: cyxbs-applications/multiplatform/build/dist/wasmJs/productionExecutable
 
   deploy:
     environment:

@@ -31,3 +31,13 @@ kotlin {
   }
 }
 
+tasks.all {
+  if (name == "wasmJsBrowserDistribution"
+    || name == "wasmJsBrowserProductionRun"
+    || name == "wasmJsBrowserProductionWebpack"
+    || name == "wasmJsBrowserDevelopmentRun"
+  ) {
+    // 抑制 channelRelease 不能缓存的报错
+    notCompatibleWithConfigurationCache("suppres configuration cache")
+  }
+}
