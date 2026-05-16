@@ -3,10 +3,9 @@ package com.cyxbs.components.base.webView
 import android.app.Activity
 import android.content.ContextWrapper
 import android.os.Bundle
-import android.view.KeyEvent
-import android.view.KeyEvent.KEYCODE_BACK
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
@@ -79,9 +78,31 @@ class WebViewActivity : BaseActivity() {
   private val mTitle by lazy { intent.getStringExtra("title") }
 
   private val mDefaultTitle by lazy { intent.getStringExtra("defaultTitle") ?: "网页" }
+  
+  // 返回按钮回调 - 根据 WebView 是否有历史记录来控制行为
+  private val onBackPressedCallback = object : OnBackPressedCallback(true) {
+    override fun handleOnBackPressed() {
+      val webView = viewModel.webViewStateFlow.value
+      if (webView != null && webView.canGoBack()) {
+        // 如果 WebView 有历史记录，则后退
+        webView.goBack()
+      } else {
+        // 临时禁用当前回调
+        isEnabled = false
+        // 递归再次触发系统默认返回行为（会调用 Activity.finish()）
+        onBackPressedDispatcher.onBackPressed()
+        // 重新启用回调，以便下次返回键按下时仍能处理
+        isEnabled = true
+      }
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    
+    // 注册返回按钮回调
+    onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+    
     setContent {
       AppTheme {
         WebViewCompose(
@@ -92,20 +113,6 @@ class WebViewActivity : BaseActivity() {
         )
       }
     }
-  }
-
-  //处理返回键，如果是还有历史记录就直接在webView返回
-  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-    if (keyCode == KEYCODE_BACK) {
-      val webView = viewModel.webViewStateFlow.value
-      if (webView != null) {
-        if (webView.canGoBack()) {
-          webView.goBack()
-          return true
-        }
-      }
-    }
-    return super.onKeyDown(keyCode, event)
   }
 }
 

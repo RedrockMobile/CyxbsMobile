@@ -9,6 +9,7 @@ import android.webkit.WebSettings
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -63,6 +64,14 @@ class ContainerActivity : BaseActivity() {
     private val mBottomSheetBehavior by lazy {
         BottomSheetBehavior.from(parent)
     }
+    
+    // 返回按钮回调 - 根据 BottomSheet 状态动态控制是否启用
+    private val onBackPressedCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            // 当回调被触发时，说明 BottomSheet 是展开状态，将其折叠
+            mBottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +90,21 @@ class ContainerActivity : BaseActivity() {
             )
             setTitleLocationAtLeft(true)
         }
+        
+        // 注册返回按钮回调
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+        
+        // 监听 BottomSheet 状态变化，动态控制回调的启用状态
+        mBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                // 当 BottomSheet 展开时启用回调，否则禁用
+                onBackPressedCallback.isEnabled = (newState == BottomSheetBehavior.STATE_EXPANDED)
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+            }
+        })
+        
         init()
     }
 
@@ -157,14 +181,7 @@ class ContainerActivity : BaseActivity() {
     }
 
 
-    override fun onBackPressed() {
-        val behavior = mBottomSheetBehavior
-        if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
-            behavior.state = BottomSheetBehavior.STATE_COLLAPSED
-        } else {
-            super.onBackPressed()
-        }
-    }
+
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun loadH5(baseUrl: String) {

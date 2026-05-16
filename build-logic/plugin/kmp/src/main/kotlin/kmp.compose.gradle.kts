@@ -1,5 +1,3 @@
-import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
-
 plugins {
   id("kmp.base")
   id(libsEx.plugins.kotlinCompose)

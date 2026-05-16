@@ -7,7 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.core.view.isGone
+import androidx.activity.OnBackPressedCallback
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
@@ -48,9 +48,22 @@ class NetworkApiResultActivity : BaseActivity() {
   private val mTvResponse by R.id.debug_tv_result_response.view<TextView>()
   private val mTvError by R.id.debug_tv_result_error.view<TextView>()
   
+  // 返回按钮回调
+  private val onBackPressedCallback = object : OnBackPressedCallback(false) {
+    override fun handleOnBackPressed() {
+      mRecyclerView.visible()
+      mLayoutDetail.gone()
+      isEnabled = false
+    }
+  }
+  
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.base_activity_network_result)
+    
+    // 注册返回按钮回调
+    onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+    
     mRecyclerView.layoutManager = LinearLayoutManager(this)
     mRecyclerView.adapter = RvAdapter()
     
@@ -59,15 +72,6 @@ class NetworkApiResultActivity : BaseActivity() {
     
     if (mNetworkResult.isEmpty()) {
       toastLong("数据为空！")
-    }
-  }
-  
-  override fun onBackPressed() {
-    if (mRecyclerView.isGone) {
-      mRecyclerView.visible()
-      mLayoutDetail.gone()
-    } else {
-      super.onBackPressed()
     }
   }
   
@@ -83,6 +87,7 @@ class NetworkApiResultActivity : BaseActivity() {
         itemView.setOnClickListener {
           mRecyclerView.gone()
           mLayoutDetail.visible()
+          onBackPressedCallback.isEnabled = true
           val result = mNetworkResult[layoutPosition]
           mTvRequest.text = result.request
           mTvResponse.text = result.response

@@ -14,10 +14,9 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
-import android.view.KeyEvent
-import android.view.KeyEvent.KEYCODE_BACK
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.webView.IAndroidWebView
 import com.cyxbs.components.base.webView.LiteJsWebView
@@ -56,10 +55,30 @@ class RollerViewActivity : BaseActivity() {
     
     private val discover_web_view by R.id.discover_web_view.view<LiteJsWebView>()
     private val common_toolbar by com.cyxbs.components.view.R.id.toolbar.view<JToolbar>()
+    
+    // 返回按钮回调 - 根据 WebView 是否有历史记录来控制行为
+    private val onBackPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (discover_web_view.canGoBack()) {
+                // 如果 WebView 有历史记录，则后退
+                discover_web_view.goBack()
+            } else {
+                // 临时禁用当前回调
+                isEnabled = false
+                // 递归再次触发系统默认返回行为（会调用 Activity.finish()）
+                onBackPressedDispatcher.onBackPressed()
+                // 重新启用回调，以便下次返回键按下时仍能处理
+                isEnabled = true
+            }
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 注册返回按钮回调
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
 
         setContentView(R.layout.discover_activity_roller_view)
         setTheme(com.google.android.material.R.style.Theme_MaterialComponents) //这里是用的Material主题
@@ -201,14 +220,6 @@ class RollerViewActivity : BaseActivity() {
         }
     }
 
-    //处理返回键，如果是还有历史记录就直接在webView返回
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KEYCODE_BACK && discover_web_view.canGoBack()) {
-            discover_web_view.goBack()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
 
     override fun onResume() {
         super.onResume()

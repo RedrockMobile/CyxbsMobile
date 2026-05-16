@@ -9,6 +9,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.appcompat.widget.AppCompatTextView
@@ -33,7 +34,6 @@ import com.cyxbs.pages.todo.ui.dialog.SelectCategoryDialog
 import com.cyxbs.pages.todo.ui.dialog.SelectRepeatDialog
 import com.cyxbs.pages.todo.util.transformRepeat
 import com.cyxbs.pages.todo.viewmodel.TodoViewModel
-import com.google.gson.Gson
 import kotlinx.coroutines.launch
 
 /**
@@ -58,6 +58,19 @@ class TodoDetailActivity : BaseActivity() {
     private val rvRepeatTime by R.id.todo_rv_inner_detail_repeat_time.view<RecyclerView>()
     private val tvSaveGrey by R.id.todo_thing_detail_no_save.view<TextView>()
     private val tvSave by R.id.todo_thing_detail_save.view<TextView>()
+    
+    // 返回按钮回调 - 根据 isChanged 状态动态控制是否启用
+    private val onBackPressedCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            // 当回调被触发时，说明有未保存的更改，显示确认对话框
+            DetailAlarmDialog.Builder(this@TodoDetailActivity)
+                .setPositiveClick {
+                    finish()
+                }.setNegativeClick {
+                    dismiss()
+                }.show()
+        }
+    }
 
     companion object {
         fun startActivity(todo: Todo, context: Context) {
@@ -76,7 +89,10 @@ class TodoDetailActivity : BaseActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.todo_activity_detail)
-
+        
+        // 注册返回按钮回调
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+        
         //下面的逻辑是为了处理端内跳转
         fun initTodo() {
             //这里反序列化两次是为了防止内外拿到同一个引用
@@ -114,8 +130,11 @@ class TodoDetailActivity : BaseActivity() {
     }
 
     private fun initView() {
-        viewModel.isChanged.observe(this) {
-            if (it) {
+        viewModel.isChanged.observe(this) { isChanged ->
+            // 根据 isChanged 状态动态控制返回按钮回调的启用状态
+            onBackPressedCallback.isEnabled = isChanged
+            
+            if (isChanged) {
                 tvSaveGrey.gone()
                 tvSave.visible()
             } else {
@@ -320,19 +339,7 @@ class TodoDetailActivity : BaseActivity() {
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (viewModel.isChanged.value == true) {
-            DetailAlarmDialog.Builder(this)
-                .setPositiveClick {
-                    finish()
-                }.setNegativeClick {
-                    dismiss()
-                }.show()
-        } else {
-            super.onBackPressed()
-        }
-    }
+
 
     private fun selectRepeatTime() {
         onClickProxy {
