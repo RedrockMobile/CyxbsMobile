@@ -18,7 +18,7 @@ import com.g985892345.provider.api.annotation.ImplProvider
 fun main() {
   initKtProvider()
   InitialManager.init(isMainProcess = true)
-  ComposeViewport {
+  ComposeViewport(viewportContainerId = "composeContainer") {
     AppTheme {
       MainNavHost()
       PlatformToastCompose()

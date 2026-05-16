@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavUri
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.Platform
+import com.cyxbs.components.config.appPlatform
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.navigation.DestinationParcel
 import com.cyxbs.components.config.navigation.HomeNavArgument
@@ -48,7 +50,7 @@ import com.cyxbs.pages.login.api.LoginNavArgument
 // 在这里注册你的 Compose 页面用于 desktop 端的测试
 // 如果你的页面没有返回键，则按 ESC 键进行返回
 private val itemList = listOf(
-  ActionItem("地图") {
+  ActionItem("地图", Platform.Web) {
     MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_MAP"))
   },
   ActionItem("我的课表") {
@@ -72,7 +74,7 @@ private val itemList = listOf(
 
 
 
-  ActionItem("校车查询"){
+  ActionItem("校车查询", Platform.Web){
     MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_SCHOOL_CAR"))
   },
   // 退出登陆放到最后，其他测试页面放到上面👆
@@ -106,6 +108,7 @@ fun AdaptiveHomePage(parcel: DestinationParcel<HomeNavArgument>) {
 @Stable
 class ActionItem(
   val name: String,
+  vararg val excludePlatform: Platform, // 排除某些平台
   val onClick: () -> Unit
 )
 
@@ -119,7 +122,10 @@ private fun SelectorItem(item: ActionItem, modifier: Modifier = Modifier) {
       .clip(RoundedCornerShape(8.dp))
       .background(color = 0xFFF5F6F8.dark(0xFF111111))
       .clickable {
-        toast(item.name)
+        if (item.excludePlatform.contains(appPlatform)) {
+          toast("当前平台不支持此功能")
+          return@clickable
+        }
         item.onClick.invoke()
       }
   ) {
