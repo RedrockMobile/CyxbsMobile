@@ -1,7 +1,6 @@
 package com.cyxbs.pages.map.viewmodel
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.fragment.app.Fragment
@@ -29,8 +28,6 @@ import io.reactivex.rxjava3.schedulers.Schedulers
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import top.limuyang2.photolibrary.LPhotoHelper
-import top.limuyang2.photolibrary.util.LPPImageType
 import java.io.File
 
 
@@ -48,10 +45,6 @@ class MapViewModel : BaseViewModel() {
         /** 从掌邮获取的地点未找到*/
         const val PLACE_SEARCH_500 = "500"
         const val DOWN_MESSAGE_NAME = "zscy-map-vr-url"
-
-        /** 图片选择的requestCode*/
-        const val PICTURE_SELECT = 0x1024
-
     }
 
     init {
@@ -132,6 +125,9 @@ class MapViewModel : BaseViewModel() {
 
     //VR地图url
     var vrUrl = ""
+    
+    // 触发图片选择的事件
+    val triggerImagePicker = MutableLiveData<Unit>()
 
     fun init() {
 
@@ -466,77 +462,15 @@ class MapViewModel : BaseViewModel() {
     }
 
     /**
-     * 打开图片选择器
-     * @param activity 用于intent
-     */
-
-    fun selectPic(activity: Activity) {
-        LPhotoHelper.Builder()
-            .maxChooseCount(9) //最多选几个
-            .columnsNumber(3) //每行显示几列图片
-            .imageType(LPPImageType.ofAll()) // 文件类型
-            .pauseOnScroll(false) // 是否滑动暂停加载图片显示
-            .isSingleChoose(false) // 是否是单选
-            .isOpenLastAlbum(false) // 是否直接打开最后一次选择的相册
-            .selectedPhotos(ArrayList())
-            .theme(com.cyxbs.components.config.R.style.ConfigLPhotoTheme)
-            .build()
-            .start(activity, PICTURE_SELECT)
-    }
-
-    /**
      * 分享图片逻辑
      * 判断是否登录了
      * @param context 用于判断是否登录
      * @param fragment 供requireSharePermission方法使用
      */
-
     fun sharePicture(context: Context, fragment: BaseFragment) {
         fragment.doIfLogin("分享") {
-            fragment.doPermissionAction(
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.CAMERA
-            ) {
-                reason = appContext.getString(R.string.map_require_permission_tips)
-                doAfterGranted {
-                    requireSharePermission(context, fragment)
-                }
-                doAfterRefused {
-                    requireSharePermission(context, fragment)
-                }
-            }
-        }
-    }
-
-    /**
-     * 获取分享权限逻辑
-     * @param context 获取权限用
-     * @param fragment 用于获得fragment依附的activity（这里是MapActivity），
-     * 去调用selectPic(activity)方法，以至于用intent，打开的activity返回后，
-     * 回到的是MapActivity的onActivityResult方法
-     */
-    private fun requireSharePermission(context: Context, fragment: Fragment) {
-        if (appContext.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
-            appContext.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
-            appContext.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
-        ) {
-            toast(R.string.map_no_permission_store)
-            return
-        }
-        context.let {
-            MapDialog.show(
-                it,
-                appContext.getString(R.string.map_share_picture_title),
-                appContext.getString(R.string.map_share_picture),
-                object : OnSelectListener {
-                    override fun onDeny() {
-                    }
-
-                    override fun onPositive() {
-                        fragment.activity?.let { it1 -> selectPic(it1) }
-                    }
-                })
+            // 触发图片选择事件，由 Activity 处理
+            triggerImagePicker.postValue(Unit)
         }
     }
 

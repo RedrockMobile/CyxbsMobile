@@ -37,36 +37,6 @@
         <item name="cornerSize">50%</item>
     </style>
 
-    <style name="ConfigLPhotoTheme" parent="LPhotoTheme">
-        <!--页面通用属性（图片选择、图片预览共用）-->
-        <item name="l_pp_toolBar_height">56dp</item>
-        <item name="l_pp_toolBar_backIcon">@drawable/config_ic_back</item><!--返回按钮资源-->
-        <item name="l_pp_toolBar_title_size">16sp</item><!--toolBar上字体大小-->
-        <item name="l_pp_bottomBar_height">50dp</item><!--底栏的高度-->
-        <!--图片选择页面属性-->
-        <item name="l_pp_status_bar_color">@color/config_photo_select_status_color
-        </item><!--状态栏颜色-->
-        <item name="l_pp_toolBar_background">@color/config_photo_select_status_color
-        </item><!--toolBar颜色-->
-        <item name="l_pp_picker_activity_bg">@color/config_window_background
-        </item><!--activity背景颜色-->
-        <item name="l_pp_toolBar_title_color">@color/config_level_two_font_color
-        </item><!--(图片选择页面)顶部toolBar字体颜色-->
-        <item name="l_pp_picker_bottomBar_background">@color/config_window_background
-        </item><!--底栏的颜色，如果需要毛玻璃效果，颜色加上透明度-->
-        <item name="l_pp_picker_bottomBar_enabled_text_color">#333333</item><!--底部按钮启用时的颜色-->
-
-        <!--图片分割线宽度-->
-
-        <!--圆形选择框样式（图片选择、图片预览共用，有特别说明的除外）-->
-        <item name="l_pp_checkBox_color_tick" format="color">#00FF7F</item><!--勾勾颜色-->
-        <item name="l_pp_checkBox_duration" format="integer">100</item><!--动画时间-->
-        <item name="l_pp_checkBox_color_checked" format="color">@color/colorPrimary
-        </item><!--选择后的背景色-->
-        <item name="l_pp_checkBox_stroke_width" format="dimension">2dp</item><!--（仅预览页面）圆圈边框宽度-->
-        <item name="l_pp_checkBox_tick_width" format="dimension">2dp</item><!--勾勾的线条宽度-->
-    </style>
-
     <style name="ConfigBottomSheetDialogTheme" parent="Theme.Design.BottomSheetDialog" tools:ignore="ResourceName">
         <!--dialog是否有边框-->
         <item name="android:windowFrame">@null</item>

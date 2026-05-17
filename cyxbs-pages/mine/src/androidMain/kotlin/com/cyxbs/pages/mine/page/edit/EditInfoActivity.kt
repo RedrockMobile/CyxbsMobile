@@ -10,7 +10,6 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,6 +32,8 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.doPermissionAction
+import com.cyxbs.components.utils.extensions.launchPickImages
+import com.cyxbs.components.utils.extensions.registerForPickSingleImage
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.view.ui.JToolbar
@@ -194,23 +195,18 @@ class EditInfoActivity : BaseActivity() {
     }
 
     /**
-     * 跳转至图片选择界面，选择图片用于裁剪后上传头像
+     * 注册新的单选图片选择器（用于头像）
      */
-    private val selectPictureFromAlbumLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            val uri = it.data?.data
-            if (uri != null) {
-                startCropActivity(uri)
-            } else {
-                toast("无法识别该图像")
-            }
-        }
+    private val pickImageLauncher = registerForPickSingleImage { uri ->
+        uri?.let {
+            startCropActivity(it)
+        } ?: toast("未选择图片")
+    }
 
     //文件权限在点击头像框时已经获取到了，这里不需要再获取
     private fun getImageFromAlbum() {
-        val intent = Intent(Intent.ACTION_PICK)
-        intent.setDataAndType(MediaStore.Images.Media.INTERNAL_CONTENT_URI, "image/*")
-        selectPictureFromAlbumLauncher.launch(intent)
+        // 使用新的图片选择器
+        pickImageLauncher.launchPickImages()
     }
 
     private fun startCropActivity(uri: Uri) {
@@ -226,9 +222,6 @@ class EditInfoActivity : BaseActivity() {
             )
         )
         options.setToolbarColor(
-            ContextCompat.getColor(this, com.cyxbs.components.config.R.color.colorPrimaryDark)
-        )
-        options.setStatusBarColor(
             ContextCompat.getColor(this, com.cyxbs.components.config.R.color.colorPrimaryDark)
         )
         uCrop.withOptions(options)

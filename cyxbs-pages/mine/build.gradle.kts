@@ -26,7 +26,6 @@ kotlin {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
       implementation(libs.androidx.work)
-      implementation(libs.lPhotoPicker)
       implementation(libs.glide)
       implementation(libs.dialog)
       implementation(libs.ucrop)
