@@ -1,5 +1,6 @@
 package com.cyxbs.pages.discover.network
 
+import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
 /**
@@ -14,7 +15,10 @@ import java.io.Serializable
  * keyword : test
  */
 data class RollerViewInfo(
-    val picture_url: String,
-    val picture_goto_url: String,
+    @SerializedName("picture_url")
+    val pictureUrl: String,
+    @SerializedName("picture_goto_url")
+    val pictureGotoUrl: String,
+    @SerializedName("keyword")
     val keyword: String,
 ) : Serializable

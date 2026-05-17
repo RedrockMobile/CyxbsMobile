@@ -19,7 +19,6 @@ kotlin {
       implementation(libs.material)
       implementation(libs.dialog) // 因为要设置 MaterialDialog 主题所以依赖
       implementation(libs.rxjava)
-      implementation(libs.lPhotoPicker)
     }
   }
 }

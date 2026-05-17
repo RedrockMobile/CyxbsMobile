@@ -1,6 +1,5 @@
 package com.cyxbs.pages.mine.page.feedback.edit.viewmodel
 
-import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -14,7 +13,6 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import top.limuyang2.photolibrary.LPhotoHelper
 import java.io.File
 
 /**
@@ -73,15 +71,10 @@ class FeedbackEditViewModel: BaseViewModel() {
     }
 
     /**
-     * 处理ActivityResult返回的图片
+     * 更新选中的图片列表
      */
-    fun dealPic(data: Intent?) {
-        //获取选择的图片
-        val selectImageUris = ArrayList(LPhotoHelper.getSelectedPhotos(data))
-        //把图片地址存入vm中
-        if (selectImageUris.size != 0) {
-            _uris.value = selectImageUris
-        }
+    fun updateSelectedImages(uris: List<Uri>) {
+        _uris.value = uris
     }
 
     /**

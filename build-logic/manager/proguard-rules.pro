@@ -195,11 +195,6 @@
     volatile <fields>;
 }
 
-# httpdns https://help.aliyun.com/document_detail/435252.html?spm=a2c4g.435261.0.0.ac114b46hmmXJI
--keep class com.aliyun.ams.ipdetector.Inet64Util{*;}
--keep class com.alibaba.sdk.android.**{*;}
--keep class com.ut.**{*;}
--keep class com.ta.**{*;}
 #-------------------------------------------------------------------------
 
 #---------------------------------3.与js互相调用的类------------------------

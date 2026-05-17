@@ -21,8 +21,12 @@ kotlin {
       targetSdk = libsEx.versions.`android-targetSdk`.toInt()
     }
     androidResources {
-      // 是否启动资源取决于是否还存在 androidMain/res 文件
-      enable = project.projectDir.resolve("src").resolve("androidMain").resolve("res").exists()
+      // 是否启动资源取决于是否还存在 /res 或 /composeResources 目录
+      //noinspection WrongGradleMethod
+      enable = project.projectDir.resolve("src").listFiles()
+        ?.filter { it.name.lowercase().endsWith("main") && it.isDirectory }
+        ?.any { it.resolve("res").exists() || it.resolve("composeResources").exists() }
+        ?: false
       // 命名规范设置，因为多模块相同资源名在打包时会合并，所以必须强制开启
       val paths = project.path.split(":").drop(1)
       if (paths.size == 1) {

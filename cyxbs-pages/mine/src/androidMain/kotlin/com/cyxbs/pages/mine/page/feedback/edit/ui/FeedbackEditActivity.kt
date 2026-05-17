@@ -1,7 +1,6 @@
 package com.cyxbs.pages.mine.page.feedback.edit.ui
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
@@ -14,13 +13,13 @@ import androidx.activity.viewModels
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.base.ui.BaseActivity
+import com.cyxbs.components.utils.extensions.launchPickImages
+import com.cyxbs.components.utils.extensions.registerForPickMultipleImages
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.pages.mine.R
 import com.cyxbs.pages.mine.page.feedback.adapter.rv.RvAdapter
 import com.cyxbs.pages.mine.page.feedback.edit.viewmodel.FeedbackEditViewModel
-import com.cyxbs.pages.mine.page.feedback.utils.CHOOSE_FEED_BACK_PIC
 import com.cyxbs.pages.mine.page.feedback.utils.FileUtils
-import com.cyxbs.pages.mine.page.feedback.utils.selectImageFromAlbum
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 
@@ -37,12 +36,23 @@ class FeedbackEditActivity : BaseActivity() {
     private var label: String? = null
 
     /**
+     * 注册新的图片选择器（最多3张）
+     */
+    private val pickImagesLauncher = registerForPickMultipleImages(3) { uris ->
+        // 处理选中的图片
+        if (uris.isNotEmpty()) {
+            viewModel.updateSelectedImages(uris)
+        }
+    }
+
+    /**
      * 初始化adapter
      */
     private val rvPicAdapter by lazy {
         RvAdapter(
             onAddClick = {
-                this@FeedbackEditActivity.selectImageFromAlbum(3, viewModel.uris.value ?: emptyList())
+                // 启动新的图片选择器
+                pickImagesLauncher.launchPickImages()
             },
             onRemoveClick = {
                 viewModel.removePic(it)
@@ -109,17 +119,6 @@ class FeedbackEditActivity : BaseActivity() {
         }
         viewModel.finishEvent.collectLaunch {
             finish()
-        }
-    }
-
-    /**
-     *
-     * 打开相册后用户筛选图片，最后返回到Activity更新选择的图片
-     */
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == CHOOSE_FEED_BACK_PIC) {
-            viewModel.dealPic(data)
         }
     }
 

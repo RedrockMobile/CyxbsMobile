@@ -381,9 +381,6 @@ class CreateActivity : BaseActivity() {
         options.setToolbarColor(
             ContextCompat.getColor(this, com.cyxbs.components.config.R.color.colorPrimaryDark)
         )
-        options.setStatusBarColor(
-            ContextCompat.getColor(this, com.cyxbs.components.config.R.color.colorPrimaryDark)
-        )
         uCrop.withOptions(options)
             .withAspectRatio(1F, 1F)
             .withMaxResultSize(convertDpToPx(106), convertDpToPx(106))

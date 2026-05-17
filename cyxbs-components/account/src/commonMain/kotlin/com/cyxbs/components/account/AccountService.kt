@@ -76,7 +76,7 @@ object AccountService : IAccountService, IAccountEditService {
   private fun resetAccountCoroutineScope() {
     val oldScope = accountCoroutineScope
     val supervisor = SupervisorJob(appCoroutineScope.coroutineContext[Job])
-    accountCoroutineScope = CoroutineScope(supervisor)
+    accountCoroutineScope = CoroutineScope(supervisor + EmptyCoroutineExceptionHandler)
     oldScope.cancel()
   }
 }

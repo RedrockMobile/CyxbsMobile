@@ -15,9 +15,6 @@ android {
     targetSdk = libsEx.versions.`android-targetSdk`.toInt()
     versionCode = Config.versionCode
     versionName = Config.versionName
-    // 添加以下两句代码，这是 LPhotoPicker 需要设置的东西
-    renderscriptTargetApi = libsEx.versions.`android-targetSdk`.toInt()  //版本号请与compileSdkVersion保持一致
-    renderscriptSupportModeEnabled = true
   }
   buildTypes {
     release {

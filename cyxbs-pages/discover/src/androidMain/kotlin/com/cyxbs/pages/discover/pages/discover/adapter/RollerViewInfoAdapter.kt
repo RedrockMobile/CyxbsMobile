@@ -34,7 +34,7 @@ class RollerViewInfoAdapter(
         }
 
         val data = list[realPosition]
-        if (data.picture_goto_url.startsWith("http")) {
+        if (data.pictureGotoUrl.startsWith("http")) {
           RollerViewActivity.startRollerViewActivity(data, iv.context)
         }
       }
@@ -72,7 +72,7 @@ class RollerViewInfoAdapter(
   ) {
     val data = list[holder.realPosition]
     Glide.with(holder.iv)
-      .load(data.picture_url)
+      .load(data.pictureUrl)
       .placeholder(R.drawable.discover_ic_cyxbsv6)
       .error(R.drawable.discover_ic_cyxbsv6)
       .into(holder.iv)

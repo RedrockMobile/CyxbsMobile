@@ -2,7 +2,6 @@ package com.cyxbs.pages.map.ui.activity
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -14,6 +13,8 @@ import androidx.lifecycle.Observer
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.route.COURSE_POS_TO_MAP
 import com.cyxbs.components.config.route.DISCOVER_MAP
+import com.cyxbs.components.utils.extensions.launchPickImages
+import com.cyxbs.components.utils.extensions.registerForPickMultipleImages
 import com.cyxbs.pages.map.R
 import com.cyxbs.pages.map.model.DataSet
 import com.cyxbs.pages.map.ui.fragment.AllPictureFragment
@@ -24,7 +25,6 @@ import com.cyxbs.pages.map.viewmodel.MapViewModel
 import com.cyxbs.pages.map.widget.GlideProgressDialog
 import com.cyxbs.pages.map.widget.ProgressDialog
 import com.g985892345.provider.api.annotation.KClassProvider
-import top.limuyang2.photolibrary.LPhotoHelper
 
 /**
  * 单activity模式，所有fragment在此activity下，能拿到同一个viewModel实例
@@ -37,6 +37,23 @@ import top.limuyang2.photolibrary.LPhotoHelper
 class MapActivity : BaseActivity() {
 
     private val viewModel by viewModels<MapViewModel>()
+
+    /**
+     * 注册新的图片选择器（最多9张）
+     */
+    private val pickImagesLauncher = registerForPickMultipleImages(9) { uris ->
+        if (uris.isNotEmpty()) {
+            // 将 URI 转换为路径
+            val pictureListPath = ArrayList<String>()
+            uris.forEach { uri ->
+                pictureListPath.add(uri.getAbsolutePath(this))
+            }
+            
+            // 上传图片
+            ProgressDialog.show(this, getString(R.string.map_upload_picture_running), getString(R.string.map_please_a_moment_text), false)
+            viewModel.uploadPicture(pictureListPath, this)
+        }
+    }
 
     private val fragmentManager = supportFragmentManager
     private var mainFragment = MainFragment()
@@ -59,6 +76,11 @@ class MapActivity : BaseActivity() {
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
         viewModel.searchShowState.observe {
             onBackPressedCallback.isEnabled = it
+        }
+        
+        // 监听图片选择事件
+        viewModel.triggerImagePicker.observe(this) {
+            pickImagesLauncher.launchPickImages()
         }
 
         val openString = intent.getStringExtra(COURSE_POS_TO_MAP)
@@ -145,33 +167,6 @@ class MapActivity : BaseActivity() {
         super.onDestroy()
         ProgressDialog.hide()
         GlideProgressDialog.hide()
-    }
-
-
-    override fun onActivityResult(
-            requestCode: Int,
-            resultCode: Int,
-            data: Intent?
-    ) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == MapViewModel.PICTURE_SELECT && resultCode == Activity.RESULT_OK) {
-            /**
-             * 从图片选择框选择照片后
-             */
-            val pictureList = ArrayList((LPhotoHelper.getSelectedPhotos(data)).map {
-                it.toString()
-            })
-            //上面获得的是UriString，转换下
-            val pictureListPath = ArrayList<String>()
-            pictureList.forEach { pictureListPath.add(Uri.parse(it).getAbsolutePath(this)) }
-
-            /**
-             * 上传图片
-             * 只需把路径列表pictureList传入，context传入即可
-             */
-            ProgressDialog.show(this, getString(R.string.map_upload_picture_running), getString(R.string.map_please_a_moment_text), false)
-            viewModel.uploadPicture(pictureListPath, this)
-        }
     }
 
   private fun Uri.getAbsolutePath(context: Context): String{
