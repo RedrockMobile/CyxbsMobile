@@ -249,7 +249,7 @@ class RollerViewActivity : BaseActivity() {
         fun startRollerViewActivity(info: RollerViewInfo, context: Context) {
             context.startActivity(
                 Intent(context,RollerViewActivity::class.java)
-                    .putExtra("URL", info.picture_goto_url)
+                    .putExtra("URL", info.pictureGotoUrl)
                     .putExtra("Key", info.keyword)
             )
         }
