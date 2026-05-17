@@ -105,6 +105,11 @@ class BottomSheetState(
     now - new
   }
 
+  internal val bottomSheetSpring = spring(
+    stiffness = Spring.StiffnessMediumLow,
+    visibilityThreshold = 1F  // 当距离目标 < 1px 时认为到达，如果不设置，会导致动画持续较久
+  )
+
   suspend fun expand() {
     if (state == BottomSheetValueState.Expanded) return
     val now = showHeight.floatValue
@@ -113,9 +118,7 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
-        spring(
-          stiffness = Spring.StiffnessMediumLow,
-        )
+        animationSpec = bottomSheetSpring,
       )
     }
     setState(BottomSheetValueState.Expanded)
@@ -129,9 +132,7 @@ class BottomSheetState(
       setState(BottomSheetValueState.Scrolling)
       scrollableState.animateScrollBy(
         value = now - target,
-        spring(
-          stiffness = Spring.StiffnessMediumLow,
-        )
+        animationSpec = bottomSheetSpring,
       )
     }
     setState(BottomSheetValueState.Collapsed)
@@ -145,9 +146,7 @@ class BottomSheetState(
       // hide 不触发 Scrolling 状态
       scrollableState.animateScrollBy(
         value = now - target,
-        spring(
-          stiffness = Spring.StiffnessMediumLow,
-        )
+        animationSpec = bottomSheetSpring,
       )
     }
     setState(BottomSheetValueState.Hide)
@@ -299,9 +298,7 @@ private fun BottomSheetContent(
     snapFlingBehavior(
       snapLayoutInfoProvider = BottomSheetSnapLayoutInfoProvider(bottomSheetState),
       decayAnimationSpec = decayAnimationSpec,
-      snapAnimationSpec = spring(
-        stiffness = Spring.StiffnessMediumLow,
-      )
+      snapAnimationSpec = bottomSheetState.bottomSheetSpring,
     )
   }
   Box(
