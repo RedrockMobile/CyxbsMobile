@@ -185,6 +185,9 @@
 -keep class com.amap.api.navi.**{*;}
 -keep class com.autonavi.**{*;}
 
+# 这个内部有些被 native 调用，官方也没给特定的混淆规则，所以就全部保留
+-keep class com.amap.location.** { *; }
+
 # kotlin协程
 # ServiceLoader support
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
