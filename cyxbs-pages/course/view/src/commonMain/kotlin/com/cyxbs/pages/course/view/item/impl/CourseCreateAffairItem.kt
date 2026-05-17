@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -16,6 +15,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.zIndex
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
@@ -30,8 +30,6 @@ import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.CourseShowRange
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
-import cyxbsmobile.cyxbs_pages.course.view.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.course.view.generated.resources.view_ic_touch_affair
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -103,15 +101,14 @@ private fun CourseCreateAffairItem.Content(
     }.background(0xFFE9EDF2.dark(0xFF202223)).zIndex(1F), // 默认就比其他布局高
   ) {
     val textColor = LocalAppColors.current.tvLv2
+    val itemRange = MinuteTimePair(
+      itemState.item.whatTime.now.collectAsState().value.beginTime,
+      itemState.item.whatTime.now.collectAsState().value.finalTime
+    )
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemRange = Snapshot.withoutReadObservation {
-          MinuteTimePair(
-            itemState.item.whatTime.now.value.beginTime,
-            itemState.item.whatTime.now.value.finalTime
-          )
-        },
+        itemRange = itemRange,
         timeline = itemState.item.coursePage.timeline,
         coverTipColor = if (itemState.overlap?.coveredItemList?.isNotEmpty() == true) textColor else Color.Transparent,
         enableAnim = false,
@@ -127,7 +124,7 @@ private fun CourseCreateAffairItem.Content(
             },
           ) {
             Image(
-              painter = painterResource(Res.drawable.view_ic_touch_affair),
+              painter = painterResource(ConfigRes.configIcCircleAdd()),
               contentDescription = "点击添加事务"
             )
           }

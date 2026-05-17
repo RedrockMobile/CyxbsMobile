@@ -40,6 +40,7 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.roundToInt
+import androidx.compose.runtime.collectAsState
 
 /**
  * item 默认的 Compose 样式函数
@@ -68,15 +69,14 @@ fun CourseDefaultItemContent(
       }
     }.background(backgroundColor)
   ) {
+    val itemRange = MinuteTimePair(
+      itemState.item.whatTime.now.collectAsState().value.beginTime,
+      itemState.item.whatTime.now.collectAsState().value.finalTime
+    )
     itemState.realShowRange.fastForEach { range ->
       CourseShowRange(
         range = range,
-        itemRange = Snapshot.withoutReadObservation {
-          MinuteTimePair(
-            itemState.item.whatTime.now.value.beginTime,
-            itemState.item.whatTime.now.value.finalTime
-          )
-        },
+        itemRange = itemRange,
         timeline = itemState.item.coursePage.timeline,
         coverTipColor = if (itemState.overlap?.coveredItemList?.isNotEmpty() == true) textColor else Color.Transparent,
       ) {
