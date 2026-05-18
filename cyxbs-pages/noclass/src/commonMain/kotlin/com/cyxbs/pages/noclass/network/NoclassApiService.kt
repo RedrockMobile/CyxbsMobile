@@ -2,6 +2,7 @@ package com.cyxbs.pages.noclass.network
 
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo
 import com.cyxbs.pages.noclass.bean.NoClassGroups
 import com.cyxbs.pages.noclass.bean.NoClassTemporarySearchs
 import com.cyxbs.pages.noclass.bean.NoclassGroupIds
@@ -75,4 +76,11 @@ interface NoclassApiService {
     suspend fun searchAll(
         @Query("key") key: String
     ): ApiWrapper<NoClassTemporarySearchs>
+
+    /** 批量添加信息检查 */
+    @FormUrlEncoded
+    @POST("magipoke-jwzx/no_class/member/check")
+    suspend fun checkUploadInfo(
+        @Field("content") content: List<String>
+    ): ApiWrapper<NoClassBatchResponseInfo>
 }
