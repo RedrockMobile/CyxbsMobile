@@ -28,6 +28,7 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 pluginManagement {
   includeBuild("build-logic")
   repositories {
+    maven("https://maven.aliyun.com/repository/gradle-plugin") // 阿里云 Gradle 插件镜像
     gradlePluginPortal()
     mavenCentral()
     google()
@@ -38,12 +39,12 @@ pluginManagement {
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // wasmJs 会单独声明仓库，这里需要放开限制
   repositories {
+    maven("https://maven.aliyun.com/repository/public") // 阿里云 Maven Central 镜像，优先使用（防止墙）
+    maven("https://maven.aliyun.com/repository/google") // 阿里云 Google 镜像
     google()
-    mavenCentral() // 优先 MavenCentral，一是：github CI 下不了 aliyun 依赖；二是：开 VPN 访问 aliyun 反而变慢了
+    mavenCentral()
     maven("https://central.sonatype.com/repository/maven-snapshots/") // mavenCentral 快照仓库
     maven("https://jitpack.io")
-    maven("https://maven.aliyun.com/repository/public")
-    maven("https://maven.aliyun.com/repository/google")
     mavenLocal() // 本地仓库，位置在 用户名/.m2/ 下
   }
 }

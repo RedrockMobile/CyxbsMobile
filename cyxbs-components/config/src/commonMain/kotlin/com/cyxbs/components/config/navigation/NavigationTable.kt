@@ -70,3 +70,6 @@ const val NAV_NO_CLASS = "no_class"
 
 // 没课约分组详情
 const val NAV_GROUP_DETAIL = "group_detail"
+
+//没课约批量添加
+const val NAV_NO_CLASS_BATCHADD = "no_class_batchadd"

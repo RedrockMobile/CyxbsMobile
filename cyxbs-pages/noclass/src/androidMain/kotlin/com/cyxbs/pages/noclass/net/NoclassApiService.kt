@@ -20,8 +20,7 @@ import retrofit2.http.*
  * @CreateDate:     2022年08月23日 02:02:00
  * @UpdateRemark:   更新说明：
  * @Version:        1.0
- * @Description:
- */
+ * @Description: */
 interface NoclassApiService {
     companion object {
         val INSTANCE by lazy {
@@ -83,6 +82,7 @@ interface NoclassApiService {
         @Field("group_id") groupId: String,
         @Field("stu_nums") stuNum: String,
     ): Single<ApiStatus>
+
 
     @GET("/magipoke-jwzx/search/people")
     fun searchPeople(

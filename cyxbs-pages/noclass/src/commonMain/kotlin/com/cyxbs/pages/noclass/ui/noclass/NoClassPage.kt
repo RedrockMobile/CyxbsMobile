@@ -41,6 +41,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.pages.noclass.api.NoclassBatchAddArgument
 import com.cyxbs.pages.noclass.viewmodel.NoClassViewModel
 import com.cyxbs.pages.noclass.viewmodel.TemporaryViewModel
 import cyxbsmobile.cyxbs_pages.noclass.generated.resources.Res
@@ -179,7 +180,9 @@ private fun TopBar() {
                     color = if (LocalAppDark.current) Color(0xFF000101) else Color.White,
                     shape = CircleShape
                 )
-                .clickableNoIndicator { /* 批量添加逻辑 */ },
+                .clickableNoIndicator {
+                    MainNavController.navigate(NoclassBatchAddArgument)
+                },
             verticalAlignment = Alignment.CenterVertically
         ) {
 
