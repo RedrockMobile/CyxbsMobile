@@ -6,11 +6,6 @@
         android:allowNativeHeapPointerTagging="false"
         tools:ignore="GoogleAppIndexingWarning"
         tools:targetApi="r">
-        <activity android:name=".SchoolCarActivity"
-            android:launchMode="singleTop"/>
-        <activity android:name=".SchoolDetailActivity"
-            />
-
         <service android:name="com.amap.api.location.APSService" />
 
         <!--⚠️注：校车需要 amap_apikey，目前是写在 pro 的注册文件里， test 模块调试时不会加载-->

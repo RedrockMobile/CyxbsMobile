@@ -5,7 +5,6 @@ plugins {
 
 useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
-useRoom(rxjava = true)
 
 kotlin {
 	sourceSets {
@@ -31,8 +30,6 @@ kotlin {
 			// https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
 			implementation(libs.amap.location)
 
-			//TODO 高德3d地图等待完全移除
-			compileOnly("com.amap.api:3dmap:latest.integration")
 		}
 		noWebMain.dependencies {
 			implementation(libs.scale.image.viewer)
