@@ -1,5 +1,5 @@
 import SwiftUI
-import CyxbsApplicationsTest
+import CyxbsApplicationsMultiplatform
 
 @main
 struct iOSApp: App {
