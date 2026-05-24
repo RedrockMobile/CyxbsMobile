@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.scheme
+package com.cyxbs.components.navigation
 
 import com.cyxbs.components.config.service.implOrNull
 

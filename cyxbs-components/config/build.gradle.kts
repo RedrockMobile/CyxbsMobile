@@ -4,6 +4,7 @@ plugins {
 }
 
 useKtProvider() // api 模块服务提供
+useNavigation() // 注册 navigation 页面
 
 kotlin {
   sourceSets {

@@ -46,35 +46,39 @@ fun LoginDialog(
       state.showParamsState.value = null
     },
   ) {
-    Box(
-      modifier = Modifier.width(300.dp).height(150.dp)
-        .clip(RoundedCornerShape(16.dp))
-        .background(LocalAppColors.current.topBg),
+    LoginDialogContent(state.showParamsState.value?.msg)
+  }
+}
+
+@Composable
+fun LoginDialogContent(msg: String? = null) {
+  Box(
+    modifier = Modifier.width(300.dp).height(150.dp)
+      .clip(RoundedCornerShape(16.dp))
+      .background(LocalAppColors.current.topBg),
+  ) {
+    Column(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+      Box(
+        modifier = Modifier.fillMaxWidth().weight(1F),
+        contentAlignment = Alignment.Center
       ) {
-        val msg = state.showParamsState.value?.msg ?: "此功能"
-        Box(
-          modifier = Modifier.fillMaxWidth().weight(1F),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = "请先登录才能使用${msg}哦~", fontSize = 14.sp, color = LocalAppColors.current.tvLv4)
-        }
-        Box(
-          modifier = Modifier.padding(bottom = 30.dp)
-            .width(80.dp)
-            .height(34.dp)
-            .clip(MaterialTheme.shapes.large)
-            .background(LocalAppColors.current.positive)
-            .clickable {
-              LoginNavArgument.navigate(target = null, clearStack = false) // 打开登录页
-            },
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = "去登录", color = Color.White)
-        }
+        Text(text = "请先登录才能使用${msg ?: "此功能"}哦~", fontSize = 14.sp, color = LocalAppColors.current.tvLv4)
+      }
+      Box(
+        modifier = Modifier.padding(bottom = 30.dp)
+          .width(80.dp)
+          .height(34.dp)
+          .clip(MaterialTheme.shapes.large)
+          .background(LocalAppColors.current.positive)
+          .clickable {
+            LoginNavArgument.navigate(target = null, clearStack = false) // 打开登录页
+          },
+        contentAlignment = Alignment.Center
+      ) {
+        Text(text = "去登录", color = Color.White)
       }
     }
   }

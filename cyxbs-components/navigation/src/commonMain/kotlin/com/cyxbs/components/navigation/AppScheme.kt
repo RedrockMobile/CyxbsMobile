@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.scheme
+package com.cyxbs.components.navigation
 
 import androidx.navigation.NavUri
 import com.cyxbs.components.init.MainNavController
@@ -12,16 +12,26 @@ import kotlinx.coroutines.launch
  * @author 985892345
  * @date 2025/10/20
  */
-object SchemeUtils {
+object AppScheme {
 
+  /**
+   * 应用 nav 统一的 scheme
+   */
+  const val SCHEME = "cyxbs"
+
+  /**
+   * 根据协议跳转页面
+   * - 支持 http 协议，跳转到统一的 webView
+   * - 支持 cyxbs 页面协议
+   */
   fun jump(url: String): Boolean {
     var result = jumpHttp(url)
-    result = result || jumpHttp(url)
+    result = result || jumpNav(url)
     return result
   }
 
-  private fun jumpCyxbs(url: String): Boolean {
-    if (!url.startsWith("cyxbs://")) return false
+  private fun jumpNav(url: String): Boolean {
+    if (!url.startsWith("${SCHEME}://")) return false
     appCoroutineScope.launch(Dispatchers.Main.immediate) {
       MainNavController.navigate(deepLink = NavUri(url))
     }
@@ -30,7 +40,7 @@ object SchemeUtils {
 
   private fun jumpHttp(url: String): Boolean {
     if (!url.startsWith("http://") && !url.startsWith("https://")) return false
-    return com.cyxbs.components.config.scheme.jumpHttp(url)
+    return com.cyxbs.components.navigation.jumpHttp(url)
   }
 }
 

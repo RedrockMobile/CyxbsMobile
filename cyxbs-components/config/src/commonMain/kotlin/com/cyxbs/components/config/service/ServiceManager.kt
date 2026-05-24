@@ -1,6 +1,7 @@
 package com.cyxbs.components.config.service
 
 import com.g985892345.provider.api.init.wrapper.ImplProviderWrapper
+import com.g985892345.provider.api.init.wrapper.KClassProviderWrapper
 import com.g985892345.provider.manager.KtProvider
 import kotlin.reflect.KClass
 
@@ -96,6 +97,16 @@ fun <T : Any> KClass<T>.implOrNull(name: String = ""): T? {
  */
 fun <T : Any> KClass<out T>.allImpl(): Map<String, ImplProviderWrapper<T>> {
   return KtProvider.allImpl(this)
+}
+
+/**
+ * ```
+ * // 得到所有实现类的 KClass
+ * val allClass = MainNavKey::class.allClazz().map { it.get() }
+ * ```
+ */
+fun <T : Any> KClass<out T>?.allClazz(): Map<String, KClassProviderWrapper<T>> {
+  return KtProvider.allClazz(this)
 }
 
 /**

@@ -34,7 +34,6 @@ import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.MainNavController
-import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.CourseNavArgument

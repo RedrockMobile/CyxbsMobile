@@ -2,14 +2,10 @@ package com.cyxbs.pages.discover.utils
 
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseUi
-import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.route.DISCOVER_CALENDAR
-import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
-import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_OTHER_COURSE
-import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.route.DISCOVER_SPORT
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.config.sp.defaultSp
@@ -21,7 +17,6 @@ import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import java.lang.ref.SoftReference
-import kotlin.reflect.KClass
 
 /**
  * @author zixuan

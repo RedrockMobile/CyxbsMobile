@@ -1,4 +1,4 @@
-package com.cyxbs.components.config.navigation
+package com.cyxbs.components.navigation
 
 /**
  * @Desc : 主页路由表
@@ -50,6 +50,7 @@ const val NAV_FOOD = "food"
 
 // 课表单页
 const val NAV_COURSE = "course"
+
 // 公告弹窗
 const val NAV_DIALOG_NOTICE = "dialog/notice"
 
