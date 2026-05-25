@@ -3,7 +3,6 @@
 
     <application>
         <activity android:name=".pages.calendar.CalendarActivity"/>
-        <activity android:name=".pages.RollerViewActivity" />
     </application>
 
 </manifest>

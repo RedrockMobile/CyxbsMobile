@@ -1,9 +1,8 @@
 package com.cyxbs.components.base.webView
 
-import android.os.Handler
-import android.os.Message
 import android.webkit.JavascriptInterface
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
@@ -16,9 +15,11 @@ import com.cyxbs.components.config.service.startActivity
  * 注意继承类需要防止被混淆，否则Js对应关键字就是a了
  */
 abstract class IAndroidWebView(
-    private val handler: Handler?,
+    private val onSavePicCallback: (url: String) -> Unit = {},
     private val lExeJs: (String) -> Unit = {},
-    private val lToast: (String) -> Unit = {}
+    private val lToast: (String) -> Unit = {},
+    private val onSetFullscreenCallback: (fullscreen: Boolean) -> Unit = {},
+    private val getSystemBarInsetsProvider: () -> String = { DEFAULT_INSETS_JSON },
     ) : WebViewBaseCallBack {
 
     var onLoadStr: String? = null
@@ -27,10 +28,7 @@ abstract class IAndroidWebView(
     //调用这个方法来保存图片
     @JavascriptInterface
     open fun savePic(url: String) {
-        val message = Message()
-        message.what = 0
-        message.obj = url
-        handler?.sendMessage(message)
+        onSavePicCallback(url)
     }
 
     /**
@@ -88,5 +86,47 @@ abstract class IAndroidWebView(
     @JavascriptInterface
     open fun isDark(): Boolean {
         return appContext.applicationContext.resources.configuration.uiMode == 0x21
+    }
+
+    /**
+     * 前端通知客户端进入/退出全屏（隐藏 systemBar 和标题栏）
+     *
+     * 使用：`window.AndroidWebView.setFullscreen(true)`
+     */
+    @JavascriptInterface
+    open fun setFullscreen(fullscreen: Boolean) {
+        onSetFullscreenCallback(fullscreen)
+    }
+
+    /**
+     * 客户端把当前 systemBar 的安全间距返回给前端用于自适应布局（单位：dp，与 CSS px 大体等价）
+     *
+     * 使用：
+     * ```js
+     * const insets = JSON.parse(window.AndroidWebView.getSystemBarInsets())
+     * // insets => { top: 24, bottom: 48, left: 0, right: 0 }
+     * ```
+     * 注意：进入 [setFullscreen] 后 systemBar 被隐藏，此处仍返回原本被遮挡的间距，
+     * 方便前端把页面元素错开刘海/挖孔/导航条区域。
+     *
+     * 值为 -1 表示未加载，请稍后再读取
+     */
+    @JavascriptInterface
+    open fun getSystemBarInsets(): String {
+        return getSystemBarInsetsProvider()
+    }
+
+    /**
+     * 返回当前应用的 token，如果不存在则返回空串 ""
+     *
+     * 使用：`window.AndroidWebView.getToken()`
+     */
+    @JavascriptInterface
+    open fun getToken(): String {
+        return ITokenService::class.impl().getToken().orEmpty()
+    }
+
+    companion object {
+        const val DEFAULT_INSETS_JSON = """{"top":-1,"bottom":-1,"left":-1,"right":-1}"""
     }
 }

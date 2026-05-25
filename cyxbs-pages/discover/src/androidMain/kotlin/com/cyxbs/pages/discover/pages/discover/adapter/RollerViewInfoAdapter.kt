@@ -2,17 +2,19 @@ package com.cyxbs.pages.discover.pages.discover.adapter
 
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.base.webView.WebViewActivity
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.utils.extensions.dp2pxF
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.discover.R
 import com.cyxbs.pages.discover.network.RollerViewInfo
-import com.cyxbs.pages.discover.pages.RollerViewActivity
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.shape.ShapeAppearanceModel
 
@@ -34,9 +36,14 @@ class RollerViewInfoAdapter(
         }
 
         val data = list[realPosition]
+        var uri = data.pictureGotoUrl.toUri()
         if (data.pictureGotoUrl.startsWith("http")) {
-          RollerViewActivity.startRollerViewActivity(data, iv.context)
+          if (uri.getQueryParameters(WebViewActivity.ARG_DEFAULT_TITLE) == null) {
+            // 兼容老逻辑，keyword 作为页面的兜底标题
+            uri = uri.buildUpon().appendQueryParameter(WebViewActivity.ARG_DEFAULT_TITLE, data.keyword).build()
+          }
         }
+        AppScheme.jump(data.pictureGotoUrl)
       }
     }
 
