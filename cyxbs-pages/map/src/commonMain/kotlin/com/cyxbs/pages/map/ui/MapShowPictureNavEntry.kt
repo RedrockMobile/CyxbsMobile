@@ -17,15 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_MAP_SHOW_PICTURE
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavArgument
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_MAP_SHOW_PICTURE
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.pages.map.widget.BannerCompose
 import com.cyxbs.pages.map.widget.rememberBannerPagerState
-import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -36,27 +35,26 @@ import kotlinx.serialization.Serializable
  */
 
 @Serializable
-class MapShowPictureArgument(
+class MapShowPictureNavArgument(
   @SerialName("imageList")
   val imageList: List<String>,
   @SerialName("currentIndex")
   val currentIndex: Int
-)
+) : AppNavArgument
 
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_MAP_SHOW_PICTURE)
-class MapShowPictureNavDestination : MainNavDestination<MapShowPictureArgument>(
-  MapShowPictureArgument::class
-) {
+@AppNav(route = NAV_MAP_SHOW_PICTURE)
+class MapShowPictureNavEntry : AppNavEntry<MapShowPictureNavArgument>() {
 
-  override val needLogin: Boolean
-    get() = false
+  override fun isNeedLogin(argument: MapShowPictureNavArgument): Boolean {
+    return false
+  }
 
   @Composable
-  override fun DestinationContent(parcel: DestinationParcel<MapShowPictureArgument>) {
+  override fun Content(argument: MapShowPictureNavArgument) {
     val images = mutableStateListOf<String>().apply {
-      addAll(parcel.argument.imageList)
+      addAll(argument.imageList)
     }
-    val currentIndex = remember { mutableStateOf(parcel.argument.currentIndex) }
+    val currentIndex = remember { mutableStateOf(argument.currentIndex) }
     val pagerState = rememberBannerPagerState(
       pageCount = images.size,
       isScrollInfinite = true,
@@ -65,7 +63,7 @@ class MapShowPictureNavDestination : MainNavDestination<MapShowPictureArgument>(
     Column(
       modifier = Modifier
         .clickableSingle {
-          MainNavController.popBackStack()
+          argument.popBackStack()
         }
         .fillMaxSize()
         .background(Color.Black)

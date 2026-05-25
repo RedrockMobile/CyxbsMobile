@@ -19,24 +19,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavUri
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.Platform
 import com.cyxbs.components.config.appPlatform
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeNavArgument
-import com.cyxbs.components.config.navigation.NAV_ABOUT
-import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
-import com.cyxbs.components.config.navigation.NAV_FOOD
-import com.cyxbs.components.config.navigation.NAV_MAP
-import com.cyxbs.components.config.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_ABOUT
+import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
+import com.cyxbs.components.navigation.NAV_FOOD
+import com.cyxbs.components.navigation.NAV_MAP
+import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.CourseNavArgument
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
 
 /**
@@ -50,31 +48,31 @@ import com.cyxbs.pages.login.api.LoginNavArgument
 // 如果你的页面没有返回键，则按 ESC 键进行返回
 private val itemList = listOf(
   ActionItem("地图", Platform.Web) {
-    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_MAP"))
+    AppScheme.jump("cyxbs://$NAV_MAP")
   },
   ActionItem("我的课表") {
     val stuNum = IAccountService::class.impl().stuNum
     if (stuNum == null) {
       toast("学号不存在，请检查是否已登陆")
     } else {
-      MainNavController.navigate(CourseNavArgument(stuNum = stuNum))
+      CourseNavArgument(stuNum = stuNum).navigate()
     }
   },
   ActionItem("关于我们") {
-    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_ABOUT"))
+    AppScheme.jump("cyxbs://$NAV_ABOUT")
   },
   ActionItem("美食咨询处") {
-    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_FOOD"))
+    AppScheme.jump("cyxbs://$NAV_FOOD")
   },
   ActionItem("空教室查询") {
-    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_EMPTY_ROOM"))
+    AppScheme.jump("cyxbs://$NAV_EMPTY_ROOM")
   },
 
 
 
 
   ActionItem("校车查询", Platform.Web){
-    MainNavController.navigate(deepLink = NavUri("cyxbs://$NAV_SCHOOL_CAR"))
+    AppScheme.jump("cyxbs://$NAV_SCHOOL_CAR")
   },
   // 退出登陆放到最后，其他测试页面放到上面👆
   ActionItem("退出登录") {
@@ -84,7 +82,7 @@ private val itemList = listOf(
 )
 
 @Composable
-fun AdaptiveHomePage(parcel: DestinationParcel<HomeNavArgument>) {
+fun AdaptiveHomePage(argument: HomeNavArgument) {
   Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     LazyVerticalGrid(
       columns = GridCells.Adaptive(74.dp),

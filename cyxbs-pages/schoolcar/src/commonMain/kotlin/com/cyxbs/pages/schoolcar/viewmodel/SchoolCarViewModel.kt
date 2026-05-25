@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schoolcar.viewmodel
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -8,7 +9,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import com.cyxbs.pages.schoolcar.bean.CarLocation
@@ -31,7 +31,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
-import androidx.compose.runtime.State
 
 /**
  * description ： 校车查询页的ViewModel
@@ -411,7 +410,6 @@ abstract class CommonSchoolCarViewModel : BaseViewModel() {
 
 	fun onDismissErrorDialog() {
 		downErrorDialogState.value = false
-		MainNavController.popBackStack()
 	}
 
 	abstract fun getClosedSite(): CarStation?

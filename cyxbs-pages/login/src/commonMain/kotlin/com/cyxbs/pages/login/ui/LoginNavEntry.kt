@@ -57,15 +57,16 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.appName
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_LOGIN
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_LOGIN
+import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.login.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.login.generated.resources.login_ic_password
 import cyxbsmobile.cyxbs_pages.login.generated.resources.login_ic_username
@@ -87,16 +88,24 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2024/12/30
  */
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_LOGIN)
-class LoginNavDestination : MainNavDestination<LoginNavArgument>(LoginNavArgument::class) {
+@AppNav(route = NAV_LOGIN)
+class LoginNavEntry : AppNavEntry<LoginNavArgument>() {
 
-  override val needLogin: Boolean
-    get() = false // 登录页允许未登录时打开
+  override fun isNeedLogin(argument: LoginNavArgument): Boolean {
+    return false // 登录页允许未登录时打开
+  }
+
+  override fun getContentKey(argument: LoginNavArgument): String {
+    return "LoginNavArgument" // Login 属于单例页面，应该返回固定值，多次提交，共享页面状态
+  }
 
   @Composable
-  override fun DestinationContent(parcel: DestinationParcel<LoginNavArgument>) {
-    viewModel { LoginViewModel(parcel.argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+  override fun Content(argument: LoginNavArgument) {
+    viewModel { LoginViewModel(argument) } // wasm 无法反射 new 对象，这里需要提供 factory
     LoginPage()
+    LaunchedEffect(Unit) {
+      logg("backStack = $appNavBackStack")
+    }
   }
 }
 

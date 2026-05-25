@@ -1,6 +1,7 @@
 package nav
 
 import Config
+import nav.AppNavReportTask.Companion.register
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ProjectDependency
@@ -71,6 +72,7 @@ abstract class AppNavReportTask : DefaultTask() {
       appendLine("# AppNav Deeplink 汇总")
       appendLine()
       appendLine("> 打包时由 build-logic/manager/${AppNavReportTask::class.qualifiedName} 自动生成")
+      appendLine("> 该文件需要被 git 提交用于后续使用")
       appendLine()
       appendLine("- versionCode: ${Config.versionCode}")
       appendLine("- versionName: ${Config.versionName}")

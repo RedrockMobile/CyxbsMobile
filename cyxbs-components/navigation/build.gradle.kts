@@ -8,15 +8,17 @@ useKtProvider(isNeedKsp = false)
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(projects.cyxbsPages.login.api)
 
       api(libs.compose.navigation3)
       implementation(libs.compose.adaptive)
       implementation(libs.compose.adaptive.layout)
-      implementation(libs.compose.adaptive.navigation3)
+      api(libs.compose.adaptive.navigation3)
       implementation(libs.compose.lifecycle.viewmodel.navigation3)
+
+      // 因为不能反向依赖 config，所以单独依赖 ktProvider.manager
+      implementation(libs.kmp.ktProvider.manager)
     }
   }
 }

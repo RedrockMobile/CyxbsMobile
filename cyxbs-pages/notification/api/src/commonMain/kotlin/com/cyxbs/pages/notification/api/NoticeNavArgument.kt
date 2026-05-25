@@ -1,7 +1,7 @@
 package com.cyxbs.pages.notification.api
 
 import androidx.compose.ui.graphics.Color
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -38,12 +38,7 @@ class NoticeNavArgument(
   val map: Map<String, TextInfo> = emptyMap(), // 用于对 [content] 中的占位符进行文本替换
   @SerialName("button")
   val button: ButtonInfo? = null,
-) {
-  fun navigate() {
-    MainNavController.navigate(this) {
-      launchSingleTop = true
-    }
-  }
+) : AppNavArgument {
 
   @Serializable
   class TextInfo(

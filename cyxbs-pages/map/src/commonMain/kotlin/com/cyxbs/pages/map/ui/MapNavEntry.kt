@@ -48,11 +48,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.res.ConfigRes
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
@@ -71,7 +70,6 @@ import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
 import com.cyxbs.pages.map.widget.SearchBottomSheet
 import com.cyxbs.pages.map.widget.rememberMapUiController
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_compass
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_hot
@@ -95,30 +93,31 @@ import org.jetbrains.compose.resources.vectorResource
  * @Date : 2025/11/10 11:42
  */
 
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_MAP)
-class MapNavDestination : MainNavDestination<MapNavArgument>(MapNavArgument::class) {
+@AppNav(route = NAV_MAP)
+class MapNavEntry : AppNavEntry<MapNavArgument>() {
 
-  override val needLogin: Boolean
-    get() = false
+  override fun isNeedLogin(argument: MapNavArgument): Boolean {
+    return false
+  }
 
   @Composable
-  override fun DestinationContent(parcel: DestinationParcel<MapNavArgument>) {
+  override fun Content(argument: MapNavArgument) {
     viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
-    MapCompose(parcel.argument)
+    MapCompose(argument)
     MapProgressDialog()
-    DownloadFailedDialog()
+    DownloadFailedDialog(argument)
     MapUpdateDialog()
     val ratio = getWindowScreenSize().height / getWindowScreenSize().width
     when {
-      ratio > 1.5f -> WH100vInfinityCompose()
-      ratio <= 1.5f -> WH100v150Compose()
+      ratio > 1.5f -> WH100vInfinityCompose(argument)
+      ratio <= 1.5f -> WH100v150Compose(argument)
     }
   }
 }
 
 // 竖屏
 @Composable
-fun WH100vInfinityCompose() {
+fun WH100vInfinityCompose(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   AnimatedContent(
     targetState = viewmodel.mapPagerState.value,
@@ -135,21 +134,21 @@ fun WH100vInfinityCompose() {
       if (viewmodel.mapPagerState.value == 1) {
         viewmodel.mapPagerState.value = 0
       } else {
-        MainNavController.popBackStack()
+        argument.popBackStack()
       }
     }
   ) { targetPage ->
     if (targetPage == 1) {
       AllPictureCompose(Modifier.fillMaxSize())
     } else {
-      MapContent(Modifier.fillMaxWidth())
+      MapContent(argument= argument, modifier = Modifier.fillMaxWidth())
     }
   }
 }
 
 // desktop/横屏
 @Composable
-fun WH100v150Compose() {
+fun WH100v150Compose(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   AnimatedContent(
     targetState = viewmodel.mapPagerState.value,
@@ -166,7 +165,7 @@ fun WH100v150Compose() {
       if (viewmodel.mapPagerState.value == 1) {
         viewmodel.mapPagerState.value = 0
       } else {
-        MainNavController.popBackStack()
+        argument.popBackStack()
       }
     }
   ) { targetPage ->
@@ -175,10 +174,11 @@ fun WH100v150Compose() {
     } else {
       Column {
         BackIconCompose(
+          argument = argument,
           modifier = Modifier
             .padding(start = 12.dp, top = 12.dp)
             .width(32.dp)
-            .height(32.dp)
+            .height(32.dp),
         )
         MapFunctionImageCompose(
           modifier = Modifier
@@ -186,14 +186,14 @@ fun WH100v150Compose() {
             .background(Color.Transparent)
         )
       }
-      SearchBottomSheet()
+      SearchBottomSheet(argument)
       PlaceDetailBottomSheet()
     }
   }
 }
 
 @Composable
-fun BackIconCompose(modifier: Modifier = Modifier) {
+fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   Image(
     modifier = modifier
@@ -201,7 +201,7 @@ fun BackIconCompose(modifier: Modifier = Modifier) {
         if (viewmodel.mapSearchPagerState.value == 1) {
           viewmodel.mapSearchPagerState.value = 0
         } else {
-          MainNavController.popBackStack()
+          argument.popBackStack()
         }
       }
       .padding(start = 10.dp, end = 10.dp),
@@ -211,7 +211,7 @@ fun BackIconCompose(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MapContent(modifier: Modifier = Modifier) {
+fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   Column(
     modifier = modifier
@@ -227,7 +227,8 @@ fun MapContent(modifier: Modifier = Modifier) {
         modifier = Modifier
           .padding(start = 6.dp, top = 6.dp)
           .width(30.dp)
-          .height(30.dp)
+          .height(30.dp),
+        argument = argument,
       )
       SearchBar(
         modifier = Modifier
@@ -250,6 +251,7 @@ fun MapContent(modifier: Modifier = Modifier) {
     ) { targetPage ->
       if (targetPage == 1) {
         SearchCompose(
+          argument = argument,
           modifier = Modifier
             .fillMaxSize()
             .background(LocalAppColors.current.topBg)
@@ -472,7 +474,7 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
           .height(54.dp)
           .clickAnimation {
             loginDialogState.doIfLogin(
-              msg = "收藏"
+              function = "收藏"
             ) {
               expandedCollect.value = true
               if (viewmodel.mapWidgetState.isLock) {

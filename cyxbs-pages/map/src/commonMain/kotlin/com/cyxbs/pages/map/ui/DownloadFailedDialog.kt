@@ -11,8 +11,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.view.ui.ChooseDialogCompose
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 
 /**
@@ -22,12 +22,12 @@ import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
  */
 
 @Composable
-fun DownloadFailedDialog() {
+fun DownloadFailedDialog(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   ChooseDialogCompose(
     showState = viewmodel.downloadFailedDialogState,
     onClickPositiveBtn = {
-      MainNavController.popBackStack()
+      argument.popBackStack()
       viewmodel.downloadFailedDialogState.value = false
     }
   ) {

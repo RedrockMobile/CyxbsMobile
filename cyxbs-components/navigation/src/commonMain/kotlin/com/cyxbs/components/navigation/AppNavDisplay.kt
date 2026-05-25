@@ -23,23 +23,13 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.account.api.ILoginDialogContent
 import com.cyxbs.components.account.api.ITokenService
-import com.cyxbs.components.config.login.LoginDialogContent
-import com.cyxbs.components.config.service.allImpl
-import com.cyxbs.components.config.service.impl
+import com.g985892345.provider.manager.KtProvider
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlin.reflect.KClass
-
-/**
- * 供全局使用的应用栈
- */
-val appNavBackStack: AppNavBackStack
-  get() = _appNavBackStack // 使用方法防止对象被一直持有
-
-@Suppress("ObjectPropertyName")
-private lateinit var _appNavBackStack: AppNavBackStack
 
 /**
  * 主导航容器，应用最顶层的 Compose 导航节点
@@ -62,9 +52,10 @@ private lateinit var _appNavBackStack: AppNavBackStack
 @Suppress("UNCHECKED_CAST")
 @Composable
 fun AppNavDisplay() {
-  _appNavBackStack = rememberAppNavBackStack()
+  appNavBackStack = rememberAppNavBackStack()
   NavDisplay(
     backStack = appNavBackStack,
+    onBack = { appNavBackStack.lastOrNull()?.popBackStack() },
     entryDecorators = listOf(
       // 添加 view model store 装饰器
       rememberViewModelStoreNavEntryDecorator(),
@@ -107,14 +98,14 @@ fun AppNavDisplay() {
 @Composable
 private fun AppNavEntryContent(navEntry: AppNavEntry<AppNavArgument>, argument: AppNavArgument) {
   if (navEntry.isNeedLogin(argument)) {
-    val loginState = remember { IAccountService::class.impl() }.state.collectAsState()
+    val loginState = remember { KtProvider.impl(IAccountService::class) }.state.collectAsState()
     if (loginState.value !is AccountState.Login) {
       // 没有登录则弹窗引导去登录，不显示页面内容
       Box(
         modifier = Modifier.fillMaxSize().background(Color.Transparent.copy(alpha = 0.6F)),
         contentAlignment = Alignment.Center,
       ) {
-        LoginDialogContent()
+        remember { KtProvider.impl(ILoginDialogContent::class) }.Content()
       }
       return
     }
@@ -141,7 +132,7 @@ private fun FallbackContent(argument: AppNavArgument) {
   }
 }
 
-internal val appNavCollector = AppNavCollector::class.allImpl()
+internal val appNavCollector = KtProvider.allImpl(AppNavCollector::class)
   .mapValues { it.value.get() }
 
 @Suppress("UNCHECKED_CAST")
@@ -172,8 +163,8 @@ fun rememberAppNavBackStack(): AppNavBackStack {
 }
 
 private fun getFirstAppNavArgument(): List<AppNavArgument> {
-  val accountService = IAccountService::class.impl()
-  val tokenService = ITokenService::class.impl()
+  val accountService = KtProvider.impl(IAccountService::class)
+  val tokenService = KtProvider.impl(ITokenService::class)
   val isFirstToLogin = !accountService.isTouristMode() &&
       (!accountService.isLogin() || tokenService.isRefreshTokenExpired())
   if (isFirstToLogin) {

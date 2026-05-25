@@ -34,12 +34,11 @@ import androidx.compose.ui.unit.times
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.MobileCourseFrameViewModel
@@ -65,15 +64,15 @@ import org.jetbrains.compose.resources.stringResource
 class MobileHomePage : PlatformHomePage {
 
   @Composable
-  override fun HomePageContent(parcel: DestinationParcel<HomeNavArgument>) {
-    viewModel { BottomNavViewModel(parcel.argument) }
+  override fun HomePageContent(argument: HomeNavArgument) {
+    viewModel { BottomNavViewModel(argument) }
     viewModel { MobileCourseFrameViewModel() }
     viewModel { CourseBottomSheetViewModel() }
-    PlatformMobileHomePage(parcel) {
+    PlatformMobileHomePage(argument) {
       Box(
         modifier = Modifier.fillMaxSize()
       ) {
-        HomeViewPagerCompose(parcel)
+        HomeViewPagerCompose(argument)
         HomeCourseCompose()
         HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
       }
@@ -84,13 +83,13 @@ class MobileHomePage : PlatformHomePage {
 // 提供给具体平台用于包裹 content，可以设置些特别的 LocalProvider 或者获取 ViewModel 啥的
 @Composable
 internal expect fun PlatformMobileHomePage(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   content: @Composable () -> Unit,
 )
 
 @Composable
 internal expect fun HomeViewPagerCompose(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   modifier: Modifier = Modifier,
 )
 

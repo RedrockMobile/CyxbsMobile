@@ -1,7 +1,5 @@
 package com.cyxbs.components.navigation
 
-import androidx.navigation.NavUri
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.init.appCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,8 +30,9 @@ object AppScheme {
 
   private fun jumpNav(url: String): Boolean {
     if (!url.startsWith("${SCHEME}://")) return false
+    val argument = AppNavArgument.decodeFromUrl(url) ?: return false
     appCoroutineScope.launch(Dispatchers.Main.immediate) {
-      MainNavController.navigate(deepLink = NavUri(url))
+      argument.navigate()
     }
     return true
   }

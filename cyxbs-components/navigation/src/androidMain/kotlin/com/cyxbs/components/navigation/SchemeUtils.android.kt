@@ -1,6 +1,6 @@
 package com.cyxbs.components.navigation
 
-import com.cyxbs.components.config.service.implOrNull
+import com.g985892345.provider.manager.KtProvider
 
 
 interface WebViewFactory {
@@ -8,7 +8,7 @@ interface WebViewFactory {
 }
 
 internal actual fun jumpHttp(url: String): Boolean {
-  val factory = WebViewFactory::class.implOrNull() ?: return false
+  val factory = KtProvider.implOrNull(WebViewFactory::class) ?: return false
   factory.startWebView(url)
   return true
 }

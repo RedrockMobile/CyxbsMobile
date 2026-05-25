@@ -2,12 +2,11 @@ package com.cyxbs.pages.home.mobile.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeNavArgument
+import com.cyxbs.pages.home.api.HomeNavArgument
 
 @Composable
 internal actual fun PlatformMobileHomePage(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   content: @Composable () -> Unit,
 ) {
   content()
@@ -15,7 +14,7 @@ internal actual fun PlatformMobileHomePage(
 
 @Composable
 internal actual fun HomeViewPagerCompose(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   modifier: Modifier,
 ) {
 }

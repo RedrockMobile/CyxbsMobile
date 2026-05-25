@@ -1,8 +1,6 @@
 package com.cyxbs.pages.login.viewmodel
 
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.snapshotFlow
 import com.cyxbs.components.account.api.IAccountEditService
@@ -10,8 +8,8 @@ import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.config.route.MINE_FORGET_PASSWORD
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.init.appTopActivity
+import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
 import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.login.api.LoginNavArgument
@@ -59,16 +57,9 @@ actual class LoginViewModel actual constructor(argument: LoginNavArgument) :
   }
 
   override fun clickDisagreeUserAgreement() {
-    if (!MainNavController.navigateUp()) {
+    if (appNavBackStack.size == 1) {
       // 没有上一级时就退出 activity
-      var context: Context? = MainNavController.context
-      while (context is ContextWrapper) {
-        if (context is Activity) {
-          context.finish()
-          return
-        }
-        context = context.baseContext
-      }
+      appTopActivity.get()?.finish()
     }
   }
 

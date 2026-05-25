@@ -16,7 +16,6 @@ import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.crash.CrashDialog
 import com.cyxbs.components.base.utils.Umeng
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.extensions.asFlow
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.invisible
@@ -144,7 +143,7 @@ class HomeCourseLayout(
                 mTvHeaderPlace.text = header.content
                 mTvHeaderPlace.setOnSingleClickListener {
                   // 跳转至地图界面
-                  MainNavController.navigate(MapNavArgument(header.content))
+                  MapNavArgument(header.content).navigate()
                 }
                 mTvHeaderTitle.setOnSingleClickListener {
                   mCourseService.openBottomSheetDialogByLesson(context, header.item.lesson)

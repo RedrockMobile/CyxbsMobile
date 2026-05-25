@@ -40,10 +40,9 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_FOOD
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
@@ -55,7 +54,6 @@ import com.cyxbs.pages.food.widget.FoodDetailDialog
 import com.cyxbs.pages.food.widget.FoodSuggestMoreTagsDialog
 import com.cyxbs.pages.food.widget.FoodWarnDialog
 import com.cyxbs.pages.food.widget.TagSelector
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.food.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_notification
 import cyxbsmobile.cyxbs_pages.food.generated.resources.food_ic_toolbar_navigation
@@ -67,26 +65,28 @@ import org.jetbrains.compose.resources.painterResource
  * email : qq2420226433@outlook.comx`
  * date : 2025/10/29 23:58
  */
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_FOOD)
-class FoodNavDestination : MainNavDestination<FoodNavArgument>(FoodNavArgument::class) {
-	override val needLogin: Boolean
-		get() = true
+@AppNav(route = NAV_FOOD)
+class FoodNavEntry : AppNavEntry<FoodNavArgument>() {
+
+	override fun isNeedLogin(argument: FoodNavArgument): Boolean {
+		return true
+	}
 
 	@Composable
-	override fun DestinationContent(parcel: DestinationParcel<FoodNavArgument>) {
+	override fun Content(argument: FoodNavArgument) {
 		viewModel { FoodViewModel() }
-		FoodPage()
+		FoodPage(argument)
 	}
 }
 
 @Composable
-fun FoodPage() {
+fun FoodPage(argument: FoodNavArgument) {
 	val scrollState = rememberScrollState()
 	Column(
 		Modifier.fillMaxSize().background(LocalAppColors.current.topBg)
 			.systemBarsPadding(),
 	) {
-		TopbarCompose(Modifier.fillMaxWidth())
+		TopbarCompose(Modifier.fillMaxWidth(), argument)
 		ConstraintLayout(
 			modifier = Modifier.fillMaxWidth().verticalScroll(scrollState),
 			constraintSet = createConstraintSet()
@@ -117,7 +117,7 @@ private fun createConstraintSet(): ConstraintSet {
 
 
 @Composable
-private fun TopbarCompose(modifier: Modifier = Modifier) {
+private fun TopbarCompose(modifier: Modifier, argument: FoodNavArgument) {
 	TopAppBar(
 		modifier = modifier.height(65.dp)
 			.clip(RoundedCornerShape(bottomStart = 15.dp, bottomEnd = 15.dp)),
@@ -131,7 +131,7 @@ private fun TopbarCompose(modifier: Modifier = Modifier) {
 			Image(
 				modifier = Modifier.padding(start = 16.dp).align(Alignment.CenterStart)
 					.clickableNoIndicator {
-						MainNavController.popBackStack()
+						argument.popBackStack()
 					},
 				painter = painterResource(Res.drawable.food_ic_toolbar_navigation),
 				contentDescription = "back",

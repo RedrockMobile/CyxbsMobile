@@ -112,7 +112,7 @@ fun Project.useNavigation(isNeedKsp: Boolean = !name.startsWith("api")) {
   }
   extensions.findByType(KotlinMultiplatformExtension::class)?.apply {
     sourceSets.commonMain.dependencies {
-      api(project(":cyxbs-components:navigation"))
+      implementation(project(":cyxbs-components:navigation"))
     }
   }
 }

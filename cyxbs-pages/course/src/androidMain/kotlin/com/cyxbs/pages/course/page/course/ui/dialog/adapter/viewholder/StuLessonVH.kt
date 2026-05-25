@@ -6,11 +6,10 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.course.R
 import com.cyxbs.pages.course.page.course.data.StuLessonData
 import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
@@ -62,7 +61,7 @@ class StuLessonVH(
       val data = mData ?: return@setOnSingleClickListener
       // 跳转至地图界面
       dialog.dismiss()
-      MainNavController.navigate(MapNavArgument(data.course.classroom))
+      MapNavArgument(data.course.classroom).navigate()
     }
   
     mIvLink.setOnSingleClickListener {

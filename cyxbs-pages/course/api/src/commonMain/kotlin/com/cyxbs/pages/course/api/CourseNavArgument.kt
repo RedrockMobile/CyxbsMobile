@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.api
 
+import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,6 +10,6 @@ import kotlinx.serialization.Serializable
  * @date 2025/11/16
  */
 @Serializable
-class CourseNavArgument(
+data class CourseNavArgument(
   val stuNum: String,
-)
+) : AppNavArgument

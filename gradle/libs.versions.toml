@@ -124,9 +124,7 @@ kmp-ktorfit = "2.7.3"
 ####################################################################################################
 # https://github.com/JetBrains/compose-multiplatform/releases
 compose-multiplatform = "1.11.0"
-# https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-navigation-routing.html#setup
 # 官网文档可能更新不及时，版本请看 compose 发布时给出的版本
-compose-navigation = "2.9.2"
 compose-navigation3 = "1.1.1"
 # https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-lifecycle.html
 # 看 compose 发布时给出的版本
@@ -305,7 +303,6 @@ compose-resources = { module = "org.jetbrains.compose.components:components-reso
 compose-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
 compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons" }
 compose-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
-compose-navigation = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "compose-navigation" }
 compose-navigation3 = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "compose-navigation3" }
 compose-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "compose-adaptive" }
 compose-adaptive-layout = { module = "org.jetbrains.compose.material3.adaptive:adaptive-layout", version.ref = "compose-adaptive" }

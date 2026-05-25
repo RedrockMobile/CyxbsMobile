@@ -22,10 +22,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_delete
@@ -40,6 +40,7 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun SearchCompose(
+  argument: MapNavArgument,
   modifier: Modifier = Modifier,
   needPlaceList: Boolean = false
 ) {
@@ -49,7 +50,7 @@ fun SearchCompose(
       if (viewmodel.mapSearchPagerState.value == 1) {
         viewmodel.mapSearchPagerState.value = 0
       } else {
-        MainNavController.popBackStack()
+        argument.popBackStack()
       }
     }
   ) {

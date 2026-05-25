@@ -61,7 +61,7 @@ import kotlin.reflect.KClass
  * - Entry 必须直接继承 `AppNavEntry<T>`，禁止中间抽象类，便于稳定获取参数类型
  * - `T` 必须是非空、具体、无泛型实参的 `@Serializable` 类
  * - `T` 的类名必须以 `NavArgument` 结尾，用于规范 nav 场景下的参数写法
- * - `T` 必须实现 `com.cyxbs.components.init.AppNavArgument` 接口，才能作为 `AppNavBackStack` 的元素
+ * - `T` 必须实现 `com.cyxbs.components.navigation.AppNavArgument` 接口，才能作为 `AppNavBackStack` 的元素
  * - `T` 不需要实现 Navigation3 官方的 `NavKey`
  * - `route` 必须满足：非空、不以 `/` 开头或结尾、不含连续 `/`，每个 segment 仅允许 `[a-zA-Z0-9_-]`
  *
@@ -89,7 +89,7 @@ class KspNavigationSymbolProcess(
     private const val APP_NAV_MODULE_PATH = "appNav.modulePath"
     private const val APP_NAV_ENTRY = "com.cyxbs.components.navigation.AppNavEntry"
     private const val SERIALIZABLE = "kotlinx.serialization.Serializable"
-    private const val NAV_ARGUMENT = "com.cyxbs.components.AppNavArgument"
+    private const val NAV_ARGUMENT = "com.cyxbs.components.navigation.AppNavArgument"
     private const val SERIAL_NAME = "kotlinx.serialization.SerialName"
     private const val TRANSIENT = "kotlinx.serialization.Transient"
     private val APP_NAV_ENTRY_CLASS = ClassName("com.cyxbs.components.navigation", "AppNavEntry")
@@ -348,7 +348,7 @@ class KspNavigationSymbolProcess(
     val type = type.resolve()
     val suffix = getOptionalSuffix()
     return if (type.isRepeatedQueryType()) {
-      "$name={${type.getListElementTemplate()}$suffix}&$name={${type.getListElementTemplate()}$suffix}"
+      "$name={${type.getListElementTemplate()}[]$suffix}"
     } else {
       "$name={${type.getUrlValueTemplate()}$suffix}"
     }
@@ -432,7 +432,7 @@ class KspNavigationSymbolProcess(
   private fun KSType.getUrlValueTemplate(): String {
     return when (declaration.qualifiedName?.asString()) {
       "kotlin.String" -> "String"
-      "kotlin.Boolean" -> "true|false"
+      "kotlin.Boolean" -> "Boolean"
       "kotlin.Byte" -> "Byte"
       "kotlin.Short" -> "Short"
       "kotlin.Int" -> "Int"

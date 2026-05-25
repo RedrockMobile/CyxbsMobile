@@ -14,7 +14,6 @@ kotlin {
       implementation(libsEx.`compose-resources`)
       implementation(libsEx.`compose-preview`)
       implementation(libsEx.`compose-material-icons`)
-      implementation(libsEx.`compose-navigation`)
       implementation(libsEx.`compose-lifecycle-runtime-compose`)
       implementation(libsEx.`compose-lifecycle-viewmodel-compose`)
       implementation(libsEx.`compose-savedstate`)

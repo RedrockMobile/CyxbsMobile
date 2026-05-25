@@ -38,12 +38,12 @@ import com.cyxbs.components.config.ICP_WEBSITE
 import com.cyxbs.components.config.compose.theme.DefaultIndication
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_ABOUT
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.config.service.implOrNull
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavArgument
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_ABOUT
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
@@ -54,7 +54,6 @@ import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.mine.about.service.IAboutService
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
 import kotlinx.coroutines.flow.collectLatest
@@ -73,22 +72,23 @@ import kotlin.time.Clock
 
 // 关于我们的路由参数
 @Serializable
-object AboutArgument
+object AboutNavArgument : AppNavArgument
 
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_ABOUT)
-class AboutNavDestination : MainNavDestination<AboutArgument>(AboutArgument::class) {
+@AppNav(route = NAV_ABOUT)
+class AboutNavEntry : AppNavEntry<AboutNavArgument>() {
 
-    override val needLogin: Boolean
-        get() = false
+    override fun isNeedLogin(argument: AboutNavArgument): Boolean {
+        return false
+    }
 
     @Composable
-    override fun DestinationContent(parcel: DestinationParcel<AboutArgument>) {
-        AboutPage()
+    override fun Content(argument: AboutNavArgument) {
+        AboutPage(argument)
     }
 }
 
 @Composable
-private fun AboutPage() {
+private fun AboutPage(argument: AboutNavArgument) {
     ConstraintLayout(
         constraintSet = createConstraintSet(),
         modifier = Modifier.fillMaxSize()
@@ -98,7 +98,7 @@ private fun AboutPage() {
             stiffness = Spring.StiffnessMediumLow
         )
     ) {
-        TopBarCompose(modifier = Modifier.layoutId(Element.Topbar))
+        TopBarCompose(argument = argument, modifier = Modifier.layoutId(Element.Topbar))
         LogoCompose(modifier = Modifier.layoutId(Element.Logo))
         AppInfoCompose(modifier = Modifier.layoutId(Element.AppInfo))
         BackgroundIvCompose(modifier = Modifier.layoutId(Element.BackgroundIv))
@@ -122,7 +122,7 @@ private fun createConstraintSet(): ConstraintSet {
 }
 
 @Composable
-private fun TopBarCompose(modifier: Modifier = Modifier) {
+private fun TopBarCompose(argument: AboutNavArgument, modifier: Modifier = Modifier) {
     TopAppBar(
         modifier = modifier,
         backgroundColor = Color.Transparent,
@@ -138,7 +138,7 @@ private fun TopBarCompose(modifier: Modifier = Modifier) {
                     .align(Alignment.CenterStart)
                     .padding(start = 20.dp)
                     .clickableSingle {
-                        MainNavController.popBackStack()
+                        argument.popBackStack()
                     }
             )
             Text(

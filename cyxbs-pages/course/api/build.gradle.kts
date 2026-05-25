@@ -3,6 +3,8 @@ plugins {
   id("kmp.compose")
 }
 
+useNavigation() // navigation 跳转
+
 kotlin {
   sourceSets {
     commonMain.dependencies {

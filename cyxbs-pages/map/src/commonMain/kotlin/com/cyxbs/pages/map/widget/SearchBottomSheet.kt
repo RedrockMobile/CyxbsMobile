@@ -36,6 +36,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.ui.SearchCompose
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
@@ -53,7 +54,7 @@ import org.jetbrains.compose.resources.vectorResource
  */
 
 @Composable
-fun SearchBottomSheet() {
+fun SearchBottomSheet(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   BottomSheetCompose(
     bottomSheetState = viewmodel.searchBottomSheetState,
@@ -104,6 +105,7 @@ fun SearchBottomSheet() {
           .height(48.dp)
       )
       SearchCompose(
+        argument = argument,
         modifier = Modifier
           .fillMaxWidth()
           .height(getWindowScreenSize().height / 3 * 2)

@@ -33,13 +33,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.R
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.scheme.WebViewFactory
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.navigation.WebViewFactory
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -68,11 +70,17 @@ class WebViewActivity : BaseActivity() {
     }
 
     override fun startWebView(url: String) {
-      start(url)
+      val uri = url.toUri()
+      start(
+        url = url,
+        hideTitle = uri.getQueryParameter("hideTitle")?.toBooleanStrictOrNull() ?: false,
+        title = uri.getQueryParameter("title"),
+        defaultTitle = uri.getQueryParameter("defaultTitle") ?: "网页",
+      )
     }
   }
 
-  private val viewModel by viewModels<WebViewViewModel>()
+  private val webViewFlow = MutableStateFlow<WebView?>(null)
   private val mHideTitle by lazy { intent.getBooleanExtra("hideTitle", false) }
   private val mUrl by lazy { intent.getStringExtra("url") }
   private val mTitle by lazy { intent.getStringExtra("title") }
@@ -82,7 +90,7 @@ class WebViewActivity : BaseActivity() {
   // 返回按钮回调 - 根据 WebView 是否有历史记录来控制行为
   private val onBackPressedCallback = object : OnBackPressedCallback(true) {
     override fun handleOnBackPressed() {
-      val webView = viewModel.webViewStateFlow.value
+      val webView = webViewFlow.value
       if (webView != null && webView.canGoBack()) {
         // 如果 WebView 有历史记录，则后退
         webView.goBack()
@@ -106,6 +114,7 @@ class WebViewActivity : BaseActivity() {
     setContent {
       AppTheme {
         WebViewCompose(
+          webViewFlow = webViewFlow,
           hideTitle = mHideTitle,
           url = mUrl,
           title = mTitle,
@@ -116,14 +125,9 @@ class WebViewActivity : BaseActivity() {
   }
 }
 
-class WebViewViewModel : BaseViewModel() {
-  // webView 对象，用于 activity 处理一些操作
-  // 声明周期由 Compose 内部主动置为 null 保证
-  val webViewStateFlow = MutableStateFlow<LiteJsWebView?>(null)
-}
-
 @Composable
 private fun WebViewCompose(
+  webViewFlow: MutableStateFlow<WebView?>,
   hideTitle: Boolean,
   url: String?,
   title: String?,
@@ -140,7 +144,7 @@ private fun WebViewCompose(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Image(
-          painter = painterResource(com.cyxbs.components.config.R.drawable.config_ic_back),
+          painter = painterResource(R.drawable.config_ic_back),
           contentDescription = null,
           modifier = Modifier
             .padding(start = 24.dp)
@@ -174,6 +178,7 @@ private fun WebViewCompose(
     ) {
       if (url != null) {
         WebViewCompose(
+          webViewFlow = webViewFlow,
           webViewTitle = webViewTitle,
           url = url,
         )
@@ -186,10 +191,10 @@ private fun WebViewCompose(
 
 @Composable
 private fun WebViewCompose(
+  webViewFlow: MutableStateFlow<WebView?>,
   webViewTitle: MutableState<String?>,
   url: String,
 ) {
-  val viewModel = viewModel<WebViewViewModel>()
   AndroidView(
     modifier = Modifier.fillMaxSize(),
     factory = {
@@ -205,11 +210,11 @@ private fun WebViewCompose(
           }
         }
         loadUrl(url)
-        viewModel.webViewStateFlow.value = this
+        webViewFlow.value = this
       }
     },
     onRelease = {
-      viewModel.webViewStateFlow.value = null
+      webViewFlow.value = null
       it.destroy()
     }
   )

@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.notification.api.INotificationService
 import cyxbsmobile.cyxbs_pages.home.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.home.generated.resources.home_ic_explore_selected

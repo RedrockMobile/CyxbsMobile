@@ -50,16 +50,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_EMPTY_ROOM
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
+import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
 import com.cyxbs.pages.emptyroom.viewmodel.EmptyRoomComposeViewModel
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.emptyroom.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.emptyroom.generated.resources.emptyroom_ic_back
 import cyxbsmobile.cyxbs_pages.emptyroom.generated.resources.emptyroom_ic_querying
@@ -104,14 +102,17 @@ private val FLOOR_NAME_MAP = mapOf(
     '6' to "六楼"
 )
 
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_EMPTY_ROOM)
-class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomArgument::class) {
-    override val needLogin: Boolean = false
+@AppNav(route = NAV_EMPTY_ROOM)
+class EmptyRoomNavEntry : AppNavEntry<EmptyRoomNavArgument>() {
+
+    override fun isNeedLogin(argument: EmptyRoomNavArgument): Boolean {
+        return false
+    }
 
     @Composable
-    override fun DestinationContent(parcel: DestinationParcel<EmptyRoomArgument>) {
+    override fun Content(argument: EmptyRoomNavArgument) {
         viewModel { EmptyRoomComposeViewModel() }
-        EmptyRoomPage()
+        EmptyRoomPage(argument)
     }
 }
 
@@ -120,7 +121,7 @@ class EmptyRoomNavDestination : MainNavDestination<EmptyRoomArgument>(EmptyRoomA
  * 空教室主界面的compose函数
  */
 @Composable
-private fun EmptyRoomPage() {
+private fun EmptyRoomPage(argument: EmptyRoomNavArgument) {
     val viewModel = viewModel(EmptyRoomComposeViewModel::class)
     //订阅所有的Flow并且转换为ComposeState
     //在Compose收集时定义初始值
@@ -160,7 +161,7 @@ private fun EmptyRoomPage() {
         ) {
             //增大返回键点区域
             IconButton(
-                onClick = { MainNavController.popBackStack() },
+                onClick = { argument.popBackStack() },
                 modifier = Modifier
                     .padding(start = 12.dp)
                     .size(24.dp)

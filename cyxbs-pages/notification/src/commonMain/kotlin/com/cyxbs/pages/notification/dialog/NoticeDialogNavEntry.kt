@@ -22,20 +22,16 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.navigation3.scene.DialogSceneStrategy
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.compose.theme.LocalAppDark
-import com.cyxbs.components.config.navigation.DialogDestinationParcel
-import com.cyxbs.components.config.navigation.JsonNavType
-import com.cyxbs.components.config.navigation.MainNavDialog
-import com.cyxbs.components.config.navigation.NAV_DIALOG_NOTICE
-import com.cyxbs.components.config.scheme.SchemeUtils
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_DIALOG_NOTICE
 import com.cyxbs.components.view.ui.DialogOneBtnCompose
 import com.cyxbs.components.view.ui.DialogTwoBtnCompose
 import com.cyxbs.pages.notification.api.NoticeNavArgument
-import com.cyxbs.pages.notification.api.NoticeNavArgument.ButtonInfo
-import com.cyxbs.pages.notification.api.NoticeNavArgument.TextInfo
-import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
  * .
@@ -43,25 +39,25 @@ import com.g985892345.provider.api.annotation.ImplProvider
  * @author 985892345
  * @date 2025/10/20
  */
-@ImplProvider(clazz = MainNavDialog::class, name = NAV_DIALOG_NOTICE)
-class NoticeNavDialog : MainNavDialog<NoticeNavArgument>(
-  argumentClass = NoticeNavArgument::class,
-  dialogProperties = DialogProperties(
-    dismissOnBackPress = true, // 仅支持按返回键关闭 dialog
-    dismissOnClickOutside = false,
-  ),
-  typeMap = mapOf(
-    JsonNavType.pair<Map<String, TextInfo>>(),
-    JsonNavType.pair<ButtonInfo?>(),
-  )
-) {
+@AppNav(route = NAV_DIALOG_NOTICE)
+class NoticeDialogNavEntry : AppNavEntry<NoticeNavArgument>() {
 
-  override val needLogin: Boolean
-    get() = false
+  override fun isNeedLogin(argument: NoticeNavArgument): Boolean {
+    return false
+  }
+
+  override fun buildMetadata(argument: NoticeNavArgument): Map<String, Any> {
+    return DialogSceneStrategy.dialog(
+      dialogProperties = DialogProperties(
+        dismissOnBackPress = true, // 仅支持按返回键关闭 dialog
+        dismissOnClickOutside = false,
+      )
+    )
+  }
 
   @Composable
-  override fun DialogContent(parcel: DialogDestinationParcel<NoticeNavArgument>) {
-    NoticeDialogContent(argument = parcel.argument)
+  override fun Content(argument: NoticeNavArgument) {
+    NoticeDialogContent(argument = argument)
   }
 }
 
@@ -95,7 +91,7 @@ fun NoticeDialogContent(argument: NoticeNavArgument) {
       DialogOneBtnCompose(
         positiveBtnText = "关闭",
         onClickPositiveBtn = {
-          MainNavController.popBackStack()
+          argument.popBackStack()
         }
       )
     } else {
@@ -103,10 +99,10 @@ fun NoticeDialogContent(argument: NoticeNavArgument) {
         positiveBtnText = button.text,
         negativeBtnText = "关闭",
         onClickPositiveBtn = {
-          SchemeUtils.jump(button.action!!)
+          AppScheme.jump(button.action!!)
         },
         onClickNegativeBtn = {
-          MainNavController.popBackStack()
+          argument.popBackStack()
         }
       )
     }
@@ -141,7 +137,7 @@ private fun buildNoticeDialogContentAnnotatedString(
                   )
                 )
               ) {
-                SchemeUtils.jump(action)
+                AppScheme.jump(action)
               }, 0, length
             )
           }

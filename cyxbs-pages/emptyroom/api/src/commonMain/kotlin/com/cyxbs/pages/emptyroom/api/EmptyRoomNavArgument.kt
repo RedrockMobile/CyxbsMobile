@@ -1,5 +1,6 @@
 package com.cyxbs.pages.emptyroom.api
 
+import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,4 +10,4 @@ import kotlinx.serialization.Serializable
  * date : 2026/3/4 17:01
  */
 @Serializable
-object EmptyRoomArgument
+object EmptyRoomNavArgument : AppNavArgument

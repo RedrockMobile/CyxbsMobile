@@ -1,5 +1,6 @@
 package com.cyxbs.pages.schoolcar.api
 
+import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,4 +10,4 @@ import kotlinx.serialization.Serializable
  * date : 2026/2/18 21:07
  */
 @Serializable
-object SchoolCarNavArgument
+object SchoolCarNavArgument : AppNavArgument

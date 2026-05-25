@@ -211,7 +211,7 @@ private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: Pl
     modifier = modifier
       .clickableSingle {
         loginDialogState.doIfLogin(
-          msg = "收藏"
+          function = "收藏"
         ) {
           if (isFavorite.value) {
             viewmodel.deleteCollect(viewmodel.placeDetailsId.value)
@@ -348,7 +348,7 @@ private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: Plac
     modifier = modifier
       .clickableSingle {
         loginDialogState.doIfLogin(
-          msg = "上传图片"
+          function = "上传图片"
         ) {
           showState.value = true
         }

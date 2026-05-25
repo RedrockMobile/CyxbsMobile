@@ -6,9 +6,9 @@ import androidx.compose.ui.window.rememberWindowState
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
-import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.runApp
+import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.multiplatform.MultiplatformKtProviderInitializer
@@ -40,7 +40,7 @@ fun main() = runApp {
         this.window.minimumSize = java.awt.Dimension(360, 600)
       }
       AppTheme {
-        MainNavHost()
+        AppNavDisplay()
         PlatformToastCompose()
       }
     }
