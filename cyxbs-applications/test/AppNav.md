@@ -5,7 +5,7 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-05-25 23:10
+- date: 2026-05-26 23:30
 
 ## 调试方法
 
@@ -35,6 +35,47 @@ while ($true) {
   adb shell am start -a android.intent.action.VIEW -d "$link"
 }
 ```
+
+## 模板说明
+
+URL 模板用 `{}` / `[]` 区分 required / optional，object fields 段递归展开复杂结构。
+
+### URL 模板
+
+- `name={Type}` — required 字段，调用方必须提供
+- `name=[Type]` — optional 字段（构造参数有默认值），调用方可省略
+- 类型末尾的 `?` 表示 Kotlin nullable，值允许为 null（与 optional 不同：nullable 仍要求字段出现）
+- 集合 / Map 直接以原始 Kotlin 类型出现，例如 `{List<TextInfo>}`、`{Map<String, TextInfo>}`，编码方式遵循 kotlinx.serialization JSON 形式
+
+### object fields
+
+仅当字段含可展开的内部结构时才会出现。展开规则：
+
+- `name: Type` — required 字段，`[name]: Type` — optional 字段
+- 普通 `@Serializable` 类：列出每个非 `@Transient` 的主构造参数
+- `enum`：列出所有 entry 名
+- `Map<K, V>`：展开为 `value: V { ... }`（仅 V 是复杂类型时才进一步展开）
+- `Collection<E>` / `Array<E>`：展开为 `value: E { ... }`
+- 带类型形参的类（如 `Wrapper<T>`）：按外层泛型实参替换 `T` 后再展开
+
+### 示例
+
+```text
+deeplink: cyxbs://test/abc?title={String}&content={String}&map=[Map<String, TextInfo>]&button=[ButtonInfo?]
+object fields:
+  [map]: Map<String, TextInfo> {
+    value: TextInfo {
+      text: String
+      [isBold]: Boolean
+    }
+  }
+  [button]: ButtonInfo? {
+    text: String
+    [action]: String?
+  }
+```
+
+解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
 
 ## :cyxbs-functions:update
 
@@ -88,7 +129,7 @@ deeplink: cyxbs://food
 - argument: `com.cyxbs.pages.home.api.HomeNavArgument`
 
 ```text
-deeplink: cyxbs://home?page={String optional}
+deeplink: cyxbs://home?page=[String]
 ```
 
 ## :cyxbs-pages:login
@@ -99,7 +140,7 @@ deeplink: cyxbs://home?page={String optional}
 - argument: `com.cyxbs.pages.login.api.LoginNavArgument`
 
 ```text
-deeplink: cyxbs://login?targetUrl={String optional}
+deeplink: cyxbs://login?targetUrl=[String?]
 ```
 
 ## :cyxbs-pages:map
@@ -110,7 +151,7 @@ deeplink: cyxbs://login?targetUrl={String optional}
 - argument: `com.cyxbs.pages.map.api.MapNavArgument`
 
 ```text
-deeplink: cyxbs://map?placeSearch={String optional}
+deeplink: cyxbs://map?placeSearch=[String?]
 ```
 
 ### map_show_picture
@@ -119,7 +160,7 @@ deeplink: cyxbs://map?placeSearch={String optional}
 - argument: `com.cyxbs.pages.map.ui.MapShowPictureNavArgument`
 
 ```text
-deeplink: cyxbs://map_show_picture?imageList={String[]}&currentIndex={Int}
+deeplink: cyxbs://map_show_picture?imageList={List<String>}&currentIndex={Int}
 ```
 
 ## :cyxbs-pages:mine
@@ -141,12 +182,20 @@ deeplink: cyxbs://about
 - argument: `com.cyxbs.pages.notification.api.NoticeNavArgument`
 
 ```text
-deeplink: cyxbs://dialog/notice?title={String}&content={String}&map={Map json optional}&button={ButtonInfo json optional}
+deeplink: cyxbs://dialog/notice?title={String}&content={String}&map=[Map<String, TextInfo>]&button=[ButtonInfo?]
 object fields:
-  map: Map
-  button: ButtonInfo {
+  [map]: Map<String, TextInfo> {
+    value: TextInfo {
+      text: String
+      [isBold]: Boolean
+      [textSize]: Int
+      [textColorStr]: String?
+      [action]: String?
+    }
+  }
+  [button]: ButtonInfo? {
     text: String
-    action: String optional
+    [action]: String?
   }
 ```
 
@@ -160,4 +209,3 @@ object fields:
 ```text
 deeplink: cyxbs://school_car
 ```
-

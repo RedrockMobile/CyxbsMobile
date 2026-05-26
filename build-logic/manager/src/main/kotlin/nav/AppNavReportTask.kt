@@ -66,60 +66,107 @@ abstract class AppNavReportTask : DefaultTask() {
       .sortedBy { it.first }
       .toList()
 
-    val file = outputFile.asFile.get()
-    file.parentFile.mkdirs()
-    file.writeText(buildString {
-      appendLine("# AppNav Deeplink 汇总")
-      appendLine()
-      appendLine("> 打包时由 build-logic/manager/${AppNavReportTask::class.qualifiedName} 自动生成")
-      appendLine("> 该文件需要被 git 提交用于后续使用")
-      appendLine()
-      appendLine("- versionCode: ${Config.versionCode}")
-      appendLine("- versionName: ${Config.versionName}")
-      appendLine("- date: ${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
-      appendLine()
-      appendLine("## 调试方法")
-      appendLine()
-      appendLine("使用 idea 文档中的 ▶ 运行下面脚本，输入要测试的 deeplink")
-      appendLine()
-      appendLine("### Windows / macOS / Linux")
-      appendLine()
-      appendLine("> win 没 bash 可使用终端运行 PowerShell 版")
-      appendLine()
-      appendLine("idea 中点击左侧 ▶ 可直接运行")
-      appendLine("```sh")
-      appendLine("#!/usr/bin/env bash")
-      appendLine("while true; do")
-      appendLine("  printf \"输入 deeplink (回车退出): \"")
-      appendLine("  read -r link")
-      appendLine("  [ -z \"\$link\" ] && break")
-      appendLine("  adb shell am start -a android.intent.action.VIEW -d \"\$link\"")
-      appendLine("done")
-      appendLine("```")
-      appendLine()
-      appendLine("### Windows (PowerShell 版)")
-      appendLine()
-      appendLine("```powershell")
-      appendLine("while (\$true) {")
-      appendLine("  \$link = Read-Host \"输入 deeplink (回车退出)\"")
-      appendLine("  if ([string]::IsNullOrEmpty(\$link)) { break }")
-      appendLine("  adb shell am start -a android.intent.action.VIEW -d \"\$link\"")
-      appendLine("}")
-      appendLine("```")
-      appendLine()
-      if (moduleBlocks.isEmpty()) {
-        appendLine("未找到任何由 KSP 生成的 AppNavReport 文档，请检查 ksp-navigation 实现")
-      } else {
-        moduleBlocks.forEach { (modulePath, files) ->
-          appendLine("## $modulePath")
-          appendLine()
-          files.sortedBy { it.name }.forEach { entryFile ->
-            appendLine(entryFile.readText().trim())
-            appendLine()
+    // 按模块聚合每个模块下所有 entry 的 md 片段，模块之间空一行隔开。
+    // 单独构建是为了避开 trimIndent —— entry md 自带的 0-indent 行会破坏外层 raw string 的最小公共缩进推断。
+    val moduleSection = if (moduleBlocks.isEmpty()) {
+      "未找到任何由 KSP 生成的 AppNavReport 文档，请检查 ksp-navigation 实现"
+    } else {
+      moduleBlocks.joinToString(separator = "\n\n") { (modulePath, files) ->
+        val entries = files.sortedBy { it.name }
+          .joinToString(separator = "\n\n") { it.readText().trim() }
+        "## $modulePath\n\n$entries"
+      }
+    }
+
+    val date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+    val taskName = AppNavReportTask::class.qualifiedName
+    // raw string 里 ${'$'} 表示字面 `$`，避免和 Kotlin 字符串模板冲突，用于 bash / PowerShell 脚本里的变量。
+    val d = "${'$'}"
+
+    val staticContent = """
+      # AppNav Deeplink 汇总
+
+      > 打包时由 build-logic/manager/$taskName 自动生成
+      > 该文件需要被 git 提交用于后续使用
+
+      - versionCode: ${Config.versionCode}
+      - versionName: ${Config.versionName}
+      - date: $date
+
+      ## 调试方法
+
+      使用 idea 文档中的 ▶ 运行下面脚本，输入要测试的 deeplink
+
+      ### Windows / macOS / Linux
+
+      > win 没 bash 可使用终端运行 PowerShell 版
+
+      idea 中点击左侧 ▶ 可直接运行
+      ```sh
+      #!/usr/bin/env bash
+      while true; do
+        printf "输入 deeplink (回车退出): "
+        read -r link
+        [ -z "${d}link" ] && break
+        adb shell am start -a android.intent.action.VIEW -d "${d}link"
+      done
+      ```
+
+      ### Windows (PowerShell 版)
+
+      ```powershell
+      while (${d}true) {
+        ${d}link = Read-Host "输入 deeplink (回车退出)"
+        if ([string]::IsNullOrEmpty(${d}link)) { break }
+        adb shell am start -a android.intent.action.VIEW -d "${d}link"
+      }
+      ```
+
+      ## 模板说明
+
+      URL 模板用 `{}` / `[]` 区分 required / optional，object fields 段递归展开复杂结构。
+
+      ### URL 模板
+
+      - `name={Type}` — required 字段，调用方必须提供
+      - `name=[Type]` — optional 字段（构造参数有默认值），调用方可省略
+      - 类型末尾的 `?` 表示 Kotlin nullable，值允许为 null（与 optional 不同：nullable 仍要求字段出现）
+      - 集合 / Map 直接以原始 Kotlin 类型出现，例如 `{List<TextInfo>}`、`{Map<String, TextInfo>}`，编码方式遵循 kotlinx.serialization JSON 形式
+
+      ### object fields
+
+      仅当字段含可展开的内部结构时才会出现。展开规则：
+
+      - `name: Type` — required 字段，`[name]: Type` — optional 字段
+      - 普通 `@Serializable` 类：列出每个非 `@Transient` 的主构造参数
+      - `enum`：列出所有 entry 名
+      - `Map<K, V>`：展开为 `value: V { ... }`（仅 V 是复杂类型时才进一步展开）
+      - `Collection<E>` / `Array<E>`：展开为 `value: E { ... }`
+      - 带类型形参的类（如 `Wrapper<T>`）：按外层泛型实参替换 `T` 后再展开
+
+      ### 示例
+
+      ```text
+      deeplink: cyxbs://test/abc?title={String}&content={String}&map=[Map<String, TextInfo>]&button=[ButtonInfo?]
+      object fields:
+        [map]: Map<String, TextInfo> {
+          value: TextInfo {
+            text: String
+            [isBold]: Boolean
           }
         }
-      }
-    })
+        [button]: ButtonInfo? {
+          text: String
+          [action]: String?
+        }
+      ```
+
+      解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
+    """.trimIndent()
+
+    val file = outputFile.asFile.get()
+    file.parentFile.mkdirs()
+    file.writeText("$staticContent\n\n$moduleSection\n")
   }
 
   companion object {
