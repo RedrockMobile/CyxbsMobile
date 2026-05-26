@@ -66,15 +66,27 @@ import kotlin.reflect.KClass
  * - `route` 必须满足：非空、不以 `/` 开头或结尾、不含连续 `/`，每个 segment 仅允许 `[a-zA-Z0-9_-]`
  *
  * ## 终端输出
- * KSP 编译时会输出每个注册项的 route、Entry、Argument、Provider 和 deeplink 模板：
+ * KSP 编译时会输出每个注册项的 route、Entry、Argument、Provider 和 deeplink 模板。
+ * URL 模板统一显示参数的原始 Kotlin 类型（含泛型、`?`）。required 字段用 `{Type}`，optional（有默认值）字段用 `\[Type\]`；
+ * object fields 端递归展开复杂类、enum、Map<K, V> 的 value、Collection / Array 的 element，
+ * optional 字段名用 `\[name\]` 方括号包裹；自定义带类型形参的类（如 `Wrapper<T>`）会按外层实参替换 `T`：
  * ```text
  * [AppNav] route = test
  * entry: com.xxx.TestNavEntry
  * argument: com.xxx.TestNavArgument
- * deeplink: cyxbs://test?name={String}&what={What json}
+ * deeplink: cyxbs://test?name={String}&what={What}&map=[Map<String, TextInfo>]&status={Status}
  * object fields:
  *   what: What {
  *     age: Int
+ *   }
+ *   [map]: Map<String, TextInfo> {
+ *     value: TextInfo {
+ *       text: String
+ *     }
+ *   }
+ *   status: Status {
+ *     ACTIVE
+ *     INACTIVE
  *   }
  * ```
  */
@@ -99,6 +111,36 @@ class KspNavigationSymbolProcess(
 
     // route 强校验：仅允许字母数字、下划线、短横线，多段以 `/` 分隔且不允许首尾或连续 `/`
     private val ROUTE_SEGMENT_REGEX = Regex("[a-zA-Z0-9_-]+")
+
+    // 仅 kotlin.collections 包下的官方 Map 抽象类型；自定义 Map 实现可能挂自定义序列化规则，不按内置 Map 展开。
+    private val MAP_TYPES = setOf(
+      "kotlin.collections.Map",
+      "kotlin.collections.MutableMap",
+    )
+
+    // 仅 kotlin.collections 包下的官方集合抽象类型 + kotlin.Array，理由同上。
+    private val COLLECTION_TYPES = setOf(
+      "kotlin.collections.Iterable",
+      "kotlin.collections.Collection",
+      "kotlin.collections.List",
+      "kotlin.collections.MutableList",
+      "kotlin.collections.Set",
+      "kotlin.collections.MutableSet",
+      "kotlin.Array",
+    )
+
+    // Kotlin 基础类型，URL 模板直接显示类名，object fields 端不展开。
+    private val PRIMITIVE_TYPES = setOf(
+      "kotlin.String",
+      "kotlin.Boolean",
+      "kotlin.Byte",
+      "kotlin.Short",
+      "kotlin.Int",
+      "kotlin.Long",
+      "kotlin.Float",
+      "kotlin.Double",
+      "kotlin.Char",
+    )
   }
 
   private val generated = mutableSetOf<String>()
@@ -322,16 +364,18 @@ class KspNavigationSymbolProcess(
 
   /** 按 UrlDecoder 的 query 解析规则生成 cyxbs:// deeplink 模板和复杂对象字段说明，会跳过 @Transient 并使用 @SerialName。 */
   private fun KSClassDeclaration.buildDeepLinkTemplate(route: String): String {
-    val parameters = primaryConstructor?.parameters.orEmpty()
+    val parameters = primaryConstructor?.parameters.orEmpty().filterNot { it.isTransient() }
     val deeplink = if (parameters.isEmpty()) {
       "cyxbs://$route"
     } else {
-      parameters.filterNot { it.isTransient() }.joinToString(
+      parameters.joinToString(
         separator = "&",
         prefix = "cyxbs://$route?"
       ) { it.buildQueryTemplate() }
     }
-    val objectFields = parameters.filterNot { it.isTransient() }.mapNotNull { it.buildObjectFieldTemplate(indent = "  ") }
+    val objectFields = parameters.mapNotNull {
+      it.buildObjectFieldTemplate(indent = "  ", typeArgMap = emptyMap(), visited = emptySet())
+    }
     return buildString {
       append("deeplink: ").append(deeplink)
       if (objectFields.isNotEmpty()) {
@@ -341,66 +385,165 @@ class KspNavigationSymbolProcess(
     }
   }
 
-  /** 为一个构造参数生成 query 片段，集合/数组使用重复 key 模板，默认值字段会标记 optional。 */
+  /**
+   * URL 模板中显示参数的原始 Kotlin 类型。required 字段用 `{Type}`，optional（有默认值）字段用 `[Type]`，
+   * 例如 `name={String}`、`map=[Map<String, TextInfo>]`。
+   */
   private fun KSValueParameter.buildQueryTemplate(): String {
-    if (isTransient()) return ""
     val name = getSerialName()
     val type = type.resolve()
-    val suffix = getOptionalSuffix()
-    return if (type.isRepeatedQueryType()) {
-      "$name={${type.getListElementTemplate()}[]$suffix}"
-    } else {
-      "$name={${type.getUrlValueTemplate()}$suffix}"
+    val (open, close) = if (hasDefault) "[" to "]" else "{" to "}"
+    return "$name=$open${type.getTypeDisplayName()}$close"
+  }
+
+  /** 如果参数有可展开的内部结构（复杂类 / enum / Map value / 集合 element），则生成换行字段说明，否则返回 null。 */
+  private fun KSValueParameter.buildObjectFieldTemplate(
+    indent: String,
+    typeArgMap: Map<String, KSType>,
+    visited: Set<String>,
+  ): String? {
+    val type = type.resolve()
+    if (!type.hasExpandableContent(typeArgMap, visited)) return null
+    return type.buildFieldTemplate(getSerialName(), indent, optional = hasDefault, typeArgMap = typeArgMap, visited = visited)
+  }
+
+  /**
+   * 为一个类型生成 object fields 中的字段说明。
+   *
+   * 分支顺序：先解析类型形参（替换 T 之类的占位符），然后按 primitive / 基础数组 / enum / Map / Collection /
+   * 复杂类 / 普通类型依次匹配。所有递归调用都把 [typeArgMap]（类型形参名 → 实参类型）和 [visited]（已展开的类，
+   * 用来防止 self-reference 循环）原样向下传递。[optional] 为 true 时字段名会被 `[name]` 方括号包裹。
+   */
+  private fun KSType.buildFieldTemplate(
+    name: String,
+    indent: String,
+    optional: Boolean,
+    typeArgMap: Map<String, KSType>,
+    visited: Set<String>,
+  ): String {
+    val resolved = applyTypeArgMap(typeArgMap)
+    val display = resolved.getTypeDisplayName(typeArgMap)
+    val displayName = if (optional) "[$name]" else name
+    if (!resolved.hasExpandableContent(typeArgMap, visited)) {
+      return "$indent$displayName: $display"
     }
-  }
-
-  /** 如果参数是复杂对象或复杂对象列表，则生成换行字段说明。 */
-  private fun KSValueParameter.buildObjectFieldTemplate(indent: String): String? {
-    val name = getSerialName()
-    val type = type.resolve()
-    val objectType = if (type.isRepeatedQueryType()) type.getRepeatedElementType() else type
-    val declaration = objectType?.declaration as? KSClassDeclaration ?: return null
-    if (!objectType.isComplexObjectType()) return null
-    return buildComplexObjectFieldTemplate(name, declaration, indent)
-  }
-
-  /** 递归展开复杂对象主构造参数，生成 object fields 中的字段树。 */
-  private fun buildComplexObjectFieldTemplate(name: String, declaration: KSClassDeclaration, indent: String): String {
-    val childParameters = declaration.primaryConstructor?.parameters.orEmpty()
-    if (childParameters.isEmpty()) return "$indent$name: ${declaration.simpleName.asString()}"
-    return buildString {
-      append(indent).append(name).append(": ").append(declaration.simpleName.asString()).append(" {")
-      childParameters.filterNot { it.isTransient() }.forEach { parameter ->
-        append('\n').append(parameter.buildFieldTemplate(indent = "$indent  "))
+    val declaration = resolved.declaration as? KSClassDeclaration
+    // enum：列出所有 entry。
+    if (declaration != null && declaration.classKind == ClassKind.ENUM_CLASS) {
+      val entries = declaration.declarations
+        .filterIsInstance<KSClassDeclaration>()
+        .filter { it.classKind == ClassKind.ENUM_ENTRY }
+        .map { it.simpleName.asString() }
+        .toList()
+      return buildString {
+        append(indent).append(displayName).append(": ").append(display).append(" {")
+        entries.forEach { append('\n').append(indent).append("  ").append(it) }
+        append('\n').append(indent).append("}")
       }
-      append('\n').append(indent).append("}")
     }
-  }
-
-  /** 为复杂对象中的一个字段生成字段说明。 */
-  private fun KSValueParameter.buildFieldTemplate(indent: String): String {
-    val name = getSerialName()
-    val type = type.resolve()
-    return type.buildFieldTemplate(name, indent, getOptionalSuffix())
-  }
-
-  /** 为类型生成字段说明，复杂对象继续递归展开。 */
-  private fun KSType.buildFieldTemplate(name: String, indent: String, suffix: String = ""): String {
-    if (isRepeatedQueryType()) {
-      val elementType = getRepeatedElementType()
-      val elementDeclaration = elementType?.declaration as? KSClassDeclaration
-      return if (elementType != null && elementDeclaration != null && elementType.isComplexObjectType()) {
-        buildComplexObjectFieldTemplate("$name[]", elementDeclaration, indent)
-      } else {
-        "$indent$name[]: ${getRepeatedElementTemplate()}$suffix"
+    // Map<K, V>：展开 value 类型。value 自身不是 optional。
+    if (resolved.isMapType()) {
+      val valueType = resolved.getMapValueType()
+        ?: return "$indent$displayName: $display"
+      return buildString {
+        append(indent).append(displayName).append(": ").append(display).append(" {")
+        append('\n').append(valueType.buildFieldTemplate("value", "$indent  ", optional = false, typeArgMap, visited))
+        append('\n').append(indent).append("}")
       }
     }
-    val declaration = declaration as? KSClassDeclaration
-    return if (declaration != null && isComplexObjectType()) {
-      buildComplexObjectFieldTemplate(name, declaration, indent)
-    } else {
-      "$indent$name: ${getUrlValueTemplate()}$suffix"
+    // Collection / Array：展开 element 类型。element 自身不是 optional。
+    if (resolved.isCollectionType()) {
+      val element = resolved.getCollectionElementType()
+        ?: return "$indent$displayName: $display"
+      return buildString {
+        append(indent).append(displayName).append(": ").append(display).append(" {")
+        append('\n').append(element.buildFieldTemplate("value", "$indent  ", optional = false, typeArgMap, visited))
+        append('\n').append(indent).append("}")
+      }
     }
+    // 普通复杂类：迭代主构造参数，并把当前类的类型实参写入 typeArgMap 供 T 替换使用。
+    if (declaration != null) {
+      val params = declaration.primaryConstructor?.parameters.orEmpty().filterNot { it.isTransient() }
+      if (params.isEmpty()) return "$indent$displayName: $display"
+      val nextTypeArgMap = resolved.buildTypeArgMap(typeArgMap)
+      val nextVisited = visited + (declaration.qualifiedName?.asString() ?: declaration.simpleName.asString())
+      return buildString {
+        append(indent).append(displayName).append(": ").append(display).append(" {")
+        params.forEach { p ->
+          val paramType = p.type.resolve()
+          append('\n').append(
+            paramType.buildFieldTemplate(
+              name = p.getSerialName(),
+              indent = "$indent  ",
+              optional = p.hasDefault,
+              typeArgMap = nextTypeArgMap,
+              visited = nextVisited,
+            )
+          )
+        }
+        append('\n').append(indent).append("}")
+      }
+    }
+    return "$indent$displayName: $display"
+  }
+
+  /**
+   * 判断类型是否含可展开的内部结构。判定顺序与 [buildFieldTemplate] 完全对齐：
+   * primitive / 基础数组直接 false；enum 永远 true；Map 看 value；Collection 看 element；
+   * 普通类看是否有非 @Transient 的主构造参数；circular 情况下 [visited] 命中返回 false 防止死循环。
+   */
+  private fun KSType.hasExpandableContent(typeArgMap: Map<String, KSType>, visited: Set<String>): Boolean {
+    val resolved = applyTypeArgMap(typeArgMap)
+    if (resolved.isPrimitiveType() || resolved.isPrimitiveArrayType()) return false
+    val decl = resolved.declaration as? KSClassDeclaration ?: return false
+    if (decl.classKind == ClassKind.ENUM_CLASS) return true
+    if (resolved.isMapType()) {
+      val v = resolved.getMapValueType() ?: return false
+      return v.hasExpandableContent(typeArgMap, visited)
+    }
+    if (resolved.isCollectionType()) {
+      val e = resolved.getCollectionElementType() ?: return false
+      return e.hasExpandableContent(typeArgMap, visited)
+    }
+    val qname = decl.qualifiedName?.asString() ?: decl.simpleName.asString()
+    if (qname in visited) return false
+    return decl.primaryConstructor?.parameters.orEmpty().any { !it.isTransient() }
+  }
+
+  /** 若当前 KSType 的 declaration 是类型形参，则按名字到 [typeArgMap] 中查找实参类型，递归直到不是形参为止。 */
+  private fun KSType.applyTypeArgMap(typeArgMap: Map<String, KSType>): KSType {
+    val tp = declaration as? KSTypeParameter ?: return this
+    val mapped = typeArgMap[tp.name.asString()] ?: return this
+    return mapped.applyTypeArgMap(typeArgMap)
+  }
+
+  /**
+   * 用当前 KSType 的 `arguments` 与 `declaration.typeParameters` 建立类型形参名 → 实参类型 的映射，
+   * 同时保留 [parent] 中外层尚未消化的形参绑定（外层 T 在内层可能继续被引用）。
+   */
+  private fun KSType.buildTypeArgMap(parent: Map<String, KSType>): Map<String, KSType> {
+    val decl = declaration as? KSClassDeclaration ?: return parent
+    val params = decl.typeParameters
+    if (params.isEmpty()) return parent
+    val merged = parent.toMutableMap()
+    for (i in params.indices) {
+      val argType = arguments.getOrNull(i)?.type?.resolve()?.applyTypeArgMap(parent) ?: continue
+      merged[params[i].name.asString()] = argType
+    }
+    return merged
+  }
+
+  /** 返回类型在文档中显示的名称，递归带上泛型实参并替换形参，例如 Map<String, TextInfo>、Wrapper<TextInfo>。 */
+  private fun KSType.getTypeDisplayName(typeArgMap: Map<String, KSType> = emptyMap()): String {
+    val resolved = applyTypeArgMap(typeArgMap)
+    val base = (resolved.declaration as? KSClassDeclaration)?.simpleName?.asString()
+      ?: resolved.declaration.simpleName.asString()
+    val generic = if (resolved.arguments.isEmpty()) "" else
+      resolved.arguments.joinToString(separator = ", ", prefix = "<", postfix = ">") {
+        it.type?.resolve()?.getTypeDisplayName(typeArgMap) ?: "?"
+      }
+    val nullable = if (resolved.isMarkedNullable) "?" else ""
+    return "$base$generic$nullable"
   }
 
   /** 读取字段序列化名称，优先使用 @SerialName，否则使用参数名。 */
@@ -418,92 +561,39 @@ class KspNavigationSymbolProcess(
     }
   }
 
-  /** 默认值字段在模板中标记为 optional，表示 UrlDecoder 缺省时由 kotlinx.serialization 使用默认值。 */
-  private fun KSValueParameter.getOptionalSuffix(): String {
-    return if (hasDefault) " optional" else ""
+
+  /** Kotlin 基础类型：URL 模板直接显示类名，object fields 端不展开。 */
+  private fun KSType.isPrimitiveType(): Boolean {
+    return declaration.qualifiedName?.asString() in PRIMITIVE_TYPES
   }
 
-  /** 获取重复 query 类型的元素在 URL 中的占位文本。 */
-  private fun KSType.getListElementTemplate(): String {
-    return getRepeatedElementTemplate()
+  /**
+   * Kotlin 基础数组：`kotlin.IntArray`、`kotlin.BooleanArray` 等以 `kotlin.` 开头并以 `Array` 结尾的类型，
+   * 排除掉 `kotlin.Array<T>` 自身。它们的元素是基础类型，等同于不可展开。
+   */
+  private fun KSType.isPrimitiveArrayType(): Boolean {
+    val name = declaration.qualifiedName?.asString() ?: return false
+    return name.startsWith("kotlin.") && name.endsWith("Array") && name != "kotlin.Array"
   }
 
-  /** 获取类型在 URL 中的占位文本，复杂对象显示为 ClassName json。 */
-  private fun KSType.getUrlValueTemplate(): String {
-    return when (declaration.qualifiedName?.asString()) {
-      "kotlin.String" -> "String"
-      "kotlin.Boolean" -> "Boolean"
-      "kotlin.Byte" -> "Byte"
-      "kotlin.Short" -> "Short"
-      "kotlin.Int" -> "Int"
-      "kotlin.Long" -> "Long"
-      "kotlin.Float" -> "Float"
-      "kotlin.Double" -> "Double"
-      "kotlin.Char" -> "Char"
-      else -> {
-        val classDeclaration = declaration as? KSClassDeclaration
-        if (classDeclaration?.classKind == ClassKind.ENUM_CLASS) {
-          "EnumName"
-        } else {
-          "${classDeclaration?.simpleName?.asString() ?: "Object"} json"
-        }
-      }
-    }
+  /** 是否是 kotlinx.serialization 中按 JSON 对象编码的 Map。仅匹配 kotlin.collections 包下的 Map / MutableMap。 */
+  private fun KSType.isMapType(): Boolean {
+    return declaration.qualifiedName?.asString() in MAP_TYPES
   }
 
-  /** 判断类型是否是 UrlDecoder 可通过重复 key 表达的集合或数组。 */
-  private fun KSType.isRepeatedQueryType(): Boolean {
-    return declaration.qualifiedName?.asString() in setOf(
-      "kotlin.collections.Iterable",
-      "kotlin.collections.Collection",
-      "kotlin.collections.List",
-      "kotlin.collections.MutableList",
-      "kotlin.collections.ArrayList",
-      "java.util.ArrayList",
-      "java.util.LinkedList",
-      "kotlin.collections.Set",
-      "kotlin.collections.MutableSet",
-      "kotlin.collections.HashSet",
-      "kotlin.collections.LinkedHashSet",
-      "java.util.HashSet",
-      "java.util.LinkedHashSet",
-      "kotlin.Array",
-      "kotlin.BooleanArray",
-      "kotlin.ByteArray",
-      "kotlin.ShortArray",
-      "kotlin.IntArray",
-      "kotlin.LongArray",
-      "kotlin.FloatArray",
-      "kotlin.DoubleArray",
-      "kotlin.CharArray",
-    )
+  /** 取出 Map<K, V> 的 V 类型，星投影返回 null。 */
+  private fun KSType.getMapValueType(): KSType? {
+    return arguments.getOrNull(1)?.type?.resolve()
   }
 
-  /** 获取集合或数组的元素占位，primitive array 直接映射到对应基础类型。 */
-  private fun KSType.getRepeatedElementTemplate(): String {
-    return when (declaration.qualifiedName?.asString()) {
-      "kotlin.BooleanArray" -> "true|false"
-      "kotlin.ByteArray" -> "Byte"
-      "kotlin.ShortArray" -> "Short"
-      "kotlin.IntArray" -> "Int"
-      "kotlin.LongArray" -> "Long"
-      "kotlin.FloatArray" -> "Float"
-      "kotlin.DoubleArray" -> "Double"
-      "kotlin.CharArray" -> "Char"
-      else -> arguments.firstOrNull()?.type?.resolve()?.getUrlValueTemplate() ?: "value"
-    }
+  /** 是否是 Kotlin 官方的可遍历集合 / 数组类型。仅匹配 kotlin.collections 下的抽象集合接口与 kotlin.Array。 */
+  private fun KSType.isCollectionType(): Boolean {
+    return declaration.qualifiedName?.asString() in COLLECTION_TYPES
   }
 
-  /** 获取集合或数组的元素类型，primitive array 没有泛型实参，返回 null。 */
-  private fun KSType.getRepeatedElementType(): KSType? {
+  /** 取出 Collection<E> / Array<E> 的 E 类型，星投影返回 null。 */
+  private fun KSType.getCollectionElementType(): KSType? {
     return arguments.firstOrNull()?.type?.resolve()
-  }
-
-  /** 判断类型是否需要用 JSON 字符串传入 URL。 */
-  private fun KSType.isComplexObjectType(): Boolean {
-    if (isRepeatedQueryType()) return false
-    val declaration = declaration as? KSClassDeclaration ?: return false
-    return declaration.classKind != ClassKind.ENUM_CLASS && getUrlValueTemplate().endsWith(" json")
   }
 
   /** 递归判断类型是否已经具体化，禁止 T 和星投影。 */
