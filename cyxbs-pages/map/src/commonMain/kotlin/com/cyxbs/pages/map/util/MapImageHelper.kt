@@ -2,10 +2,10 @@ package com.cyxbs.pages.map.util
 
 import com.cyxbs.components.utils.network.HttpClientNoToken
 import io.github.vinceglb.filekit.PlatformFile
+import io.ktor.client.call.body
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import okio.Sink
@@ -26,30 +26,61 @@ expect suspend fun deleteImageFile()
 expect suspend fun getImageFile(): ByteArray?
 expect val dispatchersIO: CoroutineDispatcher
 
+/**
+ * 地图下载的返回结果
+ * @param bytes: 地图的字节流
+ * @param isCached: 是否写入缓存
+ */
+data class MapImageDownloadResult(
+  val bytes: ByteArray,
+  val isCached: Boolean,
+)
+
 object MapImageHelper {
   suspend fun downloadImage(
     url: String,
     listener: (Long, Long) -> Unit
-  ) = withContext(dispatchersIO) {
+  ): MapImageDownloadResult = withContext(dispatchersIO) {
     try {
-      val response = HttpClientNoToken.get(url) {
+      val bytes = HttpClientNoToken.get(url.toHttpsCdnUrl()) {
         onDownload { bytesSentTotal, contentLength ->
           listener(bytesSentTotal, contentLength ?: 1L)
         }
-      }
-      val channel = response.bodyAsChannel()
-      getSink().buffer().use { sink ->
-        val buffer = ByteArray(8 * 1024)
-        while (!channel.isClosedForRead) {
-          val bytesRead = channel.readAvailable(buffer)
-          if (bytesRead < 0) break
-          sink.write(buffer, 0, bytesRead)
+      }.body<ByteArray>()
+      if (bytes.isEmpty()) error("Map image is empty")
+      // 是否写入缓存，同样使用runCatching包住
+      val isCached = runCatching {
+        getSink().buffer().use { sink ->
+          sink.write(bytes)
+          sink.flush()
         }
-        sink.flush()
-      }
-    } catch (e: Exception) {
-      deleteImageFile()
+        getImageFile()?.isNotEmpty() == true
+      }.onFailure {
+        if (isFileExist()) {
+          runCatching { deleteImageFile() }
+        }
+      }.getOrDefault(false)
+      MapImageDownloadResult(bytes, isCached)
+    } catch (e: CancellationException) {
       throw e
+    } catch (e: Exception) {
+      // 用runCatching包住，删除缓存作为兜底，失败也不抛出异常
+      if (isFileExist()) {
+        runCatching { deleteImageFile() }
+      }
+      throw e
+    }
+  }
+
+  /**
+   * 后端返回的为http开头，这里转成https的
+   * 因为苹果的ATS不允许http，这里暂时转换一下
+   */
+  private fun String.toHttpsCdnUrl(): String {
+    return if (startsWith("http://")) {
+      replaceFirst("http://", "https://")
+    } else {
+      this
     }
   }
 }

@@ -2,7 +2,6 @@ package com.cyxbs.pages.map.util
 
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.absolutePath
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
 import io.github.vinceglb.filekit.exists
@@ -19,7 +18,7 @@ actual val imageFile: PlatformFile
   get() = FileKit.filesDir / "map_image.jpg"
 
 actual fun getAbsolutePath(): String {
-  return imageFile.absolutePath()
+  return imageFile.nsUrl.path.orEmpty()
 }
 
 actual fun getSink(append: Boolean): Sink {

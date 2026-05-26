@@ -215,6 +215,9 @@ class MapUiController(
             mainAnchorState.placeId = event.placeId
             updateMainAnchorState(getOffset, true)
           }
+          launch {
+            bottomSheetState.collapse()
+          }
         }
       }
 
