@@ -20,7 +20,6 @@ import com.cyxbs.components.config.route.FAIRGROUND_ENTRY
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.ufield.R
@@ -57,7 +56,7 @@ class FairgroundPageFragment : BaseFragment(R.layout.ufield_fragment_fairground)
             doIfLogin {
                 //startActivity(FOOD_ENTRY)
                 //接入Compose
-                MainNavController.navigate(FoodNavArgument)
+                FoodNavArgument.navigate()
             }
         }
         startSquare.setOnClickListener {

@@ -1,13 +1,15 @@
 package com.cyxbs.components.base.webView
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.ContextWrapper
+import android.media.MediaScannerConnection
 import android.os.Bundle
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import androidx.activity.OnBackPressedCallback
+import android.os.Environment
+import android.view.ViewGroup
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -33,15 +35,25 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.R
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.scheme.WebViewFactory
+import com.cyxbs.components.config.dir.DIR_PHOTO
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.navigation.WebViewFactory
+import com.cyxbs.components.utils.extensions.doPermissionAction
+import com.cyxbs.components.utils.extensions.loadBitmap
+import com.cyxbs.components.utils.extensions.saveImage
+import com.cyxbs.components.utils.extensions.toast
 import com.g985892345.provider.api.annotation.ImplProvider
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * 通用的 webView activity
@@ -53,73 +65,109 @@ class WebViewActivity : BaseActivity() {
 
   @ImplProvider
   companion object : WebViewFactory {
+
+    const val ARG_URL = "url"
+    const val ARG_HIDE_TITLE = "hideTitle" // 是否隐藏标题栏
+    const val ARG_TITLE = "title" // 如果为 null 则优先使用网页标签页名字
+    const val ARG_DEFAULT_TITLE = "defaultTitle" // 如果网页标签页名字为空则使用这个为标题
+
+
+
+    const val DEFAULT_TITLE = "网页"
+
     fun start(
       url: String,
-      hideTitle: Boolean = false, // 是否隐藏标题栏
-      title: String? = null, // 如果为 null 则优先使用网页标签页名字
-      defaultTitle: String = "网页" // 如果网页标签页名字为空则使用这个
+      hideTitle: Boolean = false,
+      title: String? = null,
+      defaultTitle: String = DEFAULT_TITLE
     ) {
       startActivity(WebViewActivity::class) {
-        putExtra("hideTitle", hideTitle)
-        putExtra("url", url)
-        putExtra("title", title)
-        putExtra("defaultTitle", defaultTitle)
+        putExtra(ARG_URL, url)
+        putExtra(ARG_HIDE_TITLE, hideTitle)
+        putExtra(ARG_TITLE, title)
+        putExtra(ARG_DEFAULT_TITLE, defaultTitle)
       }
     }
 
     override fun startWebView(url: String) {
-      start(url)
+      val uri = url.toUri()
+      start(
+        url = url,
+        hideTitle = uri.getQueryParameter(ARG_HIDE_TITLE)?.toBooleanStrictOrNull() ?: false,
+        title = uri.getQueryParameter(ARG_TITLE),
+        defaultTitle = uri.getQueryParameter(ARG_DEFAULT_TITLE) ?: DEFAULT_TITLE,
+      )
     }
   }
 
-  private val viewModel by viewModels<WebViewViewModel>()
-  private val mHideTitle by lazy { intent.getBooleanExtra("hideTitle", false) }
-  private val mUrl by lazy { intent.getStringExtra("url") }
-  private val mTitle by lazy { intent.getStringExtra("title") }
+  private val mUrl by lazy { intent.getStringExtra(ARG_URL) }
+  private val mHideTitle by lazy { intent.getBooleanExtra(ARG_HIDE_TITLE, false) }
+  private val mTitle by lazy { intent.getStringExtra(ARG_TITLE) }
+  private val mDefaultTitle by lazy { intent.getStringExtra(ARG_DEFAULT_TITLE) ?: DEFAULT_TITLE }
 
-  private val mDefaultTitle by lazy { intent.getStringExtra("defaultTitle") ?: "网页" }
-  
-  // 返回按钮回调 - 根据 WebView 是否有历史记录来控制行为
-  private val onBackPressedCallback = object : OnBackPressedCallback(true) {
-    override fun handleOnBackPressed() {
-      val webView = viewModel.webViewStateFlow.value
-      if (webView != null && webView.canGoBack()) {
-        // 如果 WebView 有历史记录，则后退
-        webView.goBack()
-      } else {
-        // 临时禁用当前回调
-        isEnabled = false
-        // 递归再次触发系统默认返回行为（会调用 Activity.finish()）
-        onBackPressedDispatcher.onBackPressed()
-        // 重新启用回调，以便下次返回键按下时仍能处理
-        isEnabled = true
-      }
-    }
-  }
+  // 前端通过 JS 桥控制的全屏状态
+  private var isFullscreen by mutableStateOf(false)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    
-    // 注册返回按钮回调
-    onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
-    
     setContent {
       AppTheme {
         WebViewCompose(
-          hideTitle = mHideTitle,
+          hideTitle = mHideTitle || isFullscreen,
           url = mUrl,
           title = mTitle,
-          defaultTitle = mDefaultTitle
+          defaultTitle = mDefaultTitle,
+          onSavePic = ::savePic,
+          onSetFullscreen = ::applyFullscreen,
         )
       }
     }
   }
-}
 
-class WebViewViewModel : BaseViewModel() {
-  // webView 对象，用于 activity 处理一些操作
-  // 声明周期由 Compose 内部主动置为 null 保证
-  val webViewStateFlow = MutableStateFlow<LiteJsWebView?>(null)
+  // JS 调用 setFullscreen(b) 时触发：切换标题栏和 systemBars 显隐
+  private fun applyFullscreen(fullscreen: Boolean) {
+    runOnUiThread {
+      isFullscreen = fullscreen
+      val controller = WindowInsetsControllerCompat(window, window.decorView)
+      if (fullscreen) {
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+      } else {
+        controller.show(WindowInsetsCompat.Type.systemBars())
+      }
+    }
+  }
+
+  // JS 调用 savePic(url) 时触发：弹确认对话框 -> 申请权限 -> 下载并保存到相册
+  private fun savePic(url: String) {
+    doPermissionAction(Manifest.permission.WRITE_EXTERNAL_STORAGE) {
+      doAfterGranted {
+        MaterialAlertDialogBuilder(this@WebViewActivity)
+          .setTitle("是否保存")
+          .setMessage("这张图片将保存到手机")
+          .setPositiveButton("确定") { dialog, _ ->
+            val name = "${System.currentTimeMillis()}${url.split('/').lastIndex}"
+            this@WebViewActivity.loadBitmap(url) { bitmap ->
+              this@WebViewActivity.saveImage(bitmap, name)
+              MediaScannerConnection.scanFile(
+                this@WebViewActivity,
+                arrayOf("${Environment.getExternalStorageDirectory()}$DIR_PHOTO"),
+                arrayOf("image/jpeg"),
+                null,
+              )
+              runOnUiThread {
+                toast("图片保存于${Environment.DIRECTORY_PICTURES}${DIR_PHOTO}文件夹下哦")
+                dialog.dismiss()
+              }
+            }
+          }
+          .setNegativeButton("取消") { dialog, _ ->
+            dialog.dismiss()
+          }
+          .show()
+      }
+    }
+  }
 }
 
 @Composable
@@ -128,6 +176,8 @@ private fun WebViewCompose(
   url: String?,
   title: String?,
   defaultTitle: String,
+  onSavePic: (String) -> Unit,
+  onSetFullscreen: (Boolean) -> Unit,
 ) {
   val webViewTitle = remember { mutableStateOf(title) }
   val context = LocalContext.current
@@ -140,19 +190,17 @@ private fun WebViewCompose(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Image(
-          painter = painterResource(com.cyxbs.components.config.R.drawable.config_ic_back),
+          painter = painterResource(R.drawable.config_ic_back),
           contentDescription = null,
           modifier = Modifier
             .padding(start = 24.dp)
             .size(12.dp)
             .clickable {
-              var wrapper = context
+              var wrapper: Context = context
               while (wrapper is ContextWrapper && wrapper !is Activity) {
                 wrapper = wrapper.baseContext
               }
-              if (wrapper is Activity) {
-                wrapper.finishAfterTransition()
-              }
+              (wrapper as? Activity)?.finishAfterTransition()
             }
         )
         Text(
@@ -176,6 +224,8 @@ private fun WebViewCompose(
         WebViewCompose(
           webViewTitle = webViewTitle,
           url = url,
+          onSavePic = onSavePic,
+          onSetFullscreen = onSetFullscreen,
         )
       } else {
         Text(text = "无网页链接")
@@ -188,29 +238,30 @@ private fun WebViewCompose(
 private fun WebViewCompose(
   webViewTitle: MutableState<String?>,
   url: String,
+  onSavePic: (String) -> Unit,
+  onSetFullscreen: (Boolean) -> Unit,
 ) {
-  val viewModel = viewModel<WebViewViewModel>()
+  val lifecycleOwner = LocalLifecycleOwner.current
+  val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher!!
   AndroidView(
     modifier = Modifier.fillMaxSize(),
-    factory = {
-      LiteJsWebView(it).apply {
-        init()
-        webChromeClient = object : WebChromeClient() {
-          // 加载的时候会拿到网页的标签页名字
-          override fun onReceivedTitle(view: WebView?, title: String) {
-            super.onReceivedTitle(view, title)
-            if (webViewTitle.value == null && title.isNotEmpty()) {
-              webViewTitle.value = title
+    factory = { ctx ->
+      LiteJsWebView(ctx).apply {
+        layoutParams = ViewGroup.LayoutParams(
+          ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        init(
+          lifecycleOwner = lifecycleOwner,
+          url = url,
+          onBackPressedDispatcher = backDispatcher,
+          onSavePic = onSavePic,
+          onSetFullscreen = onSetFullscreen,
+          onReceivedTitle = { t ->
+            if (webViewTitle.value == null && t.isNotEmpty()) {
+              webViewTitle.value = t
             }
-          }
-        }
-        loadUrl(url)
-        viewModel.webViewStateFlow.value = this
+          },
+        )
       }
     },
-    onRelease = {
-      viewModel.webViewStateFlow.value = null
-      it.destroy()
-    }
   )
 }

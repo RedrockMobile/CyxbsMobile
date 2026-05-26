@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 
 /**  
@@ -35,17 +36,19 @@ import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
  */
 
 @Composable
-fun DownLoadProgressDialog() {
+fun DownLoadProgressDialog(argument: SchoolCarNavArgument) {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	DownLoadProgressDialogCompose(
-		viewModel.downProgressDialogState.value,
-		viewModel.downProgress.value,
-		viewModel::closeDownLoadProgressDialog
+		argument = argument,
+    showState = viewModel.downProgressDialogState.value,
+    progress = viewModel.downProgress.value,
+    onDismissRequest = viewModel::closeDownLoadProgressDialog
 	)
 }
 
 @Composable
 fun DownLoadProgressDialogCompose(
+	argument: SchoolCarNavArgument,
 	showState: Boolean,
 	progress: Float,
 	onDismissRequest: () -> Unit
@@ -96,9 +99,12 @@ fun DownLoadProgressDialogCompose(
 }
 
 @Composable
-fun DownLoadErrorDialog() {
+fun DownLoadErrorDialog(argument: SchoolCarNavArgument) {
 	val viewModel = viewModel(SchoolCarViewModel::class)
-	DownLoadErrorDialogCompose(viewModel.downErrorDialogState.value, viewModel::onDismissErrorDialog)
+	DownLoadErrorDialogCompose(viewModel.downErrorDialogState.value) {
+		viewModel.onDismissErrorDialog()
+		argument.popBackStack()
+	}
 }
 
 @Composable

@@ -3,7 +3,7 @@ import androidx.compose.ui.window.ComposeViewport
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
-import com.cyxbs.components.config.navigation.MainNavHost
+import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.api.annotation.ImplProvider
 
@@ -20,7 +20,7 @@ fun main() {
   InitialManager.init(isMainProcess = true)
   ComposeViewport(viewportContainerId = "composeContainer") {
     AppTheme {
-      MainNavHost()
+      AppNavDisplay()
       PlatformToastCompose()
     }
   }

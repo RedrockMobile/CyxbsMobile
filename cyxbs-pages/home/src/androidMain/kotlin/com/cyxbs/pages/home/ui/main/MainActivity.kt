@@ -5,9 +5,9 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.config.navigation.MainNavHost
 import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.functions.update.api.IAppUpdateService
@@ -30,7 +30,7 @@ class MainActivity : BaseActivity() {
     // 还原主题，因为 MainActivity 最开始在 AndroidManifest.xml 设置了闪屏页背景，所以这里需要还原
     setTheme(com.cyxbs.components.config.R.style.ConfigAppTheme)
     super.onCreate(savedInstanceState)
-    setContent { AppTheme { MainNavHost() } }
+    setContent { AppTheme { AppNavDisplay() } }
     initUpdate()
     initPing()
   }

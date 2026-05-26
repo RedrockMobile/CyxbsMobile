@@ -14,6 +14,4 @@
     <string name="discover_news_jwzx">学事オンライン</string>
     <string name="discover_title_todo">やることリスト</string>
     <string name="discover_title_sport">体育チェックイン</string>
-    <string name="discover_pic_save_alert_dialog_message">この写真はスマートフォンに保存されます</string>
-    <string name="discover_pic_save_alert_dialog_title">保存されますか</string>
 </resources>

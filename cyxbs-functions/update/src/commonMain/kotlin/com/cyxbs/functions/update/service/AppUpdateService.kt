@@ -8,7 +8,7 @@ import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.functions.update.api.UpdateInfo
-import com.cyxbs.functions.update.dialog.UpdateInfoArgument
+import com.cyxbs.functions.update.dialog.UpdateInfoNavArgument
 import com.cyxbs.functions.update.network.AppUpdateApiService
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +54,7 @@ object AppUpdateService : IAppUpdateService {
   }
 
   override fun noticeUpdate(newVersion: UpdateInfo) {
-    UpdateInfoArgument(
+    UpdateInfoNavArgument(
       versionName = newVersion.versionName,
       updateContent = newVersion.updateContent,
       downloadUrl = newVersion.apkUrl,

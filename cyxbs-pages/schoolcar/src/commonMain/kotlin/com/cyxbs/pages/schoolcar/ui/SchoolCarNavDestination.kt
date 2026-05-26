@@ -21,10 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.MainNavDestination
-import com.cyxbs.components.config.navigation.NAV_SCHOOL_CAR
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
 import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
@@ -32,7 +31,6 @@ import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import com.cyxbs.pages.schoolcar.viewmodel.SchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoButtonSheet
-import com.g985892345.provider.api.annotation.ImplProvider
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_map_back
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_positioning
@@ -47,18 +45,19 @@ import org.jetbrains.compose.resources.painterResource
  * email : qq2420226433@outlook.com
  * date : 2026/2/18 21:19
  */
-@ImplProvider(clazz = MainNavDestination::class, name = NAV_SCHOOL_CAR)
-class SchoolCarNavDestination :
-	MainNavDestination<SchoolCarNavArgument>(SchoolCarNavArgument::class) {
-	override val needLogin: Boolean
-		get() = false
+@AppNav(route = NAV_SCHOOL_CAR)
+class SchoolCarNavDestination : AppNavEntry<SchoolCarNavArgument>() {
+
+	override fun isNeedLogin(argument: SchoolCarNavArgument): Boolean {
+		return false
+	}
 
 	@Composable
-	override fun DestinationContent(parcel: DestinationParcel<SchoolCarNavArgument>) {
+	override fun Content(argument: SchoolCarNavArgument) {
 		viewModel { SchoolCarViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
 		val viewModel = viewModel(SchoolCarViewModel::class)
-		DownLoadProgressDialog()
-		DownLoadErrorDialog()
+		DownLoadProgressDialog(argument)
+		DownLoadErrorDialog(argument)
 		AnimatedContent(
 			targetState = viewModel.schoolCarPage.value,
 			transitionSpec = {
@@ -74,12 +73,12 @@ class SchoolCarNavDestination :
 				if (viewModel.schoolCarPage.value == 1) {
 					viewModel.backFromDetail()
 				} else {
-					MainNavController.popBackStack()
+					argument.popBackStack()
 				}
 			}
 		) { page ->
 			if (page == 0) {
-				SchoolCarPage()
+				SchoolCarPage(argument)
 			} else {
 				SchoolCarDetailPage()
 			}
@@ -88,7 +87,7 @@ class SchoolCarNavDestination :
 }
 
 @Composable
-fun SchoolCarPage() {
+fun SchoolCarPage(argument: SchoolCarNavArgument) {
 	val viewModel = viewModel(SchoolCarViewModel::class)
 	SchoolCarMapCompose()
 	CarInfoButtonSheet(
@@ -97,11 +96,11 @@ fun SchoolCarPage() {
 		toggleCurrentLine = viewModel::toggleCurrentLine,
 		onSelectClosedSite = viewModel::selectClosedSite
 	)
-	SchoolCarMapFunctionButtonCompose()
+	SchoolCarMapFunctionButtonCompose(argument)
 }
 
 @Composable
-fun SchoolCarMapFunctionButtonCompose() {
+fun SchoolCarMapFunctionButtonCompose(argument: SchoolCarNavArgument) {
 	val windowScreenSize = getWindowScreenSize()
 	val heigh = windowScreenSize.height / 5
 
@@ -113,7 +112,7 @@ fun SchoolCarMapFunctionButtonCompose() {
 			modifier = Modifier.align(Alignment.TopStart).systemBarsPadding()
 				.padding(top = 5.dp, start = 25.dp)
 				.clickableNoIndicator {
-					MainNavController.popBackStack()
+					argument.popBackStack()
 				},
 			painter = painterResource(Res.drawable.schoolcar_ic_map_back),
 			contentDescription = null

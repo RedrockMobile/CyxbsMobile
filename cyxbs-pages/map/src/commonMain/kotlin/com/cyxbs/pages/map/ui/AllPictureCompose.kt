@@ -27,7 +27,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.res.ConfigRes
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
@@ -76,7 +75,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
           .padding(end = 15.dp)
           .clickableSingle {
             loginDialogState.doIfLogin(
-              msg = "上传图片"
+              function = "上传图片"
             ) {
               showState.value = true
             }
@@ -113,7 +112,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
               .aspectRatio(4f / 3f)
               .clip(RoundedCornerShape(10.dp))
               .clickableSingle {
-                MainNavController.navigate(MapShowPictureArgument(images, index))
+                MapShowPictureNavArgument(images, index).navigate()
               },
             contentScale = ContentScale.Crop
           )

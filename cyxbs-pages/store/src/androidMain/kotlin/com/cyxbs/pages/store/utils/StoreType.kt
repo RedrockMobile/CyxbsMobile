@@ -8,16 +8,15 @@ import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.store.api.IStoreService.Task.DAILY_SIGN
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_DECLARE
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_FOOD
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_NOCLASS
-import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_UFIELD
 import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_QA
+import com.cyxbs.pages.store.api.IStoreService.Task.JOIN_UFIELD
 import com.cyxbs.pages.store.api.IStoreService.Task.LOGIN_VOLUNTEER
 import com.cyxbs.pages.store.bean.StampCenter
 
@@ -43,7 +42,7 @@ class StoreType {
           //startActivity(FOOD_ENTRY)
           //因为新版本的Food页面是一个MainActivity的一个Compose页面，所以这里先跳转到MainActivity
           startActivity(MAIN_ENTRY)
-          MainNavController.navigate(FoodNavArgument)
+          FoodNavArgument.navigate()
 
         }
         JOIN_NOCLASS.title-> {

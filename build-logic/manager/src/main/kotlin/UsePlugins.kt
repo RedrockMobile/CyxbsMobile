@@ -1,6 +1,5 @@
 import com.g985892345.provider.plugin.gradle.extensions.KtProviderExtensions
 import com.google.devtools.ksp.gradle.KspExtension
-import de.jensklingenberg.ktorfit.gradle.KtorfitPluginExtension
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
@@ -25,7 +24,7 @@ fun Project.useKtProvider(isNeedKsp: Boolean = !name.startsWith("api")) {
     kspMultiplatform(ktProvider.ksp)
   }
   // AGP9 后 application 插件不能与 multiplatform 共存
-  // 所以这里需要先判断 KotlinMultiplatformExtension 是否存在
+  // 所以这里需要先判断 KotlinMultiplatformExtension 是否存在 (仅 application 模块需要，lib 模块默认包含多平台插件，无需这样配置)
   extensions.findByType(KotlinMultiplatformExtension::class)?.apply {
     sourceSets.commonMain.dependencies {
       implementation(libsEx.`kmp-ktProvider-api`)
@@ -71,6 +70,8 @@ fun Project.useRoom(
 
 /**
  * 使用网络请求
+ *
+ * - 编译期会自动关联上 KtProvider，所以需要同时引入 useKtProvider()
  */
 fun Project.useNetwork() {
   // ksp 按需引入
@@ -93,6 +94,27 @@ fun Project.useNetwork() {
   // Ktorfit 每次使用都要先触发 KSP task 才会生成实现类
   // 这里编译期关联上 KtProvider，以后只需要 XXXApi::class.impl() 就可以直接获取到实现类了
   kspMultiplatform(project(":cyxbs-compiler:ksp-network"))
+}
+
+/**
+ * 使用 navigation3
+ *
+ * - 编译期会自动关联上 KtProvider，所以需要同时引入 useKtProvider()
+ * - 每个 @AppNav 类会输出输出一份 deeplink 报告，最后会汇总到 `<app>/AppNav.md`
+ */
+fun Project.useNavigation(isNeedKsp: Boolean = !name.startsWith("api")) {
+  if (isNeedKsp) {
+    apply(plugin = libsEx.plugins.ksp)
+    extensions.configure<KspExtension> {
+      arg("appNav.modulePath", project.path)
+    }
+    kspMultiplatform(project(":cyxbs-compiler:ksp-navigation"))
+  }
+  extensions.findByType(KotlinMultiplatformExtension::class)?.apply {
+    sourceSets.commonMain.dependencies {
+      implementation(project(":cyxbs-components:navigation"))
+    }
+  }
 }
 
 private fun Project.kspMultiplatform(dependencyNotation: Any) {

@@ -2,26 +2,21 @@ package com.cyxbs.pages.discover.utils
 
 import com.cyxbs.components.base.operations.doIfLogin
 import com.cyxbs.components.base.ui.BaseUi
-import com.cyxbs.components.config.navigation.NAV_MAP
 import com.cyxbs.components.config.route.DISCOVER_CALENDAR
-import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
-import com.cyxbs.components.config.route.DISCOVER_MAP
 import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_OTHER_COURSE
-import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.route.DISCOVER_SPORT
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
-import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.config.sp.defaultSp
+import com.cyxbs.components.navigation.AppNavArgument
+import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.discover.R
-import com.cyxbs.pages.emptyroom.api.EmptyRoomArgument
+import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import java.lang.ref.SoftReference
-import kotlin.reflect.KClass
 
 /**
  * @author zixuan
@@ -37,7 +32,7 @@ object MoreFunctionProvider {
             Function(R.drawable.discover_ic_map, R.string.discover_title_map, R.string.discover_detail_map, StartNavDestination(MapNavArgument(null)), ClickEvent.CLICK_CYDT_ENTRY),
             Function(R.drawable.discover_ic_no_class, R.string.discover_title_no_class, R.string.discover_detail_no_class, StartActivityAfterLogin("没课约", DISCOVER_NO_CLASS), ClickEvent.CLICK_MKY_ENTRY),
             Function(R.drawable.discover_ic_bus_track, R.string.discover_title_bus_track, R.string.discover_detail_bus_track, StartNavDestination(SchoolCarNavArgument), ClickEvent.CLICK_XCGJ_ENTRY),
-            Function(R.drawable.discover_ic_empty_classroom, R.string.discover_title_empty_classroom, R.string.discover_detail_empty_classroom, StartNavDestination(EmptyRoomArgument), ClickEvent.CLICK_YLC_KJS_ENTRY),
+            Function(R.drawable.discover_ic_empty_classroom, R.string.discover_title_empty_classroom, R.string.discover_detail_empty_classroom, StartNavDestination(EmptyRoomNavArgument), ClickEvent.CLICK_YLC_KJS_ENTRY),
             Function(R.drawable.discover_ic_school_calendar, R.string.discover_title_school_calendar, R.string.discover_detail_school_calendar, StartActivityImpl(DISCOVER_CALENDAR), ClickEvent.CLICK_YLC_XL_ENTRY),
             Function(R.drawable.discover_ic_todo,R.string.discover_title_todo, R.string.discover_detail_todo, StartActivityImpl(DISCOVER_TODO_MAIN), ClickEvent.CLICK_YZQD_ENTRY),
             Function(R.drawable.discover_ic_sport, R.string.discover_title_sport, R.string.discover_detail_sport, StartActivityAfterLogin("体育打卡", DISCOVER_SPORT), ClickEvent.CLICK_YLC_TYDK_ENTRY),
@@ -88,9 +83,9 @@ object MoreFunctionProvider {
         }
     }
 
-    class StartNavDestination<T : Any>(private val route: T) : StartActivityAble {
+    class StartNavDestination<T : AppNavArgument>(private val route: T) : StartActivityAble {
         override fun startActivity(baseUi: BaseUi) {
-            MainNavController.navigate(route)
+            route.navigate()
         }
 
     }

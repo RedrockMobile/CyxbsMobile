@@ -5,6 +5,7 @@ plugins {
 
 useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
+useNavigation() // navigation 跳转
 
 kotlin {
   sourceSets {
@@ -16,6 +17,7 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsFunctions.update.api)
       implementation(projects.cyxbsComponents.account.api)
+      implementation(projects.cyxbsPages.home.api)
       implementation(libs.compose.lottie)
     }
     androidMain.dependencies {

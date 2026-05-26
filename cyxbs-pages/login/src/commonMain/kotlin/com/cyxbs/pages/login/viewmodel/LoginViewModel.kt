@@ -6,15 +6,16 @@ import androidx.compose.ui.text.input.TextFieldValue
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.init.InitialManager
-import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
@@ -75,14 +76,19 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
         try {
           if (requestLogin(stuNum, password)) {
             delay(startTime + 2.seconds - Clock.System.now()) // 网络太快会闪一下，像bug，就让它最少待两秒吧
-            val targetRoute = argument.targetRoute
-            if (targetRoute != null) {
-              MainNavController.navigate(targetRoute) {
-                popUpTo(argument) { inclusive = true }
-                restoreState = false // 跳转不保留状态
-              }
+            val targetUrl = argument.targetUrl
+            if (targetUrl != null) {
+              argument.popBackStack()
+              AppScheme.jump(targetUrl)
+              logg("clickLogin: $appNavBackStack, targetUrl = $targetUrl")
             } else {
-              MainNavController.popBackStack()
+              // 直接返回
+              logg("clickLogin: $appNavBackStack")
+              argument.popBackStack()
+              if (appNavBackStack.isEmpty()) {
+                // 如果为空则跳到首页
+                HomeNavArgument().navigate()
+              }
             }
           }
         } catch (e: Exception) {
@@ -177,13 +183,13 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
   // 进入游客模式
   open fun enterTouristMode() {
     // 弹出所有页面，重新回到主页
-    MainNavController.navigate(HomeNavArgument()) {
-      popUpTo(0) { inclusive = true }
-    }
+    appNavBackStack.clear()
+    HomeNavArgument().navigate()
   }
 
   // 不同意用户协议
   open fun clickDisagreeUserAgreement() {
-    MainNavController.navigateUp()
+    argument.popBackStack()
+    // todo 这里应该直接退出 app，但需要分不同平台来处理，后续再配置
   }
 }

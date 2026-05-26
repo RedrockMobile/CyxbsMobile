@@ -27,14 +27,13 @@ import com.cyxbs.components.config.route.STORE_ENTRY
 import com.cyxbs.components.config.route.UFIELD_CENTER_ENTRY
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setAvatarImageFromUrl
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.pages.mine.about.ui.AboutArgument
+import com.cyxbs.pages.mine.about.ui.AboutNavArgument
 import com.cyxbs.pages.mine.page.edit.EditInfoActivity
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity
@@ -129,7 +128,7 @@ class UserFragment : BaseFragment() {
 
             mine_user_fm_about_us.setOnSingleClickListener {
                 doIfLogin {
-                    MainNavController.navigate(AboutArgument)
+                    AboutNavArgument.navigate()
                 }
             }
             mine_user_fm_setting.setOnSingleClickListener {

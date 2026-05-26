@@ -1,6 +1,5 @@
 package com.cyxbs.components.base.webView
 
-import android.os.Handler
 import androidx.annotation.Keep
 
 
@@ -9,10 +8,12 @@ import androidx.annotation.Keep
  */
 @Keep
 class AndroidWebView(
-    handler: Handler? = null,
+    onSavePic: (url: String) -> Unit = {},
     exe: (String) -> Unit = {},
-    toast: (String) -> Unit = {}
-) : IAndroidWebView(handler, exe, toast) {
+    toast: (String) -> Unit = {},
+    onSetFullscreen: (fullscreen: Boolean) -> Unit = {},
+    getSystemBarInsets: () -> String = { IAndroidWebView.DEFAULT_INSETS_JSON },
+) : IAndroidWebView(onSavePic, exe, toast, onSetFullscreen, getSystemBarInsets) {
 
 
     override fun webViewResume() {

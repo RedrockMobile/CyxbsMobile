@@ -2,7 +2,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
-import com.cyxbs.components.config.navigation.MainNavHost
+import com.cyxbs.components.navigation.AppNavDisplay
 import com.g985892345.provider.api.annotation.ImplProvider
 import platform.UIKit.UIViewController
 
@@ -23,7 +23,7 @@ fun doInitApp(isDebug: Boolean) {
 fun MainViewController(): UIViewController {
   return ComposeUIViewController {
     AppTheme {
-      MainNavHost()
+      AppNavDisplay()
 //      PlatformToastCompose()
     }
   }

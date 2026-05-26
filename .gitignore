@@ -40,3 +40,5 @@ node_modules/
 # 暂时不忽略 xcode.xml，解决无法选择指定 iosApp 打包的问题
 # https://youtrack.jetbrains.com/issue/KMT-1298/Support-multiple-iosApp-target-in-the-same-project
 !/.idea/xcode.xml
+
+*.local.json

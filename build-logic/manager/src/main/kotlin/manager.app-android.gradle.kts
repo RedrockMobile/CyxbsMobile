@@ -1,3 +1,4 @@
+import nav.AppNavReportTask
 import rule.ModuleNamespaceCheckRule
 
 plugins {
@@ -70,3 +71,6 @@ android {
     buildConfig = true
   }
 }
+
+// 在 assembleDebug/assembleRelease 后自动聚合当前 app 依赖模块的 MainNav 报告到 <app>/MainNav.md
+AppNavReportTask.register(project)

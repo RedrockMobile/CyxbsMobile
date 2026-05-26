@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.ILinkService2
@@ -90,7 +89,7 @@ private fun ClassroomWithTeacher(classroom: String, teacher: String) {
       Text(
         modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE).clickable {
           // 跳转到地图页
-          MainNavController.navigate(MapNavArgument(classroom))
+          MapNavArgument(classroom).navigate()
         },
         text = classroom,
         fontSize = 13.sp,

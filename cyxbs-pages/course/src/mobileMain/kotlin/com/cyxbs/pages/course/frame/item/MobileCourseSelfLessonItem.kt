@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.components.init.MainNavController
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
 import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
@@ -88,7 +87,7 @@ private class MobileSelfCourseBottomSheetExtension(
       },
       onClickContent = {
         // 跳转到地图页
-        MainNavController.navigate(MapNavArgument(itemKeyImpl.lesson.classroom))
+        MapNavArgument(itemKeyImpl.lesson.classroom).navigate()
       },
     )
     LaunchedEffect(this) {

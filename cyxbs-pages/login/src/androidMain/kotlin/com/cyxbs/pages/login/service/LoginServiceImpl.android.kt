@@ -1,8 +1,8 @@
 package com.cyxbs.pages.login.service
 
-import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.ILoginService
 import com.cyxbs.pages.login.api.LoginNavArgument
 

@@ -14,13 +14,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.util.Consumer
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDeepLinkRequest
 import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.utils.Umeng
-import com.cyxbs.components.config.navigation.DestinationParcel
-import com.cyxbs.components.config.navigation.HomeNavArgument
 import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
@@ -28,13 +25,14 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.init.MainNavController
+import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.R
 import com.cyxbs.pages.home.adapter.MainAdapter
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import kotlinx.coroutines.flow.launchIn
@@ -50,7 +48,7 @@ private const val ACTION_TEST_UPDATE_DIALOG = "com.mredrock.cyxbs.action.TEST_UP
 
 @Composable
 internal actual fun PlatformMobileHomePage(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   content: @Composable () -> Unit
 ) {
   content()
@@ -85,7 +83,7 @@ internal actual fun PlatformMobileHomePage(
 
 @Composable
 internal actual fun HomeViewPagerCompose(
-  parcel: DestinationParcel<HomeNavArgument>,
+  argument: HomeNavArgument,
   modifier: Modifier,
 ) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
@@ -146,12 +144,7 @@ private fun execIntentAction(
     val url = intent.data
     if (url != null) {
       runCatching {
-        MainNavController.navigate(
-          request = NavDeepLinkRequest.Builder.fromUri(url)
-            .apply { intent.action?.let { setAction(it)} }
-            .apply { intent.type?.let { setMimeType(it)} }
-            .build()
-        )
+        AppScheme.jump(url.toString())
       }.onFailure {
         logg(it.stackTraceToString())
       }

@@ -1,5 +1,6 @@
 package com.cyxbs.pages.food.api
 
+import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,4 +10,4 @@ import kotlinx.serialization.Serializable
  * date : 2025/10/29 23:50
  */
 @Serializable
-object FoodNavArgument
+object FoodNavArgument : AppNavArgument
