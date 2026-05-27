@@ -30,7 +30,7 @@ fun ImageFromUrlCompose(
   block: (ImageRequest.Builder.() -> Unit)? = null
 ) {
   val realUrl = remember(url) {
-    if (url.startsWith("http")) url else getBaseUrl() + url
+    if (url.startsWith("http")) url.toHttpsCdnUrl() else getBaseUrl() + url
   }
   AsyncImage(
     modifier = modifier,
@@ -46,4 +46,16 @@ fun ImageFromUrlCompose(
     error = painterResource(error),
     contentScale = contentScale
   )
+}
+
+/**
+ * 后端返回的为http开头，这里转成https的
+ * 因为苹果的ATS不允许http，这里暂时转换一下
+ */
+private fun String.toHttpsCdnUrl(): String {
+  return if (startsWith("http://")) {
+    replaceFirst("http://", "https://")
+  } else {
+    this
+  }
 }
