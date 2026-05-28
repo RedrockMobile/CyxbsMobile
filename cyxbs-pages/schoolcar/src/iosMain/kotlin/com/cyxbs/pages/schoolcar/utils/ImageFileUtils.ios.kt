@@ -19,7 +19,7 @@ actual val imageFile: PlatformFile
   get() = FileKit.filesDir / "schoolcar_map.png"
 
 actual fun getAbsolutePath(): String {
-  return imageFile.absolutePath()
+  return imageFile.nsUrl.path.orEmpty()
 }
 
 actual fun getSink(): Sink {
