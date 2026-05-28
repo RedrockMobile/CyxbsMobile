@@ -33,6 +33,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * @Desc : Map的ViewModel
@@ -154,11 +155,13 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 从外部跳转而来的placeSearch
   fun placeSearch(placeSearch: String) {
     launchByViewModelScope {
-      MapRepository.placeSearch(placeSearch).getOrElse { throwable ->
-        toast("未找到地点，请手动搜索")
-        mapInfo.value?.openSiteId
-      }?.let {
-        initFocus(it)
+      val placeId = withTimeoutOrNull(1500) {
+        MapRepository.placeSearch(placeSearch).getOrElse { throwable ->
+          findLocalPlace(placeSearch)?.placeId ?: mapInfo.value?.openSiteId
+        }
+      } ?: (findLocalPlace(placeSearch)?.placeId ?: mapInfo.value?.openSiteId)
+      placeId?.let {
+        focusPlaceFromSearch(it)
       }
     }
   }
@@ -166,15 +169,29 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 初始化地图信息
   fun initMapInfo() {
     launchByViewModelScope {
+      val localMapInfo = MapDataRepository.getMapInfo()
+      localMapInfo?.let {
+        mapInfo.value = it
+      }
       MapRepository.getMapInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
-        MapDataRepository.getMapInfo()
+        localMapInfo
       }?.let {
         mapInfo.value = it
-        MapDataRepository.saveMapInfo(it)
+        if (it != localMapInfo) {
+          MapDataRepository.saveMapInfo(it)
+        }
       } ?: run {
         downloadFailedDialogState.value = true
       }
+    }
+  }
+
+  private fun findLocalPlace(placeSearch: String): PlaceItem? {
+    val keyword = placeSearch.trim()
+    if (keyword.isEmpty()) return null
+    return mapInfo.value?.placeList?.firstOrNull { placeItem ->
+      placeItem.placeId == keyword || placeItem.placeName.contains(keyword, true)
     }
   }
 
@@ -203,6 +220,12 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     )
   }
 
+  private fun focusPlaceFromSearch(placeId: String) {
+    mapInfo.value?.placeList?.find { it.placeId == placeId }?.let { placeItem ->
+      focusOnPlace(placeItem)
+    }
+  }
+
   fun calculatePlaceOffset(placeCenterX: Float, placeCenterY: Float): Offset? {
     val mapInfo = mapInfo.value ?: return null
     if (mapContainer.value == IntSize.Zero) return null
@@ -216,13 +239,21 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 获取按钮信息
   fun getButtonInfo() {
     launchByViewModelScope {
+      MapDataRepository.getButtonInfo()?.let { buttonInfo ->
+        buttonInfoItemList.clear()
+        buttonInfoItemList.addAll(buttonInfo.buttonInfo)
+      }
       MapRepository.getButtonInfo().getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
         MapDataRepository.getButtonInfo()
       }?.let { buttonInfo ->
-        buttonInfoItemList.clear()
-        buttonInfoItemList.addAll(buttonInfo.buttonInfo)
-        MapDataRepository.saveButtonInfo(buttonInfo)
+        if (buttonInfo.buttonInfo != buttonInfoItemList.toList()) {
+          buttonInfoItemList.clear()
+          buttonInfoItemList.addAll(buttonInfo.buttonInfo)
+        }
+        if (MapDataRepository.getButtonInfo() != buttonInfo) {
+          MapDataRepository.saveButtonInfo(buttonInfo)
+        }
       }
     }
   }
@@ -230,14 +261,32 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 获取地点详细信息
   fun getPlaceDetails(placeId: String) {
     launchByViewModelScope {
+      val localPlaceDetails = MapDataRepository.getPlaceDetails(placeId) ?: getLocalPlaceDetails(placeId)
+      localPlaceDetails?.let {
+        placeDetails.value = it
+        placeDetailsId.value = placeId
+      }
       MapRepository.getPlaceDetails(placeId).getOrElse { throwable ->
         toast(NETWORK_ERROR_INFO)
-        MapDataRepository.getPlaceDetails(placeId)
+        localPlaceDetails
       }?.let {
         placeDetails.value = it
         placeDetailsId.value = placeId
-        MapDataRepository.savePlaceDetails(placeId, it)
+        if (it != localPlaceDetails || MapDataRepository.getPlaceDetails(placeId) != it) {
+          MapDataRepository.savePlaceDetails(placeId, it)
+        }
       }
+    }
+  }
+
+  private fun getLocalPlaceDetails(placeId: String): PlaceDetails? {
+    return mapInfo.value?.placeList?.find { it.placeId == placeId }?.let {
+      PlaceDetails(
+        placeName = it.placeName,
+        placeAttribute = null,
+        tags = null,
+        images = null
+      )
     }
   }
 

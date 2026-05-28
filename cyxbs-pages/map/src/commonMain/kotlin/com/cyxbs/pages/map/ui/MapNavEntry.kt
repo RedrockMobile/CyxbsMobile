@@ -64,7 +64,6 @@ import com.cyxbs.pages.map.util.MapImageHelper
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
 import com.cyxbs.pages.map.util.getImageFile
-import com.cyxbs.pages.map.util.isFileExist
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
@@ -80,6 +79,7 @@ import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search_edit_text_i
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_unlock
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr_description
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
@@ -559,8 +559,6 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
 @Composable
 fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
-  val localImage = remember { mutableStateOf<ByteArray?>(null) }
-  val isImageLocalExist = remember { mutableStateOf(false) }
   val mapUiController = rememberMapUiController(
     mapWidgetState = viewmodel.mapWidgetState,
     mainAnchorState = viewmodel.anchorItemState,
@@ -574,48 +572,49 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
     viewmodel.mapInfo.value,
     viewmodel.isUpdateStart.value
   ) {
-    viewmodel.mapInfo.value?.let { mapInfo ->
-      // 如果不是更新地图，就走正常流程，否则就直接下载地图
-      if (!viewmodel.isUpdateStart.value) {
-        // 本地没有就直接下载,如果本地没有版本号信息也直接走下载
-        if (!isFileExist() || MapDataRepository.getMapVersion() == null) {
-          viewmodel.progressDialogState.value = true
-          MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-            viewmodel.downloadProgress.value = bytesRead.toFloat() / contentLength.toFloat()
-          }
-          value = getImageFile()
-          if (value == null) {
-            viewmodel.downloadFailedDialogState.value = true
+    try {
+      viewmodel.mapInfo.value?.let { mapInfo ->
+        // 如果不是更新地图，就走正常流程，否则就直接下载地图
+        if (!viewmodel.isUpdateStart.value) {
+          val localMapImage = getImageFile()?.takeIf { it.isNotEmpty() }
+          val localMapVersion = MapDataRepository.getMapVersion()
+          // 本地没有就直接下载,如果本地没有版本号信息也直接走下载
+          if (localMapImage == null || localMapVersion == null) {
+            viewmodel.progressDialogState.value = true
+            val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
+              viewmodel.downloadProgress.value =
+                bytesRead.toFloat() / contentLength.toFloat()
+            }
+            value = result.bytes
+            if (result.isCached) {
+              runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
+            }
             viewmodel.progressDialogState.value = false
           } else {
-            // 下载有数据就把当前版本号存进本地
-            MapDataRepository.saveMapVersion(mapInfo.pictureVersion)
-            viewmodel.progressDialogState.value = false
-          }
-        } else {
-          // 如果有，则先核对版本，版本对就直接拿缓存，不对就走更新
-          MapDataRepository.getMapInfo()?.let {
-            if (it.pictureVersion == MapDataRepository.getMapVersion()) {
-              value = getImageFile()
-            } else {
+            // 如果有，则先核对版本，版本对就直接拿缓存，不对就走更新
+            value = localMapImage
+            if (mapInfo.pictureVersion != localMapVersion) {
               viewmodel.updateMapDialogState.value = true
             }
           }
-        }
-      } else {
-        viewmodel.progressDialogState.value = true
-        MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-          viewmodel.downloadProgress.value = bytesRead.toFloat() / contentLength.toFloat()
-        }
-        value = getImageFile()
-        if (value == null) {
-          viewmodel.downloadFailedDialogState.value = true
-          viewmodel.progressDialogState.value = false
         } else {
-          MapDataRepository.saveMapVersion(mapInfo.pictureVersion)
+          viewmodel.progressDialogState.value = true
+          val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
+            viewmodel.downloadProgress.value =
+              bytesRead.toFloat() / contentLength.toFloat()
+          }
+          value = result.bytes
+          if (result.isCached) {
+            runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
+          }
           viewmodel.progressDialogState.value = false
         }
       }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Exception) {
+      viewmodel.progressDialogState.value = false
+      viewmodel.downloadFailedDialogState.value = true
     }
   }
   viewmodel.maxScale =
@@ -624,7 +623,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
     modifier = modifier
       .background(Color(0xFFA8BCF1))
   ) {
-    // 这里如果统一对imageResult作处理会导致更新地图的下载会模糊，只能暂时这样写了
     viewmodel.mapInfo.value?.let { mapInfo ->
       imageResult?.let { imageResult ->
         MapWidgetCompose(
@@ -634,16 +632,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           anchorItemState = viewmodel.anchorItemState,
           anchorItemStateList = viewmodel.anchorItemStateList
         )
-      } ?: run {
-        if (isImageLocalExist.value && !viewmodel.updateMapDialogState.value) {
-          MapWidgetCompose(
-            inputStream = localImage.value,
-            mapInfo = mapInfo,
-            mapWidgetState = viewmodel.mapWidgetState,
-            anchorItemState = viewmodel.anchorItemState,
-            anchorItemStateList = viewmodel.anchorItemStateList
-          )
-        }
       }
     }
 
@@ -666,10 +654,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           }
         )
       }
-    }
-    launch {
-      isImageLocalExist.value = isFileExist()
-      localImage.value = getImageFile()
     }
     launch {
       snapshotFlow { viewmodel.mapContainer.value }
