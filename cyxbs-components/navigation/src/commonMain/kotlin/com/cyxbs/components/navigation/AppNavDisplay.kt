@@ -63,9 +63,7 @@ fun AppNavDisplay() {
       rememberSaveableStateHolderNavEntryDecorator(),
     ),
     sceneStrategies = listOf(
-      rememberListDetailSceneStrategy(     // 宽屏下的列表与详细页处理
-        shouldHandleSinglePaneLayout = true,        // 从宽屏变成竖屏时拦截默认单栈处理
-      ),
+      rememberListDetailSceneStrategy(),        // 宽屏下的列表与详细页处理
       remember { DialogSceneStrategy() },       // 支持 Dialog 栈处理
       remember { SinglePaneSceneStrategy() },   // 默认单栈处理
     ),

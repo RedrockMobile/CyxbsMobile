@@ -1,6 +1,5 @@
 package com.cyxbs.pages.course.page.find.ui.find.activity
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -10,7 +9,6 @@ import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.viewpager2.widget.ViewPager2
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.config.route.DISCOVER_OTHER_COURSE
 import com.cyxbs.components.utils.adapter.FragmentVpAdapter
 import com.cyxbs.components.utils.extensions.lazyUnlock
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
@@ -19,18 +17,19 @@ import com.cyxbs.pages.course.page.find.ui.course.stu.FindStuCourseFragment
 import com.cyxbs.pages.course.page.find.ui.course.tea.FindTeaCourseFragment
 import com.cyxbs.pages.course.page.find.ui.find.fragment.FindStuFragment
 import com.cyxbs.pages.course.page.find.viewmodel.activity.FindLessonViewModel
-import com.g985892345.provider.api.annotation.KClassProvider
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 
 /**
- * ...
+ * 老的查找他人课表入口（DISCOVER_OTHER_COURSE 路由）。
+ * 已迁移至 Navigation3 ([com.cyxbs.pages.course.page.find.FindCourseNavEntry])，
+ * 移除 `@KClassProvider` 后此 Activity 不再被任何路由命中，仅作为历史代码保留。
+ *
  * @author 985892345 (Guo Xiangrui)
  * @email 2767465918@qq.com
  * @date 2022/2/8 15:40
  */
-@KClassProvider(clazz = Activity::class, name = DISCOVER_OTHER_COURSE)
 class FindLessonActivity : BaseActivity() {
   
   companion object {

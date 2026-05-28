@@ -31,6 +31,8 @@ import kotlin.math.max
 /**
  * 通用带选择按钮的 Dialog
  *
+ * 可使用 [rememberTextDialog] 快捷操作
+ *
  * @author 985892345
  * @date 2023/12/21 21:06
  */

@@ -130,7 +130,7 @@ abstract class LongPressMoveController {
 // 长按移动 item
 @Stable
 @Composable
-fun Modifier.longPressMove(
+private fun Modifier.longPressMove(
   controller: LongPressMoveController,
 ): Modifier {
   val controllerWrapper by rememberUpdatedWrapper(controller)

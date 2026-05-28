@@ -27,6 +27,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_ABOUT
+import com.cyxbs.components.navigation.NAV_COURSE_FIND
 import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
@@ -67,13 +68,15 @@ private val itemList = listOf(
   ActionItem("空教室查询") {
     AppScheme.jump("cyxbs://$NAV_EMPTY_ROOM")
   },
-
-
-
-
   ActionItem("校车查询", Platform.Web){
     AppScheme.jump("cyxbs://$NAV_SCHOOL_CAR")
   },
+  ActionItem("查询课表") {
+    AppScheme.jump("cyxbs://$NAV_COURSE_FIND")
+  },
+
+
+
   // 退出登陆放到最后，其他测试页面放到上面👆
   ActionItem("退出登录") {
     IAccountEditService::class.impl().onLogout()

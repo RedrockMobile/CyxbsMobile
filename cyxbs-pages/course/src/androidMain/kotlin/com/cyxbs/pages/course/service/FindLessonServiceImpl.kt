@@ -1,37 +1,30 @@
 package com.cyxbs.pages.course.service
 
 import android.content.Context
-import android.content.Intent
+import com.cyxbs.pages.course.api.CourseNavArgument
+import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.course.api.IFindLessonService
-import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
-import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
- * .
+ * 旧 [IFindLessonService] 的实现：已下线 KSP `@ImplProvider` 注册，
+ * 实现内部统一改走 Navigation3 路由（[FindCourseNavArgument] / [CourseNavArgument]）。
+ *
+ * grep 显示外部无 [IFindLessonService] 引用，保留此类仅作为历史代码参考。
  *
  * @author 985892345
  * @date 2022/9/22 15:54
  */
-@ImplProvider
 object FindLessonServiceImpl : IFindLessonService {
-  
+
   override fun startActivity(context: Context) {
-    context.startActivity(Intent(context, FindLessonActivity::class.java))
+    FindCourseNavArgument().navigate()
   }
-  
+
   override fun startActivityByStuNum(context: Context, stuNum: String) {
-    FindLessonActivity.startByStuNum(context, stuNum)
+    FindCourseNavArgument(directStuNum = stuNum).navigate()
   }
-  
+
   override fun startActivityByStuName(context: Context, stuName: String) {
-    FindLessonActivity.startByStuName(context, stuName)
-  }
-  
-  override fun startActivityByTeaNum(context: Context, teaNum: String) {
-    FindLessonActivity.startByTeaNum(context, teaNum)
-  }
-  
-  override fun startActivityByTeaName(context: Context, teaName: String) {
-    FindLessonActivity.startByTeaName(context, teaName)
+    FindCourseNavArgument(initialQuery = stuName).navigate()
   }
 }
