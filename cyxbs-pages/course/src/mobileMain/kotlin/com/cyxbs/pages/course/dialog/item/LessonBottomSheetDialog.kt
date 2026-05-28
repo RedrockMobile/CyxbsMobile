@@ -27,9 +27,10 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.model.LinkLessonRepository
 import com.cyxbs.pages.map.api.MapNavArgument
 import org.jetbrains.compose.resources.painterResource
 
@@ -73,8 +74,7 @@ private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
         contentScale = ContentScale.Inside,
         painter = painterResource(ILinkService2.icon_link_double),
         modifier = Modifier.padding(start = 16.dp).clickableNoIndicator {
-          // todo 跳转到搜索课表界面并打开关联人的课表
-          toast("todo：跳转到搜索课表界面并打开关联人的课表")
+          FindCourseNavArgument(directStuNum = LinkLessonRepository.state.value.linkNum).navigate()
         },
       )
     }

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
-
-    <style name="course_find_course_tab_style" tools:ignore="ResourceName">
-        <item name="android:textSize">18sp</item>
-        <item name="android:unselectedAlpha">0.6</item>
-    </style>
-</resources>

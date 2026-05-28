@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="course_find_course_link_bg">#E8F0FC</color>
-    <color name="course_find_course_link_line">#F2F3F8</color>
-    <color name="course_find_course_link_add_tv">#66142C52</color>
-
     <!--    课程色块内的字体颜色-->
     <color name="course_widget_link_lesson_tv">#06A3FC</color>
 

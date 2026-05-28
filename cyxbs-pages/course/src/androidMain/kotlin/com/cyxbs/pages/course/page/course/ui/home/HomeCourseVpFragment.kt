@@ -5,9 +5,9 @@ import android.view.View
 import androidx.fragment.app.viewModels
 import androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.course.page.course.ui.home.base.HomeCourseVpLinkFragment
 import com.cyxbs.pages.course.page.course.ui.home.viewmodel.HomeCourseViewModel
-import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
 import com.cyxbs.pages.course.widget.fragment.page.CoursePageFragment
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.launchByLifecycleScope
@@ -51,7 +51,7 @@ class HomeCourseVpFragment : HomeCourseVpLinkFragment() {
     mIvLink.setOnLongClickListener {
       val linkNum = mViewModel.linkStu.value.linkNum
       return@setOnLongClickListener if (linkNum.isNotBlank()) {
-        FindLessonActivity.startByStuNum(it.context, linkNum)
+        FindCourseNavArgument(directStuNum = linkNum).navigate()
         true
       } else false
     }
