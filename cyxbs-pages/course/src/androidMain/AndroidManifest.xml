@@ -2,11 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
-        <activity
-            android:name=".page.find.ui.find.activity.FindLessonActivity"
-            android:windowSoftInputMode="adjustPan"/><!--  添加这个是为解决软键盘问题https://www.jb51.net/article/137229.htm  -->
-
-        <activity android:name=".page.find.ui.find.activity.ShowResultActivity"/>
     </application>
 
 </manifest>

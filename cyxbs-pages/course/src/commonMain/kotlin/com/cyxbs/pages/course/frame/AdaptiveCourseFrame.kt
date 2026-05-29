@@ -4,12 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.account.api.IAccountService
@@ -35,12 +40,22 @@ import com.cyxbs.pages.course.view.page.CourseFrameHeader
  */
 @Stable
 class AdaptiveCourseFrame(
-  val stuNum: String,
+  initialStuNum: String,
 ) : AbstractCourseFrame() {
+
+  // 当前展示的学号，由外部通过 [updateStuNum] 更新；
+  // 切换后 CoursePageDecorationManager 会按新的 stuNum 重建以订阅对应课表数据
+  var stuNum: String by mutableStateOf(initialStuNum)
+    private set
+
+  fun updateStuNum(num: String) {
+    if (num != stuNum) stuNum = num
+  }
 
   @Composable
   fun HomeCourseContent(modifier: Modifier) {
-    val decorationManager = createCoursePageDecorationManager(this)
+    val currentStuNum = stuNum
+    val decorationManager = createCoursePageDecorationManager(this, currentStuNum)
     CompositionLocalProvider(
       Local provides this,
       CoursePageDecorationManager.Local provides decorationManager,
@@ -58,8 +73,7 @@ private fun AdaptiveHomeCourseFrameContent(
   modifier: Modifier,
   frame: AdaptiveCourseFrame,
 ) {
-
-  Column(modifier = modifier.background(LocalAppColors.current.topBg)) {
+  Column(modifier = modifier.background(LocalAppColors.current.topBg).systemBarsPadding()) {
     CourseFrameHeader(
       modifier = Modifier.height(50.dp),
       frame = frame,
@@ -79,23 +93,22 @@ private fun AdaptiveHomeCourseFrameContent(
 
 @Composable
 private fun createCoursePageDecorationManager(
-  frame: AdaptiveCourseFrame
+  frame: AdaptiveCourseFrame,
+  stuNum: String,
 ): CoursePageDecorationManager {
   val coroutineScope = rememberCoroutineScope()
-  val selfStuNum = IAccountService::class.impl().stuNum
-  if (selfStuNum != frame.stuNum) {
-    return remember {
+  val selfStuNum by IAccountService::class.impl().stuNumFlow.collectAsState(null)
+  return remember(stuNum, selfStuNum) {
+    if (selfStuNum != stuNum) {
       CoursePageDecorationManager(
         courseFrame = frame,
         courseCoroutineScope = coroutineScope,
         CourseLessonPageDecoration(
-          stuNum = frame.stuNum,
+          stuNum = stuNum,
           platformItemFactory = DefaultCourseLessonItemFactory
         ),
       )
-    }
-  } else {
-    return remember {
+    } else {
       CoursePageDecorationManager(
         courseFrame = frame,
         courseCoroutineScope = coroutineScope,

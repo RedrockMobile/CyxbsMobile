@@ -1,10 +1,15 @@
 package com.cyxbs.components.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,6 +18,8 @@ import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.entryProvider
@@ -63,9 +70,7 @@ fun AppNavDisplay() {
       rememberSaveableStateHolderNavEntryDecorator(),
     ),
     sceneStrategies = listOf(
-      rememberListDetailSceneStrategy(     // 宽屏下的列表与详细页处理
-        shouldHandleSinglePaneLayout = true,        // 从宽屏变成竖屏时拦截默认单栈处理
-      ),
+      rememberAppListDetailSceneStrategy(),     // 宽屏下的列表与详细页处理
       remember { DialogSceneStrategy() },       // 支持 Dialog 栈处理
       remember { SinglePaneSceneStrategy() },   // 默认单栈处理
     ),
@@ -76,7 +81,6 @@ fun AppNavDisplay() {
           NavEntry(argument) {
             FallbackContent(it)
           }
-          throw IllegalArgumentException("No NavKey found")
         }
       ) {
         appNavCollector.forEach { entry ->
@@ -90,6 +94,30 @@ fun AppNavDisplay() {
           }
         }
       }
+    }
+  )
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun rememberAppListDetailSceneStrategy(): ListDetailSceneStrategy<AppNavArgument> {
+  val directive = calculatePaneScaffoldDirective(currentWindowAdaptiveInfoV2())
+    .copy(horizontalPartitionSpacerSize = 0.dp)   // ← 把 spacer 压到 0，drag handle 自己撑空间
+  return rememberListDetailSceneStrategy(
+    directive = directive,
+    paneExpansionDragHandle = { state ->
+      val interactionSource = remember { MutableInteractionSource() }
+      Box(
+        modifier = Modifier
+          .pointerHoverIcon(icon = HorizontalResizePointerIcon)
+          .paneExpansionDraggable(
+            state = state,
+            minTouchTargetSize = 3.dp,  // 这是设置间距的地方
+            interactionSource = interactionSource,
+          )
+          .fillMaxHeight()
+          .background(Color(0xFFCFD8DC))
+      )
     }
   )
 }

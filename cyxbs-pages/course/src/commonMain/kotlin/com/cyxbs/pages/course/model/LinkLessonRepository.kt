@@ -8,6 +8,7 @@ import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.bean.LinkStuBean
 import com.cyxbs.pages.course.network.CourseApiService
@@ -41,7 +42,7 @@ object LinkLessonRepository {
     accountSettings.getBoolean(SETTING_KEY_ENABLE_SHOW_LINK_COURSE, true)
   )
 
-  fun changeLinkStu(linkStuNum: String) {
+  fun changeLinkStu(linkStuNum: String, toast: String? = null) {
     appCoroutineScope.launch {
       runCatchingCoroutine {
         CourseApiService::class.impl().changeLinkStudent(linkStuNum)
@@ -62,6 +63,9 @@ object LinkLessonRepository {
         )
       }.onSuccess {
         _state.emit(it)
+        if (toast != null) {
+          toast(toast)
+        }
       }
     }
   }
@@ -70,6 +74,27 @@ object LinkLessonRepository {
     val newEnableShow = !enableShow.value
     accountSettings.putBoolean(SETTING_KEY_ENABLE_SHOW_LINK_COURSE, newEnableShow)
     _enableShow.value = newEnableShow
+  }
+
+  /**
+   * 取消当前关联，调用后端 deleteLinkStudent 接口并清理本地缓存与 state
+   */
+  fun deleteLink() {
+    appCoroutineScope.launch {
+      runCatchingCoroutine {
+        CourseApiService::class.impl().deleteLinkStudent()
+      }.mapCatching {
+        it.throwApiExceptionIfFail()
+      }.onSuccess {
+        val selfNum = IAccountService::class.impl().stuNum
+        if (!selfNum.isNullOrBlank()) {
+          AccountSettings.get(selfNum).remove(SETTING_KEY_LINK_STU)
+        }
+        _state.emit(EMPTY_LINK_STU)
+      }.onFailure {
+        logg(it.stackTraceToString())
+      }
+    }
   }
 
   init {

@@ -51,6 +51,9 @@ const val NAV_FOOD = "food"
 // 课表单页
 const val NAV_COURSE = "course"
 
+// 查找他人课表
+const val NAV_COURSE_FIND = "course_find"
+
 // 公告弹窗
 const val NAV_DIALOG_NOTICE = "dialog/notice"
 

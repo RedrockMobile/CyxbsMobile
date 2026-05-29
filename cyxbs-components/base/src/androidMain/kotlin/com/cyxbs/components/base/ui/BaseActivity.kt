@@ -2,6 +2,7 @@ package com.cyxbs.components.base.ui
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.activity.enableEdgeToEdge
@@ -138,6 +139,10 @@ abstract class BaseActivity : AppCompatActivity, BaseUi {
     val windowInsetsController = WindowCompat.getInsetsController(window, decorView)
     // 如果你要白色的状态栏字体，请在你直接的 Activity 中单独设置 isAppearanceLightStatusBars，这里不提供方法
     windowInsetsController.isAppearanceLightStatusBars = isDaytimeMode()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      // 取消导航栏透明时的遮罩
+      window.isNavigationBarContrastEnforced = false
+    }
   }
 
   /**

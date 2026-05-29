@@ -10,9 +10,9 @@ import com.cyxbs.pages.course.frame.AdaptiveCourseFrame
  * @date 2025/9/23
  */
 class AdaptiveCourseFrameViewModel(
-  val stuNum: String
+  initialStuNum: String
 ) : BaseViewModel() {
 
-  // 课表主页框架
-  val frame = AdaptiveCourseFrame(stuNum)
+  // 课表主页框架；stuNum 在框架内部是可变 State，外部通过 frame.updateStuNum 切换
+  val frame = AdaptiveCourseFrame(initialStuNum = initialStuNum)
 }

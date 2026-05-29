@@ -11,8 +11,8 @@ import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setOnSingleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.course.R
+import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.course.page.course.data.StuLessonData
-import com.cyxbs.pages.course.page.find.ui.find.activity.FindLessonActivity
 import com.cyxbs.pages.map.api.MapNavArgument
 
 /**
@@ -67,7 +67,7 @@ class StuLessonVH(
     mIvLink.setOnSingleClickListener {
       val data = mData ?: return@setOnSingleClickListener
       // 跳到查找关联人课表的界面
-      FindLessonActivity.startByStuNum(it.context, data.stuNum)
+      FindCourseNavArgument(directStuNum = data.stuNum).navigate()
     }
   }
 }

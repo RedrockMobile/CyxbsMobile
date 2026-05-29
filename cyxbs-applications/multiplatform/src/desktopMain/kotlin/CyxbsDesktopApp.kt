@@ -27,7 +27,7 @@ fun main() = runApp {
   InitialManager.init(isMainProcess = true)
   FileKit.init(appId = "com.mredrock.cyxbs")
   launchApplication {
-    val width = 800
+    val width = 900
     val height = 600
     Window(
       onCloseRequest = ::exitApplication,

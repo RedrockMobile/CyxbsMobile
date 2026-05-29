@@ -5,7 +5,7 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-05-26 23:30
+- date: 2026-05-29 02:18
 
 ## 调试方法
 
@@ -96,7 +96,16 @@ deeplink: cyxbs://dialog/update?versionName={String}&updateContent={String}&down
 - argument: `com.cyxbs.pages.course.api.CourseNavArgument`
 
 ```text
-deeplink: cyxbs://course?stuNum={String}
+deeplink: cyxbs://course?stuNum={String}&stableKey=[String?]
+```
+
+### course_find
+
+- entry: `com.cyxbs.pages.course.find.FindCourseNavEntry`
+- argument: `com.cyxbs.pages.course.api.FindCourseNavArgument`
+
+```text
+deeplink: cyxbs://course_find?initialQuery=[String]&directStuNum=[String]
 ```
 
 ## :cyxbs-pages:emptyroom

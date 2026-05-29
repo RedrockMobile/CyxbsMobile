@@ -23,6 +23,7 @@ kotlin {
       implementation(projects.cyxbsPages.map.api)
       implementation(projects.cyxbsPages.emptyroom.api)
       implementation(projects.cyxbsPages.schoolcar.api)
+      implementation(projects.cyxbsPages.course.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
