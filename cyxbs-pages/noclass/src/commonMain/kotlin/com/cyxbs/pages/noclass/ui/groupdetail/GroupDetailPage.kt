@@ -1,4 +1,4 @@
-package com.cyxbs.pages.noclass.ui.GroupDetail
+package com.cyxbs.pages.noclass.ui.groupdetail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,10 +39,10 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.noclass.api.GroupDetailArgument
 import com.cyxbs.pages.noclass.bean.NoClassGroups
 import com.cyxbs.pages.noclass.bean.NoClassTemporarySearchs
-import com.cyxbs.pages.noclass.ui.NoClass.CommonSearchInput
-import com.cyxbs.pages.noclass.ui.NoClass.NoClassBottomButton
-import com.cyxbs.pages.noclass.ui.NoClass.StudentListItem
-import com.cyxbs.pages.noclass.ui.NoClass.SwipeHintToast
+import com.cyxbs.pages.noclass.ui.noclass.CommonSearchInput
+import com.cyxbs.pages.noclass.ui.noclass.NoClassBottomButton
+import com.cyxbs.pages.noclass.ui.noclass.StudentListItem
+import com.cyxbs.pages.noclass.ui.noclass.SwipeHintToast
 import com.cyxbs.pages.noclass.ui.dialog.SearchNoExistDialog
 import com.cyxbs.pages.noclass.ui.dialog.SearchResultSheet
 import com.cyxbs.pages.noclass.viewmodel.GroupDetailViewModel

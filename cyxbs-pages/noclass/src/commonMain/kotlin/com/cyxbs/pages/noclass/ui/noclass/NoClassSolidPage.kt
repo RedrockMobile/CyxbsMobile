@@ -1,4 +1,4 @@
-package com.cyxbs.pages.noclass.ui.NoClass
+package com.cyxbs.pages.noclass.ui.noclass
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -47,7 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.noclass.bean.NoClassGroups
-import com.cyxbs.pages.noclass.ui.GroupDetail.navigateToGroupDetail
+import com.cyxbs.pages.noclass.ui.groupdetail.navigateToGroupDetail
 import com.cyxbs.pages.noclass.ui.dialog.AddToGroupSheet
 import com.cyxbs.pages.noclass.ui.dialog.CreateGroupSheet
 import com.cyxbs.pages.noclass.ui.dialog.SearchNoExistDialog

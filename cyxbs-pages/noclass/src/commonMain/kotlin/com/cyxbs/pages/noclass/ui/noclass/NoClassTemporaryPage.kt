@@ -1,4 +1,4 @@
-package com.cyxbs.pages.noclass.ui.NoClass
+package com.cyxbs.pages.noclass.ui.noclass
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween

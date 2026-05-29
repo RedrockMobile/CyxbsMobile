@@ -54,7 +54,7 @@ import com.cyxbs.pages.noclass.bean.Clss
 import com.cyxbs.pages.noclass.bean.NoClassGroups
 import com.cyxbs.pages.noclass.bean.NoClassTemporarySearchs
 import com.cyxbs.pages.noclass.bean.Students
-import com.cyxbs.pages.noclass.ui.NoClass.NoClassBottomButton
+import com.cyxbs.pages.noclass.ui.noclass.NoClassBottomButton
 import cyxbsmobile.cyxbs_pages.noclass.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_add_group
 import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_add_student

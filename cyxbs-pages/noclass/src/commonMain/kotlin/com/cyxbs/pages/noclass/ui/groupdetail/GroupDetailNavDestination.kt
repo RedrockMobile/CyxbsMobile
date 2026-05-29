@@ -1,4 +1,4 @@
-package com.cyxbs.pages.noclass.ui.GroupDetail
+package com.cyxbs.pages.noclass.ui.groupdetail
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel

@@ -63,7 +63,7 @@ const val NAV_MAP_SHOW_PICTURE = "map_show_picture"
 const val NAV_SCHOOL_CAR = "school_car"
 
 // 空教室
-const val NAV_EMPTY_ROOM = "emptyroom"
+const val  NAV_EMPTY_ROOM = "emptyroom"
 
 // 没课约主页
 const val NAV_NO_CLASS = "no_class"
