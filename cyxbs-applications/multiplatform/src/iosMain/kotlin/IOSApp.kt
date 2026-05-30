@@ -8,6 +8,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.IOSToast
+import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +43,9 @@ fun MainViewController(): UIViewController {
   return ComposeUIViewController {
     AppTheme {
       AppNavDisplay()
-//      PlatformToastCompose()
+      if (!IOSKmpInterfaceLink.enableUsePlatformToast()) {
+        PlatformToastCompose()
+      }
     }
   }
 }
@@ -61,11 +64,13 @@ interface IOSKmpInterface {
   fun setToken(token: String)
   fun createTabBarController(): UITabBarController
   fun getDefaultExpandCourse(): Boolean
+  fun enableUsePlatformToast(): Boolean
   fun toast(s: String, isLong: Boolean)
 }
 
 @ImplProvider(IOSHomeViewPager::class)
 @ImplProvider(IOSToast::class)
+@ImplProvider(ConfigApplicationInfo::class)
 internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo {
 
   lateinit var impl: IOSKmpInterface
@@ -80,6 +85,10 @@ internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicat
 
   override fun getDefaultExpandCourse(): Boolean {
     return impl.getDefaultExpandCourse()
+  }
+
+  override fun enableUsePlatformToast(): Boolean {
+    return impl.enableUsePlatformToast()
   }
 
   override fun toast(s: String, isLong: Boolean) {

@@ -5,7 +5,7 @@
 
 import Foundation
 import UIKit
-import CyxbsApplicationsPro
+import CyxbsApplicationsMultiplatform
 
 class KmpInterfaceImpl: IOSKmpInterface {
 
@@ -27,6 +27,10 @@ class KmpInterfaceImpl: IOSKmpInterface {
 
     func getDefaultExpandCourse() -> Bool {
         return UserDefaultsManager.shared.presentScheduleWhenOpenApp
+    }
+
+    func enableUsePlatformToast() -> Bool {
+        return true
     }
 
     func toast(s: String, isLong: Bool) {

@@ -8,7 +8,7 @@
 
 import UIKit
 import XBSBugly
-import CyxbsApplicationsPro
+import CyxbsApplicationsMultiplatform
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {

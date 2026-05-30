@@ -6,7 +6,7 @@
 | 平台      | 功能   | 状态                                                            |
 |---------|------|---------------------------------------------------------------|
 | Android | 功能完善 | 部分页面使用 Compose                                                |
-| iOS     | 功能完善 | 几乎都是原生，KMP、CMP 还在迁移中                                          |
+| iOS     | 功能完善 | 目前都是原生，KMP、CMP 还在迁移中（详细看 feature/ios_cmp 分支）                  |
 | 桌面版     | 仅课表  | 暂无发版计划                                                        |
 | 网页版     | 仅课表  | 暂无发版计划 [🔗体验链接](https://redrockmobile.github.io/CyxbsMobile/) |
 
@@ -16,13 +16,13 @@
 | 平台      |                                                                 |
 |---------|-----------------------------------------------------------------|
 | Android | Android Studio 运行 `cyxbs-applications:test` 模块                  |
-| iOS     | 安装 Kotlin Multiplatform 插件后运行 `iosApp` 配置                       |
+| iOS     | 安装 Kotlin Multiplatform 插件后运行 `CyxbsMobile2019_iOS` 配置          |
 | 桌面版     | 安装 Kotlin Multiplatform 插件后运行 `cyxbs-applications [desktop]` 配置 |
 | 网页版     | 安装 Kotlin Multiplatform 插件后运行 `cyxbs-applications [wasmJs]` 配置  |
 
 ⚠️注:
 - Android 中 `cyxbs-applications:pro` 模块只用于打正式包并发版，需要密钥等文件，由每届副站或部长持有
-- iOS 中若需体验完整项目，请使用 XCode 运行 [cyxbs-applications/pro/iosApp](cyxbs-applications/pro/iosApp)，目前暂无 Compose 界面，KMP 仅包含简单互调用
+- iOS 中若需体验完整项目，请使用 XCode 运行 [cyxbs-applications/pro/iosApp](cyxbs-applications/pro/iosApp)，iOS 的 KMP、CMP 在 feature/ios_cmp 分支 迁移中
 
 ## 必看文档
 - [多模块教程](https://github.com/VegetableChicken-Group/WanAndroid_Multi/blob/framework/doce/%E5%A4%9A%E6%A8%A1%E5%9D%97%E6%8C%87%E5%8D%97.md): 包含 api、lib、module 模块相关问题，还有多模块使用规范、多模块通信、单模块调试等教程

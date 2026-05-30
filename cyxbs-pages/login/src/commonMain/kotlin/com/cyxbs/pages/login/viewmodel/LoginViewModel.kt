@@ -117,11 +117,13 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
       }
       wrapper.throwApiExceptionIfFail() // 如果网络请求返回了异常，则直接抛出
       wrapper.data
-    }.onFailure {
-      runCatchingCoroutine { onLoginFailure(it) }.onFailure {
+    }.onFailure { throwable ->
+      logg("requestLogin, onLoginFailure: $throwable")
+      runCatchingCoroutine { onLoginFailure(throwable) }.onFailure {
         // TODO 打开 CrashDialog
       }.getOrThrow()
     }.onSuccess {
+      logg("requestLogin, onLoginSuccess")
       runCatchingCoroutine { onLoginSuccess(stuNum, it) }.onFailure {
         // TODO 打开 CrashDialog
       }.getOrThrow()

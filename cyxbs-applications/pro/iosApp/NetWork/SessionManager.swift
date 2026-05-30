@@ -65,7 +65,10 @@ class SessionManager: Session {
     
     static let shared = SessionManager(serverTrustManager: TrustPlicyManager(allHostsMustBeEvaluated: true, evaluators: [:]))
     
-    var token: String? = UserModel.default.token?.token
+    /// 不直接读取 `UserModel.default.token`，因为 Swift 不支持多线程的同时读写，会直接崩溃，所以这里采取读缓存
+    func currentToken() -> String? {
+        CacheManager.shared.getCodable(TokenModel.self, in: .token)?.token
+    }
     
     @discardableResult
     open func ry_request(_ convertible: URLConvertible,
@@ -83,8 +86,8 @@ class SessionManager: Session {
                                              requestModifier: requestModifier)
         
         convertible.headers.add(.host(APIConfig.current.environment.host))
-        
-        if let bearerToken = token {
+
+        if let bearerToken = currentToken() {
             convertible.headers.add(.authorization(bearerToken: bearerToken))
         }
 
@@ -111,7 +114,7 @@ class SessionManager: Session {
 
         convertible.headers.add(.host(APIConfig.current.environment.host))
 
-        if let bearerToken = token {
+        if let bearerToken = currentToken() {
             convertible.headers.add(.authorization(bearerToken: bearerToken))
         }
 

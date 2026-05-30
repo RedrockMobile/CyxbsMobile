@@ -27,6 +27,10 @@ class KmpInterfaceImpl: IOSKmpInterface {
         return false
     }
 
+    func enableUsePlatformToast() -> Bool {
+        return false
+    }
+
     func toast(s: String, isLong: Bool) {
     }
 }

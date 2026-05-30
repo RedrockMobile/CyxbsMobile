@@ -7,7 +7,7 @@
 //
 
 import UIKit
-import CyxbsApplicationsPro
+import CyxbsApplicationsMultiplatform
 
 class SwiftToOC: NSObject {
 
