@@ -1,13 +1,19 @@
 import androidx.compose.ui.window.ComposeUIViewController
+import com.cyxbs.components.account.api.IAccountEditService
+import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.config.ConfigApplicationInfo
-import com.cyxbs.components.config.IOSDebug
 import com.cyxbs.components.config.compose.theme.AppTheme
-import com.cyxbs.components.config.navigation.MainNavHost
-import com.cyxbs.components.utils.extensions.IOSToast
-import com.g985892345.provider.api.annotation.ImplProvider
-import platform.UIKit.UIViewController
 import com.cyxbs.components.config.init.InitialManager
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.navigation.AppNavDisplay
+import com.cyxbs.components.utils.extensions.IOSToast
+import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
+import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import platform.UIKit.UITabBarController
+import platform.UIKit.UIViewController
 
 /**
  * .
@@ -19,18 +25,30 @@ import com.cyxbs.components.navigation.AppNavDisplay
 // 在 iOS 项目 AppDelegate#application 调用
 fun doInitApp(impl: IOSKmpInterface) {
   IOSKmpInterfaceLink.impl = impl
-  IOSConfigApplicationInfo.isDebug = impl.isDebug
   initProvider()
   InitialManager.init(isMainProcess = true)
+
+  // 监听 token
+  appCoroutineScope.launch(Dispatchers.Main) {
+    TokenProvider.stateFlow.collect {
+      if (it != null) {
+        impl.setToken(it.token)
+      }
+    }
+  }
 }
 
 fun MainViewController(): UIViewController {
   return ComposeUIViewController {
     AppTheme {
-      MainNavHost()
+      AppNavDisplay()
 //      PlatformToastCompose()
     }
   }
+}
+
+fun onLogout() {
+  IAccountEditService::class.impl().onLogout()
 }
 
 // 初始化 KtProvider
@@ -40,31 +58,31 @@ internal expect fun initProvider()
 
 interface IOSKmpInterface {
   fun isDebug(): Boolean
+  fun setToken(token: String)
+  fun createTabBarController(): UITabBarController
+  fun getDefaultExpandCourse(): Boolean
+  fun toast(s: String, isLong: Boolean)
 }
 
-@ImplProvider(IOSDebug::class)
-internal object IOSKmpInterfaceLink : IOSDebug {
+@ImplProvider(IOSHomeViewPager::class)
+@ImplProvider(IOSToast::class)
+internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo {
 
   lateinit var impl: IOSKmpInterface
 
   override fun isDebug(): Boolean {
     return impl.isDebug()
   }
-}
 
-@ImplProvider(IOSToast::class)
-internal object IOSToast : IOSToast {
-  override fun toast(s: String, isLong: Boolean) {
-    // todo
+  override fun createTabBarController(): UITabBarController {
+    return impl.createTabBarController()
   }
-}
 
-@ImplProvider
-object IOSConfigApplicationInfo : ConfigApplicationInfo {
+  override fun getDefaultExpandCourse(): Boolean {
+    return impl.getDefaultExpandCourse()
+  }
 
-  var isDebug = false
-
-  override fun isDebug(): Boolean {
-    return isDebug
+  override fun toast(s: String, isLong: Boolean) {
+    impl.toast(s, isLong)
   }
 }

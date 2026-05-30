@@ -4,7 +4,7 @@
 
 import Foundation
 import UIKit
-import CyxbsApplicationsTest
+import CyxbsApplicationsMultiplatform
 
 class KmpInterfaceImpl: IOSKmpInterface {
 
@@ -14,6 +14,20 @@ class KmpInterfaceImpl: IOSKmpInterface {
         #else
         return false
         #endif
+    }
+
+    func setToken(token: String) {
+    }
+
+    func createTabBarController() -> UITabBarController {
+        return UITabBarController()
+    }
+
+    func getDefaultExpandCourse() -> Bool {
+        return false
+    }
+
+    func toast(s: String, isLong: Bool) {
     }
 }
 
