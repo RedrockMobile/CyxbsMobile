@@ -7,7 +7,6 @@
 //
 
 #import "UserItemTool.h"
-#import <UMShare/UMShare.h>
 #import "UserDefaultTool.h"
 #import "掌上重邮-Swift.h"        // 将Swift中的类暴露给OC
 @interface UserItemTool ()
