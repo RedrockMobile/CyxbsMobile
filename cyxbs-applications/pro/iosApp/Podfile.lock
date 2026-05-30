@@ -17,14 +17,14 @@ PODS:
   - Alamofire (5.10.2)
   - AlicloudHTTPDNS (2.2.0):
     - AlicloudUtils
-  - AlicloudUTDID (1.6.1)
+  - AlicloudUTDID (1.6.1.1)
   - AlicloudUtils (2.0.1):
     - AlicloudUTDID
-  - AMap3DMap-NO-IDFA (10.1.600):
-    - AMapFoundation-NO-IDFA (>= 1.8.0)
-  - AMapFoundation-NO-IDFA (1.8.2)
-  - AMapLocation-NO-IDFA (2.10.0):
-    - AMapFoundation-NO-IDFA (>= 1.8.0)
+  - AMap3DMap-NO-IDFA (11.1.200):
+    - AMapFoundation-NO-IDFA (>= 1.8.7)
+  - AMapFoundation-NO-IDFA (1.8.7)
+  - AMapLocation-NO-IDFA (2.11.1):
+    - AMapFoundation-NO-IDFA (>= 1.8.7)
   - Bugly (2.6.1)
   - FluentDarkModeKit (1.0.4)
   - FMDB (2.7.12):
@@ -102,28 +102,6 @@ PODS:
     - TZImagePickerController/Location (= 3.8.9)
   - TZImagePickerController/Basic (3.8.9)
   - TZImagePickerController/Location (3.8.9)
-  - UMCCommonLog (2.0.2)
-  - UMCommon (7.5.3):
-    - UMDevice
-  - UMDevice (3.4.0)
-  - UMShare/Core (6.10.15):
-    - UMCommon
-  - UMShare/Social/QQ (6.10.15):
-    - UMCommon
-    - UMShare/Core
-    - UMShare/Social/ReducedQQ
-  - UMShare/Social/ReducedQQ (6.10.15):
-    - UMCommon
-    - UMShare/Core
-  - UMShare/Social/ReducedWeChat (6.10.15):
-    - UMCommon
-    - UMShare/Core
-  - UMShare/Social/WeChat (6.10.15):
-    - UMCommon
-    - UMShare/Core
-    - UMShare/Social/ReducedWeChat
-  - UMVerify (3.1.0):
-    - UMCommon
   - XBSBugly (0.1.0):
     - Bugly
   - YBImageBrowser (3.0.9):
@@ -142,7 +120,7 @@ DEPENDENCIES:
   - AFNetworking
   - Alamofire
   - AlicloudHTTPDNS (= 2.2.0)
-  - AMap3DMap-NO-IDFA (~> 10.1.500)
+  - AMap3DMap-NO-IDFA
   - AMapLocation-NO-IDFA
   - Bugly
   - FluentDarkModeKit
@@ -169,12 +147,6 @@ DEPENDENCIES:
   - SwiftyJSON
   - TOCropViewController
   - TZImagePickerController
-  - UMCCommonLog
-  - UMCommon
-  - UMDevice
-  - UMShare/Social/QQ
-  - UMShare/Social/WeChat
-  - UMVerify
   - XBSBugly (from `Development Pods/`)
   - YBImageBrowser
   - YYImage
@@ -219,11 +191,6 @@ SPEC REPOS:
     - SwiftyJSON
     - TOCropViewController
     - TZImagePickerController
-    - UMCCommonLog
-    - UMCommon
-    - UMDevice
-    - UMShare
-    - UMVerify
     - YBImageBrowser
     - YYImage
     - YYKit
@@ -236,11 +203,11 @@ SPEC CHECKSUMS:
   AFNetworking: 3bd23d814e976cd148d7d44c3ab78017b744cd58
   Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
   AlicloudHTTPDNS: b1efa2e175672c5822d322c68efeae62068d7d05
-  AlicloudUTDID: 5d2f22d50e11eecd38f30bc7a48c71925ea90976
+  AlicloudUTDID: f0cde02afb754d7d3591d2a21bfe0cae8c89bce5
   AlicloudUtils: ef4436f52b828b1182b002373758ecb88068e679
-  AMap3DMap-NO-IDFA: 5279e94b7d4d6561826c63411f52389a3b2e2eff
-  AMapFoundation-NO-IDFA: 6ce0ef596d4eb8d934ff498e56747b6de1247b05
-  AMapLocation-NO-IDFA: 735791aeb1ba52dff666e4158b86caf4b68b5be7
+  AMap3DMap-NO-IDFA: 393a24abb0451fed2daa4316c8d3d356a395f2be
+  AMapFoundation-NO-IDFA: f48acbf6e74913dc6744581053f7d984f2432850
+  AMapLocation-NO-IDFA: 0fa6e7d5e42e10253f4437424d98966f53760862
   Bugly: 217ac2ce5f0f2626d43dbaa4f70764c953a26a31
   FluentDarkModeKit: b6317653a00329564582884772ec57c4eaad1a1f
   FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
@@ -269,16 +236,11 @@ SPEC CHECKSUMS:
   SwiftyJSON: f5b1bf1cd8dd53cd25887ac0eabcfd92301c6a5a
   TOCropViewController: 80b8985ad794298fb69d3341de183f33d1853654
   TZImagePickerController: 456f470b5dea97b37226ec7a694994a8663340b2
-  UMCCommonLog: bea707e50c85cef4b0eb47cc5c7226bb843245ca
-  UMCommon: 3b850836e8bc162b4e7f6b527d30071ed8ea75a1
-  UMDevice: dcdf7ec167387837559d149fbc7d793d984faf82
-  UMShare: e8448c955153770c40a87fa26267bddf8c5b0691
-  UMVerify: 832cbda6a895a798fd5619035594c9370561158d
-  XBSBugly: 15cb1f1d1f30e3c1e0c902eafe566bada6fcf02e
+  XBSBugly: 96823fe01bb05751bdd387dd0b870e7c0e882198
   YBImageBrowser: 7ecc8bf33ffa5f3b94c397c29b4f3638dd37f527
   YYImage: 1e1b62a9997399593e4b9c4ecfbbabbf1d3f3b54
   YYKit: 7cda43304a8dc3696c449041e2cb3107b4e236e7
 
-PODFILE CHECKSUM: 5666fb8a91394f227184da1e450ca2fe1235deff
+PODFILE CHECKSUM: e76efff3db80da5d2a0acbd130df4a8f87fb8e18
 
 COCOAPODS: 1.16.2

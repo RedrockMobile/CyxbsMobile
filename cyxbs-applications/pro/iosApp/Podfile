@@ -4,8 +4,10 @@ source 'https://github.com/aliyun/aliyun-specs.git'
 platform :ios, '26.0'
 use_frameworks!
 
-# 是否为模拟器环境，真机/发版请改为 false
-IS_SIMULATOR = false
+# 是否为模拟器环境，优先读取环境变量，未设置时默认 true（模拟器）：
+#   pod install                  → 模拟器（默认）
+#   IS_SIMULATOR=0 pod install   → 真机 / 发布包
+IS_SIMULATOR = ENV.fetch('IS_SIMULATOR', '1') != '0'
 
 inhibit_all_warnings!
 
@@ -27,17 +29,10 @@ target 'CyxbsMobile2019_iOS' do
   pod 'Masonry'  # 自动布局库
   pod 'MJRefresh'  # 下拉刷新库
   pod 'AMapLocation-NO-IDFA'  # 高德地图定位库
-  pod 'AMap3DMap-NO-IDFA', '~> 10.1.500'  # 高德地图3D库
+  pod 'AMap3DMap-NO-IDFA'  # 高德地图3D库
   pod 'MJExtension'  # 字典和模型之间的转换库
   pod 'SDCycleScrollView'  # 轮播图库
   pod 'FSCalendar'  # iOS日历库，兼容Objective-C和Swift
-  
-  pod 'UMCommon'  # 友盟统计库
-  pod 'UMDevice'  # 友盟设备信息库
-  pod 'UMVerify'  # 友盟一键登录库
-  pod 'UMCCommonLog',           :configurations => ['Debug']  # 友盟日志库
-  pod 'UMShare/Social/WeChat'  # 友盟微信分享库
-  pod 'UMShare/Social/QQ'  # 友盟QQ分享库
   
   pod 'IQKeyboardManager'  # 键盘管理库
   pod 'Bugly'  # 腾讯Bugly崩溃日志上报库
@@ -83,21 +78,118 @@ post_install do |installer|
       config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"  # 不要求代码签名
       config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"  # 不允许代码签名
       
-      #如果是模拟器运行
-      if IS_SIMULATOR
-        if M1_VALID_ARCHS.include?(target.name)
-          config.build_settings['VALID_ARCHS'] = 'x86_64'  # 在模拟器上仅使用 x86_64 架构
-        end
-        
-        if M1_EXCLUDED_ARCHS_iphonesimulator.include?(target.name)
-          config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'  # 在模拟器上排除 arm64 架构
-        end
+      # Xcode 26 / clang 21 把链式比较(a<b<c)等老写法默认升级成 error，
+      # inhibit_all_warnings! 的 -w 压不住"默认 error"级诊断；老 pod(如 YYKit)需显式关闭。
+      config.build_settings['OTHER_CFLAGS'] = "#{config.build_settings['OTHER_CFLAGS'] || '$(inherited)'} -Wno-parentheses"
 
-      else
-        # 在模拟器上排除 arm64 架构
-        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'  
+      # Apple Silicon 模拟器只有 arm64，而 CocoaPods 为 AMap 等不含 arm64-sim slice 的 pod
+      # 在聚合 target(Pods-CyxbsMobile2019_iOS)的 xcconfig 里自动写入
+      # EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64，导致该 target 啥都不产出，链接失败。
+      # 这里强制清除，让聚合 target 能在 arm64 模拟器上正常构建。
+      if target.name == 'Pods-CyxbsMobile2019_iOS'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = ''
       end
     end
+  end
+  
+  # AMap / Bugly 官方预编译 fat framework 只有 arm64-device + x86_64-simulator，
+  # 没有 arm64-simulator slice，在 Apple Silicon 模拟器上链接报 "built for iOS" 错误。
+  #
+  # 方案：解包 arm64-device 静态库 → vtool 改平台标记 → 重打包为 arm64-sim → 替换。
+  # lipo 不允许同一 fat binary 里出现两个 arm64（无论平台标记），因此模拟器包和真机包互斥。
+  # 通过顶部的 IS_SIMULATOR 变量控制：true = patch 为模拟器，false = 还原为真机/发布包。
+  require 'tmpdir'
+  restore_mode = !IS_SIMULATOR
+  [
+    ['AMapFoundation-NO-IDFA', 'AMapFoundationKit'],
+    ['AMap3DMap-NO-IDFA',      'MAMapKit'],
+    ['AMapLocation-NO-IDFA',   'AMapLocationKit'],
+    ['Bugly',                  'Bugly'],
+  ].each do |pod_dir, fw_name|
+    fw_bin = File.join(installer.sandbox.root, pod_dir, "#{fw_name}.framework", fw_name)
+    next unless File.exist?(fw_bin)
+
+    orig = "#{fw_bin}.device-orig"
+
+    if restore_mode
+      if File.exist?(orig)
+        FileUtils.cp(orig, fw_bin)
+        puts "Restored #{fw_name} to device binary"
+      end
+      next
+    end
+
+    # 首次 patch 时保存原始 device 二进制备份（确保幂等：每次都从原始备份开始 patch）
+    FileUtils.cp(fw_bin, orig) unless File.exist?(orig)
+    fw_source = orig   # 始终从 device-orig 提取，避免重复 pod install 后 patch 已 patch 过的文件
+
+    tmp      = Dir.mktmpdir("patch_#{fw_name}")
+    dev_a    = "#{tmp}/arm64-dev.a"
+    objs_dir = "#{tmp}/objs"
+    sim_a    = "#{tmp}/arm64-sim.a"
+    x86_a    = "#{tmp}/x86_64.a"
+
+    # 提取 arm64-device 静态库
+    next unless system("lipo '#{fw_source}' -thin arm64 -output '#{dev_a}' 2>/dev/null")
+
+    # 解包所有 .o，用 vtool 把平台从 ios(2) 改为 ios-simulator(7)，再重打包
+    Dir.mkdir(objs_dir)
+    Dir.chdir(objs_dir) do
+      system("ar x '#{dev_a}' 2>/dev/null")
+      objs = Dir.glob('*.o')
+      objs.each do |o|
+        # vtool 对含 LC_BUILD_VERSION 的 .o 有效；
+        # 对旧格式 LC_VERSION_MIN_IPHONEOS 因 load commands 空间不足会失败，
+        # 此时改为用 xcrun 重新编译一个等效的 arm64-simulator dummy 替换。
+        unless system("vtool -set-build-version 7 15.0 15.0 -replace -output '#{o}' '#{o}' 2>/dev/null")
+          warn "  [#{fw_name}] vtool fallback (old LC_VERSION_MIN): #{o} → replaced with empty stub"
+          func = File.basename(o, '.o').gsub(/[^a-zA-Z0-9]/, '_')
+          dm = "#{tmp}/#{func}.m"
+          File.write(dm, "void __attribute__((used)) #{func}(void) {}\n")
+          system("xcrun clang -arch arm64 -target arm64-apple-ios15.0-simulator -c '#{dm}' -o '#{o}' 2>/dev/null")
+        end
+      end
+      system("ar -r '#{sim_a}' #{objs.map { |o| "'#{o}'" }.join(' ')} 2>/dev/null")
+      system("ranlib '#{sim_a}' 2>/dev/null")
+    end
+    next unless File.exist?(sim_a)
+
+    # 用 arm64-sim 替换（保留 x86_64-sim 如果存在）
+    # 注意：lipo 不允许同一 fat 里有两个 arm64，无法同时保留 device + sim slice
+    has_x86 = system("lipo '#{fw_source}' -thin x86_64 -output '#{x86_a}' 2>/dev/null") && File.exist?(x86_a)
+    if has_x86
+      system("lipo -create '#{sim_a}' '#{x86_a}' -output '#{fw_bin}'")
+    else
+      FileUtils.cp(sim_a, fw_bin)
+    end
+    FileUtils.rm_rf(tmp)
+    puts "Patched #{fw_name} for arm64 simulator"
+  end
+
+  # 本项目未使用 webp 解码；YYKit 自带的 WebP.framework 缺 arm64 模拟器 slice，
+  # 在 Xcode 26 的 arm64 模拟器上链接失败(Building for 'iOS-simulator', but linking ... built for 'iOS')。
+  # 删除它并去掉 -framework WebP，让 YYImageCoder 的 __has_include(<webp/...>) 失效
+  # (YYIMAGE_WEBP_ENABLED=0)，webp 代码不编译、不再链接该缺 slice 的二进制。
+  require 'fileutils'
+  webp_fw = File.join(installer.sandbox.root, 'YYKit', 'Vendor', 'WebP.framework')
+  FileUtils.rm_rf(webp_fw)
+  Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', 'YYKit', 'YYKit.*.xcconfig')).each do |f|
+    text = File.read(f)
+    patched = text.gsub(' -framework "WebP"', '')
+    File.write(f, patched) if patched != text
+  end
+
+  # Xcode 26 / iOS 26 SDK 把 netinet6/in6.h 设为私有头，禁止直接 import（头内含 #error 提示改用 netinet/in.h）。
+  # 已废弃的 AFNetworking 直接 import 了它 → "Use of private header from outside its module"。
+  # 删除这两处多余 import（上一行的 <netinet/in.h> 已涵盖 IPv6 定义）。
+  ['AFHTTPSessionManager.m', 'AFNetworkReachabilityManager.m'].each do |name|
+    af = File.join(installer.sandbox.root, 'AFNetworking', 'AFNetworking', name)
+    next unless File.exist?(af)
+    text = File.read(af)
+    patched = text.gsub(/^[ \t]*#import <netinet6\/in6\.h>[ \t]*\r?\n/, '')
+    next if patched == text
+    File.chmod(0644, af)   # CocoaPods 下载的源码是只读(444)，先加写权限再改
+    File.write(af, patched)
   end
 end
 
