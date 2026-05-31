@@ -48,6 +48,25 @@ fun ImageFromUrlCompose(
   )
 }
 
+// 头像加载
+@Composable
+fun ImageAvatarCompose(
+  url: String,
+  modifier: Modifier = Modifier,
+  contentScale: ContentScale = ContentScale.Crop,
+  block: (ImageRequest.Builder.() -> Unit)? = null
+) {
+  ImageFromUrlCompose(
+    url = url,
+    modifier = modifier,
+    contentDescription = "头像",
+    placeholder = ConfigRes.configIcDefaultAvatar(),
+    error = ConfigRes.configIcDefaultAvatar(),
+    contentScale = contentScale,
+    block = block,
+  )
+}
+
 /**
  * 后端返回的为http开头，这里转成https的
  * 因为苹果的ATS不允许http，这里暂时转换一下

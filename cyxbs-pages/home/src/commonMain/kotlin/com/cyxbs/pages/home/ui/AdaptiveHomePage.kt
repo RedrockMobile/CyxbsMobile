@@ -29,6 +29,7 @@ import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_ABOUT
 import com.cyxbs.components.navigation.NAV_COURSE_FIND
 import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
+import com.cyxbs.components.navigation.NAV_FAIRGROUND
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
@@ -74,7 +75,9 @@ private val itemList = listOf(
   ActionItem("查询课表") {
     AppScheme.jump("cyxbs://$NAV_COURSE_FIND")
   },
-
+  ActionItem("邮乐园") {
+    AppScheme.jump("cyxbs://$NAV_FAIRGROUND")
+  },
 
 
   // 退出登陆放到最后，其他测试页面放到上面👆

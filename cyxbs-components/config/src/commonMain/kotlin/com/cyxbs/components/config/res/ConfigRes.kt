@@ -5,6 +5,7 @@ import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_circle_
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_compose_app_logo
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_compose_back
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_compose_place_holder
+import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_default_avatar
 import org.jetbrains.compose.resources.DrawableResource
 
 /**
@@ -17,5 +18,6 @@ object ConfigRes {
     fun configIcAppLogo() : DrawableResource = Res.drawable.config_ic_compose_app_logo
     fun configIcBack() : DrawableResource = Res.drawable.config_ic_compose_back
     fun configIcPlaceHolder() : DrawableResource = Res.drawable.config_ic_compose_place_holder
+    fun configIcDefaultAvatar(): DrawableResource = Res.drawable.config_ic_default_avatar
     fun configIcCircleAdd(): DrawableResource = Res.drawable.config_ic_circle_add
 }

@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.DpSize
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 actual fun getWindowScreenSize(): DpSize {
-  return LocalWindowInfo.current.containerSize.let {
-    DpSize(it.width.px2dpCompose, it.height.px2dpCompose)
+  return LocalWindowInfo.current.containerDpSize.let {
+    DpSize(it.width, it.height)
   }
 }

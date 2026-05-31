@@ -5,7 +5,7 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-05-29 02:18
+- date: 2026-05-31 14:31
 
 ## 调试方法
 
@@ -217,4 +217,15 @@ object fields:
 
 ```text
 deeplink: cyxbs://school_car
+```
+
+## :cyxbs-pages:ufield
+
+### fairground
+
+- entry: `com.cyxbs.pages.ufield.fairground.FairgroundNavEntry`
+- argument: `com.cyxbs.pages.ufield.api.FairgroundNavArgument`
+
+```text
+deeplink: cyxbs://fairground
 ```
