@@ -4,6 +4,7 @@ import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.DialogSceneStrategy
+import androidx.navigation3.scene.SceneStrategy
 import com.cyxbs.components.navigation.utils.UrlDecoder
 import kotlinx.serialization.KSerializer
 import kotlin.reflect.KClass
@@ -93,6 +94,13 @@ abstract class AppNavEntry<T : AppNavArgument> {
    */
   open fun buildMetadata(argument: T): Map<String, Any> {
     return emptyMap()
+  }
+
+  /**
+   * 自定义注入的Strategy
+   */
+  open fun getSceneStrategy(): SceneStrategy<Any>? {
+    return null
   }
 
   /**

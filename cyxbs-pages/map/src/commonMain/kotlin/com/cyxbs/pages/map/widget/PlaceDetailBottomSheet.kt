@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,7 +44,7 @@ import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
-import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.components.view.ui.LocalBottomSheetScope
 import com.cyxbs.pages.map.model.bean.PlaceDetails
 import com.cyxbs.pages.map.ui.UploadPhotoDialog
 import com.cyxbs.pages.map.ui.UploadPhotoResult
@@ -65,78 +64,66 @@ import org.jetbrains.compose.resources.painterResource
  * @Date : 2025/11/26 13:25
  */
 
+/**
+ * 地点详情 bottomSheet 的内层内容（不含 BottomSheetCompose 外壳）。
+ *
+ * 由 [com.cyxbs.pages.map.ui.PlaceDetailNavEntry] 作为 NavEntry 内容使用（横竖屏统一）。
+ * draggable 通过 [LocalBottomSheetScope] 获取。
+ */
 @Composable
-fun PlaceDetailBottomSheet() {
+fun PlaceDetailBottomSheetContent() {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val bottomSheetScope = LocalBottomSheetScope.current
   viewmodel.placeDetails.value?.let { placeDetails ->
-    Box {
-      BottomSheetCompose(
-        modifier = Modifier.navigationBarsPadding(),
-        bottomSheetState = viewmodel.bottomSheetState,
-        peekHeight = 112.dp,
-        dismissOnBackPress = false,
-        dismissOnClickOutside = false,
-        scrimColor = Color.Transparent
-      ) {
-        val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-        val modifier = when {
-          ratio > 1.5 -> {
-            Modifier.fillMaxWidth()
-          }
-
-          else -> {
-            Modifier
-              .padding(start = 30.dp)
-              .width(getWindowScreenSize().width / 3)
-          }
-        }
-        ConstraintLayout(
-          constraintSet = createConstraintSet(),
-          modifier = modifier
-            .then(bottomSheetDraggable())
-            .shadow(
-              elevation = 10.dp,
-              shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-            )
-            .background(LocalAppColors.current.topBg)
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            .padding(start = 16.dp, end = 16.dp),
-          animateChangesSpec = spring(
-            stiffness = Spring.StiffnessMediumLow
-          )
-        ) {
-          ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
-          PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
-          PlaceAttributeListCompose(
-            modifier = Modifier.layoutId(Element.PlaceAttributeList),
-            placeDetails
-          )
-          PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
-          PlaceNavigationCompose(
-            modifier = Modifier.layoutId(Element.PlaceNavigation),
-            placeDetails
-          )
-          DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
-          DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
-          ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
-          DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
-          DetailAboutTextCompose(
-            modifier = Modifier.layoutId(Element.DetailAboutText),
-            placeDetails
-          )
-          DetailAboutListCompose(
-            modifier = Modifier.layoutId(Element.DetailAboutList),
-            placeDetails
-          )
-        }
+    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
+    val modifier = when {
+      ratio > 1.5 -> {
+        Modifier.fillMaxWidth()
       }
-      Spacer(
-        modifier = Modifier
-          .background(LocalAppColors.current.topBg)
-          .navigationBarsPadding()
-          .fillMaxWidth()
-          .height(0.dp)
-          .align(Alignment.BottomStart)
+
+      else -> {
+        Modifier
+          .padding(start = 30.dp)
+          .width(getWindowScreenSize().width / 3)
+      }
+    }
+    ConstraintLayout(
+      constraintSet = createConstraintSet(),
+      modifier = modifier
+        .then(bottomSheetScope.bottomSheetDraggable())
+        .shadow(
+          elevation = 10.dp,
+          shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        )
+        .background(LocalAppColors.current.topBg)
+        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+        .padding(start = 16.dp, end = 16.dp),
+      animateChangesSpec = spring(
+        stiffness = Spring.StiffnessMediumLow
+      )
+    ) {
+      ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
+      PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
+      PlaceAttributeListCompose(
+        modifier = Modifier.layoutId(Element.PlaceAttributeList),
+        placeDetails
+      )
+      PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
+      PlaceNavigationCompose(
+        modifier = Modifier.layoutId(Element.PlaceNavigation),
+        placeDetails
+      )
+      DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
+      DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
+      ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
+      DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
+      DetailAboutTextCompose(
+        modifier = Modifier.layoutId(Element.DetailAboutText),
+        placeDetails
+      )
+      DetailAboutListCompose(
+        modifier = Modifier.layoutId(Element.DetailAboutList),
+        placeDetails
       )
     }
   }

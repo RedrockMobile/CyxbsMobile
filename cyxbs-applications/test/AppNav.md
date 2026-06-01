@@ -5,7 +5,7 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-05-29 02:18
+- date: 2026-05-31 15:13
 
 ## 调试方法
 
@@ -170,6 +170,24 @@ deeplink: cyxbs://map?placeSearch=[String?]
 
 ```text
 deeplink: cyxbs://map_show_picture?imageList={List<String>}&currentIndex={Int}
+```
+
+### map_place_detail
+
+- entry: `com.cyxbs.pages.map.ui.PlaceDetailNavEntry`
+- argument: `com.cyxbs.pages.map.ui.PlaceDetailNavArgument`
+
+```text
+deeplink: cyxbs://map_place_detail
+```
+
+### map_search
+
+- entry: `com.cyxbs.pages.map.ui.SearchNavEntry`
+- argument: `com.cyxbs.pages.map.ui.SearchNavArgument`
+
+```text
+deeplink: cyxbs://map_search
 ```
 
 ## :cyxbs-pages:mine

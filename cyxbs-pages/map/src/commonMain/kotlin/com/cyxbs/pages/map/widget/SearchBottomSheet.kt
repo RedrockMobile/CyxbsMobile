@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,7 +34,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.components.view.ui.LocalBottomSheetScope
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.ui.SearchCompose
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
@@ -53,65 +52,63 @@ import org.jetbrains.compose.resources.vectorResource
  * @Date : 2026/1/13 13:08
  */
 
+/**
+ * 搜索 bottomSheet 的内层内容（不含 BottomSheetCompose 外壳）。
+ *
+ * 由 [com.cyxbs.pages.map.ui.SearchNavEntry] 作为 NavEntry 内容使用，
+ * draggable 通过 [LocalBottomSheetScope] 获取。
+ */
 @Composable
-fun SearchBottomSheet(argument: MapNavArgument) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  BottomSheetCompose(
-    bottomSheetState = viewmodel.searchBottomSheetState,
-    peekHeight = 80.dp,
-    dismissOnBackPress = false,
-    dismissOnClickOutside = false,
-    scrimColor = Color.Transparent
-  ) {
-    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-    val modifier = when {
-      ratio > 1.5 -> {
-        Modifier.fillMaxWidth()
-      }
+fun SearchBottomSheetContent(argument: MapNavArgument) {
+  val bottomSheetScope = LocalBottomSheetScope.current
+  val ratio = getWindowScreenSize().height / getWindowScreenSize().width
+  val modifier = when {
+    ratio > 1.5 -> {
+      Modifier.fillMaxWidth()
+    }
 
-      else -> {
-        Modifier
-          .padding(start = 30.dp)
-          .width(getWindowScreenSize().width / 3)
-      }
+    else -> {
+      Modifier
+        .padding(start = 30.dp)
+        .width(getWindowScreenSize().width / 3)
     }
-    Column(
-      modifier = modifier
-        .then(bottomSheetDraggable())
-        .shadow(
-          elevation = 10.dp,
-          shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+  }
+  Column(
+    modifier = modifier
+      .then(bottomSheetScope.bottomSheetDraggable())
+      .shadow(
+        elevation = 10.dp,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+      )
+      .background(LocalAppColors.current.topBg)
+      .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+      .padding(start = 16.dp, end = 16.dp)
+      .navigationBarsPadding()
+  ) {
+    Box(
+      modifier = Modifier
+        .align(Alignment.CenterHorizontally)
+        .padding(top = 8.dp)
+        .width(40.dp)
+        .height(8.dp)
+        .background(
+          color = 0xFFE2EDFB.dark(0xFF000000),
+          shape = RoundedCornerShape(6.dp)
         )
+    )
+    BottomSearchBar(
+      modifier = Modifier
+        .padding(top = 8.dp, bottom = 8.dp)
+        .fillMaxWidth()
+        .height(48.dp)
+    )
+    SearchCompose(
+      argument = argument,
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(getWindowScreenSize().height / 3 * 2)
         .background(LocalAppColors.current.topBg)
-        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-        .padding(start = 16.dp, end = 16.dp)
-        .navigationBarsPadding()
-    ) {
-      Box(
-        modifier = Modifier
-          .align(Alignment.CenterHorizontally)
-          .padding(top = 8.dp)
-          .width(40.dp)
-          .height(8.dp)
-          .background(
-            color = 0xFFE2EDFB.dark(0xFF000000),
-            shape = RoundedCornerShape(6.dp)
-          )
-      )
-      BottomSearchBar(
-        modifier = Modifier
-          .padding(top = 8.dp, bottom = 8.dp)
-          .fillMaxWidth()
-          .height(48.dp)
-      )
-      SearchCompose(
-        argument = argument,
-        modifier = Modifier
-          .fillMaxWidth()
-          .height(getWindowScreenSize().height / 3 * 2)
-          .background(LocalAppColors.current.topBg)
-      )
-    }
+    )
   }
 }
 
