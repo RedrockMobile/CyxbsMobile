@@ -13,6 +13,7 @@ import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.DialogSceneStrategy
+import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
@@ -69,7 +71,13 @@ fun AppNavDisplay() {
       // 添加状态保存的默认装饰器
       rememberSaveableStateHolderNavEntryDecorator(),
     ),
-    sceneStrategies = listOf(
+    sceneStrategies = appNavCollector.values.mapNotNull {
+      key(it) {
+        remember {
+          it.navEntry.getSceneStrategy() as SceneStrategy<AppNavArgument>?
+        }
+      }
+    } + listOf(
       rememberAppListDetailSceneStrategy(),     // 宽屏下的列表与详细页处理
       remember { DialogSceneStrategy() },       // 支持 Dialog 栈处理
       remember { SinglePaneSceneStrategy() },   // 默认单栈处理

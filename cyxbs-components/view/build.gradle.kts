@@ -3,6 +3,9 @@ plugins {
   id("kmp.compose")
 }
 
+useNavigation()
+useKtProvider()
+
 kotlin {
   sourceSets {
     commonMain.dependencies {
