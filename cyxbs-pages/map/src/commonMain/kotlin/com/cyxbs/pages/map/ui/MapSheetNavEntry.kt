@@ -60,6 +60,8 @@ class PlaceDetailNavEntry : AppNavEntry<PlaceDetailNavArgument>() {
         dismissOnBackPress = false,
         dismissOnClickOutside = false,
         scrimColor = Color.Transparent,
+        // 内层 ConstraintLayout 已自带 navigationBarsPadding，这里外壳不再重复
+        modifier = Modifier,
         // 由 MapBottomSheetEntryHost 统一随地图页进出栈，不按单个 sheet 的 Hide 出栈（保证与 Search 的稳定 z-order）
         popOnHide = false,
       )

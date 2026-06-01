@@ -19,7 +19,7 @@ import androidx.navigation3.scene.OverlayScene
 
 
 /**
- * description: 自定义BottomSheet的Strategy
+ * description: 自定义BottomSheet的Strategy(决定如何显示导航栈)
  *
  * 把带有 [BottomSheetSceneStrategy.Companion.BottomSheetKey] metadata 的 NavEntry 以
  * [BottomSheetCompose] 的形式作为 overlay 渲染，使其支持压栈/出栈。
@@ -75,7 +75,7 @@ class BottomSheetSceneStrategy : SceneStrategy<Any> {
       val modifier: Modifier = Modifier.navigationBarsPadding(),
       /**
        * 是否在 state 进入 [BottomSheetValueState.Hide] 时自动出栈。
-       * 默认 true（贴合"彻底 hide 才出栈"）。
+       * 默认 true
        * 若由业务自行管理 entry 的进出栈（如需要稳定 z-order 的多 sheet 叠加场景），可设为 false。
        */
       val popOnHide: Boolean = true,
