@@ -1,6 +1,14 @@
+
 package com.cyxbs.pages.noclass.bean
 
 import com.cyxbs.pages.course.api.LessonByWeeks
+
+/**
+ * description ： TODO:没课约空闲时间数据模型
+ * author : 我不抽火哪儿来的烟
+ * email : 3114795332qq.com
+ * date : 2026/5/18 13:00
+ */
 
 const val MAX_WEEK = 25
 

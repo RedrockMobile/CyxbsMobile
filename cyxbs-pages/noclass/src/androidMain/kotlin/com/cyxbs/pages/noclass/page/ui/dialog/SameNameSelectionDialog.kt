@@ -13,7 +13,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.cyxbs.components.utils.extensions.drawable
 import com.cyxbs.pages.noclass.R
-import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.Student
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent as Student
 import com.cyxbs.pages.noclass.page.adapter.SameNameStudentsAdapter
 import com.cyxbs.pages.noclass.page.viewmodel.activity.BatchAdditionViewModel
 

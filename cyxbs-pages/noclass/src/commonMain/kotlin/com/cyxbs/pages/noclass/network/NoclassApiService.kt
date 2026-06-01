@@ -16,9 +16,10 @@ import de.jensklingenberg.ktorfit.http.PUT
 import de.jensklingenberg.ktorfit.http.Query
 
 /**
- * 没课约 API 接口（commonMain / Ktorfit 版本）
- *
- *
+ * description ： TODO:没课约 API 接口（commonMain / Ktorfit 版本）
+ * author : summer_palace2
+ * email : 2992203079qq.com
+ * date : 2026/5/18 16:20
  */
 interface NoclassApiService {
 

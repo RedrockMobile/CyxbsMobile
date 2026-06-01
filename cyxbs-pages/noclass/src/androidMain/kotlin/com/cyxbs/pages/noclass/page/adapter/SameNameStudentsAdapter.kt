@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.extensions.string
 import com.cyxbs.pages.noclass.R
-import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.Student
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent as Student
 
 /**
  * ...

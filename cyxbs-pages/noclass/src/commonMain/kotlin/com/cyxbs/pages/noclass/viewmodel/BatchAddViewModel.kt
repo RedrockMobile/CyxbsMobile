@@ -1,3 +1,4 @@
+
 package com.cyxbs.pages.noclass.viewmodel
 
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,12 @@ import com.cyxbs.pages.noclass.network.NoclassApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+/**
+ * description ： TODO:没课约批量添加 ViewModel
+ * author : summer_palace2
+ * email : 2992203079qq.com
+ * date : 2026/5/19 10:00
+ */
 
 sealed class CheckState {
     data object Idle : CheckState()

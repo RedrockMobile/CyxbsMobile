@@ -1,7 +1,16 @@
+
 package com.cyxbs.pages.noclass.bean
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+
+/**
+ * description ： TODO:没课约批量检查响应模型
+ * author : 我不抽火哪儿来的烟
+ * email : 3114795332qq.com
+ * date : 2026/5/17 11:34
+ */
 
 @Serializable
 data class NoClassBatchResponseInfo(
@@ -25,4 +34,5 @@ data class NoClassBatchResponseInfo(
         @SerialName("classnum") val classNum: String,
         var isSelected: Boolean = false
     )
+
 }

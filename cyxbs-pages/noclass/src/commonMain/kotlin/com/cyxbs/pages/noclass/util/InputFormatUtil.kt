@@ -1,4 +1,12 @@
+
 package com.cyxbs.pages.noclass.util
+
+/**
+ * description ： TODO:没课约输入格式校验工具
+ * author : 我不抽火哪儿来的烟
+ * email : 3114795332qq.com
+ * date : 2026/5/17 11:34
+ */
 
 object InputFormatUtil {
     fun isNoInput(s: String): Boolean {

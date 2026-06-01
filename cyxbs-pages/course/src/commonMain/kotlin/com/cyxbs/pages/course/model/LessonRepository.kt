@@ -6,6 +6,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.utils.extensions.log
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
@@ -137,6 +138,7 @@ object LessonRepository {
     }.onFailure {
       if (isDebug()) {
         toast("请求课表数据异常, ${it.message}")
+        log("whjwhj,${it.message}")
         logg("请求课表数据异常: ${it.stackTraceToString()}")
       }
     }

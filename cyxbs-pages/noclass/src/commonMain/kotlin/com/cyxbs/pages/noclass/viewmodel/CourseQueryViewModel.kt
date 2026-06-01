@@ -1,3 +1,4 @@
+
 package com.cyxbs.pages.noclass.viewmodel
 
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * description ： TODO:没课约课表查询 ViewModel
+ * author : 我不抽火哪儿来的烟
+ * email : 3114795332qq.com
+ * date : 2026/5/19 17:00
+ */
 class CourseQueryViewModel : BaseViewModel() {
 
     private val _noclassData = MutableStateFlow<HashMap<Int, NoClassSpareTime>>(hashMapOf())
