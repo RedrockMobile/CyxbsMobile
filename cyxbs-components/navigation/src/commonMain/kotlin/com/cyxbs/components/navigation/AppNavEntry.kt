@@ -98,6 +98,9 @@ abstract class AppNavEntry<T : AppNavArgument> {
 
   /**
    * 自定义注入的Strategy
+   *
+   * 重写这个方法就能注入一些自定义的Strategy
+   * 比如我自定义了一个BottomSheetSceneStrategy,就能重写这个方法给添加进去
    */
   open fun getSceneStrategy(): SceneStrategy<Any>? {
     return null
