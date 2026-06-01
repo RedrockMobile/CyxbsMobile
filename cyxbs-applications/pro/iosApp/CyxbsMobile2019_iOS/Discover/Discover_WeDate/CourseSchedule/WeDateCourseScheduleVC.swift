@@ -83,7 +83,9 @@ class WeDateCourseScheduleVC: UIViewController {
     }
     
     @objc private func clickButton() {
-        collectionView.setContentOffset(CGPoint(x: Int(SCREEN_WIDTH) * nowWeek, y: 0), animated: true)
+        let maxPage = max(collectionView.numberOfSections - 1, 0)
+        let targetWeek = min(max(nowWeek, 0), maxPage)
+        collectionView.setContentOffset(CGPoint(x: collectionView.bounds.width * CGFloat(targetWeek), y: 0), animated: true)
     }
     
     // MARK: - Lazy

@@ -30,6 +30,9 @@ class ScheduleFact: NSObject {
     // 标志位数组，标志当周的课程安排是否被请求
     private var flagArray = Array(repeating: false, count: 26)
     
+    // 标志位数组，避免同一周未完成加载时重复发起请求
+    private var loadingFlagArray = Array(repeating: false, count: 26)
+    
     private var dateVersion: String = ""
     
     private var stuNumAry: [String] = []
@@ -44,25 +47,29 @@ class ScheduleFact: NSObject {
         // 先加载全部周和当周课表
         updateWeeklySchedule(forWeek: 0)
         // 如果当前周数不在学期内（会导致数组越界），则不加载当周课表
-        if nowWeek <= 26 {
+        if data.indices.contains(nowWeek) {
             updateWeeklySchedule(forWeek: nowWeek)
         }
     }
     
     // 更新某周的课表
     func updateWeeklySchedule(forWeek week: Int) {
-        if !flagArray[week] {
-            WeekMaping.mapWeekToAry(stuNumAry: stuNumAry, weekNum: week) { weekAry in
-                self.data[week] = WeekMaping.processWeekArray(weekAry: weekAry, weekNum: week)
-                self.flagArray[week] = true
-                self.collectionView.reloadSections(IndexSet(integer: week))
-                // 新加载的课表cell渐入
-                for cell in self.collectionView.visibleCells {
-                    if let indexPath = self.collectionView.indexPath(for: cell), indexPath.section == week {
-                        cell.alpha = 0
-                        UIView.animate(withDuration: 0.3) {
-                            cell.alpha = 1
-                        }
+        guard data.indices.contains(week) else { return }
+        guard !flagArray[week], !loadingFlagArray[week] else { return }
+        
+        loadingFlagArray[week] = true
+        WeekMaping.mapWeekToAry(stuNumAry: stuNumAry, weekNum: week) { weekAry in
+            self.data[week] = WeekMaping.processWeekArray(weekAry: weekAry, weekNum: week)
+            self.flagArray[week] = true
+            self.loadingFlagArray[week] = false
+            guard let collectionView = self.collectionView else { return }
+            collectionView.reloadSections(IndexSet(integer: week))
+            // 新加载的课表cell渐入
+            for cell in collectionView.visibleCells {
+                if let indexPath = collectionView.indexPath(for: cell), indexPath.section == week {
+                    cell.alpha = 0
+                    UIView.animate(withDuration: 0.3) {
+                        cell.alpha = 1
                     }
                 }
             }
@@ -73,7 +80,10 @@ class ScheduleFact: NSObject {
 extension ScheduleFact {
     
     var currentPage: Int {
-        Int(collectionView.contentOffset.x / collectionView.bounds.width / CGFloat(collectionView.ry_layout?.pageShows ?? 1) + 0.5)
+        let pageShows = CGFloat(collectionView.ry_layout?.pageShows ?? 1)
+        let rawPage = Int(collectionView.contentOffset.x / collectionView.bounds.width / pageShows + 0.5)
+        let maxPage = max(collectionView.numberOfSections - 1, 0)
+        return min(max(rawPage, 0), maxPage)
     }
     
     @objc
