@@ -256,7 +256,42 @@ extension RYScheduleInteractionFact: ScheduleDetailCollectionViewCellDelegate {
     }
     
     func collectionViewCell(_ collectionViewCell: ScheduleDetailCollectionViewCell, responsePlaceTap: UITapGestureRecognizer) {
+        guard let placeName = collectionViewCell.cal?.curriculum.classRoom, !placeName.isEmpty else { return }
         
+        let detailViewController = collectionViewCell.latestViewController
+        ClassDetailModel.requestPlaceID(withPlaceName: placeName) { [weak self] responseObject in
+            guard let self else { return }
+            guard let data = responseObject["data"] as? [String: Any] else { return }
+            
+            let placeID: String
+            if let number = data["place_id"] as? NSNumber {
+                placeID = number.stringValue
+            } else if let string = data["place_id"] as? String {
+                placeID = string
+            } else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                let mapVC = CQUPTMapViewController(initialPlace: placeID)
+                mapVC.isPresent = true
+                
+                let navigationController = UINavigationController(rootViewController: mapVC)
+                navigationController.modalPresentationStyle = .formSheet
+                mapVC.modalPresentationStyle = .formSheet
+                
+                let presentMap = {
+                    if let viewController = self.viewController {
+                        viewController.present(navigationController, animated: true)
+                    }
+                }
+                if let detailViewController {
+                    detailViewController.dismiss(animated: true, completion: presentMap)
+                } else {
+                    presentMap()
+                }
+            }
+        }
     }
 }
 
