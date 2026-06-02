@@ -25,7 +25,7 @@ object InputFormatUtil {
     }
 
     fun isChineseCharacters(s: String): Boolean {
-        val chineseRegex = Regex("^[\\u4e00-\\u9fa5]+([·.]?[\\u4e00-\\u9fa5]+)+$")
+        val chineseRegex = Regex("^[\\u4e00-\\u9fa5]+([·.][\\u4e00-\\u9fa5]+)*$")
         return chineseRegex.matches(s)
     }
 
