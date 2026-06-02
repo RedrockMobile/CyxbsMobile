@@ -47,26 +47,48 @@ class ScheduleFact: NSObject {
         self.stuNumAry = stuNumAry
         self.dateVersion = dateVersion
         self.nowWeek = nowWeek
-        // 先加载全部周和当周课表
-        updateWeeklySchedule(forWeek: 0)
-        // 如果当前周数不在学期内（会导致数组越界），则不加载当周课表
-        if data.indices.contains(nowWeek) {
-            updateWeeklySchedule(forWeek: nowWeek)
+    }
+    
+    func loadInitialSchedules(completion: @escaping () -> Void) {
+        var weeks = [0]
+        if data.indices.contains(nowWeek), nowWeek != 0 {
+            weeks.append(nowWeek)
+        }
+        
+        let group = DispatchGroup()
+        for week in weeks {
+            group.enter()
+            updateWeeklySchedule(forWeek: week) {
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion()
         }
     }
     
     // 更新某周的课表
-    func updateWeeklySchedule(forWeek week: Int) {
-        guard data.indices.contains(week) else { return }
-        guard !flagArray[week], !loadingFlagArray[week] else { return }
+    func updateWeeklySchedule(forWeek week: Int, completion: (() -> Void)? = nil) {
+        guard data.indices.contains(week) else {
+            completion?()
+            return
+        }
+        guard !flagArray[week], !loadingFlagArray[week] else {
+            completion?()
+            return
+        }
         
         loadingFlagArray[week] = true
         WeekMaping.mapWeekToAry(stuNumAry: stuNumAry, weekNum: week) { [weak self] weekAry in
-            guard let self = self else { return }
+            guard let self = self else {
+                completion?()
+                return
+            }
             self.data[week] = WeekMaping.processWeekArray(weekAry: weekAry, weekNum: week)
             self.flagArray[week] = true
             self.loadingFlagArray[week] = false
             self.reloadWeekWhenPossible(week)
+            completion?()
         }
     }
     

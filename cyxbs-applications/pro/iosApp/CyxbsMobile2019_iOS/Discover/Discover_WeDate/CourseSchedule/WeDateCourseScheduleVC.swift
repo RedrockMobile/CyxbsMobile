@@ -16,6 +16,10 @@ class WeDateCourseScheduleVC: UIViewController {
     /// 学号数组
     var stuNumAry: [String] = []
     
+    private var shouldWaitForInitialSchedules: Bool {
+        stuNumAry.count > 5
+    }
+    
     // MARK: - Life Cycle
     
     init(stuNumAry: [String]) {
@@ -35,19 +39,36 @@ class WeDateCourseScheduleVC: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .weDatePageBackground
         view.addSubview(titleLab)
+        #if DEBUG
+        print("[WeDateCourseSchedule] schedule page received stuNumCount=\(stuNumAry.count)")
+        #endif
         
-        if(stuNumAry.count != 0){
-            CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { courseScheduleModel in
+        if shouldWaitForInitialSchedules {
+            showLoadingView()
+        }
+        
+        if !stuNumAry.isEmpty {
+            CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { [weak self] courseScheduleModel in
+                guard let self = self else { return }
                 self.nowWeek = courseScheduleModel.nowWeek
+                WeekMaping.cacheCourseSchedule(courseScheduleModel, for: self.stuNumAry[0])
                 self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
                 self.fact?.delegate = self
-                // 添加回到本周按钮时需确保fact有值，否则点击会崩溃
-                self.view.addSubview(self.button)
-                // 添加collectionView时需确保fact有值，否则会崩溃
-                self.view.addSubview(self.collectionView)
-            } failure: { error in
+                
+                if self.shouldWaitForInitialSchedules {
+                    self.fact?.loadInitialSchedules { [weak self] in
+                        self?.showScheduleContent()
+                    }
+                } else {
+                    self.showScheduleContent()
+                    self.fact?.loadInitialSchedules {}
+                }
+            } failure: { [weak self] error in
                 print(error)
+                self?.hideLoadingView()
             }
+        } else {
+            hideLoadingView()
         }
     }
     
@@ -82,6 +103,28 @@ class WeDateCourseScheduleVC: UIViewController {
         return result
     }
     
+    private func showScheduleContent() {
+        hideLoadingView()
+        if button.superview == nil {
+            view.addSubview(button)
+        }
+        if collectionView.superview == nil {
+            view.addSubview(collectionView)
+        }
+    }
+    
+    private func showLoadingView() {
+        if loadingView.superview == nil {
+            view.addSubview(loadingView)
+        }
+        loadingIndicator.startAnimating()
+    }
+    
+    private func hideLoadingView() {
+        loadingIndicator.stopAnimating()
+        loadingView.removeFromSuperview()
+    }
+    
     @objc private func clickButton() {
         let maxPage = max(collectionView.numberOfSections - 1, 0)
         let targetWeek = min(max(nowWeek, 0), maxPage)
@@ -105,6 +148,32 @@ class WeDateCourseScheduleVC: UIViewController {
         titleLab.textColor = .weDateTitleText
         titleLab.text = "整学期"
         return titleLab
+    }()
+    
+    private lazy var loadingView: UIView = {
+        let y: CGFloat = 64
+        let loadingView = UIView(frame: CGRect(x: 0, y: y, width: view.bounds.width, height: view.bounds.height - y))
+        loadingView.backgroundColor = .weDatePageBackground
+        loadingView.addSubview(loadingIndicator)
+        loadingView.addSubview(loadingLabel)
+        loadingIndicator.center = CGPoint(x: loadingView.bounds.midX, y: loadingView.bounds.midY - 18)
+        loadingLabel.frame = CGRect(x: 24, y: loadingIndicator.frame.maxY + 12, width: loadingView.bounds.width - 48, height: 22)
+        return loadingView
+    }()
+    
+    private lazy var loadingIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.color = .weDateAccent
+        return indicator
+    }()
+    
+    private lazy var loadingLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .weDateSecondaryText
+        label.textAlignment = .center
+        label.text = "课表加载中..."
+        return label
     }()
     
     private lazy var button: UIButton = {

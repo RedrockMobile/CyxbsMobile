@@ -12,6 +12,12 @@ import UIKit
 class WeekMaping {
     
     private static let cacheQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.cache")
+    private static let requestQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.cyxbs.wedate.courseSchedule.request"
+        queue.maxConcurrentOperationCount = 3
+        return queue
+    }()
     private static var courseScheduleCache: [String: CourseScheduleModel] = [:]
     private static var pendingCourseScheduleCompletions: [String: [(CourseScheduleModel?) -> Void]] = [:]
     
@@ -42,6 +48,12 @@ class WeekMaping {
         }
     }
     
+    static func cacheCourseSchedule(_ courseScheduleModel: CourseScheduleModel, for stuNum: String) {
+        cacheQueue.async {
+            courseScheduleCache[stuNum] = courseScheduleModel
+        }
+    }
+    
     private static func requestCourseSchedule(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
         cacheQueue.async {
             if let cachedModel = courseScheduleCache[stuNum] {
@@ -55,19 +67,30 @@ class WeekMaping {
             }
             
             pendingCourseScheduleCompletions[stuNum] = [completion]
+            enqueueCourseScheduleRequest(stuNum: stuNum)
+        }
+    }
+    
+    private static func enqueueCourseScheduleRequest(stuNum: String) {
+        requestQueue.addOperation {
+            let semaphore = DispatchSemaphore(value: 0)
             CourseScheduleModel.requestWithStuNum(stuNum) { courseScheduleModel in
                 cacheQueue.async {
                     courseScheduleCache[stuNum] = courseScheduleModel
                     let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
                     completions.forEach { $0(courseScheduleModel) }
+                    semaphore.signal()
                 }
             } failure: { error in
                 print(error)
                 cacheQueue.async {
                     let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
                     completions.forEach { $0(nil) }
+                    semaphore.signal()
                 }
             }
+            semaphore.wait()
+            Thread.sleep(forTimeInterval: 0.12)
         }
     }
     
@@ -99,6 +122,10 @@ class WeekMaping {
         }
 
         group.notify(queue: .main) {
+            #if DEBUG
+            let loadedStudentIDs = Set(weekAry.flatMap { $0 }.flatMap { $0 }.map { $0.studentID }.filter { !$0.isEmpty })
+            print("[WeDateCourseSchedule] week map finished week=\(weekNum), expected=\(stuNumAry.count), loaded=\(loadedStudentIDs.count)")
+            #endif
             completion(weekAry)
         }
     }
