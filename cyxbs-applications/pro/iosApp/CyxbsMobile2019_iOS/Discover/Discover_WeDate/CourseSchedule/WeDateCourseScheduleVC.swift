@@ -56,6 +56,7 @@ class WeDateCourseScheduleVC: UIViewController {
                 self.fact?.delegate = self
                 
                 if self.shouldWaitForInitialSchedules {
+                    _ = self.collectionView
                     self.fact?.loadInitialSchedules { [weak self] in
                         self?.showScheduleContent()
                     }

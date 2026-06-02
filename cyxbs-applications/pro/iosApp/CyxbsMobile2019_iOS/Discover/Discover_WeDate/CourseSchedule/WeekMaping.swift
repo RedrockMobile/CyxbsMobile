@@ -12,7 +12,7 @@ import UIKit
 class WeekMaping {
     
     private static let cacheQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.cache")
-    private static let callbackQueue = DispatchQueue.global(qos: .userInitiated)
+    private static let callbackQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.callback", qos: .userInitiated)
     private static let maxConcurrentRequestCount = 3
     private static let requestStartInterval: TimeInterval = 0.12
     private static var courseScheduleCache: [String: CourseScheduleModel] = [:]
