@@ -101,7 +101,7 @@
         UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         backBtn.frame = CGRectMake(17, STATUSBARHEIGHT + 13, 19, 19);
         backBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 10);
-        [backBtn setImage:[UIImage imageNamed:@"我的返回"] forState:UIControlStateNormal];
+        [backBtn setImage:[UIImage imageNamed:@"Publish_backBtn"] forState:UIControlStateNormal];
         [backBtn setTintColor:[UIColor grayColor]];
         [backBtn addTarget:self.delegate action:@selector(backBtnClicked) forControlEvents:UIControlEventTouchUpInside];
         _backBtn = backBtn;

@@ -7,7 +7,6 @@
 //
 
 import UIKit
-import MJRefresh
 import JXSegmentedView
 import RYTransitioningDelegateSwift
 
@@ -25,19 +24,6 @@ class RYScheduleInteractionFact: RYScheduleFact {
     
     override func createCollectionView() -> UICollectionView {
         let collectionView = super.createCollectionView()
-        
-        let header = MJRefreshGifHeader {
-            self.cleanAndReload()
-        }
-        .autoChangeTransparency(true)
-        .set_refresh_sports()
-        .ignoredScrollView(contentInsetTop: -58)
-        .link(to: collectionView)
-        
-        header.isCollectionViewAnimationBug = true
-        header.endRefreshingAnimationBeginAction = {
-            collectionView.collectionViewLayout.finalizeLayoutTransition()
-        }
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(collectionViewEmpty(tap:)))
         tap.delegate = self
@@ -117,7 +103,6 @@ extension RYScheduleInteractionFact {
             }
             DispatchQueue.main.async {
                 self.collectionView.reloadData()
-                self.collectionView.mj_header?.endRefreshing()
                 complition?(self)
             }
         }
@@ -212,7 +197,6 @@ extension RYScheduleInteractionFact {
     
     override func scrollViewDidScroll(_ scrollView: UIScrollView) {
         super.scrollViewDidScroll(scrollView)
-        scrollView.mj_header?.frame.origin.x = scrollView.contentOffset.x
         reloadHeaderView()
     }
     
@@ -253,7 +237,42 @@ extension RYScheduleInteractionFact: ScheduleDetailCollectionViewCellDelegate {
     }
     
     func collectionViewCell(_ collectionViewCell: ScheduleDetailCollectionViewCell, responsePlaceTap: UITapGestureRecognizer) {
+        guard let placeName = collectionViewCell.cal?.curriculum.classRoom, !placeName.isEmpty else { return }
         
+        let detailViewController = collectionViewCell.latestViewController
+        ClassDetailModel.requestPlaceID(withPlaceName: placeName) { [weak self] responseObject in
+            guard let self else { return }
+            guard let data = responseObject["data"] as? [String: Any] else { return }
+            
+            let placeID: String
+            if let number = data["place_id"] as? NSNumber {
+                placeID = number.stringValue
+            } else if let string = data["place_id"] as? String {
+                placeID = string
+            } else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                let mapVC = CQUPTMapViewController(initialPlace: placeID)
+                mapVC.isPresent = true
+                
+                let navigationController = UINavigationController(rootViewController: mapVC)
+                navigationController.modalPresentationStyle = .formSheet
+                mapVC.modalPresentationStyle = .formSheet
+                
+                let presentMap = {
+                    if let viewController = self.viewController {
+                        viewController.present(navigationController, animated: true)
+                    }
+                }
+                if let detailViewController {
+                    detailViewController.dismiss(animated: true, completion: presentMap)
+                } else {
+                    presentMap()
+                }
+            }
+        }
     }
 }
 

@@ -66,7 +66,7 @@ class CreateGroupAlertVC: UIViewController {
         let customView = UIView(frame: CGRect(x: (SCREEN_WIDTH - 303) / 2, y: (SCREEN_HEIGHT - 197) / 2 - 50, width: 303, height: 197))
         customView.layer.cornerRadius = 12
         customView.clipsToBounds = true
-        customView.backgroundColor = .white
+        customView.backgroundColor = .weDatePanelBackground
         return customView
     }()
     /// 提示文本
@@ -76,7 +76,7 @@ class CreateGroupAlertVC: UIViewController {
         alertLab.textAlignment = .center
         alertLab.numberOfLines = 0
         alertLab.font = .systemFont(ofSize: 15)
-        alertLab.textColor = UIColor(hexString: "#15315B", alpha: 1)
+        alertLab.textColor = .weDatePrimaryText
         return alertLab
     }()
     /// 取消按钮
@@ -86,7 +86,7 @@ class CreateGroupAlertVC: UIViewController {
         cancelBtn.clipsToBounds = true
         cancelBtn.setTitle("取消", for: .normal)
         cancelBtn.titleLabel?.font = .boldSystemFont(ofSize: 15)
-        cancelBtn.backgroundColor = UIColor(hexString: "#C3D4EE", alpha: 1)
+        cancelBtn.backgroundColor = .weDateDisabledButton
         cancelBtn.addTarget(self, action: #selector(clickCancelBtn), for: .touchUpInside)
         return cancelBtn
     }()
@@ -99,8 +99,8 @@ class CreateGroupAlertVC: UIViewController {
         confirmBtn.titleLabel?.font = .boldSystemFont(ofSize: 15)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -122,7 +122,7 @@ class CreateGroupAlertVC: UIViewController {
         let label = UILabel(frame: CGRect(x: boxBtn.right + 3, y: cancelBtn.bottom + 14, width: 62, height: 14))
         label.text = "下次不再提醒"
         label.font = .systemFont(ofSize: 10)
-        label.textColor = UIColor(hexString: "#7B8899", alpha: 1)
+        label.textColor = .weDateMutedText
         return label
     }()
 }

@@ -48,7 +48,7 @@ class AddArrangePlaceVC: UIViewController {
         view.addSubview(label)
         view.addSubview(collectionView)
         view.addSubview(nextBtn)
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
         
         HttpRequest()
     }
@@ -101,7 +101,7 @@ class AddArrangePlaceVC: UIViewController {
         let label = UILabel(frame: CGRect(x: returnBtn.left, y: returnBtn.bottom + 104, width: 98, height: 34))
         label.text = "选择地点"
         label.font = .boldSystemFont(ofSize: 24)
-        label.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        label.textColor = .weDateDeepText
         return label
     }()
     /// 展示地点热词
@@ -112,6 +112,7 @@ class AddArrangePlaceVC: UIViewController {
         layout.scrollDirection = .vertical
         let collectionView = UICollectionView(frame: CGRect(x: label.left, y: label.bottom + 25, width: SCREEN_WIDTH - label.left * 2, height: 108), collectionViewLayout: layout)
         collectionView.register(AddArrangeCollectionViewCell.self, forCellWithReuseIdentifier: AddArrangeCollectionViewCellReuseIdentifier)
+        collectionView.backgroundColor = .weDatePageBackground
         collectionView.dataSource = self
         collectionView.delegate = self
         return collectionView
@@ -126,8 +127,8 @@ class AddArrangePlaceVC: UIViewController {
         nextBtn.addTarget(self, action: #selector(clickNextBtn), for: .touchUpInside)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -144,7 +145,7 @@ class AddArrangePlaceVC: UIViewController {
         promptLab.layer.cornerRadius = 18
         promptLab.clipsToBounds = true
         promptLab.textColor = .white
-        promptLab.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        promptLab.backgroundColor = .weDateToastBackground
         return promptLab
     }()
 }

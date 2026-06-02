@@ -16,11 +16,11 @@ class AddArrangeTitleVC: UIViewController {
     private var selectedTitle: String = "" {
         willSet {
             if !newValue.isEmpty {
-                nextBtn.backgroundColor = .white
+                nextBtn.backgroundColor = .weDatePanelBackground
                 let gradientLayer = CAGradientLayer()
                 gradientLayer.colors = [
-                    UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-                    UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+                    UIColor.weDateGradientStart.cgColor,
+                    UIColor.weDateGradientEnd.cgColor
                 ]
                 gradientLayer.startPoint = CGPoint(x: 0, y: 0)
                 gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -58,7 +58,7 @@ class AddArrangeTitleVC: UIViewController {
         view.addSubview(secondLab)
         view.addSubview(collectionView)
         view.addSubview(nextBtn)
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
         self.navigationController?.navigationBar.isHidden = true
     }
     
@@ -111,7 +111,7 @@ class AddArrangeTitleVC: UIViewController {
         let firstLab = UILabel(frame: CGRect(x: returnBtn.left, y: returnBtn.bottom + 70, width: 171, height: 34))
         firstLab.text = "为你的行程添加"
         firstLab.font = .boldSystemFont(ofSize: 24)
-        firstLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        firstLab.textColor = .weDateDeepText
         return firstLab
     }()
     /// '一个标题'文本
@@ -119,7 +119,7 @@ class AddArrangeTitleVC: UIViewController {
         let secondLab = UILabel(frame: CGRect(x: returnBtn.left, y: firstLab.bottom + 2, width: 100, height: firstLab.height))
         secondLab.text = "一个标题"
         secondLab.font = .boldSystemFont(ofSize: 24)
-        secondLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        secondLab.textColor = .weDateDeepText
         return secondLab
     }()
     /// 展示标题热词
@@ -130,6 +130,7 @@ class AddArrangeTitleVC: UIViewController {
         layout.scrollDirection = .vertical
         let collectionView = UICollectionView(frame: CGRect(x: firstLab.left, y: secondLab.bottom + 25, width: SCREEN_WIDTH - firstLab.left * 2, height: 70), collectionViewLayout: layout)
         collectionView.register(AddArrangeCollectionViewCell.self, forCellWithReuseIdentifier: AddArrangeCollectionViewCellReuseIdentifier)
+        collectionView.backgroundColor = .weDatePageBackground
         collectionView.dataSource = self
         collectionView.delegate = self
         return collectionView
@@ -142,7 +143,7 @@ class AddArrangeTitleVC: UIViewController {
         nextBtn.setTitle("下一步", for: .normal)
         nextBtn.titleLabel?.font = .boldSystemFont(ofSize: 18)
         nextBtn.addTarget(self, action: #selector(clickNextBtn), for: .touchUpInside)
-        nextBtn.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#C3D4EE", alpha: 1), dark: UIColor(hexString: "#C3D4EE", alpha: 1))
+        nextBtn.backgroundColor = .weDateDisabledButton
         return nextBtn
     }()
     /// 标题为空提示语
@@ -154,7 +155,7 @@ class AddArrangeTitleVC: UIViewController {
         promptLab.layer.cornerRadius = 18
         promptLab.clipsToBounds = true
         promptLab.textColor = .white
-        promptLab.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        promptLab.backgroundColor = .weDateToastBackground
         return promptLab
     }()
 }

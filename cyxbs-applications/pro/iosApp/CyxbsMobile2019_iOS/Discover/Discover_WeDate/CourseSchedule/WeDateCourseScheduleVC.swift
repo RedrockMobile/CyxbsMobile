@@ -15,12 +15,19 @@ class WeDateCourseScheduleVC: UIViewController {
     private var nowWeek: Int = 0
     /// 学号数组
     var stuNumAry: [String] = []
+    /// 学号对应的兜底姓名
+    private var studentNamesByStuNum: [String: String] = [:]
+    
+    private var shouldWaitForInitialSchedules: Bool {
+        stuNumAry.count > 5
+    }
     
     // MARK: - Life Cycle
     
-    init(stuNumAry: [String]) {
+    init(stuNumAry: [String], studentNamesByStuNum: [String: String] = [:]) {
         super.init(nibName: nil, bundle: nil)
         self.stuNumAry = stuNumAry
+        self.studentNamesByStuNum = studentNamesByStuNum
     }
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -33,21 +40,42 @@ class WeDateCourseScheduleVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
         view.addSubview(titleLab)
+        #if DEBUG
+        print("[WeDateCourseSchedule] schedule page received stuNumCount=\(stuNumAry.count)")
+        #endif
         
-        if(stuNumAry.count != 0){
-            CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { courseScheduleModel in
-                self.nowWeek = courseScheduleModel.nowWeek
-                self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
-                self.fact?.delegate = self
-                // 添加回到本周按钮时需确保fact有值，否则点击会崩溃
-                self.view.addSubview(self.button)
-                // 添加collectionView时需确保fact有值，否则会崩溃
-                self.view.addSubview(self.collectionView)
-            } failure: { error in
-                print(error)
+        if shouldWaitForInitialSchedules {
+            showLoadingView()
+        }
+        
+        if !stuNumAry.isEmpty {
+            WeekMaping.updateFallbackStudentNames(studentNamesByStuNum)
+            WeekMaping.requestCourseScheduleModel(stuNum: stuNumAry[0]) { [weak self] courseScheduleModel in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    guard let courseScheduleModel = courseScheduleModel else {
+                        self.hideLoadingView()
+                        return
+                    }
+                    self.nowWeek = courseScheduleModel.nowWeek
+                    self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
+                    self.fact?.delegate = self
+                    
+                    if self.shouldWaitForInitialSchedules {
+                        _ = self.collectionView
+                        self.fact?.loadInitialSchedules { [weak self] in
+                            self?.showScheduleContent()
+                        }
+                    } else {
+                        self.showScheduleContent()
+                        self.fact?.loadInitialSchedules {}
+                    }
+                }
             }
+        } else {
+            hideLoadingView()
         }
     }
     
@@ -82,8 +110,32 @@ class WeDateCourseScheduleVC: UIViewController {
         return result
     }
     
+    private func showScheduleContent() {
+        hideLoadingView()
+        if button.superview == nil {
+            view.addSubview(button)
+        }
+        if collectionView.superview == nil {
+            view.addSubview(collectionView)
+        }
+    }
+    
+    private func showLoadingView() {
+        if loadingView.superview == nil {
+            view.addSubview(loadingView)
+        }
+        loadingIndicator.startAnimating()
+    }
+    
+    private func hideLoadingView() {
+        loadingIndicator.stopAnimating()
+        loadingView.removeFromSuperview()
+    }
+    
     @objc private func clickButton() {
-        collectionView.setContentOffset(CGPoint(x: Int(SCREEN_WIDTH) * nowWeek, y: 0), animated: true)
+        let maxPage = max(collectionView.numberOfSections - 1, 0)
+        let targetWeek = min(max(nowWeek, 0), maxPage)
+        collectionView.setContentOffset(CGPoint(x: collectionView.bounds.width * CGFloat(targetWeek), y: 0), animated: true)
     }
     
     // MARK: - Lazy
@@ -100,9 +152,35 @@ class WeDateCourseScheduleVC: UIViewController {
     private lazy var titleLab: UILabel = {
         let titleLab = UILabel(frame: CGRect(x: 16, y: 21, width: 90, height: 31))
         titleLab.font = .systemFont(ofSize: 22, weight: .black)
-        titleLab.textColor = UIColor(hexString: "#112C54", alpha: 1)
+        titleLab.textColor = .weDateTitleText
         titleLab.text = "整学期"
         return titleLab
+    }()
+    
+    private lazy var loadingView: UIView = {
+        let y: CGFloat = 64
+        let loadingView = UIView(frame: CGRect(x: 0, y: y, width: view.bounds.width, height: view.bounds.height - y))
+        loadingView.backgroundColor = .weDatePageBackground
+        loadingView.addSubview(loadingIndicator)
+        loadingView.addSubview(loadingLabel)
+        loadingIndicator.center = CGPoint(x: loadingView.bounds.midX, y: loadingView.bounds.midY - 18)
+        loadingLabel.frame = CGRect(x: 24, y: loadingIndicator.frame.maxY + 12, width: loadingView.bounds.width - 48, height: 22)
+        return loadingView
+    }()
+    
+    private lazy var loadingIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.color = .weDateAccent
+        return indicator
+    }()
+    
+    private lazy var loadingLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .weDateSecondaryText
+        label.textAlignment = .center
+        label.text = "课表加载中..."
+        return label
     }()
     
     private lazy var button: UIButton = {
@@ -114,8 +192,8 @@ class WeDateCourseScheduleVC: UIViewController {
         button.addTarget(self, action: #selector(clickButton), for: .touchUpInside)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)

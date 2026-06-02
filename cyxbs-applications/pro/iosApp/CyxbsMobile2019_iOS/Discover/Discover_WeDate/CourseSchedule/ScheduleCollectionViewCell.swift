@@ -99,13 +99,13 @@ class ScheduleCollectionViewCell: UICollectionViewCell {
     
     private lazy var lightBackView: UIView = {
         let lightBackView = UIView()
-        lightBackView.backgroundColor = UIColor(hexString: "#F3F6FD", alpha: 1)
+        lightBackView.backgroundColor = .weDateTodayColumnBackground
         return lightBackView
     }()
     
     private lazy var darkBackView: UIView = {
         let darkBackView = UIView()
-        darkBackView.backgroundColor = UIColor(hexString: "#2A4E84", alpha: 1)
+        darkBackView.backgroundColor = .weDateTodayHighlight
         darkBackView.layer.cornerRadius = 8
         darkBackView.clipsToBounds = true
         return darkBackView
@@ -146,16 +146,16 @@ extension ScheduleCollectionViewCell {
         switch curriculumType {
             
         case .allBusy:
-            contentView.backgroundColor = UIColor(hexString: "#F9E3E4", alpha: 1)
-            titleLab.textColor = UIColor(hexString: "#FF6262", alpha: 1)
+            contentView.backgroundColor = .weDateBusyAllBackground
+            titleLab.textColor = .weDateBusyStateText
             
         case .leisureMore:
-            contentView.backgroundColor = UIColor(hexString: "#DDE3F8", alpha: 1)
-            titleLab.textColor = UIColor(hexString: "#4066EA", alpha: 1)
+            contentView.backgroundColor = .weDateLeisureMoreBackground
+            titleLab.textColor = .weDateLeisureStateText
             
         case .busyMore:
-            contentView.backgroundColor = UIColor(hexString: "#F9E7D8", alpha: 1)
-            titleLab.textColor = UIColor(hexString: "#FF8015", alpha: 1)
+            contentView.backgroundColor = .weDateBusyMoreBackground
+            titleLab.textColor = .weDateBusyMoreText
             
         case .allLeisure:
             contentView.backgroundColor = .clear
@@ -173,10 +173,10 @@ extension ScheduleCollectionViewCell {
         switch supplementaryType {
             
         case .normal:
-            contentView.backgroundColor = .white
+            contentView.backgroundColor = .weDatePageBackground
             contentView.layer.cornerRadius = 0
-            titleLab.textColor = UIColor(hexString: "#15315B", alpha: 1)
-            contentLab.textColor = UIColor(hexString: "#606E8A", alpha: 1)
+            titleLab.textColor = .weDatePrimaryText
+            contentLab.textColor = .weDateSecondaryText
             lightBackView.isHidden = true
             darkBackView.isHidden = true
             
@@ -188,7 +188,7 @@ extension ScheduleCollectionViewCell {
             
         case .today:
             titleLab.textColor = .white
-            contentView.backgroundColor = .white
+            contentView.backgroundColor = .weDatePageBackground
             lightBackView.isHidden = false
             darkBackView.isHidden = false
         }

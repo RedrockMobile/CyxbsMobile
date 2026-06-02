@@ -163,6 +163,7 @@
 		1849D8B62EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 1849D8B22EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m */; };
 		1849D8B72EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 1849D8B42EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m */; };
 		1851CEE22E53541300356C1A /* QAImage.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1851CEE12E53541300356C1A /* QAImage.xcassets */; };
+		1878186F2FCDB31E00095E79 /* WeDateTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1878186E2FCDB31E00095E79 /* WeDateTheme.swift */; };
 		187DF4BA260310DD000BCDE9 /* LYEmptyBaseView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */; };
 		187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B2260310DD000BCDE9 /* UIScrollView+Empty.m */; };
 		187DF4BD260310DD000BCDE9 /* LYEmptyView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187DF4B6260310DD000BCDE9 /* LYEmptyView.m */; };
@@ -945,6 +946,7 @@
 		1849D8B32EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DetailsCustomizeNavigationBar.h; sourceTree = "<group>"; };
 		1849D8B42EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DetailsCustomizeNavigationBar.m; sourceTree = "<group>"; };
 		1851CEE12E53541300356C1A /* QAImage.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = QAImage.xcassets; sourceTree = "<group>"; };
+		1878186E2FCDB31E00095E79 /* WeDateTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeDateTheme.swift; sourceTree = "<group>"; };
 		187DF4AF260310DD000BCDE9 /* LYEmptyBaseView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LYEmptyBaseView.m; sourceTree = "<group>"; };
 		187DF4B0260310DD000BCDE9 /* LYEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LYEmptyView.h; sourceTree = "<group>"; };
 		187DF4B1260310DD000BCDE9 /* FTEmptyView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FTEmptyView.h; sourceTree = "<group>"; };
@@ -1942,8 +1944,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = QA;
 			sourceTree = "<group>";
 		};
@@ -3248,6 +3248,7 @@
 				FC1F872A2A9107E8001E2104 /* SearchResult */,
 				B5E4B3082962BADF00F80452 /* Controller */,
 				B5E4B3092962BAF200F80452 /* View */,
+				1878186E2FCDB31E00095E79 /* WeDateTheme.swift */,
 			);
 			path = Discover_WeDate;
 			sourceTree = "<group>";
@@ -6651,9 +6652,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -6668,9 +6673,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -6924,6 +6933,7 @@
 				75CC08402C5657AA00810A4E /* SCBarChart.m in Sources */,
 				B0C9F23F2B0126E1006F4286 /* JustifiedLabel.swift in Sources */,
 				7551F9C62C69FB810072CA88 /* EmptyClassModel.m in Sources */,
+				1878186F2FCDB31E00095E79 /* WeDateTheme.swift in Sources */,
 				7551F9CE2C69FB810072CA88 /* EmptyClassViewController.m in Sources */,
 				DB4064F82466D889006CE5BC /* DLWeekButton.m in Sources */,
 				14B73F84281CCC3000D08ADD /* MessageDetailVC.m in Sources */,

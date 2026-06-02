@@ -234,6 +234,8 @@ open class ScheduleCollectionViewLayout: UICollectionViewLayout {
         }
         index = max(index, pageCalculation - 1)
         index = min(index, pageCalculation + 1)
+        index = max(index, 0)
+        index = min(index, max(numberOfPages - 1, 0))
         
         let toX = collectionView!.bounds.width * CGFloat(index)
         

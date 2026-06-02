@@ -30,6 +30,12 @@ class ScheduleFact: NSObject {
     // 标志位数组，标志当周的课程安排是否被请求
     private var flagArray = Array(repeating: false, count: 26)
     
+    // 标志位数组，避免同一周未完成加载时重复发起请求
+    private var loadingFlagArray = Array(repeating: false, count: 26)
+    
+    // 滑动过程中完成加载的周次，等滚动结束后再刷新，避免打断分页回弹动画
+    private var pendingReloadWeeks = Set<Int>()
+    
     private var dateVersion: String = ""
     
     private var stuNumAry: [String] = []
@@ -41,29 +47,88 @@ class ScheduleFact: NSObject {
         self.stuNumAry = stuNumAry
         self.dateVersion = dateVersion
         self.nowWeek = nowWeek
-        // 先加载全部周和当周课表
-        updateWeeklySchedule(forWeek: 0)
-        // 如果当前周数不在学期内（会导致数组越界），则不加载当周课表
-        if nowWeek <= 26 {
-            updateWeeklySchedule(forWeek: nowWeek)
+    }
+    
+    func loadInitialSchedules(completion: @escaping () -> Void) {
+        var weeks = [0]
+        if data.indices.contains(nowWeek), nowWeek != 0 {
+            weeks.append(nowWeek)
+        }
+        
+        let group = DispatchGroup()
+        for week in weeks {
+            group.enter()
+            updateWeeklySchedule(forWeek: week) {
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion()
         }
     }
     
     // 更新某周的课表
-    func updateWeeklySchedule(forWeek week: Int) {
-        if !flagArray[week] {
-            WeekMaping.mapWeekToAry(stuNumAry: stuNumAry, weekNum: week) { weekAry in
-                self.data[week] = WeekMaping.processWeekArray(weekAry: weekAry, weekNum: week)
-                self.flagArray[week] = true
-                self.collectionView.reloadSections(IndexSet(integer: week))
-                // 新加载的课表cell渐入
-                for cell in self.collectionView.visibleCells {
-                    if let indexPath = self.collectionView.indexPath(for: cell), indexPath.section == week {
-                        cell.alpha = 0
-                        UIView.animate(withDuration: 0.3) {
-                            cell.alpha = 1
-                        }
-                    }
+    func updateWeeklySchedule(forWeek week: Int, completion: (() -> Void)? = nil) {
+        guard data.indices.contains(week) else {
+            completion?()
+            return
+        }
+        guard !flagArray[week], !loadingFlagArray[week] else {
+            completion?()
+            return
+        }
+        
+        loadingFlagArray[week] = true
+        WeekMaping.mapWeekToAry(stuNumAry: stuNumAry, weekNum: week) { [weak self] weekAry in
+            guard let self = self else {
+                completion?()
+                return
+            }
+            self.data[week] = WeekMaping.processWeekArray(weekAry: weekAry, weekNum: week)
+            self.flagArray[week] = true
+            self.loadingFlagArray[week] = false
+            self.reloadWeekWhenPossible(week)
+            completion?()
+        }
+    }
+    
+    private func reloadWeekWhenPossible(_ week: Int) {
+        guard let collectionView = collectionView else { return }
+        guard data.indices.contains(week), week < collectionView.numberOfSections else { return }
+        
+        if collectionView.isDragging || collectionView.isDecelerating || collectionView.isTracking {
+            pendingReloadWeeks.insert(week)
+            return
+        }
+        
+        reloadWeeks([week])
+    }
+    
+    private func reloadPendingWeeksIfNeeded() {
+        guard !pendingReloadWeeks.isEmpty else { return }
+        
+        let weeks = pendingReloadWeeks.sorted()
+        pendingReloadWeeks.removeAll()
+        reloadWeeks(weeks)
+    }
+    
+    private func reloadWeeks(_ weeks: [Int]) {
+        guard let collectionView = collectionView else { return }
+        
+        var indexSet = IndexSet()
+        for week in weeks where data.indices.contains(week) && week < collectionView.numberOfSections {
+            indexSet.insert(week)
+        }
+        guard !indexSet.isEmpty else { return }
+        
+        collectionView.reloadSections(indexSet)
+        
+        // 新加载的课表cell渐入
+        for cell in collectionView.visibleCells {
+            if let indexPath = collectionView.indexPath(for: cell), indexSet.contains(indexPath.section) {
+                cell.alpha = 0
+                UIView.animate(withDuration: 0.3) {
+                    cell.alpha = 1
                 }
             }
         }
@@ -73,7 +138,10 @@ class ScheduleFact: NSObject {
 extension ScheduleFact {
     
     var currentPage: Int {
-        Int(collectionView.contentOffset.x / collectionView.bounds.width / CGFloat(collectionView.ry_layout?.pageShows ?? 1) + 0.5)
+        let pageShows = CGFloat(collectionView.ry_layout?.pageShows ?? 1)
+        let rawPage = Int(collectionView.contentOffset.x / collectionView.bounds.width / pageShows + 0.5)
+        let maxPage = max(collectionView.numberOfSections - 1, 0)
+        return min(max(rawPage, 0), maxPage)
     }
     
     @objc
@@ -179,7 +247,7 @@ extension ScheduleFact: UICollectionViewDataSource {
                         isToday = true
                         
                         let todayView = UIView()
-                        todayView.backgroundColor = UIColor(hexString: "#F3F6FD", alpha: 1)
+                        todayView.backgroundColor = .weDateTodayColumnBackground
                         todayView.frame = cell.frame
                         todayView.origin.y = -collectionView.bounds.height / 2
                         todayView.height = collectionView.bounds.height * 2
@@ -316,11 +384,19 @@ extension ScheduleFact: UICollectionViewDelegate {
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if decelerate { scrollDirection = 0 }
+        scrollDirection = 0
+        if !decelerate {
+            reloadPendingWeeksIfNeeded()
+        }
     }
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         scrollDirection = 0
+        reloadPendingWeeksIfNeeded()
+    }
+    
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        reloadPendingWeeksIfNeeded()
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {

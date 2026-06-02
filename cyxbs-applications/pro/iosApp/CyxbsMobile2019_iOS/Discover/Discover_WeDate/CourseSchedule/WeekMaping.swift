@@ -11,36 +11,123 @@ import UIKit
 /// 数组映射
 class WeekMaping {
     
+    private static let cacheQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.cache")
+    private static let callbackQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.callback", qos: .userInitiated)
+    private static let maxConcurrentRequestCount = 3
+    private static let requestStartInterval: TimeInterval = 0.12
+    private static var courseScheduleCache: [String: CourseScheduleModel] = [:]
+    private static var fallbackStudentNames: [String: String] = [:]
+    private static var pendingCourseScheduleCompletions: [String: [(CourseScheduleModel?) -> Void]] = [:]
+    private static var pendingRequestStuNums: [String] = []
+    private static var runningRequestCount = 0
+    private static var lastRequestStartTime: TimeInterval = 0
+    private static var isRequestStartScheduled = false
+    
     /// 返回一个映射某人某周课程安排的二维数组
     /// - Parameters:
     ///   - stuNum: 学号
     ///   - weekNum: 周数（展示整学期则传入0
     /// - Returns: 二维数组
     private static func mapPersonWeekToAry(stuNum: String, weekNum: Int, completion: @escaping ([[StudentResultItem]]) -> Void) {
-        /// 一个七列十二行的二维数组，映射某人某周或整学期的课程安排
-        var perHeadAry = [[StudentResultItem]](repeating: [StudentResultItem](repeating: StudentResultItem(dictionary: [:]), count: 12), count: 7)
-        CourseScheduleModel.requestWithStuNum(stuNum) { courseScheduleModel in
+        requestCourseSchedule(stuNum: stuNum) { courseScheduleModel in
+            var perHeadAry = [[StudentResultItem]](repeating: [StudentResultItem](repeating: StudentResultItem(dictionary: [:]), count: 12), count: 7)
+            guard let courseScheduleModel = courseScheduleModel else {
+                completion(perHeadAry)
+                return
+            }
+            
             let student = courseScheduleModel.student
-            // 为整学期
-            if weekNum == 0 {
-                for course in courseScheduleModel.courseAry {
-                    for i in 0..<course.period {
-                        perHeadAry[course.dayNum - 1][course.beginLesson - 1 + i] = student
-                    }
-                }
-            // 为某周
-            } else {
-                for course in courseScheduleModel.courseAry {
-                    if course.inWeeks.contains(weekNum) {
-                        for i in 0..<course.period {
-                            perHeadAry[course.dayNum - 1][course.beginLesson - 1 + i] = student
-                        }
-                    }
+            for course in courseScheduleModel.courseAry where weekNum == 0 || course.inWeeks.contains(weekNum) {
+                guard (1...7).contains(course.dayNum), (1...12).contains(course.beginLesson), course.period > 0 else { continue }
+                let dayIndex = course.dayNum - 1
+                let beginIndex = course.beginLesson - 1
+                let endIndex = min(beginIndex + course.period, perHeadAry[dayIndex].count)
+                for lessonIndex in beginIndex..<endIndex {
+                    perHeadAry[dayIndex][lessonIndex] = student
                 }
             }
             completion(perHeadAry)
+        }
+    }
+    
+    static func updateFallbackStudentNames(_ names: [String: String]) {
+        cacheQueue.async {
+            fallbackStudentNames.merge(names) { current, new in
+                new.isEmpty ? current : new
+            }
+        }
+    }
+    
+    static func requestCourseScheduleModel(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
+        requestCourseSchedule(stuNum: stuNum, completion: completion)
+    }
+    
+    private static func requestCourseSchedule(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
+        cacheQueue.async {
+            if let cachedModel = courseScheduleCache[stuNum] {
+                callbackQueue.async {
+                    completion(cachedModel)
+                }
+                return
+            }
+            
+            if pendingCourseScheduleCompletions[stuNum] != nil {
+                pendingCourseScheduleCompletions[stuNum]?.append(completion)
+                return
+            }
+            
+            pendingCourseScheduleCompletions[stuNum] = [completion]
+            pendingRequestStuNums.append(stuNum)
+            scheduleNextCourseScheduleRequestIfNeeded()
+        }
+    }
+    
+    private static func scheduleNextCourseScheduleRequestIfNeeded() {
+        guard runningRequestCount < maxConcurrentRequestCount,
+              !pendingRequestStuNums.isEmpty,
+              !isRequestStartScheduled else { return }
+        
+        let now = Date().timeIntervalSince1970
+        let delay = max(0, requestStartInterval - (now - lastRequestStartTime))
+        isRequestStartScheduled = true
+        cacheQueue.asyncAfter(deadline: .now() + delay) {
+            isRequestStartScheduled = false
+            startNextCourseScheduleRequestIfPossible()
+        }
+    }
+    
+    private static func startNextCourseScheduleRequestIfPossible() {
+        guard runningRequestCount < maxConcurrentRequestCount,
+              !pendingRequestStuNums.isEmpty else { return }
+        
+        let stuNum = pendingRequestStuNums.removeFirst()
+        let fallbackName = fallbackStudentNames[stuNum]
+        runningRequestCount += 1
+        lastRequestStartTime = Date().timeIntervalSince1970
+        
+        CourseScheduleModel.requestWithStuNum(stuNum, fallbackName: fallbackName) { courseScheduleModel in
+            finishCourseScheduleRequest(stuNum: stuNum, courseScheduleModel: courseScheduleModel)
         } failure: { error in
+            #if DEBUG
             print(error)
+            #endif
+            finishCourseScheduleRequest(stuNum: stuNum, courseScheduleModel: nil)
+        }
+        
+        scheduleNextCourseScheduleRequestIfNeeded()
+    }
+    
+    private static func finishCourseScheduleRequest(stuNum: String, courseScheduleModel: CourseScheduleModel?) {
+        cacheQueue.async {
+            if let courseScheduleModel = courseScheduleModel {
+                courseScheduleCache[stuNum] = courseScheduleModel
+            }
+            let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
+            runningRequestCount = max(runningRequestCount - 1, 0)
+            callbackQueue.async {
+                completions.forEach { $0(courseScheduleModel) }
+            }
+            scheduleNextCourseScheduleRequestIfNeeded()
         }
     }
     
@@ -53,12 +140,12 @@ class WeekMaping {
         /// 一个三维数组，映射所有人某周或整学期的课程安排
         var weekAry = [[[StudentResultItem]]](repeating: [[StudentResultItem]](repeating: [StudentResultItem](), count: 12), count: 7)
         let group = DispatchGroup()
-        let queue = DispatchQueue.global(qos: .userInitiated) // 使用全局并发队列
+        let mergeQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.merge")
 
         for stuNum in stuNumAry {
             group.enter()
-            queue.async {
-                mapPersonWeekToAry(stuNum: stuNum, weekNum: weekNum) { personWeekAry in
+            mapPersonWeekToAry(stuNum: stuNum, weekNum: weekNum) { personWeekAry in
+                mergeQueue.async {
                     for i in 0..<personWeekAry.count {
                         for j in 0..<personWeekAry[i].count {
                             if !personWeekAry[i][j].studentID.isEmpty {
@@ -72,6 +159,10 @@ class WeekMaping {
         }
 
         group.notify(queue: .main) {
+            #if DEBUG
+            let loadedStudentIDs = Set(weekAry.flatMap { $0 }.flatMap { $0 }.map { $0.studentID }.filter { !$0.isEmpty })
+            print("[WeDateCourseSchedule] week map finished week=\(weekNum), expected=\(stuNumAry.count), loaded=\(loadedStudentIDs.count)")
+            #endif
             completion(weekAry)
         }
     }

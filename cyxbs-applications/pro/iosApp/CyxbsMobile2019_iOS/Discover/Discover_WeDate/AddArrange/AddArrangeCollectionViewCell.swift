@@ -18,11 +18,11 @@ class AddArrangeCollectionViewCell: UICollectionViewCell {
     override var isSelected: Bool {
         willSet {
             if newValue {
-                label.textColor = UIColor(hexString: "#4A44E4", alpha: 1)
-                contentView.backgroundColor = UIColor(hexString: "#E8E8FE", alpha: 1)
+                label.textColor = .weDateAccent
+                contentView.backgroundColor = .weDateChipSelectedBackground
             } else {
-                label.textColor = UIColor(hexString: "#2D4D80", alpha: 0.6)
-                contentView.backgroundColor = UIColor(hexString: "#F2F5FF", alpha: 1)
+                label.textColor = .weDateChipText
+                contentView.backgroundColor = .weDateChipBackground
             }
         }
     }
@@ -34,7 +34,7 @@ class AddArrangeCollectionViewCell: UICollectionViewCell {
         layer.cornerRadius = 15
         clipsToBounds = true
         contentView.addSubview(label)
-        contentView.backgroundColor = UIColor(hexString: "#F2F5FF", alpha: 1)
+        contentView.backgroundColor = .weDateChipBackground
     }
     
     required init?(coder: NSCoder) {
@@ -47,7 +47,7 @@ class AddArrangeCollectionViewCell: UICollectionViewCell {
         let label = UILabel(frame: CGRect(x: 0, y: 0, width: self.width, height: self.height))
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 14)
-        label.textColor = UIColor(hexString: "#2D4D80", alpha: 0.6)
+        label.textColor = .weDateChipText
         return label
     }()
 }

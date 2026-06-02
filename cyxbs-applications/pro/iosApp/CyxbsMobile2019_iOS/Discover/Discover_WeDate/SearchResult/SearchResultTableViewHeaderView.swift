@@ -20,6 +20,7 @@ class SearchResultTableViewHeaderView: UITableViewHeaderFooterView {
         super.init(reuseIdentifier: reuseIdentifier)
         contentView.addSubview(nameLab)
         contentView.addSubview(addBtn)
+        contentView.backgroundColor = .weDatePanelBackground
     }
     
     required init?(coder: NSCoder) {
@@ -32,7 +33,7 @@ class SearchResultTableViewHeaderView: UITableViewHeaderFooterView {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel(frame: CGRect(x: 16, y: 19, width: 200, height: 24.65))
         nameLab.font = .systemFont(ofSize: 18, weight: .black)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#15315B", alpha: 1), dark: UIColor(hexString: "#15315B", alpha: 1))
+        nameLab.textColor = .weDatePrimaryText
         return nameLab
     }()
     /// 加号按钮
