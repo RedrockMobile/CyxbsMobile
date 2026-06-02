@@ -18,6 +18,8 @@ class BatchAddVC: UIViewController {
     }
     /// 学号数组
     private var studentIDAry: [String] = []
+    /// 学号对应的兜底姓名
+    private var studentNamesByStuNum: [String: String] = [:]
     
     private var scheduleVC: WeDateCourseScheduleVC?
 
@@ -97,6 +99,7 @@ class BatchAddVC: UIViewController {
                     if !batchAddModel.normalStudent.isEmpty {
                         for student in batchAddModel.normalStudent {
                             self.studentIDAry.append(student.studentID)
+                            self.studentNamesByStuNum[student.studentID] = student.name
                         }
                     }
                     // 有重复数据
@@ -122,7 +125,7 @@ class BatchAddVC: UIViewController {
     }
     
     private func showCourseSchedule() {
-        let vc = WeDateCourseScheduleVC(stuNumAry: self.studentIDAry)
+        let vc = WeDateCourseScheduleVC(stuNumAry: self.studentIDAry, studentNamesByStuNum: studentNamesByStuNum)
         self.scheduleVC = vc
         self.navigationController?.present(vc, animated: true, completion: {
             if !UserDefaults.standard.bool(forKey: "noMoreReminders") {
@@ -133,6 +136,7 @@ class BatchAddVC: UIViewController {
             }
         })
         studentIDAry.removeAll()
+        studentNamesByStuNum.removeAll()
     }
     
     // MARK: - Lazy
@@ -351,6 +355,7 @@ extension BatchAddVC: RepeatNameVCDelegate {
     func addRepeatStudent(_ array: [StudentResultItem]) {
         for student in array {
             studentIDAry.append(student.studentID)
+            studentNamesByStuNum[student.studentID] = student.name
         }
         showCourseSchedule()
     }

@@ -22,8 +22,14 @@ class CourseScheduleModel {
         #endif
     }
     
-    private static func fallbackStudent(stuNum: String) -> StudentResultItem {
-        StudentResultItem(dictionary: ["name": stuNum, "stunum": stuNum])
+    private static func fallbackStudent(stuNum: String, fallbackName: String?) -> StudentResultItem {
+        let name: String
+        if let fallbackName = fallbackName, !fallbackName.isEmpty {
+            name = fallbackName
+        } else {
+            name = stuNum
+        }
+        return StudentResultItem(dictionary: ["name": name, "stunum": stuNum])
     }
     
     /// 现在周数
@@ -35,10 +41,10 @@ class CourseScheduleModel {
     /// 学生信息
     var student = StudentResultItem(dictionary: [:])
     
-    static func requestWithStuNum(_ stuNum: String, success: ((_ courseScheduleModel: CourseScheduleModel) -> Void)?, failure: ((_ error: Error) -> Void)?) {
+    static func requestWithStuNum(_ stuNum: String, fallbackName: String? = nil, success: ((_ courseScheduleModel: CourseScheduleModel) -> Void)?, failure: ((_ error: Error) -> Void)?) {
         debugLog("request start", stuNum: stuNum)
         let courseScheduleModel = CourseScheduleModel()
-        courseScheduleModel.student = fallbackStudent(stuNum: stuNum)
+        courseScheduleModel.student = fallbackStudent(stuNum: stuNum, fallbackName: fallbackName)
         var scheduleSucceeded = false
         var scheduleError: Error?
         let group = DispatchGroup()

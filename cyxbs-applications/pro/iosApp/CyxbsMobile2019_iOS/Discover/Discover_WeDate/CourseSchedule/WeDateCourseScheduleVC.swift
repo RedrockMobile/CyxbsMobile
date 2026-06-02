@@ -15,6 +15,8 @@ class WeDateCourseScheduleVC: UIViewController {
     private var nowWeek: Int = 0
     /// 学号数组
     var stuNumAry: [String] = []
+    /// 学号对应的兜底姓名
+    private var studentNamesByStuNum: [String: String] = [:]
     
     private var shouldWaitForInitialSchedules: Bool {
         stuNumAry.count > 5
@@ -22,9 +24,10 @@ class WeDateCourseScheduleVC: UIViewController {
     
     // MARK: - Life Cycle
     
-    init(stuNumAry: [String]) {
+    init(stuNumAry: [String], studentNamesByStuNum: [String: String] = [:]) {
         super.init(nibName: nil, bundle: nil)
         self.stuNumAry = stuNumAry
+        self.studentNamesByStuNum = studentNamesByStuNum
     }
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -48,25 +51,28 @@ class WeDateCourseScheduleVC: UIViewController {
         }
         
         if !stuNumAry.isEmpty {
-            CourseScheduleModel.requestWithStuNum(stuNumAry[0]) { [weak self] courseScheduleModel in
-                guard let self = self else { return }
-                self.nowWeek = courseScheduleModel.nowWeek
-                WeekMaping.cacheCourseSchedule(courseScheduleModel, for: self.stuNumAry[0])
-                self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
-                self.fact?.delegate = self
-                
-                if self.shouldWaitForInitialSchedules {
-                    _ = self.collectionView
-                    self.fact?.loadInitialSchedules { [weak self] in
-                        self?.showScheduleContent()
+            WeekMaping.updateFallbackStudentNames(studentNamesByStuNum)
+            WeekMaping.requestCourseScheduleModel(stuNum: stuNumAry[0]) { [weak self] courseScheduleModel in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    guard let courseScheduleModel = courseScheduleModel else {
+                        self.hideLoadingView()
+                        return
                     }
-                } else {
-                    self.showScheduleContent()
-                    self.fact?.loadInitialSchedules {}
+                    self.nowWeek = courseScheduleModel.nowWeek
+                    self.fact = ScheduleFact(stuNumAry: self.stuNumAry, dateVersion: courseScheduleModel.dateVersion, nowWeek: self.nowWeek)
+                    self.fact?.delegate = self
+                    
+                    if self.shouldWaitForInitialSchedules {
+                        _ = self.collectionView
+                        self.fact?.loadInitialSchedules { [weak self] in
+                            self?.showScheduleContent()
+                        }
+                    } else {
+                        self.showScheduleContent()
+                        self.fact?.loadInitialSchedules {}
+                    }
                 }
-            } failure: { [weak self] error in
-                print(error)
-                self?.hideLoadingView()
             }
         } else {
             hideLoadingView()

@@ -16,6 +16,7 @@ class WeekMaping {
     private static let maxConcurrentRequestCount = 3
     private static let requestStartInterval: TimeInterval = 0.12
     private static var courseScheduleCache: [String: CourseScheduleModel] = [:]
+    private static var fallbackStudentNames: [String: String] = [:]
     private static var pendingCourseScheduleCompletions: [String: [(CourseScheduleModel?) -> Void]] = [:]
     private static var pendingRequestStuNums: [String] = []
     private static var runningRequestCount = 0
@@ -49,10 +50,16 @@ class WeekMaping {
         }
     }
     
-    static func cacheCourseSchedule(_ courseScheduleModel: CourseScheduleModel, for stuNum: String) {
+    static func updateFallbackStudentNames(_ names: [String: String]) {
         cacheQueue.async {
-            courseScheduleCache[stuNum] = courseScheduleModel
+            fallbackStudentNames.merge(names) { current, new in
+                new.isEmpty ? current : new
+            }
         }
+    }
+    
+    static func requestCourseScheduleModel(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
+        requestCourseSchedule(stuNum: stuNum, completion: completion)
     }
     
     private static func requestCourseSchedule(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
@@ -94,10 +101,11 @@ class WeekMaping {
               !pendingRequestStuNums.isEmpty else { return }
         
         let stuNum = pendingRequestStuNums.removeFirst()
+        let fallbackName = fallbackStudentNames[stuNum]
         runningRequestCount += 1
         lastRequestStartTime = Date().timeIntervalSince1970
         
-        CourseScheduleModel.requestWithStuNum(stuNum) { courseScheduleModel in
+        CourseScheduleModel.requestWithStuNum(stuNum, fallbackName: fallbackName) { courseScheduleModel in
             finishCourseScheduleRequest(stuNum: stuNum, courseScheduleModel: courseScheduleModel)
         } failure: { error in
             #if DEBUG

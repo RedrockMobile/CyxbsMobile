@@ -124,7 +124,13 @@ class TemporaryGroupVC: UIViewController {
     
     @objc private func clickInquireBtn() {
         TaskManager.shared.uploadTaskProgress(title: "使用一次没课约", stampCount: 10, remindText: "今日已使用没课约1次，获得10张邮票")
-        let vc = WeDateCourseScheduleVC(stuNumAry: dataDictionary["studentID"]!)
+        let studentIDAry = dataDictionary["studentID"] ?? []
+        let nameAry = dataDictionary["name"] ?? []
+        var studentNamesByStuNum: [String: String] = [:]
+        for (index, stuNum) in studentIDAry.enumerated() where index < nameAry.count {
+            studentNamesByStuNum[stuNum] = nameAry[index]
+        }
+        let vc = WeDateCourseScheduleVC(stuNumAry: studentIDAry, studentNamesByStuNum: studentNamesByStuNum)
         scheduleVC = vc
         self.navigationController?.present(vc, animated: true, completion: {
             if !UserDefaults.standard.bool(forKey: "noMoreReminders") {

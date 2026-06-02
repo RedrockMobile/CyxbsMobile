@@ -106,14 +106,16 @@ class GroupManageVC: UIViewController {
     
     @objc private func clickInquireBtn() {
         var studentIDAry: [String] = []
+        var studentNamesByStuNum: [String: String] = [:]
         for student in memberAry {
             studentIDAry.append(student.studentID)
+            studentNamesByStuNum[student.studentID] = student.name
         }
         #if DEBUG
         print("[WeDateCourseSchedule] fixed group inquire memberCount=\(memberAry.count), stuNumCount=\(studentIDAry.count)")
         #endif
         TaskManager.shared.uploadTaskProgress(title: "使用一次没课约", stampCount: 10, remindText: "今日已使用没课约1次，获得10张邮票")
-        let vc = WeDateCourseScheduleVC(stuNumAry: studentIDAry)
+        let vc = WeDateCourseScheduleVC(stuNumAry: studentIDAry, studentNamesByStuNum: studentNamesByStuNum)
         self.navigationController?.present(vc, animated: true, completion: nil)
     }
     
