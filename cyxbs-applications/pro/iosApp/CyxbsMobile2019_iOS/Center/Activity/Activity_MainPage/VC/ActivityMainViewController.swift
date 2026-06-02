@@ -16,6 +16,7 @@ class ActivityMainViewController: UIViewController {
     private var segmentedDataSource: JXSegmentedActivityCustomDataSource!
     private var segmentedView: JXSegmentedView!
     private var listContainerView: JXSegmentedListContainerView!
+    private var hasConfiguredInteractivePopGesture = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -29,6 +30,21 @@ class ActivityMainViewController: UIViewController {
         isAdmin()
         initVCs()
         addSegmentView()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        configureInteractivePopGesture()
+    }
+    
+    private func configureInteractivePopGesture() {
+        guard !hasConfiguredInteractivePopGesture,
+              let popGesture = navigationController?.interactivePopGestureRecognizer,
+              let contentPanGesture = listContainerView?.scrollView?.panGestureRecognizer else {
+            return
+        }
+        contentPanGesture.require(toFail: popGesture)
+        hasConfiguredInteractivePopGesture = true
     }
     
     // MARK: - 懒加载
