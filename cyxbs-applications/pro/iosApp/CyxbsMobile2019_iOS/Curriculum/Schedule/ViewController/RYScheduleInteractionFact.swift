@@ -26,18 +26,13 @@ class RYScheduleInteractionFact: RYScheduleFact {
     override func createCollectionView() -> UICollectionView {
         let collectionView = super.createCollectionView()
         
-        let header = MJRefreshGifHeader {
+        MJRefreshGifHeader {
             self.cleanAndReload()
         }
         .autoChangeTransparency(true)
         .set_refresh_sports()
         .ignoredScrollView(contentInsetTop: -58)
         .link(to: collectionView)
-        
-        header.isCollectionViewAnimationBug = true
-        header.endRefreshingAnimationBeginAction = {
-            collectionView.collectionViewLayout.finalizeLayoutTransition()
-        }
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(collectionViewEmpty(tap:)))
         tap.delegate = self
@@ -116,9 +111,17 @@ extension RYScheduleInteractionFact {
                 self.mappy.maping(model, priority: priority)
             }
             DispatchQueue.main.async {
-                self.collectionView.reloadData()
-                self.collectionView.mj_header?.endRefreshing()
-                complition?(self)
+                let reloadAction = {
+                    self.collectionView.mj_header?.transform = .identity
+                    self.collectionView.reloadData()
+                    complition?(self)
+                }
+                
+                if let header = self.collectionView.mj_header, header.isRefreshing {
+                    header.endRefreshing(completionBlock: reloadAction)
+                } else {
+                    reloadAction()
+                }
             }
         }
     }
