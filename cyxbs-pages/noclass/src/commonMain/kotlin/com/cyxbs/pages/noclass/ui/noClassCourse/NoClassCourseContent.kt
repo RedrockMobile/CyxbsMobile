@@ -35,7 +35,7 @@ class NoClassCourseFrame : AbstractCourseFrame() {
             FixedTimelineData(
                 text = "", optionText = "",
                 startTime = MinuteTime(0, 0), endTime = MinuteTime(8, 0),
-                weight = 0.1F,
+                weight = 0.01F,
             ),
             LessonTimelineData(1),
             breakData(1),
@@ -47,7 +47,7 @@ class NoClassCourseFrame : AbstractCourseFrame() {
             MutableTimelineData(
                 text = "中午", optionText = "中午",
                 startTime = MinuteTime(11, 55), endTime = MinuteTime(14, 0),
-                maxWeight = 2F, initialWeight = 0.1F, fontSize = 10.sp,
+                maxWeight = 2F, initialWeight = 0.01F, fontSize = 10.sp,
             ),
             LessonTimelineData(5),
             breakData(5),
@@ -59,7 +59,7 @@ class NoClassCourseFrame : AbstractCourseFrame() {
             MutableTimelineData(
                 text = "傍晚", optionText = "下午",
                 startTime = MinuteTime(17, 55), endTime = MinuteTime(19, 0),
-                maxWeight = 1F, initialWeight = 0.1F, fontSize = 10.sp,
+                maxWeight = 1F, initialWeight = 0.01F, fontSize = 10.sp,
             ),
             LessonTimelineData(9),
             breakData(9),
@@ -71,7 +71,7 @@ class NoClassCourseFrame : AbstractCourseFrame() {
             FixedTimelineData(
                 text = "", optionText = "",
                 startTime = MinuteTime(22, 30), endTime = MinuteTime(23, 59),
-                weight = 0.1F,
+                weight = 0.01F,
             ),
         ),
     )
@@ -89,7 +89,7 @@ class NoClassCourseFrame : AbstractCourseFrame() {
                 optionText = "",
                 startTime = CourseUtils.getEndMinuteTime(lesson),
                 endTime = CourseUtils.getStartMinuteTime(lesson + 1),
-                weight = 0.1F,
+                weight = 0.01F,
             )
         }
     }
@@ -100,6 +100,7 @@ fun NoClassCourseContent(
     noClassCourseFrame: NoClassCourseFrame,
     noclassData: HashMap<Int, NoClassSpareTime>,
     modifier: Modifier = Modifier,
+    onItemClick: ((NoClassLessonItem) -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val decorationManager = remember {
@@ -111,6 +112,7 @@ fun NoClassCourseContent(
     }
 
     LaunchedEffect(noclassData) {
+        noClassCourseFrame.decoration.onItemClick = onItemClick
         noClassCourseFrame.setAllData(noclassData)
     }
 

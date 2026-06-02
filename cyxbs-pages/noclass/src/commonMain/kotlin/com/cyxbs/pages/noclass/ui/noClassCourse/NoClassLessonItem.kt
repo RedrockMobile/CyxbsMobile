@@ -18,6 +18,9 @@ class NoClassLessonItem(
     val topText: String,
     val textColor: Color,
     val backgroundColor: Color,
+    val beginLesson: Int,
+    val lessonLength: Int,
+    val onClick: ((NoClassLessonItem) -> Unit)? = null,
 ) : CourseItem(whatTime, coroutineScope) {
 
     @Composable
@@ -28,6 +31,7 @@ class NoClassLessonItem(
             bottomText = "",
             textColor = textColor,
             backgroundColor = backgroundColor,
+            onClick = { onClick?.invoke(this@NoClassLessonItem) },
         )
     }
 }
@@ -40,6 +44,9 @@ data class NoClassLessonWhatTime(
     val topText: String,
     val textColor: Color,
     val backgroundColor: Color,
+    val beginLesson: Int,
+    val lessonLength: Int,
+    val onClick: ((NoClassLessonItem) -> Unit)? = null,
 ) : ItemHierarchyWhatTime<NoClassLessonItem>() {
 
     override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
@@ -53,6 +60,9 @@ data class NoClassLessonWhatTime(
             topText = topText,
             textColor = textColor,
             backgroundColor = backgroundColor,
+            beginLesson = beginLesson,
+            lessonLength = lessonLength,
+            onClick = onClick,
         )
     }
 
@@ -63,6 +73,7 @@ data class NoClassLessonWhatTime(
             beginLesson: Int,
             endLesson: Int,
             topText: String,
+            onClick: ((NoClassLessonItem) -> Unit)? = null,
         ): NoClassLessonWhatTime {
             val beginTime = CourseUtils.getStartMinuteTime(beginLesson)
             val finalTime = CourseUtils.getEndMinuteTime(endLesson)
@@ -75,6 +86,9 @@ data class NoClassLessonWhatTime(
                 topText = topText,
                 textColor = textColor,
                 backgroundColor = bgColor,
+                beginLesson = beginLesson,
+                lessonLength = endLesson - beginLesson + 1,
+                onClick = onClick,
             )
         }
 

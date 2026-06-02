@@ -5,9 +5,11 @@ import com.cyxbs.pages.noclass.bean.NoClassSpareTime
 
 class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
 
+    var onItemClick: ((NoClassLessonItem) -> Unit)? = null
+
     fun setAllData(data: HashMap<Int, NoClassSpareTime>) {
         val totalStudents = computeTotalStudents(data)
-        val items = convertToItems(data, totalStudents)
+        val items = convertToItems(data, totalStudents, onItemClick)
         itemHierarchy.reset(items)
     }
 
@@ -18,13 +20,14 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
 
         fun convertToItems(
             data: HashMap<Int, NoClassSpareTime>,
-            totalStudents: Int
+            totalStudents: Int,
+            onItemClick: ((NoClassLessonItem) -> Unit)?,
         ): List<NoClassLessonWhatTime> {
             val items = mutableListOf<NoClassLessonWhatTime>()
             data.forEach { (week, spareTime) ->
                 for (day in 0..6) {
                     val line = spareTime.spareDayTime[day] ?: continue
-                    convertDayItems(week, day, line, totalStudents, items)
+                    convertDayItems(week, day, line, totalStudents, items, onItemClick)
                 }
             }
             return items
@@ -35,14 +38,15 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
             day: Int,
             line: NoClassSpareTime.SpareLineTime,
             totalStudents: Int,
-            outItems: MutableList<NoClassLessonWhatTime>
+            outItems: MutableList<NoClassLessonWhatTime>,
+            onItemClick: ((NoClassLessonItem) -> Unit)?,
         ) {
-            addLessonPair(page, day, line, totalStudents, outItems, 1, 2)
-            addLessonPair(page, day, line, totalStudents, outItems, 3, 4)
-            addLessonPair(page, day, line, totalStudents, outItems, 5, 6)
-            addLessonPair(page, day, line, totalStudents, outItems, 7, 8)
-            addLessonPair(page, day, line, totalStudents, outItems, 9, 10)
-            addLessonPair(page, day, line, totalStudents, outItems, 11, 12)
+            addLessonPair(page, day, line, totalStudents, outItems, 1, 2, onItemClick)
+            addLessonPair(page, day, line, totalStudents, outItems, 3, 4, onItemClick)
+            addLessonPair(page, day, line, totalStudents, outItems, 5, 6, onItemClick)
+            addLessonPair(page, day, line, totalStudents, outItems, 7, 8, onItemClick)
+            addLessonPair(page, day, line, totalStudents, outItems, 9, 10, onItemClick)
+            addLessonPair(page, day, line, totalStudents, outItems, 11, 12, onItemClick)
         }
 
         private fun addLessonPair(
@@ -52,7 +56,8 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
             totalStudents: Int,
             outItems: MutableList<NoClassLessonWhatTime>,
             first: Int,
-            second: Int
+            second: Int,
+            onItemClick: ((NoClassLessonItem) -> Unit)?,
         ) {
             val id1 = line.SpareItem[first].spareId
             val id2 = line.SpareItem[second].spareId
@@ -61,14 +66,14 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
 
             if (id1 == id2) {
                 if (isId1Busy) {
-                    addBusyBlock(page, day, first, 2, id1.size, totalStudents, outItems)
+                    addBusyBlock(page, day, first, 2, id1.size, totalStudents, outItems, onItemClick)
                 }
             } else {
                 if (isId1Busy) {
-                    addBusyBlock(page, day, first, 1, id1.size, totalStudents, outItems)
+                    addBusyBlock(page, day, first, 1, id1.size, totalStudents, outItems, onItemClick)
                 }
                 if (isId2Busy) {
-                    addBusyBlock(page, day, second, 1, id2.size, totalStudents, outItems)
+                    addBusyBlock(page, day, second, 1, id2.size, totalStudents, outItems, onItemClick)
                 }
             }
         }
@@ -80,7 +85,8 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
             length: Int,
             freeCount: Int,
             totalStudents: Int,
-            outItems: MutableList<NoClassLessonWhatTime>
+            outItems: MutableList<NoClassLessonWhatTime>,
+            onItemClick: ((NoClassLessonItem) -> Unit)?,
         ) {
             val busyCount = totalStudents - freeCount
             val text = if (freeCount == 0) "全员\n忙碌" else "${busyCount}人\n忙碌"
@@ -91,6 +97,7 @@ class NoClassPageDecoration : CoursePageDecoration<NoClassLessonItem>() {
                     beginLesson = beginLesson,
                     endLesson = beginLesson + length - 1,
                     topText = text,
+                    onClick = onItemClick,
                 )
             )
         }
