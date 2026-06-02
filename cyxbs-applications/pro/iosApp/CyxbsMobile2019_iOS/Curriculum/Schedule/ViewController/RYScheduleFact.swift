@@ -16,10 +16,6 @@ class RYScheduleFact: NSObject {
     
     private var scrollDirection: Int = 0
     
-    private var isLockingScheduleContentOffset = false
-    
-    private var scheduleRefreshPullDistance: CGFloat = 0
-    
     lazy var currentBackgroundView: UIView = {
         let bkView = UIView()
         bkView.backgroundColor = .ry(light: "#E8F0FC", dark: "#00000040")
@@ -45,6 +41,7 @@ extension RYScheduleFact {
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.decelerationRate = .fast
+        collectionView.alwaysBounceVertical = true
         /* cell */
         collectionView.register(RYScheduleCollectionViewCell.self, forCellWithReuseIdentifier: RYScheduleCollectionViewCell.curriculumReuseIdentifier)
         /* header */
@@ -216,17 +213,11 @@ extension RYScheduleFact: UICollectionViewDelegate { }
 
 extension RYScheduleFact: UIScrollViewDelegate {
     
-    /*
-    
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard let layout = scrollView.as_collectionView?.ry_layout else { return }
         layout.pageCalculation = Int(scrollView.contentOffset.x / scrollView.bounds.size.width) * layout.pageShows
         scrollViewStartPosPoint = scrollView.contentOffset
         scrollDirection = 0
-        scheduleRefreshPullDistance = 0
-        if scrollView.mj_header?.isRefreshing != true {
-            scrollView.mj_header?.transform = .identity
-        }
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -249,81 +240,9 @@ extension RYScheduleFact: UIScrollViewDelegate {
         }
     }
     
-    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        let refreshThreshold = scrollView.mj_header?.bounds.height ?? 54
-        if scheduleRefreshPullDistance >= refreshThreshold,
-           scrollView.mj_header?.isRefreshing != true {
-            scrollView.mj_header?.beginRefreshing()
-        } else {
-            scrollView.mj_header?.transform = .identity
-        }
-        scheduleRefreshPullDistance = 0
-        if decelerate { scrollDirection = 0 }
-    }
-    
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        scrollDirection = 0
-    }
-     */
-    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        guard let layout = scrollView.as_collectionView?.ry_layout else { return }
-        layout.pageCalculation = Int(scrollView.contentOffset.x / scrollView.bounds.size.width) * layout.pageShows
-        scrollViewStartPosPoint = scrollView.contentOffset
-        scrollDirection = 0
-        scheduleRefreshPullDistance = 0
-        if scrollView.mj_header?.isRefreshing != true {
-            scrollView.mj_header?.transform = .identity
-        }
-    }
-    
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if isLockingScheduleContentOffset { return }
-        
-        if scrollView.contentOffset.y < scrollViewStartPosPoint.y {
-            let pullDistance = scrollViewStartPosPoint.y - scrollView.contentOffset.y
-            scheduleRefreshPullDistance = max(scheduleRefreshPullDistance, pullDistance)
-            scrollView.mj_header?.transform = CGAffineTransform(translationX: 0, y: pullDistance)
-            isLockingScheduleContentOffset = true
-            scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: scrollViewStartPosPoint.y)
-            isLockingScheduleContentOffset = false
-            return
-        }
-        
-        scrollView.mj_header?.transform = .identity
-        currentBackgroundView.frame.origin.y = scrollView.contentOffset.y - scrollView.bounds.height / 2
-        
-        if scrollDirection == 0 {
-            if abs(scrollViewStartPosPoint.x - scrollView.contentOffset.x) <
-                abs(scrollViewStartPosPoint.y - scrollView.contentOffset.y) {
-                
-                scrollDirection = 1     // Vertical Scrolling
-            } else {
-                scrollDirection = 2     // Horitonzal Scrolling
-            }
-        }
-        // Update scroll position of the scrollview according to detected direction.
-        if scrollDirection == 1 {
-            scrollView.contentOffset = CGPoint(x: scrollViewStartPosPoint.x, y: scrollView.contentOffset.y)
-        } else {
-            scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: scrollViewStartPosPoint.y)
-        }
-    }
-    
-    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
-        if scheduleRefreshPullDistance > 0 {
-            targetContentOffset.pointee.y = scrollViewStartPosPoint.y
-        }
-    }
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) { }
     
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        let refreshThreshold = scrollView.mj_header?.bounds.height ?? 54
-        if scheduleRefreshPullDistance >= refreshThreshold,
-           scrollView.mj_header?.isRefreshing != true {
-            scrollView.mj_header?.beginRefreshing()
-        } else {
-            scrollView.mj_header?.transform = .identity
-        }
-        scheduleRefreshPullDistance = 0
         if decelerate { scrollDirection = 0 }
     }
     

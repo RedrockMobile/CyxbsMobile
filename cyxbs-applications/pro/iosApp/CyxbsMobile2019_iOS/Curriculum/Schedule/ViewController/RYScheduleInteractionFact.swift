@@ -7,7 +7,6 @@
 //
 
 import UIKit
-import MJRefresh
 import JXSegmentedView
 import RYTransitioningDelegateSwift
 
@@ -25,14 +24,6 @@ class RYScheduleInteractionFact: RYScheduleFact {
     
     override func createCollectionView() -> UICollectionView {
         let collectionView = super.createCollectionView()
-        
-        MJRefreshGifHeader {
-            self.cleanAndReload()
-        }
-        .autoChangeTransparency(true)
-        .set_refresh_sports()
-        .ignoredScrollView(contentInsetTop: -58)
-        .link(to: collectionView)
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(collectionViewEmpty(tap:)))
         tap.delegate = self
@@ -111,17 +102,8 @@ extension RYScheduleInteractionFact {
                 self.mappy.maping(model, priority: priority)
             }
             DispatchQueue.main.async {
-                let reloadAction = {
-                    self.collectionView.mj_header?.transform = .identity
-                    self.collectionView.reloadData()
-                    complition?(self)
-                }
-                
-                if let header = self.collectionView.mj_header, header.isRefreshing {
-                    header.endRefreshing(completionBlock: reloadAction)
-                } else {
-                    reloadAction()
-                }
+                self.collectionView.reloadData()
+                complition?(self)
             }
         }
     }
@@ -215,7 +197,6 @@ extension RYScheduleInteractionFact {
     
     override func scrollViewDidScroll(_ scrollView: UIScrollView) {
         super.scrollViewDidScroll(scrollView)
-        scrollView.mj_header?.frame.origin.x = scrollView.contentOffset.x
         reloadHeaderView()
     }
     
