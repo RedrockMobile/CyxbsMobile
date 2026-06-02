@@ -20,11 +20,11 @@ class ChooseGroupVC: UIViewController {
     var selectedGroupIDAry: [Int] = [] {
         willSet {
             if newValue.count > 0 {
-                finishBtn.backgroundColor = .white
+                finishBtn.backgroundColor = .weDatePanelBackground
                 let gradientLayer = CAGradientLayer()
                 gradientLayer.colors = [
-                    UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-                    UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+                    UIColor.weDateGradientStart.cgColor,
+                    UIColor.weDateGradientEnd.cgColor
                 ]
                 gradientLayer.startPoint = CGPoint(x: 0, y: 0)
                 gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -39,7 +39,7 @@ class ChooseGroupVC: UIViewController {
                         }
                     }
                 }
-                finishBtn.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#C3D4EE", alpha: 1), dark: UIColor(hexString: "#C3D4EE", alpha: 1))
+                finishBtn.backgroundColor = .weDateDisabledButton
                 finishBtn.isUserInteractionEnabled = false
             }
         }
@@ -120,7 +120,7 @@ class ChooseGroupVC: UIViewController {
     /// 此VC所有UI的容器视图
     private lazy var containerView: UIView = {
         let containerView = UIView(frame: CGRect(x: 0, y: SCREEN_HEIGHT - 280, width: SCREEN_WIDTH, height: 280))
-        containerView.backgroundColor = .white
+        containerView.backgroundColor = .weDatePanelBackground
         let maskPath = UIBezierPath(roundedRect: containerView.bounds, byRoundingCorners: [.topLeft, .topRight], cornerRadii: CGSize(width: 12, height: 12))
         let maskLayer = CAShapeLayer()
         maskLayer.path = maskPath.cgPath
@@ -132,7 +132,7 @@ class ChooseGroupVC: UIViewController {
         let cancelBtn = UIButton(frame: CGRect(x: SCREEN_WIDTH - 16 - 25, y: 16, width: 25, height: 17))
         cancelBtn.setTitle("取消", for: .normal)
         cancelBtn.titleLabel?.font = .systemFont(ofSize: 12)
-        cancelBtn.setTitleColor(UIColor(.dm, light: UIColor(hexString: "#ABB5C4", alpha: 1), dark: UIColor(hexString: "#ABB5C4", alpha: 1)), for: .normal)
+        cancelBtn.setTitleColor(.weDateLightMutedText, for: .normal)
         cancelBtn.addTarget(self, action: #selector(clickCancelBtn), for: .touchUpInside)
         return cancelBtn
     }()
@@ -141,7 +141,7 @@ class ChooseGroupVC: UIViewController {
         let label = UILabel(frame: CGRect(x: 16, y: 46, width: 56, height: 21))
         label.text = "添加到"
         label.font = .systemFont(ofSize: 18)
-        label.textColor = UIColor(.dm, light: UIColor(hexString: "#15315B", alpha: 1), dark: UIColor(hexString: "#15315B", alpha: 1))
+        label.textColor = .weDatePrimaryText
         return label
     }()
     /// 展示分组名
@@ -152,6 +152,7 @@ class ChooseGroupVC: UIViewController {
         layout.scrollDirection = .horizontal
         let collectionView = UICollectionView(frame: CGRect(x: 0, y: label.bottom + 19, width: SCREEN_WIDTH, height: 90), collectionViewLayout: layout)
         collectionView.showsHorizontalScrollIndicator = false
+        collectionView.backgroundColor = .weDatePanelBackground
         collectionView.register(ChooseGroupCollectionViewCell.self, forCellWithReuseIdentifier: ChooseGroupCollectionViewCellReuseIdentifier)
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -162,7 +163,7 @@ class ChooseGroupVC: UIViewController {
         let indicatorBackView = UIView(frame: CGRect(x: (SCREEN_WIDTH - 62) / 2, y: label.bottom + 120, width: 62, height: 3))
         indicatorBackView.layer.cornerRadius = 1.5
         indicatorBackView.clipsToBounds = true
-        indicatorBackView.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#E8F0FC", alpha: 1), dark: UIColor(hexString: "#E8F0FC", alpha: 1))
+        indicatorBackView.backgroundColor = .weDateSearchBackground
         return indicatorBackView
     }()
     /// 指示器
@@ -170,7 +171,7 @@ class ChooseGroupVC: UIViewController {
         let customIndicator = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 3))
         customIndicator.layer.cornerRadius = 1.5
         customIndicator.clipsToBounds = true
-        customIndicator.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#6364F7", alpha: 1), dark: UIColor(hexString: "#6364F7", alpha: 1))
+        customIndicator.backgroundColor = .weDateIndicator
         return customIndicator
     }()
     /// 完成按钮
@@ -181,7 +182,7 @@ class ChooseGroupVC: UIViewController {
         finishBtn.setTitle("完成", for: .normal)
         finishBtn.titleLabel?.font = .boldSystemFont(ofSize: 18)
         finishBtn.addTarget(self, action: #selector(clickFinishBtn), for: .touchUpInside)
-        finishBtn.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#C3D4EE", alpha: 1), dark: UIColor(hexString: "#C3D4EE", alpha: 1))
+        finishBtn.backgroundColor = .weDateDisabledButton
         return finishBtn
     }()
 }

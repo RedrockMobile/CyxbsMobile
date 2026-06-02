@@ -33,7 +33,7 @@ class WeDateCourseScheduleVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
         view.addSubview(titleLab)
         
         if(stuNumAry.count != 0){
@@ -102,7 +102,7 @@ class WeDateCourseScheduleVC: UIViewController {
     private lazy var titleLab: UILabel = {
         let titleLab = UILabel(frame: CGRect(x: 16, y: 21, width: 90, height: 31))
         titleLab.font = .systemFont(ofSize: 22, weight: .black)
-        titleLab.textColor = UIColor(hexString: "#112C54", alpha: 1)
+        titleLab.textColor = .weDateTitleText
         titleLab.text = "整学期"
         return titleLab
     }()
@@ -116,8 +116,8 @@ class WeDateCourseScheduleVC: UIViewController {
         button.addTarget(self, action: #selector(clickButton), for: .touchUpInside)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)

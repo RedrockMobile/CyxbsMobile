@@ -60,7 +60,7 @@ class SearchResultVC: UIViewController {
             height = SCREEN_HEIGHT * 0.3
         }
         let containerView = UIView(frame: CGRect(x: 0, y: top, width: SCREEN_WIDTH, height: height))
-        containerView.backgroundColor = .white
+        containerView.backgroundColor = .weDatePanelBackground
         containerView.addSubview(cancelBtn)
         containerView.addSubview(tableView)
         view.addSubview(containerView)
@@ -116,7 +116,7 @@ class SearchResultVC: UIViewController {
         let cancelBtn = UIButton(type: .system)
         cancelBtn.setTitle("取消", for: .normal)
         cancelBtn.titleLabel?.font = .systemFont(ofSize: 12)
-        cancelBtn.setTitleColor(UIColor(.dm, light: UIColor(hexString: "#ABB5C4", alpha: 1), dark: UIColor(hexString: "#ABB5C4", alpha: 1)), for: .normal)
+        cancelBtn.setTitleColor(.weDateLightMutedText, for: .normal)
         cancelBtn.addTarget(self, action: #selector(clickCancelBtn), for: .touchUpInside)
         return cancelBtn
     }()
@@ -127,6 +127,7 @@ class SearchResultVC: UIViewController {
         tableView.contentInsetAdjustmentBehavior = .never
         tableView.separatorStyle = .none
         tableView.showsVerticalScrollIndicator = true
+        tableView.backgroundColor = .weDatePanelBackground
         tableView.dataSource = self
         tableView.delegate = self
         if #available(iOS 15.0, *) {

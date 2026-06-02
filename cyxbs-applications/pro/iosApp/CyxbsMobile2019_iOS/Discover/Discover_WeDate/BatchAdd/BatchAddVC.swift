@@ -41,7 +41,7 @@ class BatchAddVC: UIViewController {
         textView.addSubview(sixthLineLab)
         textView.addSubview(seventhLineLab)
         textView.addSubview(eighthLineLab)
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
     }
     
     // MARK: - Method
@@ -149,13 +149,13 @@ class BatchAddVC: UIViewController {
         let label = UILabel(frame: CGRect(x: returnBtn.left + 23, y: returnBtn.top - 2, width: 96, height: 23))
         label.text = "批量添加"
         label.font = .boldSystemFont(ofSize: 21)
-        label.textColor = UIColor(.dm, light: UIColor(hexString: "#15315B", alpha: 1), dark: UIColor(hexString: "#15315B", alpha: 1))
+        label.textColor = .weDatePrimaryText
         return label
     }()
     /// 分割线
     private lazy var dividingLine: UIView = {
         let dividingLine = UIView(frame: CGRect(x: 0, y: label.bottom + 7, width: SCREEN_WIDTH, height: 1))
-        dividingLine.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#2A4E84", alpha: 0.1), dark: UIColor(hexString: "#2A4E84", alpha: 0.1))
+        dividingLine.backgroundColor = .weDateSeparator
         return dividingLine
     }()
     /// 输入框所在视图
@@ -164,7 +164,8 @@ class BatchAddVC: UIViewController {
         textViewBackView.layer.cornerRadius = 12
         textViewBackView.clipsToBounds = true
         textViewBackView.layer.borderWidth = 2
-        textViewBackView.layer.borderColor = UIColor(.dm, light: UIColor(hexString: "#E6EFFC", alpha: 1), dark: UIColor(hexString: "#E6EFFC", alpha: 1)).cgColor
+        textViewBackView.layer.borderColor = UIColor.weDateInputBorder.cgColor
+        textViewBackView.backgroundColor = .weDatePanelBackground
         return textViewBackView
     }()
     /// 输入框
@@ -172,7 +173,8 @@ class BatchAddVC: UIViewController {
         let textView = UITextView(frame: CGRect(x: 13, y: 13, width: textViewBackView.width - 13 * 2, height: textViewBackView.height - 13))
         textView.autocorrectionType = .no
         textView.autocapitalizationType = .none
-        textView.backgroundColor = .white
+        textView.backgroundColor = .weDatePanelBackground
+        textView.textColor = .weDateDeepText
         textView.delegate = self
         return textView
     }()
@@ -187,8 +189,8 @@ class BatchAddVC: UIViewController {
         // 为按钮添加线性渐变
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -201,7 +203,7 @@ class BatchAddVC: UIViewController {
         let alertView = UIView(frame: CGRect(x: (SCREEN_WIDTH - 283) / 2, y: (SCREEN_HEIGHT - 170 ) / 2 - 50, width: 283, height: 170))
         alertView.layer.cornerRadius = 12.0
         alertView.clipsToBounds = true
-        alertView.backgroundColor = .white
+        alertView.backgroundColor = .weDatePanelBackground
         return alertView
     }()
     /// 信息有误文本
@@ -210,7 +212,7 @@ class BatchAddVC: UIViewController {
         alertLabel.numberOfLines = 0
         alertLabel.textAlignment = .center
         alertLabel.font = .systemFont(ofSize: 15)
-        alertLabel.textColor = UIColor(hexString: "#15315B", alpha: 1)
+        alertLabel.textColor = .weDatePrimaryText
         return alertLabel
     }()
     /// 信息有误按钮
@@ -223,8 +225,8 @@ class BatchAddVC: UIViewController {
         alertBtn.addTarget(self, action: #selector(clickConfirmBtn), for: .touchUpInside)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -244,56 +246,56 @@ class BatchAddVC: UIViewController {
         let firstLineLab = UILabel(frame: CGRect(x: 0, y: 0, width: 115, height: 20))
         firstLineLab.text = "样例输入1：卷卷"
         firstLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        firstLineLab.textColor = UIColor(hexString: "#6B89B7", alpha: 1)
+        firstLineLab.textColor = .weDateCorrectExampleText
         return firstLineLab
     }()
     private lazy var secondLineLab: UILabel = {
         let secondLineLab = UILabel(frame: CGRect(x:82, y: firstLineLab.bottom, width: 30, height: 20))
         secondLineLab.text = "卷娘"
         secondLineLab.font = .systemFont(ofSize: 14)
-        secondLineLab.textColor = UIColor(hexString: "#6B89B7", alpha: 1)
+        secondLineLab.textColor = .weDateCorrectExampleText
         return secondLineLab
     }()
     private lazy var thirdLineLab: UILabel = {
         let thirdLineLab = UILabel(frame: CGRect(x: 0, y: secondLineLab.bottom + 6, width: 170, height: 20))
         thirdLineLab.text = "样例输入2：2022213333"
         thirdLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        thirdLineLab.textColor = UIColor(hexString: "#6B89B7", alpha: 1)
+        thirdLineLab.textColor = .weDateCorrectExampleText
         return thirdLineLab
     }()
     private lazy var fourthLineLab: UILabel = {
         let fourthLineLab = UILabel(frame: CGRect(x: 82, y: thirdLineLab.bottom, width: 90, height: 20))
         fourthLineLab.text = "2011118888"
         fourthLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        fourthLineLab.textColor = UIColor(hexString: "#6B89B7", alpha: 1)
+        fourthLineLab.textColor = .weDateCorrectExampleText
         return fourthLineLab
     }()
     private lazy var fifthLineLab: UILabel = {
         let fifthLineLab = UILabel(frame: CGRect(x: 0, y: fourthLineLab.bottom + 14, width: 159, height: 20))
         fifthLineLab.text = "错误输入1：卷卷，卷娘"
         fifthLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        fifthLineLab.textColor = UIColor(hexString: "#EFB7AB", alpha: 1)
+        fifthLineLab.textColor = .weDateWrongExampleText
         return fifthLineLab
     }()
     private lazy var sixthLineLab: UILabel = {
         let sixthLineLab = UILabel(frame: CGRect(x: 82, y: fifthLineLab.bottom, width: 75, height: 20))
         sixthLineLab.text = "卷卷；卷娘"
         sixthLineLab.font = .systemFont(ofSize: 14)
-        sixthLineLab.textColor = UIColor(hexString: "#EFB7AB", alpha: 1)
+        sixthLineLab.textColor = .weDateWrongExampleText
         return sixthLineLab
     }()
     private lazy var seventhLineLab: UILabel = {
         let seventhLineLab = UILabel(frame: CGRect(x: 0, y: sixthLineLab.bottom + 6, width: 159, height: 20))
         seventhLineLab.text = "错误输入2：卷卷"
         seventhLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        seventhLineLab.textColor = UIColor(hexString: "#EFB7AB", alpha: 1)
+        seventhLineLab.textColor = .weDateWrongExampleText
         return seventhLineLab
     }()
     private lazy var eighthLineLab: UILabel = {
         let eighthLineLab = UILabel(frame: CGRect(x: 82, y: seventhLineLab.bottom, width: 90, height: 20))
         eighthLineLab.text = "2022222222"
         eighthLineLab.font = .monospacedDigitSystemFont(ofSize: 14, weight: .regular)
-        eighthLineLab.textColor = UIColor(hexString: "#EFB7AB", alpha: 1)
+        eighthLineLab.textColor = .weDateWrongExampleText
         return eighthLineLab
     }()
 }
@@ -333,7 +335,7 @@ extension BatchAddVC: UITextViewDelegate {
             let attributes: [NSAttributedString.Key: Any] = [
                 .paragraphStyle: paragraphStyle,
                 .font: UIFont.systemFont(ofSize: 14),
-                .foregroundColor: UIColor(hexString: "#2D4D80", alpha: 1)
+                .foregroundColor: UIColor.weDateDeepText
             ]
             let attributedUserInput = NSAttributedString(string: text, attributes: attributes)
             attributedString.append(attributedUserInput)

@@ -22,6 +22,8 @@ class GroupSearchResultTableViewCell: UITableViewCell {
         contentView.addSubview(imgView)
         contentView.addSubview(nameLab)
         contentView.addSubview(addBtn)
+        backgroundColor = .weDatePanelBackground
+        contentView.backgroundColor = .weDatePanelBackground
     }
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -45,7 +47,7 @@ class GroupSearchResultTableViewCell: UITableViewCell {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel(frame: CGRect(x: imgView.right + 10, y: 4.8, width: 170, height: 24.65))
         nameLab.font = .systemFont(ofSize: 18, weight: .black)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#15315B", alpha: 1), dark: UIColor(hexString: "#15315B", alpha: 1))
+        nameLab.textColor = .weDatePrimaryText
         return nameLab
     }()
     /// 加号按钮

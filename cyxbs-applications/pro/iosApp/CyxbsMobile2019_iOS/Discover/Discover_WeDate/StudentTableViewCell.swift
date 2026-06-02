@@ -20,7 +20,8 @@ class StudentTableViewCell: UITableViewCell {
         contentView.addSubview(imgView)
         contentView.addSubview(nameLab)
         contentView.addSubview(stuNumLab)
-        contentView.backgroundColor = .white
+        backgroundColor = .weDatePageBackground
+        contentView.backgroundColor = .weDatePageBackground
     }
     
     required init?(coder: NSCoder) {
@@ -39,14 +40,14 @@ class StudentTableViewCell: UITableViewCell {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel(frame: CGRect(x: imgView.right + 9, y: 0, width: 100, height: 22))
         nameLab.font = .boldSystemFont(ofSize: 16)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        nameLab.textColor = .weDateDeepText
         return nameLab
     }()
     /// 学号文本
     lazy var stuNumLab: UILabel = {
         let stuNumLab = UILabel(frame: CGRect(x: nameLab.left, y: nameLab.bottom, width: 100, height: 20))
         stuNumLab.font = .boldSystemFont(ofSize: 14)
-        stuNumLab.textColor = UIColor(.dm, light: UIColor(hexString: "#ABB5C4", alpha: 1), dark: UIColor(hexString: "#ABB5C4", alpha: 1))
+        stuNumLab.textColor = .weDateLightMutedText
         return stuNumLab
     }()
 }

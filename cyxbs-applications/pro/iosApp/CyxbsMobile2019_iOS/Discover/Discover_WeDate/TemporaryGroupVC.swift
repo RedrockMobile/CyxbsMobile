@@ -29,6 +29,7 @@ class TemporaryGroupVC: UIViewController {
         view.addSubview(tableView)
         view.addSubview(promptLab)
         view.addSubview(inquireBtn)
+        view.backgroundColor = .weDatePageBackground
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             self.promptLab.isHidden = true
@@ -56,8 +57,8 @@ class TemporaryGroupVC: UIViewController {
         // 为按钮添加线性渐变
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -75,7 +76,7 @@ class TemporaryGroupVC: UIViewController {
         toolBar.addSubview(button)
         button.setTitle("完成", for: .normal)
         button.titleLabel?.font = .boldSystemFont(ofSize: 16)
-        button.setTitleColor(UIColor.systemBlue, for: .normal)
+        button.setTitleColor(.weDateAccent, for: .normal)
         button.addTarget(self, action: #selector(clickDoneBtn), for: .touchUpInside)
         
         let label = UILabel()
@@ -86,7 +87,7 @@ class TemporaryGroupVC: UIViewController {
         label.text = textField.placeholder
         label.font = .systemFont(ofSize: 13)
         label.alpha = 0.8
-        label.textColor = .systemGray
+        label.textColor = .weDateLightMutedText
         
         textField.inputAccessoryView = toolBar
     }
@@ -142,18 +143,20 @@ class TemporaryGroupVC: UIViewController {
         let searchTextFieldBackView = UIView()
         searchTextFieldBackView.layer.cornerRadius = 22
         searchTextFieldBackView.clipsToBounds = true
-        searchTextFieldBackView.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#E8F0FC", alpha: 1), dark: UIColor(hexString: "#E8F0FC", alpha: 1))
+        searchTextFieldBackView.backgroundColor = .weDateSearchBackground
         return searchTextFieldBackView
     }()
     /// 搜索框
     private lazy var searchTextField: UITextField = {
         let searchTextField = UITextField()
         let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: UIColor(hexString: "#142C52", alpha: 0.4),
+            .foregroundColor: UIColor.weDatePlaceholderText,
             .font: UIFont.systemFont(ofSize: 18)
         ]
         let attributedPlaceholder = NSAttributedString(string: "添加同学、分组或班级", attributes: attributes)
         searchTextField.attributedPlaceholder = attributedPlaceholder
+        searchTextField.textColor = .weDatePrimaryText
+        searchTextField.tintColor = .weDatePrimaryText
         searchTextField.returnKeyType = .search
         searchTextField.delegate = self
         addKeyBoardToolBarforTextField(searchTextField)
@@ -165,7 +168,7 @@ class TemporaryGroupVC: UIViewController {
         tableView.estimatedRowHeight = 0
         tableView.contentInsetAdjustmentBehavior = .never
         tableView.separatorStyle = .none
-        tableView.backgroundColor = .white
+        tableView.backgroundColor = .weDatePageBackground
         tableView.register(StudentTableViewCell.self, forCellReuseIdentifier: StudentTableViewCellReuseIdentifier)
         tableView.dataSource = self
         tableView.delegate = self
@@ -180,7 +183,7 @@ class TemporaryGroupVC: UIViewController {
         promptLab.layer.cornerRadius = 18
         promptLab.clipsToBounds = true
         promptLab.textColor = .white
-        promptLab.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        promptLab.backgroundColor = .weDateToastBackground
         return promptLab
     }()
     /// 查询按钮
@@ -239,7 +242,7 @@ extension TemporaryGroupVC: UITableViewDelegate {
             self.dataDictionary["studentID"]!.remove(at: indexPath.row)
             tableView.reloadData()
         }
-        deleteAction.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#ED535C", alpha: 1), dark: UIColor(hexString: "#ED535C", alpha: 1))
+        deleteAction.backgroundColor = .hex("#ED535C")
         let configuration = UISwipeActionsConfiguration(actions: [deleteAction])
         configuration.performsFirstActionWithFullSwipe = false
         return configuration

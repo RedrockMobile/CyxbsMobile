@@ -73,8 +73,8 @@ class ChooseGroupCollectionViewCell: UICollectionViewCell {
     lazy var groupNameBtn: UIButton = {
         let groupNameBtn = UIButton(frame: CGRect(x: hookBtn.right + 7, y: 0, width: 150, height: 22))
         groupNameBtn.contentHorizontalAlignment = .left
-        groupNameBtn.setTitleColor(UIColor(hexString: "#8F9CAF", alpha: 1), for: .normal)
-        groupNameBtn.setTitleColor(UIColor(hexString: "#15315B", alpha: 1), for: .selected)
+        groupNameBtn.setTitleColor(.weDateLightMutedText, for: .normal)
+        groupNameBtn.setTitleColor(.weDatePrimaryText, for: .selected)
         groupNameBtn.addTarget(self, action: #selector(clickBtn), for: .touchUpInside)
         return groupNameBtn
     }()
