@@ -39,6 +39,8 @@ class CourseScheduleModel {
         debugLog("request start", stuNum: stuNum)
         let courseScheduleModel = CourseScheduleModel()
         courseScheduleModel.student = fallbackStudent(stuNum: stuNum)
+        var scheduleSucceeded = false
+        var scheduleError: Error?
         let group = DispatchGroup()
         group.enter()
         HttpTool.share().request(Discover_POST_courseSchedule_API,
@@ -56,10 +58,12 @@ class CourseScheduleModel {
                     courseScheduleModel.courseAry.append(course)
                 }
             }
+            scheduleSucceeded = true
             debugLog("schedule success courseCount=\(courseScheduleModel.courseAry.count)", stuNum: stuNum)
             group.leave()
         },
                                  failure: { task, error in
+            scheduleError = error
             debugLog("schedule failure error=\(error.localizedDescription)", stuNum: stuNum)
             group.leave()
         })
@@ -84,6 +88,12 @@ class CourseScheduleModel {
             group.leave()
         })
         group.notify(queue: .main) {
+            if !scheduleSucceeded {
+                let error = scheduleError ?? NSError(domain: "CourseScheduleModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Course schedule request failed"])
+                debugLog("request failed error=\(error.localizedDescription)", stuNum: stuNum)
+                failure?(error)
+                return
+            }
             debugLog("request finished courseCount=\(courseScheduleModel.courseAry.count), resolvedStudent=\(!courseScheduleModel.student.studentID.isEmpty)", stuNum: stuNum)
             success?(courseScheduleModel)
         }

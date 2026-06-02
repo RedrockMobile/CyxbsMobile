@@ -12,14 +12,15 @@ import UIKit
 class WeekMaping {
     
     private static let cacheQueue = DispatchQueue(label: "com.cyxbs.wedate.courseSchedule.cache")
-    private static let requestQueue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.name = "com.cyxbs.wedate.courseSchedule.request"
-        queue.maxConcurrentOperationCount = 3
-        return queue
-    }()
+    private static let callbackQueue = DispatchQueue.global(qos: .userInitiated)
+    private static let maxConcurrentRequestCount = 3
+    private static let requestStartInterval: TimeInterval = 0.12
     private static var courseScheduleCache: [String: CourseScheduleModel] = [:]
     private static var pendingCourseScheduleCompletions: [String: [(CourseScheduleModel?) -> Void]] = [:]
+    private static var pendingRequestStuNums: [String] = []
+    private static var runningRequestCount = 0
+    private static var lastRequestStartTime: TimeInterval = 0
+    private static var isRequestStartScheduled = false
     
     /// 返回一个映射某人某周课程安排的二维数组
     /// - Parameters:
@@ -57,7 +58,9 @@ class WeekMaping {
     private static func requestCourseSchedule(stuNum: String, completion: @escaping (CourseScheduleModel?) -> Void) {
         cacheQueue.async {
             if let cachedModel = courseScheduleCache[stuNum] {
-                completion(cachedModel)
+                callbackQueue.async {
+                    completion(cachedModel)
+                }
                 return
             }
             
@@ -67,30 +70,56 @@ class WeekMaping {
             }
             
             pendingCourseScheduleCompletions[stuNum] = [completion]
-            enqueueCourseScheduleRequest(stuNum: stuNum)
+            pendingRequestStuNums.append(stuNum)
+            scheduleNextCourseScheduleRequestIfNeeded()
         }
     }
     
-    private static func enqueueCourseScheduleRequest(stuNum: String) {
-        requestQueue.addOperation {
-            let semaphore = DispatchSemaphore(value: 0)
-            CourseScheduleModel.requestWithStuNum(stuNum) { courseScheduleModel in
-                cacheQueue.async {
-                    courseScheduleCache[stuNum] = courseScheduleModel
-                    let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
-                    completions.forEach { $0(courseScheduleModel) }
-                    semaphore.signal()
-                }
-            } failure: { error in
-                print(error)
-                cacheQueue.async {
-                    let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
-                    completions.forEach { $0(nil) }
-                    semaphore.signal()
-                }
+    private static func scheduleNextCourseScheduleRequestIfNeeded() {
+        guard runningRequestCount < maxConcurrentRequestCount,
+              !pendingRequestStuNums.isEmpty,
+              !isRequestStartScheduled else { return }
+        
+        let now = Date().timeIntervalSince1970
+        let delay = max(0, requestStartInterval - (now - lastRequestStartTime))
+        isRequestStartScheduled = true
+        cacheQueue.asyncAfter(deadline: .now() + delay) {
+            isRequestStartScheduled = false
+            startNextCourseScheduleRequestIfPossible()
+        }
+    }
+    
+    private static func startNextCourseScheduleRequestIfPossible() {
+        guard runningRequestCount < maxConcurrentRequestCount,
+              !pendingRequestStuNums.isEmpty else { return }
+        
+        let stuNum = pendingRequestStuNums.removeFirst()
+        runningRequestCount += 1
+        lastRequestStartTime = Date().timeIntervalSince1970
+        
+        CourseScheduleModel.requestWithStuNum(stuNum) { courseScheduleModel in
+            finishCourseScheduleRequest(stuNum: stuNum, courseScheduleModel: courseScheduleModel)
+        } failure: { error in
+            #if DEBUG
+            print(error)
+            #endif
+            finishCourseScheduleRequest(stuNum: stuNum, courseScheduleModel: nil)
+        }
+        
+        scheduleNextCourseScheduleRequestIfNeeded()
+    }
+    
+    private static func finishCourseScheduleRequest(stuNum: String, courseScheduleModel: CourseScheduleModel?) {
+        cacheQueue.async {
+            if let courseScheduleModel = courseScheduleModel {
+                courseScheduleCache[stuNum] = courseScheduleModel
             }
-            semaphore.wait()
-            Thread.sleep(forTimeInterval: 0.12)
+            let completions = pendingCourseScheduleCompletions.removeValue(forKey: stuNum) ?? []
+            runningRequestCount = max(runningRequestCount - 1, 0)
+            callbackQueue.async {
+                completions.forEach { $0(courseScheduleModel) }
+            }
+            scheduleNextCourseScheduleRequestIfNeeded()
         }
     }
     
