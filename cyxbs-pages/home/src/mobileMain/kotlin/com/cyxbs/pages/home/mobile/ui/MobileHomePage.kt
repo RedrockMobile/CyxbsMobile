@@ -111,7 +111,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
-    modifier = modifier.systemBarsPadding(),
+    modifier = modifier,
     bottomBarHeight = bottomNavViewModel.height
   )
   LaunchedEffect(Unit) {

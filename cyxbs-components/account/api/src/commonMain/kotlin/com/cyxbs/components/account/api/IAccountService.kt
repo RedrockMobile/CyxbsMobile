@@ -95,4 +95,6 @@ data class UserInfo(
   val nickname: String, // 昵称
   @SerialName("college")
   val college: String, // 学院信息
+  @SerialName("introduction")
+  val introduction: String, // 签名
 )

@@ -1,22 +1,24 @@
 package com.cyxbs.pages.course.frame
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.px2dpCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
@@ -92,13 +94,17 @@ private fun MobileHomeCourseFrameContent(
   CompositionLocalProvider(
     LocalCourseItemBottomSheetDialog provides itemBottomSheetDialog
   ) {
+    val density = LocalDensity.current
+    val navigationBars = WindowInsets.navigationBars
+    val navigationBarHeight = (navigationBars.getTop(density) + navigationBars.getBottom(density)).px2dpCompose
     MobileHomeBottomSheet(
-      modifier = modifier,
+      modifier = modifier.statusBarsPadding(),
       frame = frame,
+      peekHeightExtra = frame.bottomBarHeightState.value + navigationBarHeight, // 额外添加底导和导航栏的高度
       header = { MobileHomeCourseHeader(modifier = Modifier, frame = frame) },
     ) {
       HorizontalPager(
-        modifier = Modifier.fillMaxSize().background(LocalAppColors.current.topBg).graphicsLayer {
+        modifier = Modifier.navigationBarsPadding().fillMaxSize().graphicsLayer {
           alpha = frame.bottomSheetState.fraction
         },
         state = frame.pagerState,

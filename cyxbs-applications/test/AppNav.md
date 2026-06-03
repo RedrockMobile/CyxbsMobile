@@ -5,7 +5,7 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-05-31 14:31
+- date: 2026-05-31 23:21
 
 ## 调试方法
 
@@ -181,6 +181,15 @@ deeplink: cyxbs://map_show_picture?imageList={List<String>}&currentIndex={Int}
 
 ```text
 deeplink: cyxbs://about
+```
+
+### mine
+
+- entry: `com.cyxbs.pages.mine.user.MineNavEntry`
+- argument: `com.cyxbs.pages.mine.user.MineNavArgument`
+
+```text
+deeplink: cyxbs://mine
 ```
 
 ## :cyxbs-pages:notification

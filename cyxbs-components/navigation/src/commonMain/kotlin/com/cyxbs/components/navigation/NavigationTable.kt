@@ -42,6 +42,9 @@ const val NAV_LOGIN = "login"
 // 关于我们
 const val NAV_ABOUT = "about"
 
+// 我的（主页）
+const val NAV_MINE = "mine"
+
 // 更新弹窗
 const val NAV_DIALOG_UPDATE = "dialog/update"
 
