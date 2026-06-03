@@ -67,7 +67,7 @@ object MineNavArgument : AppNavArgument
 /**
  * 「我的」主页（commonMain）
  *
- * 由原 androidMain UserFragment + mine_fragment_main_new.xml 迁移而来，内容完全还原。
+ * 由原 androidMain UserFragment 迁移而来。
  * 该页面同时被 UserFragment 通过 ComposeView 复用（共用 [MinePage]）。
  */
 @AppNav(route = NAV_MINE)
@@ -91,8 +91,7 @@ private val NicknameColor @Composable get() = 0xFF15315B.dark(0xFFFFFFFF)    // 
 private val IntroduceColor @Composable get() = 0xFF15315B.dark(0xFFFFFFFF)   // mine_text_introduce
 private val SettingTextColor @Composable get() = 0xFF15315B.dark(0xFFF0F0F2) // mine_text_setting
 private val SignTextColor @Composable get() = 0xFF15315B.dark(0xFFFFFFFF)    // mine_text_sign
-private val SignBtnColor =
-  Color(0xFF4A44E4)                                 // mine_shape_bg_user_btn_sign
+private val SignBtnColor = Color(0xFF4A44E4)                                            // mine_shape_bg_user_btn_sign
 private val SignedBtnBgColor @Composable get() = 0xFFEAEAEA.dark(0xFF4A4A4A) // mine_bg_round_corner_grey
 private val SignedBtnTextColor @Composable get() = 0xFF9E9E9E.dark(0xFFBEBEBE)
 

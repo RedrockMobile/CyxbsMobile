@@ -1,6 +1,5 @@
 package com.cyxbs.pages.mine
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -30,16 +29,13 @@ import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Created by zzzia on 2018/8/14.
- * 我的 主界面Fragment
- * 这个类的代码不要格式化了吧 否则initView里面的代码会很凌乱
+ * 「我的」主页 Fragment。
+ *
+ * 页面已迁移为 commonMain 的 [com.cyxbs.pages.mine.user.MineNavEntry]，
+ * 这里仅作为 [ComposeView] 宿主复用同一份 Compose 内容 [MinePage]。
  */
-@SuppressLint("SetTextI18n")
 @ImplProvider(clazz = Fragment::class, name = MINE_ENTRY)
 class UserFragment : BaseFragment() {
-
-    // 页面已迁移为 commonMain 的 [com.cyxbs.pages.mine.user.MineNavEntry]，
-    // 这里仅作为 ComposeView 宿主复用同一份 Compose 内容 [MinePage]，内容完全还原。
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,

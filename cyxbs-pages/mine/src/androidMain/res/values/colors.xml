@@ -58,15 +58,10 @@
     <color name="mine_white">#FFFFFF</color>
     <color name="mine_division_line">#15315BCC</color>
     <color name="mine_black">#15315B</color>
-    <color name="mine_bg_user">#FCFDFF</color>
-    <color name="mine_text_nickname">#15315B</color>
-    <color name="mine_text_introduce">#15315B</color>
     <color name="mine_text_introduction">#CC15315B</color>
     <color name="mine_text_count">#2A4E84</color>
     <color name="mine_text_count_bottom">#B315315B</color>
     <color name="mine_bg_sign">#FFFFFF</color>
-    <color name="mine_text_sign">#15315B</color>
-    <color name="mine_text_setting">#15315B</color>
     <color name="mine_text_fan_head">#15315B</color>
     <color name="mine_text_tab">#15315B</color>
     <color name="mine_bg_vp_fan">#FFFFFF</color>
@@ -80,7 +75,6 @@
     <color name="mine_bg_personal_info">#FBFCFF</color>
     <color name="mine_dynamic">#FFFFFF</color>
     <color name="mine_tv_signature">#8015315B</color>
-    <color name="mine_bg_user_header">#F5F7FF</color>
     <color name="mine_et_hint_text">#6615315B</color>
     <color name="mine_homepage_line_background">#1A2A4E84</color>
 
