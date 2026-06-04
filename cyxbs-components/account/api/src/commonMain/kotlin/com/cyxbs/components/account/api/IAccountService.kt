@@ -96,5 +96,9 @@ data class UserInfo(
   @SerialName("college")
   val college: String, // 学院信息
   @SerialName("introduction")
-  val introduction: String, // 签名
+  val introduction: String? = null, // 签名
+  @SerialName("phone")
+  val phone: String? = null, // 电话
+  @SerialName("qq")
+  val qq: String? = null, // QQ 号
 )

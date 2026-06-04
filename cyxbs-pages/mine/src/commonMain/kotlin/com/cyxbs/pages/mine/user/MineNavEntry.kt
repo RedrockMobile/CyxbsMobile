@@ -46,6 +46,7 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.ImageAvatarCompose
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.mine.about.ui.AboutNavArgument
+import com.cyxbs.pages.mine.edit.EditInfoNavArgument
 import com.cyxbs.pages.mine.user.viewmodel.MineComposeViewModel
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_activity_center
@@ -162,14 +163,12 @@ private fun InfoHeader(
   introduction: String?
 ) {
   val loginDialogState = rememberLoginDialogState()
-  val platform = rememberMinePlatform()
-
   Box(
     modifier = Modifier
       .fillMaxWidth()
       .clickableNoIndicator {
         loginDialogState.doIfLogin(function = "编辑资料") {
-          platform?.jumpEditInfo() ?: toast("暂不支持跳转")
+          EditInfoNavArgument.navigate()
         }
       }
   ) {
@@ -199,7 +198,7 @@ private fun InfoHeader(
           fontSize = 22.sp,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.padding(start = 24.dp),
+          modifier = Modifier.padding(start = 16.dp),
         )
       }
       Text(

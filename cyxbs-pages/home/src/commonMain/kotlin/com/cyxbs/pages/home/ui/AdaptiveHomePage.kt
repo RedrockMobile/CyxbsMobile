@@ -28,6 +28,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_ABOUT
 import com.cyxbs.components.navigation.NAV_COURSE_FIND
+import com.cyxbs.components.navigation.NAV_EDIT_INFO
 import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.navigation.NAV_FAIRGROUND
 import com.cyxbs.components.navigation.NAV_FOOD
@@ -77,6 +78,9 @@ private val itemList = listOf(
   },
   ActionItem("邮乐园") {
     AppScheme.jump("cyxbs://$NAV_FAIRGROUND")
+  },
+  ActionItem("资料编辑") {
+    AppScheme.jump("cyxbs://$NAV_EDIT_INFO")
   },
 
 

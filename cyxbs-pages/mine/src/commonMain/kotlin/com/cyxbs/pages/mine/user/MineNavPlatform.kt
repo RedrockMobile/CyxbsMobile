@@ -34,9 +34,6 @@ interface MineNavPlatform {
   /** 设置页 */
   fun jumpSetting()
 
-  /** 编辑资料页（原有头像共享元素转场迁移后丢失，仅普通跳转） */
-  fun jumpEditInfo()
-
   /** 活动中心 */
   fun jumpActivityCenter()
 }

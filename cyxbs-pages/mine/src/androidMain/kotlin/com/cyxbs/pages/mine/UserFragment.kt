@@ -17,7 +17,6 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.pages.mine.page.edit.EditInfoActivity
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity
 import com.cyxbs.pages.mine.page.sign.DailySignActivity
@@ -88,11 +87,6 @@ object MineNavPlatformImpl : MineNavPlatform {
 
     override fun jumpSetting() {
         startActivity(SettingActivity::class)
-    }
-
-    override fun jumpEditInfo() {
-        // 原有头像共享元素转场迁移为 Compose 后丢失，仅普通跳转
-        startActivity(EditInfoActivity::class)
     }
 
     override fun jumpActivityCenter() {

@@ -19,9 +19,8 @@
             android:name="com.cyxbs.pages.mine.page.security.activity.SecurityActivity"
             android:theme="@style/ConfigAppTheme.NoActionBar" />
         <activity
-            android:name="com.cyxbs.pages.mine.page.edit.EditInfoActivity"
-            android:launchMode="singleTop"
-            android:screenOrientation="portrait" />
+            android:name="com.cyxbs.pages.mine.edit.AvatarPickerActivity"
+            android:theme="@style/mine_AvatarPickerTheme" />
         <activity
             android:name="com.cyxbs.pages.mine.page.sign.DailySignActivity"
             android:launchMode="singleTop" />
