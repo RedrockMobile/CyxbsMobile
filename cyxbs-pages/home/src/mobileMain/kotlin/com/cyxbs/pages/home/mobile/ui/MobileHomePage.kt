@@ -109,6 +109,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   }
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  // CourseBottomSheetViewModel 提供对外控制课表展示和监听当前展示状态
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier,
@@ -127,11 +128,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
     bottomNavViewModel.selectedItem.collect {
-      if (it === bottomNavViewModel.fairgroundItem) {
-        bottomSheetState.hide()
-      } else if (bottomSheetState.state == BottomSheetValueState.Hide) {
-        bottomSheetState.collapse()
-      }
+      // 之前主页的第二页是邮问（掌邮社区，因为违规问题下架了）会将课表 bottomSheetState 设置成 hide 状态
+      // 现在改成游乐园后没必要再 hide 了
+      bottomSheetState.collapse()
     }
   }
   LaunchedEffect(Unit) {
@@ -175,8 +174,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 @Composable
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val shadowElevation by bottomNavViewModel.selectedItem.map {
-    if (it === bottomNavViewModel.discoverItem || it === bottomNavViewModel.mineItem) 0.dp else 4.dp
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  val shadowElevation by courseFrameViewModel.frame.bottomSheetState.stateFlow.map {
+    if (it == BottomSheetValueState.Hide) 4.dp else 0.dp // 如果课表不展示了则添加阴影
   }.collectAsState(0.dp)
   Row(
     modifier = modifier
