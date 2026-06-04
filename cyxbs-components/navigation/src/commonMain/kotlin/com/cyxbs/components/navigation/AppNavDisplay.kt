@@ -82,6 +82,9 @@ fun AppNavDisplay() {
       remember { DialogSceneStrategy() },       // 支持 Dialog 栈处理
       remember { SinglePaneSceneStrategy() },   // 默认单栈处理
     ),
+    transitionSpec = appNavTransitionSpec(),
+    popTransitionSpec = appNavPopTransitionSpec(),
+    predictivePopTransitionSpec = appNavPredictivePopTransitionSpec(),
     entryProvider = remember(appNavCollector) {
       entryProvider(
         fallback = { argument ->
