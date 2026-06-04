@@ -163,6 +163,10 @@ class TemporaryViewModel : BaseViewModel() {
         if (tempStudentList.isEmpty()) return
         _isSheetExpanded.value = true
     }
+
+    fun dismissQuerySheet() {
+        _isSheetExpanded.value = false
+    }
 }
 
 

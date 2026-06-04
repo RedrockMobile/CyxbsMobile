@@ -74,6 +74,12 @@ internal fun NoClassPage() {
         if (isSheetExpanded) sheetState.expand() else sheetState.collapse()
     }
 
+    LaunchedEffect(sheetState.state) {
+        if (sheetState.state == BottomSheetValueState.Collapsed) {
+            tempViewModel.dismissQuerySheet()
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = viewModel.currentTabIndex.intValue,
         pageCount = { TAB_TITLES.size })
