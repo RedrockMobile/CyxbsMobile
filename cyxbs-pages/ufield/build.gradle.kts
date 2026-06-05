@@ -15,6 +15,7 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.food.api)
+      implementation(projects.cyxbsPages.map.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

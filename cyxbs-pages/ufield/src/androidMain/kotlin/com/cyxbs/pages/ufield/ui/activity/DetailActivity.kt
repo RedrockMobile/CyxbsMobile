@@ -11,7 +11,7 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.ui.viewModelBy
-import com.cyxbs.components.config.route.DISCOVER_MAP
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.components.config.route.UFIELD_DETAIL_ENTRY
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setImageFromUrl
@@ -139,7 +139,7 @@ class DetailActivity : BaseActivity() {
     @SuppressLint("SetTextI18n")
     private fun initView() {
         layoutMap.setOnClickListener {
-            startActivity(DISCOVER_MAP)
+            MapNavArgument().navigate()
         }
 
         ivBack.setOnClickListener {
