@@ -33,7 +33,7 @@
     [self addCustomTabbarView];
     
     //两个页面，两个控制器
-    [self addSegmentView];
+    [self addStudentView];
     
     //添加返回按钮
     [self addBackButton];
@@ -91,31 +91,48 @@
      [self.navigationController popViewControllerAnimated:YES];
 }
 
-//添加带标签栏的一个分页的一个scrollView（即QAListSegmentView）
-- (void)addSegmentView {
+//添加一个查询同学课表的VC
+- (void)addStudentView{
     ScheduleViewController *stu = [[ScheduleViewController alloc] initWithUserDefaultKey:STU_FIND_HISTORY andPeopleType:PeopleTypeStudent];
     stu.title = @"同学课表";
     stu.delegate = self;
     
-    ScheduleViewController *tea = [[ScheduleViewController alloc] initWithUserDefaultKey:TEA_FIND_HISTORY andPeopleType:PeopleTypeTeacher];
-    tea.title = @"老师课表";
-    tea.delegate = self;
-    
-    
-    QAListSegmentView *segmentView = [[QAListSegmentView alloc]initWithFrame:CGRectMake(0, 120, self.view.width, self.view.height-60) controllers:@[stu, tea]];
-    [self.view addSubview:segmentView];
-    if (@available(iOS 11.0, *)) {
-        [segmentView setValue:[UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#15315B" alpha:1] darkColor:[UIColor colorWithHexString:@"#F0F0F2" alpha:1]] forKey:@"titleColor"];
-    } else {
-        [segmentView setValue:[UIColor colorWithHexString:@"#15315B"] forKey:@"titleColor"];
-    }
-    
-    [segmentView mas_makeConstraints:^(MASConstraintMaker *make) {
+    [self addChildViewController:stu];
+    [self.view addSubview:stu.view];
+    [stu.view mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.backgroundView.mas_bottom);
-        make.left.right.width.equalTo(self.backgroundView);
+        make.left.right.equalTo(self.view);
         make.bottom.equalTo(self.view);
     }];
+    [stu didMoveToParentViewController:self];
 }
+
+//已废弃
+//添加带标签栏的一个分页的一个scrollView（即QAListSegmentView）
+//- (void)addSegmentView {
+//    ScheduleViewController *stu = [[ScheduleViewController alloc] initWithUserDefaultKey:STU_FIND_HISTORY andPeopleType:PeopleTypeStudent];
+//    stu.title = @"同学课表";
+//    stu.delegate = self;
+//    
+//    ScheduleViewController *tea = [[ScheduleViewController alloc] initWithUserDefaultKey:TEA_FIND_HISTORY andPeopleType:PeopleTypeTeacher];
+//    tea.title = @"老师课表";
+//    tea.delegate = self;
+//    
+//    
+//    QAListSegmentView *segmentView = [[QAListSegmentView alloc]initWithFrame:CGRectMake(0, 120, self.view.width, self.view.height-60) controllers:@[stu]];
+//    [self.view addSubview:segmentView];
+//    if (@available(iOS 11.0, *)) {
+//        [segmentView setValue:[UIColor dm_colorWithLightColor:[UIColor colorWithHexString:@"#15315B" alpha:1] darkColor:[UIColor colorWithHexString:@"#F0F0F2" alpha:1]] forKey:@"titleColor"];
+//    } else {
+//        [segmentView setValue:[UIColor colorWithHexString:@"#15315B"] forKey:@"titleColor"];
+//    }
+//    
+//    [segmentView mas_makeConstraints:^(MASConstraintMaker *make) {
+//        make.top.equalTo(self.backgroundView.mas_bottom);
+//        make.left.right.width.equalTo(self.backgroundView);
+//        make.bottom.equalTo(self.view);
+//    }];
+//}
 
 //这个是<ScheduleViewControllerDelegate>协议里需要实现的方法，起到跳转到符合条件的人员名单页的功能
 - (void)pushToController:(UIViewController *)studentListVC {
