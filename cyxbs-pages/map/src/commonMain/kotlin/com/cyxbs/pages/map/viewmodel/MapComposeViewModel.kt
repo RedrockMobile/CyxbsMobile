@@ -261,7 +261,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 获取地点详细信息
   fun getPlaceDetails(placeId: String) {
     launchByViewModelScope {
-      val localPlaceDetails = MapDataRepository.getPlaceDetails(placeId) ?: getLocalPlaceDetails(placeId)
+      val localPlaceDetails =
+        MapDataRepository.getPlaceDetails(placeId) ?: getLocalPlaceDetails(placeId)
       localPlaceDetails?.let {
         placeDetails.value = it
         placeDetailsId.value = placeId
@@ -515,7 +516,5 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 跳转导航
   open fun jumpToNavigation(endPlace: String) {}
-
-  open fun jumpToVR() {}
 
 }
