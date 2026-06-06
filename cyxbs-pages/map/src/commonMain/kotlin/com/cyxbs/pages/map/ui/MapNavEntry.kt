@@ -29,9 +29,6 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -51,11 +48,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import com.cyxbs.components.config.MAP_VR_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
@@ -379,7 +381,7 @@ fun MapFunctionImageCompose(modifier: Modifier = Modifier) {
         modifier = Modifier
           .size(36.dp)
           .clickAnimation {
-            viewmodel.jumpToVR()
+            AppScheme.jump(MAP_VR_WEBSITE)
           },
         painter = painterResource(Res.drawable.map_ic_vr),
         contentDescription = null
