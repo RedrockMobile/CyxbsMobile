@@ -107,17 +107,6 @@ deeplink: cyxbs://course?stuNum={String}&stableKey=[String?]
 deeplink: cyxbs://course_find?initialQuery=[String]&directStuNum=[String]
 ```
 
-## :cyxbs-pages:discover
-
-### discover
-
-- entry: `com.cyxbs.pages.discover.home.DiscoverNavEntry`
-- argument: `com.cyxbs.pages.discover.api.DiscoverNavArgument`
-
-```text
-deeplink: cyxbs://discover
-```
-
 ## :cyxbs-pages:emptyroom
 
 ### emptyroom
@@ -202,15 +191,6 @@ deeplink: cyxbs://about
 deeplink: cyxbs://edit_info
 ```
 
-### mine
-
-- entry: `com.cyxbs.pages.mine.user.MineNavEntry`
-- argument: `com.cyxbs.pages.mine.user.MineNavArgument`
-
-```text
-deeplink: cyxbs://mine
-```
-
 ## :cyxbs-pages:notification
 
 ### dialog/notice
@@ -245,15 +225,4 @@ object fields:
 
 ```text
 deeplink: cyxbs://school_car
-```
-
-## :cyxbs-pages:ufield
-
-### fairground
-
-- entry: `com.cyxbs.pages.ufield.fairground.FairgroundNavEntry`
-- argument: `com.cyxbs.pages.ufield.api.FairgroundNavArgument`
-
-```text
-deeplink: cyxbs://fairground
 ```

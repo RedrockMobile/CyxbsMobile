@@ -12,6 +12,6 @@
     <string name="discover_title_school_calendar">School Calendar</string>
     <string name="discover_title_more_function">More Features</string>
     <string name="discover_news_jwzx">Academic Affairs</string>
-    <string name="discover_title_todo">"Todo List          "</string>
+    <string name="discover_title_todo">"Todo List"</string>
     <string name="discover_title_sport">Sports Check-In</string>
 </resources>

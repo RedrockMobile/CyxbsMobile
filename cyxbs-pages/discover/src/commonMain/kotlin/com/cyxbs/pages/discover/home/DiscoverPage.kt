@@ -64,6 +64,9 @@ import com.cyxbs.pages.discover.home.widget.JwNewsFlipper
 import com.cyxbs.pages.discover.home.widget.MsgImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
+import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
+import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover
+import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_news_jwzx
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -71,6 +74,7 @@ import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import org.jetbrains.compose.resources.stringResource
 
 /* ---------------- 颜色（对齐 discover 模块原 light/dark） ---------------- */
 private val JwLabelBgColor @Composable get() = 0xFFAFD2FB.dark(0xFF5A5A5A) // discover_academic_online_colors_background
@@ -122,7 +126,7 @@ private fun Header() {
         modifier = Modifier.alpha(0.65f),
       )
       Text(
-        text = "发现",
+        text = stringResource(Res.string.discover),
         color = LocalAppColors.current.tvLv2,
         fontSize = 26.sp,
         fontWeight = FontWeight.Bold,
@@ -283,7 +287,7 @@ private fun JwNewsSection(
         .padding(horizontal = 13.dp, vertical = 2.dp),
     ) {
       Text(
-        text = "教务在线",
+        text = stringResource(Res.string.discover_news_jwzx),
         color = LocalAppColors.current.whiteBlack,
         fontSize = 11.sp,
       )

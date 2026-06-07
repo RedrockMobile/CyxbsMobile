@@ -30,8 +30,6 @@ kotlin {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
       implementation(libs.glide)
-      implementation(libs.eventBus)
-      implementation(libs.slideShow)
     }
   }
 }

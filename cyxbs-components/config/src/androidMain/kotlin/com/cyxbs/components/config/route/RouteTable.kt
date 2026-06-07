@@ -18,9 +18,6 @@ package com.cyxbs.components.config.route
 // MainActivity
 const val MAIN_ENTRY = "/main/entry"
 
-const val DISCOVER_ENTRY = "/discover/entry"
-const val MINE_ENTRY = "/mine/entry"
-
 const val DISCOVER_OTHER_COURSE = "/other_course/discover/entry"
 const val DISCOVER_NO_CLASS = "/no_class/discover/entry"
 const val DISCOVER_MAP = "/map/discover/entry"
@@ -56,8 +53,6 @@ const val STORE_ENTRY = "/store/entry"
 const val COURSE_POS_TO_MAP = "COURSE_POS_TO_MAP"
 
 //下面是邮乐场板块的地址
-//游乐场主界面
-const val FAIRGROUND_ENTRY = "/fairground/entry"
 //活动布告栏
 const val UFIELD_MAIN_ENTRY = "/ufield/main/entry"
 //活动中心

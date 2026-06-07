@@ -30,7 +30,6 @@ import com.cyxbs.components.navigation.NAV_ABOUT
 import com.cyxbs.components.navigation.NAV_COURSE_FIND
 import com.cyxbs.components.navigation.NAV_EDIT_INFO
 import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
-import com.cyxbs.components.navigation.NAV_FAIRGROUND
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
@@ -75,9 +74,6 @@ private val itemList = listOf(
   },
   ActionItem("查询课表") {
     AppScheme.jump("cyxbs://$NAV_COURSE_FIND")
-  },
-  ActionItem("邮乐园") {
-    AppScheme.jump("cyxbs://$NAV_FAIRGROUND")
   },
   ActionItem("资料编辑") {
     AppScheme.jump("cyxbs://$NAV_EDIT_INFO")

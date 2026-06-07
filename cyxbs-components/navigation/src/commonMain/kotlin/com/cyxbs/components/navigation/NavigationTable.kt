@@ -42,9 +42,6 @@ const val NAV_LOGIN = "login"
 // 关于我们
 const val NAV_ABOUT = "about"
 
-// 我的（主页）
-const val NAV_MINE = "mine"
-
 // 资料编辑
 const val NAV_EDIT_INFO = "edit_info"
 
@@ -53,12 +50,6 @@ const val NAV_DIALOG_UPDATE = "dialog/update"
 
 //美食咨询处
 const val NAV_FOOD = "food"
-
-// 邮乐园（入口页）
-const val NAV_FAIRGROUND = "fairground"
-
-// 发现（入口页）
-const val NAV_DISCOVER = "discover"
 
 // 课表单页
 const val NAV_COURSE = "course"

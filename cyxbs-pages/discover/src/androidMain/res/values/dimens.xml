@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
-
-    <dimen name="indicatorView_height" tools:ignore="ResourceName">60dp</dimen>
-
-</resources>
