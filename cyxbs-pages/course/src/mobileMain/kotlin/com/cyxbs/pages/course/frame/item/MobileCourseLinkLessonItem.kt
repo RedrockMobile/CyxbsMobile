@@ -17,6 +17,7 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.impl.CourseLinkLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItemFactory
+import com.cyxbs.pages.map.api.MapNavArgument
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -83,10 +84,7 @@ private class MobileLinkLessonBottomSheetExtension(
         itemBottomSheetDialog.showDialog(this)
       },
       onClickContent = {
-        // todo 跳转到地图页
-//        startActivity(DISCOVER_MAP) {
-//          putExtra(COURSE_POS_TO_MAP, header.content)
-//        }
+        MapNavArgument(itemKeyImpl.lesson.classroom).navigate()
       },
     )
     LaunchedEffect(this) {

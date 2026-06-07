@@ -18,7 +18,7 @@ class WeDateVC: UIViewController {
         view.addSubview(topView)
         view.addSubview(segmentedView)
         view.addSubview(listContainerView)
-        view.backgroundColor = .white
+        view.backgroundColor = .weDatePageBackground
         addShadow()
     }
     
@@ -49,7 +49,10 @@ class WeDateVC: UIViewController {
         let gradientView = UIView(frame: CGRect(x: 0, y: statusBarHeight + 33, width: SCREEN_WIDTH, height: 85))
         let gradientLayer = CAGradientLayer()
         gradientLayer.frame = gradientView.bounds
-        gradientLayer.colors = [UIColor(hexString: "#EBF0F5", alpha: 1).cgColor, UIColor(hexString: "#EBF0F5", alpha: 0).cgColor]
+        gradientLayer.colors = [
+            UIColor(light: .hex("#EBF0F5"), dark: .hex("#000000").withAlphaComponent(0.35)).cgColor,
+            UIColor(light: .hex("#EBF0F5").withAlphaComponent(0), dark: .hex("#000000").withAlphaComponent(0)).cgColor
+        ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 0, y: 1)
         gradientView.layer.addSublayer(gradientLayer)
@@ -62,7 +65,7 @@ class WeDateVC: UIViewController {
         let topView = WeDateTopView()
         topView.returnBtn.addTarget(self, action: #selector(clickReturnBtn), for: .touchUpInside)
         topView.batchAddBtn.addTarget(self, action: #selector(clickBatchAddBtn), for: .touchUpInside)
-        topView.backgroundColor = .white
+        topView.backgroundColor = .weDatePageBackground
         return topView
     }()
     
@@ -78,7 +81,7 @@ class WeDateVC: UIViewController {
         segmentedView.indicators = [indicator]
         segmentedView.listContainer = listContainerView
         segmentedView.defaultSelectedIndex = 0
-        segmentedView.backgroundColor = .white
+        segmentedView.backgroundColor = .weDatePageBackground
         return segmentedView
     }()
     
@@ -86,8 +89,8 @@ class WeDateVC: UIViewController {
         let segmentedDataSource = JXSegmentedTitleDataSource()
         segmentedDataSource.titles = ["临时分组", "固定分组"]
         segmentedDataSource.titleNormalFont = .systemFont(ofSize: 18)
-        segmentedDataSource.titleSelectedColor = UIColor(.dm, light: UIColor(hexString: "#112C54", alpha: 1), dark: UIColor(hexString: "#112C54", alpha: 1))
-        segmentedDataSource.titleNormalColor = UIColor(.dm, light: UIColor(hexString: "#112C54", alpha: 1), dark: UIColor(hexString: "#112C54", alpha: 1))
+        segmentedDataSource.titleSelectedColor = .weDateTitleText
+        segmentedDataSource.titleNormalColor = .weDateTitleText
         return segmentedDataSource
     }()
     

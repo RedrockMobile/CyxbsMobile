@@ -23,11 +23,11 @@ class RepeatNameVC: UIViewController {
     var selectedStudentAry: [StudentResultItem] = [] {
         willSet {
             if newValue.count > 0 {
-                confirmBtn.backgroundColor = .white
+                confirmBtn.backgroundColor = .weDatePanelBackground
                 let gradientLayer = CAGradientLayer()
                 gradientLayer.colors = [
-                    UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-                    UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+                    UIColor.weDateGradientStart.cgColor,
+                    UIColor.weDateGradientEnd.cgColor
                 ]
                 gradientLayer.startPoint = CGPoint(x: 0, y: 0)
                 gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -42,7 +42,7 @@ class RepeatNameVC: UIViewController {
                         }
                     }
                 }
-                confirmBtn.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#C3D4EE", alpha: 1), dark: UIColor(hexString: "#C3D4EE", alpha: 1))
+                confirmBtn.backgroundColor = .weDateDisabledButton
                 confirmBtn.isUserInteractionEnabled = false
             }
         }
@@ -118,7 +118,7 @@ class RepeatNameVC: UIViewController {
     /// 此VC所有UI的容器视图
     private lazy var containerView: UIView = {
         let containerView = UIView()
-        containerView.backgroundColor = .white
+        containerView.backgroundColor = .weDatePanelBackground
         return containerView
     }()
     /// 取消按钮
@@ -126,7 +126,7 @@ class RepeatNameVC: UIViewController {
         let cancelBtn = UIButton()
         cancelBtn.setTitle("取消", for: .normal)
         cancelBtn.titleLabel?.font = .systemFont(ofSize: 12)
-        cancelBtn.setTitleColor(UIColor(.dm, light: UIColor(hexString: "#ABB5C4", alpha: 1), dark: UIColor(hexString: "#ABB5C4", alpha: 1)), for: .normal)
+        cancelBtn.setTitleColor(.weDateLightMutedText, for: .normal)
         cancelBtn.addTarget(self, action: #selector(clickCancelBtn), for: .touchUpInside)
         return cancelBtn
     }()
@@ -135,7 +135,7 @@ class RepeatNameVC: UIViewController {
         let label = UILabel()
         label.text = "有重名现象，请勾选"
         label.font = .systemFont(ofSize: 18, weight: .black)
-        label.textColor = UIColor(.dm, light: UIColor(hexString: "#15315B", alpha: 1), dark: UIColor(hexString: "#15315B", alpha: 1))
+        label.textColor = .weDatePrimaryText
         return label
     }()
     /// 重名学生展示
@@ -148,6 +148,7 @@ class RepeatNameVC: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(RepeatNameTableViewCell.self, forCellReuseIdentifier: RepeatNameTableViewCellReuseIdentifier)
+        tableView.backgroundColor = .weDatePanelBackground
         return tableView
     }()
     /// 确认按钮
@@ -158,7 +159,7 @@ class RepeatNameVC: UIViewController {
         confirmBtn.setTitle("确定", for: .normal)
         confirmBtn.titleLabel?.font = .boldSystemFont(ofSize: 18)
         confirmBtn.addTarget(self, action: #selector(clickConfirmBtn), for: .touchUpInside)
-        confirmBtn.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#C3D4EE", alpha: 1), dark: UIColor(hexString: "#C3D4EE", alpha: 1))
+        confirmBtn.backgroundColor = .weDateDisabledButton
         return confirmBtn
     }()
 }

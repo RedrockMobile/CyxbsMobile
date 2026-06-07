@@ -11,46 +11,21 @@ import com.cyxbs.pages.mine.network.model.EmailCode
 import com.cyxbs.pages.mine.network.model.IdsGetCode
 import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.network.model.SecurityQuestion
-import com.cyxbs.pages.mine.network.model.UploadImgResponse
 import com.mredrock.cyxbs.common.bean.RedrockApiStatus
 import com.mredrock.cyxbs.common.bean.RedrockApiWrapper
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.core.Single
-import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
-import retrofit2.http.Multipart
 import retrofit2.http.POST
-import retrofit2.http.PUT
-import retrofit2.http.Part
 
 /**
  * Created by zia on 2018/8/15.
  */
 interface ApiService:IApi {
-
-    /**
-     * 上传头像
-     */
-    @Multipart
-    @PUT("magipoke/person/upload/avatar")
-    fun uploadSocialImg(
-        @Part("stunum") stunum: RequestBody,
-        @Part fold: MultipartBody.Part
-    ): Observable<RedrockApiWrapper<UploadImgResponse>>
-
-    /**
-     * 上传图片
-     */
-    @FormUrlEncoded
-    @POST("/magipoke/Person/SetInfo")
-    fun updateUserImage(
-        @Field("photo_thumbnail_src") photo_thumbnail_src: String?,
-        @Field("photo_src") photo_src: String?
-    ): Observable<RedrockApiStatus>
 
     /**
      * 签到部分

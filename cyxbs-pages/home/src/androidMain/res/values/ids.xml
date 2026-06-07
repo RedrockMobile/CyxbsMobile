@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="home_view_pager_id" type="id"/>
     <item name="home_course_container_id" type="id"/>
 </resources>

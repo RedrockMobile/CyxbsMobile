@@ -253,7 +253,7 @@ class ActivityUploadVC: UIViewController,
         let cropViewController = TOCropViewController(image: image)
         cropViewController.delegate = self
         cropViewController.aspectRatioLockEnabled = true
-        cropViewController.aspectRatioPreset = .presetSquare // 设置裁剪比例为1:1
+        cropViewController.aspectRatioPreset = CGSize(width: 1.0, height: 1.0) // 设置裁剪比例为1:1
         cropViewController.resetAspectRatioEnabled = false // 禁用切换比例功能
         cropViewController.aspectRatioPickerButtonHidden = true // 隐藏比例选择按钮
         present(cropViewController, animated: true)

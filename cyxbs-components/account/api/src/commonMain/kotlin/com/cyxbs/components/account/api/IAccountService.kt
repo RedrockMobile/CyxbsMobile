@@ -91,6 +91,14 @@ data class UserInfo(
   val stuNum: String, // 学号
   @SerialName("username")
   val username: String, // 用户名字
+  @SerialName("nickname")
+  val nickname: String, // 昵称
   @SerialName("college")
   val college: String, // 学院信息
+  @SerialName("introduction")
+  val introduction: String? = null, // 签名
+  @SerialName("phone")
+  val phone: String? = null, // 电话
+  @SerialName("qq")
+  val qq: String? = null, // QQ 号
 )

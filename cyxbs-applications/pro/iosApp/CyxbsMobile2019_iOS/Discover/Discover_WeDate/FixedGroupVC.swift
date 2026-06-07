@@ -25,6 +25,7 @@ class FixedGroupVC: UIViewController {
         view.addSubview(searchTextFieldBackView)
         view.addSubview(tableView)
         view.addSubview(foundBtn)
+        view.backgroundColor = .weDatePageBackground
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -52,8 +53,8 @@ class FixedGroupVC: UIViewController {
         // 为按钮添加线性渐变
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -131,18 +132,20 @@ class FixedGroupVC: UIViewController {
         let searchTextFieldBackView = UIView()
         searchTextFieldBackView.layer.cornerRadius = 22
         searchTextFieldBackView.clipsToBounds = true
-        searchTextFieldBackView.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#E8F0FC", alpha: 1), dark: UIColor(hexString: "#E8F0FC", alpha: 1))
+        searchTextFieldBackView.backgroundColor = .weDateSearchBackground
         return searchTextFieldBackView
     }()
     /// 搜索框
     private lazy var searchTextField: UITextField = {
         let searchTextField = UITextField()
         let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: UIColor(hexString: "#142C52", alpha: 0.4),
+            .foregroundColor: UIColor.weDatePlaceholderText,
             .font: UIFont.systemFont(ofSize: 18)
         ]
         let attributedPlaceholder = NSAttributedString(string: "添加同学", attributes: attributes)
         searchTextField.attributedPlaceholder = attributedPlaceholder
+        searchTextField.textColor = .weDatePrimaryText
+        searchTextField.tintColor = .weDatePrimaryText
         searchTextField.returnKeyType = .search
         searchTextField.delegate = self
         TemporaryGroupVC().addKeyBoardToolBarforTextField(searchTextField)
@@ -154,7 +157,7 @@ class FixedGroupVC: UIViewController {
         tableView.estimatedRowHeight = 0
         tableView.contentInsetAdjustmentBehavior = .never
         tableView.separatorStyle = .none
-        tableView.backgroundColor = .white
+        tableView.backgroundColor = .weDatePageBackground
         tableView.register(GroupTableViewCell.self, forCellReuseIdentifier: GroupTableViewCellReuseIdentifier)
         tableView.dataSource = self
         tableView.delegate = self
@@ -179,7 +182,7 @@ class FixedGroupVC: UIViewController {
         promptLab.layer.cornerRadius = 18
         promptLab.clipsToBounds = true
         promptLab.textColor = .white
-        promptLab.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        promptLab.backgroundColor = .weDateToastBackground
         return promptLab
     }()
 }
@@ -236,7 +239,7 @@ extension FixedGroupVC: UITableViewDelegate {
             self.groupAry.remove(at: indexPath.row)
             self.tableView.reloadData()
         }
-        deleteAction.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#ED535C", alpha: 1), dark: UIColor(hexString: "#ED535C", alpha: 1))
+        deleteAction.backgroundColor = .hex("#ED535C")
         let stickyAction = UIContextualAction(style: .destructive, title: "置顶") { action, sourceView, completionHandler in
             let name = self.groupAry[indexPath.row].name
             let groupID = self.groupAry[indexPath.row].groupID
@@ -245,7 +248,7 @@ extension FixedGroupVC: UITableViewDelegate {
                 self.receiveGroup()
             }
         }
-        stickyAction.backgroundColor = UIColor(.dm, light: UIColor(hexString: "#4741E0", alpha: 1), dark: UIColor(hexString: "#4741E0", alpha: 1))
+        stickyAction.backgroundColor = .weDateGradientStart
         
         let configuration = UISwipeActionsConfiguration(actions: [deleteAction, stickyAction])
         configuration.performsFirstActionWithFullSwipe = false

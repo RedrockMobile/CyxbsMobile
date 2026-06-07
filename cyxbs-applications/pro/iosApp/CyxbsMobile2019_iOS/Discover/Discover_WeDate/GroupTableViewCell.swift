@@ -19,7 +19,8 @@ class GroupTableViewCell: UITableViewCell {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         contentView.addSubview(imgView)
         contentView.addSubview(nameLab)
-        contentView.backgroundColor = .white
+        backgroundColor = .weDatePageBackground
+        contentView.backgroundColor = .weDatePageBackground
     }
     
     required init?(coder: NSCoder) {
@@ -38,7 +39,7 @@ class GroupTableViewCell: UITableViewCell {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel(frame: CGRect(x: imgView.right + 9, y: 6, width: 250, height: 22))
         nameLab.font = .boldSystemFont(ofSize: 16)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        nameLab.textColor = .weDateDeepText
         return nameLab
     }()
 }

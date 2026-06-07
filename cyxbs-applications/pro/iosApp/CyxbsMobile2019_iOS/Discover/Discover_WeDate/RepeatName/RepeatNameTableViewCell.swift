@@ -37,6 +37,8 @@ class RepeatNameTableViewCell: UITableViewCell {
         contentView.addSubview(stuNumLab)
         contentView.addSubview(button)
         contentView.addSubview(departLab)
+        backgroundColor = .weDatePanelBackground
+        contentView.backgroundColor = .weDatePanelBackground
     }
     
     required init?(coder: NSCoder) {
@@ -71,14 +73,14 @@ class RepeatNameTableViewCell: UITableViewCell {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel()
         nameLab.font = .boldSystemFont(ofSize: 14)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        nameLab.textColor = .weDateDeepText
         return nameLab
     }()
     /// 学号文本
     lazy var stuNumLab: UILabel = {
         let stuNumLab = UILabel()
         stuNumLab.font = .boldSystemFont(ofSize: 12)
-        stuNumLab.textColor = UIColor(.dm, light: UIColor(hexString: "#7B8899", alpha: 1), dark: UIColor(hexString: "#7B8899", alpha: 1))
+        stuNumLab.textColor = .weDateMutedText
         return stuNumLab
     }()
     /// 圆圈按钮
@@ -96,7 +98,7 @@ class RepeatNameTableViewCell: UITableViewCell {
     lazy var departLab: UILabel = {
         let departLab = UILabel()
         departLab.font = .systemFont(ofSize: 12)
-        departLab.textColor = UIColor(.dm, light: UIColor(hexString: "#7B8899", alpha: 1), dark: UIColor(hexString: "#7B8899", alpha: 1))
+        departLab.textColor = .weDateMutedText
         return departLab
     }()
 }

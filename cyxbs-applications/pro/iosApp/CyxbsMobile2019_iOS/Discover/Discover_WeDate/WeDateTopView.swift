@@ -36,8 +36,8 @@ class WeDateTopView: UIView {
     private lazy var label: UILabel = {
         let label = UILabel(frame: CGRect(x: returnBtn.right + 13 , y: 0, width: 67, height: 31))
         label.text = "没课约"
-        label.font = .systemFont(ofSize: 22, weight: .black)
-        label.textColor = UIColor(.dm, light: UIColor(hexString: "#112C54", alpha: 1), dark: UIColor(hexString: "#112C54", alpha: 1))
+        label.font = .systemFont(ofSize: 22, weight: .medium)
+        label.textColor = .weDateTitleText
         return label
     }()
     /// 批量添加按钮

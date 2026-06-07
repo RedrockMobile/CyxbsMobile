@@ -116,8 +116,8 @@ class BusyDetailVC: UIViewController {
             label.layer.cornerRadius = 16
             label.clipsToBounds = true
             label.layer.borderWidth = 1.2
-            label.layer.borderColor = UIColor(hexString: "#E8F0FC", alpha: 1).cgColor
-            label.textColor = UIColor(hexString: "#969FD2", alpha: 1)
+            label.layer.borderColor = UIColor.weDateSearchBackground.cgColor
+            label.textColor = .weDateLightMutedText
             scrollView.addSubview(label)
             
             nowWidth += (width + space)
@@ -150,13 +150,13 @@ class BusyDetailVC: UIViewController {
         let maskLayer = CAShapeLayer()
         maskLayer.path = maskPath.cgPath
         containerView.layer.mask = maskLayer
-        containerView.backgroundColor = .white
+        containerView.backgroundColor = .weDatePanelBackground
         return containerView
     }()
     /// "忙碌x人"文本
     private lazy var titleLab: UILabel = {
         let titleLab = UILabel(frame: CGRect(x: 16, y: 20, width: 110, height: 21))
-        titleLab.textColor = UIColor(hexString: "#15315B", alpha: 1)
+        titleLab.textColor = .weDatePrimaryText
         titleLab.font = .boldSystemFont(ofSize: 18)
         titleLab.text = "忙碌" + String(nameAry.count) + "人"
         return titleLab
@@ -173,8 +173,8 @@ class BusyDetailVC: UIViewController {
         button.addTarget(self, action: #selector(clickButton), for: .touchUpInside)
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -186,12 +186,12 @@ class BusyDetailVC: UIViewController {
     private lazy var numberLab: UILabel = {
         let numberLab = UILabel(frame: CGRect(x: titleLab.left, y: titleLab.bottom + 16, width: 148, height: 13))
         let attributedString = NSMutableAttributedString(string: "人数：", attributes: [
-            .foregroundColor: UIColor(hexString: "#8F9CAF", alpha: 1),
+            .foregroundColor: UIColor.weDateLightMutedText,
             .font: UIFont.systemFont(ofSize: 14)
         ])
         let string = "共计 " + String(sumIDAry.count) + " 人"
         attributedString.append(NSAttributedString(string: string, attributes: [
-            .foregroundColor: UIColor(hexString: "#73839D", alpha: 1),
+            .foregroundColor: UIColor.weDateMutedText,
             .font: UIFont.systemFont(ofSize: 14)
         ]))
         numberLab.attributedText = attributedString
@@ -201,11 +201,11 @@ class BusyDetailVC: UIViewController {
     private lazy var timeLab: UILabel = {
         let timeLab = UILabel(frame: CGRect(x: titleLab.left, y: numberLab.bottom + 8, width: 250, height: 15))
         let attributedString = NSMutableAttributedString(string: "时间：", attributes: [
-            .foregroundColor: UIColor(hexString: "#8F9CAF", alpha: 1),
+            .foregroundColor: UIColor.weDateLightMutedText,
             .font: UIFont.systemFont(ofSize: 14)
         ])
         attributedString.append(NSAttributedString(string: timePeriod, attributes: [
-            .foregroundColor: UIColor(hexString: "#73839D", alpha: 1),
+            .foregroundColor: UIColor.weDateMutedText,
             .font: UIFont.systemFont(ofSize: 14)
         ]))
         timeLab.attributedText = attributedString
@@ -214,15 +214,15 @@ class BusyDetailVC: UIViewController {
     /// 分割线
     private lazy var lineView: UIView = {
         let lineView = UIView(frame: CGRect(x: 0, y: timeLab.bottom + 14, width: SCREEN_WIDTH, height: 1))
-        lineView.backgroundColor = UIColor(hexString: "#2A4E84", alpha: 0.05)
+        lineView.backgroundColor = .weDateThinSeparator
         return lineView
     }()
     /// 分页控制
     private lazy var pageControl: UIPageControl = {
         let pageControl = UIPageControl()
         pageControl.isEnabled = false
-        pageControl.currentPageIndicatorTintColor = UIColor(hexString: "#6364F7", alpha: 1)
-        pageControl.pageIndicatorTintColor = UIColor(hexString: "#C3D4EE", alpha: 1)
+        pageControl.currentPageIndicatorTintColor = .weDateIndicator
+        pageControl.pageIndicatorTintColor = .weDateDisabledButton
         return pageControl
     }()
 }

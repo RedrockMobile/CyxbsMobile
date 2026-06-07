@@ -30,6 +30,8 @@ class StudentSearchResultTableViewCell: UITableViewCell {
         contentView.addSubview(studentIDLab)
         contentView.addSubview(addBtn)
         contentView.addSubview(departLab)
+        backgroundColor = .weDatePanelBackground
+        contentView.backgroundColor = .weDatePanelBackground
     }
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -75,14 +77,14 @@ class StudentSearchResultTableViewCell: UITableViewCell {
     lazy var nameLab: UILabel = {
         let nameLab = UILabel()
         nameLab.font = .boldSystemFont(ofSize: 16)
-        nameLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        nameLab.textColor = .weDateDeepText
         return nameLab
     }()
     /// 学号文本
     lazy var studentIDLab: UILabel = {
         let studentIDLab = UILabel()
         studentIDLab.font = .systemFont(ofSize: 12)
-        studentIDLab.textColor = UIColor(.dm, light: UIColor(hexString: "#7B8899", alpha: 1), dark: UIColor(hexString: "#7B8899", alpha: 1))
+        studentIDLab.textColor = .weDateMutedText
         return studentIDLab
     }()
     /// 加号按钮
@@ -96,7 +98,7 @@ class StudentSearchResultTableViewCell: UITableViewCell {
     lazy var departLab: UILabel = {
         let departLab = UILabel()
         departLab.font = .systemFont(ofSize: 12)
-        departLab.textColor = UIColor(.dm, light: UIColor(hexString: "#7B8899", alpha: 1), dark: UIColor(hexString: "#7B8899", alpha: 1))
+        departLab.textColor = .weDateMutedText
         return departLab
     }()
 }

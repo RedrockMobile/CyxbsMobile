@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -22,7 +25,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.map.api.MapNavArgument
@@ -45,14 +47,19 @@ fun SearchCompose(
   needPlaceList: Boolean = false
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
-  Box(
-    modifier = modifier.backHandler {
+  val backState = rememberNavigationEventState(NavigationEventInfo.None)
+  NavigationBackHandler(
+    state = backState,
+    onBackCompleted = {
       if (viewmodel.mapSearchPagerState.value == 1) {
         viewmodel.mapSearchPagerState.value = 0
       } else {
         argument.popBackStack()
       }
-    }
+    },
+  )
+  Box(
+    modifier = modifier
   ) {
     if (viewmodel.searchTextFieldState.text.isNotEmpty()) {
       SearchResultCompose(

@@ -11,9 +11,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
@@ -93,7 +94,7 @@ private fun AboutPage(argument: AboutNavArgument) {
         constraintSet = createConstraintSet(),
         modifier = Modifier.fillMaxSize()
             .background(LocalAppColors.current.bottomBg)
-            .systemBarsPadding(),
+            .statusBarsPadding(),
         animateChangesSpec = spring(
             stiffness = Spring.StiffnessMediumLow
         )
@@ -106,7 +107,7 @@ private fun AboutPage(argument: AboutNavArgument) {
         VersionInfoCompose(modifier = Modifier.layoutId(Element.VersionInfo))
         ProductWebsiteCompose(modifier = Modifier.layoutId(Element.ProductWebsite))
         ShareCompose(modifier = Modifier.layoutId(Element.Share))
-        BottomInfoCompose(modifier = Modifier.layoutId(Element.BottomInfo))
+        BottomInfoCompose(modifier = Modifier.navigationBarsPadding().layoutId(Element.BottomInfo))
     }
 }
 
@@ -234,13 +235,13 @@ private fun VersionUpdateCompose(modifier: Modifier = Modifier) {
             fontSize = 16.sp
         )
         Text(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 29.dp),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 38.dp),
             text = updateStatus.value,
             fontSize = 13.sp,
             color = 0x80294169.dark(0x48F0F0F2)
         )
         Image(
-            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+            modifier = Modifier.padding(end = 20.dp).size(width = 6.dp, height = 13.dp)
                 .align(Alignment.CenterEnd),
             painter = painterResource(Res.drawable.mine_ic_arrow_right),
             contentDescription = null
@@ -363,7 +364,7 @@ private fun InfoItem(
             fontSize = 16.sp
         )
         Image(
-            modifier = Modifier.padding(end = 11.dp).size(width = 6.dp, height = 13.dp)
+            modifier = Modifier.padding(end = 20.dp).size(width = 6.dp, height = 13.dp)
                 .align(Alignment.CenterEnd),
             painter = painterResource(Res.drawable.mine_ic_arrow_right),
             contentDescription = null

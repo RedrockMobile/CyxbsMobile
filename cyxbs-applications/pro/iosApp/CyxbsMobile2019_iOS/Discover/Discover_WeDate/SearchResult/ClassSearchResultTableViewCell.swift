@@ -21,6 +21,8 @@ class ClassSearchResultTableViewCell: UITableViewCell {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         contentView.addSubview(classIDLab)
         contentView.addSubview(addBtn)
+        backgroundColor = .weDatePanelBackground
+        contentView.backgroundColor = .weDatePanelBackground
     }
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -39,7 +41,7 @@ class ClassSearchResultTableViewCell: UITableViewCell {
     lazy var classIDLab: UILabel = {
         let classIDLab = UILabel(frame: CGRect(x: 16, y: 10, width: 100, height: 22))
         classIDLab.font = .boldSystemFont(ofSize: 16)
-        classIDLab.textColor = UIColor(.dm, light: UIColor(hexString: "#2D4D80", alpha: 1), dark: UIColor(hexString: "#2D4D80", alpha: 1))
+        classIDLab.textColor = .weDateDeepText
         return classIDLab
     }()
     /// 加号按钮

@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 fun MobileHomeBottomSheet(
   modifier: Modifier,
   frame: MobileHomeCourseFrame,
+  peekHeightExtra: Dp,
   header: @Composable () -> Unit,
   content: @Composable () -> Unit,
 ) {
@@ -45,7 +46,7 @@ fun MobileHomeBottomSheet(
     modifier = modifier,
     bottomSheetState = frame.bottomSheetState,
     scrimColor = Color.Transparent,
-    peekHeight = frame.peekHeightState.value + frame.bottomBarHeightState.value, // 底导是覆盖在课表上的
+    peekHeight = frame.peekHeightState.value + peekHeightExtra,
   ) {
     CourseBottomSheetBackground(
       headerHeight = frame.peekHeightState.value
@@ -86,11 +87,13 @@ private fun CourseBottomSheetBackground(
         )
       )
     )
+    // 圆角
     Box(
       modifier = Modifier.padding(top = 15.dp)
         .fillMaxSize()
         .background(color = LocalAppColors.current.topBg, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
     ) {
+      // 拖动的 tips
       Spacer(
         modifier = Modifier.align(Alignment.TopCenter)
           .padding(top = 10.dp)

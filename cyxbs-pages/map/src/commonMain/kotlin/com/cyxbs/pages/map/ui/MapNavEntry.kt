@@ -27,6 +27,7 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,14 +46,19 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import com.cyxbs.components.config.MAP_VR_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_MAP
-import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
@@ -66,8 +72,6 @@ import com.cyxbs.pages.map.util.clickCompass
 import com.cyxbs.pages.map.util.getImageFile
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
-import com.cyxbs.pages.map.widget.PlaceDetailBottomSheet
-import com.cyxbs.pages.map.widget.SearchBottomSheet
 import com.cyxbs.pages.map.widget.rememberMapUiController
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_compass
@@ -102,7 +106,15 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
 
   @Composable
   override fun Content(argument: MapNavArgument) {
-    viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
+    val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
+    // 把当前 Map 的 VM / owner / 跳转参数发布给独立的 sheet NavEntry 复用（见 MapVmHolder）
+    val viewModelStoreOwner = LocalViewModelStoreOwner.current
+    DisposableEffect(viewmodel, viewModelStoreOwner, argument) {
+      if (viewModelStoreOwner != null) {
+        MapVmHolder.publish(viewmodel, viewModelStoreOwner, argument)
+      }
+      onDispose { MapVmHolder.clear(viewmodel) }
+    }
     MapCompose(argument)
     MapProgressDialog()
     DownloadFailedDialog(argument)
@@ -119,6 +131,17 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
 @Composable
 fun WH100vInfinityCompose(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val backState = rememberNavigationEventState(NavigationEventInfo.None)
+  NavigationBackHandler(
+    state = backState,
+    onBackCompleted = {
+      if (viewmodel.mapPagerState.value == 1) {
+        viewmodel.mapPagerState.value = 0
+      } else {
+        argument.popBackStack()
+      }
+    },
+  )
   AnimatedContent(
     targetState = viewmodel.mapPagerState.value,
     transitionSpec = {
@@ -130,18 +153,13 @@ fun WH100vInfinityCompose(argument: MapNavArgument) {
             slideOutHorizontally { width -> width }
       }
     },
-    modifier = Modifier.backHandler {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        argument.popBackStack()
-      }
-    }
   ) { targetPage ->
     if (targetPage == 1) {
       AllPictureCompose(Modifier.fillMaxSize())
     } else {
-      MapContent(argument= argument, modifier = Modifier.fillMaxWidth())
+      MapContent(argument = argument, modifier = Modifier.fillMaxWidth())
+      // 竖屏：地点详情 sheet 以 NavEntry overlay 形式压栈（搜索仍是整页，由 mapSearchPagerState 控制）
+      MapBottomSheetEntryHost(landscape = false)
     }
   }
 }
@@ -150,6 +168,18 @@ fun WH100vInfinityCompose(argument: MapNavArgument) {
 @Composable
 fun WH100v150Compose(argument: MapNavArgument) {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val backState = rememberNavigationEventState(NavigationEventInfo.None)
+  NavigationBackHandler(
+    state = backState,
+    onBackCompleted = {
+      if (viewmodel.mapPagerState.value == 1) {
+        viewmodel.mapPagerState.value = 0
+      } else {
+        // sheet entry 的清理由 MapNavArgument.beforePop 统一处理（见 MapBottomSheetEntryHost）
+        argument.popBackStack()
+      }
+    },
+  )
   AnimatedContent(
     targetState = viewmodel.mapPagerState.value,
     transitionSpec = {
@@ -161,13 +191,6 @@ fun WH100v150Compose(argument: MapNavArgument) {
             slideOutHorizontally { width -> width }
       }
     },
-    modifier = Modifier.backHandler {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        argument.popBackStack()
-      }
-    }
   ) { targetPage ->
     if (targetPage == 1) {
       AllPictureCompose(Modifier.fillMaxSize())
@@ -186,8 +209,8 @@ fun WH100v150Compose(argument: MapNavArgument) {
             .background(Color.Transparent)
         )
       }
-      SearchBottomSheet(argument)
-      PlaceDetailBottomSheet()
+      // 横屏：把两个 bottomSheet 以 NavEntry overlay 形式压栈显示（见 MapBottomSheetEntryHost）
+      MapBottomSheetEntryHost(landscape = true)
     }
   }
 }
@@ -266,7 +289,6 @@ fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
               .padding(top = 32.dp)
               .background(Color.Transparent)
           )
-          PlaceDetailBottomSheet()
         }
       }
     }
@@ -359,7 +381,7 @@ fun MapFunctionImageCompose(modifier: Modifier = Modifier) {
         modifier = Modifier
           .size(36.dp)
           .clickAnimation {
-            viewmodel.jumpToVR()
+            AppScheme.jump(MAP_VR_WEBSITE)
           },
         painter = painterResource(Res.drawable.map_ic_vr),
         contentDescription = null

@@ -17,6 +17,7 @@ class QAMainVC: UIViewController {
     private var listContainerView: JXSegmentedListContainerView!
     private let sharedQAModel = QAModel()
     private let newQACounter = NewQAItemCounter()
+    private var hasConfiguredInteractivePopGesture = false
     private var unreadCounts: [Int] = [0, 0, 0, 0, 0] // 对应5个分类的未读数量
     private var badgeViews: [UILabel] = [] // 存储角标视图
     
@@ -40,10 +41,25 @@ class QAMainVC: UIViewController {
         loadUnreadCounts()
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        configureInteractivePopGesture()
+    }
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 更新角标位置
         updateBadgePositions()
+    }
+    
+    private func configureInteractivePopGesture() {
+        guard !hasConfiguredInteractivePopGesture,
+              let popGesture = navigationController?.interactivePopGestureRecognizer,
+              let contentPanGesture = listContainerView?.scrollView?.panGestureRecognizer else {
+            return
+        }
+        contentPanGesture.require(toFail: popGesture)
+        hasConfiguredInteractivePopGesture = true
     }
     
     // MARK: - 加载未读数量

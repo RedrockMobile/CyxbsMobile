@@ -2,15 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
-        <activity
-            android:name=".ui.activity.MapActivity"
-            android:launchMode="singleTop"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
-        <activity
-            android:name=".ui.activity.VRActivity"
-            android:launchMode="singleTop" />
-        <activity
-            android:name=".ui.activity.ShowPictureActivity"
-            android:launchMode="singleTop"/>
+
     </application>
 </manifest>

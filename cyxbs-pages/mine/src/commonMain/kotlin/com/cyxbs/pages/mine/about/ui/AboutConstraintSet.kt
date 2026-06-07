@@ -87,7 +87,7 @@ private fun AboutConstraintSet.wh100vInfinity() {
         width = Dimension.fillToConstraints
     }
     scope.constrain(bottomInfo) {
-        bottom.linkTo(parent.bottom, 40.dp)
+        bottom.linkTo(parent.bottom, 24.dp)
         linkTo(parent.start, parent.end)
     }
 }

@@ -90,7 +90,7 @@
            make.bottom.equalTo(backView).offset(-11);
        }];
        [textField setFont:[UIFont fontWithName:PingFangSCRegular size:15]];
-       textField.placeholder = @"输入内容";
+       textField.placeholder = @"输入你要查找的同学的姓名/学号";
     
     //设置return类型为search，这样键盘上就会有一个搜索按钮
     [textField setReturnKeyType:(UIReturnKeySearch)];

@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +41,9 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toastLong
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.home.api.HomeNavArgument
+import com.cyxbs.pages.home.api.IHomeDiscoverTab
+import com.cyxbs.pages.home.api.IHomeFairgroundTab
+import com.cyxbs.pages.home.api.IHomeMineTab
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.MobileCourseFrameViewModel
@@ -87,11 +92,66 @@ internal expect fun PlatformMobileHomePage(
   content: @Composable () -> Unit,
 )
 
+/**
+ * 主页三个 tab 的 ViewPager 容器
+ *
+ * tab 内容由各 page 模块通过 [IHomeDiscoverTab] / [IHomeFairgroundTab] / [IHomeMineTab]
+ * 这三个接口配合 `@ImplProvider` 注入，home 模块不直接依赖任何一个 page 模块。
+ *
+ * 状态保留：用 [rememberSaveableStateHolder] 给每个 tab 独立 key，切 tab 后回来不丢
+ * Composable 内的 rememberSaveable 状态；ViewModel 与 home entry 同生命周期，三个 tab 的
+ * ViewModel 类不冲突，可安全共享 store。
+ */
 @Composable
-internal expect fun HomeViewPagerCompose(
+internal fun HomeViewPagerCompose(
   argument: HomeNavArgument,
   modifier: Modifier = Modifier,
-)
+) {
+  val bottomNavViewModel = viewModel(BottomNavViewModel::class)
+  val items = bottomNavViewModel.items
+  val initialPage = remember {
+    items.indexOf(bottomNavViewModel.selectedItem.value).coerceAtLeast(0)
+  }
+  val pagerState = rememberPagerState(
+    initialPage = initialPage,
+    pageCount = { items.size },
+  )
+  // 底部 tab 选中 -> Pager 滚动，对齐原 ViewPager2.currentItem = it（单参 setCurrentItem
+  // 默认 smoothScroll=true）的带动画切换。isUserInputEnabled=false 只关用户手势，不影响
+  // 程序触发的滚动动画。
+  LaunchedEffect(Unit) {
+    bottomNavViewModel.selectedItem
+      .map { items.indexOf(it) }
+      .collect { if (it >= 0) pagerState.animateScrollToPage(it) }
+  }
+
+  val discoverTab = remember { IHomeDiscoverTab::class.implOrNull() }
+  val fairgroundTab = remember { IHomeFairgroundTab::class.implOrNull() }
+  val mineTab = remember { IHomeMineTab::class.implOrNull() }
+  val stateHolder = rememberSaveableStateHolder()
+
+  HorizontalPager(
+    state = pagerState,
+    modifier = modifier
+      .fillMaxSize()
+      .navigationBarsPadding()
+      .padding(bottom = bottomNavViewModel.height),
+    userScrollEnabled = false, // 与原 ViewPager2.isUserInputEnabled=false 保持一致
+    // 让所有 tab 始终保持组合，避免切走再回来 page 内 remember / 滚动位置 / 动画 丢失。
+    // 原 ViewPager2 + FragmentStateAdapter 通过 Fragment savedState 恢复，Compose 这边
+    // 用全员驻留替代。tab 总数固定为 3，开销可接受。
+    beyondViewportPageCount = items.size - 1,
+    key = { it },
+  ) { page ->
+    stateHolder.SaveableStateProvider(key = page) {
+      when (items[page]) {
+        bottomNavViewModel.discoverItem -> discoverTab?.Content()
+        bottomNavViewModel.fairgroundItem -> fairgroundTab?.Content()
+        bottomNavViewModel.mineItem -> mineTab?.Content()
+      }
+    }
+  }
+}
 
 // 旧版课表
 interface IOldHomeCourse {
@@ -109,9 +169,10 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   }
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  // CourseBottomSheetViewModel 提供对外控制课表展示和监听当前展示状态
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
   courseFrameViewModel.frame.HomeCourseContent(
-    modifier = modifier.systemBarsPadding(),
+    modifier = modifier,
     bottomBarHeight = bottomNavViewModel.height
   )
   LaunchedEffect(Unit) {
@@ -127,11 +188,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
     bottomNavViewModel.selectedItem.collect {
-      if (it === bottomNavViewModel.fairgroundItem) {
-        bottomSheetState.hide()
-      } else if (bottomSheetState.state == BottomSheetValueState.Hide) {
-        bottomSheetState.collapse()
-      }
+      // 之前主页的第二页是邮问（掌邮社区，因为违规问题下架了）会将课表 bottomSheetState 设置成 hide 状态
+      // 现在改成游乐园后没必要再 hide 了
+      bottomSheetState.collapse()
     }
   }
   LaunchedEffect(Unit) {
@@ -175,8 +234,9 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 @Composable
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
-  val shadowElevation by bottomNavViewModel.selectedItem.map {
-    if (it === bottomNavViewModel.discoverItem || it === bottomNavViewModel.mineItem) 0.dp else 4.dp
+  val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
+  val shadowElevation by courseFrameViewModel.frame.bottomSheetState.stateFlow.map {
+    if (it == BottomSheetValueState.Hide) 4.dp else 0.dp // 如果课表不展示了则添加阴影
   }.collectAsState(0.dp)
   Row(
     modifier = modifier

@@ -46,13 +46,13 @@ class SearchAlertVC: UIViewController {
         let customView = UIView(frame: CGRect(x: (SCREEN_WIDTH - 238) / 2, y: (SCREEN_HEIGHT - 133) / 2 - 50, width: 238, height: 133))
         customView.layer.cornerRadius = 11.0
         customView.clipsToBounds = true
-        customView.backgroundColor = .white
+        customView.backgroundColor = .weDatePanelBackground
         
         let label = UILabel(frame: CGRect(x: 0, y: 25, width: customView.width, height: 22))
         label.text = alertStr
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 15)
-        label.textColor = UIColor(hexString: "#15315B", alpha: 1)
+        label.textColor = .weDatePrimaryText
         customView.addSubview(label)
         
         let button = UIButton(frame: CGRect(x: 73, y: label.bottom + 25, width: 92, height: 36))
@@ -64,8 +64,8 @@ class SearchAlertVC: UIViewController {
         // 为按钮添加线性渐变
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            UIColor(hexString: "#4741E0", alpha: 1).cgColor,
-            UIColor(hexString: "#5D5EF7", alpha: 1).cgColor
+            UIColor.weDateGradientStart.cgColor,
+            UIColor.weDateGradientEnd.cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
