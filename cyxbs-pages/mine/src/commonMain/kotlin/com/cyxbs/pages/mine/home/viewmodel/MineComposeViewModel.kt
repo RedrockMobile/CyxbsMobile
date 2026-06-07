@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.user.viewmodel
+package com.cyxbs.pages.mine.home.viewmodel
 
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -11,8 +11,8 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
-import com.cyxbs.pages.mine.user.MineNavPlatform
-import com.cyxbs.pages.mine.user.network.MineApiService
+import com.cyxbs.pages.mine.home.MineNavPlatform
+import com.cyxbs.pages.mine.home.network.MineApiService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

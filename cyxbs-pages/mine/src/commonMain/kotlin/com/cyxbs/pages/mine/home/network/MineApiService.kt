@@ -1,7 +1,7 @@
-package com.cyxbs.pages.mine.user.network
+package com.cyxbs.pages.mine.home.network
 
 import com.cyxbs.components.utils.network.ApiWrapper
-import com.cyxbs.pages.mine.user.bean.SignStatusBean
+import com.cyxbs.pages.mine.home.bean.SignStatusBean
 import de.jensklingenberg.ktorfit.http.POST
 
 /**

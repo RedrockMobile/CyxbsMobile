@@ -343,7 +343,7 @@ private fun PortraitAgreementDialog(
  *   （"3.我的" 后端漏字符的兜底也保留）
  */
 @Composable
-private fun PortraitAgreementItem(item: com.cyxbs.pages.mine.user.bean.DownMessageBean.DownMessageText) {
+private fun PortraitAgreementItem(item: com.cyxbs.pages.mine.home.bean.DownMessageBean.DownMessageText) {
   val tvLv2 = LocalAppColors.current.tvLv2
   when (item.title) {
     "title" -> {

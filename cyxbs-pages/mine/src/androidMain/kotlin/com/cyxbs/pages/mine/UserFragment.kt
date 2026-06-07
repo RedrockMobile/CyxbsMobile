@@ -20,8 +20,8 @@ import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
 import com.cyxbs.pages.mine.page.setting.SettingActivity
 import com.cyxbs.pages.mine.page.sign.DailySignActivity
-import com.cyxbs.pages.mine.user.MineNavPlatform
-import com.cyxbs.pages.mine.user.MinePage
+import com.cyxbs.pages.mine.home.MineNavPlatform
+import com.cyxbs.pages.mine.home.MinePage
 import com.cyxbs.pages.notification.api.ILaunchNotificationService
 import com.cyxbs.pages.notification.api.INotificationService
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * 「我的」主页 Fragment。
  *
- * 页面已迁移为 commonMain 的 [com.cyxbs.pages.mine.user.MineNavEntry]，
+ * 页面已迁移为 commonMain 的 [com.cyxbs.pages.mine.home.MineNavEntry]，
  * 这里仅作为 [ComposeView] 宿主复用同一份 Compose 内容 [MinePage]。
  */
 @ImplProvider(clazz = Fragment::class, name = MINE_ENTRY)

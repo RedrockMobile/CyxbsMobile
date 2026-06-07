@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.user
+package com.cyxbs.pages.mine.home
 
 import kotlinx.coroutines.flow.StateFlow
 

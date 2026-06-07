@@ -2,9 +2,9 @@ package com.cyxbs.pages.mine.edit.network
 
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
-import com.cyxbs.pages.mine.user.bean.DownMessageBean
-import com.cyxbs.pages.mine.user.bean.DownMessageParams
-import com.cyxbs.pages.mine.user.bean.UploadAvatarBean
+import com.cyxbs.pages.mine.home.bean.DownMessageBean
+import com.cyxbs.pages.mine.home.bean.DownMessageParams
+import com.cyxbs.pages.mine.home.bean.UploadAvatarBean
 import de.jensklingenberg.ktorfit.http.Body
 import de.jensklingenberg.ktorfit.http.Headers
 import de.jensklingenberg.ktorfit.http.POST

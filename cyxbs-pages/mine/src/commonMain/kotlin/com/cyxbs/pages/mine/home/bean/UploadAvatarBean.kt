@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.user.bean
+package com.cyxbs.pages.mine.home.bean
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

@@ -14,8 +14,8 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.mine.edit.EditInfoPlatform
 import com.cyxbs.pages.mine.edit.network.EditApiService
-import com.cyxbs.pages.mine.user.bean.DownMessageBean
-import com.cyxbs.pages.mine.user.bean.DownMessageParams
+import com.cyxbs.pages.mine.home.bean.DownMessageBean
+import com.cyxbs.pages.mine.home.bean.DownMessageParams
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
