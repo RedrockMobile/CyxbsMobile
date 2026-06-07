@@ -24,13 +24,12 @@ kotlin {
       implementation(projects.cyxbsPages.emptyroom.api)
       implementation(projects.cyxbsPages.schoolcar.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.home.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
       implementation(libs.glide)
-      implementation(libs.eventBus)
-      implementation(libs.slideShow)
     }
   }
 }

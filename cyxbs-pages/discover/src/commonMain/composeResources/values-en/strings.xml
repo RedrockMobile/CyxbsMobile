@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="discover">Explore</string>
+
+    <string name="discover_function">Tools</string>
+    <string name="discover_title_other_course">Curriculum</string>
+    <string name="discover_title_map">Campus Map</string>
+    <string name="discover_title_my_exam">Examinations</string>
+    <string name="discover_title_empty_classroom">Empty Classrooms</string>
+    <string name="discover_title_bus_track">School Bus Track</string>
+    <string name="discover_title_no_class">Shared Period</string>
+    <string name="discover_title_school_calendar">School Calendar</string>
+    <string name="discover_title_more_function">More Features</string>
+    <string name="discover_news_jwzx">Academic Affairs</string>
+    <string name="discover_title_todo">"Todo List"</string>
+    <string name="discover_title_sport">Sports Check-In</string>
+</resources>

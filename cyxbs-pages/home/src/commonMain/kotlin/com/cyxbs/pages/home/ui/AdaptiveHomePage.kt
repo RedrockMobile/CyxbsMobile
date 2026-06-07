@@ -28,6 +28,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_ABOUT
 import com.cyxbs.components.navigation.NAV_COURSE_FIND
+import com.cyxbs.components.navigation.NAV_EDIT_INFO
 import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
@@ -74,7 +75,9 @@ private val itemList = listOf(
   ActionItem("查询课表") {
     AppScheme.jump("cyxbs://$NAV_COURSE_FIND")
   },
-
+  ActionItem("资料编辑") {
+    AppScheme.jump("cyxbs://$NAV_EDIT_INFO")
+  },
 
 
   // 退出登陆放到最后，其他测试页面放到上面👆
