@@ -65,6 +65,7 @@ import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent
 import com.cyxbs.pages.noclass.ui.dialog.BatchQueryErrorDialog
 import com.cyxbs.pages.noclass.ui.dialog.SameNameSelectionSheet
 import com.cyxbs.pages.noclass.util.InputFormatUtil
+import com.cyxbs.pages.noclass.util.noClassArrangePlan
 import com.cyxbs.pages.noclass.viewmodel.BatchAddViewModel
 import com.cyxbs.pages.noclass.viewmodel.CheckState
 import com.cyxbs.pages.noclass.viewmodel.CourseQueryViewModel
@@ -351,7 +352,14 @@ fun NoclassBatchAddPage() {
                                 )
                                 .clickable {
                                     gatherSheetData = null
-                                    "安排行程（待接入）".toast()
+                                    noClassArrangePlan(
+                                        week = data.week,
+                                        day = data.day,
+                                        beginLesson = data.beginLesson,
+                                        lessonLength = data.lessonLength,
+                                        spareIds = data.spareIds,
+                                        idToNameMap = data.idToNameMap,
+                                    )
                                 }
                                 .padding(horizontal = 15.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center

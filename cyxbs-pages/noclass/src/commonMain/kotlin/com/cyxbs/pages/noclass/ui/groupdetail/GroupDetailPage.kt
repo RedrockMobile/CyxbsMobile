@@ -66,6 +66,7 @@ import com.cyxbs.pages.noclass.ui.noclass.CommonSearchInput
 import com.cyxbs.pages.noclass.ui.noclass.NoClassBottomButton
 import com.cyxbs.pages.noclass.ui.noclass.StudentListItem
 import com.cyxbs.pages.noclass.ui.noclass.SwipeHintToast
+import com.cyxbs.pages.noclass.util.noClassArrangePlan
 import com.cyxbs.pages.noclass.ui.dialog.SearchNoExistDialog
 import com.cyxbs.pages.noclass.ui.dialog.SearchResultSheet
 import com.cyxbs.pages.noclass.ui.noClassCourse.NoClassCourseContent
@@ -380,7 +381,14 @@ internal fun GroupDetailPage(argument: GroupDetailArgument) {
                                 )
                                 .clickable {
                                     gatherSheetData = null
-                                    "安排行程（待接入）".toast()
+                                    noClassArrangePlan(
+                                        week = data.week,
+                                        day = data.day,
+                                        beginLesson = data.beginLesson,
+                                        lessonLength = data.lessonLength,
+                                        spareIds = data.spareIds,
+                                        idToNameMap = data.idToNameMap,
+                                    )
                                 }
                                 .padding(horizontal = 15.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center

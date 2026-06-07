@@ -65,6 +65,7 @@ import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.noclass.api.NoclassBatchAddArgument
 import com.cyxbs.pages.noclass.ui.noClassCourse.NoClassCourseContent
+import com.cyxbs.pages.noclass.util.noClassArrangePlan
 import com.cyxbs.pages.noclass.ui.noClassCourse.NoClassCourseFrame
 import com.cyxbs.pages.noclass.ui.noClassCourse.NoClassLessonItem
 import com.cyxbs.pages.noclass.ui.noClassCourse.NoClassLessonWhatTime
@@ -354,7 +355,14 @@ internal fun NoClassPage() {
                                 )
                                 .clickable {
                                     gatherSheetData = null
-                                    "安排行程（待接入）".toast()
+                                    noClassArrangePlan(
+                                        week = data.week,
+                                        day = data.day,
+                                        beginLesson = data.beginLesson,
+                                        lessonLength = data.lessonLength,
+                                        spareIds = data.spareIds,
+                                        idToNameMap = data.idToNameMap,
+                                    )
                                 }
                                 .padding(horizontal = 15.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center
