@@ -78,10 +78,9 @@ abstract class AppNavReportTask : DefaultTask() {
       }
     }
 
-    val date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
     val taskName = AppNavReportTask::class.qualifiedName
     // raw string 里 ${'$'} 表示字面 `$`，避免和 Kotlin 字符串模板冲突，用于 bash / PowerShell 脚本里的变量。
-    val d = "${'$'}"
+    val d = "$"
 
     val staticContent = """
       # AppNav Deeplink 汇总
@@ -91,7 +90,6 @@ abstract class AppNavReportTask : DefaultTask() {
 
       - versionCode: ${Config.versionCode}
       - versionName: ${Config.versionName}
-      - date: $date
 
       ## 调试方法
 

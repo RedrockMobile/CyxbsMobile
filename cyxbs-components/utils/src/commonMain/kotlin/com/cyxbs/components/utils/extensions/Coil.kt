@@ -3,11 +3,11 @@ package com.cyxbs.components.utils.extensions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.utils.network.getBaseUrl
 import org.jetbrains.compose.resources.DrawableResource
@@ -29,6 +29,31 @@ fun ImageFromUrlCompose(
   contentScale: ContentScale = ContentScale.Crop,
   block: (ImageRequest.Builder.() -> Unit)? = null
 ) {
+  ImageFromUrlCompose(
+    url = url,
+    placeholder = painterResource(placeholder),
+    error = painterResource(error),
+    modifier = modifier,
+    contentDescription = contentDescription,
+    contentScale = contentScale,
+    block = block,
+  )
+}
+
+/**
+ * 接受任意 [Painter] 作为 placeholder / error 的重载，便于把纯 Compose 绘制
+ * （如 `rememberCyxbsV6BannerPainter()`）当作兜底图，不再依赖 [DrawableResource]。
+ */
+@Composable
+fun ImageFromUrlCompose(
+  url: String,
+  placeholder: Painter,
+  error: Painter,
+  modifier: Modifier = Modifier,
+  contentDescription: String? = null,
+  contentScale: ContentScale = ContentScale.Crop,
+  block: (ImageRequest.Builder.() -> Unit)? = null
+) {
   val realUrl = remember(url) {
     if (url.startsWith("http")) url.toHttpsCdnUrl() else getBaseUrl() + url
   }
@@ -42,8 +67,8 @@ fun ImageFromUrlCompose(
       }
       .build(),
     contentDescription = contentDescription,
-    placeholder = painterResource(placeholder),
-    error = painterResource(error),
+    placeholder = placeholder,
+    error = error,
     contentScale = contentScale
   )
 }

@@ -5,7 +5,6 @@
 
 - versionCode: 94
 - versionName: 6.10.6-alpha
-- date: 2026-06-04 00:13
 
 ## 调试方法
 
@@ -106,6 +105,17 @@ deeplink: cyxbs://course?stuNum={String}&stableKey=[String?]
 
 ```text
 deeplink: cyxbs://course_find?initialQuery=[String]&directStuNum=[String]
+```
+
+## :cyxbs-pages:discover
+
+### discover
+
+- entry: `com.cyxbs.pages.discover.home.DiscoverNavEntry`
+- argument: `com.cyxbs.pages.discover.api.DiscoverNavArgument`
+
+```text
+deeplink: cyxbs://discover
 ```
 
 ## :cyxbs-pages:emptyroom

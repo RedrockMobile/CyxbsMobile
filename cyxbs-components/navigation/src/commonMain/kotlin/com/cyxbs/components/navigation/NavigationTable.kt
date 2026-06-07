@@ -57,6 +57,9 @@ const val NAV_FOOD = "food"
 // 邮乐园（入口页）
 const val NAV_FAIRGROUND = "fairground"
 
+// 发现（入口页）
+const val NAV_DISCOVER = "discover"
+
 // 课表单页
 const val NAV_COURSE = "course"
 
