@@ -3,7 +3,6 @@ package com.cyxbs.pages.map.viewmodel
 import android.content.Intent
 import androidx.core.net.toUri
 import com.cyxbs.components.init.appTopActivity
-import com.cyxbs.pages.map.ui.activity.VRActivity
 import java.net.URLEncoder
 
 actual class MapComposeViewModel : CommonMapComposeViewModel() {
@@ -15,19 +14,15 @@ actual class MapComposeViewModel : CommonMapComposeViewModel() {
           "&mode=walking").toUri()
       val intent = Intent(Intent.ACTION_VIEW, uri)
       appTopActivity.get()?.startActivity(intent)
-    }catch (e: Exception){
+    } catch (e: Exception) {
       // 未安装百度地图App，跳转网页版
       // 对终点进行URL编码，处理特殊字符
       val encodedEndPlace = URLEncoder.encode(endPlace, "UTF-8")
-      val webUrl = "http://api.map.baidu.com/geocoder?address=$encodedEndPlace&output=html&src=webapp.baidu.openAPIdemo"
+      val webUrl =
+        "http://api.map.baidu.com/geocoder?address=$encodedEndPlace&output=html&src=webapp.baidu.openAPIdemo"
       val browserIntent = Intent(Intent.ACTION_VIEW, webUrl.toUri())
       appTopActivity.get()?.startActivity(browserIntent)
     }
-  }
-
-  override fun jumpToVR() {
-    val activity = appTopActivity.get() ?: return
-    VRActivity.startVRActivity(activity, "http://720yun.com/t/0e929mp6utn?pano_id=473004")
   }
 
 }

@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -341,6 +342,19 @@ interface BottomSheetScope {
   // 这里直接使用 Modifier.bottomSheetDraggable(): Modifier 会出问题，使用处会经历两次 layout，原因未知
   @Stable
   fun bottomSheetDraggable(): Modifier
+}
+
+/**
+ * 用于把 [BottomSheetScope] 下传到 [BottomSheetCompose] content 之外的地方。
+ *
+ * 当 BottomSheet 的内容由其他不携带 [BottomSheetScope] receiver 的 @Composable（如
+ * navigation3 的 NavEntry.Content()）渲染时，可通过本 CompositionLocal 获取 scope 来调用
+ * [BottomSheetScope.bottomSheetDraggable]。
+ *
+ * 仅在 [BottomSheetCompose] 内部被提供，外部使用前需先 provide。
+ */
+val LocalBottomSheetScope = staticCompositionLocalOf<BottomSheetScope> {
+  error("LocalBottomSheetScope 未被提供，请确认处于 BottomSheetCompose 的 content 作用域内")
 }
 
 private class BottomSheetScopeImpl(

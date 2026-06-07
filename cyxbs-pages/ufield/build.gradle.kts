@@ -18,6 +18,7 @@ kotlin {
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.food.api)
       implementation(projects.cyxbsPages.home.api)
+      implementation(projects.cyxbsPages.map.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
@@ -39,5 +40,3 @@ kotlin {
 /*
 * ufield: u＝邮, field=场地
 * */
-
-

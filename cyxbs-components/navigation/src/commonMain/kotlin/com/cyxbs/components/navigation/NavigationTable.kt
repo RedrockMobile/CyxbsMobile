@@ -66,6 +66,12 @@ const val NAV_MAP = "map"
 // 地图-查看图片
 const val NAV_MAP_SHOW_PICTURE = "map_show_picture"
 
+// 地图-地点详情底部抽屉
+const val NAV_MAP_PLACE_DETAIL = "map_place_detail"
+
+// 地图-搜索底部抽屉
+const val NAV_MAP_SEARCH = "map_search"
+
 // 校车轨迹
 const val NAV_SCHOOL_CAR = "school_car"
 

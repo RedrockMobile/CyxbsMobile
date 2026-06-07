@@ -20,7 +20,6 @@ const val MAIN_ENTRY = "/main/entry"
 
 const val DISCOVER_OTHER_COURSE = "/other_course/discover/entry"
 const val DISCOVER_NO_CLASS = "/no_class/discover/entry"
-const val DISCOVER_MAP = "/map/discover/entry"
 const val DISCOVER_CALENDAR = "/calendar/discover/entry"
 const val DISCOVER_EMPTY_ROOM = "/empty_room/discover/entry"
 const val DISCOVER_GRADES = "/grades/discover/entry"
@@ -48,9 +47,6 @@ const val TODO_ADD_TODO_BY_WIDGET = "/widget/todo/entry"
 
 // module_store 邮票中心页
 const val STORE_ENTRY = "/store/entry"
-
-//课表上课地点跳转到地图key
-const val COURSE_POS_TO_MAP = "COURSE_POS_TO_MAP"
 
 //下面是邮乐场板块的地址
 //活动布告栏

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-
-
-    <style name="map_transparent_dialog" parent="Theme.AppCompat.Dialog">
-        <item name="android:windowBackground">@color/map_dialog_transparent</item>
-    </style>
-</resources>
-
