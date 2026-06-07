@@ -10,11 +10,15 @@ useNavigation() // navigation 跳转
 kotlin {
   sourceSets {
     commonMain.dependencies {
+      subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.utils)
+      implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.food.api)
+      implementation(projects.cyxbsPages.home.api)
+      implementation(projects.cyxbsPages.map.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
@@ -36,5 +40,3 @@ kotlin {
 /*
 * ufield: u＝邮, field=场地
 * */
-
-
