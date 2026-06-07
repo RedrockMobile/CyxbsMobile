@@ -1,12 +1,16 @@
 package com.cyxbs.pages.discover.pages.discover
 
-import android.view.View
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.FragmentManager
 import com.cyxbs.components.account.api.IAccountService
@@ -216,15 +220,17 @@ private fun FeedFragmentHost(
 ) {
   // 让 viewId 与 feedId 绑定且稳定，避免重组时 id 变化导致 Fragment 重复 add
   val viewId = remember(id) { stableViewIdFor(id) }
+  val context = LocalContext.current
+  // 优先用最近的宿主 Fragment（兼容老路径：DiscoverPage 被 Fragment 包裹）；
+  // 没有宿主 Fragment 时（DiscoverPage 直接挂在 NavDisplay 下）兜底到 Activity 的 supportFragmentManager。
+  val fm = remember(context) { context.findOwningFragmentManager() }
   AndroidView(
     modifier = modifier,
     factory = { ctx ->
       FragmentContainerView(ctx).also { container ->
         container.id = viewId
-        // 沿 View 父链向上查找宿主 Fragment（DiscoverHomeFragment），用它的 childFragmentManager
         container.post {
-          val host = container.findHostFragment() ?: return@post
-          val fm = host.childFragmentManager
+          fm ?: return@post
           if (fm.findFragmentById(viewId) == null) {
             fm.beginTransaction()
               .add(viewId, fragmentFactory())
@@ -234,6 +240,18 @@ private fun FeedFragmentHost(
       }
     },
   )
+  // FeedFragmentHost 退出组合时把 Fragment 也从 FM 中摘下，避免使用 Activity 级 FM 时
+  // 跨页面累积。原方案靠 DiscoverHomeFragment.childFragmentManager 销毁自动清理，这里手动对齐。
+  DisposableEffect(fm, viewId) {
+    onDispose {
+      fm ?: return@onDispose
+      if (fm.isStateSaved || fm.isDestroyed) return@onDispose
+      val f = fm.findFragmentById(viewId) ?: return@onDispose
+      fm.beginTransaction()
+        .remove(f)
+        .commitNowAllowingStateLoss()
+    }
+  }
 }
 
 private fun stableViewIdFor(id: String): Int {
@@ -241,10 +259,16 @@ private fun stableViewIdFor(id: String): Int {
   return (id.hashCode() and 0x00ffffff) or 0x7f000000
 }
 
-private fun View.findHostFragment(): Fragment? {
-  return try {
-    FragmentManager.findFragment(this)
-  } catch (e: IllegalStateException) {
-    null
+/**
+ * 找到一个能挂 Fragment 的 FragmentManager：
+ * 1. 当前 Composable 所在 View 链中最近的 Fragment 的 childFragmentManager；
+ * 2. 兜底到宿主 FragmentActivity 的 supportFragmentManager。
+ */
+private fun Context.findOwningFragmentManager(): FragmentManager? {
+  var c: Context? = this
+  while (c is ContextWrapper) {
+    if (c is FragmentActivity) return c.supportFragmentManager
+    c = c.baseContext
   }
+  return null
 }

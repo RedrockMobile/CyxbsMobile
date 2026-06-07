@@ -21,6 +21,7 @@ kotlin {
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.notification.api)
+      implementation(projects.cyxbsPages.home.api)
     }
     androidMain.dependencies {
       implementation(projects.libCommon) // TODO common 模块不再使用，新模块请依赖 base 和 utils 模块
