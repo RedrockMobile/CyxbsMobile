@@ -35,8 +35,8 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo
 import com.cyxbs.pages.noclass.ui.NoClass.NoClassBottomButton
 import cyxbsmobile.cyxbs_pages.noclass.generated.resources.Res
-import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_check_box_choose
-import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_check_box_unchoose
+import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_same_name_selected
+import cyxbsmobile.cyxbs_pages.noclass.generated.resources.noclass_ic_same_name_not_selected
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -86,7 +86,7 @@ fun SameNameSelectionSheet(
                         modifier = Modifier.fillMaxSize().padding(top = 45.dp)
                     ) {
                         Text(
-                            text = "以下同学重名，请确认",
+                            text = "有重名现象，请勾选",
                             color = Color(0xFF15315B).dark(Color(0xFFF0F0F2)),
                             fontSize = 18.sp,
                             modifier = Modifier.padding(start = 16.dp)
@@ -112,8 +112,8 @@ fun SameNameSelectionSheet(
                                 ) {
                                     Icon(
                                         painter = painterResource(
-                                            if (isSelected) Res.drawable.noclass_ic_check_box_choose
-                                            else Res.drawable.noclass_ic_check_box_unchoose
+                                            if (isSelected) Res.drawable.noclass_ic_same_name_selected
+                                            else Res.drawable.noclass_ic_same_name_not_selected
                                         ),
                                         contentDescription = null,
                                         tint = Color.Unspecified,

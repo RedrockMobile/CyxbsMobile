@@ -94,9 +94,9 @@ data class NoClassLessonWhatTime(
 
         private fun getColorsForLesson(beginLesson: Int): Pair<Color, Color> {
             return when {
-                beginLesson <= 4 -> Color(0xFFFF8015) to Color(0xFFF9E7D8)
-                beginLesson <= 8 -> Color(0xFFFF6262) to Color(0xFFF9E3E4)
-                else -> Color(0xFF4066EA) to Color(0xFFDDE3F8)
+                beginLesson <= 4 -> NoClassCourseColor.morningText to NoClassCourseColor.morningBg
+                beginLesson <= 8 -> NoClassCourseColor.afternoonText to NoClassCourseColor.afternoonBg
+                else -> NoClassCourseColor.eveningText to NoClassCourseColor.eveningBg
             }
         }
     }

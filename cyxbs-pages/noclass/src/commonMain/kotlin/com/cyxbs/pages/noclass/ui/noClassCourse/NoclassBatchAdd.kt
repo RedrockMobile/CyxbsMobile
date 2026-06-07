@@ -148,7 +148,7 @@ fun NoclassBatchAddPage() {
     )) {
         Column(
             modifier = Modifier
-                .background(Color(0xFFFEFEFE))
+                .background(LocalAppColors.current.whiteBlack)
                 .statusBarsPadding()
                 .fillMaxSize()
         ) {
@@ -324,7 +324,7 @@ fun NoclassBatchAddPage() {
                             )
                         }
                         .background(
-                            Color.White,
+                            LocalAppColors.current.topBg,
                             RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
                         )
                         .padding(start = 16.dp, end = 16.dp)
@@ -338,7 +338,7 @@ fun NoclassBatchAddPage() {
                             text = "忙碌${busyStudents.size}人",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF15315B),
+                            color = LocalAppColors.current.tvLv1,
                         )
                         Spacer(Modifier.weight(1f))
                         Box(
@@ -466,8 +466,7 @@ private fun TopBar1() {
             painter = painterResource(Res.drawable.noclass_ic_back),
             contentDescription = "返回",
             modifier = Modifier
-                .size(11.dp, 19.dp)
-                .padding(10.dp)
+                .size(24.dp)
                 .clickable {
                     MainNavController.popBackStack()
                 }
@@ -475,10 +474,9 @@ private fun TopBar1() {
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = "批量添加",
-            modifier = Modifier.padding(10.dp),
             fontSize = 21.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF15315B)
+            color = LocalAppColors.current.tvLv1
         )
     }
 }
@@ -501,7 +499,7 @@ private fun InputField(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .background(Color(0xFFFEFEFE), RoundedCornerShape(12.dp))
+                .background(LocalAppColors.current.whiteBlack, RoundedCornerShape(12.dp))
                 .border(2.dp, Color(0xFFE6EFFC), RoundedCornerShape(12.dp))
                 .verticalScroll(ScrollState(0))
                 .padding(start = 13.dp, top = 13.dp, end = 6.dp, bottom = 16.dp),
@@ -509,7 +507,7 @@ private fun InputField(
             maxLines = Int.MAX_VALUE,
             textStyle = TextStyle(
                 fontSize = 14.sp,
-                color = Color(0xFF2D4D80),
+                color = LocalAppColors.current.tvLv1,
                 textAlign = TextAlign.Start,
                 lineHeight = 22.sp
             )
@@ -517,9 +515,9 @@ private fun InputField(
 
         if (text.isEmpty()) {
             Column(
-                modifier = Modifier.padding(start = 13.dp, top = 13.dp)
+                modifier = Modifier.padding(start = 13.dp, top = 0.dp)
             ) {
-                Row(modifier = Modifier.padding(top = 17.dp)) {
+                Row(modifier = Modifier.padding(top = 13.dp)) {
                     Text(
                         text = "样例输入1：",
                         fontSize = 14.sp,

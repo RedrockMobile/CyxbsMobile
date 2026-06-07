@@ -43,6 +43,7 @@ class CourseQueryViewModel : BaseViewModel() {
 
     private fun queryLessons(stuNumList: List<String>, stuNameById: Map<String, String>) {
         if (stuNumList.isEmpty() || stuNameById.isEmpty() || stuNumList.size != stuNameById.size) return
+        _noclassData.value = hashMapOf()
         viewModelScope.launch {
             _isLoading.value = true
             val lessonService = ILessonService2::class.impl()
