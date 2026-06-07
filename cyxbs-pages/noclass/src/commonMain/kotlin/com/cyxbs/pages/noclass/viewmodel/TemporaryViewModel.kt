@@ -164,6 +164,10 @@ class TemporaryViewModel : BaseViewModel() {
         _isSheetExpanded.value = true
     }
 
+    /**
+     * 当课表 BottomSheet 被收起时调用（用户下滑/返回键），重置展开状态
+     * 确保下次点击"查询"按钮能再次触发 LaunchedEffect
+     */
     fun dismissQuerySheet() {
         _isSheetExpanded.value = false
     }
