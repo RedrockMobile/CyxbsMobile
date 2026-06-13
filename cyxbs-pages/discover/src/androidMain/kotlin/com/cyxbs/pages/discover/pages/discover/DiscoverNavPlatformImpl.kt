@@ -170,7 +170,9 @@ object DiscoverNavPlatformImpl : DiscoverNavPlatform {
       listOf(
         makeFeed("sport") { ISportService::class.impl().getSportFeed() },
         makeFeed("todo") { ITodoService::class.impl().getTodoFeed() },
-        makeFeed("electricity") { IElectricityService::class.impl().getElectricityFeed() },
+        DiscoverFeedItem(
+          content = { modifier -> IElectricityService::class.impl().ElectricityFeed(modifier) },
+        ),
       )
     }
   }

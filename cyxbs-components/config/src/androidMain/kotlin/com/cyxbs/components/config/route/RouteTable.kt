@@ -31,9 +31,6 @@ const val DISCOVER_NEWS = "/news/discover/entry"
 const val DISCOVER_TODO_MAIN = "/todo/discover/entry"
 const val DISCOVER_SPORT = "/sport/discover/entry"
 
-//查电费在发现页面的展示信息
-const val DISCOVER_ELECTRICITY_FEED = "/electricity/discover/feed"
-
 //教务新闻子项入口
 const val DISCOVER_NEWS_ITEM = "/news/discover/item"
 
