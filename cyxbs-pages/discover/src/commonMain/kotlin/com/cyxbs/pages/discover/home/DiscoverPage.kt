@@ -401,6 +401,13 @@ private fun FeedSection(
   ) {
     feeds.forEach { item ->
       item.content(Modifier.fillMaxWidth())
+      if (item !== feeds.last()) {
+        Spacer(
+          modifier = Modifier.fillMaxWidth().height(1.dp)
+            .alpha(0.1F)
+            .background(color = LocalAppColors.current.tvLv4)
+        )
+      }
     }
     // 80dp 顶起来课表与底部按钮
     Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))

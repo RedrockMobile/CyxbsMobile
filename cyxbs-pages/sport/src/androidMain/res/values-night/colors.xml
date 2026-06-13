@@ -12,13 +12,4 @@
 
     <!--夜间模式RecyclerView的item的背景颜色-->
     <color name="sport_item_background">#2d2d2d</color>
-
-    <!--夜间模式首页小板块的字体颜色-->
-    <color name="sport_feed_text_color">#ffffff</color>
-
-    <!--夜间模式未登录以及未绑定教务在线提醒字体的颜色-->
-    <color name="sport_feed_text_hint">#33F0F0F2</color>
-
-    <!--日间模式dialog的字体颜色-->
-    <color name="sport_feed_dialog_text_color">#ffffff</color>
 </resources>

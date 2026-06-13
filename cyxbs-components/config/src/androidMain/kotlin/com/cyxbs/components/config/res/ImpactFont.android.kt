@@ -5,4 +5,4 @@ import androidx.compose.ui.text.font.FontFamily
 import com.cyxbs.components.config.R
 
 internal actual fun platformImpactFontFamily(): FontFamily? =
-  FontFamily(Font(R.font.impact_min))
+  FontFamily(Font(R.font.impact))

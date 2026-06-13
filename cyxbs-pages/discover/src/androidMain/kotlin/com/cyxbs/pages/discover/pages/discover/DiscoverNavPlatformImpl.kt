@@ -168,7 +168,9 @@ object DiscoverNavPlatformImpl : DiscoverNavPlatform {
   override fun rememberFeeds(): List<DiscoverFeedItem> {
     return remember {
       listOf(
-        makeFeed("sport") { ISportService::class.impl().getSportFeed() },
+        DiscoverFeedItem(
+          content = { modifier -> ISportService::class.impl().SportFeed(modifier) },
+        ),
         makeFeed("todo") { ITodoService::class.impl().getTodoFeed() },
         DiscoverFeedItem(
           content = { modifier -> IElectricityService::class.impl().ElectricityFeed(modifier) },
