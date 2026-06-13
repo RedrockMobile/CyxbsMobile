@@ -1,0 +1,13 @@
+<resources>
+    <string name="electricity_inquire_string">电费查询</string>
+    <string name="electricity_searching">查询中...</string>
+    <string name="electricity_no_data">暂无该宿舍电费数据</string>
+    <string name="electricity_unbind">先选择寝室吧~</string>
+    <string name="electricity_label_fee">应缴/本月</string>
+    <string name="electricity_label_kilowatt">使用度数/本月</string>
+    <string name="electricity_unit_yuan">元</string>
+    <string name="electricity_unit_kilowatt">度</string>
+    <string name="electricity_feed_subtitle_record">%1$s抄表</string>
+    <string name="electricity_confirm">确定</string>
+    <string name="electricity_dormitory_label">宿舍号:</string>
+</resources>
