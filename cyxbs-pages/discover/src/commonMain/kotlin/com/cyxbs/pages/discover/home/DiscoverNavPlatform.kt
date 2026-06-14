@@ -11,7 +11,6 @@ import androidx.compose.ui.graphics.painter.Painter
  * 这些能力依赖仅在 androidMain / mobileMain 可见的服务或 Activity 跳转，
  * 无法直接在 commonMain 调用，故下放到平台层：
  * - [rememberFunctions] 提供功能区按钮列表（图标、文字、点击行为由平台决定）
- * - [rememberFeeds]     提供 Feed 区块列表（每个 Feed 在原项目里是一个 Android Fragment）
  * - [launchNotification] / [jumpCheckIn] / [jumpJwNewsList] / [jumpJwNewsItem]
  *   是 Android Activity / 路由跳转
  *
@@ -23,9 +22,6 @@ interface DiscoverNavPlatform {
   /** 功能按钮列表（id 用于持久化顺序，调整后不要随便改） */
   @Composable
   fun rememberFunctions(): List<DiscoverFunctionItem>
-
-  @Composable
-  fun rememberFeeds(): List<DiscoverFeedItem>
 
   /** 跳转消息中心 */
   fun launchNotification()

@@ -1,0 +1,5 @@
+<resources>
+    <string name="todo_feed_title">邮子清单</string>
+    <string name="todo_feed_loading">查询中…</string>
+    <string name="todo_feed_empty_notify">还没有待做事项哦~快去添加吧！</string>
+</resources>
