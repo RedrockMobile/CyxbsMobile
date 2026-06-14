@@ -173,6 +173,7 @@ private fun SportFeedColumn(valueText: String, label: String) {
   val timesColor = 0xFF15315B.dark(0xFFFFFFFF)
   val labelColor = 0xFF697C9B.dark(0xFF606061)
   // 旧 XML 数字用 @font/impact，仅 Android 提供；其它平台为 null 时回退默认字体并加粗
+  // todo 待后续把字体迁移到 commonMain 中，目前因为存在 xml 引用所以不进行迁移
   val numberFontFamily = remember { ConfigRes.impactFontFamily() }
   Column(horizontalAlignment = Alignment.CenterHorizontally) {
     Row(verticalAlignment = Alignment.Bottom) {
