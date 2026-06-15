@@ -55,6 +55,7 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.Num2CN
+import com.cyxbs.pages.discover.home.functions.PlatformDiscoverFunctions
 import com.cyxbs.pages.discover.home.viewmodel.DiscoverComposeViewModel
 import com.cyxbs.pages.discover.home.widget.BannerConfig
 import com.cyxbs.pages.discover.home.widget.CheckInImageVector
@@ -105,7 +106,7 @@ fun DiscoverPage() {
     Header()
     Banner(viewModel = viewModel, platform = platform)
     JwNewsSection(viewModel = viewModel, platform = platform)
-    FunctionsSection(viewModel = viewModel, platform = platform)
+    FunctionsSection(viewModel = viewModel)
     FeedSection()
   }
 }
@@ -312,9 +313,8 @@ private fun JwNewsSection(
 @Composable
 private fun FunctionsSection(
   viewModel: DiscoverComposeViewModel,
-  platform: DiscoverNavPlatform?,
 ) {
-  val functions = platform?.rememberFunctions().orEmpty()
+  val functions = PlatformDiscoverFunctions.rememberFunctions()
   if (functions.isEmpty()) return
 
   // 持久化的 pin 顺序（最早 pin 的在第 0 位，更晚 pin 的依次往后）；未 pin 的按规范顺序紧跟其后。
