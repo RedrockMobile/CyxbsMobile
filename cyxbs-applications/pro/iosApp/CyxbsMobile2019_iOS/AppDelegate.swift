@@ -59,8 +59,14 @@ extension AppDelegate {
         rootVC.edgesForExtendedLayout = .all
         rootVC.extendedLayoutIncludesOpaqueBars = true
 
+        // 用 CustomNavigationController 包一层，让 CMP 主页里跳到原生页（体育打卡、邮子清单等）
+        // 走标准 push。CustomNavigationController 自带 isNavigationBarHidden = true，
+        // 且修过 isNavigationBarHidden 下系统会禁用边缘右滑返回手势的问题（root VC 上拒绝触发，
+        // 避免空 pop 崩溃），与原版 iOS 各 tab 内的导航行为保持一致。
+        let nav = CustomNavigationController(rootViewController: rootVC)
+
         window = UIWindow()
-        window?.rootViewController = rootVC
+        window?.rootViewController = nav
         window?.makeKeyAndVisible()
     }
     

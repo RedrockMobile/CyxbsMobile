@@ -10,6 +10,7 @@ import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
+import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -66,12 +67,16 @@ interface IOSKmpInterface {
   fun getDefaultExpandCourse(): Boolean
   fun enableUsePlatformToast(): Boolean
   fun toast(s: String, isLong: Boolean)
+
+  /** push 体育打卡详情页（iOS 原生 SportAttendanceViewController） */
+  fun jumpSportDetail()
 }
 
 @ImplProvider(IOSHomeViewPager::class)
 @ImplProvider(IOSToast::class)
 @ImplProvider(ConfigApplicationInfo::class)
-internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo {
+@ImplProvider(SportIosPlatform::class)
+internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo, SportIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -93,5 +98,9 @@ internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicat
 
   override fun toast(s: String, isLong: Boolean) {
     impl.toast(s, isLong)
+  }
+
+  override fun jumpSportDetail() {
+    impl.jumpSportDetail()
   }
 }
