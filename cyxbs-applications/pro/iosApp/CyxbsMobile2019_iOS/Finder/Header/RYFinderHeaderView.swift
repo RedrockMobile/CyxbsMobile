@@ -122,8 +122,11 @@ extension RYFinderHeaderView {
                     let hasMessage = model["data"]["has"].boolValue
                     self.messageBtn.setImage(self.messageImage(read: !hasMessage), for: .normal)
                     
-                    let tabBarVC = Constants.keyWindow?.rootViewController as? UITabBarController
-                    tabBarVC?.viewControllers?.last?.tabBarItem.needShowBadgePoint = hasMessage
+                    // Step 3 整个 Finder/ 目录会删，这里临时去掉对 UITabBarItem+TabBar 扩展的依赖：
+                    // 原本是给"我的" tab 的 TabBarItem 点红点；Step 4 已删 TabBar 容器，原始 cast
+                    // 也拿不到 UITabBarController 了。
+                    // let tabBarVC = Constants.keyWindow?.rootViewController as? UITabBarController
+                    // tabBarVC?.viewControllers?.last?.tabBarItem.needShowBadgePoint = hasMessage
                 }
             }
         }

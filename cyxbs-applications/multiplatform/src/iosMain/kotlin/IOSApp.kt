@@ -16,7 +16,6 @@ import com.cyxbs.pages.todo.service.TodoIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import platform.UIKit.UITabBarController
 import platform.UIKit.UIViewController
 
 /**
@@ -65,7 +64,6 @@ internal expect fun initProvider()
 interface IOSKmpInterface {
   fun isDebug(): Boolean
   fun setToken(token: String)
-  fun createTabBarController(): UITabBarController
   fun getDefaultExpandCourse(): Boolean
   fun enableUsePlatformToast(): Boolean
   fun toast(s: String, isLong: Boolean)
@@ -107,10 +105,6 @@ internal object IOSKmpInterfaceLink :
 
   override fun isDebug(): Boolean {
     return impl.isDebug()
-  }
-
-  override fun createTabBarController(): UITabBarController {
-    return impl.createTabBarController()
   }
 
   override fun getDefaultExpandCourse(): Boolean {

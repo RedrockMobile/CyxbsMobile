@@ -19,10 +19,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
     func setToken(token: String) {
     }
 
-    func createTabBarController() -> UITabBarController {
-        return UITabBarController()
-    }
-
     func getDefaultExpandCourse() -> Bool {
         return false
     }

@@ -21,10 +21,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
         UserModel.default.setingTokenToOC(token: TokenModel(token: token))
     }
 
-    func createTabBarController() -> UITabBarController {
-        return TabBarController()
-    }
-
     func getDefaultExpandCourse() -> Bool {
         return UserDefaultsManager.shared.presentScheduleWhenOpenApp
     }
@@ -77,8 +73,8 @@ class KmpInterfaceImpl: IOSKmpInterface {
     }
 
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →
-    // 解 TabBar.selectedVC → 取 NavigationController。
-    // 在已 present 出 Compose 主页 + 仍保留 iOS TabBarController 的混合阶段也能用。
+    // 解 NavigationController。CMP 主页 rootVC 被 CustomNavigationController 包了一层
+    // （见 AppDelegate.setupWindow），所以根上就能拿到 nav。
     private static func topNavigationController() -> UINavigationController? {
         var vc: UIViewController?
         if #available(iOS 13.0, *) {
@@ -91,7 +87,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
             vc = UIApplication.shared.keyWindow?.rootViewController
         }
         while let presented = vc?.presentedViewController { vc = presented }
-        if let tab = vc as? UITabBarController { vc = tab.selectedViewController }
         if let nav = vc as? UINavigationController { return nav }
         return vc?.navigationController
     }

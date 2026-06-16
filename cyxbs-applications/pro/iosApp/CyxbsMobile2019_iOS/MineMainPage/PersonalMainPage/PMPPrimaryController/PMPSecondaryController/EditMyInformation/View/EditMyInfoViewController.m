@@ -9,7 +9,6 @@
 #import "EditMyInfoViewController.h"
 #import "EditMyInfoContentView.h"
 #import "EditMyInfoPresenter.h"
-#import "MineViewController.h"
 #import "UserInformationIntorductionView.h"
 #import "RemindHud.h"
 #import "掌上重邮-Swift.h"

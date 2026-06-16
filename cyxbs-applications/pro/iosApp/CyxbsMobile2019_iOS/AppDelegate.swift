@@ -30,10 +30,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillEnterForeground(_ application: UIApplication) {
         //检查token是否过期
 //         RYLoginViewController.checkToken(rootVC: window?.rootViewController)
-        //更新Tabbar上方的课表topView显示的课程信息
-        // if let vc = window?.rootViewController as? TabBarController {
-        //     vc.reloadData()
-        // }
     }
     
     // 当应用程序进入后台时调用的方法
@@ -53,7 +49,6 @@ extension AppDelegate {
     
     // 设置应用程序窗口
     func setupWindow() {
-//         let rootVC = TabBarController()
         let rootVC = IOSAppKt.MainViewController() // 使用 CMP 主页
         // 扩展到安全区域以下显示
         rootVC.edgesForExtendedLayout = .all
