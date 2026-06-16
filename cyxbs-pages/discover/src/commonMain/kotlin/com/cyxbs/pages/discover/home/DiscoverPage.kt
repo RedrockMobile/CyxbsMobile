@@ -55,6 +55,7 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.Num2CN
+import com.cyxbs.pages.discover.home.functions.PlatformDiscoverFunctions
 import com.cyxbs.pages.discover.home.viewmodel.DiscoverComposeViewModel
 import com.cyxbs.pages.discover.home.widget.BannerConfig
 import com.cyxbs.pages.discover.home.widget.CheckInImageVector
@@ -64,6 +65,9 @@ import com.cyxbs.pages.discover.home.widget.JwNewsFlipper
 import com.cyxbs.pages.discover.home.widget.MsgImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
+import com.cyxbs.pages.electricity.api.IElectricityService
+import com.cyxbs.pages.sport.api.ISportService
+import com.cyxbs.pages.todo.api.ITodoService
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_news_jwzx
@@ -102,8 +106,8 @@ fun DiscoverPage() {
     Header()
     Banner(viewModel = viewModel, platform = platform)
     JwNewsSection(viewModel = viewModel, platform = platform)
-    FunctionsSection(viewModel = viewModel, platform = platform)
-    FeedSection(platform = platform)
+    FunctionsSection(viewModel = viewModel)
+    FeedSection()
   }
 }
 
@@ -309,9 +313,8 @@ private fun JwNewsSection(
 @Composable
 private fun FunctionsSection(
   viewModel: DiscoverComposeViewModel,
-  platform: DiscoverNavPlatform?,
 ) {
-  val functions = platform?.rememberFunctions().orEmpty()
+  val functions = PlatformDiscoverFunctions.rememberFunctions()
   if (functions.isEmpty()) return
 
   // 持久化的 pin 顺序（最早 pin 的在第 0 位，更晚 pin 的依次往后）；未 pin 的按规范顺序紧跟其后。
@@ -383,12 +386,7 @@ private fun FunctionsSection(
 /* ----------------------------- Feed 区 ------------------------------ */
 
 @Composable
-private fun FeedSection(
-  platform: DiscoverNavPlatform?,
-) {
-  val feeds = platform?.rememberFeeds().orEmpty()
-  if (feeds.isEmpty()) return
-
+private fun FeedSection() {
   val cornerShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
   val containerColor = LocalAppColors.current.middleBg
 
@@ -399,9 +397,22 @@ private fun FeedSection(
       .clip(cornerShape)
       .background(color = containerColor),
   ) {
-    feeds.forEach { item ->
-      item.content(Modifier.fillMaxWidth())
-    }
+    // 体育打卡
+    ISportService::class.impl().SportFeed(Modifier.fillMaxWidth())
+    Spacer(
+      modifier = Modifier.fillMaxWidth().height(1.dp)
+        .alpha(0.1F)
+        .background(color = LocalAppColors.current.tvLv4)
+    )
+    // 邮子清单
+    ITodoService::class.impl().TodoFeed(Modifier.fillMaxWidth())
+    Spacer(
+      modifier = Modifier.fillMaxWidth().height(1.dp)
+        .alpha(0.1F)
+        .background(color = LocalAppColors.current.tvLv4)
+    )
+    // 电费查询
+    IElectricityService::class.impl().ElectricityFeed(Modifier.fillMaxWidth())
     // 80dp 顶起来课表与底部按钮
     Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))
   }

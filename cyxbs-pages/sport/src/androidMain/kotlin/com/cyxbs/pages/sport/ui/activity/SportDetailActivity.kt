@@ -80,8 +80,8 @@ class SportDetailActivity : BaseActivity() {
                 }
             }
         }
-        //添加数据
-        SportDetailRepository.sportData.observe { result ->
+        //添加数据（共享数据源已下沉 commonMain，改为收集 StateFlow）
+        SportDetailRepository.sportData.collectLaunch { result ->
             sportSrlDetailList.finishRefresh()
             if (result == null) {
                 showError()
@@ -174,7 +174,7 @@ class SportDetailActivity : BaseActivity() {
                 sportSivDetailHint.gone()
                 sportRvDetailList.visible()
                 //把风雨操场的两项数据进行合并（因为太长了显示不下，经与产品商讨后采用此种方式，ios同步）
-                val list = bean.item.map {
+                val list = bean.item.orEmpty().map {
                     it.apply {
                         spot = spot.replace("风雨操场（篮球馆）", "风雨操场")
                         spot = spot.replace("风雨操场（乒乓球馆）", "风雨操场")
