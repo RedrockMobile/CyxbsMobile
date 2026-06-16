@@ -23,10 +23,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.utils.compose.px
-import com.cyxbs.pages.discover.home.DiscoverFunctionItem
+import com.cyxbs.pages.discover.home.functions.DiscoverFunctionItem
 
 /**
  * 功能按钮横向滚动条：

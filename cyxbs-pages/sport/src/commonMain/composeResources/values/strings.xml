@@ -1,0 +1,13 @@
+<resources>
+    <string name="sport_feed_title">体育打卡</string>
+    <string name="sport_feed_subtitle">实际以智慧体育为准</string>
+    <string name="sport_feed_run_remain">跑步剩余</string>
+    <string name="sport_feed_other_remain">其他剩余</string>
+    <string name="sport_feed_award">奖励</string>
+    <string name="sport_feed_times">次</string>
+    <string name="sport_feed_not_login">登录后才能查看体育打卡哦</string>
+    <string name="sport_feed_error">当前数据错误，正在努力修复中</string>
+    <string name="sport_notice_title">体育打卡信息说明</string>
+    <string name="sport_notice_load_fail">数据加载失败，正在努力修复中~</string>
+    <string name="sport_notice_confirm">确认</string>
+</resources>

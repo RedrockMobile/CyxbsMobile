@@ -18,5 +18,5 @@ interface IElectricityService {
    * 点击卡片会弹出宿舍选择对话框，未登录时会先提示登录。
    */
   @Composable
-  fun ElectricityFeed(modifier: Modifier = Modifier)
+  fun ElectricityFeed(modifier: Modifier)
 }
