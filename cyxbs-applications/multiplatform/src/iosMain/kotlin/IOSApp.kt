@@ -11,6 +11,7 @@ import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.sport.service.SportIosPlatform
+import com.cyxbs.pages.todo.service.TodoIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,13 +71,17 @@ interface IOSKmpInterface {
 
   /** push 体育打卡详情页（iOS 原生 SportAttendanceViewController） */
   fun jumpSportDetail()
+
+  /** push 邮子清单主页（iOS 原生 ToDoVC） */
+  fun jumpTodoMain()
 }
 
 @ImplProvider(IOSHomeViewPager::class)
 @ImplProvider(IOSToast::class)
 @ImplProvider(ConfigApplicationInfo::class)
 @ImplProvider(SportIosPlatform::class)
-internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo, SportIosPlatform {
+@ImplProvider(TodoIosPlatform::class)
+internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo, SportIosPlatform, TodoIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -102,5 +107,9 @@ internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicat
 
   override fun jumpSportDetail() {
     impl.jumpSportDetail()
+  }
+
+  override fun jumpTodoMain() {
+    impl.jumpTodoMain()
   }
 }

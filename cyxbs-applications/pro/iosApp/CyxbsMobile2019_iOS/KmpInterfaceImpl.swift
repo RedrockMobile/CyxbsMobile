@@ -48,6 +48,13 @@ class KmpInterfaceImpl: IOSKmpInterface {
         nav.pushViewController(vc, animated: true)
     }
 
+    func jumpTodoMain() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = ToDoVC()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →
     // 解 TabBar.selectedVC → 取 NavigationController。
     // 在已 present 出 Compose 主页 + 仍保留 iOS TabBarController 的混合阶段也能用。
