@@ -9,6 +9,7 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
+import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
@@ -74,14 +75,33 @@ interface IOSKmpInterface {
 
   /** push 邮子清单主页（iOS 原生 ToDoVC） */
   fun jumpTodoMain()
+
+  /** push 没课约（iOS 原生 WeDateVC） */
+  fun jumpWeDate()
+
+  /** push 校历（iOS 原生 CalendarViewController） */
+  fun jumpSchoolCalendar()
+
+  /** push 我的考试（iOS 原生 TestArrangeViewController） */
+  fun jumpTestArrange()
 }
 
+// SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
+// 方法（jumpSportDetail / jumpTodoMain），同一个 override 一次性满足多个接口，是 Kotlin
+// 多接口合并的标准行为，不需要 super<X> 仲裁。
 @ImplProvider(IOSHomeViewPager::class)
 @ImplProvider(IOSToast::class)
 @ImplProvider(ConfigApplicationInfo::class)
 @ImplProvider(SportIosPlatform::class)
 @ImplProvider(TodoIosPlatform::class)
-internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicationInfo, SportIosPlatform, TodoIosPlatform {
+@ImplProvider(DiscoverFunctionsIosPlatform::class)
+internal object IOSKmpInterfaceLink :
+  IOSHomeViewPager,
+  IOSToast,
+  ConfigApplicationInfo,
+  SportIosPlatform,
+  TodoIosPlatform,
+  DiscoverFunctionsIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -111,5 +131,17 @@ internal object IOSKmpInterfaceLink : IOSHomeViewPager, IOSToast, ConfigApplicat
 
   override fun jumpTodoMain() {
     impl.jumpTodoMain()
+  }
+
+  override fun jumpWeDate() {
+    impl.jumpWeDate()
+  }
+
+  override fun jumpSchoolCalendar() {
+    impl.jumpSchoolCalendar()
+  }
+
+  override fun jumpTestArrange() {
+    impl.jumpTestArrange()
   }
 }
