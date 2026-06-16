@@ -336,9 +336,7 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "ClassDetailModel.h"
 #import "FinderToolViewController.h"
 #import "FoodVC.h"
-#import "ElectricViewController.h"
 #import "AttitudeMainPageVC.h"
-#import "DiscoverSAVC.h" // 主页体育打卡
 #import "EmptyClassViewController.h" // 空教室
 #import "SportAttendanceViewController.h" // 体育打卡
 #import "TestArrangeViewController.h" // 我的考试
