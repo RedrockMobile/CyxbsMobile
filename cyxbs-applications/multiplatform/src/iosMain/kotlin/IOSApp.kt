@@ -9,6 +9,7 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
+import com.cyxbs.pages.discover.home.DiscoverIosPlatform
 import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.sport.service.SportIosPlatform
@@ -82,6 +83,21 @@ interface IOSKmpInterface {
 
   /** push 我的考试（iOS 原生 TestArrangeViewController） */
   fun jumpTestArrange()
+
+  /** push 消息中心（iOS 原生 MineMessageVC） */
+  fun launchNotification()
+
+  /** present 签到页（iOS 原生 CheckInViewController，全屏 modal） */
+  fun jumpCheckIn()
+
+  /** 跳转教务在线新闻列表（iOS 原版功能已停服，toast 兜底） */
+  fun jumpJwNewsList()
+
+  /** 跳转教务在线某条新闻详情（iOS 原版功能已停服，toast 兜底） */
+  fun jumpJwNewsItem(newId: String)
+
+  /** Banner 点击：UIApplication.shared.open(url) 交给系统 Safari */
+  fun onBannerClick(pictureGotoUrl: String, keyword: String)
 }
 
 // SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
@@ -93,13 +109,15 @@ interface IOSKmpInterface {
 @ImplProvider(SportIosPlatform::class)
 @ImplProvider(TodoIosPlatform::class)
 @ImplProvider(DiscoverFunctionsIosPlatform::class)
+@ImplProvider(DiscoverIosPlatform::class)
 internal object IOSKmpInterfaceLink :
   IOSHomeViewPager,
   IOSToast,
   ConfigApplicationInfo,
   SportIosPlatform,
   TodoIosPlatform,
-  DiscoverFunctionsIosPlatform {
+  DiscoverFunctionsIosPlatform,
+  DiscoverIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -137,5 +155,25 @@ internal object IOSKmpInterfaceLink :
 
   override fun jumpTestArrange() {
     impl.jumpTestArrange()
+  }
+
+  override fun launchNotification() {
+    impl.launchNotification()
+  }
+
+  override fun jumpCheckIn() {
+    impl.jumpCheckIn()
+  }
+
+  override fun jumpJwNewsList() {
+    impl.jumpJwNewsList()
+  }
+
+  override fun jumpJwNewsItem(newId: String) {
+    impl.jumpJwNewsItem(newId)
+  }
+
+  override fun onBannerClick(pictureGotoUrl: String, keyword: String) {
+    impl.onBannerClick(pictureGotoUrl, keyword)
   }
 }

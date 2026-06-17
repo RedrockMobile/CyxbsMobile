@@ -72,10 +72,52 @@ class KmpInterfaceImpl: IOSKmpInterface {
         nav.pushViewController(vc, animated: true)
     }
 
+    func launchNotification() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = MineMessageVC()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpCheckIn() {
+        // 与原 RYFinderHeaderView.attendanceBtnTouched 一致：全屏 modal present 而不是 push。
+        guard let topVC = Self.topViewController() else { return }
+        let vc = CheckInViewController()
+        vc.modalPresentationStyle = .fullScreen
+        vc.hidesBottomBarWhenPushed = true
+        topVC.present(vc, animated: true)
+    }
+
+    func jumpJwNewsList() {
+        // iOS 原版 FinderNewsView 显示 "教务新闻功能暂时停止服务..." 且点击事件为空。
+        // 这里给用户一个明确提示，对齐原版体验。
+        toast(s: "教务新闻功能暂时停止服务", isLong: false)
+    }
+
+    func jumpJwNewsItem(newId: String) {
+        // 同上：iOS 原版无详情页跳转。
+        toast(s: "教务新闻功能暂时停止服务", isLong: false)
+    }
+
+    func onBannerClick(pictureGotoUrl: String, keyword: String) {
+        // 与原 FinderBannerView.jxBanner(_:didSelectItemAt:) 一致：交给系统 Safari。
+        // 这里不做埋点（Android 端 DiscoverNavPlatformImpl 里那段 TrackingUtils 是 Android 专用）。
+        guard let url = URL(string: pictureGotoUrl) else { return }
+        UIApplication.shared.open(url)
+    }
+
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →
     // 解 NavigationController。CMP 主页 rootVC 被 CustomNavigationController 包了一层
     // （见 AppDelegate.setupWindow），所以根上就能拿到 nav。
     private static func topNavigationController() -> UINavigationController? {
+        guard let vc = topViewController() else { return nil }
+        if let nav = vc as? UINavigationController { return nav }
+        return vc.navigationController
+    }
+
+    // 找最顶层 UIViewController：key window → rootVC → 递归解 presentedVC。
+    // 用于 present 场景（不需要再解出 NavigationController）。
+    private static func topViewController() -> UIViewController? {
         var vc: UIViewController?
         if #available(iOS 13.0, *) {
             vc = UIApplication.shared.connectedScenes
@@ -87,7 +129,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
             vc = UIApplication.shared.keyWindow?.rootViewController
         }
         while let presented = vc?.presentedViewController { vc = presented }
-        if let nav = vc as? UINavigationController { return nav }
-        return vc?.navigationController
+        return vc
     }
 }
