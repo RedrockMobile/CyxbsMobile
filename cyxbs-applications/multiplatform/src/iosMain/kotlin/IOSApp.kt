@@ -12,6 +12,7 @@ import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.discover.home.DiscoverIosPlatform
 import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
+import com.cyxbs.pages.mine.home.MineIosPlatform
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
 import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
@@ -105,6 +106,21 @@ interface IOSKmpInterface {
 
   /** push 活动布告栏（iOS 原生 ActivityMainViewController） */
   fun jumpUfieldMainEntry()
+
+  /** push 邮票中心（iOS 原生 StampCenterVC） */
+  fun jumpStore()
+
+  /** push 反馈中心（iOS 原生 FeedBackMainPageViewController） */
+  fun jumpFeedbackCenter()
+
+  /** push 我的页签到（iOS 原生 CheckInViewController，与 jumpCheckIn 的 present 不同） */
+  fun jumpSign()
+
+  /** push 设置页（iOS 原生 MineSettingViewController） */
+  fun jumpSetting()
+
+  /** push 活动中心（iOS 原生 ActivityCenterVC） */
+  fun jumpActivityCenter()
 }
 
 // SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
@@ -118,6 +134,7 @@ interface IOSKmpInterface {
 @ImplProvider(DiscoverFunctionsIosPlatform::class)
 @ImplProvider(DiscoverIosPlatform::class)
 @ImplProvider(FairgroundIosPlatform::class)
+@ImplProvider(MineIosPlatform::class)
 internal object IOSKmpInterfaceLink :
   IOSHomeViewPager,
   IOSToast,
@@ -126,7 +143,8 @@ internal object IOSKmpInterfaceLink :
   TodoIosPlatform,
   DiscoverFunctionsIosPlatform,
   DiscoverIosPlatform,
-  FairgroundIosPlatform {
+  FairgroundIosPlatform,
+  MineIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -192,5 +210,25 @@ internal object IOSKmpInterfaceLink :
 
   override fun jumpUfieldMainEntry() {
     impl.jumpUfieldMainEntry()
+  }
+
+  override fun jumpStore() {
+    impl.jumpStore()
+  }
+
+  override fun jumpFeedbackCenter() {
+    impl.jumpFeedbackCenter()
+  }
+
+  override fun jumpSign() {
+    impl.jumpSign()
+  }
+
+  override fun jumpSetting() {
+    impl.jumpSetting()
+  }
+
+  override fun jumpActivityCenter() {
+    impl.jumpActivityCenter()
   }
 }

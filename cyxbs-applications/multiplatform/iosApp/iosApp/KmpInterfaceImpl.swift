@@ -68,5 +68,20 @@ class KmpInterfaceImpl: IOSKmpInterface {
 
     func jumpUfieldMainEntry() {
     }
+
+    func jumpStore() {
+    }
+
+    func jumpFeedbackCenter() {
+    }
+
+    func jumpSign() {
+    }
+
+    func jumpSetting() {
+    }
+
+    func jumpActivityCenter() {
+    }
 }
 

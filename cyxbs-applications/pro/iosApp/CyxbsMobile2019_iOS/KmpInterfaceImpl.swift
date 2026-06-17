@@ -120,6 +120,43 @@ class KmpInterfaceImpl: IOSKmpInterface {
         nav.pushViewController(vc, animated: true)
     }
 
+    func jumpStore() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = StampCenterVC()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpFeedbackCenter() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = FeedBackMainPageViewController()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpSign() {
+        // 与原 MineViewController.signViewClicked 一致：push 进 CheckInVC，
+        // 与 jumpCheckIn 的「present 全屏」不同（原版我的页是 push、发现页是 present）。
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = CheckInViewController()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpSetting() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = MineSettingViewController()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpActivityCenter() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = ActivityCenterVC()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →
     // 解 NavigationController。CMP 主页 rootVC 被 CustomNavigationController 包了一层
     // （见 AppDelegate.setupWindow），所以根上就能拿到 nav。
