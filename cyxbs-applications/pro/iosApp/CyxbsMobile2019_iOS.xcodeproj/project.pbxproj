@@ -358,7 +358,6 @@
 		758C7E4F2BA456AF002CA3F4 /* MXBackButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758C7E4E2BA456AF002CA3F4 /* MXBackButton.swift */; };
 		758C7E522BA4700F002CA3F4 /* MXObjCBackButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 758C7E512BA4700F002CA3F4 /* MXObjCBackButton.m */; };
 		7591F1AF2B95D61E001890D2 /* TaskManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7591F1AE2B95D61E001890D2 /* TaskManager.swift */; };
-		7591F1B22B96FDB5001890D2 /* UpdatePersonModelTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7591F1B12B96FDB5001890D2 /* UpdatePersonModelTool.swift */; };
 		75B1D7752B9EC71100BBC794 /* NSDictionaryExtension.m in Sources */ = {isa = PBXBuildFile; fileRef = 75B1D7742B9EC71100BBC794 /* NSDictionaryExtension.m */; };
 		75B7AFB72B8F35F30028E4DC /* TaskTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 75B7AFB62B8F35F30028E4DC /* TaskTableViewCell.m */; };
 		75CC08062C539B3700810A4E /* ExamArrangeData.m in Sources */ = {isa = PBXBuildFile; fileRef = 75CC07C32C539B3700810A4E /* ExamArrangeData.m */; };
@@ -411,19 +410,6 @@
 		9AEC13522CA9062300486D26 /* XBSAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEC13512CA9062300486D26 /* XBSAlertController.swift */; };
 		9AEC13542CA9396D00486D26 /* ToDoAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEC13532CA9396D00486D26 /* ToDoAlertController.swift */; };
 		AA0DD8FB286C50E500802324 /* MineMsgCntView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DD8FA286C50E400802324 /* MineMsgCntView.m */; };
-		AA0DDB57286C8B1A00802324 /* UIView+JHFrameExtension.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDADC286C8B1900802324 /* UIView+JHFrameExtension.m */; };
-		AA0DDB58286C8B1A00802324 /* UIScrollView+JHContentExtension.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDADD286C8B1900802324 /* UIScrollView+JHContentExtension.m */; };
-		AA0DDB5B286C8B1A00802324 /* PMPBasicNavBarController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDAE6286C8B1900802324 /* PMPBasicNavBarController.m */; };
-		AA0DDB5D286C8B1A00802324 /* PMPBasicActionView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDAEB286C8B1900802324 /* PMPBasicActionView.m */; };
-		AA0DDB64286C8B1A00802324 /* SQLCodeCreater.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDAFD286C8B1900802324 /* SQLCodeCreater.m */; };
-		AA0DDB6B286C8B1A00802324 /* EditMyInfoPresenter.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB14286C8B1900802324 /* EditMyInfoPresenter.m */; };
-		AA0DDB6C286C8B1A00802324 /* EditMyInfoModel.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB19286C8B1900802324 /* EditMyInfoModel.m */; };
-		AA0DDB6D286C8B1A00802324 /* EditMyInfoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB1C286C8B1900802324 /* EditMyInfoViewController.m */; };
-		AA0DDB6E286C8B1A00802324 /* PMPDatePicker.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB1D286C8B1900802324 /* PMPDatePicker.m */; };
-		AA0DDB6F286C8B1A00802324 /* MineInformationLabel.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB1E286C8B1900802324 /* MineInformationLabel.m */; };
-		AA0DDB70286C8B1A00802324 /* EditMyInfoContentView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB21286C8B1900802324 /* EditMyInfoContentView.m */; };
-		AA0DDB71286C8B1A00802324 /* UserInformationIntorductionView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB25286C8B1900802324 /* UserInformationIntorductionView.m */; };
-		AA0DDB72286C8B1A00802324 /* PMPPickerView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB26286C8B1900802324 /* PMPPickerView.m */; };
 		AA0DDB87286C8E8100802324 /* AFHTTPSessionManager+compatibility.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0DDB86286C8E8100802324 /* AFHTTPSessionManager+compatibility.m */; };
 		AA0DEF6A2668C88D00284112 /* 掌邮工具类.md in Resources */ = {isa = PBXBuildFile; fileRef = AA0DEF692668C88D00284112 /* 掌邮工具类.md */; };
 		AA19FCB82663A266004E9F5D /* DeviceUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19FCB72663A266004E9F5D /* DeviceUtils.swift */; };
@@ -1268,7 +1254,6 @@
 		758C7E502BA4700F002CA3F4 /* MXObjCBackButton.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXObjCBackButton.h; sourceTree = "<group>"; };
 		758C7E512BA4700F002CA3F4 /* MXObjCBackButton.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXObjCBackButton.m; sourceTree = "<group>"; };
 		7591F1AE2B95D61E001890D2 /* TaskManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskManager.swift; sourceTree = "<group>"; };
-		7591F1B12B96FDB5001890D2 /* UpdatePersonModelTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePersonModelTool.swift; sourceTree = "<group>"; };
 		75B1D7732B9EC70400BBC794 /* NSDictionaryExtension.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDictionaryExtension.h; sourceTree = "<group>"; };
 		75B1D7742B9EC71100BBC794 /* NSDictionaryExtension.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NSDictionaryExtension.m; sourceTree = "<group>"; };
 		75B7AFB62B8F35F30028E4DC /* TaskTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TaskTableViewCell.m; sourceTree = "<group>"; };
@@ -1374,7 +1359,6 @@
 		7AA4C480289220CE00E204C8 /* ADHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ADHeader.h; sourceTree = "<group>"; };
 		7AA4C4842892217100E204C8 /* MapHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MapHeader.h; sourceTree = "<group>"; };
 		7AA4C48628922F9A00E204C8 /* ToDoHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ToDoHeader.h; sourceTree = "<group>"; };
-		7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineMainPageHeader.h; sourceTree = "<group>"; };
 		7FBF39E8257B79F20077494E /* ByWordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByWordViewController.h; sourceTree = "<group>"; };
 		7FBF39E9257B79F20077494E /* ByPasswordViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByPasswordViewController.h; sourceTree = "<group>"; };
 		7FBF39EB257B79F20077494E /* ByPasswordViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ByPasswordViewController.m; sourceTree = "<group>"; };
@@ -1383,33 +1367,6 @@
 		9AEC13532CA9396D00486D26 /* ToDoAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToDoAlertController.swift; sourceTree = "<group>"; };
 		AA0DD8F9286C50E400802324 /* MineMsgCntView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MineMsgCntView.h; sourceTree = "<group>"; };
 		AA0DD8FA286C50E400802324 /* MineMsgCntView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MineMsgCntView.m; sourceTree = "<group>"; };
-		AA0DDADB286C8B1900802324 /* UIScrollView+JHContentExtension.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIScrollView+JHContentExtension.h"; sourceTree = "<group>"; };
-		AA0DDADC286C8B1900802324 /* UIView+JHFrameExtension.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIView+JHFrameExtension.m"; sourceTree = "<group>"; };
-		AA0DDADD286C8B1900802324 /* UIScrollView+JHContentExtension.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIScrollView+JHContentExtension.m"; sourceTree = "<group>"; };
-		AA0DDADE286C8B1900802324 /* UIView+JHFrameExtension.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIView+JHFrameExtension.h"; sourceTree = "<group>"; };
-		AA0DDAE6286C8B1900802324 /* PMPBasicNavBarController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PMPBasicNavBarController.m; sourceTree = "<group>"; };
-		AA0DDAE7286C8B1900802324 /* PMPBasicNavBarController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PMPBasicNavBarController.h; sourceTree = "<group>"; };
-		AA0DDAEA286C8B1900802324 /* PMPBasicActionView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PMPBasicActionView.h; sourceTree = "<group>"; };
-		AA0DDAEB286C8B1900802324 /* PMPBasicActionView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PMPBasicActionView.m; sourceTree = "<group>"; };
-		AA0DDAFB286C8B1900802324 /* SQLCodeCreater.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SQLCodeCreater.h; sourceTree = "<group>"; };
-		AA0DDAFD286C8B1900802324 /* SQLCodeCreater.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SQLCodeCreater.m; sourceTree = "<group>"; };
-		AA0DDB13286C8B1900802324 /* EditMyInfoPresenter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditMyInfoPresenter.h; sourceTree = "<group>"; };
-		AA0DDB14286C8B1900802324 /* EditMyInfoPresenter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditMyInfoPresenter.m; sourceTree = "<group>"; };
-		AA0DDB16286C8B1900802324 /* EditMyInfoViewProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditMyInfoViewProtocol.h; sourceTree = "<group>"; };
-		AA0DDB18286C8B1900802324 /* EditMyInfoModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditMyInfoModel.h; sourceTree = "<group>"; };
-		AA0DDB19286C8B1900802324 /* EditMyInfoModel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditMyInfoModel.m; sourceTree = "<group>"; };
-		AA0DDB1B286C8B1900802324 /* EditMyInfoContentView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditMyInfoContentView.h; sourceTree = "<group>"; };
-		AA0DDB1C286C8B1900802324 /* EditMyInfoViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditMyInfoViewController.m; sourceTree = "<group>"; };
-		AA0DDB1D286C8B1900802324 /* PMPDatePicker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PMPDatePicker.m; sourceTree = "<group>"; };
-		AA0DDB1E286C8B1900802324 /* MineInformationLabel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MineInformationLabel.m; sourceTree = "<group>"; };
-		AA0DDB1F286C8B1900802324 /* PMPPickerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PMPPickerView.h; sourceTree = "<group>"; };
-		AA0DDB20286C8B1900802324 /* UserInformationIntorductionView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UserInformationIntorductionView.h; sourceTree = "<group>"; };
-		AA0DDB21286C8B1900802324 /* EditMyInfoContentView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditMyInfoContentView.m; sourceTree = "<group>"; };
-		AA0DDB22286C8B1900802324 /* PMPDatePicker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PMPDatePicker.h; sourceTree = "<group>"; };
-		AA0DDB23286C8B1900802324 /* EditMyInfoViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditMyInfoViewController.h; sourceTree = "<group>"; };
-		AA0DDB24286C8B1900802324 /* MineInformationLabel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MineInformationLabel.h; sourceTree = "<group>"; };
-		AA0DDB25286C8B1900802324 /* UserInformationIntorductionView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = UserInformationIntorductionView.m; sourceTree = "<group>"; };
-		AA0DDB26286C8B1900802324 /* PMPPickerView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PMPPickerView.m; sourceTree = "<group>"; };
 		AA0DDB85286C8E8100802324 /* AFHTTPSessionManager+compatibility.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "AFHTTPSessionManager+compatibility.h"; sourceTree = "<group>"; };
 		AA0DDB86286C8E8100802324 /* AFHTTPSessionManager+compatibility.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "AFHTTPSessionManager+compatibility.m"; sourceTree = "<group>"; };
 		AA0DEF692668C88D00284112 /* 掌邮工具类.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = "掌邮工具类.md"; sourceTree = "<group>"; usesTabs = 0; };
@@ -4362,7 +4319,6 @@
 		7591F1B02B96FD85001890D2 /* Tools */ = {
 			isa = PBXGroup;
 			children = (
-				7591F1B12B96FDB5001890D2 /* UpdatePersonModelTool.swift */,
 			);
 			path = Tools;
 			sourceTree = "<group>";
@@ -4642,7 +4598,6 @@
 		7AA4C4872892368200E204C8 /* Source */ = {
 			isa = PBXGroup;
 			children = (
-				7AA4C4882892368C00E204C8 /* MineMainPageHeader.h */,
 			);
 			path = Source;
 			sourceTree = "<group>";
@@ -4709,10 +4664,6 @@
 		AA0DDADA286C8B1900802324 /* FrameExtension */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDADB286C8B1900802324 /* UIScrollView+JHContentExtension.h */,
-				AA0DDADD286C8B1900802324 /* UIScrollView+JHContentExtension.m */,
-				AA0DDADE286C8B1900802324 /* UIView+JHFrameExtension.h */,
-				AA0DDADC286C8B1900802324 /* UIView+JHFrameExtension.m */,
 			);
 			path = FrameExtension;
 			sourceTree = "<group>";
@@ -4729,8 +4680,6 @@
 		AA0DDAE5286C8B1900802324 /* Controller */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDAE7286C8B1900802324 /* PMPBasicNavBarController.h */,
-				AA0DDAE6286C8B1900802324 /* PMPBasicNavBarController.m */,
 			);
 			path = Controller;
 			sourceTree = "<group>";
@@ -4738,8 +4687,6 @@
 		AA0DDAE8286C8B1900802324 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDAEA286C8B1900802324 /* PMPBasicActionView.h */,
-				AA0DDAEB286C8B1900802324 /* PMPBasicActionView.m */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -4755,8 +4702,6 @@
 		AA0DDAFA286C8B1900802324 /* Tool */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDAFB286C8B1900802324 /* SQLCodeCreater.h */,
-				AA0DDAFD286C8B1900802324 /* SQLCodeCreater.m */,
 			);
 			path = Tool;
 			sourceTree = "<group>";
@@ -4792,8 +4737,6 @@
 		AA0DDB12286C8B1900802324 /* Presenter */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDB13286C8B1900802324 /* EditMyInfoPresenter.h */,
-				AA0DDB14286C8B1900802324 /* EditMyInfoPresenter.m */,
 			);
 			path = Presenter;
 			sourceTree = "<group>";
@@ -4801,7 +4744,6 @@
 		AA0DDB15286C8B1900802324 /* Protocol */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDB16286C8B1900802324 /* EditMyInfoViewProtocol.h */,
 			);
 			path = Protocol;
 			sourceTree = "<group>";
@@ -4809,8 +4751,6 @@
 		AA0DDB17286C8B1900802324 /* Model */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDB18286C8B1900802324 /* EditMyInfoModel.h */,
-				AA0DDB19286C8B1900802324 /* EditMyInfoModel.m */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -4818,18 +4758,6 @@
 		AA0DDB1A286C8B1900802324 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				AA0DDB1B286C8B1900802324 /* EditMyInfoContentView.h */,
-				AA0DDB21286C8B1900802324 /* EditMyInfoContentView.m */,
-				AA0DDB23286C8B1900802324 /* EditMyInfoViewController.h */,
-				AA0DDB1C286C8B1900802324 /* EditMyInfoViewController.m */,
-				AA0DDB24286C8B1900802324 /* MineInformationLabel.h */,
-				AA0DDB1E286C8B1900802324 /* MineInformationLabel.m */,
-				AA0DDB22286C8B1900802324 /* PMPDatePicker.h */,
-				AA0DDB1D286C8B1900802324 /* PMPDatePicker.m */,
-				AA0DDB1F286C8B1900802324 /* PMPPickerView.h */,
-				AA0DDB26286C8B1900802324 /* PMPPickerView.m */,
-				AA0DDB20286C8B1900802324 /* UserInformationIntorductionView.h */,
-				AA0DDB25286C8B1900802324 /* UserInformationIntorductionView.m */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -6717,7 +6645,6 @@
 				B09BB8312AADA35400FF88F7 /* FoodVC.m in Sources */,
 				18CDF68D257F91BD006E8E5C /* CQUPTMapPresenter.m in Sources */,
 				646B1975282CDF840015DF28 /* StationsCollectionViewCell.m in Sources */,
-				AA0DDB6D286C8B1A00802324 /* EditMyInfoViewController.m in Sources */,
 				B0FE5F2D294C94540070E755 /* UIColor+Rising.m in Sources */,
 				7551F9DE2C73A8BF0072CA88 /* DLTimeSelectedButton.swift in Sources */,
 				D0101F66243587A1004337ED /* GKWebImageManager.m in Sources */,
@@ -6748,7 +6675,6 @@
 				FC7D381A2AAB867000DEAD50 /* BatchAddModel.swift in Sources */,
 				14B73F7C281BED7B00D08ADD /* MineMessageModel.m in Sources */,
 				B0F71C832ABC71B200F8B1AC /* AttitudeSelfPageViewController.m in Sources */,
-				AA0DDB58286C8B1A00802324 /* UIScrollView+JHContentExtension.m in Sources */,
 				FC15428F2ABC221600BD806F /* CourseScheduleModel.swift in Sources */,
 				75CC08402C5657AA00810A4E /* SCBarChart.m in Sources */,
 				B0C9F23F2B0126E1006F4286 /* JustifiedLabel.swift in Sources */,
@@ -6765,7 +6691,6 @@
 				757A58EE2BA1EAD0003D95F0 /* ExpressDetailPageVC.m in Sources */,
 				FCB39F2D2AB03B7400914462 /* AddArrangePlaceVC.swift in Sources */,
 				1893DC8926EA32A3007E871E /* MGDGCD.m in Sources */,
-				AA0DDB6C286C8B1A00802324 /* EditMyInfoModel.m in Sources */,
 				7577295B2C85915E00982233 /* ToDoEmptyView.swift in Sources */,
 				75CC08092C539B3700810A4E /* PointAndDottedLineView.m in Sources */,
 				B0C9F23A2B0126E1006F4286 /* ActivitySelectBar.swift in Sources */,
@@ -6838,7 +6763,6 @@
 				7311328526CCEC2400EF88C1 /* ExchangeCenterViewController.m in Sources */,
 				1AC2550823C9B14F00DF0475 /* DidNotCheckInDot.m in Sources */,
 				EE131C212471362E00B6ED97 /* URLController.m in Sources */,
-				AA0DDB6F286C8B1A00802324 /* MineInformationLabel.m in Sources */,
 				14E7E4A827F5762500B67469 /* QuestionSelectView.m in Sources */,
 				FCB9214E2AAF782B00F373A7 /* AddArrangeTitleVC.swift in Sources */,
 				14FFFBE82AF8C0F3005A7EBD /* UIImageExtensions.swift in Sources */,
@@ -6849,7 +6773,6 @@
 				AA49098624F3B6B4007CB3BC /* ClassSchedulInterController.m in Sources */,
 				B0FE5F2B294C94540070E755 /* RisingUIKitExtension.m in Sources */,
 				B0F71C972ABC71B200F8B1AC /* PublishViewController.m in Sources */,
-				AA0DDB70286C8B1A00802324 /* EditMyInfoContentView.m in Sources */,
 				757729502C85914F00982233 /* ToDoDetailVC.swift in Sources */,
 				1A141322235F521C0001417E /* BaseNavigationController.m in Sources */,
 				B033366E294C971D004D141D /* HttpTool.m in Sources */,
@@ -6868,7 +6791,6 @@
 				14CED37E288A594600BADA8B /* RisingRouterResponse.m in Sources */,
 				75F7296D2C7C624D00B36A56 /* DiscoverTodoSelectTimeView.swift in Sources */,
 				7311328926CCEC2400EF88C1 /* PopupView.m in Sources */,
-				AA0DDB64286C8B1A00802324 /* SQLCodeCreater.m in Sources */,
 				14FFFBE62AF8C0F3005A7EBD /* UIButton+Cyxbs.swift in Sources */,
 				758C7E522BA4700F002CA3F4 /* MXObjCBackButton.m in Sources */,
 				1A15DF97238D03B3005E0843 /* CheckInContentView.m in Sources */,
@@ -6893,8 +6815,6 @@
 				757729692C85916E00982233 /* ToDoTopActiveStyleCell.swift in Sources */,
 				AAFD87D024F50DB800CBBD11 /* FakeTabBarView.m in Sources */,
 				18CDF6A3257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m in Sources */,
-				AA0DDB71286C8B1A00802324 /* UserInformationIntorductionView.m in Sources */,
-				AA0DDB6E286C8B1A00802324 /* PMPDatePicker.m in Sources */,
 				FC51103F2AED06910049EE43 /* AddArrangeFlowLayout.swift in Sources */,
 				18CDF68B257F91BD006E8E5C /* ChoosePeopleListView.m in Sources */,
 				AA57588C24EF5841002F6F6D /* NoticeWaySelectView.m in Sources */,
@@ -6922,7 +6842,6 @@
 				18CDF4C0257F8DBD006E8E5C /* sendCodeModel.m in Sources */,
 				147842F227F080A7002359BA /* NSDate+Day.m in Sources */,
 				D0101F68243587A1004337ED /* UIImage+GKDecoder.m in Sources */,
-				AA0DDB57286C8B1A00802324 /* UIView+JHFrameExtension.m in Sources */,
 				DB34EB32239BD4550052B65E /* LessonNumLabel.m in Sources */,
 				1A1691FB2430ECA70076EDC7 /* ClassTabBarController.m in Sources */,
 				646B1978282CE0340015DF28 /* StationsGuideTableViewCell.m in Sources */,
@@ -7028,7 +6947,6 @@
 				DB34EB22239BD4550052B65E /* AddRemindViewController.m in Sources */,
 				DB4064FD2466D889006CE5BC /* DLReminderSetTimeVC.m in Sources */,
 				14FFFC022AF8C0FD005A7EBD /* APIConfig.swift in Sources */,
-				AA0DDB6B286C8B1A00802324 /* EditMyInfoPresenter.m in Sources */,
 				7551F9E62C74C2020072CA88 /* TodoTitleInputTextField.swift in Sources */,
 				7577296B2C85916E00982233 /* ToDoTopNoDeadlineStyleCell.swift in Sources */,
 				14F6F5482AFB8CDA007C7CA6 /* CurriculumModel.swift in Sources */,
@@ -7070,7 +6988,6 @@
 				18CDF691257F91BD006E8E5C /* CQUPTMapStarPlaceItem.m in Sources */,
 				75CC08462C5657AA00810A4E /* SCLineChart.m in Sources */,
 				7551F9DC2C73A3FC0072CA88 /* DLHistodyButton.swift in Sources */,
-				AA0DDB72286C8B1A00802324 /* PMPPickerView.m in Sources */,
 				B0F71C992ABC71B200F8B1AC /* PublishTableAddTagView.m in Sources */,
 				75CC08162C539B3800810A4E /* ABScoreView.m in Sources */,
 				1A141320235F521C0001417E /* BaseTableViewController.m in Sources */,
@@ -7094,7 +7011,6 @@
 				7FBF39F6257B79F30077494E /* ByWordViewController.m in Sources */,
 				D0101D582433C885004337ED /* UIResponder+SDMask.m in Sources */,
 				75CC08152C539B3700810A4E /* GPA.m in Sources */,
-				7591F1B22B96FDB5001890D2 /* UpdatePersonModelTool.swift in Sources */,
 				B0C9F23C2B0126E1006F4286 /* AdminModel.swift in Sources */,
 				14B73F7E281BED7B00D08ADD /* MineMessageVC.m in Sources */,
 				14B73F74281BED7B00D08ADD /* SystemMsgModel.m in Sources */,
@@ -7156,7 +7072,6 @@
 				18CDF4C5257F8DBD006E8E5C /* QuestionView.m in Sources */,
 				FCD622E62AB53CE3007094A2 /* BusyDetailVC.swift in Sources */,
 				AAAA1D9024FE39F500DB9A81 /* NextLessonFinder.m in Sources */,
-				AA0DDB5D286C8B1A00802324 /* PMPBasicActionView.m in Sources */,
 				FCB921502AAF816A00F373A7 /* AddArrangeCollectionViewCell.swift in Sources */,
 				646B199728311B0E0015DF28 /* StationGuideBar.m in Sources */,
 				B0FE5F2C294C94540070E755 /* UIView+Rising.m in Sources */,
@@ -7174,7 +7089,6 @@
 				B0C9F2422B0126E1006F4286 /* ActivitySearchTableViewCell.swift in Sources */,
 				49343A2326D4EAB2001A2892 /* CommonQuestionCell.m in Sources */,
 				14B73F71281BED7B00D08ADD /* ActiveMessage.m in Sources */,
-				AA0DDB5B286C8B1A00802324 /* PMPBasicNavBarController.m in Sources */,
 				73AAA1CB26C918250084E44D /* DetailsTaskModel.m in Sources */,
 				B0F71C912ABC71B200F8B1AC /* ExpressDetailModel.m in Sources */,
 				14F6F4FB2AFB8171007C7CA6 /* AppDelegate.swift in Sources */,

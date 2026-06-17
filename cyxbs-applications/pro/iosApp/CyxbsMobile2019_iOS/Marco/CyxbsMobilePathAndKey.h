@@ -82,8 +82,6 @@
 
 #import "NewQAHeader.h"
 
-#import "MineMainPageHeader.h"
-
 #import "RisingScheduleHeader.h"
 
 #import "AttitudeHeader.h"

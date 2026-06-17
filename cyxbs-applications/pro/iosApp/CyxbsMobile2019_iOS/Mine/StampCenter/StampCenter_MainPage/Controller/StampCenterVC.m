@@ -13,7 +13,6 @@
 #import "GoodsCollectionViewCell.h"
 #import "StampCenterSecondHeaderView.h"
 #import "TaskTableViewCell.h"
-#import "EditMyInfoViewController.h"
 #import "TableHeaderView.h"
 #import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
@@ -701,9 +700,11 @@
 }
 
 //跳转至个人中心
+// 编辑资料页已迁移到 CMP（cyxbs-pages/mine/edit），iOS 原生 EditMyInfoViewController
+// 已删除。这里的任务条目原本由通知 "jumpToProfile" 触发（TaskTableViewCell），
+// 暂以 toast 提示用户到「我的」页面操作，待 StampCenter 整体迁移 CMP 后再统一接入。
 - (void)jumpToProfile{
-    EditMyInfoViewController *EVC = [[EditMyInfoViewController alloc]init];
-    [self.navigationController presentViewController:EVC animated:YES completion:nil];
+    [RemindHUD.shared showDefaultHUDWithText:@"请到「我的」-「编辑资料」中完善信息" completion:nil];
 }
 
 //跳转至中心->美食版块
