@@ -239,8 +239,6 @@
 		1A30F3AD23D33F1300FBBD83 /* CheckInModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A30F3A923D33F1300FBBD83 /* CheckInModel.m */; };
 		1A30F3AF23D33F8800FBBD83 /* TodaysDot.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A30F3AE23D33F8800FBBD83 /* TodaysDot.m */; };
 		1A3106312377173B00A56468 /* Impact.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1A310630237711A800A56468 /* Impact.ttf */; };
-		1A344BB723E96AD80014A3B4 /* MineAboutController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A344BB623E96AD80014A3B4 /* MineAboutController.m */; };
-		1A344BBA23E96BF50014A3B4 /* MineAboutContentView.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A344BB923E96BF50014A3B4 /* MineAboutContentView.m */; };
 		1A4A466C24C97E2A0033734E /* UserProtocolViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A4A466B24C97E2A0033734E /* UserProtocolViewController.m */; };
 		1A5A5EE52360100B00543BAE /* UserItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A5A5EE42360100B00543BAE /* UserItem.m */; };
 		1A5A5EF12361A82E00543BAE /* UserItemTool.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A5A5EF02361A82E00543BAE /* UserItemTool.m */; };
@@ -250,7 +248,6 @@
 		1AC2550523C9AB3700DF0475 /* CheckedInDot.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AC2550423C9AB3700DF0475 /* CheckedInDot.m */; };
 		1AC2550823C9B14F00DF0475 /* DidNotCheckInDot.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AC2550723C9B14F00DF0475 /* DidNotCheckInDot.m */; };
 		1AF4B6072362EBFE00A0823A /* NSDate+Timestamp.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */; };
-		1AFE535124F7571300F42A74 /* IntroductionController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AFE535024F7571300F42A74 /* IntroductionController.m */; };
 		491DAE5726E207C600693AAA /* CommonQuestionData.m in Sources */ = {isa = PBXBuildFile; fileRef = 491DAE5626E207C600693AAA /* CommonQuestionData.m */; };
 		49252DAA26D39CC9003A8A7F /* FeedBackMainPageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 49252DA926D39CC9003A8A7F /* FeedBackMainPageViewController.m */; };
 		492C19AE26CE458000C485D9 /* Bauhaus-93.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 492C19AD26CE458000C485D9 /* Bauhaus-93.ttf */; };
@@ -440,7 +437,6 @@
 		AA49098924F3BF5A007CB3BC /* TransitionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = AA49098824F3BF5A007CB3BC /* TransitionManager.m */; };
 		AA4B0FB324D3E09B00221B5A /* TopBarScrollView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4B0FB224D3E09B00221B5A /* TopBarScrollView.m */; };
 		AA4CD61025EF7E0F002D9394 /* NothingStateView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4CD60F25EF7E0F002D9394 /* NothingStateView.m */; };
-		AA4FA1DF25C2DE5F005139BA /* LearnMoreViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4FA1DE25C2DE5F005139BA /* LearnMoreViewController.m */; };
 		AA4FF36525879CD500C31286 /* MineSettingViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4FF36425879CD500C31286 /* MineSettingViewController.m */; };
 		AA5368F02589E28800236CB5 /* QuitTipView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA5368EF2589E28800236CB5 /* QuitTipView.m */; };
 		AA536DDA258C3F7C00F69E73 /* TopBarBasicViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA536DD9258C3F7C00F69E73 /* TopBarBasicViewController.m */; };
@@ -1066,10 +1062,6 @@
 		1A30F3AB23D33F1300FBBD83 /* CheckInProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CheckInProtocol.h; sourceTree = "<group>"; };
 		1A30F3AE23D33F8800FBBD83 /* TodaysDot.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TodaysDot.m; sourceTree = "<group>"; };
 		1A310630237711A800A56468 /* Impact.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Impact.ttf; sourceTree = "<group>"; };
-		1A344BB523E96AD80014A3B4 /* MineAboutController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineAboutController.h; sourceTree = "<group>"; };
-		1A344BB623E96AD80014A3B4 /* MineAboutController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MineAboutController.m; sourceTree = "<group>"; };
-		1A344BB823E96BF50014A3B4 /* MineAboutContentView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineAboutContentView.h; sourceTree = "<group>"; };
-		1A344BB923E96BF50014A3B4 /* MineAboutContentView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MineAboutContentView.m; sourceTree = "<group>"; };
 		1A4A466A24C97E2A0033734E /* UserProtocolViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UserProtocolViewController.h; sourceTree = "<group>"; };
 		1A4A466B24C97E2A0033734E /* UserProtocolViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UserProtocolViewController.m; sourceTree = "<group>"; };
 		1A5A5EE32360100B00543BAE /* UserItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UserItem.h; sourceTree = "<group>"; };
@@ -1093,8 +1085,6 @@
 		1AC2550923C9B23200DF0475 /* TodaysDot.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TodaysDot.h; sourceTree = "<group>"; };
 		1AF4B6052362EBFE00A0823A /* NSDate+Timestamp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSDate+Timestamp.h"; sourceTree = "<group>"; };
 		1AF4B6062362EBFE00A0823A /* NSDate+Timestamp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSDate+Timestamp.m"; sourceTree = "<group>"; };
-		1AFE534F24F7571300F42A74 /* IntroductionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IntroductionController.h; sourceTree = "<group>"; };
-		1AFE535024F7571300F42A74 /* IntroductionController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IntroductionController.m; sourceTree = "<group>"; };
 		21BAC4215263E008B4AD6F34 /* Pods-CyxbsMobile2019_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CyxbsMobile2019_iOS.release.xcconfig"; path = "Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		387F1BE7DB99B7F30EA14155 /* Pods_CyxbsMobile2019_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CyxbsMobile2019_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		491DAE5526E207C600693AAA /* CommonQuestionData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CommonQuestionData.h; sourceTree = "<group>"; };
@@ -1452,8 +1442,6 @@
 		AA4B0FB224D3E09B00221B5A /* TopBarScrollView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TopBarScrollView.m; sourceTree = "<group>"; };
 		AA4CD60E25EF7E0F002D9394 /* NothingStateView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NothingStateView.h; sourceTree = "<group>"; };
 		AA4CD60F25EF7E0F002D9394 /* NothingStateView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NothingStateView.m; sourceTree = "<group>"; };
-		AA4FA1DD25C2DE5E005139BA /* LearnMoreViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LearnMoreViewController.h; sourceTree = "<group>"; };
-		AA4FA1DE25C2DE5F005139BA /* LearnMoreViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LearnMoreViewController.m; sourceTree = "<group>"; };
 		AA4FF36325879CD500C31286 /* MineSettingViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineSettingViewController.h; sourceTree = "<group>"; };
 		AA4FF36425879CD500C31286 /* MineSettingViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MineSettingViewController.m; sourceTree = "<group>"; };
 		AA5368EE2589E28800236CB5 /* QuitTipView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = QuitTipView.h; sourceTree = "<group>"; };
@@ -3432,14 +3420,6 @@
 		1A344BB423E96AB80014A3B4 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				1AFE534F24F7571300F42A74 /* IntroductionController.h */,
-				1AFE535024F7571300F42A74 /* IntroductionController.m */,
-				AA4FA1DD25C2DE5E005139BA /* LearnMoreViewController.h */,
-				AA4FA1DE25C2DE5F005139BA /* LearnMoreViewController.m */,
-				1A344BB823E96BF50014A3B4 /* MineAboutContentView.h */,
-				1A344BB923E96BF50014A3B4 /* MineAboutContentView.m */,
-				1A344BB523E96AD80014A3B4 /* MineAboutController.h */,
-				1A344BB623E96AD80014A3B4 /* MineAboutController.m */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -6702,7 +6682,6 @@
 				AA4FF36525879CD500C31286 /* MineSettingViewController.m in Sources */,
 				14B73F76281BED7B00D08ADD /* SystemMessageCell.m in Sources */,
 				14B73F7B281BED7B00D08ADD /* MineMessageMoreVC.m in Sources */,
-				1A344BBA23E96BF50014A3B4 /* MineAboutContentView.m in Sources */,
 				FE0D60442801702B00319A9E /* SchoolBusData.m in Sources */,
 				14B73F7F281BED7B00D08ADD /* DiscoverMineMessageVC.m in Sources */,
 				AA49098924F3BF5A007CB3BC /* TransitionManager.m in Sources */,
@@ -6783,7 +6762,6 @@
 				1A30F3AF23D33F8800FBBD83 /* TodaysDot.m in Sources */,
 				75CC08182C539B3800810A4E /* DetailSubjectScoreCell.m in Sources */,
 				14FFFC052AF8C0FD005A7EBD /* AliyunConfig.m in Sources */,
-				AA4FA1DF25C2DE5F005139BA /* LearnMoreViewController.m in Sources */,
 				757A58EE2BA1EAD0003D95F0 /* ExpressDetailPageVC.m in Sources */,
 				FCB39F2D2AB03B7400914462 /* AddArrangePlaceVC.swift in Sources */,
 				1893DC8926EA32A3007E871E /* MGDGCD.m in Sources */,
@@ -6948,7 +6926,6 @@
 				DB34EB32239BD4550052B65E /* LessonNumLabel.m in Sources */,
 				1A1691FB2430ECA70076EDC7 /* ClassTabBarController.m in Sources */,
 				646B1978282CE0340015DF28 /* StationsGuideTableViewCell.m in Sources */,
-				1AFE535124F7571300F42A74 /* IntroductionController.m in Sources */,
 				735BC53C26D3B33E00F22678 /* FeedBackDetailsViewController.m in Sources */,
 				FC1542912ABC75E900BD806F /* WeekMaping.swift in Sources */,
 				18CDF68A257F91BD006E8E5C /* PeopleListTableViewCell.m in Sources */,
@@ -7089,7 +7066,6 @@
 				B09BB8322AADA35400FF88F7 /* FoodHomeModel.m in Sources */,
 				B0F71C8A2ABC71B200F8B1AC /* AttitudeSelfPageItem.m in Sources */,
 				1A141365235F524B0001417E /* UIFont+AdaptiveFont.m in Sources */,
-				1A344BB723E96AD80014A3B4 /* MineAboutController.m in Sources */,
 				B09BB8372AADA35400FF88F7 /* FoodMainPageCollectionViewCell.m in Sources */,
 				18CDF691257F91BD006E8E5C /* CQUPTMapStarPlaceItem.m in Sources */,
 				75CC08462C5657AA00810A4E /* SCLineChart.m in Sources */,
