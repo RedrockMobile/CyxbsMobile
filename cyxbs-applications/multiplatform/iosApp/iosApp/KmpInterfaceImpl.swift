@@ -62,5 +62,11 @@ class KmpInterfaceImpl: IOSKmpInterface {
 
     func onBannerClick(pictureGotoUrl: String, keyword: String) {
     }
+
+    func jumpQaEntry() {
+    }
+
+    func jumpUfieldMainEntry() {
+    }
 }
 

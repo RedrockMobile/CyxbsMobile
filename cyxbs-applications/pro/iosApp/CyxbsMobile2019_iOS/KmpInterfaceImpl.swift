@@ -106,6 +106,20 @@ class KmpInterfaceImpl: IOSKmpInterface {
         UIApplication.shared.open(url)
     }
 
+    func jumpQaEntry() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = QAMainVC()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
+    func jumpUfieldMainEntry() {
+        guard let nav = Self.topNavigationController() else { return }
+        let vc = ActivityMainViewController()
+        vc.hidesBottomBarWhenPushed = true
+        nav.pushViewController(vc, animated: true)
+    }
+
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →
     // 解 NavigationController。CMP 主页 rootVC 被 CustomNavigationController 包了一层
     // （见 AppDelegate.setupWindow），所以根上就能拿到 nav。

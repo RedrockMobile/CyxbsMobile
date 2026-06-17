@@ -14,6 +14,7 @@ import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
+import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,6 +99,12 @@ interface IOSKmpInterface {
 
   /** Banner 点击：UIApplication.shared.open(url) 交给系统 Safari */
   fun onBannerClick(pictureGotoUrl: String, keyword: String)
+
+  /** push 答疑广场（iOS 原生 QAMainVC） */
+  fun jumpQaEntry()
+
+  /** push 活动布告栏（iOS 原生 ActivityMainViewController） */
+  fun jumpUfieldMainEntry()
 }
 
 // SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
@@ -110,6 +117,7 @@ interface IOSKmpInterface {
 @ImplProvider(TodoIosPlatform::class)
 @ImplProvider(DiscoverFunctionsIosPlatform::class)
 @ImplProvider(DiscoverIosPlatform::class)
+@ImplProvider(FairgroundIosPlatform::class)
 internal object IOSKmpInterfaceLink :
   IOSHomeViewPager,
   IOSToast,
@@ -117,7 +125,8 @@ internal object IOSKmpInterfaceLink :
   SportIosPlatform,
   TodoIosPlatform,
   DiscoverFunctionsIosPlatform,
-  DiscoverIosPlatform {
+  DiscoverIosPlatform,
+  FairgroundIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -175,5 +184,13 @@ internal object IOSKmpInterfaceLink :
 
   override fun onBannerClick(pictureGotoUrl: String, keyword: String) {
     impl.onBannerClick(pictureGotoUrl, keyword)
+  }
+
+  override fun jumpQaEntry() {
+    impl.jumpQaEntry()
+  }
+
+  override fun jumpUfieldMainEntry() {
+    impl.jumpUfieldMainEntry()
   }
 }
