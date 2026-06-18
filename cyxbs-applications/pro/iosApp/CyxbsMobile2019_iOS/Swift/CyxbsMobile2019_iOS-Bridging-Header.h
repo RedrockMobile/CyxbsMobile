@@ -334,10 +334,8 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "CalendarViewController.h"
 #import "CQUPTMapViewController.h"
 #import "ClassDetailModel.h"
-#import "FinderToolViewController.h"
 #import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
-#import "EmptyClassViewController.h" // 空教室
 #import "SportAttendanceViewController.h" // 体育打卡
 #import "TestArrangeViewController.h" // 我的考试
 #import "TodoDateTool.h"
