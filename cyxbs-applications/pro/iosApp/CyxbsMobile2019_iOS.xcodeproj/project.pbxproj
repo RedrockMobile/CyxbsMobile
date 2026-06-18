@@ -177,16 +177,6 @@
 		18CDF4C8257F8DBD006E8E5C /* ResetPwdView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B1257F8DBD006E8E5C /* ResetPwdView.m */; };
 		18CDF4C9257F8DBD006E8E5C /* safePopView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B3257F8DBD006E8E5C /* safePopView.m */; };
 		18CDF4CA257F8DBD006E8E5C /* SelfSafeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B6257F8DBD006E8E5C /* SelfSafeView.m */; };
-		18CDF678257F91BD006E8E5C /* ChooseStudentListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF515257F91BC006E8E5C /* ChooseStudentListViewController.m */; };
-		18CDF679257F91BD006E8E5C /* ScheduleViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF516257F91BC006E8E5C /* ScheduleViewController.m */; };
-		18CDF67A257F91BD006E8E5C /* ScheduleInquiryViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF518257F91BC006E8E5C /* ScheduleInquiryViewController.m */; };
-		18CDF67B257F91BD006E8E5C /* ClassmateItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF51C257F91BC006E8E5C /* ClassmateItem.m */; };
-		18CDF67C257F91BD006E8E5C /* ClassmatesList.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF51D257F91BC006E8E5C /* ClassmatesList.m */; };
-		18CDF67D257F91BD006E8E5C /* PeopleListCellTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF520257F91BC006E8E5C /* PeopleListCellTableViewCell.m */; };
-		18CDF67E257F91BD006E8E5C /* HistoryView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF521257F91BC006E8E5C /* HistoryView.m */; };
-		18CDF689257F91BD006E8E5C /* WeDateViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF53F257F91BC006E8E5C /* WeDateViewController.m */; };
-		18CDF68A257F91BD006E8E5C /* PeopleListTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF540257F91BC006E8E5C /* PeopleListTableViewCell.m */; };
-		18CDF68B257F91BD006E8E5C /* ChoosePeopleListView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF541257F91BC006E8E5C /* ChoosePeopleListView.m */; };
 		18CDF68D257F91BD006E8E5C /* CQUPTMapPresenter.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF546257F91BC006E8E5C /* CQUPTMapPresenter.m */; };
 		18CDF68E257F91BD006E8E5C /* CQUPTMapModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF54A257F91BC006E8E5C /* CQUPTMapModel.m */; };
 		18CDF68F257F91BD006E8E5C /* CQUPTMapPlaceRect.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF550257F91BC006E8E5C /* CQUPTMapPlaceRect.m */; };
@@ -911,26 +901,6 @@
 		18CDF4B4257F8DBD006E8E5C /* SelfSafeView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SelfSafeView.h; sourceTree = "<group>"; };
 		18CDF4B5257F8DBD006E8E5C /* safePopView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = safePopView.h; sourceTree = "<group>"; };
 		18CDF4B6257F8DBD006E8E5C /* SelfSafeView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SelfSafeView.m; sourceTree = "<group>"; };
-		18CDF514257F91BC006E8E5C /* ScheduleInquiryViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ScheduleInquiryViewController.h; sourceTree = "<group>"; };
-		18CDF515257F91BC006E8E5C /* ChooseStudentListViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ChooseStudentListViewController.m; sourceTree = "<group>"; };
-		18CDF516257F91BC006E8E5C /* ScheduleViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ScheduleViewController.m; sourceTree = "<group>"; };
-		18CDF517257F91BC006E8E5C /* ChooseStudentListViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ChooseStudentListViewController.h; sourceTree = "<group>"; };
-		18CDF518257F91BC006E8E5C /* ScheduleInquiryViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ScheduleInquiryViewController.m; sourceTree = "<group>"; };
-		18CDF519257F91BC006E8E5C /* ScheduleViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ScheduleViewController.h; sourceTree = "<group>"; };
-		18CDF51B257F91BC006E8E5C /* ClassmatesList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ClassmatesList.h; sourceTree = "<group>"; };
-		18CDF51C257F91BC006E8E5C /* ClassmateItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ClassmateItem.m; sourceTree = "<group>"; };
-		18CDF51D257F91BC006E8E5C /* ClassmatesList.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ClassmatesList.m; sourceTree = "<group>"; };
-		18CDF51E257F91BC006E8E5C /* ClassmateItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ClassmateItem.h; sourceTree = "<group>"; };
-		18CDF520257F91BC006E8E5C /* PeopleListCellTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PeopleListCellTableViewCell.m; sourceTree = "<group>"; };
-		18CDF521257F91BC006E8E5C /* HistoryView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HistoryView.m; sourceTree = "<group>"; };
-		18CDF522257F91BC006E8E5C /* HistoryView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HistoryView.h; sourceTree = "<group>"; };
-		18CDF523257F91BC006E8E5C /* PeopleListCellTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PeopleListCellTableViewCell.h; sourceTree = "<group>"; };
-		18CDF53C257F91BC006E8E5C /* PeopleListTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PeopleListTableViewCell.h; sourceTree = "<group>"; };
-		18CDF53D257F91BC006E8E5C /* WeDateViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WeDateViewController.h; sourceTree = "<group>"; };
-		18CDF53E257F91BC006E8E5C /* ChoosePeopleListView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ChoosePeopleListView.h; sourceTree = "<group>"; };
-		18CDF53F257F91BC006E8E5C /* WeDateViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WeDateViewController.m; sourceTree = "<group>"; };
-		18CDF540257F91BC006E8E5C /* PeopleListTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PeopleListTableViewCell.m; sourceTree = "<group>"; };
-		18CDF541257F91BC006E8E5C /* ChoosePeopleListView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ChoosePeopleListView.m; sourceTree = "<group>"; };
 		18CDF545257F91BC006E8E5C /* CQUPTMapViewProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapViewProtocol.h; sourceTree = "<group>"; };
 		18CDF546257F91BC006E8E5C /* CQUPTMapPresenter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapPresenter.m; sourceTree = "<group>"; };
 		18CDF547257F91BC006E8E5C /* CQUPTMapPresenter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapPresenter.h; sourceTree = "<group>"; };
@@ -2975,12 +2945,6 @@
 		18CDF513257F91BC006E8E5C /* Controller */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF514257F91BC006E8E5C /* ScheduleInquiryViewController.h */,
-				18CDF518257F91BC006E8E5C /* ScheduleInquiryViewController.m */,
-				18CDF517257F91BC006E8E5C /* ChooseStudentListViewController.h */,
-				18CDF515257F91BC006E8E5C /* ChooseStudentListViewController.m */,
-				18CDF519257F91BC006E8E5C /* ScheduleViewController.h */,
-				18CDF516257F91BC006E8E5C /* ScheduleViewController.m */,
 			);
 			path = Controller;
 			sourceTree = "<group>";
@@ -2988,10 +2952,6 @@
 		18CDF51A257F91BC006E8E5C /* model */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF51B257F91BC006E8E5C /* ClassmatesList.h */,
-				18CDF51D257F91BC006E8E5C /* ClassmatesList.m */,
-				18CDF51E257F91BC006E8E5C /* ClassmateItem.h */,
-				18CDF51C257F91BC006E8E5C /* ClassmateItem.m */,
 			);
 			path = model;
 			sourceTree = "<group>";
@@ -2999,10 +2959,6 @@
 		18CDF51F257F91BC006E8E5C /* View */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF522257F91BC006E8E5C /* HistoryView.h */,
-				18CDF521257F91BC006E8E5C /* HistoryView.m */,
-				18CDF523257F91BC006E8E5C /* PeopleListCellTableViewCell.h */,
-				18CDF520257F91BC006E8E5C /* PeopleListCellTableViewCell.m */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -5592,8 +5548,6 @@
 		B5E4B3082962BADF00F80452 /* Controller */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF53D257F91BC006E8E5C /* WeDateViewController.h */,
-				18CDF53F257F91BC006E8E5C /* WeDateViewController.m */,
 			);
 			path = Controller;
 			sourceTree = "<group>";
@@ -5601,10 +5555,6 @@
 		B5E4B3092962BAF200F80452 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF53E257F91BC006E8E5C /* ChoosePeopleListView.h */,
-				18CDF541257F91BC006E8E5C /* ChoosePeopleListView.m */,
-				18CDF53C257F91BC006E8E5C /* PeopleListTableViewCell.h */,
-				18CDF540257F91BC006E8E5C /* PeopleListTableViewCell.m */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -6496,7 +6446,6 @@
 				187DF4BA260310DD000BCDE9 /* LYEmptyBaseView.m in Sources */,
 				FCB39F312AB08C0200914462 /* CreateGroupAlertVC.swift in Sources */,
 				18CDF6C7257F91BE006E8E5C /* CalendarViewController.m in Sources */,
-				18CDF67A257F91BD006E8E5C /* ScheduleInquiryViewController.m in Sources */,
 				14B73F6E281BED7B00D08ADD /* MessageSettingCell.m in Sources */,
 				DB4064FB2466D889006CE5BC /* DLWeeklSelectView.m in Sources */,
 				646B1967282AA9420015DF28 /* BusGuideViewController.m in Sources */,
@@ -6648,7 +6597,6 @@
 				1A141366235F524B0001417E /* AESCipher.m in Sources */,
 				4931631026CD7B6800140412 /* StampCenterTopView.m in Sources */,
 				AA3F82E624EA4A8900B65042 /* LeftBar.m in Sources */,
-				18CDF67B257F91BD006E8E5C /* ClassmateItem.m in Sources */,
 				1A1E869723C8D1DE00321367 /* CheckInBar.m in Sources */,
 				646B19A5283885740015DF28 /* CircleMAPointAnnotation.m in Sources */,
 				FC78F80F2AD036E500995C01 /* AddArrangeModel.swift in Sources */,
@@ -6682,7 +6630,6 @@
 				FE0D60462801702B00319A9E /* SchoolBusBottomView.m in Sources */,
 				DB4064FC2466D889006CE5BC /* DLReminderModel.m in Sources */,
 				AAC7CA0B25F7725200E6B5D5 /* MainPage2RequestModel.m in Sources */,
-				18CDF67D257F91BD006E8E5C /* PeopleListCellTableViewCell.m in Sources */,
 				FC15428D2ABBED5500BD806F /* CourseItem.swift in Sources */,
 				B09BB8352AADA35400FF88F7 /* FoodResultModel.m in Sources */,
 				B09BB8392AADA35400FF88F7 /* FoodHeaderCollectionReusableView.m in Sources */,
@@ -6702,7 +6649,6 @@
 				FCB9214E2AAF782B00F373A7 /* AddArrangeTitleVC.swift in Sources */,
 				14FFFBE82AF8C0F3005A7EBD /* UIImageExtensions.swift in Sources */,
 				14F6F5572AFB8CDB007C7CA6 /* ScheduleDetailTableHeaderView.swift in Sources */,
-				18CDF689257F91BD006E8E5C /* WeDateViewController.m in Sources */,
 				75CC080A2C539B3700810A4E /* TestCardTableViewCell.m in Sources */,
 				DB34EACE239BD4550052B65E /* DateModle.m in Sources */,
 				AA49098624F3B6B4007CB3BC /* ClassSchedulInterController.m in Sources */,
@@ -6751,7 +6697,6 @@
 				AAFD87D024F50DB800CBBD11 /* FakeTabBarView.m in Sources */,
 				18CDF6A3257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m in Sources */,
 				FC51103F2AED06910049EE43 /* AddArrangeFlowLayout.swift in Sources */,
-				18CDF68B257F91BD006E8E5C /* ChoosePeopleListView.m in Sources */,
 				AA57588C24EF5841002F6F6D /* NoticeWaySelectView.m in Sources */,
 				646B199A28313CB20015DF28 /* StationScrollView.m in Sources */,
 				646B198D282FFC460015DF28 /* BusMAPointAnnotation.m in Sources */,
@@ -6781,7 +6726,6 @@
 				646B1978282CE0340015DF28 /* StationsGuideTableViewCell.m in Sources */,
 				735BC53C26D3B33E00F22678 /* FeedBackDetailsViewController.m in Sources */,
 				FC1542912ABC75E900BD806F /* WeekMaping.swift in Sources */,
-				18CDF68A257F91BD006E8E5C /* PeopleListTableViewCell.m in Sources */,
 				DB4065012466D889006CE5BC /* DLTimeSelectedButton.m in Sources */,
 				B09BB8342AADA35400FF88F7 /* FoodPraiseModel.m in Sources */,
 				14F6F54A2AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift in Sources */,
@@ -6796,7 +6740,6 @@
 				1ABE8026238D01EC00E88C4E /* CheckInViewController.m in Sources */,
 				DB4064FA2466D889006CE5BC /* DLTextFiled.m in Sources */,
 				147842EA27F0758F002359BA /* UIView+Frame.m in Sources */,
-				18CDF67E257F91BD006E8E5C /* HistoryView.m in Sources */,
 				75CC08132C539B3700810A4E /* TermGrade.m in Sources */,
 				14B73F77281BED7B00D08ADD /* SystemMessageView.m in Sources */,
 				AA7ABAC62873EA5500BA6790 /* NewQAHud.m in Sources */,
@@ -6934,7 +6877,6 @@
 				FC63434B2A891FD200DCD96C /* SearchResultVC.swift in Sources */,
 				DB34EADA239BD4550052B65E /* RemindNotification.m in Sources */,
 				FC42109F2AD5C2F20044EEAA /* ArrangeMessageTableViewCell.swift in Sources */,
-				18CDF678257F91BD006E8E5C /* ChooseStudentListViewController.m in Sources */,
 				4931631226CD7B6800140412 /* StampCenterMainScrollView.m in Sources */,
 				18CDF4BC257F8DBD006E8E5C /* selfSafeViewController.m in Sources */,
 				18CDF698257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m in Sources */,
@@ -7015,7 +6957,6 @@
 				4931631E26CD7B7900140412 /* StampCenterVC.m in Sources */,
 				18CDF695257F91BD006E8E5C /* CQUPTMapPlaceItem.m in Sources */,
 				18CDF69A257F91BD006E8E5C /* CQUPTMapProgressView.m in Sources */,
-				18CDF679257F91BD006E8E5C /* ScheduleViewController.m in Sources */,
 				B0C9F2422B0126E1006F4286 /* ActivitySearchTableViewCell.swift in Sources */,
 				49343A2326D4EAB2001A2892 /* CommonQuestionCell.m in Sources */,
 				14B73F71281BED7B00D08ADD /* ActiveMessage.m in Sources */,
@@ -7031,7 +6972,6 @@
 				B0C9F2352B0126E1006F4286 /* ActivityDetailVCExtension.swift in Sources */,
 				14F6F5502AFB8CDA007C7CA6 /* RYScheduleMaping.swift in Sources */,
 				75CC08432C5657AA00810A4E /* SCCircleChart.m in Sources */,
-				18CDF67C257F91BD006E8E5C /* ClassmatesList.m in Sources */,
 				7311328826CCEC2400EF88C1 /* ContentScrollView.m in Sources */,
 				758C7E4F2BA456AF002CA3F4 /* MXBackButton.swift in Sources */,
 				B0C9F2322B0126E1006F4286 /* ActivityDetailView.swift in Sources */,

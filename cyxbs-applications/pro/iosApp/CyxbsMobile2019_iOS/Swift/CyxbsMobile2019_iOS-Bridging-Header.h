@@ -329,7 +329,6 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "UserItem.h"
 #import "MineMessageVC.h"
 #import "CheckInViewController.h"
-#import "ScheduleInquiryViewController.h"
 #import "SchoolBusVC.h"
 #import "CalendarViewController.h"
 #import "CQUPTMapViewController.h"
