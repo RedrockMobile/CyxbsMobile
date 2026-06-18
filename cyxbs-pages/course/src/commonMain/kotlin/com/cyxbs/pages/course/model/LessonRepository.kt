@@ -3,6 +3,7 @@ package com.cyxbs.pages.course.model
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
@@ -13,6 +14,7 @@ import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.bean.StuLessonBean
 import com.cyxbs.pages.course.network.CourseApiService
+import com.cyxbs.pages.course.service.CourseIosPlatform
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.channels.BufferOverflow
@@ -123,8 +125,18 @@ object LessonRepository {
     }.onSuccess {
       // 保存进磁盘
       val accountSettings = AccountSettings.get(stuNum)
+      val stuLessonBeanJson= defaultJson.encodeToString<StuLessonBean>(it)
       accountSettings.putLong(SETTING_KEY_LESSON_REQUEST_TIME, requestTime.toEpochMilliseconds())
-      accountSettings.putString(SETTING_KEY_LESSON, defaultJson.encodeToString<StuLessonBean>(it))
+      accountSettings.putString(SETTING_KEY_LESSON, stuLessonBeanJson)
+      // 同步给 iOS 原生侧（仅 iOS 实现，其它平台 implOrNull 直接返回 null）。
+      // 目前用于让 CyxbsWidgetExtension 课表小组件读到最新的 App Group 共享缓存。
+      CourseIosPlatform::class.implOrNull()?.onLessonUpdated(
+        stuNum = stuNum,
+        nowWeek = it.nowWeek,
+        stuLessonBeanJson = stuLessonBeanJson,
+      )
+    }.onSuccess { bean ->
+
     }.mapCatching { bean ->
       bean.data.mapNotNull { it.toLessonByWeeks() }
     }.onSuccess {

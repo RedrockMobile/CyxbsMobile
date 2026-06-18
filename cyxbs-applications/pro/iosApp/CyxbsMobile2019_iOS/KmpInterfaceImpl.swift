@@ -5,6 +5,7 @@
 
 import Foundation
 import UIKit
+import SwiftyJSON
 import CyxbsApplicationsMultiplatform
 
 class KmpInterfaceImpl: IOSKmpInterface {
@@ -155,6 +156,27 @@ class KmpInterfaceImpl: IOSKmpInterface {
         let vc = ActivityCenterVC()
         vc.hidesBottomBarWhenPushed = true
         nav.pushViewController(vc, animated: true)
+    }
+
+    // CMP 课表请求成功后回调（cyxbs-pages/course LessonRepository.requestLesson 的 onSuccess
+    // 之一）。把 StuLessonBean JSON 解析为旧 ScheduleModel，写入 App Group 共享缓存
+    // （CacheManager.FilePath.schedule(sno:)），供 CyxbsWidgetExtension 课表小组件读取。
+    //
+    // 旧 CurriculumModel(json:) 的字段与 StuLessonBean.StuLesson 的 @SerialName 完全一致
+    // （hash_day / begin_lesson / week / course / classroom / type / course_num / rawWeek
+    // / teacher），无需再做字段适配。student 字段缺失时复用之前缓存。
+    func onLessonUpdated(stuNum: String, nowWeek: Int32, stuLessonBeanJson: String) {
+        guard let data = stuLessonBeanJson.data(using: .utf8),
+              let root = try? JSON(data: data) else { return }
+
+        var model = ScheduleModel(sno: stuNum)
+        model.nowWeek = Int(nowWeek)
+        model.curriculum = root["data"].arrayValue.map(CurriculumModel.init(json:))
+        model.student = CacheManager.shared.getCodable(
+            SearchStudentModel.self,
+            in: .searchStudent(sno: stuNum)
+        )
+        CacheManager.shared.cache(codable: model, in: .schedule(sno: stuNum))
     }
 
     // 找最顶层可 push 的 UINavigationController：key window → rootVC → 解 presentedVC →

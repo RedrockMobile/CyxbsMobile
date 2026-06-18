@@ -16,6 +16,7 @@ import com.cyxbs.pages.mine.home.MineIosPlatform
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
 import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
+import com.cyxbs.pages.course.service.CourseIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -121,6 +122,13 @@ interface IOSKmpInterface {
 
   /** push 活动中心（iOS 原生 ActivityCenterVC） */
   fun jumpActivityCenter()
+
+  /**
+   * 课表数据更新成功回调。
+   * Swift 端把 [stuLessonBeanJson] 解析为旧 ScheduleModel / CurriculumModel，
+   * 写入 App Group 共享缓存供 CyxbsWidgetExtension 课表小组件读取。
+   */
+  fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String)
 }
 
 // SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
@@ -135,6 +143,7 @@ interface IOSKmpInterface {
 @ImplProvider(DiscoverIosPlatform::class)
 @ImplProvider(FairgroundIosPlatform::class)
 @ImplProvider(MineIosPlatform::class)
+@ImplProvider(CourseIosPlatform::class)
 internal object IOSKmpInterfaceLink :
   IOSHomeViewPager,
   IOSToast,
@@ -144,7 +153,8 @@ internal object IOSKmpInterfaceLink :
   DiscoverFunctionsIosPlatform,
   DiscoverIosPlatform,
   FairgroundIosPlatform,
-  MineIosPlatform {
+  MineIosPlatform,
+  CourseIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -230,5 +240,9 @@ internal object IOSKmpInterfaceLink :
 
   override fun jumpActivityCenter() {
     impl.jumpActivityCenter()
+  }
+
+  override fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String) {
+    impl.onLessonUpdated(stuNum, nowWeek, stuLessonBeanJson)
   }
 }
