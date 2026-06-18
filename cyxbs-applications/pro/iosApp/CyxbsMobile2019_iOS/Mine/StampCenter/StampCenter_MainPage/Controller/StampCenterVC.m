@@ -14,7 +14,6 @@
 #import "StampCenterSecondHeaderView.h"
 #import "TaskTableViewCell.h"
 #import "TableHeaderView.h"
-#import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
 #import "掌上重邮-Swift.h"
 #import "CheckInModel.h"
@@ -708,9 +707,9 @@
 }
 
 //跳转至中心->美食版块
+// 美食页已迁移到 CMP；StampCenter 仍是 iOS 原生页，暂以 toast 提示用户从「邮乐园」进入。
 - (void)jumpToFood{
-    FoodVC *FVC = [[FoodVC alloc]init];
-    [self.navigationController pushViewController:FVC animated:YES];
+    [RemindHUD.shared showDefaultHUDWithText:@"请到「邮乐园」中进入美食" completion:nil];
 }
 
 //跳转至中心->活动布告栏
