@@ -42,10 +42,10 @@
 		1476CA5E2AFCD2C400635848 /* SearchStudentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5032AFB8CDA007C7CA6 /* SearchStudentModel.swift */; };
 		1476CA5F2AFCD2C600635848 /* ScheduleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5042AFB8CDA007C7CA6 /* ScheduleModel.swift */; };
 		1476CA602AFCD2C800635848 /* CurriculumModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5052AFB8CDA007C7CA6 /* CurriculumModel.swift */; };
-		1476CA612AFCD2CE00635848 /* ScheduleDataFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50B2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */; };
 		1476CA622AFCD2D100635848 /* ScheduleDrawType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50C2AFB8CDA007C7CA6 /* ScheduleDrawType.swift */; };
 		1476CA632AFCD2D500635848 /* ScheduleCalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50D2AFB8CDA007C7CA6 /* ScheduleCalModel.swift */; };
-		1476CA642AFCD2D900635848 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
+		1476CA612AFCD2CE00635848 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
+		1476CA642AFCD2D800635848 /* ScheduleDataFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5142AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */; };
 		1476CA652AFCD2EE00635848 /* TokenModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5382AFB8CDA007C7CA6 /* TokenModel.swift */; };
 		1476CA662AFCD30300635848 /* PersonModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */; };
 		1476CA6F2AFCD41200635848 /* UserModelEX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1476CA6D2AFCD3FD00635848 /* UserModelEX.swift */; };
@@ -88,25 +88,11 @@
 		14F6F5462AFB8CDA007C7CA6 /* SearchStudentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5032AFB8CDA007C7CA6 /* SearchStudentModel.swift */; };
 		14F6F5472AFB8CDA007C7CA6 /* ScheduleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5042AFB8CDA007C7CA6 /* ScheduleModel.swift */; };
 		14F6F5482AFB8CDA007C7CA6 /* CurriculumModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5052AFB8CDA007C7CA6 /* CurriculumModel.swift */; };
-		14F6F5492AFB8CDA007C7CA6 /* RYScheduleHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5072AFB8CDA007C7CA6 /* RYScheduleHeaderView.swift */; };
-		14F6F54A2AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5082AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift */; };
-		14F6F54B2AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5092AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift */; };
-		14F6F54C2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50B2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */; };
 		14F6F54D2AFB8CDA007C7CA6 /* ScheduleDrawType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50C2AFB8CDA007C7CA6 /* ScheduleDrawType.swift */; };
 		14F6F54E2AFB8CDA007C7CA6 /* ScheduleCalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50D2AFB8CDA007C7CA6 /* ScheduleCalModel.swift */; };
 		14F6F54F2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50E2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift */; };
-		14F6F5502AFB8CDA007C7CA6 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
-		14F6F5512AFB8CDB007C7CA6 /* RYScheduleCollectionViewLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5112AFB8CDA007C7CA6 /* RYScheduleCollectionViewLayout.swift */; };
-		14F6F5522AFB8CDB007C7CA6 /* RYScheduleViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5122AFB8CDA007C7CA6 /* RYScheduleViewController.swift */; };
-		14F6F5532AFB8CDB007C7CA6 /* RYScheduleInteractionFact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5132AFB8CDA007C7CA6 /* RYScheduleInteractionFact.swift */; };
-		14F6F5542AFB8CDB007C7CA6 /* RYScheduleFact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5142AFB8CDA007C7CA6 /* RYScheduleFact.swift */; };
-		14F6F5552AFB8CDB007C7CA6 /* ScheduleDetailCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5172AFB8CDA007C7CA6 /* ScheduleDetailCollectionViewCell.swift */; };
-		14F6F5562AFB8CDB007C7CA6 /* ScheduleDetailMessageTableViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5182AFB8CDA007C7CA6 /* ScheduleDetailMessageTableViewCell.swift */; };
-		14F6F5572AFB8CDB007C7CA6 /* ScheduleDetailTableHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5192AFB8CDA007C7CA6 /* ScheduleDetailTableHeaderView.swift */; };
-		14F6F5582AFB8CDB007C7CA6 /* ScheduleDetailsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F51B2AFB8CDA007C7CA6 /* ScheduleDetailsViewController.swift */; };
-		14F6F5592AFB8CDB007C7CA6 /* ScheduleEditSectionCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F51E2AFB8CDA007C7CA6 /* ScheduleEditSectionCollectionViewCell.swift */; };
-		14F6F55A2AFB8CDB007C7CA6 /* ScheduleCustomEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F51F2AFB8CDA007C7CA6 /* ScheduleCustomEditView.swift */; };
-		14F6F55B2AFB8CDB007C7CA6 /* ScheduleEditViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5212AFB8CDA007C7CA6 /* ScheduleEditViewController.swift */; };
+		14F6F5502AFB8CDB007C7CA6 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
+		14F6F5512AFB8CDB007C7CA6 /* ScheduleDataFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5142AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */; };
 		14F6F5682AFB8CDB007C7CA6 /* ConfidentialityQuestionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5372AFB8CDA007C7CA6 /* ConfidentialityQuestionModel.swift */; };
 		14F6F5692AFB8CDB007C7CA6 /* TokenModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5382AFB8CDA007C7CA6 /* TokenModel.swift */; };
 		14F6F56A2AFB8CDB007C7CA6 /* EmailBidingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F53A2AFB8CDA007C7CA6 /* EmailBidingViewController.swift */; };
@@ -115,6 +101,8 @@
 		14F6F56D2AFB8CDB007C7CA6 /* ForgotViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F53D2AFB8CDA007C7CA6 /* ForgotViewController.swift */; };
 		14F6F56E2AFB8CDB007C7CA6 /* PersonModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */; };
 		14F6F5752AFB8F4C007C7CA6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */; };
+		14E7E4C127F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
+		14E7E4C227F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
 		14FBBD41280505CC00D5B05D /* SSRTextCycleView.m in Sources */ = {isa = PBXBuildFile; fileRef = 14FBBD3F280505CC00D5B05D /* SSRTextCycleView.m */; };
 		14FBBD4E2805489A00D5B05D /* SSRTextCycleCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 14FBBD4D2805489A00D5B05D /* SSRTextCycleCell.m */; };
 		14FFFBE02AF8C0F3005A7EBD /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBCB2AF8C0F3005A7EBD /* Constants.swift */; };
@@ -728,25 +716,11 @@
 		14F6F5032AFB8CDA007C7CA6 /* SearchStudentModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SearchStudentModel.swift; sourceTree = "<group>"; };
 		14F6F5042AFB8CDA007C7CA6 /* ScheduleModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleModel.swift; sourceTree = "<group>"; };
 		14F6F5052AFB8CDA007C7CA6 /* CurriculumModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CurriculumModel.swift; sourceTree = "<group>"; };
-		14F6F5072AFB8CDA007C7CA6 /* RYScheduleHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleHeaderView.swift; sourceTree = "<group>"; };
-		14F6F5082AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleCollectionViewCell.swift; sourceTree = "<group>"; };
-		14F6F5092AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleSelectSectionHeaderView.swift; sourceTree = "<group>"; };
-		14F6F50B2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDataFetch.swift; sourceTree = "<group>"; };
 		14F6F50C2AFB8CDA007C7CA6 /* ScheduleDrawType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDrawType.swift; sourceTree = "<group>"; };
 		14F6F50D2AFB8CDA007C7CA6 /* ScheduleCalModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleCalModel.swift; sourceTree = "<group>"; };
 		14F6F50E2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "ScheduleCalModel+EX.swift"; sourceTree = "<group>"; };
 		14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleMaping.swift; sourceTree = "<group>"; };
-		14F6F5112AFB8CDA007C7CA6 /* RYScheduleCollectionViewLayout.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleCollectionViewLayout.swift; sourceTree = "<group>"; };
-		14F6F5122AFB8CDA007C7CA6 /* RYScheduleViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleViewController.swift; sourceTree = "<group>"; };
-		14F6F5132AFB8CDA007C7CA6 /* RYScheduleInteractionFact.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleInteractionFact.swift; sourceTree = "<group>"; };
-		14F6F5142AFB8CDA007C7CA6 /* RYScheduleFact.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RYScheduleFact.swift; sourceTree = "<group>"; };
-		14F6F5172AFB8CDA007C7CA6 /* ScheduleDetailCollectionViewCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDetailCollectionViewCell.swift; sourceTree = "<group>"; };
-		14F6F5182AFB8CDA007C7CA6 /* ScheduleDetailMessageTableViewCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDetailMessageTableViewCell.swift; sourceTree = "<group>"; };
-		14F6F5192AFB8CDA007C7CA6 /* ScheduleDetailTableHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDetailTableHeaderView.swift; sourceTree = "<group>"; };
-		14F6F51B2AFB8CDA007C7CA6 /* ScheduleDetailsViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDetailsViewController.swift; sourceTree = "<group>"; };
-		14F6F51E2AFB8CDA007C7CA6 /* ScheduleEditSectionCollectionViewCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleEditSectionCollectionViewCell.swift; sourceTree = "<group>"; };
-		14F6F51F2AFB8CDA007C7CA6 /* ScheduleCustomEditView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleCustomEditView.swift; sourceTree = "<group>"; };
-		14F6F5212AFB8CDA007C7CA6 /* ScheduleEditViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleEditViewController.swift; sourceTree = "<group>"; };
+		14F6F5142AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScheduleDataFetch.swift; sourceTree = "<group>"; };
 		14F6F5372AFB8CDA007C7CA6 /* ConfidentialityQuestionModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConfidentialityQuestionModel.swift; sourceTree = "<group>"; };
 		14F6F5382AFB8CDA007C7CA6 /* TokenModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TokenModel.swift; sourceTree = "<group>"; };
 		14F6F53A2AFB8CDA007C7CA6 /* EmailBidingViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EmailBidingViewController.swift; sourceTree = "<group>"; };
@@ -755,6 +729,7 @@
 		14F6F53D2AFB8CDA007C7CA6 /* ForgotViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ForgotViewController.swift; sourceTree = "<group>"; };
 		14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PersonModel.swift; sourceTree = "<group>"; };
 		14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UICollectionView+ElementKindSection.swift"; sourceTree = "<group>"; };
 		14FBBD3E280505CC00D5B05D /* SSRTextCycleView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SSRTextCycleView.h; sourceTree = "<group>"; };
 		14FBBD3F280505CC00D5B05D /* SSRTextCycleView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SSRTextCycleView.m; sourceTree = "<group>"; };
 		14FBBD4C2805489A00D5B05D /* SSRTextCycleCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SSRTextCycleCell.h; sourceTree = "<group>"; };
@@ -2246,6 +2221,7 @@
 				14FBBD43280505E700D5B05D /* TextCycleView */,
 				14D03A0C27FE6BE200D6AE93 /* SSRTopBarBaseView */,
 				14E7E4AB27F5763700B67469 /* QuestionSelectView */,
+				14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */,
 			);
 			path = Encapsulation;
 			sourceTree = "<group>";
@@ -2322,9 +2298,6 @@
 		14F6F5062AFB8CDA007C7CA6 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F5072AFB8CDA007C7CA6 /* RYScheduleHeaderView.swift */,
-				14F6F5082AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift */,
-				14F6F5092AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -2332,11 +2305,11 @@
 		14F6F50A2AFB8CDA007C7CA6 /* Filter */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F50B2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */,
 				14F6F50C2AFB8CDA007C7CA6 /* ScheduleDrawType.swift */,
 				14F6F50D2AFB8CDA007C7CA6 /* ScheduleCalModel.swift */,
 				14F6F50E2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift */,
 				14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */,
+				14F6F5142AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */,
 			);
 			path = Filter;
 			sourceTree = "<group>";
@@ -2344,10 +2317,6 @@
 		14F6F5102AFB8CDA007C7CA6 /* ViewController */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F5112AFB8CDA007C7CA6 /* RYScheduleCollectionViewLayout.swift */,
-				14F6F5122AFB8CDA007C7CA6 /* RYScheduleViewController.swift */,
-				14F6F5132AFB8CDA007C7CA6 /* RYScheduleInteractionFact.swift */,
-				14F6F5142AFB8CDA007C7CA6 /* RYScheduleFact.swift */,
 			);
 			path = ViewController;
 			sourceTree = "<group>";
@@ -2364,9 +2333,6 @@
 		14F6F5162AFB8CDA007C7CA6 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F5172AFB8CDA007C7CA6 /* ScheduleDetailCollectionViewCell.swift */,
-				14F6F5182AFB8CDA007C7CA6 /* ScheduleDetailMessageTableViewCell.swift */,
-				14F6F5192AFB8CDA007C7CA6 /* ScheduleDetailTableHeaderView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -2374,7 +2340,6 @@
 		14F6F51A2AFB8CDA007C7CA6 /* ViewController */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F51B2AFB8CDA007C7CA6 /* ScheduleDetailsViewController.swift */,
 			);
 			path = ViewController;
 			sourceTree = "<group>";
@@ -2391,8 +2356,6 @@
 		14F6F51D2AFB8CDA007C7CA6 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F51E2AFB8CDA007C7CA6 /* ScheduleEditSectionCollectionViewCell.swift */,
-				14F6F51F2AFB8CDA007C7CA6 /* ScheduleCustomEditView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -2400,7 +2363,6 @@
 		14F6F5202AFB8CDA007C7CA6 /* ViewController */ = {
 			isa = PBXGroup;
 			children = (
-				14F6F5212AFB8CDA007C7CA6 /* ScheduleEditViewController.swift */,
 			);
 			path = ViewController;
 			sourceTree = "<group>";
@@ -6097,19 +6059,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14E7E4C227F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */,
 				1476CA542AFCD29500635848 /* UserDefualtsManager.swift in Sources */,
 				1476CA472AFCD21700635848 /* ScheduleTimelineEntry.swift in Sources */,
 				1476CA5F2AFCD2C600635848 /* ScheduleModel.swift in Sources */,
 				1476CA5B2AFCD2B200635848 /* APIConfig.swift in Sources */,
 				1476CA5A2AFCD2AD00635848 /* SwiftEX.swift in Sources */,
 				1476CA632AFCD2D500635848 /* ScheduleCalModel.swift in Sources */,
+				1476CA612AFCD2CE00635848 /* RYScheduleMaping.swift in Sources */,
+				1476CA642AFCD2D800635848 /* ScheduleDataFetch.swift in Sources */,
 				1476CA4B2AFCD21700635848 /* ScheduleProvider.swift in Sources */,
 				1476CA4F2AFCD21700635848 /* ScheduleWidget.swift in Sources */,
-				1476CA612AFCD2CE00635848 /* ScheduleDataFetch.swift in Sources */,
 				1476CA502AFCD21700635848 /* ScheduleSupplementaryView.swift in Sources */,
 				1476CA4C2AFCD21700635848 /* CyxbsWidget.intentdefinition in Sources */,
 				1476CA442AFCD21700635848 /* CyxbsWidgetBundle.swift in Sources */,
-				1476CA642AFCD2D900635848 /* RYScheduleMaping.swift in Sources */,
 				1476CA592AFCD2AB00635848 /* UIImageExtensions.swift in Sources */,
 				1476CA482AFCD21700635848 /* AppIntent.swift in Sources */,
 				1476CA602AFCD2C800635848 /* CurriculumModel.swift in Sources */,
@@ -6137,6 +6100,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14E7E4C127F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */,
 				B07597292B20381D0004AC3C /* ClassSchedulPresentingAnimater.m in Sources */,
 				B07597282B2037E00004AC3C /* TodoDateTool.m in Sources */,
 				B06965DD2AFE0A0A0096D1A8 /* WebAllowController.swift in Sources */,
@@ -6147,7 +6111,6 @@
 				B0F71C862ABC71B200F8B1AC /* AttitudeSelfPageDefaultView.m in Sources */,
 				DB34EB3B239BD4550052B65E /* WeekChooseButton.m in Sources */,
 				14FFFBE32AF8C0F3005A7EBD /* CyxbsSegmentedIndicatorLineView.swift in Sources */,
-				14F6F5542AFB8CDB007C7CA6 /* RYScheduleFact.swift in Sources */,
 				18CDF4C2257F8DBD006E8E5C /* changePassword.m in Sources */,
 				14B73F6F281BED7B00D08ADD /* MessageSettingVC.m in Sources */,
 				73AAA1D326C918250084E44D /* PurchaseinfoViewController.m in Sources */,
@@ -6209,7 +6172,6 @@
 				FC5279042AAC473E00B09685 /* GroupResultItem.swift in Sources */,
 				AA57588924EE739F002F6F6D /* TimeBtnSelectedBackView.m in Sources */,
 				75FD5F692BC5514500D8302D /* CustomNavigationController.swift in Sources */,
-				14F6F5532AFB8CDB007C7CA6 /* RYScheduleInteractionFact.swift in Sources */,
 				1849D8B62EAF4E4700DBFD72 /* DetailsBaseTableViewCell.m in Sources */,
 				1849D8B72EAF4E4700DBFD72 /* DetailsCustomizeNavigationBar.m in Sources */,
 				FC5849B92A967F7F00D9BBDF /* CreateGroupVC.swift in Sources */,
@@ -6222,7 +6184,6 @@
 				14B73F8B2823577600D08ADD /* SSRButton.m in Sources */,
 				75CC08082C539B3700810A4E /* ExamArrangeModel.m in Sources */,
 				DB34EACF239BD4550052B65E /* WYCClassAndRemindDataModel.m in Sources */,
-				14F6F5552AFB8CDB007C7CA6 /* ScheduleDetailCollectionViewCell.swift in Sources */,
 				14F6F54D2AFB8CDA007C7CA6 /* ScheduleDrawType.swift in Sources */,
 				FC5110432AED3B6A0049EE43 /* ArrangeMessageHeader.swift in Sources */,
 				14F6F5462AFB8CDA007C7CA6 /* SearchStudentModel.swift in Sources */,
@@ -6251,6 +6212,8 @@
 				7551F9E02C74785A0072CA88 /* DiscoverTodoSelectDateView.swift in Sources */,
 				D0101D5A2433C885004337ED /* SDMaskNotificationName.m in Sources */,
 				14F6F54F2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift in Sources */,
+				14F6F5502AFB8CDB007C7CA6 /* RYScheduleMaping.swift in Sources */,
+				14F6F5512AFB8CDB007C7CA6 /* ScheduleDataFetch.swift in Sources */,
 				14FFFBEF2AF8C0F3005A7EBD /* PlaceholderCollectionViewCell.swift in Sources */,
 				757729672C85916E00982233 /* ToDoNonTopNoDeadlineStyleCell.swift in Sources */,
 				AA3F82DA24E8E03C00B65042 /* ClassDetailView.m in Sources */,
@@ -6289,7 +6252,6 @@
 				FCB39F2F2AB03F0E00914462 /* AddArrangeMemberVC.swift in Sources */,
 				B03DB39B2AF123E600307DE0 /* DarkMatteView.m in Sources */,
 				DB4064F92466D889006CE5BC /* DLTimeSelectView.m in Sources */,
-				14F6F5582AFB8CDB007C7CA6 /* ScheduleDetailsViewController.swift in Sources */,
 				18CDF4CA257F8DBD006E8E5C /* SelfSafeView.m in Sources */,
 				735BC54A26D3BF6400F22678 /* FeedBackReplyModel.m in Sources */,
 				1A14136F235F524B0001417E /* UserDefaultTool.m in Sources */,
@@ -6308,12 +6270,10 @@
 				DB4065032466D889006CE5BC /* DLReminderView.m in Sources */,
 				DB4064F72466D889006CE5BC /* DLReminderSetDetailVC.m in Sources */,
 				B0C9F2402B0126E1006F4286 /* GradientButton.swift in Sources */,
-				14F6F5522AFB8CDB007C7CA6 /* RYScheduleViewController.swift in Sources */,
 				AA9ABE9024EB63BF00D16BE0 /* ClassDetailViewShower.m in Sources */,
 				75F7296F2C7D75D000B36A56 /* DiscoverTodoSelectTypeView.swift in Sources */,
 				AAC7CA3B25F89C9D00E6B5D5 /* MainPageModel.m in Sources */,
 				FC06D0F02A9E643A00A974D8 /* StudentItem.swift in Sources */,
-				14F6F55B2AFB8CDB007C7CA6 /* ScheduleEditViewController.swift in Sources */,
 				4931630E26CD7B6800140412 /* StampCenterSecondHeaderView.m in Sources */,
 				7551F9D12C733E030072CA88 /* DiscoverTodoSetRemindBasicView.swift in Sources */,
 				75CC08192C539B3800810A4E /* ScoreTwoTitleView.m in Sources */,
@@ -6337,7 +6297,6 @@
 				14E7E4A827F5762500B67469 /* QuestionSelectView.m in Sources */,
 				FCB9214E2AAF782B00F373A7 /* AddArrangeTitleVC.swift in Sources */,
 				14FFFBE82AF8C0F3005A7EBD /* UIImageExtensions.swift in Sources */,
-				14F6F5572AFB8CDB007C7CA6 /* ScheduleDetailTableHeaderView.swift in Sources */,
 				75CC080A2C539B3700810A4E /* TestCardTableViewCell.m in Sources */,
 				DB34EACE239BD4550052B65E /* DateModle.m in Sources */,
 				AA49098624F3B6B4007CB3BC /* ClassSchedulInterController.m in Sources */,
@@ -6367,7 +6326,6 @@
 				75CC080D2C539B3700810A4E /* ScorePresentAnimation.m in Sources */,
 				1A4A466C24C97E2A0033734E /* UserProtocolViewController.m in Sources */,
 				B0F71C902ABC71B200F8B1AC /* ExpressPutModel.m in Sources */,
-				14F6F54C2AFB8CDA007C7CA6 /* ScheduleDataFetch.swift in Sources */,
 				1893DC9126EA3375007E871E /* MGDGroup.m in Sources */,
 				73AAA1CF26C918250084E44D /* DetailsGoodsTableView.m in Sources */,
 				4931631326CD7B6800140412 /* TableHeaderView.m in Sources */,
@@ -6400,7 +6358,6 @@
 				FC9E3A992AB6D2F200E3C65F /* WeDateCourseScheduleVC.swift in Sources */,
 				73AAA1D026C918250084E44D /* DetailsTaskTableViewCell.m in Sources */,
 				B0F71C962ABC71B200F8B1AC /* ExpressDetailCell.m in Sources */,
-				14F6F55A2AFB8CDB007C7CA6 /* ScheduleCustomEditView.swift in Sources */,
 				FC7EC7C22AA9000E009FC098 /* ChooseGroupVC.swift in Sources */,
 				75CC083F2C5657AA00810A4E /* SCBar.m in Sources */,
 				1AF4B6072362EBFE00A0823A /* NSDate+Timestamp.m in Sources */,
@@ -6412,14 +6369,12 @@
 				735BC53C26D3B33E00F22678 /* FeedBackDetailsViewController.m in Sources */,
 				FC1542912ABC75E900BD806F /* WeekMaping.swift in Sources */,
 				DB4065012466D889006CE5BC /* DLTimeSelectedButton.m in Sources */,
-				14F6F54A2AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift in Sources */,
 				B0F71C852ABC71B200F8B1AC /* AttitudeSelfPageDataItem.m in Sources */,
 				14E7E4A927F5762500B67469 /* QuestionButton.m in Sources */,
 				FC42109B2AD5BBA80044EEAA /* ArrangeMessageModel.swift in Sources */,
 				B0C9F24A2B0126E1006F4286 /* ActivityUploadScrollView.swift in Sources */,
 				FC66D92B2A88B4C80024FB6A /* StudentTableViewCell.swift in Sources */,
 				B0F71C892ABC71B200F8B1AC /* AttitudeMainPageItem.m in Sources */,
-				14F6F5592AFB8CDB007C7CA6 /* ScheduleEditSectionCollectionViewCell.swift in Sources */,
 				1ABE8026238D01EC00E88C4E /* CheckInViewController.m in Sources */,
 				DB4064FA2466D889006CE5BC /* DLTextFiled.m in Sources */,
 				147842EA27F0758F002359BA /* UIView+Frame.m in Sources */,
@@ -6489,7 +6444,6 @@
 				1A14136D235F524B0001417E /* UIImage+Helper.m in Sources */,
 				75500E622AEE8FD200C2FC3A /* SwiftyClient.swift in Sources */,
 				75CC08202C539B3800810A4E /* SportAttendanceTableViewCell.m in Sources */,
-				14F6F5512AFB8CDB007C7CA6 /* RYScheduleCollectionViewLayout.swift in Sources */,
 				DB34EB3A239BD4550052B65E /* CoverView.m in Sources */,
 				DB34EB22239BD4550052B65E /* AddRemindViewController.m in Sources */,
 				DB4064FD2466D889006CE5BC /* DLReminderSetTimeVC.m in Sources */,
@@ -6593,11 +6547,9 @@
 				1476CA6F2AFCD41200635848 /* UserModelEX.swift in Sources */,
 				FCEC87C22A8B69A2007EFBA4 /* SearchAlertVC.swift in Sources */,
 				7577295A2C85915E00982233 /* ToDoBatchManageBottomView.swift in Sources */,
-				14F6F5562AFB8CDB007C7CA6 /* ScheduleDetailMessageTableViewCell.swift in Sources */,
 				49628E3C26D52E6C00805A08 /* TypeButton.m in Sources */,
 				14FFFBEC2AF8C0F3005A7EBD /* UNManager.swift in Sources */,
 				B0C9F2452B0126E1006F4286 /* ActivityAdminReviewedVC.swift in Sources */,
-				14F6F54B2AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift in Sources */,
 				14E7E4B327F57FC800B67469 /* FeedBackSelectView.m in Sources */,
 				FC20AA3A2AA3A11100A62BCB /* GroupManageVC.swift in Sources */,
 				FC1484672AD1D38500657191 /* ReceiveMessageVC.swift in Sources */,
@@ -6626,10 +6578,8 @@
 				18CDF4BB257F8DBD006E8E5C /* ResetPwdViewController.m in Sources */,
 				B0C9F2412B0126E1006F4286 /* ActivitySearchVC.swift in Sources */,
 				752A03F02B0796D9003256C1 /* ActivityMessageVC.swift in Sources */,
-				14F6F5492AFB8CDA007C7CA6 /* RYScheduleHeaderView.swift in Sources */,
 				14FFFBF02AF8C0F3005A7EBD /* UserModel.swift in Sources */,
 				B0C9F2352B0126E1006F4286 /* ActivityDetailVCExtension.swift in Sources */,
-				14F6F5502AFB8CDA007C7CA6 /* RYScheduleMaping.swift in Sources */,
 				75CC08432C5657AA00810A4E /* SCCircleChart.m in Sources */,
 				7311328826CCEC2400EF88C1 /* ContentScrollView.m in Sources */,
 				758C7E4F2BA456AF002CA3F4 /* MXBackButton.swift in Sources */,
