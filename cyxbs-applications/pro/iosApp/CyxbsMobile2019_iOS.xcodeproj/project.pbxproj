@@ -177,31 +177,7 @@
 		18CDF4C8257F8DBD006E8E5C /* ResetPwdView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B1257F8DBD006E8E5C /* ResetPwdView.m */; };
 		18CDF4C9257F8DBD006E8E5C /* safePopView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B3257F8DBD006E8E5C /* safePopView.m */; };
 		18CDF4CA257F8DBD006E8E5C /* SelfSafeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF4B6257F8DBD006E8E5C /* SelfSafeView.m */; };
-		18CDF68D257F91BD006E8E5C /* CQUPTMapPresenter.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF546257F91BC006E8E5C /* CQUPTMapPresenter.m */; };
-		18CDF68E257F91BD006E8E5C /* CQUPTMapModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF54A257F91BC006E8E5C /* CQUPTMapModel.m */; };
-		18CDF68F257F91BD006E8E5C /* CQUPTMapPlaceRect.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF550257F91BC006E8E5C /* CQUPTMapPlaceRect.m */; };
-		18CDF690257F91BD006E8E5C /* CQUPTMapDataItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF551257F91BC006E8E5C /* CQUPTMapDataItem.m */; };
-		18CDF691257F91BD006E8E5C /* CQUPTMapStarPlaceItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF553257F91BC006E8E5C /* CQUPTMapStarPlaceItem.m */; };
-		18CDF692257F91BD006E8E5C /* CQUPTMapPlaceDetailItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF555257F91BD006E8E5C /* CQUPTMapPlaceDetailItem.m */; };
-		18CDF693257F91BD006E8E5C /* CQUPTMapHotPlaceItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF556257F91BD006E8E5C /* CQUPTMapHotPlaceItem.m */; };
-		18CDF694257F91BD006E8E5C /* CQUPTMapSearchItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF557257F91BD006E8E5C /* CQUPTMapSearchItem.m */; };
-		18CDF695257F91BD006E8E5C /* CQUPTMapPlaceItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF558257F91BD006E8E5C /* CQUPTMapPlaceItem.m */; };
 		18CDF696257F91BD006E8E5C /* FYHCycleLabel.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF55B257F91BD006E8E5C /* FYHCycleLabel.m */; };
-		18CDF697257F91BD006E8E5C /* CQUPTVRMapController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF55D257F91BD006E8E5C /* CQUPTVRMapController.m */; };
-		18CDF698257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF562257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m */; };
-		18CDF699257F91BD006E8E5C /* CQUPTMapContentView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF565257F91BD006E8E5C /* CQUPTMapContentView.m */; };
-		18CDF69A257F91BD006E8E5C /* CQUPTMapProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF567257F91BD006E8E5C /* CQUPTMapProgressView.m */; };
-		18CDF69B257F91BD006E8E5C /* CQUPTMapMyStarButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF568257F91BD006E8E5C /* CQUPTMapMyStarButton.m */; };
-		18CDF69C257F91BD006E8E5C /* CQUPTMapViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF569257F91BD006E8E5C /* CQUPTMapViewController.m */; };
-		18CDF69D257F91BD006E8E5C /* CQUPTMapSearchResultCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF56C257F91BD006E8E5C /* CQUPTMapSearchResultCell.m */; };
-		18CDF69E257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF56D257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m */; };
-		18CDF69F257F91BD006E8E5C /* CQUPTMapSearchView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF56E257F91BD006E8E5C /* CQUPTMapSearchView.m */; };
-		18CDF6A0257F91BD006E8E5C /* CQUPTMapMoreImageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF572257F91BD006E8E5C /* CQUPTMapMoreImageViewController.m */; };
-		18CDF6A1257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF575257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.m */; };
-		18CDF6A2257F91BD006E8E5C /* CQUPTMapImageLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF576257F91BD006E8E5C /* CQUPTMapImageLayout.m */; };
-		18CDF6A3257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF57A257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m */; };
-		18CDF6A4257F91BD006E8E5C /* CollectionViewSpaceLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF57E257F91BD006E8E5C /* CollectionViewSpaceLayout.m */; };
-		18CDF6A5257F91BD006E8E5C /* CQUPTMapDetailView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF57F257F91BD006E8E5C /* CQUPTMapDetailView.m */; };
 		18CDF6C7257F91BE006E8E5C /* CalendarViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 18CDF5CB257F91BD006E8E5C /* CalendarViewController.m */; };
 		18FE64F625FDA186008748AE /* UIControl+MGD.m in Sources */ = {isa = PBXBuildFile; fileRef = 18FE64F525FDA186008748AE /* UIControl+MGD.m */; };
 		1A141320235F521C0001417E /* BaseTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A14131A235F521C0001417E /* BaseTableViewController.m */; };
@@ -884,57 +860,8 @@
 		18CDF4B4257F8DBD006E8E5C /* SelfSafeView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SelfSafeView.h; sourceTree = "<group>"; };
 		18CDF4B5257F8DBD006E8E5C /* safePopView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = safePopView.h; sourceTree = "<group>"; };
 		18CDF4B6257F8DBD006E8E5C /* SelfSafeView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SelfSafeView.m; sourceTree = "<group>"; };
-		18CDF545257F91BC006E8E5C /* CQUPTMapViewProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapViewProtocol.h; sourceTree = "<group>"; };
-		18CDF546257F91BC006E8E5C /* CQUPTMapPresenter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapPresenter.m; sourceTree = "<group>"; };
-		18CDF547257F91BC006E8E5C /* CQUPTMapPresenter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapPresenter.h; sourceTree = "<group>"; };
-		18CDF549257F91BC006E8E5C /* CQUPTMapModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapModel.h; sourceTree = "<group>"; };
-		18CDF54A257F91BC006E8E5C /* CQUPTMapModel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapModel.m; sourceTree = "<group>"; };
-		18CDF54C257F91BC006E8E5C /* CQUPTMapStarPlaceItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapStarPlaceItem.h; sourceTree = "<group>"; };
-		18CDF54D257F91BC006E8E5C /* CQUPTMapSearchItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapSearchItem.h; sourceTree = "<group>"; };
-		18CDF54E257F91BC006E8E5C /* CQUPTMapHotPlaceItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapHotPlaceItem.h; sourceTree = "<group>"; };
-		18CDF54F257F91BC006E8E5C /* CQUPTMapPlaceDetailItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapPlaceDetailItem.h; sourceTree = "<group>"; };
-		18CDF550257F91BC006E8E5C /* CQUPTMapPlaceRect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapPlaceRect.m; sourceTree = "<group>"; };
-		18CDF551257F91BC006E8E5C /* CQUPTMapDataItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapDataItem.m; sourceTree = "<group>"; };
-		18CDF552257F91BC006E8E5C /* CQUPTMapPlaceItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapPlaceItem.h; sourceTree = "<group>"; };
-		18CDF553257F91BC006E8E5C /* CQUPTMapStarPlaceItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapStarPlaceItem.m; sourceTree = "<group>"; };
-		18CDF554257F91BC006E8E5C /* CQUPTMapPlaceRect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapPlaceRect.h; sourceTree = "<group>"; };
-		18CDF555257F91BD006E8E5C /* CQUPTMapPlaceDetailItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapPlaceDetailItem.m; sourceTree = "<group>"; };
-		18CDF556257F91BD006E8E5C /* CQUPTMapHotPlaceItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapHotPlaceItem.m; sourceTree = "<group>"; };
-		18CDF557257F91BD006E8E5C /* CQUPTMapSearchItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapSearchItem.m; sourceTree = "<group>"; };
-		18CDF558257F91BD006E8E5C /* CQUPTMapPlaceItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapPlaceItem.m; sourceTree = "<group>"; };
-		18CDF559257F91BD006E8E5C /* CQUPTMapDataItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapDataItem.h; sourceTree = "<group>"; };
 		18CDF55B257F91BD006E8E5C /* FYHCycleLabel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FYHCycleLabel.m; sourceTree = "<group>"; };
-		18CDF55D257F91BD006E8E5C /* CQUPTVRMapController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTVRMapController.m; sourceTree = "<group>"; };
-		18CDF55E257F91BD006E8E5C /* CQUPTVRMapController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTVRMapController.h; sourceTree = "<group>"; };
-		18CDF560257F91BD006E8E5C /* CQUPTMapContentView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapContentView.h; sourceTree = "<group>"; };
-		18CDF561257F91BD006E8E5C /* CQUPTMapMyStarButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapMyStarButton.h; sourceTree = "<group>"; };
-		18CDF562257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapHotPlaceButton.m; sourceTree = "<group>"; };
-		18CDF563257F91BD006E8E5C /* CQUPTMapProgressView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapProgressView.h; sourceTree = "<group>"; };
-		18CDF564257F91BD006E8E5C /* CQUPTMapViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapViewController.h; sourceTree = "<group>"; };
-		18CDF565257F91BD006E8E5C /* CQUPTMapContentView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapContentView.m; sourceTree = "<group>"; };
-		18CDF566257F91BD006E8E5C /* CQUPTMapHotPlaceButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapHotPlaceButton.h; sourceTree = "<group>"; };
-		18CDF567257F91BD006E8E5C /* CQUPTMapProgressView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapProgressView.m; sourceTree = "<group>"; };
-		18CDF568257F91BD006E8E5C /* CQUPTMapMyStarButton.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapMyStarButton.m; sourceTree = "<group>"; };
-		18CDF569257F91BD006E8E5C /* CQUPTMapViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapViewController.m; sourceTree = "<group>"; };
-		18CDF56B257F91BD006E8E5C /* CQUPTMapSearchView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapSearchView.h; sourceTree = "<group>"; };
-		18CDF56C257F91BD006E8E5C /* CQUPTMapSearchResultCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapSearchResultCell.m; sourceTree = "<group>"; };
-		18CDF56D257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapBeforeSearchCell.m; sourceTree = "<group>"; };
-		18CDF56E257F91BD006E8E5C /* CQUPTMapSearchView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapSearchView.m; sourceTree = "<group>"; };
-		18CDF56F257F91BD006E8E5C /* CQUPTMapSearchResultCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapSearchResultCell.h; sourceTree = "<group>"; };
-		18CDF570257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapBeforeSearchCell.h; sourceTree = "<group>"; };
-		18CDF572257F91BD006E8E5C /* CQUPTMapMoreImageViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapMoreImageViewController.m; sourceTree = "<group>"; };
-		18CDF573257F91BD006E8E5C /* CQUPTMapImageLayout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapImageLayout.h; sourceTree = "<group>"; };
-		18CDF574257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapAllImageCollectionViewCell.h; sourceTree = "<group>"; };
-		18CDF575257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapAllImageCollectionViewCell.m; sourceTree = "<group>"; };
-		18CDF576257F91BD006E8E5C /* CQUPTMapImageLayout.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapImageLayout.m; sourceTree = "<group>"; };
-		18CDF577257F91BD006E8E5C /* CQUPTMapMoreImageViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapMoreImageViewController.h; sourceTree = "<group>"; };
 		18CDF578257F91BD006E8E5C /* FYHCycleLabel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FYHCycleLabel.h; sourceTree = "<group>"; };
-		18CDF57A257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapDetailTagsCollectionViewCell.m; sourceTree = "<group>"; };
-		18CDF57B257F91BD006E8E5C /* CollectionViewSpaceLayout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CollectionViewSpaceLayout.h; sourceTree = "<group>"; };
-		18CDF57C257F91BD006E8E5C /* CQUPTMapDetailView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapDetailView.h; sourceTree = "<group>"; };
-		18CDF57D257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CQUPTMapDetailTagsCollectionViewCell.h; sourceTree = "<group>"; };
-		18CDF57E257F91BD006E8E5C /* CollectionViewSpaceLayout.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CollectionViewSpaceLayout.m; sourceTree = "<group>"; };
-		18CDF57F257F91BD006E8E5C /* CQUPTMapDetailView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CQUPTMapDetailView.m; sourceTree = "<group>"; };
 		18CDF5CA257F91BD006E8E5C /* CalendarViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CalendarViewController.h; sourceTree = "<group>"; };
 		18CDF5CB257F91BD006E8E5C /* CalendarViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CalendarViewController.m; sourceTree = "<group>"; };
 		18FE64F425FDA186008748AE /* UIControl+MGD.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "UIControl+MGD.h"; sourceTree = "<group>"; };
@@ -2623,6 +2550,8 @@
 		14FBBD43280505E700D5B05D /* TextCycleView */ = {
 			isa = PBXGroup;
 			children = (
+				18CDF578257F91BD006E8E5C /* FYHCycleLabel.h */,
+				18CDF55B257F91BD006E8E5C /* FYHCycleLabel.m */,
 				14FBBD3E280505CC00D5B05D /* SSRTextCycleView.h */,
 				14FBBD3F280505CC00D5B05D /* SSRTextCycleView.m */,
 				14FBBD4F28054AE000D5B05D /* SSRTextCycleCell */,
@@ -2956,9 +2885,6 @@
 		18CDF544257F91BC006E8E5C /* Presenter */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF547257F91BC006E8E5C /* CQUPTMapPresenter.h */,
-				18CDF546257F91BC006E8E5C /* CQUPTMapPresenter.m */,
-				18CDF545257F91BC006E8E5C /* CQUPTMapViewProtocol.h */,
 			);
 			path = Presenter;
 			sourceTree = "<group>";
@@ -2966,8 +2892,6 @@
 		18CDF548257F91BC006E8E5C /* Model */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF549257F91BC006E8E5C /* CQUPTMapModel.h */,
-				18CDF54A257F91BC006E8E5C /* CQUPTMapModel.m */,
 				18CDF54B257F91BC006E8E5C /* Items */,
 			);
 			path = Model;
@@ -2976,20 +2900,6 @@
 		18CDF54B257F91BC006E8E5C /* Items */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF559257F91BD006E8E5C /* CQUPTMapDataItem.h */,
-				18CDF551257F91BC006E8E5C /* CQUPTMapDataItem.m */,
-				18CDF54E257F91BC006E8E5C /* CQUPTMapHotPlaceItem.h */,
-				18CDF556257F91BD006E8E5C /* CQUPTMapHotPlaceItem.m */,
-				18CDF54F257F91BC006E8E5C /* CQUPTMapPlaceDetailItem.h */,
-				18CDF555257F91BD006E8E5C /* CQUPTMapPlaceDetailItem.m */,
-				18CDF552257F91BC006E8E5C /* CQUPTMapPlaceItem.h */,
-				18CDF558257F91BD006E8E5C /* CQUPTMapPlaceItem.m */,
-				18CDF554257F91BC006E8E5C /* CQUPTMapPlaceRect.h */,
-				18CDF550257F91BC006E8E5C /* CQUPTMapPlaceRect.m */,
-				18CDF54D257F91BC006E8E5C /* CQUPTMapSearchItem.h */,
-				18CDF557257F91BD006E8E5C /* CQUPTMapSearchItem.m */,
-				18CDF54C257F91BC006E8E5C /* CQUPTMapStarPlaceItem.h */,
-				18CDF553257F91BC006E8E5C /* CQUPTMapStarPlaceItem.m */,
 			);
 			path = Items;
 			sourceTree = "<group>";
@@ -2997,8 +2907,6 @@
 		18CDF55A257F91BD006E8E5C /* View */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF578257F91BD006E8E5C /* FYHCycleLabel.h */,
-				18CDF55B257F91BD006E8E5C /* FYHCycleLabel.m */,
 				18CDF55C257F91BD006E8E5C /* VRMap */,
 				18CDF55F257F91BD006E8E5C /* MainPage */,
 				18CDF56A257F91BD006E8E5C /* Search */,
@@ -3011,8 +2919,6 @@
 		18CDF55C257F91BD006E8E5C /* VRMap */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF55E257F91BD006E8E5C /* CQUPTVRMapController.h */,
-				18CDF55D257F91BD006E8E5C /* CQUPTVRMapController.m */,
 			);
 			path = VRMap;
 			sourceTree = "<group>";
@@ -3020,16 +2926,6 @@
 		18CDF55F257F91BD006E8E5C /* MainPage */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF560257F91BD006E8E5C /* CQUPTMapContentView.h */,
-				18CDF565257F91BD006E8E5C /* CQUPTMapContentView.m */,
-				18CDF566257F91BD006E8E5C /* CQUPTMapHotPlaceButton.h */,
-				18CDF562257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m */,
-				18CDF561257F91BD006E8E5C /* CQUPTMapMyStarButton.h */,
-				18CDF568257F91BD006E8E5C /* CQUPTMapMyStarButton.m */,
-				18CDF563257F91BD006E8E5C /* CQUPTMapProgressView.h */,
-				18CDF567257F91BD006E8E5C /* CQUPTMapProgressView.m */,
-				18CDF564257F91BD006E8E5C /* CQUPTMapViewController.h */,
-				18CDF569257F91BD006E8E5C /* CQUPTMapViewController.m */,
 			);
 			path = MainPage;
 			sourceTree = "<group>";
@@ -3037,12 +2933,6 @@
 		18CDF56A257F91BD006E8E5C /* Search */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF570257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.h */,
-				18CDF56D257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m */,
-				18CDF56F257F91BD006E8E5C /* CQUPTMapSearchResultCell.h */,
-				18CDF56C257F91BD006E8E5C /* CQUPTMapSearchResultCell.m */,
-				18CDF56B257F91BD006E8E5C /* CQUPTMapSearchView.h */,
-				18CDF56E257F91BD006E8E5C /* CQUPTMapSearchView.m */,
 			);
 			path = Search;
 			sourceTree = "<group>";
@@ -3050,12 +2940,6 @@
 		18CDF571257F91BD006E8E5C /* MoreImage */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF574257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.h */,
-				18CDF575257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.m */,
-				18CDF573257F91BD006E8E5C /* CQUPTMapImageLayout.h */,
-				18CDF576257F91BD006E8E5C /* CQUPTMapImageLayout.m */,
-				18CDF577257F91BD006E8E5C /* CQUPTMapMoreImageViewController.h */,
-				18CDF572257F91BD006E8E5C /* CQUPTMapMoreImageViewController.m */,
 			);
 			path = MoreImage;
 			sourceTree = "<group>";
@@ -3063,12 +2947,6 @@
 		18CDF579257F91BD006E8E5C /* PlaceDetail */ = {
 			isa = PBXGroup;
 			children = (
-				18CDF57B257F91BD006E8E5C /* CollectionViewSpaceLayout.h */,
-				18CDF57E257F91BD006E8E5C /* CollectionViewSpaceLayout.m */,
-				18CDF57D257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.h */,
-				18CDF57A257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m */,
-				18CDF57C257F91BD006E8E5C /* CQUPTMapDetailView.h */,
-				18CDF57F257F91BD006E8E5C /* CQUPTMapDetailView.m */,
 			);
 			path = PlaceDetail;
 			sourceTree = "<group>";
@@ -6327,7 +6205,6 @@
 				DB34EB3B239BD4550052B65E /* WeekChooseButton.m in Sources */,
 				14FFFBE32AF8C0F3005A7EBD /* CyxbsSegmentedIndicatorLineView.swift in Sources */,
 				14F6F5542AFB8CDB007C7CA6 /* RYScheduleFact.swift in Sources */,
-				18CDF6A1257F91BD006E8E5C /* CQUPTMapAllImageCollectionViewCell.m in Sources */,
 				18CDF4C2257F8DBD006E8E5C /* changePassword.m in Sources */,
 				14B73F6F281BED7B00D08ADD /* MessageSettingVC.m in Sources */,
 				73AAA1D326C918250084E44D /* PurchaseinfoViewController.m in Sources */,
@@ -6416,7 +6293,6 @@
 				FC06D0EE2A9E637D00A974D8 /* FixedGroupModel.swift in Sources */,
 				14FFFBF12AF8C0F3005A7EBD /* BaseButton.swift in Sources */,
 				B09BB8312AADA35400FF88F7 /* FoodVC.m in Sources */,
-				18CDF68D257F91BD006E8E5C /* CQUPTMapPresenter.m in Sources */,
 				B0FE5F2D294C94540070E755 /* UIColor+Rising.m in Sources */,
 				7551F9DE2C73A8BF0072CA88 /* DLTimeSelectedButton.swift in Sources */,
 				D0101F66243587A1004337ED /* GKWebImageManager.m in Sources */,
@@ -6434,7 +6310,6 @@
 				D0101D5A2433C885004337ED /* SDMaskNotificationName.m in Sources */,
 				14F6F54F2AFB8CDA007C7CA6 /* ScheduleCalModel+EX.swift in Sources */,
 				14FFFBEF2AF8C0F3005A7EBD /* PlaceholderCollectionViewCell.swift in Sources */,
-				18CDF690257F91BD006E8E5C /* CQUPTMapDataItem.m in Sources */,
 				757729672C85916E00982233 /* ToDoNonTopNoDeadlineStyleCell.swift in Sources */,
 				AA3F82DA24E8E03C00B65042 /* ClassDetailView.m in Sources */,
 				B0F71C9E2ABC71B200F8B1AC /* PublishPageCell.m in Sources */,
@@ -6452,7 +6327,6 @@
 				1878186F2FCDB31E00095E79 /* WeDateTheme.swift in Sources */,
 				DB4064F82466D889006CE5BC /* DLWeekButton.m in Sources */,
 				14B73F84281CCC3000D08ADD /* MessageDetailVC.m in Sources */,
-				18CDF6A0257F91BD006E8E5C /* CQUPTMapMoreImageViewController.m in Sources */,
 				73AAA1CE26C918250084E44D /* DetailsGoodsTableViewCell.m in Sources */,
 				1A30F3AF23D33F8800FBBD83 /* TodaysDot.m in Sources */,
 				75CC08182C539B3800810A4E /* DetailSubjectScoreCell.m in Sources */,
@@ -6483,9 +6357,7 @@
 				AA3F82E624EA4A8900B65042 /* LeftBar.m in Sources */,
 				1A1E869723C8D1DE00321367 /* CheckInBar.m in Sources */,
 				FC78F80F2AD036E500995C01 /* AddArrangeModel.swift in Sources */,
-				18CDF69E257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m in Sources */,
 				1A1691F82430DEE70076EDC7 /* ClassScheduleTabBarView.m in Sources */,
-				18CDF6A5257F91BD006E8E5C /* CQUPTMapDetailView.m in Sources */,
 				1A141321235F521C0001417E /* BaseViewController.m in Sources */,
 				1451EA53282A09B800A5BB55 /* UserPublishModel.m in Sources */,
 				D0101F6A243587A1004337ED /* GKPanGestureRecognizer.m in Sources */,
@@ -6498,7 +6370,6 @@
 				14F6F5522AFB8CDB007C7CA6 /* RYScheduleViewController.swift in Sources */,
 				AA9ABE9024EB63BF00D16BE0 /* ClassDetailViewShower.m in Sources */,
 				75F7296F2C7D75D000B36A56 /* DiscoverTodoSelectTypeView.swift in Sources */,
-				18CDF694257F91BD006E8E5C /* CQUPTMapSearchItem.m in Sources */,
 				AAC7CA3B25F89C9D00E6B5D5 /* MainPageModel.m in Sources */,
 				FC06D0F02A9E643A00A974D8 /* StudentItem.swift in Sources */,
 				14F6F55B2AFB8CDB007C7CA6 /* ScheduleEditViewController.swift in Sources */,
@@ -6521,7 +6392,6 @@
 				B0F08FFD28A2509900986EB6 /* RisingRouter+Extension.m in Sources */,
 				B0F71C952ABC71B200F8B1AC /* ExpressDeclareItem.m in Sources */,
 				18CDF4BE257F8DBD006E8E5C /* questionItem.m in Sources */,
-				18CDF69C257F91BD006E8E5C /* CQUPTMapViewController.m in Sources */,
 				B0F71C9A2ABC71B200F8B1AC /* PublishTableHeadView.m in Sources */,
 				D0101F61243587A1004337ED /* GKLoadingView.m in Sources */,
 				7311328526CCEC2400EF88C1 /* ExchangeCenterViewController.m in Sources */,
@@ -6577,7 +6447,6 @@
 				75CC080F2C539B3700810A4E /* Credit.m in Sources */,
 				757729692C85916E00982233 /* ToDoTopActiveStyleCell.swift in Sources */,
 				AAFD87D024F50DB800CBBD11 /* FakeTabBarView.m in Sources */,
-				18CDF6A3257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m in Sources */,
 				FC51103F2AED06910049EE43 /* AddArrangeFlowLayout.swift in Sources */,
 				AA57588C24EF5841002F6F6D /* NoticeWaySelectView.m in Sources */,
 				493162DE26CD7B6300140412 /* StampTaskData.m in Sources */,
@@ -6608,7 +6477,6 @@
 				DB4065012466D889006CE5BC /* DLTimeSelectedButton.m in Sources */,
 				B09BB8342AADA35400FF88F7 /* FoodPraiseModel.m in Sources */,
 				14F6F54A2AFB8CDA007C7CA6 /* RYScheduleCollectionViewCell.swift in Sources */,
-				18CDF699257F91BD006E8E5C /* CQUPTMapContentView.m in Sources */,
 				B0F71C852ABC71B200F8B1AC /* AttitudeSelfPageDataItem.m in Sources */,
 				14E7E4A927F5762500B67469 /* QuestionButton.m in Sources */,
 				FC42109B2AD5BBA80044EEAA /* ArrangeMessageModel.swift in Sources */,
@@ -6627,10 +6495,8 @@
 				14FFFC002AF8C0FD005A7EBD /* APIConfigEX.swift in Sources */,
 				75CC081A2C539B3800810A4E /* UserInfoView.m in Sources */,
 				75CC08422C5657AA00810A4E /* SCChartLabel.m in Sources */,
-				18CDF69F257F91BD006E8E5C /* CQUPTMapSearchView.m in Sources */,
 				75CC08112C539B3700810A4E /* GPAItem.m in Sources */,
 				4931630C26CD7B6800140412 /* GotoButton.m in Sources */,
-				18CDF693257F91BD006E8E5C /* CQUPTMapHotPlaceItem.m in Sources */,
 				DB34EB29239BD4550052B65E /* WeekChooseViewController.m in Sources */,
 				D0101F65243587A1004337ED /* GKPhoto.m in Sources */,
 				75F729732C7D8F4B00B36A56 /* TodoDataModel.m in Sources */,
@@ -6638,7 +6504,6 @@
 				75CC08482C5657AA00810A4E /* SCPieChartDataItem.m in Sources */,
 				B05DE7862ABB226700A6A6F6 /* CustomSessionManager.m in Sources */,
 				14B73F75281BED7B00D08ADD /* SystemMessage.m in Sources */,
-				18CDF692257F91BD006E8E5C /* CQUPTMapPlaceDetailItem.m in Sources */,
 				4999FA8326D44EA8005D0ADE /* HintView.m in Sources */,
 				757729522C85914F00982233 /* ToDoTypeView.swift in Sources */,
 				1A141371235F524B0001417E /* CAShapeLayer+ViewMask.m in Sources */,
@@ -6681,11 +6546,9 @@
 				D0101F63243587A1004337ED /* GKScrollView.m in Sources */,
 				18CDF4C7257F8DBD006E8E5C /* sendCodeView.m in Sources */,
 				49628E3226D52C6000805A08 /* FeedBackVC.m in Sources */,
-				18CDF697257F91BD006E8E5C /* CQUPTVRMapController.m in Sources */,
 				FEBA676427E9BAC000C4D231 /* updatePopView.m in Sources */,
 				14FFFBEE2AF8C0F3005A7EBD /* MarkDownViewController.swift in Sources */,
 				75CC08442C5657AA00810A4E /* SCColor.m in Sources */,
-				18CDF6A2257F91BD006E8E5C /* CQUPTMapImageLayout.m in Sources */,
 				B0F71C8E2ABC71B200F8B1AC /* AttitudeNetWrong.m in Sources */,
 				DB34EB38239BD4550052B65E /* MainView.m in Sources */,
 				1A14136D235F524B0001417E /* UIImage+Helper.m in Sources */,
@@ -6693,7 +6556,6 @@
 				75CC08202C539B3800810A4E /* SportAttendanceTableViewCell.m in Sources */,
 				14F6F5512AFB8CDB007C7CA6 /* RYScheduleCollectionViewLayout.swift in Sources */,
 				DB34EB3A239BD4550052B65E /* CoverView.m in Sources */,
-				18CDF68F257F91BD006E8E5C /* CQUPTMapPlaceRect.m in Sources */,
 				DB34EB22239BD4550052B65E /* AddRemindViewController.m in Sources */,
 				DB4064FD2466D889006CE5BC /* DLReminderSetTimeVC.m in Sources */,
 				14FFFC022AF8C0FD005A7EBD /* APIConfig.swift in Sources */,
@@ -6735,7 +6597,6 @@
 				B0F71C8A2ABC71B200F8B1AC /* AttitudeSelfPageItem.m in Sources */,
 				1A141365235F524B0001417E /* UIFont+AdaptiveFont.m in Sources */,
 				B09BB8372AADA35400FF88F7 /* FoodMainPageCollectionViewCell.m in Sources */,
-				18CDF691257F91BD006E8E5C /* CQUPTMapStarPlaceItem.m in Sources */,
 				75CC08462C5657AA00810A4E /* SCLineChart.m in Sources */,
 				7551F9DC2C73A3FC0072CA88 /* DLHistodyButton.swift in Sources */,
 				B0F71C992ABC71B200F8B1AC /* PublishTableAddTagView.m in Sources */,
@@ -6755,7 +6616,6 @@
 				FC42109F2AD5C2F20044EEAA /* ArrangeMessageTableViewCell.swift in Sources */,
 				4931631226CD7B6800140412 /* StampCenterMainScrollView.m in Sources */,
 				18CDF4BC257F8DBD006E8E5C /* selfSafeViewController.m in Sources */,
-				18CDF698257F91BD006E8E5C /* CQUPTMapHotPlaceButton.m in Sources */,
 				187DF4BD260310DD000BCDE9 /* LYEmptyView.m in Sources */,
 				7FBF39F6257B79F30077494E /* ByWordViewController.m in Sources */,
 				D0101D582433C885004337ED /* UIResponder+SDMask.m in Sources */,
@@ -6780,12 +6640,10 @@
 				FC06D0E62A9DC0EA00A974D8 /* CreateGroupModel.swift in Sources */,
 				D0101D5D2433C885004337ED /* SDMaskView.m in Sources */,
 				B0F08FF828A24F9000986EB6 /* IDSController.m in Sources */,
-				18CDF69B257F91BD006E8E5C /* CQUPTMapMyStarButton.m in Sources */,
 				14F6F5472AFB8CDA007C7CA6 /* ScheduleModel.swift in Sources */,
 				1A14136C235F524B0001417E /* UIViewController+BackButtonHandler.m in Sources */,
 				9AEC13542CA9396D00486D26 /* ToDoAlertController.swift in Sources */,
 				14B73F7A281BED7B00D08ADD /* MessageMoreCell.m in Sources */,
-				18CDF69D257F91BD006E8E5C /* CQUPTMapSearchResultCell.m in Sources */,
 				14FFFC042AF8C0FD005A7EBD /* HttpManager.swift in Sources */,
 				DB34EB2E239BD4550052B65E /* RemindTableViewCell.m in Sources */,
 				7311328626CCEC2400EF88C1 /* Goods.m in Sources */,
@@ -6806,7 +6664,6 @@
 				49628E3C26D52E6C00805A08 /* TypeButton.m in Sources */,
 				14FFFBEC2AF8C0F3005A7EBD /* UNManager.swift in Sources */,
 				B0C9F2452B0126E1006F4286 /* ActivityAdminReviewedVC.swift in Sources */,
-				18CDF6A4257F91BD006E8E5C /* CollectionViewSpaceLayout.m in Sources */,
 				14F6F54B2AFB8CDA007C7CA6 /* RYScheduleSelectSectionHeaderView.swift in Sources */,
 				14E7E4B327F57FC800B67469 /* FeedBackSelectView.m in Sources */,
 				FC20AA3A2AA3A11100A62BCB /* GroupManageVC.swift in Sources */,
@@ -6827,8 +6684,6 @@
 				B0C9F23E2B0126E1006F4286 /* TitleContentView.swift in Sources */,
 				187DF4C5260310FA000BCDE9 /* UITextView+WZB.m in Sources */,
 				4931631E26CD7B7900140412 /* StampCenterVC.m in Sources */,
-				18CDF695257F91BD006E8E5C /* CQUPTMapPlaceItem.m in Sources */,
-				18CDF69A257F91BD006E8E5C /* CQUPTMapProgressView.m in Sources */,
 				B0C9F2422B0126E1006F4286 /* ActivitySearchTableViewCell.swift in Sources */,
 				49343A2326D4EAB2001A2892 /* CommonQuestionCell.m in Sources */,
 				14B73F71281BED7B00D08ADD /* ActiveMessage.m in Sources */,
@@ -6852,7 +6707,6 @@
 				18CDF4B9257F8DBD006E8E5C /* sendCodeViewController.m in Sources */,
 				735BC54426D3B64500F22678 /* FeedBackDetailsTableViewCell.m in Sources */,
 				75CC08172C539B3800810A4E /* DetailScorePerYearCell.m in Sources */,
-				18CDF68E257F91BD006E8E5C /* CQUPTMapModel.m in Sources */,
 				7311328726CCEC2400EF88C1 /* Balance.m in Sources */,
 				18CDF4C3257F8DBD006E8E5C /* questionAndEmail.m in Sources */,
 				B047BF8D2AB34EF700616A5B /* ReduceAFSecurityPolicy.m in Sources */,

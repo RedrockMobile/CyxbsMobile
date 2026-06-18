@@ -25,7 +25,6 @@
 #import "NSDate+Timestamp.h"
 #import "URLController.h"
 #import "SDMask.h"
-#import "CQUPTMapPlaceRect.h"   // 重邮地图里用的，很多文件都要导入这个，太麻烦了，直接写这里好了
 #import "AESCipher.h"           // AES加密算法
 #import <SDWebImage/SDWebImage.h>
 

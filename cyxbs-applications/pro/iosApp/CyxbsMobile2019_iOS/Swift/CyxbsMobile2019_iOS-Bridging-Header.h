@@ -19,7 +19,6 @@
 #import "NSDate+Timestamp.h"
 #import "URLController.h"
 #import "SDMask.h"
-#import "CQUPTMapPlaceRect.h"   // 重邮地图里用的，很多文件都要导入这个，太麻烦了，直接写这里好了
 #import "AESCipher.h"           // AES加密算法
 #import "UserProtocolViewController.h"
 #import "ByWordViewController.h"
@@ -327,7 +326,6 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "MineMessageVC.h"
 #import "CheckInViewController.h"
 #import "CalendarViewController.h"
-#import "CQUPTMapViewController.h"
 #import "ClassDetailModel.h"
 #import "FoodVC.h"
 #import "AttitudeMainPageVC.h"
