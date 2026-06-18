@@ -224,9 +224,6 @@ for(NSString *fontFamilyName in [UIFont familyNames]){
 /// 考试安排接口
 #define Discover_POST_examArrange_API @"https://cyxbsmobile.redrock.team/api/examSchedule"
 
-/// 校车位置
-#define Discover_POST_schoolBus_API @"https://cyxbsmobile.redrock.team/wxapi/schoolbus/status"
-
 /// banner
 //#define Discover_GET_bannerView_API @"http://api-234.redrock.team/magipoke-text/banner/get"
 
@@ -329,7 +326,6 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "UserItem.h"
 #import "MineMessageVC.h"
 #import "CheckInViewController.h"
-#import "SchoolBusVC.h"
 #import "CalendarViewController.h"
 #import "CQUPTMapViewController.h"
 #import "ClassDetailModel.h"

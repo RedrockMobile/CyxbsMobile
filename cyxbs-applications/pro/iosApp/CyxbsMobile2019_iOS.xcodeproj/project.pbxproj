@@ -260,19 +260,6 @@
 		54A015758B176F663A191330 /* Pods_CyxbsWidgetExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1843D71C9EBEADC648DA3CE4 /* Pods_CyxbsWidgetExtension.framework */; };
 		5F73C44C6FE2FF78EB4A2B49 /* Pods_CyxbsMobile2019_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 387F1BE7DB99B7F30EA14155 /* Pods_CyxbsMobile2019_iOS.framework */; };
 		6464F93426E4F6EE008562C5 /* BuyModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 6464F93326E4F6EE008562C5 /* BuyModel.m */; };
-		646B1967282AA9420015DF28 /* BusGuideViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1966282AA9420015DF28 /* BusGuideViewController.m */; };
-		646B1975282CDF840015DF28 /* StationsCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1974282CDF840015DF28 /* StationsCollectionViewCell.m */; };
-		646B1978282CE0340015DF28 /* StationsGuideTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1977282CE0340015DF28 /* StationsGuideTableViewCell.m */; };
-		646B1984282E8F000015DF28 /* StationGuideView.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B1983282E8F000015DF28 /* StationGuideView.m */; };
-		646B198D282FFC460015DF28 /* BusMAPointAnnotation.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B198C282FFC460015DF28 /* BusMAPointAnnotation.m */; };
-		646B1990283001A60015DF28 /* StationMAPointAnnotation.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B198F283001A60015DF28 /* StationMAPointAnnotation.m */; };
-		646B199728311B0E0015DF28 /* StationGuideBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B199628311B0E0015DF28 /* StationGuideBar.m */; };
-		646B199A28313CB20015DF28 /* StationScrollView.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B199928313CB10015DF28 /* StationScrollView.m */; };
-		646B199D28313CDB0015DF28 /* StationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B199C28313CDB0015DF28 /* StationView.m */; };
-		646B19A02833983E0015DF28 /* NextStationBtn.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B199F2833983D0015DF28 /* NextStationBtn.m */; };
-		646B19A5283885740015DF28 /* CircleMAPointAnnotation.m in Sources */ = {isa = PBXBuildFile; fileRef = 646B19A4283885730015DF28 /* CircleMAPointAnnotation.m */; };
-		647AC30A2826CCB0009A2E35 /* StationData.m in Sources */ = {isa = PBXBuildFile; fileRef = 647AC3092826CCB0009A2E35 /* StationData.m */; };
-		647AC3102828012F009A2E35 /* SchoolBusMapSideBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 647AC30F2828012F009A2E35 /* SchoolBusMapSideBar.m */; };
 		7311328526CCEC2400EF88C1 /* ExchangeCenterViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7311327326CCEC2400EF88C1 /* ExchangeCenterViewController.m */; };
 		7311328626CCEC2400EF88C1 /* Goods.m in Sources */ = {isa = PBXBuildFile; fileRef = 7311327726CCEC2400EF88C1 /* Goods.m */; };
 		7311328726CCEC2400EF88C1 /* Balance.m in Sources */ = {isa = PBXBuildFile; fileRef = 7311327826CCEC2400EF88C1 /* Balance.m */; };
@@ -628,10 +615,6 @@
 		FCEC87C22A8B69A2007EFBA4 /* SearchAlertVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEC87C12A8B69A2007EFBA4 /* SearchAlertVC.swift */; };
 		FCED76292AA9C51100A3D55C /* ChooseGroupCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCED76282AA9C51100A3D55C /* ChooseGroupCollectionViewCell.swift */; };
 		FCF2B95B2A9343BD00A007DD /* SearchResultTableViewHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCF2B95A2A9343BD00A007DD /* SearchResultTableViewHeaderView.swift */; };
-		FE0D60442801702B00319A9E /* SchoolBusData.m in Sources */ = {isa = PBXBuildFile; fileRef = FE0D603A2801702B00319A9E /* SchoolBusData.m */; };
-		FE0D60452801702B00319A9E /* SchoolBusVC.m in Sources */ = {isa = PBXBuildFile; fileRef = FE0D603C2801702B00319A9E /* SchoolBusVC.m */; };
-		FE0D60462801702B00319A9E /* SchoolBusBottomView.m in Sources */ = {isa = PBXBuildFile; fileRef = FE0D60402801702B00319A9E /* SchoolBusBottomView.m */; };
-		FE0D60472801702B00319A9E /* SchoolBusMapView.m in Sources */ = {isa = PBXBuildFile; fileRef = FE0D60412801702B00319A9E /* SchoolBusMapView.m */; };
 		FE11E82027E8712B00C4B90B /* QAListSegmentView.m in Sources */ = {isa = PBXBuildFile; fileRef = FE11E81D27E8712A00C4B90B /* QAListSegmentView.m */; };
 		FE2C136827AEF629001CF7AF /* TodoSyncMsg.m in Sources */ = {isa = PBXBuildFile; fileRef = FE2C134927AEF629001CF7AF /* TodoSyncMsg.m */; };
 		FEBA676427E9BAC000C4D231 /* updatePopView.m in Sources */ = {isa = PBXBuildFile; fileRef = FEBA676327E9BAC000C4D231 /* updatePopView.m */; };
@@ -1070,32 +1053,6 @@
 		6464F93226E4F6EE008562C5 /* BuyModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BuyModel.h; sourceTree = "<group>"; };
 		6464F93326E4F6EE008562C5 /* BuyModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BuyModel.m; sourceTree = "<group>"; };
 		6464F98726F4FDB4008562C5 /* ExchangeCenterViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ExchangeCenterViewController.h; sourceTree = "<group>"; };
-		646B1965282AA9420015DF28 /* BusGuideViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BusGuideViewController.h; sourceTree = "<group>"; };
-		646B1966282AA9420015DF28 /* BusGuideViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BusGuideViewController.m; sourceTree = "<group>"; };
-		646B1973282CDF840015DF28 /* StationsCollectionViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationsCollectionViewCell.h; sourceTree = "<group>"; };
-		646B1974282CDF840015DF28 /* StationsCollectionViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationsCollectionViewCell.m; sourceTree = "<group>"; };
-		646B1976282CE0340015DF28 /* StationsGuideTableViewCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationsGuideTableViewCell.h; sourceTree = "<group>"; };
-		646B1977282CE0340015DF28 /* StationsGuideTableViewCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationsGuideTableViewCell.m; sourceTree = "<group>"; };
-		646B1982282E8F000015DF28 /* StationGuideView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationGuideView.h; sourceTree = "<group>"; };
-		646B1983282E8F000015DF28 /* StationGuideView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationGuideView.m; sourceTree = "<group>"; };
-		646B198B282FFC460015DF28 /* BusMAPointAnnotation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BusMAPointAnnotation.h; sourceTree = "<group>"; };
-		646B198C282FFC460015DF28 /* BusMAPointAnnotation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BusMAPointAnnotation.m; sourceTree = "<group>"; };
-		646B198E283001A60015DF28 /* StationMAPointAnnotation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationMAPointAnnotation.h; sourceTree = "<group>"; };
-		646B198F283001A60015DF28 /* StationMAPointAnnotation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationMAPointAnnotation.m; sourceTree = "<group>"; };
-		646B199528311B0E0015DF28 /* StationGuideBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationGuideBar.h; sourceTree = "<group>"; };
-		646B199628311B0E0015DF28 /* StationGuideBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationGuideBar.m; sourceTree = "<group>"; };
-		646B199828313CB10015DF28 /* StationScrollView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationScrollView.h; sourceTree = "<group>"; };
-		646B199928313CB10015DF28 /* StationScrollView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationScrollView.m; sourceTree = "<group>"; };
-		646B199B28313CDB0015DF28 /* StationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationView.h; sourceTree = "<group>"; };
-		646B199C28313CDB0015DF28 /* StationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationView.m; sourceTree = "<group>"; };
-		646B199E2833983D0015DF28 /* NextStationBtn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NextStationBtn.h; sourceTree = "<group>"; };
-		646B199F2833983D0015DF28 /* NextStationBtn.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NextStationBtn.m; sourceTree = "<group>"; };
-		646B19A3283885730015DF28 /* CircleMAPointAnnotation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CircleMAPointAnnotation.h; sourceTree = "<group>"; };
-		646B19A4283885730015DF28 /* CircleMAPointAnnotation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CircleMAPointAnnotation.m; sourceTree = "<group>"; };
-		647AC3082826CCB0009A2E35 /* StationData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StationData.h; sourceTree = "<group>"; };
-		647AC3092826CCB0009A2E35 /* StationData.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StationData.m; sourceTree = "<group>"; };
-		647AC30E2828012E009A2E35 /* SchoolBusMapSideBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SchoolBusMapSideBar.h; sourceTree = "<group>"; };
-		647AC30F2828012F009A2E35 /* SchoolBusMapSideBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SchoolBusMapSideBar.m; sourceTree = "<group>"; };
 		7311327326CCEC2400EF88C1 /* ExchangeCenterViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ExchangeCenterViewController.m; sourceTree = "<group>"; };
 		7311327626CCEC2400EF88C1 /* Balance.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Balance.h; sourceTree = "<group>"; };
 		7311327726CCEC2400EF88C1 /* Goods.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Goods.m; sourceTree = "<group>"; };
@@ -1290,7 +1247,6 @@
 		7AA4C4722891237600E204C8 /* StampCenterHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StampCenterHeader.h; sourceTree = "<group>"; };
 		7AA4C473289123B700E204C8 /* FeedBackCenterHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FeedBackCenterHeader.h; sourceTree = "<group>"; };
 		7AA4C47628921BF400E204C8 /* SchoolCalendarHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SchoolCalendarHeader.h; sourceTree = "<group>"; };
-		7AA4C47E2892206200E204C8 /* SchoolBusHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SchoolBusHeader.h; sourceTree = "<group>"; };
 		7AA4C480289220CE00E204C8 /* ADHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ADHeader.h; sourceTree = "<group>"; };
 		7AA4C4842892217100E204C8 /* MapHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MapHeader.h; sourceTree = "<group>"; };
 		7AA4C48628922F9A00E204C8 /* ToDoHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ToDoHeader.h; sourceTree = "<group>"; };
@@ -1696,14 +1652,6 @@
 		FCEC87C12A8B69A2007EFBA4 /* SearchAlertVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAlertVC.swift; sourceTree = "<group>"; };
 		FCED76282AA9C51100A3D55C /* ChooseGroupCollectionViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooseGroupCollectionViewCell.swift; sourceTree = "<group>"; };
 		FCF2B95A2A9343BD00A007DD /* SearchResultTableViewHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultTableViewHeaderView.swift; sourceTree = "<group>"; };
-		FE0D60392801702B00319A9E /* SchoolBusData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SchoolBusData.h; sourceTree = "<group>"; };
-		FE0D603A2801702B00319A9E /* SchoolBusData.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SchoolBusData.m; sourceTree = "<group>"; };
-		FE0D603C2801702B00319A9E /* SchoolBusVC.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SchoolBusVC.m; sourceTree = "<group>"; };
-		FE0D603D2801702B00319A9E /* SchoolBusVC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SchoolBusVC.h; sourceTree = "<group>"; };
-		FE0D603F2801702B00319A9E /* SchoolBusMapView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SchoolBusMapView.h; sourceTree = "<group>"; };
-		FE0D60402801702B00319A9E /* SchoolBusBottomView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SchoolBusBottomView.m; sourceTree = "<group>"; };
-		FE0D60412801702B00319A9E /* SchoolBusMapView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SchoolBusMapView.m; sourceTree = "<group>"; };
-		FE0D60422801702B00319A9E /* SchoolBusBottomView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SchoolBusBottomView.h; sourceTree = "<group>"; };
 		FE11E81D27E8712A00C4B90B /* QAListSegmentView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = QAListSegmentView.m; sourceTree = "<group>"; };
 		FE11E81E27E8712A00C4B90B /* QAListSegmentView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = QAListSegmentView.h; sourceTree = "<group>"; };
 		FE2C134627AEF629001CF7AF /* TodoDateTool.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TodoDateTool.m; sourceTree = "<group>"; };
@@ -3755,8 +3703,6 @@
 			children = (
 				646B1987282F68CD0015DF28 /* CollectionViewCell */,
 				646B1986282F68B40015DF28 /* TableViewCell */,
-				646B199B28313CDB0015DF28 /* StationView.h */,
-				646B199C28313CDB0015DF28 /* StationView.m */,
 			);
 			path = Cell;
 			sourceTree = "<group>";
@@ -3764,8 +3710,6 @@
 		646B1986282F68B40015DF28 /* TableViewCell */ = {
 			isa = PBXGroup;
 			children = (
-				646B1976282CE0340015DF28 /* StationsGuideTableViewCell.h */,
-				646B1977282CE0340015DF28 /* StationsGuideTableViewCell.m */,
 			);
 			path = TableViewCell;
 			sourceTree = "<group>";
@@ -3773,8 +3717,6 @@
 		646B1987282F68CD0015DF28 /* CollectionViewCell */ = {
 			isa = PBXGroup;
 			children = (
-				646B1973282CDF840015DF28 /* StationsCollectionViewCell.h */,
-				646B1974282CDF840015DF28 /* StationsCollectionViewCell.m */,
 			);
 			path = CollectionViewCell;
 			sourceTree = "<group>";
@@ -3782,12 +3724,6 @@
 		646B199428311ABE0015DF28 /* Annotation */ = {
 			isa = PBXGroup;
 			children = (
-				646B198B282FFC460015DF28 /* BusMAPointAnnotation.h */,
-				646B198C282FFC460015DF28 /* BusMAPointAnnotation.m */,
-				646B198E283001A60015DF28 /* StationMAPointAnnotation.h */,
-				646B198F283001A60015DF28 /* StationMAPointAnnotation.m */,
-				646B19A3283885730015DF28 /* CircleMAPointAnnotation.h */,
-				646B19A4283885730015DF28 /* CircleMAPointAnnotation.m */,
 			);
 			path = Annotation;
 			sourceTree = "<group>";
@@ -3795,8 +3731,6 @@
 		646B19A1283398450015DF28 /* Button */ = {
 			isa = PBXGroup;
 			children = (
-				646B199E2833983D0015DF28 /* NextStationBtn.h */,
-				646B199F2833983D0015DF28 /* NextStationBtn.m */,
 			);
 			path = Button;
 			sourceTree = "<group>";
@@ -3804,12 +3738,6 @@
 		646B19A22833985B0015DF28 /* Bottom */ = {
 			isa = PBXGroup;
 			children = (
-				FE0D60422801702B00319A9E /* SchoolBusBottomView.h */,
-				FE0D60402801702B00319A9E /* SchoolBusBottomView.m */,
-				646B199528311B0E0015DF28 /* StationGuideBar.h */,
-				646B199628311B0E0015DF28 /* StationGuideBar.m */,
-				646B199828313CB10015DF28 /* StationScrollView.h */,
-				646B199928313CB10015DF28 /* StationScrollView.m */,
 			);
 			path = Bottom;
 			sourceTree = "<group>";
@@ -4483,7 +4411,6 @@
 				75CC08242C564B9600810A4E /* ScorePageHeader.h */,
 				75CC08232C564AB100810A4E /* TestArrangeHeader.h */,
 				75CC08222C564A4C00810A4E /* SportAttendanceHeader.h */,
-				7AA4C47E2892206200E204C8 /* SchoolBusHeader.h */,
 				7AA4C480289220CE00E204C8 /* ADHeader.h */,
 				14B73F32281BED7B00D08ADD /* MineMessageHeader.h */,
 				7AA4C4842892217100E204C8 /* MapHeader.h */,
@@ -5971,10 +5898,6 @@
 		FE0D60382801702B00319A9E /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				FE0D60392801702B00319A9E /* SchoolBusData.h */,
-				FE0D603A2801702B00319A9E /* SchoolBusData.m */,
-				647AC3082826CCB0009A2E35 /* StationData.h */,
-				647AC3092826CCB0009A2E35 /* StationData.m */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -5982,10 +5905,6 @@
 		FE0D603B2801702B00319A9E /* Controller */ = {
 			isa = PBXGroup;
 			children = (
-				FE0D603D2801702B00319A9E /* SchoolBusVC.h */,
-				FE0D603C2801702B00319A9E /* SchoolBusVC.m */,
-				646B1965282AA9420015DF28 /* BusGuideViewController.h */,
-				646B1966282AA9420015DF28 /* BusGuideViewController.m */,
 			);
 			path = Controller;
 			sourceTree = "<group>";
@@ -5997,12 +5916,6 @@
 				646B19A1283398450015DF28 /* Button */,
 				646B199428311ABE0015DF28 /* Annotation */,
 				646B1985282F68AB0015DF28 /* Cell */,
-				FE0D603F2801702B00319A9E /* SchoolBusMapView.h */,
-				FE0D60412801702B00319A9E /* SchoolBusMapView.m */,
-				647AC30E2828012E009A2E35 /* SchoolBusMapSideBar.h */,
-				647AC30F2828012F009A2E35 /* SchoolBusMapSideBar.m */,
-				646B1982282E8F000015DF28 /* StationGuideView.h */,
-				646B1983282E8F000015DF28 /* StationGuideView.m */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -6448,7 +6361,6 @@
 				18CDF6C7257F91BE006E8E5C /* CalendarViewController.m in Sources */,
 				14B73F6E281BED7B00D08ADD /* MessageSettingCell.m in Sources */,
 				DB4064FB2466D889006CE5BC /* DLWeeklSelectView.m in Sources */,
-				646B1967282AA9420015DF28 /* BusGuideViewController.m in Sources */,
 				14B73F72281BED7B00D08ADD /* ActiveMessageCell.m in Sources */,
 				14D03A0B27FE69A800D6AE93 /* SSRTopBarBaseView.m in Sources */,
 				B074C03B2AFD20F00086AB07 /* ActivityCenterVC.swift in Sources */,
@@ -6464,7 +6376,6 @@
 				AAE3307225E367E400324750 /* MainPageTableViewCell.m in Sources */,
 				B0F71C982ABC71B200F8B1AC /* PublishPageModel.m in Sources */,
 				187DF4BB260310DD000BCDE9 /* UIScrollView+Empty.m in Sources */,
-				646B199D28313CDB0015DF28 /* StationView.m in Sources */,
 				75CC080B2C539B3700810A4E /* GPAUnavailableViewController.m in Sources */,
 				49252DAA26D39CC9003A8A7F /* FeedBackMainPageViewController.m in Sources */,
 				B0C9F2342B0126E1006F4286 /* ActivityTypePickerVC.swift in Sources */,
@@ -6497,7 +6408,6 @@
 				AA4FF36525879CD500C31286 /* MineSettingViewController.m in Sources */,
 				14B73F76281BED7B00D08ADD /* SystemMessageCell.m in Sources */,
 				14B73F7B281BED7B00D08ADD /* MineMessageMoreVC.m in Sources */,
-				FE0D60442801702B00319A9E /* SchoolBusData.m in Sources */,
 				14B73F7F281BED7B00D08ADD /* DiscoverMineMessageVC.m in Sources */,
 				AA49098924F3BF5A007CB3BC /* TransitionManager.m in Sources */,
 				FC5279042AAC473E00B09685 /* GroupResultItem.swift in Sources */,
@@ -6531,7 +6441,6 @@
 				14FFFBF12AF8C0F3005A7EBD /* BaseButton.swift in Sources */,
 				B09BB8312AADA35400FF88F7 /* FoodVC.m in Sources */,
 				18CDF68D257F91BD006E8E5C /* CQUPTMapPresenter.m in Sources */,
-				646B1975282CDF840015DF28 /* StationsCollectionViewCell.m in Sources */,
 				B0FE5F2D294C94540070E755 /* UIColor+Rising.m in Sources */,
 				7551F9DE2C73A8BF0072CA88 /* DLTimeSelectedButton.swift in Sources */,
 				D0101F66243587A1004337ED /* GKWebImageManager.m in Sources */,
@@ -6556,7 +6465,6 @@
 				AA5368F02589E28800236CB5 /* QuitTipView.m in Sources */,
 				752A03EE2B0796CF003256C1 /* ActivityMessageCell.swift in Sources */,
 				B0F71C922ABC71B200F8B1AC /* ExpressDeclareModel.m in Sources */,
-				646B1984282E8F000015DF28 /* StationGuideView.m in Sources */,
 				B0C9F22F2B0126E1006F4286 /* ActivityRankingListVC.swift in Sources */,
 				7551F9E42C74AC470072CA88 /* DiscoverTodoSheetView.swift in Sources */,
 				FC7D381A2AAB867000DEAD50 /* BatchAddModel.swift in Sources */,
@@ -6598,7 +6506,6 @@
 				4931631026CD7B6800140412 /* StampCenterTopView.m in Sources */,
 				AA3F82E624EA4A8900B65042 /* LeftBar.m in Sources */,
 				1A1E869723C8D1DE00321367 /* CheckInBar.m in Sources */,
-				646B19A5283885740015DF28 /* CircleMAPointAnnotation.m in Sources */,
 				FC78F80F2AD036E500995C01 /* AddArrangeModel.swift in Sources */,
 				18CDF69E257F91BD006E8E5C /* CQUPTMapBeforeSearchCell.m in Sources */,
 				1A1691F82430DEE70076EDC7 /* ClassScheduleTabBarView.m in Sources */,
@@ -6627,7 +6534,6 @@
 				14F6F56D2AFB8CDB007C7CA6 /* ForgotViewController.swift in Sources */,
 				B0C9F2302B0126E1006F4286 /* ActivityHitTableViewCell.swift in Sources */,
 				B0F71C9D2ABC71B200F8B1AC /* PublishTextView.m in Sources */,
-				FE0D60462801702B00319A9E /* SchoolBusBottomView.m in Sources */,
 				DB4064FC2466D889006CE5BC /* DLReminderModel.m in Sources */,
 				AAC7CA0B25F7725200E6B5D5 /* MainPage2RequestModel.m in Sources */,
 				FC15428D2ABBED5500BD806F /* CourseItem.swift in Sources */,
@@ -6698,8 +6604,6 @@
 				18CDF6A3257F91BD006E8E5C /* CQUPTMapDetailTagsCollectionViewCell.m in Sources */,
 				FC51103F2AED06910049EE43 /* AddArrangeFlowLayout.swift in Sources */,
 				AA57588C24EF5841002F6F6D /* NoticeWaySelectView.m in Sources */,
-				646B199A28313CB20015DF28 /* StationScrollView.m in Sources */,
-				646B198D282FFC460015DF28 /* BusMAPointAnnotation.m in Sources */,
 				493162DE26CD7B6300140412 /* StampTaskData.m in Sources */,
 				7FBF39F4257B79F30077494E /* ByPasswordViewController.m in Sources */,
 				75CC08472C5657AA00810A4E /* SCPieChart.m in Sources */,
@@ -6723,7 +6627,6 @@
 				D0101F68243587A1004337ED /* UIImage+GKDecoder.m in Sources */,
 				DB34EB32239BD4550052B65E /* LessonNumLabel.m in Sources */,
 				1A1691FB2430ECA70076EDC7 /* ClassTabBarController.m in Sources */,
-				646B1978282CE0340015DF28 /* StationsGuideTableViewCell.m in Sources */,
 				735BC53C26D3B33E00F22678 /* FeedBackDetailsViewController.m in Sources */,
 				FC1542912ABC75E900BD806F /* WeekMaping.swift in Sources */,
 				DB4065012466D889006CE5BC /* DLTimeSelectedButton.m in Sources */,
@@ -6744,7 +6647,6 @@
 				14B73F77281BED7B00D08ADD /* SystemMessageView.m in Sources */,
 				AA7ABAC62873EA5500BA6790 /* NewQAHud.m in Sources */,
 				DB34EB36239BD4550052B65E /* ChooseButton.m in Sources */,
-				647AC3102828012F009A2E35 /* SchoolBusMapSideBar.m in Sources */,
 				B09BB8302AADA35400FF88F7 /* popUpInformationVC.m in Sources */,
 				14FFFC002AF8C0FD005A7EBD /* APIConfigEX.swift in Sources */,
 				75CC081A2C539B3800810A4E /* UserInfoView.m in Sources */,
@@ -6788,7 +6690,6 @@
 				B0F71C8B2ABC71B200F8B1AC /* AttitudeSelfPageModel.m in Sources */,
 				18CDF4C6257F8DBD006E8E5C /* setEmail.m in Sources */,
 				1A141376235F524B0001417E /* UIImage+Color.m in Sources */,
-				FE0D60452801702B00319A9E /* SchoolBusVC.m in Sources */,
 				75CC08062C539B3700810A4E /* ExamArrangeData.m in Sources */,
 				DB34EB3D239BD4550052B65E /* ORWInputTextView.m in Sources */,
 				14FBBD41280505CC00D5B05D /* SSRTextCycleView.m in Sources */,
@@ -6817,7 +6718,6 @@
 				14F6F5512AFB8CDB007C7CA6 /* RYScheduleCollectionViewLayout.swift in Sources */,
 				DB34EB3A239BD4550052B65E /* CoverView.m in Sources */,
 				18CDF68F257F91BD006E8E5C /* CQUPTMapPlaceRect.m in Sources */,
-				647AC30A2826CCB0009A2E35 /* StationData.m in Sources */,
 				DB34EB22239BD4550052B65E /* AddRemindViewController.m in Sources */,
 				DB4064FD2466D889006CE5BC /* DLReminderSetTimeVC.m in Sources */,
 				14FFFC022AF8C0FD005A7EBD /* APIConfig.swift in Sources */,
@@ -6901,7 +6801,6 @@
 				DB4064F62466D889006CE5BC /* DLReminderViewController.m in Sources */,
 				AA86E38B2635B04A00756F05 /* ColorManager.m in Sources */,
 				738C15B126E0B35600E24F8C /* FeedBackDefaultView.m in Sources */,
-				FE0D60472801702B00319A9E /* SchoolBusMapView.m in Sources */,
 				FC06D0E62A9DC0EA00A974D8 /* CreateGroupModel.swift in Sources */,
 				D0101D5D2433C885004337ED /* SDMaskView.m in Sources */,
 				B0F08FF828A24F9000986EB6 /* IDSController.m in Sources */,
@@ -6917,7 +6816,6 @@
 				AAE3308725E3AD5E00324750 /* MainPageNumBtn.m in Sources */,
 				1A141368235F524B0001417E /* HttpClient.m in Sources */,
 				7577296A2C85916E00982233 /* ToDoTopExpiredStyleCell.swift in Sources */,
-				646B19A02833983E0015DF28 /* NextStationBtn.m in Sources */,
 				B0C9F2472B0126E1006F4286 /* ActivityReviewedTableViewCell.swift in Sources */,
 				75CC081E2C539B3800810A4E /* SportAttendanceModel.m in Sources */,
 				B00C3C342AF243D60057DDBA /* RemindHUD.m in Sources */,
@@ -6945,14 +6843,12 @@
 				FCD622E62AB53CE3007094A2 /* BusyDetailVC.swift in Sources */,
 				AAAA1D9024FE39F500DB9A81 /* NextLessonFinder.m in Sources */,
 				FCB921502AAF816A00F373A7 /* AddArrangeCollectionViewCell.swift in Sources */,
-				646B199728311B0E0015DF28 /* StationGuideBar.m in Sources */,
 				B0FE5F2C294C94540070E755 /* UIView+Rising.m in Sources */,
 				75CC08142C539B3700810A4E /* TermGrades.m in Sources */,
 				B09BB8332AADA35400FF88F7 /* FoodRefreshModel.m in Sources */,
 				73AAA1D426C918250084E44D /* PurchaseInfoGoodsInfoView.m in Sources */,
 				B0F71C9C2ABC71B200F8B1AC /* PublishMakeSureView.m in Sources */,
 				B0C9F23E2B0126E1006F4286 /* TitleContentView.swift in Sources */,
-				646B1990283001A60015DF28 /* StationMAPointAnnotation.m in Sources */,
 				187DF4C5260310FA000BCDE9 /* UITextView+WZB.m in Sources */,
 				4931631E26CD7B7900140412 /* StampCenterVC.m in Sources */,
 				18CDF695257F91BD006E8E5C /* CQUPTMapPlaceItem.m in Sources */,
