@@ -122,9 +122,7 @@ private fun BottomSearchBar(modifier: Modifier = Modifier) {
       )
       .onFocusChanged { focusState ->
         if (focusState.isFocused) {
-          scope.launch {
-            viewmodel.searchBottomSheetState.expand()
-          }
+          viewmodel.searchBottomSheetState.expandAsync()
         }
       }
       .padding(4.dp),

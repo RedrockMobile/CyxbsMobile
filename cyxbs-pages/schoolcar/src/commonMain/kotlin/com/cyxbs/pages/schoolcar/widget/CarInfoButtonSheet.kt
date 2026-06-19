@@ -151,7 +151,7 @@ fun CarInfoButtonSheet(
 			when (state.displayMode.value) {
 				is Empty -> {
 					//切换到empty
-					state.bottomSheetState.collapse()
+					state.bottomSheetState.collapseSuspend()
 					render.value = Empty
 				}
 
@@ -159,7 +159,7 @@ fun CarInfoButtonSheet(
 					render.value = state.displayMode.value
 					//等待一会完成测量
 					delay(100)
-					state.bottomSheetState.expand()
+					state.bottomSheetState.expandSuspend()
 				}
 			}
 		} finally {

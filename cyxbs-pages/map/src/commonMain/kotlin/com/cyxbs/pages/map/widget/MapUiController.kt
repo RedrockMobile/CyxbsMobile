@@ -85,13 +85,9 @@ class MapUiController(
     anchorListJob?.cancel()
     anchorListJob = scope.launch {
       if (!isCollectList) {
-        launch {
-          searchBottomSheetState.collapse()
-        }
+        searchBottomSheetState.collapseAsync()
       }
-      launch {
-        bottomSheetState.collapse()
-      }
+      bottomSheetState.collapseAsync()
       if (mainAnchorState.scale != 0f) mainAnchorState.animateClose()
       anchorItemStateList.forEach { anchorItemState ->
         if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
@@ -170,9 +166,7 @@ class MapUiController(
       is MapUiEvent.SearchToPlace -> {
         val getOffset = calculatePlaceOffset(event.placeCenterX, event.placeCenterY) ?: return
         coroutineScope {
-          launch {
-            searchBottomSheetState.collapse()
-          }
+          searchBottomSheetState.collapseAsync()
           resetMapAnimation(this)
           anchorItemStateList.filter {
             it.visible
@@ -182,9 +176,7 @@ class MapUiController(
               anchorItemState.visible = false
             }
           }
-          launch {
-            bottomSheetState.collapse()
-          }
+          bottomSheetState.collapseAsync()
           launch {
             mainAnchorState.placeId = event.placeId
             updateMainAnchorState(getOffset, true)
@@ -199,9 +191,7 @@ class MapUiController(
       is MapUiEvent.FocusOnPlace -> {
         val getOffset = calculatePlaceOffset(event.placeCenterX, event.placeCenterY) ?: return
         coroutineScope {
-          launch {
-            searchBottomSheetState.collapse()
-          }
+          searchBottomSheetState.collapseAsync()
           animateMapToPosition(this, maxScale, getOffset)
           anchorItemStateList.filter {
             it.visible
@@ -215,9 +205,7 @@ class MapUiController(
             mainAnchorState.placeId = event.placeId
             updateMainAnchorState(getOffset, true)
           }
-          launch {
-            bottomSheetState.collapse()
-          }
+          bottomSheetState.collapseAsync()
         }
       }
 
@@ -244,9 +232,7 @@ class MapUiController(
           null
         }
         coroutineScope {
-          launch {
-            searchBottomSheetState.collapse()
-          }
+          searchBottomSheetState.collapseAsync()
           if (realOffset != null) {
             animateMapToPosition(this, maxScale, realOffset)
           }
@@ -264,17 +250,13 @@ class MapUiController(
                 updateMainAnchorState(realOffset, true)
               }
               if (bottomSheetState.state == BottomSheetValueState.Hide) {
-                launch {
-                  bottomSheetState.collapse()
-                }
+                bottomSheetState.collapseAsync()
               }
             } else {
               launch {
                 updateMainAnchorState(visible = false)
               }
-              launch {
-                bottomSheetState.hide()
-              }
+              bottomSheetState.hideAsync()
             }
           }
         }
@@ -285,12 +267,8 @@ class MapUiController(
           launch {
             animateMapToPosition(this, maxScale, Offset(event.anchorPositionX, event.anchorPositionY))
           }
-          launch {
-            searchBottomSheetState.collapse()
-          }
-          launch {
-            bottomSheetState.expand()
-          }
+          searchBottomSheetState.collapseAsync()
+          bottomSheetState.expandAsync()
         }
       }
 
@@ -303,19 +281,19 @@ class MapUiController(
       }
 
       MapUiEvent.CollapseSearchSheet -> {
-        searchBottomSheetState.collapse()
+        searchBottomSheetState.collapseAsync()
       }
 
       MapUiEvent.CollapseBottomSheet -> {
-        bottomSheetState.collapse()
+        bottomSheetState.collapseAsync()
       }
 
       MapUiEvent.ExpandBottomSheet -> {
-        bottomSheetState.expand()
+        bottomSheetState.expandAsync()
       }
 
       MapUiEvent.HideBottomSheet -> {
-        bottomSheetState.hide()
+        bottomSheetState.hideAsync()
       }
     }
   }

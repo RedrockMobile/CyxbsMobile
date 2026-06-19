@@ -147,7 +147,7 @@ private class BottomSheetScene(
 
       if (properties.expandOnShow) {
         LaunchedEffect(state) {
-          state.expand()
+          state.expandAsync()
         }
       }
 
@@ -170,7 +170,7 @@ private class BottomSheetScene(
 
   override suspend fun onRemove() {
     if (::bottomSheetState.isInitialized) {
-      bottomSheetState.hide()
+      bottomSheetState.hideSuspend()
     }
   }
 

@@ -191,16 +191,16 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     bottomNavViewModel.selectedItem.drop(1).collect {
       // 之前主页的第二页是邮问（掌邮社区，因为违规问题下架了）会将课表 bottomSheetState 设置成 hide 状态
       // 现在改成游乐园后没必要再 hide 了
-      bottomSheetState.collapse()
+      bottomSheetState.collapseAsync()
     }
   }
   LaunchedEffect(Unit) {
     courseBottomSheetViewModel.state.collectLatest {
       // 展开折叠在其他地方同时触发时会将上次触发的协程取消掉，所以需要 catch
       when (it) {
-        true -> courseFrameViewModel.frame.bottomSheetState.expand()
-        false -> courseFrameViewModel.frame.bottomSheetState.collapse()
-        null -> courseFrameViewModel.frame.bottomSheetState.hide()
+        true -> courseFrameViewModel.frame.bottomSheetState.expandAsync()
+        false -> courseFrameViewModel.frame.bottomSheetState.collapseAsync()
+        null -> courseFrameViewModel.frame.bottomSheetState.hideAsync()
       }
     }
   }
