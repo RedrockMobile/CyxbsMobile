@@ -104,7 +104,7 @@ deeplink: cyxbs://course?stuNum={String}&stableKey=[String?]
 - argument: `com.cyxbs.pages.course.api.FindCourseNavArgument`
 
 ```text
-deeplink: cyxbs://course_find?initialQuery=[String]&directStuNum=[String]
+deeplink: cyxbs://course_find?initialQuery=[String]
 ```
 
 ## :cyxbs-pages:emptyroom

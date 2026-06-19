@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.pages.course.api.FindCourseNavArgument
+import com.cyxbs.pages.course.api.CourseNavArgument
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.model.LinkLessonRepository
@@ -74,7 +74,7 @@ private fun TitleWithLinkIcon(title: String, enableShowLinkIcon: Boolean) {
         contentScale = ContentScale.Inside,
         painter = painterResource(ILinkService2.icon_link_double),
         modifier = Modifier.padding(start = 16.dp).clickableNoIndicator {
-          FindCourseNavArgument(directStuNum = LinkLessonRepository.state.value.linkNum).navigate()
+          CourseNavArgument(stuNum = LinkLessonRepository.state.value.linkNum).navigate()
         },
       )
     }
