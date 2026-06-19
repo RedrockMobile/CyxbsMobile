@@ -158,6 +158,57 @@ class KmpInterfaceImpl: IOSKmpInterface {
         nav.pushViewController(vc, animated: true)
     }
 
+    // 登录成功后同步 iOS 原生数据：待办、用户信息、Person 模型、邮箱绑定检查、登录时间。
+    // 对齐 RYLoginViewController.loginIfNeeded() 成功后的处理逻辑。
+    func onLoginSuccess(stuNum: String) {
+        TodoSyncTool.share().logInSuccess()
+        UserItem.default().getUserInfo()
+        updatePersonModel()
+        checkoutEmailBinding()
+        UserDefaultsManager.shared.latestRequestToken = Date()
+    }
+
+    // 跳转找回密码页面。
+    // 对齐 RYLoginViewController.forgotPassword()：先查询绑定状态，
+    // 有邮箱或密保则 push ForgotViewController，否则提示联系 QQ 群。
+    func jumpForgotPassword(stuNum: String) {
+        guard let nav = Self.topNavigationController() else { return }
+
+        let alertVC = UIAlertController(title: "忘记密码？", message: "输入你的学号，找回你的密码！", preferredStyle: .alert)
+        alertVC.addTextField { textField in
+            textField.keyboardType = .asciiCapable
+            textField.placeholder = "输入你的学号"
+            textField.text = stuNum.isEmpty ? nil : stuNum
+        }
+        let cancel = UIAlertAction(title: "取消", style: .cancel)
+        let sure = UIAlertAction(title: "确定", style: .default) { _ in
+            let inputStuNum = alertVC.textFields?.first?.text
+            self.requestForgotPassword(sno: inputStuNum, nav: nav)
+        }
+        alertVC.addAction(cancel)
+        alertVC.addAction(sure)
+
+        guard let topVC = Self.topViewController() else { return }
+        topVC.present(alertVC, animated: true)
+    }
+
+    // 打开用户协议页面
+    func jumpUserAgreement() {
+        guard let url = RYLoginViewController.agreementURL else { return }
+        UIApplication.shared.open(url)
+    }
+
+    // 打开隐私政策页面
+    func jumpPrivacyPolicy() {
+        guard let url = RYLoginViewController.privacyURL else { return }
+        UIApplication.shared.open(url)
+    }
+
+    // 退出应用（用户不同意用户协议时调用）
+    func exitApp() {
+        exit(0)
+    }
+
     // CMP 课表请求成功后回调（cyxbs-pages/course LessonRepository.requestLesson 的 onSuccess
     // 之一）。把 StuLessonBean JSON 解析为旧 ScheduleModel，写入 App Group 共享缓存
     // （CacheManager.FilePath.schedule(sno:)），供 CyxbsWidgetExtension 课表小组件读取。
@@ -203,5 +254,64 @@ class KmpInterfaceImpl: IOSKmpInterface {
         }
         while let presented = vc?.presentedViewController { vc = presented }
         return vc
+    }
+
+    // 更新 Person 模型，对齐 RYLoginViewController.updatePersonModel()。
+    private func updatePersonModel() {
+        HttpManager.shared.magipoke_Person_Search().ry_JSON { response in
+            if case .success(let model) = response, model["status"].stringValue == "10000" {
+                let person = PersonModel(json: model["data"])
+                UserModel.default.person = person
+            }
+        }
+    }
+
+    // 检查邮箱绑定，未绑定则 push EmailBidingViewController。
+    // 对齐 RYLoginViewController.checktoutEmailBiding()。
+    private func checkoutEmailBinding() {
+        EmailBidingViewController.isBiding { response in
+            if let response, !response.email {
+                guard let nav = Self.topNavigationController() else { return }
+                let vc = EmailBidingViewController()
+                vc.hidesBottomBarWhenPushed = true
+                nav.pushViewController(vc, animated: true)
+            }
+        }
+    }
+
+    // 找回密码：查询绑定状态，有邮箱或密保则 push ForgotViewController，否则提示联系 QQ 群。
+    // 对齐 RYLoginViewController.requestToForgot()。
+    private func requestForgotPassword(sno: String?, nav: UINavigationController) {
+        guard let sno = sno, !sno.isEmpty else {
+            toast(s: "学号有误！！！", isLong: false)
+            return
+        }
+
+        EmailBidingViewController.isBiding(sno: sno) { bidingType in
+            guard let bidingType = bidingType else {
+                self.toast(s: "学号有误！！！", isLong: false)
+                return
+            }
+
+            if !bidingType.email && !bidingType.question {
+                // 未绑定邮箱和密保，提示联系 QQ 群
+                let alertVC = UIAlertController(
+                    title: "无法找回密码",
+                    message: "你从未绑定过你的邮箱，也未绑定过问题，请添加我们的QQ群，联系相关人员进行找回。QQ群:\(BaseTextFiledViewController.forgotQQGroup)",
+                    preferredStyle: .alert
+                )
+                let cancel = UIAlertAction(title: "确定", style: .cancel)
+                alertVC.addAction(cancel)
+                Self.topViewController()?.present(alertVC, animated: true)
+                return
+            }
+
+            let vc = ForgotViewController(sno: sno, bidingType: bidingType)
+            if !bidingType.email {
+                vc.retrieveWay = .question
+            }
+            vc.hidesBottomBarWhenPushed = true
+            nav.pushViewController(vc, animated: true)
+        }
     }
 }

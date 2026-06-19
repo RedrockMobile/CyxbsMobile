@@ -86,5 +86,21 @@ class KmpInterfaceImpl: IOSKmpInterface {
 
     func onLessonUpdated(stuNum: String, nowWeek: Int32, stuLessonBeanJson: String) {
     }
+
+    func onLoginSuccess(stuNum: String) {
+    }
+
+    func jumpForgotPassword(stuNum: String) {
+    }
+
+    func jumpUserAgreement() {
+    }
+
+    func jumpPrivacyPolicy() {
+    }
+
+    func exitApp() {
+        exit(0)
+    }
 }
 

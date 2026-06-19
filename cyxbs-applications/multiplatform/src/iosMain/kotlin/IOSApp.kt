@@ -1,5 +1,7 @@
 import androidx.compose.ui.window.ComposeUIViewController
+import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountEditService
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
@@ -14,6 +16,7 @@ import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.login.api.LoginNavArgument
+import com.cyxbs.pages.login.service.LoginIosPlatform
 import com.cyxbs.pages.mine.home.MineIosPlatform
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
@@ -21,6 +24,8 @@ import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
 import com.cyxbs.pages.course.service.CourseIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import platform.UIKit.UIViewController
 
@@ -37,13 +42,24 @@ fun doInitApp(impl: IOSKmpInterface) {
   initProvider()
   InitialManager.init(isMainProcess = true)
 
-  // 监听 token
+  // 监听 token 变化，同步到 iOS 原生侧
   appCoroutineScope.launch(Dispatchers.Main) {
     TokenProvider.stateFlow.collect {
-      if (it != null) {
-        impl.setToken(it.token)
-      }
+      impl.setToken(it?.token ?: "")
     }
+  }
+
+  // 监听账户状态变化，登录成功后同步 iOS 原生数据（待办、用户信息、邮箱绑定等）。
+  // drop(1) 跳过初始值：app 启动时有缓存 token 则 state 已经是 Login，
+  // 不跳过会误触发 onLoginSuccess 导致重复同步。
+  val accountService = IAccountService::class.impl()
+  appCoroutineScope.launch(Dispatchers.Main) {
+    accountService.state
+      .drop(1)
+      .filterIsInstance<AccountState.Login>()
+      .collect { login ->
+        impl.onLoginSuccess(login.stuNum)
+      }
   }
 }
 
@@ -133,6 +149,33 @@ interface IOSKmpInterface {
    * 写入 App Group 共享缓存供 CyxbsWidgetExtension 课表小组件读取。
    */
   fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String)
+
+  /**
+   * 登录成功后同步 iOS 原生数据。
+   * Swift 端执行：同步待办、获取用户信息、更新 Person 模型、检查邮箱绑定、记录登录时间。
+   */
+  fun onLoginSuccess(stuNum: String)
+
+  /**
+   * 跳转找回密码页面。
+   * [stuNum] 当前输入的学号（可能为空），Swift 端用于预填充和查询绑定状态。
+   */
+  fun jumpForgotPassword(stuNum: String)
+
+  /**
+   * 打开用户协议页面
+   */
+  fun jumpUserAgreement()
+
+  /**
+   * 打开隐私政策页面
+   */
+  fun jumpPrivacyPolicy()
+
+  /**
+   * 退出应用（用户不同意用户协议时调用）
+   */
+  fun exitApp()
 }
 
 // SportIosPlatform / TodoIosPlatform / DiscoverFunctionsIosPlatform 之间存在同名同签名
@@ -148,6 +191,7 @@ interface IOSKmpInterface {
 @ImplProvider(FairgroundIosPlatform::class)
 @ImplProvider(MineIosPlatform::class)
 @ImplProvider(CourseIosPlatform::class)
+@ImplProvider(LoginIosPlatform::class)
 internal object IOSKmpInterfaceLink :
   IOSHomeViewPager,
   IOSToast,
@@ -158,7 +202,8 @@ internal object IOSKmpInterfaceLink :
   DiscoverIosPlatform,
   FairgroundIosPlatform,
   MineIosPlatform,
-  CourseIosPlatform {
+  CourseIosPlatform,
+  LoginIosPlatform {
 
   lateinit var impl: IOSKmpInterface
 
@@ -248,5 +293,21 @@ internal object IOSKmpInterfaceLink :
 
   override fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String) {
     impl.onLessonUpdated(stuNum, nowWeek, stuLessonBeanJson)
+  }
+
+  override fun jumpForgotPassword(stuNum: String) {
+    impl.jumpForgotPassword(stuNum)
+  }
+
+  override fun jumpUserAgreement() {
+    impl.jumpUserAgreement()
+  }
+
+  override fun jumpPrivacyPolicy() {
+    impl.jumpPrivacyPolicy()
+  }
+
+  override fun exitApp() {
+    impl.exitApp()
   }
 }

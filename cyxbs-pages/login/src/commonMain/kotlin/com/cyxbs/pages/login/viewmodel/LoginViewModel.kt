@@ -185,6 +185,7 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
   // 进入游客模式
   open fun enterTouristMode() {
     // 弹出所有页面，重新回到主页
+    IAccountEditService::class.impl().onTouristMode()
     appNavBackStack.clear()
     HomeNavArgument().navigate()
   }
