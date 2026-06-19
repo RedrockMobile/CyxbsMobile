@@ -83,5 +83,8 @@ class KmpInterfaceImpl: IOSKmpInterface {
 
     func jumpActivityCenter() {
     }
+
+    func onLessonUpdated(stuNum: String, nowWeek: Int32, stuLessonBeanJson: String) {
+    }
 }
 

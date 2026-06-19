@@ -42,9 +42,9 @@
 		1476CA5E2AFCD2C400635848 /* SearchStudentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5032AFB8CDA007C7CA6 /* SearchStudentModel.swift */; };
 		1476CA5F2AFCD2C600635848 /* ScheduleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5042AFB8CDA007C7CA6 /* ScheduleModel.swift */; };
 		1476CA602AFCD2C800635848 /* CurriculumModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5052AFB8CDA007C7CA6 /* CurriculumModel.swift */; };
+		1476CA612AFCD2CE00635848 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
 		1476CA622AFCD2D100635848 /* ScheduleDrawType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50C2AFB8CDA007C7CA6 /* ScheduleDrawType.swift */; };
 		1476CA632AFCD2D500635848 /* ScheduleCalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50D2AFB8CDA007C7CA6 /* ScheduleCalModel.swift */; };
-		1476CA612AFCD2CE00635848 /* RYScheduleMaping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F50F2AFB8CDA007C7CA6 /* RYScheduleMaping.swift */; };
 		1476CA642AFCD2D800635848 /* ScheduleDataFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5142AFB8CDA007C7CA6 /* ScheduleDataFetch.swift */; };
 		1476CA652AFCD2EE00635848 /* TokenModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5382AFB8CDA007C7CA6 /* TokenModel.swift */; };
 		1476CA662AFCD30300635848 /* PersonModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */; };
@@ -82,6 +82,8 @@
 		14E7E4A927F5762500B67469 /* QuestionButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4A727F5762500B67469 /* QuestionButton.m */; };
 		14E7E4B227F57FC800B67469 /* FeedBackQuestionButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4AE27F57FC800B67469 /* FeedBackQuestionButton.m */; };
 		14E7E4B327F57FC800B67469 /* FeedBackSelectView.m in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4AF27F57FC800B67469 /* FeedBackSelectView.m */; };
+		14E7E4C127F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
+		14E7E4C227F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
 		14F6F4FB2AFB8171007C7CA6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F4CE2AFB8171007C7CA6 /* AppDelegate.swift */; };
 		14F6F4FD2AFB81B9007C7CA6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 14F6F4FC2AFB81B9007C7CA6 /* LaunchScreen.storyboard */; };
 		14F6F4FF2AFB8C7D007C7CA6 /* 掌上重邮用户协议.md in Resources */ = {isa = PBXBuildFile; fileRef = 14F6F4FE2AFB8C7D007C7CA6 /* 掌上重邮用户协议.md */; };
@@ -101,8 +103,6 @@
 		14F6F56D2AFB8CDB007C7CA6 /* ForgotViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F53D2AFB8CDA007C7CA6 /* ForgotViewController.swift */; };
 		14F6F56E2AFB8CDB007C7CA6 /* PersonModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */; };
 		14F6F5752AFB8F4C007C7CA6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */; };
-		14E7E4C127F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
-		14E7E4C227F5800100B67469 /* UICollectionView+ElementKindSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */; };
 		14FBBD41280505CC00D5B05D /* SSRTextCycleView.m in Sources */ = {isa = PBXBuildFile; fileRef = 14FBBD3F280505CC00D5B05D /* SSRTextCycleView.m */; };
 		14FBBD4E2805489A00D5B05D /* SSRTextCycleCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 14FBBD4D2805489A00D5B05D /* SSRTextCycleCell.m */; };
 		14FFFBE02AF8C0F3005A7EBD /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FFFBCB2AF8C0F3005A7EBD /* Constants.swift */; };
@@ -710,6 +710,7 @@
 		14E7E4AF27F57FC800B67469 /* FeedBackSelectView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FeedBackSelectView.m; sourceTree = "<group>"; };
 		14E7E4B027F57FC800B67469 /* FeedBackQuestionButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FeedBackQuestionButton.h; sourceTree = "<group>"; };
 		14E7E4B127F57FC800B67469 /* FeedBackSelectView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FeedBackSelectView.h; sourceTree = "<group>"; };
+		14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UICollectionView+ElementKindSection.swift"; sourceTree = "<group>"; };
 		14F6F4CE2AFB8171007C7CA6 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		14F6F4FC2AFB81B9007C7CA6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		14F6F4FE2AFB8C7D007C7CA6 /* 掌上重邮用户协议.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = "掌上重邮用户协议.md"; path = "CyxbsMobile2019_iOS/掌上重邮用户协议.md"; sourceTree = "<group>"; };
@@ -729,7 +730,6 @@
 		14F6F53D2AFB8CDA007C7CA6 /* ForgotViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ForgotViewController.swift; sourceTree = "<group>"; };
 		14F6F5402AFB8CDA007C7CA6 /* PersonModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PersonModel.swift; sourceTree = "<group>"; };
 		14F6F5742AFB8F4C007C7CA6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		14E7E4C027F5800100B67469 /* UICollectionView+ElementKindSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UICollectionView+ElementKindSection.swift"; sourceTree = "<group>"; };
 		14FBBD3E280505CC00D5B05D /* SSRTextCycleView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SSRTextCycleView.h; sourceTree = "<group>"; };
 		14FBBD3F280505CC00D5B05D /* SSRTextCycleView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SSRTextCycleView.m; sourceTree = "<group>"; };
 		14FBBD4C2805489A00D5B05D /* SSRTextCycleCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SSRTextCycleCell.h; sourceTree = "<group>"; };
@@ -1534,8 +1534,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		187D2C3E2E4D7EDD00D8B45C /* QA */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = QA;
 			sourceTree = "<group>";
 		};
@@ -2367,53 +2365,6 @@
 			path = ViewController;
 			sourceTree = "<group>";
 		};
-		14F6F5222AFB8CDA007C7CA6 /* Finder */ = {
-			isa = PBXGroup;
-			children = (
-				14F6F5232AFB8CDA007C7CA6 /* Tools */,
-				14F6F5282AFB8CDA007C7CA6 /* News */,
-				14F6F52C2AFB8CDA007C7CA6 /* ViewController */,
-				14F6F52E2AFB8CDA007C7CA6 /* Header */,
-				14F6F5302AFB8CDA007C7CA6 /* Banner */,
-			);
-			path = Finder;
-			sourceTree = "<group>";
-		};
-		14F6F5232AFB8CDA007C7CA6 /* Tools */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Tools;
-			sourceTree = "<group>";
-		};
-		14F6F5282AFB8CDA007C7CA6 /* News */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = News;
-			sourceTree = "<group>";
-		};
-		14F6F52C2AFB8CDA007C7CA6 /* ViewController */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = ViewController;
-			sourceTree = "<group>";
-		};
-		14F6F52E2AFB8CDA007C7CA6 /* Header */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Header;
-			sourceTree = "<group>";
-		};
-		14F6F5302AFB8CDA007C7CA6 /* Banner */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Banner;
-			sourceTree = "<group>";
-		};
 		14F6F5352AFB8CDA007C7CA6 /* Login */ = {
 			isa = PBXGroup;
 			children = (
@@ -3122,14 +3073,12 @@
 				14F6F4CE2AFB8171007C7CA6 /* AppDelegate.swift */,
 				E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */,
 				14F6F5002AFB8CDA007C7CA6 /* Curriculum */,
-				14F6F5222AFB8CDA007C7CA6 /* Finder */,
 				14F6F5352AFB8CDA007C7CA6 /* Login */,
 				18CDF4D4257F91BC006E8E5C /* Discover */,
 				B5B454FC29C0C09F00875DF7 /* Center */,
 				1817F00C2594D5C500FE1304 /* NewQA */,
 				DB34EA28239BD4540052B65E /* ClassSchedule */,
 				1A14132A235F523B0001417E /* Mine */,
-				AA0DDAC8286C8B1900802324 /* MineMainPage */,
 				1A0AC5F5252B234700221514 /* Swift */,
 				1A141339235F524B0001417E /* Tools */,
 				B0FE5F1A294C94540070E755 /* Rising Extension */,
@@ -3950,13 +3899,6 @@
 			path = TaskManager;
 			sourceTree = "<group>";
 		};
-		7591F1B02B96FD85001890D2 /* Tools */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Tools;
-			sourceTree = "<group>";
-		};
 		75B1D7722B9EC62800BBC794 /* NSDictionaryExtension */ = {
 			isa = PBXGroup;
 			children = (
@@ -4228,171 +4170,11 @@
 			path = Source;
 			sourceTree = "<group>";
 		};
-		7AA4C4872892368200E204C8 /* Source */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Source;
-			sourceTree = "<group>";
-		};
 		9AB758822CEEEE4900E8258A /* Alert */ = {
 			isa = PBXGroup;
 			children = (
 			);
 			path = Alert;
-			sourceTree = "<group>";
-		};
-		AA0DDAC8286C8B1900802324 /* MineMainPage */ = {
-			isa = PBXGroup;
-			children = (
-				7AA4C4872892368200E204C8 /* Source */,
-				AA0DDAC9286C8B1900802324 /* Controller */,
-				AA0DDACC286C8B1900802324 /* Model */,
-				AA0DDACF286C8B1900802324 /* View */,
-				AA0DDAD8286C8B1900802324 /* PersonalMainPage */,
-			);
-			path = MineMainPage;
-			sourceTree = "<group>";
-		};
-		AA0DDAC9286C8B1900802324 /* Controller */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Controller;
-			sourceTree = "<group>";
-		};
-		AA0DDACC286C8B1900802324 /* Model */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Model;
-			sourceTree = "<group>";
-		};
-		AA0DDACF286C8B1900802324 /* View */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = View;
-			sourceTree = "<group>";
-		};
-		AA0DDAD8286C8B1900802324 /* PersonalMainPage */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDAED286C8B1900802324 /* AuthenticationSetting */,
-				AA0DDAE4286C8B1900802324 /* PMPBasicClass */,
-				AA0DDAFF286C8B1900802324 /* PMPPrimaryController */,
-				AA0DDAD9286C8B1900802324 /* PMPTools */,
-			);
-			path = PersonalMainPage;
-			sourceTree = "<group>";
-		};
-		AA0DDAD9286C8B1900802324 /* PMPTools */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDADA286C8B1900802324 /* FrameExtension */,
-			);
-			path = PMPTools;
-			sourceTree = "<group>";
-		};
-		AA0DDADA286C8B1900802324 /* FrameExtension */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = FrameExtension;
-			sourceTree = "<group>";
-		};
-		AA0DDAE4286C8B1900802324 /* PMPBasicClass */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDAE5286C8B1900802324 /* Controller */,
-				AA0DDAE8286C8B1900802324 /* View */,
-			);
-			path = PMPBasicClass;
-			sourceTree = "<group>";
-		};
-		AA0DDAE5286C8B1900802324 /* Controller */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Controller;
-			sourceTree = "<group>";
-		};
-		AA0DDAE8286C8B1900802324 /* View */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = View;
-			sourceTree = "<group>";
-		};
-		AA0DDAED286C8B1900802324 /* AuthenticationSetting */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDAFA286C8B1900802324 /* Tool */,
-			);
-			path = AuthenticationSetting;
-			sourceTree = "<group>";
-		};
-		AA0DDAFA286C8B1900802324 /* Tool */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Tool;
-			sourceTree = "<group>";
-		};
-		AA0DDAFF286C8B1900802324 /* PMPPrimaryController */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDB00286C8B1900802324 /* PMPSecondaryController */,
-			);
-			path = PMPPrimaryController;
-			sourceTree = "<group>";
-		};
-		AA0DDB00286C8B1900802324 /* PMPSecondaryController */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDB11286C8B1900802324 /* EditMyInformation */,
-			);
-			path = PMPSecondaryController;
-			sourceTree = "<group>";
-		};
-		AA0DDB11286C8B1900802324 /* EditMyInformation */ = {
-			isa = PBXGroup;
-			children = (
-				AA0DDB12286C8B1900802324 /* Presenter */,
-				AA0DDB15286C8B1900802324 /* Protocol */,
-				AA0DDB17286C8B1900802324 /* Model */,
-				AA0DDB1A286C8B1900802324 /* View */,
-				7591F1B02B96FD85001890D2 /* Tools */,
-			);
-			path = EditMyInformation;
-			sourceTree = "<group>";
-		};
-		AA0DDB12286C8B1900802324 /* Presenter */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Presenter;
-			sourceTree = "<group>";
-		};
-		AA0DDB15286C8B1900802324 /* Protocol */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Protocol;
-			sourceTree = "<group>";
-		};
-		AA0DDB17286C8B1900802324 /* Model */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Model;
-			sourceTree = "<group>";
-		};
-		AA0DDB1A286C8B1900802324 /* View */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = View;
 			sourceTree = "<group>";
 		};
 		AA0DEF682668C7D400284112 /* Introduction */ = {
@@ -5980,9 +5762,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-CyxbsMobile2019_iOS/Pods-CyxbsMobile2019_iOS-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

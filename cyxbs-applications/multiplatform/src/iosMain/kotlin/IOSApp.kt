@@ -11,7 +11,9 @@ import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.discover.home.DiscoverIosPlatform
 import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
+import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.mine.home.MineIosPlatform
 import com.cyxbs.pages.sport.service.SportIosPlatform
 import com.cyxbs.pages.todo.service.TodoIosPlatform
@@ -58,6 +60,8 @@ fun MainViewController(): UIViewController {
 
 fun onLogout() {
   IAccountEditService::class.impl().onLogout()
+  // 退出登录后跳转到 CMP 登录页，登录成功后回到主页
+  LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
 }
 
 // 初始化 KtProvider
