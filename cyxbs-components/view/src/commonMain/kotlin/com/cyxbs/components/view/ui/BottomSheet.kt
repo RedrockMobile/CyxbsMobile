@@ -117,11 +117,12 @@ class BottomSheetState(
     val target = showMaxHeight.floatValue
     if (now != target) {
       setState(BottomSheetValueState.Scrolling)
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
     }
+    // now 即使等于 target 也需要执行 animateScrollBy，将其他正在进行中的协程给取消掉
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Expanded)
   }
 
@@ -131,11 +132,11 @@ class BottomSheetState(
     val target = peekHeight
     if (now != target) {
       setState(BottomSheetValueState.Scrolling)
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
     }
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Collapsed)
   }
 
@@ -143,13 +144,11 @@ class BottomSheetState(
     if (state == BottomSheetValueState.Hide) return
     val now = showHeight.floatValue
     val target = 0F
-    if (now != target) {
-      // hide 不触发 Scrolling 状态
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
-    }
+    // hide 不触发 Scrolling 状态
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Hide)
   }
 

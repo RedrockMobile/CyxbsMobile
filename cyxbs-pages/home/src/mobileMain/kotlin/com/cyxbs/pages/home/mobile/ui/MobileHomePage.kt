@@ -51,6 +51,7 @@ import com.cyxbs.pages.home.ui.PlatformHomePage
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -187,7 +188,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   }
   LaunchedEffect(Unit) {
     val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
-    bottomNavViewModel.selectedItem.collect {
+    bottomNavViewModel.selectedItem.drop(1).collect {
       // 之前主页的第二页是邮问（掌邮社区，因为违规问题下架了）会将课表 bottomSheetState 设置成 hide 状态
       // 现在改成游乐园后没必要再 hide 了
       bottomSheetState.collapse()
@@ -195,6 +196,7 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
   }
   LaunchedEffect(Unit) {
     courseBottomSheetViewModel.state.collectLatest {
+      // 展开折叠在其他地方同时触发时会将上次触发的协程取消掉，所以需要 catch
       when (it) {
         true -> courseFrameViewModel.frame.bottomSheetState.expand()
         false -> courseFrameViewModel.frame.bottomSheetState.collapse()
