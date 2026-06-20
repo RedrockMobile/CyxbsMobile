@@ -52,6 +52,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.compose.theme.LocalAppDark
 import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.utils.compose.rememberSavableWrapper
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.ui.rememberTextDialog
 import com.cyxbs.pages.course.api.CourseNavArgument
@@ -67,9 +68,13 @@ internal fun FindCourseScreen(
 ) {
   val vm = viewModel<FindCourseViewModel>()
   // 处理路由初始参数
-  LaunchedEffect(argument) {
-    argument.directStuNum.takeIf { it.isNotBlank() }?.let { navigateToCourse(it) }
-    argument.initialQuery.takeIf { it.isNotBlank() }?.let { vm.setQuery(it) }
+  // 每次 NavEntry 进后台后都会被摧毁，返回时重建，所以需要判断是否已经处理了初始化的参数
+  val hasInitArgument = rememberSavableWrapper { false }
+  if (!hasInitArgument.value) {
+    LaunchedEffect(argument) {
+      hasInitArgument.value = true
+      argument.initialQuery.takeIf { it.isNotBlank() }?.let { vm.setQuery(it) }
+    }
   }
 
   val searchState by vm.searchState.collectAsState()

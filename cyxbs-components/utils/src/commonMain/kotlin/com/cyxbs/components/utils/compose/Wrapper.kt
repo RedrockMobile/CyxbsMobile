@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisallowComposableCalls
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlin.reflect.KProperty
 
 /**
@@ -65,6 +66,14 @@ operator fun <T> Wrapper<T>.getValue(thisRef: Any?, property: KProperty<*>): T =
 operator fun <T> Wrapper<T>.setValue(thisRef: Any?, property: KProperty<*>, value: T) {
   this.value = value
 }
+@Composable
+fun <T : Any> rememberSavableWrapper(init: () -> T): Wrapper<T> = rememberSaveable(
+  saver = Saver(
+    save = { it.value },
+    restore = { Wrapper(it) }
+  ),
+  init = { Wrapper(init.invoke()) },
+)
 
 @Composable
 fun rememberIntWrapper(value: Int): IntWrapper = remember { IntWrapper(value) }

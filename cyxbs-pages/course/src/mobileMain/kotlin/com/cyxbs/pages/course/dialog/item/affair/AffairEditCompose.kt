@@ -176,9 +176,7 @@ private fun EditStateButtons(
         val show = currentForm.commit()
         if (currentForm.isCreateAffair) {
           // 创建事务时取消编辑则直接关闭 BottomSheet
-          parentCoroutineScope.launch {
-            courseState.bottomSheetState.collapse()
-          }
+          courseState.bottomSheetState.collapseAsync()
           dismiss()
         } else if (show != null) {
           affairState.currentFormState.value = show
@@ -239,9 +237,7 @@ private fun EditStateButtons(
         courseState.currentPageItemFlow.value = courseState.dialogContents.value[0]
         if (currentForm.isCreateAffair) {
           // 创建事务时取消编辑则直接关闭 BottomSheet
-          parentCoroutineScope.launch {
-            courseState.bottomSheetState.collapse()
-          }
+          courseState.bottomSheetState.collapseAsync()
         } else {
           affairState.currentFormState.value = show
         }
@@ -265,10 +261,7 @@ private fun EditStateButtons(
       cancelEditDialog.showAndCover(
         onClickPositiveBtnProxy = {
           onClickPositiveBtn.invoke(this)
-          parentCoroutineScope.launch {
-            // 需要使用外界的 coroutineScope，因为 EditStateButtons 函数立马就被移除了
-            collapse()
-          }
+          collapseAsync()
         },
       )
     }

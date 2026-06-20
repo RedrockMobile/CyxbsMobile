@@ -372,7 +372,7 @@ private fun BottomSheet(
   }
   LaunchedEffect(Unit) {
     try {
-      state.bottomSheetState.expand()
+      state.bottomSheetState.expandSuspend()
     } catch (e: CancellationException) {
       // 在展开动画时用户可能快速点击空白区域触发 collapse()，这里就会抛出 CancellationException
     }

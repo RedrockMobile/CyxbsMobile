@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -234,15 +235,14 @@ private fun EmptyRoomPage(argument: EmptyRoomNavArgument) {
 
 
             //底部面板(选择第几节课和教学楼)
-            Surface(
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .shadow(elevation = 12.dp, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .background(color = LocalAppColors.current.bottomBg, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .navigationBarsPadding()
                     .height(105.dp),
-                color = LocalAppColors.current.bottomBg,
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                elevation = 12.dp
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),

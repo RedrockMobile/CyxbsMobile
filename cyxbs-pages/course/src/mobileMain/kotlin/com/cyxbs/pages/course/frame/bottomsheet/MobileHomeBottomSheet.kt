@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -24,7 +23,6 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
-import kotlinx.coroutines.launch
 
 /**
  * .
@@ -41,7 +39,6 @@ fun MobileHomeBottomSheet(
   header: @Composable () -> Unit,
   content: @Composable () -> Unit,
 ) {
-  val coroutineScope = rememberCoroutineScope()
   BottomSheetCompose(
     modifier = modifier,
     bottomSheetState = frame.bottomSheetState,
@@ -56,7 +53,7 @@ fun MobileHomeBottomSheet(
           modifier = Modifier.fillMaxWidth().height(frame.peekHeightState.value)
             .then(bottomSheetDraggable()).clickableNoIndicator {
               if (frame.bottomSheetState.state == BottomSheetValueState.Collapsed) {
-                coroutineScope.launch { frame.bottomSheetState.expand() }
+                frame.bottomSheetState.expandAsync()
               }
             }
         ) {

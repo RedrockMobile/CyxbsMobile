@@ -51,9 +51,11 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -65,7 +67,7 @@ import kotlinx.coroutines.launch
 
 @Stable
 class BottomSheetState(
-  var onDismissRequest: suspend BottomSheetState.() -> Unit = { collapse() },
+  var onDismissRequest: suspend BottomSheetState.() -> Unit = { collapseSuspend() },
   val hideable: Boolean = false
 ) {
 
@@ -84,6 +86,11 @@ class BottomSheetState(
 
   val stateFlow: StateFlow<BottomSheetValueState> get() = stateFlowInternal
   private val stateFlowInternal = MutableStateFlow(BottomSheetValueState.Collapsed)
+
+  /**
+   * 命令通道：承载 expand/collapse/hide 的「一次性触发」语义。
+   */
+  internal val commandFlow = MutableStateFlow<BottomSheetValueState?>(null)
 
   var state: BottomSheetValueState by mutableStateOf(stateFlowInternal.value)
     private set
@@ -111,45 +118,83 @@ class BottomSheetState(
     visibilityThreshold = 1F  // 当距离目标 < 1px 时认为到达，如果不设置，会导致动画持续较久
   )
 
-  suspend fun expand() {
+  /**
+   * 异步触发 expand
+   */
+  fun expandAsync() {
+    // 发命令给 collector（由 BottomSheetCompose 安装），不阻塞调用方
+    commandFlow.value = BottomSheetValueState.Expanded
+  }
+
+  /**
+   * 挂起直到 expand 完成或者被后续操作取消，若不需要等待则使用 [expandAsync]
+   *
+   * ⚠️外界需要考虑 CancellationException
+   *
+   * @throws kotlinx.coroutines.CancellationException 被另一次折叠或隐藏操作取消时抛出
+   */
+  suspend fun expandSuspend() {
     if (state == BottomSheetValueState.Expanded) return
     val now = showHeight.floatValue
     val target = showMaxHeight.floatValue
     if (now != target) {
       setState(BottomSheetValueState.Scrolling)
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
     }
+    // now 即使等于 target 也需要执行 animateScrollBy，将其他正在进行中的协程给取消掉
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Expanded)
   }
 
-  suspend fun collapse() {
+  // 异步触发 collapse
+  fun collapseAsync() {
+    commandFlow.value = BottomSheetValueState.Collapsed
+  }
+
+  /**
+   * 挂起直到 collapse 完成或者被后续操作取消，若不需要等待则使用 [collapseAsync]
+   *
+   * ⚠️外界需要考虑 CancellationException
+   *
+   * @throws kotlinx.coroutines.CancellationException 被另一次展开或隐藏操作取消时抛出
+   */
+  suspend fun collapseSuspend() {
     if (state == BottomSheetValueState.Collapsed) return
     val now = showHeight.floatValue
     val target = peekHeight
     if (now != target) {
       setState(BottomSheetValueState.Scrolling)
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
     }
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Collapsed)
   }
 
-  suspend fun hide() {
+  // 异步触发 hide
+  fun hideAsync() {
+    commandFlow.value = BottomSheetValueState.Hide
+  }
+
+  /**
+   * 挂起直到 hide 完成或者被后续操作取消，若不需要等待则使用 [hideAsync]
+   *
+   * ⚠️外界需要考虑 CancellationException
+   *
+   * @throws kotlinx.coroutines.CancellationException 被另一次展开或折叠操作取消时抛出
+   */
+  suspend fun hideSuspend() {
     if (state == BottomSheetValueState.Hide) return
     val now = showHeight.floatValue
     val target = 0F
-    if (now != target) {
-      // hide 不触发 Scrolling 状态
-      scrollableState.animateScrollBy(
-        value = now - target,
-        animationSpec = bottomSheetSpring,
-      )
-    }
+    // hide 不触发 Scrolling 状态
+    scrollableState.animateScrollBy(
+      value = now - target,
+      animationSpec = bottomSheetSpring,
+    )
     setState(BottomSheetValueState.Hide)
   }
 
@@ -165,7 +210,7 @@ enum class BottomSheetValueState {
 
 @Composable
 fun rememberBottomSheetState(
-  onDismissRequest: suspend BottomSheetState.() -> Unit = { collapse() }
+  onDismissRequest: suspend BottomSheetState.() -> Unit = { collapseSuspend() }
 ): BottomSheetState {
   return remember { BottomSheetState(onDismissRequest) }.also {
     it.onDismissRequest = onDismissRequest
@@ -196,9 +241,24 @@ fun BottomSheetCompose(
     )
   }
   val density = LocalDensity.current
-  DisposableEffect(peekHeight, density) {
+  DisposableEffect(bottomSheetState, peekHeight, density) {
     bottomSheetState.peekHeight = with(density) { peekHeight.toPx() }
     onDispose { }
+  }
+  LaunchedEffect(bottomSheetState) {
+    bottomSheetState.commandFlow.collectLatest { command ->
+      try {
+        when (command) {
+          BottomSheetValueState.Expanded -> bottomSheetState.expandSuspend()
+          BottomSheetValueState.Collapsed -> bottomSheetState.collapseSuspend()
+          BottomSheetValueState.Hide -> bottomSheetState.hideSuspend()
+          else -> Unit
+        }
+        bottomSheetState.commandFlow.value = null
+      } catch (_: CancellationException) {
+        // 被新命令的 animateScrollBy 取消（例如展开动画中触发了折叠）
+      }
+    }
   }
 }
 
