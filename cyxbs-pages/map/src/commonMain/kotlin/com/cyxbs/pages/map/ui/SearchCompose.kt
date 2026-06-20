@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_delete
@@ -42,7 +42,6 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun SearchCompose(
-  argument: MapNavArgument,
   modifier: Modifier = Modifier,
   needPlaceList: Boolean = false
 ) {
@@ -50,12 +49,10 @@ fun SearchCompose(
   val backState = rememberNavigationEventState(NavigationEventInfo.None)
   NavigationBackHandler(
     state = backState,
+    isBackEnabled = viewmodel.mapSearchPagerState.value == 1,
     onBackCompleted = {
-      if (viewmodel.mapSearchPagerState.value == 1) {
-        viewmodel.mapSearchPagerState.value = 0
-      } else {
-        argument.popBackStack()
-      }
+      viewmodel.mapSearchPagerState.value = 0
+      viewmodel.searchTextFieldState.clearText()
     },
   )
   Box(

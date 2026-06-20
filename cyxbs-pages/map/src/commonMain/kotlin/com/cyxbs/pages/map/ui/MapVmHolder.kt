@@ -33,8 +33,8 @@ internal object MapVmHolder {
   var current: MapShared? by mutableStateOf(null)
     private set
 
-  fun publish(vm: MapComposeViewModel, owner: ViewModelStoreOwner, argument: MapNavArgument) {
-    current = MapShared(vm, owner, argument)
+  fun publish(vm: MapComposeViewModel, owner: ViewModelStoreOwner) {
+    current = MapShared(vm, owner)
   }
 
   /** 仅当当前持有的就是该 vm 时才清理，避免 A→B 切换时误清 B 的登记。 */
@@ -61,5 +61,4 @@ internal object MapVmHolder {
 internal data class MapShared(
   val vm: MapComposeViewModel,
   val owner: ViewModelStoreOwner,
-  val argument: MapNavArgument,
 )

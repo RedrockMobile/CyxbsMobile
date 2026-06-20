@@ -59,6 +59,7 @@ import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.NAV_MAP
+import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
@@ -109,9 +110,9 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
     val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
     // 把当前 Map 的 VM / owner / 跳转参数发布给独立的 sheet NavEntry 复用（见 MapVmHolder）
     val viewModelStoreOwner = LocalViewModelStoreOwner.current
-    DisposableEffect(viewmodel, viewModelStoreOwner, argument) {
+    DisposableEffect(viewmodel, viewModelStoreOwner) {
       if (viewModelStoreOwner != null) {
-        MapVmHolder.publish(viewmodel, viewModelStoreOwner, argument)
+        MapVmHolder.publish(viewmodel, viewModelStoreOwner)
       }
       onDispose { MapVmHolder.clear(viewmodel) }
     }
@@ -138,7 +139,7 @@ fun WH100vInfinityCompose(argument: MapNavArgument) {
       if (viewmodel.mapPagerState.value == 1) {
         viewmodel.mapPagerState.value = 0
       } else {
-        argument.popBackStack()
+        popMapAndSheets(argument)
       }
     },
   )
@@ -175,8 +176,7 @@ fun WH100v150Compose(argument: MapNavArgument) {
       if (viewmodel.mapPagerState.value == 1) {
         viewmodel.mapPagerState.value = 0
       } else {
-        // sheet entry 的清理由 MapNavArgument.beforePop 统一处理（见 MapBottomSheetEntryHost）
-        argument.popBackStack()
+        popMapAndSheets(argument)
       }
     },
   )
@@ -224,7 +224,7 @@ fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
         if (viewmodel.mapSearchPagerState.value == 1) {
           viewmodel.mapSearchPagerState.value = 0
         } else {
-          argument.popBackStack()
+          popMapAndSheets(argument)
         }
       }
       .padding(start = 10.dp, end = 10.dp),
@@ -274,7 +274,6 @@ fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
     ) { targetPage ->
       if (targetPage == 1) {
         SearchCompose(
-          argument = argument,
           modifier = Modifier
             .fillMaxSize()
             .background(LocalAppColors.current.topBg)
@@ -693,5 +692,13 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           }
         }
     }
+  }
+}
+
+private fun popMapAndSheets(argument: MapNavArgument) {
+  PlaceDetailNavArgument.popBackStack()
+  SearchNavArgument.popBackStack()
+  if (appNavBackStack.size > 1) {
+    argument.popBackStack()
   }
 }
