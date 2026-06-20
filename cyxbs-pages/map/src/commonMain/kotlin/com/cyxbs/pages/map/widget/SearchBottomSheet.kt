@@ -35,7 +35,6 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.view.ui.LocalBottomSheetScope
-import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.map.ui.SearchCompose
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
@@ -59,7 +58,7 @@ import org.jetbrains.compose.resources.vectorResource
  * draggable 通过 [LocalBottomSheetScope] 获取。
  */
 @Composable
-fun SearchBottomSheetContent(argument: MapNavArgument) {
+fun SearchBottomSheetContent() {
   val bottomSheetScope = LocalBottomSheetScope.current
   val ratio = getWindowScreenSize().height / getWindowScreenSize().width
   val modifier = when {
@@ -103,7 +102,6 @@ fun SearchBottomSheetContent(argument: MapNavArgument) {
         .height(48.dp)
     )
     SearchCompose(
-      argument = argument,
       modifier = Modifier
         .fillMaxWidth()
         .height(getWindowScreenSize().height / 3 * 2)
