@@ -25,15 +25,18 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -81,8 +84,6 @@ import kotlin.time.Clock
  */
 
 /** 弹窗内容固定高度，对齐课表 item 弹窗（[com.cyxbs.pages.course.dialog] 的 280dp），两处观感一致。 */
-private val EditSheetHeight = 280.dp
-
 @Composable
 fun EditScheduleDialog(
   show: Boolean,
@@ -126,7 +127,7 @@ fun EditScheduleDialog(
     onDismiss = onDismiss,
     onDismissRequest = { if (state.isChanged) { showUnsavedExit = true; false } else true },
   ) {
-    Column(modifier = Modifier.fillMaxWidth().height(EditSheetHeight).padding(horizontal = 20.dp, vertical = 18.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
       when (mode) {
         Mode.SHOW -> ShowContent(
           state = state,
@@ -272,16 +273,24 @@ private fun EditContent(
         Text("请输入标题", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2.copy(alpha = 0.3f))
       }
     }
-    val canSave = state.canConfirm
-    Icon(
-      painter = rememberVectorPainter(Icons.Outlined.Check), contentDescription = "保存",
-      tint = if (canSave) colors.positive else colors.tvLv3.copy(alpha = 0.4f),
-      modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
-    )
-    Icon(
-      painter = rememberVectorPainter(Icons.Outlined.Close), contentDescription = "取消",
-      tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
-    )
+    if (editingTime) {
+      // 正在编辑时间段：右上是「返回」← 收起滚轮回到表单（滚轮值已实时写回，不会丢）。
+      Icon(
+        painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack), contentDescription = "返回",
+        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onDoneTime),
+      )
+    } else {
+      val canSave = state.canConfirm
+      Icon(
+        painter = rememberVectorPainter(Icons.Rounded.Check), contentDescription = "保存",
+        tint = if (canSave) colors.positive else colors.tvLv3.copy(alpha = 0.4f),
+        modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
+      )
+      Icon(
+        painter = rememberVectorPainter(Icons.Rounded.Close), contentDescription = "取消",
+        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
+      )
+    }
   }
   Spacer(modifier = Modifier.height(10.dp))
   InfoRow(
@@ -291,7 +300,7 @@ private fun EditContent(
   )
   Spacer(modifier = Modifier.height(10.dp))
   if (editingTime) {
-    TimeWheelPane(state = state, onDone = onDoneTime)
+    TimeWheelPane(state = state)
   } else {
     Box {
       BasicTextField(
@@ -375,7 +384,6 @@ private fun InfoSegment(
 @Composable
 private fun TimeWheelPane(
   state: EditScheduleState,
-  onDone: () -> Unit,
 ) {
   val colors = LocalAppColors.current
   val now = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }
@@ -411,24 +419,28 @@ private fun TimeWheelPane(
       }
       WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.weight(1f))
     }
-    Text(
-      text = "完成",
-      fontSize = 15.sp, color = colors.positive, textAlign = TextAlign.Center,
-      modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickableNoIndicator {
-        val date = state.anchorDate
-        val eH = endHour.value.roundToInt().coerceIn(0, 23)
-        val eM = endMinute.value.roundToInt().coerceIn(0, 59)
-        state.endTime = formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, eH, eM)
-        if (deadlineOnly) {
-          state.startTime = "" // 截止型：清空开始
-        } else {
-          val sH = startHour.value.roundToInt().coerceIn(0, 23)
-          val sM = startMinute.value.roundToInt().coerceIn(0, 59)
-          state.startTime = formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, sH, sM)
-        }
-        onDone()
-      },
-    )
+  }
+
+  // 滚轮值（及 截止/时间段 切换）实时写回 state：顶部「返回」← 收起即生效，无需单独「完成」按钮。
+  LaunchedEffect(deadlineOnly) {
+    snapshotFlow {
+      listOf(
+        startHour.value.roundToInt(), startMinute.value.roundToInt(),
+        endHour.value.roundToInt(), endMinute.value.roundToInt(),
+      )
+    }.collect {
+      val date = state.anchorDate
+      val eH = endHour.value.roundToInt().coerceIn(0, 23)
+      val eM = endMinute.value.roundToInt().coerceIn(0, 59)
+      state.endTime = formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, eH, eM)
+      state.startTime = if (deadlineOnly) {
+        "" // 截止型：清空开始
+      } else {
+        val sH = startHour.value.roundToInt().coerceIn(0, 23)
+        val sM = startMinute.value.roundToInt().coerceIn(0, 59)
+        formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, sH, sM)
+      }
+    }
   }
 }
 
@@ -581,11 +593,11 @@ private fun PreviewFrame(content: @Composable () -> Unit) {
   AppTheme {
     // 用 Column 提供纵向排布作用域（ShowContent/EditContent 内部直接发多个同级子项，
     // 真实弹窗里靠外层 Column 堆叠；预览必须同样包一层 Column，否则会全叠在一起）。
-    // 固定高度 EditSheetHeight，和真实弹窗、课表 item 弹窗一致。
+    // 固定高度 280dp，和真实弹窗、课表 item 弹窗一致。
     Column(
       modifier = Modifier
         .width(360.dp)
-        .height(EditSheetHeight)
+        .height(280.dp)
         .background(LocalAppColors.current.topBg)
         .padding(20.dp),
     ) { content() }
