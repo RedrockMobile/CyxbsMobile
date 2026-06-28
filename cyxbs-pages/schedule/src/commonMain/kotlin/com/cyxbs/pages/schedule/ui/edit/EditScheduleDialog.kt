@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
@@ -80,8 +81,8 @@ import kotlin.time.Clock
  *
  * 形态（见与用户确认的文本草图）：标题行 + **单行信息栏**(日期·第N周·周几·时间段·重复·提醒) + 备注。
  * - 查看态(Show)：只读，右上 ✎ 编辑 / 🗑 删除。
- * - 编辑态(Edit)：标题/备注可输入；信息栏每段可点——日期→日历、时间段→下方备注区变时分滚轮、
- *   重复→[RecurrenceEditDialog]、提醒→提前分钟选择。
+ * - 编辑态(Edit)：标题/备注可输入；信息栏每段可点——下方区域就地切换：日期→日历、时间段→时分滚轮、
+ *   重复→[RecurrenceEditInline]、提醒→提前分钟选择（均实时写回，← 返回）。
  * - 周数由 commonMain 的 [SchoolCalendar] 推导（学期内显示「第N周」，否则只显示日期），不依赖课表帧，
  *   所以邮子清单与课表能真正共用、长得一样。
  *
@@ -106,10 +107,8 @@ fun EditScheduleDialog(
   // 新建直接进编辑态；点已有日程先进查看态。
   var mode by remember { mutableStateOf(if (editSchedule == null) Mode.EDIT else Mode.SHOW) }
 
-  // 标题行下方区域的编辑子模式，用枚举流转（备注 / 日历 / 时分滚轮，后续重复提醒也并入）。
+  // 标题行下方区域的编辑子模式，用枚举流转（备注 / 日历 / 时分滚轮 / 重复 / 提醒）。
   var subArea by remember { mutableStateOf(EditSubArea.NOTE) }
-  var showRepeat by remember { mutableStateOf(false) }
-  var showRemind by remember { mutableStateOf(false) }
   var showUnsavedExit by remember { mutableStateOf(false) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }
 
@@ -148,8 +147,8 @@ fun EditScheduleDialog(
           subArea = subArea,
           onClickDate = { subArea = EditSubArea.DATE },
           onClickTime = { subArea = EditSubArea.TIME },
-          onClickRepeat = { showRepeat = true },
-          onClickRemind = { showRemind = true },
+          onClickRepeat = { subArea = EditSubArea.REPEAT },
+          onClickRemind = { subArea = EditSubArea.REMIND },
           onBackSub = { subArea = EditSubArea.NOTE },
           onSave = doSave,
           onCancel = requestDismiss,
@@ -157,22 +156,6 @@ fun EditScheduleDialog(
       }
     }
   }
-
-  // 重复规则编辑器
-  RecurrenceEditDialog(
-    show = showRepeat,
-    initial = state.recurrence,
-    onDismiss = { showRepeat = false },
-    onConfirm = { state.recurrence = it },
-  )
-
-  // 提前提醒选择
-  RemindChooserSheet(
-    show = showRemind,
-    current = state.remindMinutes,
-    onDismiss = { showRemind = false },
-    onChoose = { state.remindMinutes = it; showRemind = false },
-  )
 
   // 三态选择
   EditScopeChooserSheet(
@@ -207,10 +190,10 @@ private enum class ScopeAction { SAVE, DELETE }
 
 /**
  * 编辑态下「标题行下方区域」当前展示什么，用枚举统一流转：
- * [NOTE] 备注输入（默认）/ [DATE] 日历选日期 / [TIME] 时分滚轮。
- * 后续重复、提醒的内联编辑也并入此枚举（点对应段切到对应区，← 返回回到 [NOTE]）。
+ * [NOTE] 备注输入（默认）/ [DATE] 日历选日期 / [TIME] 时分滚轮 / [REPEAT] 重复规则 / [REMIND] 提前提醒。
+ * 点信息栏对应段切到对应区，← 返回回到 [NOTE]，改动均实时写回 state。
  */
-private enum class EditSubArea { NOTE, DATE, TIME }
+private enum class EditSubArea { NOTE, DATE, TIME, REPEAT, REMIND }
 
 /* ---------------- 查看态 ---------------- */
 
@@ -333,6 +316,18 @@ private fun ColumnScope.EditContent(
         },
       )
     }
+    // 重复：下方就地变 RFC5545 重复规则编辑器，实时写回 state.recurrence
+    EditSubArea.REPEAT -> RecurrenceEditInline(
+      draft = state.recurrence,
+      onChange = { state.recurrence = it },
+      modifier = Modifier.weight(1f),
+    )
+    // 提醒：下方就地变提前分钟选项，实时写回 state.remindMinutes
+    EditSubArea.REMIND -> RemindInline(
+      current = state.remindMinutes,
+      onChoose = { state.remindMinutes = it },
+      modifier = Modifier.weight(1f),
+    )
     // 默认：备注输入
     EditSubArea.NOTE -> Box {
       BasicTextField(
@@ -527,30 +522,23 @@ private fun WheelPair(
   }
 }
 
-/* ---------------- 提前提醒选择 ---------------- */
+/* ---------------- 提前提醒选择（内联） ---------------- */
 
 @Composable
-private fun RemindChooserSheet(
-  show: Boolean,
+private fun RemindInline(
   current: Int,
-  onDismiss: () -> Unit,
   onChoose: (Int) -> Unit,
+  modifier: Modifier = Modifier,
 ) {
-  if (!show) return
   val colors = LocalAppColors.current
-  ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-      Text("提前提醒", fontSize = 14.sp, color = colors.tvLv3.copy(alpha = 0.6f),
-        modifier = Modifier.fillMaxWidth().padding(20.dp))
-      REMIND_AHEAD_OPTIONS.forEach { opt ->
-        Text(
-          text = remindOptionLabel(opt),
-          fontSize = 16.sp,
-          color = if (opt == current) colors.positive else colors.tvLv2,
-          modifier = Modifier.fillMaxWidth().clickableNoIndicator { onChoose(opt) }.padding(horizontal = 20.dp, vertical = 13.dp),
-        )
-      }
-      Spacer(modifier = Modifier.height(8.dp))
+  Column(modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+    REMIND_AHEAD_OPTIONS.forEach { opt ->
+      Text(
+        text = remindOptionLabel(opt),
+        fontSize = 15.sp,
+        color = if (opt == current) colors.positive else colors.tvLv2,
+        modifier = Modifier.fillMaxWidth().clickableNoIndicator { onChoose(opt) }.padding(vertical = 11.dp),
+      )
     }
   }
 }
@@ -705,6 +693,34 @@ private fun PreviewScheduleEditDate() {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
       state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.DATE,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
+/** 编辑态·点重复后：下方就地变 RFC5545 重复规则编辑器。 */
+@Preview
+@Composable
+private fun PreviewScheduleEditRepeat() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.REPEAT,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
+/** 编辑态·点提醒后：下方就地变提前分钟选项。 */
+@Preview
+@Composable
+private fun PreviewScheduleEditRemind() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.REMIND,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
