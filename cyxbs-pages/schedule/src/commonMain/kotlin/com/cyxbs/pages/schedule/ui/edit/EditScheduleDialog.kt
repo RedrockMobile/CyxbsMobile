@@ -131,7 +131,7 @@ fun EditScheduleDialog(
     onDismiss = onDismiss,
     onDismissRequest = { if (state.isChanged) { showUnsavedExit = true; false } else true },
   ) {
-    Column(modifier = Modifier.fillMaxWidth().height(EditSheetHeight).padding(horizontal = 20.dp, vertical = 18.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().height(EditSheetHeight).padding(top = 16.dp, start = 16.dp, end = 16.dp)) {
       when (mode) {
         Mode.SHOW -> ShowContent(
           state = state,
@@ -630,7 +630,7 @@ private fun PreviewFrame(content: @Composable () -> Unit) {
         .width(360.dp)
         .height(EditSheetHeight)
         .background(LocalAppColors.current.topBg)
-        .padding(20.dp),
+        .padding(top = 16.dp, start = 16.dp, end = 16.dp),
     ) { content() }
   }
 }
