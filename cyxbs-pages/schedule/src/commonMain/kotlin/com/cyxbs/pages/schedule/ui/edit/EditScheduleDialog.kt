@@ -55,7 +55,6 @@ import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.view.calendar.CalendarCompose
 import com.cyxbs.components.view.calendar.CalendarDateCompose
@@ -107,9 +106,8 @@ fun EditScheduleDialog(
   // 新建直接进编辑态；点已有日程先进查看态。
   var mode by remember { mutableStateOf(if (editSchedule == null) Mode.EDIT else Mode.SHOW) }
 
-  // 下方区域当前编辑子模式：时间段滚轮 / 日历选日期 / 都不选(显示备注)。互斥。
-  var editingTime by remember { mutableStateOf(false) }
-  var editingDate by remember { mutableStateOf(false) }
+  // 标题行下方区域的编辑子模式，用枚举流转（备注 / 日历 / 时分滚轮，后续重复提醒也并入）。
+  var subArea by remember { mutableStateOf(EditSubArea.NOTE) }
   var showRepeat by remember { mutableStateOf(false) }
   var showRemind by remember { mutableStateOf(false) }
   var showUnsavedExit by remember { mutableStateOf(false) }
@@ -147,13 +145,12 @@ fun EditScheduleDialog(
         Mode.EDIT -> EditContent(
           state = state,
           firstMonday = firstMonday,
-          editingTime = editingTime,
-          editingDate = editingDate,
-          onClickDate = { editingDate = true; editingTime = false },
-          onClickTime = { editingTime = true; editingDate = false },
+          subArea = subArea,
+          onClickDate = { subArea = EditSubArea.DATE },
+          onClickTime = { subArea = EditSubArea.TIME },
           onClickRepeat = { showRepeat = true },
           onClickRemind = { showRemind = true },
-          onBackSub = { editingTime = false; editingDate = false },
+          onBackSub = { subArea = EditSubArea.NOTE },
           onSave = doSave,
           onCancel = requestDismiss,
         )
@@ -208,6 +205,13 @@ fun EditScheduleDialog(
 private enum class Mode { SHOW, EDIT }
 private enum class ScopeAction { SAVE, DELETE }
 
+/**
+ * 编辑态下「标题行下方区域」当前展示什么，用枚举统一流转：
+ * [NOTE] 备注输入（默认）/ [DATE] 日历选日期 / [TIME] 时分滚轮。
+ * 后续重复、提醒的内联编辑也并入此枚举（点对应段切到对应区，← 返回回到 [NOTE]）。
+ */
+private enum class EditSubArea { NOTE, DATE, TIME }
+
 /* ---------------- 查看态 ---------------- */
 
 @Composable
@@ -248,8 +252,7 @@ private fun ShowContent(
 private fun ColumnScope.EditContent(
   state: EditScheduleState,
   firstMonday: Date?,
-  editingTime: Boolean,
-  editingDate: Boolean,
+  subArea: EditSubArea,
   onClickDate: () -> Unit,
   onClickTime: () -> Unit,
   onClickRepeat: () -> Unit,
@@ -259,7 +262,7 @@ private fun ColumnScope.EditContent(
   onCancel: () -> Unit,
 ) {
   val colors = LocalAppColors.current
-  val inSubEdit = editingTime || editingDate
+  val inSubEdit = subArea != EditSubArea.NOTE
   Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     Box(modifier = Modifier.weight(1f)) {
       BasicTextField(
@@ -300,11 +303,11 @@ private fun ColumnScope.EditContent(
     onClickRepeat = onClickRepeat, onClickRemind = onClickRemind,
   )
   Spacer(modifier = Modifier.height(10.dp))
-  when {
+  when (subArea) {
     // 时间段：下方变时分滚轮
-    editingTime -> TimeWheelPane(state = state)
+    EditSubArea.TIME -> TimeWheelPane(state = state)
     // 日期：下方就地变日历，点某天实时改写开始/结束的日期（周数随之重算）；← 返回
-    editingDate -> {
+    EditSubArea.DATE -> {
       val calendarState = rememberCalendarState(
         initialClickDate = state.anchorDate,
         onClick = { date ->
@@ -316,33 +319,16 @@ private fun ColumnScope.EditContent(
       CalendarCompose(
         modifier = Modifier.fillMaxWidth().weight(1f),
         state = calendarState,
-        // 自定义日历头：左「YYYY年M月」，右「< >」快速切月（替换默认 MonthTextCompose）。
+        // 只留星期行 + 月份网格：去掉默认的左侧年月列(MonthTextCompose)，
+        // 年月/第N周 已由上面的信息栏展示，无需在日历里重复。
         calendar = {
-          Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-              text = "${calendarState.clickDate.year}年${calendarState.clickDate.monthNumber}月",
-              fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-              text = "<", fontSize = 18.sp, color = colors.positive,
-              modifier = Modifier.clickableNoIndicator {
-                calendarState.updateClickDate(calendarState.clickDate.minusMonths(1))
-              }.padding(horizontal = 10.dp),
-            )
-            Text(
-              text = ">", fontSize = 18.sp, color = colors.positive,
-              modifier = Modifier.clickableNoIndicator {
-                calendarState.updateClickDate(calendarState.clickDate.plusMonths(1))
-              }.padding(horizontal = 10.dp),
-            )
-          }
           calendarState.WeekTextCompose()
           calendarState.CalendarMonthCompose { date, show -> calendarState.CalendarDateCompose(date, show) }
         },
       )
     }
-    else -> Box {
+    // 默认：备注输入
+    EditSubArea.NOTE -> Box {
       BasicTextField(
         state = state.detail,
         cursorBrush = SolidColor(colors.positive),
@@ -659,7 +645,7 @@ private fun PreviewScheduleEdit() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = false,
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.NOTE,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
@@ -673,7 +659,7 @@ private fun PreviewScheduleEditTime() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = true, editingDate = false,
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.TIME,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
@@ -698,7 +684,7 @@ private fun PreviewScheduleEditDeadline() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleDeadline()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = true, editingDate = false,
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.TIME,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
@@ -712,7 +698,7 @@ private fun PreviewScheduleEditDate() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = true,
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.DATE,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
@@ -726,7 +712,7 @@ private fun PreviewScheduleNew() {
   PreviewFrame {
     val state = remember { EditScheduleState(null) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = false,
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.NOTE,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onBackSub = {}, onSave = {}, onCancel = {},
     )
