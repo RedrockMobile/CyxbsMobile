@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -103,8 +104,9 @@ fun EditScheduleDialog(
   // 新建直接进编辑态；点已有日程先进查看态。
   var mode by remember { mutableStateOf(if (editSchedule == null) Mode.EDIT else Mode.SHOW) }
 
-  var showDatePicker by remember { mutableStateOf(false) }
+  // 下方区域当前编辑子模式：时间段滚轮 / 日历选日期 / 都不选(显示备注)。互斥。
   var editingTime by remember { mutableStateOf(false) }
+  var editingDate by remember { mutableStateOf(false) }
   var showRepeat by remember { mutableStateOf(false) }
   var showRemind by remember { mutableStateOf(false) }
   var showUnsavedExit by remember { mutableStateOf(false) }
@@ -143,28 +145,18 @@ fun EditScheduleDialog(
           state = state,
           firstMonday = firstMonday,
           editingTime = editingTime,
-          onClickDate = { showDatePicker = true },
-          onClickTime = { editingTime = true },
+          editingDate = editingDate,
+          onClickDate = { editingDate = true; editingTime = false },
+          onClickTime = { editingTime = true; editingDate = false },
           onClickRepeat = { showRepeat = true },
           onClickRemind = { showRemind = true },
-          onDoneTime = { editingTime = false },
+          onBackSub = { editingTime = false; editingDate = false },
           onSave = doSave,
           onCancel = requestDismiss,
         )
       }
     }
   }
-
-  // 日期选择（仅取日期，周数随之重算）；点某天实时应用、不关闭，用户点 ← 回退。
-  DatePickerSheet(
-    show = showDatePicker,
-    initial = state.anchorDate,
-    onDismiss = { showDatePicker = false },
-    onSelect = { date ->
-      state.startTime = reanchorTimeString(state.startTime, date)
-      state.endTime = reanchorTimeString(state.endTime, date)
-    },
-  )
 
   // 重复规则编辑器
   RecurrenceEditDialog(
@@ -250,19 +242,21 @@ private fun ShowContent(
 /* ---------------- 编辑态 ---------------- */
 
 @Composable
-private fun EditContent(
+private fun ColumnScope.EditContent(
   state: EditScheduleState,
   firstMonday: Date?,
   editingTime: Boolean,
+  editingDate: Boolean,
   onClickDate: () -> Unit,
   onClickTime: () -> Unit,
   onClickRepeat: () -> Unit,
   onClickRemind: () -> Unit,
-  onDoneTime: () -> Unit,
+  onBackSub: () -> Unit,
   onSave: () -> Unit,
   onCancel: () -> Unit,
 ) {
   val colors = LocalAppColors.current
+  val inSubEdit = editingTime || editingDate
   Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     Box(modifier = Modifier.weight(1f)) {
       BasicTextField(
@@ -276,11 +270,11 @@ private fun EditContent(
         Text("请输入标题", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2.copy(alpha = 0.3f))
       }
     }
-    if (editingTime) {
-      // 正在编辑时间段：右上是「返回」← 收起滚轮回到表单（滚轮值已实时写回，不会丢）。
+    if (inSubEdit) {
+      // 正在编辑时间段/日期：右上是「返回」← 收起子编辑区回到表单（改动已实时写回，不会丢）。
       Icon(
         painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack), contentDescription = "返回",
-        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onDoneTime),
+        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onBackSub),
       )
     } else {
       val canSave = state.canConfirm
@@ -290,7 +284,7 @@ private fun EditContent(
         modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
       )
     }
-    // 取消 ✕ 始终显示（编辑时间段时也能取消整个编辑）。
+    // 取消 ✕ 始终显示（编辑子区时也能取消整个编辑）。
     Icon(
       painter = rememberVectorPainter(Icons.Rounded.Close), contentDescription = "取消",
       tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
@@ -303,10 +297,21 @@ private fun EditContent(
     onClickRepeat = onClickRepeat, onClickRemind = onClickRemind,
   )
   Spacer(modifier = Modifier.height(10.dp))
-  if (editingTime) {
-    TimeWheelPane(state = state)
-  } else {
-    Box {
+  when {
+    // 时间段：下方变时分滚轮
+    editingTime -> TimeWheelPane(state = state)
+    // 日期：下方就地变日历，点某天实时改写开始/结束的日期（周数随之重算）；← 返回
+    editingDate -> {
+      val calendarState = rememberCalendarState(
+        initialClickDate = state.anchorDate,
+        onClick = { date ->
+          state.startTime = reanchorTimeString(state.startTime, date)
+          state.endTime = reanchorTimeString(state.endTime, date)
+        },
+      )
+      CalendarCompose(modifier = Modifier.fillMaxWidth().weight(1f), state = calendarState)
+    }
+    else -> Box {
       BasicTextField(
         state = state.detail,
         cursorBrush = SolidColor(colors.positive),
@@ -499,46 +504,6 @@ private fun WheelPair(
   }
 }
 
-/* ---------------- 日期选择 ---------------- */
-
-@Composable
-private fun DatePickerSheet(
-  show: Boolean,
-  initial: Date,
-  onDismiss: () -> Unit,
-  onSelect: (Date) -> Unit,
-) {
-  if (!show) return
-  ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
-    DatePickerContent(initial = initial, onDismiss = onDismiss, onSelect = onSelect)
-  }
-}
-
-/** 日期选择内容（拆出便于 @Preview）：左上 ← 返回 + 日历；点某天即实时应用、不关闭。 */
-@Composable
-private fun DatePickerContent(
-  initial: Date,
-  onDismiss: () -> Unit,
-  onSelect: (Date) -> Unit,
-) {
-  val colors = LocalAppColors.current
-  val calendarState = rememberCalendarState(
-    initialClickDate = initial,
-    onClick = { date -> onSelect(date) },
-  )
-  Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-      Icon(
-        painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack), contentDescription = "返回",
-        tint = colors.tvLv2, modifier = Modifier.clickableNoIndicator(onClick = onDismiss),
-      )
-      Spacer(modifier = Modifier.width(12.dp))
-      Text("选择日期", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2)
-    }
-    CalendarCompose(modifier = Modifier.fillMaxWidth().height(280.dp), state = calendarState)
-  }
-}
-
 /* ---------------- 提前提醒选择 ---------------- */
 
 @Composable
@@ -631,7 +596,7 @@ private fun previewSampleSchedule() = com.cyxbs.pages.schedule.data.model.Schedu
 private val previewFirstMonday = Date(2026, 3, 2)
 
 @Composable
-private fun PreviewFrame(content: @Composable () -> Unit) {
+private fun PreviewFrame(content: @Composable ColumnScope.() -> Unit) {
   AppTheme {
     // 用 Column 提供纵向排布作用域（ShowContent/EditContent 内部直接发多个同级子项，
     // 真实弹窗里靠外层 Column 堆叠；预览必须同样包一层 Column，否则会全叠在一起）。
@@ -663,9 +628,9 @@ private fun PreviewScheduleEdit() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = false,
+      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = false,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
-      onDoneTime = {}, onSave = {}, onCancel = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
     )
   }
 }
@@ -677,9 +642,9 @@ private fun PreviewScheduleEditTime() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = true,
+      state = state, firstMonday = previewFirstMonday, editingTime = true, editingDate = false,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
-      onDoneTime = {}, onSave = {}, onCancel = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
     )
   }
 }
@@ -702,26 +667,24 @@ private fun PreviewScheduleEditDeadline() {
   PreviewFrame {
     val state = remember { EditScheduleState(previewSampleDeadline()) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = true,
+      state = state, firstMonday = previewFirstMonday, editingTime = true, editingDate = false,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
-      onDoneTime = {}, onSave = {}, onCancel = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
     )
   }
 }
 
-/** 日期选择：左上 ← 返回 + 日历，点某天即应用。外层必须给有界高度，否则 CalendarCompose 会撑满屏幕。 */
+/** 编辑态·点日期后：下方备注区就地变日历（点某天实时应用），← 返回。 */
 @Preview
 @Composable
-private fun PreviewScheduleDatePicker() {
-  AppTheme {
-    Column(
-      modifier = Modifier
-        .width(360.dp)
-        .height(360.dp)
-        .background(LocalAppColors.current.topBg),
-    ) {
-      DatePickerContent(initial = previewFirstMonday, onDismiss = {}, onSelect = {})
-    }
+private fun PreviewScheduleEditDate() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = true,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
+    )
   }
 }
 
@@ -732,9 +695,9 @@ private fun PreviewScheduleNew() {
   PreviewFrame {
     val state = remember { EditScheduleState(null) }
     EditContent(
-      state = state, firstMonday = previewFirstMonday, editingTime = false,
+      state = state, firstMonday = previewFirstMonday, editingTime = false, editingDate = false,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
-      onDoneTime = {}, onSave = {}, onCancel = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
     )
   }
 }
