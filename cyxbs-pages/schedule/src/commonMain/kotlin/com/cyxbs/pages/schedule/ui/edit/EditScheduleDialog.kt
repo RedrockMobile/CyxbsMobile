@@ -84,6 +84,8 @@ import kotlin.time.Clock
  */
 
 /** 弹窗内容固定高度，对齐课表 item 弹窗（[com.cyxbs.pages.course.dialog] 的 280dp），两处观感一致。 */
+private val EditSheetHeight = 280.dp
+
 @Composable
 fun EditScheduleDialog(
   show: Boolean,
@@ -127,7 +129,7 @@ fun EditScheduleDialog(
     onDismiss = onDismiss,
     onDismissRequest = { if (state.isChanged) { showUnsavedExit = true; false } else true },
   ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().height(EditSheetHeight).padding(horizontal = 20.dp, vertical = 18.dp)) {
       when (mode) {
         Mode.SHOW -> ShowContent(
           state = state,
@@ -286,11 +288,12 @@ private fun EditContent(
         tint = if (canSave) colors.positive else colors.tvLv3.copy(alpha = 0.4f),
         modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
       )
-      Icon(
-        painter = rememberVectorPainter(Icons.Rounded.Close), contentDescription = "取消",
-        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
-      )
     }
+    // 取消 ✕ 始终显示（编辑时间段时也能取消整个编辑）。
+    Icon(
+      painter = rememberVectorPainter(Icons.Rounded.Close), contentDescription = "取消",
+      tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
+    )
   }
   Spacer(modifier = Modifier.height(10.dp))
   InfoRow(
@@ -593,11 +596,11 @@ private fun PreviewFrame(content: @Composable () -> Unit) {
   AppTheme {
     // 用 Column 提供纵向排布作用域（ShowContent/EditContent 内部直接发多个同级子项，
     // 真实弹窗里靠外层 Column 堆叠；预览必须同样包一层 Column，否则会全叠在一起）。
-    // 固定高度 280dp，和真实弹窗、课表 item 弹窗一致。
+    // 固定高度 EditSheetHeight，和真实弹窗、课表 item 弹窗一致。
     Column(
       modifier = Modifier
         .width(360.dp)
-        .height(280.dp)
+        .height(EditSheetHeight)
         .background(LocalAppColors.current.topBg)
         .padding(20.dp),
     ) { content() }
