@@ -6,6 +6,8 @@ import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
+import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
+import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -153,33 +155,8 @@ class ScheduleMainViewModel : BaseViewModel() {
     scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
     occurrenceDate: com.cyxbs.components.config.time.Date?,
   ) {
-    val origin = state.origin
     launchByViewModelScope {
-      if (origin == null) {
-        repository.createSchedule(
-          title = state.outputTitle,
-          detail = state.outputDetail,
-          type = state.type,
-          startTime = state.outputStartTime,
-          endTime = state.outputEndTime,
-          recurrence = state.outputRecurrence,
-        )
-        return@launchByViewModelScope
-      }
-      when (scope) {
-        com.cyxbs.pages.schedule.ui.edit.EditScope.ALL ->
-          repository.updateSchedule(state.toEntity(origin))
-        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_ONLY ->
-          if (occurrenceDate != null) repository.editThisOccurrence(
-            origin.todoId, occurrenceDate,
-            com.cyxbs.pages.schedule.ui.edit.buildOccurrenceOverride(occurrenceDate, state.toEntity(origin), origin),
-          )
-        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_AND_FOLLOWING ->
-          if (occurrenceDate != null) repository.editThisAndFollowing(
-            origin.todoId, occurrenceDate,
-            com.cyxbs.pages.schedule.ui.edit.buildFollowingSeries(state.toEntity(origin), occurrenceDate),
-          )
-      }
+      repository.applyScheduleEdit(state, scope, occurrenceDate)
     }
   }
 
@@ -192,13 +169,7 @@ class ScheduleMainViewModel : BaseViewModel() {
     occurrenceDate: com.cyxbs.components.config.time.Date?,
   ) {
     launchByViewModelScope {
-      when (scope) {
-        com.cyxbs.pages.schedule.ui.edit.EditScope.ALL -> repository.deleteSchedule(todoId)
-        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_ONLY ->
-          if (occurrenceDate != null) repository.deleteThisOccurrence(todoId, occurrenceDate)
-        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_AND_FOLLOWING ->
-          if (occurrenceDate != null) repository.deleteThisAndFollowing(todoId, occurrenceDate)
-      }
+      repository.applyScheduleDelete(todoId, scope, occurrenceDate)
     }
   }
 

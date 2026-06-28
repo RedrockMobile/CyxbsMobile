@@ -36,6 +36,8 @@ import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.CreateAffairPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.schedule.api.IScheduleCourseDecorationFactory
 import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
@@ -131,6 +133,7 @@ private fun createCoursePageDecorationManager(
       SelfLessonPageDecoration(platformItemFactory = MobileCourseSelfLessonItemFactory), // 自己的课程
       AffairPageDecoration(courseFrame = frame, platformItemFactory = MobileCourseAffairItemFactory), // 自己的事务
       LinkLessonPageDecoration(platformItemFactory = MobileCourseLinkLessonItemFactory), // 关联人的课程
+      IScheduleCourseDecorationFactory::class.impl().create(frame), // 新日程模块(与 affair 并存)
     )
   }
 }

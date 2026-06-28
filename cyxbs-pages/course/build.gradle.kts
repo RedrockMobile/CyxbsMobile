@@ -19,6 +19,7 @@ kotlin {
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.affair.api)
       implementation(projects.cyxbsPages.map.api)
+      implementation(projects.cyxbsPages.schedule.api) // 课表注册 SchedulePageDecoration(经 api 工厂, 与 affair 并存)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

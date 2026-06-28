@@ -16,6 +16,7 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsComponents.view) // CalendarCompose 等
+      implementation(projects.cyxbsPages.course.view) // 课表渲染基建(CoursePageDecoration/CourseItem)
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
