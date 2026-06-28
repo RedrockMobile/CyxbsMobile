@@ -561,7 +561,9 @@ private val previewFirstMonday = Date(2026, 3, 2)
 @Composable
 private fun PreviewFrame(content: @Composable () -> Unit) {
   AppTheme {
-    Box(
+    // 用 Column 提供纵向排布作用域（ShowContent/EditContent 内部直接发多个同级子项，
+    // 真实弹窗里靠外层 Column 堆叠；预览必须同样包一层 Column，否则会全叠在一起）。
+    Column(
       modifier = Modifier
         .width(360.dp)
         .background(LocalAppColors.current.topBg)
