@@ -709,8 +709,21 @@ private fun PreviewScheduleEditDeadline() {
   }
 }
 
-// 注：日期选择用的 CalendarCompose 与日历滚动体系强绑定，在隔离 @Preview 里无法正常渲染
-// （空白且高度不受约束），故不为其加预览；日期选择请在真机查看。
+/** 日期选择：左上 ← 返回 + 日历，点某天即应用。外层必须给有界高度，否则 CalendarCompose 会撑满屏幕。 */
+@Preview
+@Composable
+private fun PreviewScheduleDatePicker() {
+  AppTheme {
+    Column(
+      modifier = Modifier
+        .width(360.dp)
+        .height(360.dp)
+        .background(LocalAppColors.current.topBg),
+    ) {
+      DatePickerContent(initial = previewFirstMonday, onDismiss = {}, onSelect = {})
+    }
+  }
+}
 
 /** 新建态（空表单）：占位文案。 */
 @Preview
