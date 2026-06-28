@@ -323,11 +323,11 @@ private fun ColumnScope.EditContent(
         // 年月/第N周 已由上面的信息栏展示，无需在日历里重复。
         // 弹窗空间小，用更小的字号与格子高度，保证整月放得下。
         calendar = {
-          calendarState.WeekTextCompose(fontSize = 10.sp)
+          calendarState.WeekTextCompose(fontSize = 9.sp)
           calendarState.CalendarMonthCompose { date, show ->
             calendarState.CalendarDateCompose(
               date = date, show = show,
-              dayFontSize = 14.sp, lunarFontSize = 8.sp, maxCellHeight = 30.dp,
+              dayFontSize = 12.sp, lunarFontSize = 7.sp, maxCellHeight = 26.dp,
             )
           }
         },

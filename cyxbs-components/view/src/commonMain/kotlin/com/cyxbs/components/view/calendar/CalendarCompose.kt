@@ -2,11 +2,9 @@ package com.cyxbs.components.view.calendar
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +14,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -185,15 +185,22 @@ fun CalendarState.CalendarDateCompose(
       }
     }.clickableNoIndicator {
       clickEventFlowInternal.tryEmit(CalendarState.ClickEventData(clickDate, date))
-    }.background(
-      color = when {
+    }.drawBehind {
+      // 画正圆高亮：直径取格子较小边，避免格子被压扁(宽>高)时 CircleShape 变成椭圆。
+      val bg = when {
         date == today && show == CalendarDateShowValue.Clicked -> Color(0xFF1C71FF)
         show == CalendarDateShowValue.Clicked -> Color.LightGray
         date == today -> Color.White
         else -> Color.Transparent
-      },
-      shape = CircleShape
-    ),
+      }
+      if (bg != Color.Transparent) {
+        drawCircle(
+          color = bg,
+          radius = minOf(size.width, size.height) / 2f,
+          center = Offset(size.width / 2f, size.height / 2f),
+        )
+      }
+    },
     content = {
       CalendarDateDayCompose(date, today, show, dayFontSize)
       CalendarDateLunarCompose(date, today, show, lunarFontSize)
