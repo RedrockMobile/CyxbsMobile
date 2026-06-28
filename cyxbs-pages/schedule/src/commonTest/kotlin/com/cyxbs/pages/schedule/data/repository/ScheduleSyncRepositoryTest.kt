@@ -31,8 +31,9 @@ import kotlin.test.assertTrue
  *
  * - account 通过 KtProvider hook 注册假实现（生产代码不动）；
  * - local/remote 用内存假实现注入；
- * - scope 用 runTest 的 backgroundScope，防抖时长设极大 → 防抖任务在虚拟时间内永不触发、
- *   测试结束自动取消，不干扰断言；同步逻辑通过显式 [ScheduleSyncRepository.sync] 验证。
+ * - 用 [Dispatchers.setMain] 安装独立 scheduler 的测试主调度器：仓库防抖走 desktop 兜底的
+ *   appCoroutineScope(=Main)，其上任务被排队但不推进 → 永不触发、不干扰断言；
+ *   同步逻辑通过显式 [ScheduleSyncRepository.sync] 验证。
  */
 class ScheduleSyncRepositoryTest {
 
@@ -69,6 +70,7 @@ class ScheduleSyncRepositoryTest {
     recurrence = recurrence, startTime = startTime, endTime = endTime,
   )
 
+  // 验证新建：本地写入该 todo，并记录一条 UPSERT 待同步操作
   @Test
   fun create_adds_local_and_pending() = runTest {
     val repo = newRepo()
@@ -82,6 +84,7 @@ class ScheduleSyncRepositoryTest {
     )
   }
 
+  // 验证完成单次（无重复）：直接删除
   @Test
   fun complete_single_deletes() = runTest {
     val repo = newRepo()
@@ -91,6 +94,7 @@ class ScheduleSyncRepositoryTest {
     assertNull(local.getById(TEST_STU_NUM, id))
   }
 
+  // 验证完成重复的某一次：把该次加入 EXDATE，系列保留
   @Test
   fun complete_recurring_adds_exdate() = runTest {
     val repo = newRepo()
@@ -100,6 +104,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(Date(2026, 1, 12) in saved.recurrence!!.exdate)
   }
 
+  // 验证删除某一次（三态之"删此次"）：写入 EXDATE
   @Test
   fun delete_this_occurrence_adds_exdate() = runTest {
     val repo = newRepo()
@@ -108,6 +113,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(Date(2026, 1, 12) in local.getById(TEST_STU_NUM, 1)!!.recurrence!!.exdate)
   }
 
+  // 验证"此次及后续"：原系列 UNTIL 截断到前一天，并新建一条从该次起的新系列(新 id)
   @Test
   fun edit_this_and_following_truncates_and_creates_new() = runTest {
     val repo = newRepo()
@@ -119,6 +125,7 @@ class ScheduleSyncRepositoryTest {
     assertNull(local.getById(TEST_STU_NUM, 999)) // 新系列使用生成 id，而非传入的 999
   }
 
+  // 验证全量同步：用服务端 /list 结果整体替换本地
   @Test
   fun sync_full_rebuild_replaces_local() = runTest {
     val repo = newRepo()
@@ -127,6 +134,7 @@ class ScheduleSyncRepositoryTest {
     assertEquals(listOf(7L), local.getAll(TEST_STU_NUM).map { it.todoId })
   }
 
+  // 验证增量同步：sync_time 存在且更新时，拉取增量 changed 合并到本地
   @Test
   fun sync_incremental_merges_changes() = runTest {
     val repo = newRepo()
@@ -137,6 +145,7 @@ class ScheduleSyncRepositoryTest {
     assertEquals(listOf(8L), local.getAll(TEST_STU_NUM).map { it.todoId })
   }
 
+  // 验证 pending 上传(UPSERT)：sync 时把待同步的新增推送到服务端并清空 pending
   @Test
   fun flush_pending_pushes_upsert() = runTest {
     val repo = newRepo()
@@ -149,6 +158,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(local.getPendingOperations(TEST_STU_NUM).isEmpty())
   }
 
+  // 验证置顶：isPinned 置 1（作为完整 upsert，不走 /pin）
   @Test
   fun pin_sets_pinned() = runTest {
     val repo = newRepo()
@@ -158,6 +168,7 @@ class ScheduleSyncRepositoryTest {
     assertEquals(1, local.getById(TEST_STU_NUM, id)!!.isPinned)
   }
 
+  // 验证删除链路 + pending DELETE 上传：sync 时调用远端删除、清空 pending、本地无残留
   @Test
   fun delete_and_flush_pending_delete() = runTest {
     val repo = newRepo()
@@ -173,6 +184,7 @@ class ScheduleSyncRepositoryTest {
     assertNull(local.getById(TEST_STU_NUM, id))
   }
 
+  // 验证同步失败：异常被捕获并置为 Error 状态（不崩溃）
   @Test
   fun sync_failure_sets_error_state() = runTest {
     val repo = newRepo()
@@ -181,6 +193,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(repo.syncState.value is ScheduleSyncState.Error)
   }
 
+  // 验证 pending 上传失败：标记 needsFullRebuild 以便下次走全量重建，并置 Error
   @Test
   fun flush_pending_failure_marks_needs_rebuild() = runTest {
     val repo = newRepo()
@@ -193,6 +206,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(local.loadSnapshot(TEST_STU_NUM).meta.needsFullRebuild)
   }
 
+  // 验证增量基线失效(sync_time 不存在)：回退到全量重建
   @Test
   fun incremental_falls_back_to_full_when_sync_time_missing() = runTest {
     val repo = newRepo()
@@ -203,6 +217,7 @@ class ScheduleSyncRepositoryTest {
     assertEquals(listOf(9L), local.getAll(TEST_STU_NUM).map { it.todoId })
   }
 
+  // 验证增量同步合并删除：delArray 中的 id 从本地移除
   @Test
   fun incremental_merges_deletions() = runTest {
     val repo = newRepo()
@@ -217,6 +232,7 @@ class ScheduleSyncRepositoryTest {
     assertTrue(local.getAll(TEST_STU_NUM).isEmpty())
   }
 
+  // 验证仅修改某一次（三态之"仅此次"）：写入对应 recurrenceId 的 override
   @Test
   fun edit_this_occurrence_writes_override() = runTest {
     val repo = newRepo()

@@ -17,6 +17,7 @@ class ScheduleMutationsTest {
     todoId = 1L, title = "t", lastModifyTime = 0L, recurrence = recurrence,
   )
 
+  // 验证 isRecurring：有 rrule 或 rdate 判为重复，空 recurrence / null 判为单次
   @Test
   fun is_recurring() {
     assertTrue(ScheduleMutations.isRecurring(entity(Recurrence(RRule(Freq.DAILY)))))
@@ -25,6 +26,7 @@ class ScheduleMutationsTest {
     assertFalse(ScheduleMutations.isRecurring(entity(null)))
   }
 
+  // 验证 addExdate：把某次加入 EXDATE，且重复加入同一天保持幂等（不重复追加）
   @Test
   fun add_exdate_appends_and_dedupes() {
     val e = entity(Recurrence(RRule(Freq.WEEKLY)))
@@ -36,6 +38,7 @@ class ScheduleMutationsTest {
     assertEquals(listOf(day), twice.recurrence!!.exdate)
   }
 
+  // 验证 applyOverride：同一 recurrenceId 的 override 是替换而非追加（按 id 去重）
   @Test
   fun apply_override_replaces_same_recurrence_id() {
     val e = entity(Recurrence(RRule(Freq.WEEKLY)))
@@ -46,6 +49,7 @@ class ScheduleMutationsTest {
     assertEquals("B", second.recurrence!!.overrides.first().title)
   }
 
+  // 验证 truncateBefore（此次及后续）：UNTIL 设为前一天、清空 count，并丢弃截断点之后的 rdate/exdate/override
   @Test
   fun truncate_before_sets_until_clears_count_and_drops_tail() {
     val e = entity(

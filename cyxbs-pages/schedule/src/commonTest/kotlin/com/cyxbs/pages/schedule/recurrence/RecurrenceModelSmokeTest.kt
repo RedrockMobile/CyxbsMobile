@@ -13,6 +13,7 @@ import kotlin.test.assertTrue
  */
 class RecurrenceModelSmokeTest {
 
+  // 验证 RRule 默认值：interval=1、until/count 为 null、byDay 原样保留
   @Test
   fun rrule_defaults() {
     val rule = RRule(freq = Freq.WEEKLY, byDay = listOf(1, 3))
@@ -22,6 +23,7 @@ class RecurrenceModelSmokeTest {
     assertEquals(listOf(1, 3), rule.byDay)
   }
 
+  // 验证 Recurrence 默认构造为空（无 rrule/rdate/exdate/overrides）
   @Test
   fun recurrence_defaults_empty() {
     val r = Recurrence()
@@ -31,6 +33,7 @@ class RecurrenceModelSmokeTest {
     assertTrue(r.overrides.isEmpty())
   }
 
+  // 验证 RecurrenceOverride 字段：recurrenceId/cancelled 保存、未设字段为 null
   @Test
   fun override_carries_recurrence_id() {
     val day = Date(2026, 6, 28)

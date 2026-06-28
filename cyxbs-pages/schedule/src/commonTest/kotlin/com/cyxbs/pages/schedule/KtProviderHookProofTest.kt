@@ -16,6 +16,7 @@ class KtProviderHookProofTest {
     fun hi(): String
   }
 
+  // 验证 addImplProvider hook 注册的假实现能被 impl()/implOrNull() 解析到
   @Test
   fun can_register_fake_impl_for_unit_test() {
     IKtProviderDelegate.addImplProvider(Greeter::class, "") { object : Greeter {
