@@ -3,6 +3,7 @@ package com.cyxbs.pages.schedule.ui.edit
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -403,18 +405,10 @@ private fun TimeWheelPane(
   val minutes = remember { (0..59).map { it.toString().padStart(2, '0') }.toPersistentList() }
 
   Column(modifier = Modifier.fillMaxWidth()) {
-    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        text = if (deadlineOnly) "截止时间" else "开始 — 结束",
-        fontSize = 13.sp, color = colors.tvLv3.copy(alpha = 0.7f), modifier = Modifier.weight(1f),
-      )
-      // 时间段 / 仅截止 切换
-      Text(
-        text = if (deadlineOnly) "改为时间段" else "设为截止型",
-        fontSize = 13.sp, color = colors.positive,
-        modifier = Modifier.clickableNoIndicator { deadlineOnly = !deadlineOnly },
-      )
-    }
+    // 时间段 / 截止 分段框框切换（沿用 todo cmp 的样式）。
+    ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { deadlineOnly = !it })
+    // 去掉「完成」按钮后，滚轮整体下移一点。
+    Spacer(modifier = Modifier.height(18.dp))
     Row(
       modifier = Modifier.fillMaxWidth().height(120.dp),
       horizontalArrangement = Arrangement.Center,
@@ -452,6 +446,33 @@ private fun TimeWheelPane(
       }
     }
   }
+}
+
+/** 时间段 / 截止 分段框框切换（沿用 todo cmp 的 TodoTimeTypeToggle 样式）。 */
+@Composable
+private fun ScheduleTimeTypeToggle(isInterval: Boolean, onChange: (Boolean) -> Unit) {
+  Row(modifier = Modifier.fillMaxWidth()) {
+    TimeTypeChip("时间段", selected = isInterval, modifier = Modifier.weight(1f)) { onChange(true) }
+    Spacer(modifier = Modifier.width(8.dp))
+    TimeTypeChip("截止", selected = !isInterval, modifier = Modifier.weight(1f)) { onChange(false) }
+  }
+}
+
+@Composable
+private fun TimeTypeChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+  val colors = LocalAppColors.current
+  val accent = colors.positive
+  Text(
+    text = text,
+    textAlign = TextAlign.Center,
+    fontSize = 14.sp,
+    color = if (selected) accent else colors.tvLv3.copy(alpha = 0.5f),
+    modifier = modifier
+      .border(1.dp, if (selected) accent else colors.tvLv3.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+      .background(if (selected) accent.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
+      .clickableNoIndicator(onClick = onClick)
+      .padding(vertical = 9.dp),
+  )
 }
 
 @Composable
