@@ -155,15 +155,14 @@ fun EditScheduleDialog(
     }
   }
 
-  // 日期选择（仅取日期，周数随之重算）
+  // 日期选择（仅取日期，周数随之重算）；点某天实时应用、不关闭，用户点 ← 回退。
   DatePickerSheet(
     show = showDatePicker,
     initial = state.anchorDate,
     onDismiss = { showDatePicker = false },
-    onConfirm = { date ->
+    onSelect = { date ->
       state.startTime = reanchorTimeString(state.startTime, date)
       state.endTime = reanchorTimeString(state.endTime, date)
-      showDatePicker = false
     },
   )
 
@@ -507,25 +506,36 @@ private fun DatePickerSheet(
   show: Boolean,
   initial: Date,
   onDismiss: () -> Unit,
-  onConfirm: (Date) -> Unit,
+  onSelect: (Date) -> Unit,
 ) {
   if (!show) return
+  ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
+    DatePickerContent(initial = initial, onDismiss = onDismiss, onSelect = onSelect)
+  }
+}
+
+/** 日期选择内容（拆出便于 @Preview）：左上 ← 返回 + 日历；点某天即实时应用、不关闭。 */
+@Composable
+private fun DatePickerContent(
+  initial: Date,
+  onDismiss: () -> Unit,
+  onSelect: (Date) -> Unit,
+) {
   val colors = LocalAppColors.current
-  // 点日历某天即确认并关闭（onClick 回调），无需再点「确定」；保留「取消」兜底。
   val calendarState = rememberCalendarState(
     initialClickDate = initial,
-    onClick = { date -> onConfirm(date) },
+    onClick = { date -> onSelect(date) },
   )
-  ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-      Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("选择日期", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2)
-        Spacer(modifier = Modifier.weight(1f))
-        Text("取消", fontSize = 16.sp, color = colors.tvLv3.copy(alpha = 0.5f),
-          modifier = Modifier.clickableNoIndicator(onClick = onDismiss))
-      }
-      CalendarCompose(modifier = Modifier.fillMaxWidth().height(280.dp), state = calendarState)
+  Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+      Icon(
+        painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack), contentDescription = "返回",
+        tint = colors.tvLv2, modifier = Modifier.clickableNoIndicator(onClick = onDismiss),
+      )
+      Spacer(modifier = Modifier.width(12.dp))
+      Text("选择日期", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2)
     }
+    CalendarCompose(modifier = Modifier.fillMaxWidth().height(280.dp), state = calendarState)
   }
 }
 
@@ -696,6 +706,19 @@ private fun PreviewScheduleEditDeadline() {
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
       onDoneTime = {}, onSave = {}, onCancel = {},
     )
+  }
+}
+
+/** 日期选择：左上 ← 返回 + 日历，点某天即应用。（用独立 frame，因日历比 280 高。） */
+@Preview
+@Composable
+private fun PreviewScheduleDatePicker() {
+  AppTheme {
+    Column(
+      modifier = Modifier.width(360.dp).background(LocalAppColors.current.topBg),
+    ) {
+      DatePickerContent(initial = previewFirstMonday, onDismiss = {}, onSelect = {})
+    }
   }
 }
 
