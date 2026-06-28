@@ -38,11 +38,20 @@ class EditScheduleState(val origin: ScheduleEntity?) {
   // 重复规则草稿：编辑时从原 recurrence 反解，新建为「不重复」。
   var recurrence by mutableStateOf(origin?.recurrence.toDraft())
 
+  // 提前多少分钟提醒（写系统日历闹钟偏移）；-1 表示不提醒。
+  var remindMinutes by mutableStateOf(origin?.remindMinutes ?: -1)
+
   /** 锚点日期：开始时间优先、否则截止时间、再否则今天。用于把草稿补全成完整 RRULE。 */
   val anchorDate: Date
     get() = parseScheduleDateTime(outputStartTime)?.date
       ?: parseScheduleDateTime(outputEndTime)?.date
       ?: Date.now()
+
+  /** 开始时刻的当天分钟数（截止型 / 未填返回 null）。 */
+  val startMinuteOfDay: Int? get() = parseScheduleDateTime(outputStartTime)?.minuteOfDay
+
+  /** 结束时刻的当天分钟数（未填返回 null）。 */
+  val endMinuteOfDay: Int? get() = parseScheduleDateTime(outputEndTime)?.minuteOfDay
 
   /** 时间段类型下需开始/结束都合法；截止类型恒为 true。 */
   val intervalValid: Boolean
@@ -59,6 +68,7 @@ class EditScheduleState(val origin: ScheduleEntity?) {
       type != (origin?.type ?: ScheduleEntity.TYPE_OTHER) ||
       startTime != (origin?.startTime ?: "") ||
       endTime != (origin?.endTime ?: "") ||
+      remindMinutes != (origin?.remindMinutes ?: -1) ||
       recurrence != origin?.recurrence.toDraft()
 
   /** 保存写库用的标题（去首尾空格）。 */
@@ -90,7 +100,7 @@ class EditScheduleState(val origin: ScheduleEntity?) {
     endTime = outputEndTime ?: "",
     recurrence = outputRecurrence,
     remindMode = base?.remindMode ?: com.cyxbs.pages.schedule.data.model.ScheduleRemindMode(),
-    remindMinutes = base?.remindMinutes ?: -1,
+    remindMinutes = remindMinutes,
     isDone = base?.isDone ?: 0,
     isPinned = base?.isPinned ?: 0,
     isOvered = base?.isOvered ?: 0,

@@ -44,7 +44,6 @@ import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
-import com.cyxbs.pages.schedule.ui.edit.orderedCategories
 import com.cyxbs.pages.schedule.ui.timeline.HourHeight
 import com.cyxbs.pages.schedule.ui.timeline.ScheduleTimelinePane
 import com.cyxbs.pages.schedule.ui.timeline.allDaySchedulesForDate
@@ -91,7 +90,6 @@ fun SchedulePage(
   val colors = LocalAppColors.current
   val syncState by viewModel.syncState.collectAsState()
   val allSchedules by viewModel.allSchedules.collectAsState()
-  val categoriesPool by viewModel.categories.collectAsState()
 
   LaunchedEffect(Unit) {
     viewModel.initialize()
@@ -179,11 +177,6 @@ fun SchedulePage(
     show = showEdit,
     editSchedule = currentEditing,
     occurrenceDate = editingDate,
-    categories = remember(categoriesPool, allSchedules) {
-      orderedCategories(categoriesPool, allSchedules)
-    },
-    onAddCategory = { viewModel.addCategory(it) },
-    onDeleteCategory = { viewModel.removeCategory(it) },
     onDismiss = { showEdit = false },
     onConfirm = { state, scope -> viewModel.saveSchedule(state, scope, editingDate) },
     onDelete = if (currentEditing != null) {
