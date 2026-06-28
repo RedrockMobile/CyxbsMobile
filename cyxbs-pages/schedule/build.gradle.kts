@@ -14,6 +14,9 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.utils)
     }
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+    }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
