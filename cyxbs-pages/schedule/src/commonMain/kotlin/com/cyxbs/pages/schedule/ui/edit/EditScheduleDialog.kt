@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
@@ -38,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -522,8 +522,12 @@ private fun WheelPair(
   }
 }
 
-/* ---------------- 提前提醒选择（内联） ---------------- */
+/* ---------------- 提前提醒选择（内联滚轮） ---------------- */
 
+/**
+ * 提前提醒：「不提醒 / 提前」分段 + 滚轮设「提前 N 分钟/小时」。
+ * [current] 为 remindMinutes（-1 不提醒；整小时存为 N*60）。改动实时回调 [onChoose]。
+ */
 @Composable
 private fun RemindInline(
   current: Int,
@@ -531,15 +535,51 @@ private fun RemindInline(
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
-  Column(modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-    REMIND_AHEAD_OPTIONS.forEach { opt ->
-      Text(
-        text = remindOptionLabel(opt),
-        fontSize = 15.sp,
-        color = if (opt == current) colors.positive else colors.tvLv2,
-        modifier = Modifier.fillMaxWidth().clickableNoIndicator { onChoose(opt) }.padding(vertical = 11.dp),
-      )
+  val onChooseS = rememberUpdatedState(onChoose)
+  val isHour = current >= 60 && current % 60 == 0
+  val initN = (if (current < 0) 10 else if (isHour) current / 60 else current).coerceIn(1, 59)
+  val nLine = remember { Animatable((initN - 1).toFloat()) }
+  val unitLine = remember { Animatable((if (isHour) 1 else 0).toFloat()) } // 0=分钟,1=小时
+  val numbers = remember { (1..59).map { it.toString() }.toPersistentList() }
+  val units = remember { listOf("分钟", "小时").toPersistentList() }
+
+  Column(modifier = modifier.fillMaxWidth()) {
+    Row {
+      TimeTypeChip("不提醒", selected = current < 0) { onChoose(-1) }
+      Spacer(modifier = Modifier.width(8.dp))
+      TimeTypeChip("提前", selected = current >= 0) { if (current < 0) onChoose(10) }
     }
+    if (current >= 0) {
+      Spacer(modifier = Modifier.height(12.dp))
+      Row(modifier = Modifier.fillMaxWidth().height(110.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("提前", fontSize = 14.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
+        OneWheel(numbers, nLine, modifier = Modifier.weight(1f))
+        OneWheel(units, unitLine, modifier = Modifier.weight(1f))
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { nLine.value.roundToInt() to unitLine.value.roundToInt() }.collect { (n, u) ->
+          val v = (n + 1).coerceIn(1, 59)
+          onChooseS.value(if (u == 1) v * 60 else v)
+        }
+      }
+    }
+  }
+}
+
+/** 单列滚轮（与 [WheelPair] 同款，单列）。 */
+@Composable
+private fun OneWheel(
+  options: kotlinx.collections.immutable.ImmutableList<String>,
+  line: Animatable<Float, *>,
+  modifier: Modifier = Modifier,
+) {
+  WheelSelectBackground(modifier = modifier.fillMaxHeight()) {
+    @Suppress("UNCHECKED_CAST")
+    WheelSelectCompose(
+      selectedLine = line as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+      options = options,
+      modifier = Modifier.fillMaxSize(),
+    )
   }
 }
 
