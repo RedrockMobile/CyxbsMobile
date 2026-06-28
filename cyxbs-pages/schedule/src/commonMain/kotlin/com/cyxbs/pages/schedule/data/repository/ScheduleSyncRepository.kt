@@ -12,6 +12,7 @@ import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleLocalMeta
 import com.cyxbs.pages.schedule.data.model.SchedulePendingOperation
 import com.cyxbs.pages.schedule.data.model.LegacyRecurrenceMigration
+import com.cyxbs.pages.schedule.data.model.ScheduleMutations
 import com.cyxbs.pages.schedule.data.model.ScheduleOccurrences
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
 import com.cyxbs.pages.schedule.data.remote.ScheduleRemoteDataSource
@@ -295,19 +296,15 @@ class ScheduleSyncRepository(
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
       val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
-      val rec = todo.recurrence
-      val isRecurring = rec != null && (rec.rrule != null || rec.rdate.isNotEmpty())
-      if (!isRecurring) {
+      if (!ScheduleMutations.isRecurring(todo)) {
         localDataSource.deleteLocal(account, todoId, recordPending = true)
       } else {
         val target = occurrenceDate ?: firstUpcomingOccurrence(todo)
         if (target == null) {
           localDataSource.deleteLocal(account, todoId, recordPending = true)
         } else {
-          val updated = todo.copy(
-            recurrence = rec!!.copy(exdate = rec.exdate + target),
-            lastModifyTime = Clock.System.now().toEpochMilliseconds(),
-          )
+          val updated = ScheduleMutations.addExdate(todo, target)
+            .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
           localDataSource.upsertLocal(account, updated, recordPending = true)
         }
       }
@@ -325,11 +322,9 @@ class ScheduleSyncRepository(
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
       val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
-      val rec = todo.recurrence ?: return
-      val updated = todo.copy(
-        recurrence = rec.copy(exdate = rec.exdate + occurrenceDate),
-        lastModifyTime = Clock.System.now().toEpochMilliseconds(),
-      )
+      if (todo.recurrence == null) return
+      val updated = ScheduleMutations.addExdate(todo, occurrenceDate)
+        .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
       localDataSource.upsertLocal(account, updated, recordPending = true)
       reloadSchedules(account)
     }
@@ -345,12 +340,9 @@ class ScheduleSyncRepository(
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
       val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
-      val rec = todo.recurrence ?: return
-      val newOverrides = rec.overrides.filterNot { it.recurrenceId == occurrenceDate } + patch
-      val updated = todo.copy(
-        recurrence = rec.copy(overrides = newOverrides),
-        lastModifyTime = Clock.System.now().toEpochMilliseconds(),
-      )
+      if (todo.recurrence == null) return
+      val updated = ScheduleMutations.applyOverride(todo, patch)
+        .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
       localDataSource.upsertLocal(account, updated, recordPending = true)
       reloadSchedules(account)
     }
@@ -366,17 +358,9 @@ class ScheduleSyncRepository(
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
       val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
-      val rec = todo.recurrence ?: return
-      val cut = occurrenceDate.minusDays(1)
-      val truncated = todo.copy(
-        recurrence = rec.copy(
-          rrule = rec.rrule?.copy(until = cut, count = null),
-          rdate = rec.rdate.filter { it <= cut },
-          exdate = rec.exdate.filter { it <= cut },
-          overrides = rec.overrides.filter { it.recurrenceId <= cut },
-        ),
-        lastModifyTime = Clock.System.now().toEpochMilliseconds(),
-      )
+      if (todo.recurrence == null) return
+      val truncated = ScheduleMutations.truncateBefore(todo, occurrenceDate)
+        .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
       localDataSource.upsertLocal(account, truncated, recordPending = true)
       val created = newTodo.copy(
         todoId = generateLocalId(),
