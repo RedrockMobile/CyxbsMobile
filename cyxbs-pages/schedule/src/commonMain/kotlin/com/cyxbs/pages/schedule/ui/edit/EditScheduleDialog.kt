@@ -415,12 +415,19 @@ private fun TimeWheelPane(
         modifier = Modifier.clickableNoIndicator { deadlineOnly = !deadlineOnly },
       )
     }
-    Row(modifier = Modifier.fillMaxWidth().height(120.dp), verticalAlignment = Alignment.CenterVertically) {
-      if (!deadlineOnly) {
+    Row(
+      modifier = Modifier.fillMaxWidth().height(120.dp),
+      horizontalArrangement = Arrangement.Center,
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      if (deadlineOnly) {
+        // 截止型只有一个滚轮：居中、占一半宽度，避免背景铺满整行显得太宽。
+        WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.fillMaxWidth(0.5f))
+      } else {
         WheelPair(hours, minutes, startHour, startMinute, modifier = Modifier.weight(1f))
         Text("—", modifier = Modifier.padding(horizontal = 8.dp), color = colors.tvLv2)
+        WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.weight(1f))
       }
-      WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.weight(1f))
     }
   }
 
