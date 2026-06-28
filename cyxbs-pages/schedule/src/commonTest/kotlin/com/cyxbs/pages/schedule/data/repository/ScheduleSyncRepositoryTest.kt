@@ -13,8 +13,12 @@ import com.cyxbs.pages.schedule.support.FakeScheduleLocalDataSource
 import com.cyxbs.pages.schedule.support.FakeScheduleRemoteDataSource
 import com.cyxbs.pages.schedule.support.TEST_STU_NUM
 import com.cyxbs.pages.schedule.support.registerFakeAccount
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,16 +40,22 @@ class ScheduleSyncRepositoryTest {
 
   @BeforeTest
   fun setup() {
+    // 用独立 scheduler 的测试主调度器：appCoroutineScope(desktop 兜底)走它，
+    // 防抖任务被排队但不推进 → 永不触发，不干扰断言；同步逻辑通过显式 sync() 验证。
+    Dispatchers.setMain(StandardTestDispatcher())
     registerFakeAccount()
     local = FakeScheduleLocalDataSource()
     remote = FakeScheduleRemoteDataSource()
   }
 
-  private fun TestScope.newRepo() = ScheduleSyncRepository(
+  @AfterTest
+  fun tearDown() {
+    Dispatchers.resetMain()
+  }
+
+  private fun newRepo() = ScheduleSyncRepository(
     localDataSource = local,
     remoteDataSource = remote,
-    scope = backgroundScope,
-    syncDebounceMillis = 60_000_000L,
   )
 
   private fun entity(

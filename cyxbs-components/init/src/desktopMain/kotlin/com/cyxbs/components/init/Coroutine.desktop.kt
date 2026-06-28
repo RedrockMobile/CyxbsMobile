@@ -18,9 +18,19 @@ import kotlin.system.exitProcess
 private val AppCoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> }
 
 actual val appCoroutineScope: CoroutineScope
-  get() = appCoroutineScopeInternal
+  // runApp 设置真实作用域；未调用 runApp 时（如单测）回退到 [defaultAppCoroutineScope]，
+  // 避免直接访问未初始化的 lateinit 抛 UninitializedPropertyAccessException。
+  get() = appCoroutineScopeInternal ?: defaultAppCoroutineScope
 
-private lateinit var appCoroutineScopeInternal: CoroutineScope
+private var appCoroutineScopeInternal: CoroutineScope? = null
+
+/**
+ * runApp 未调用时的兜底应用作用域，遵循 Main.immediate 契约。
+ * 单测可用 `Dispatchers.setMain(...)` 控制其调度（desktop 单测据此即可测试依赖 [appCoroutineScope] 的代码）。
+ */
+private val defaultAppCoroutineScope: CoroutineScope by lazy {
+  CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + AppCoroutineExceptionHandler)
+}
 
 fun runApp(block: suspend CoroutineScope.() -> Unit) {
   runBlocking {
