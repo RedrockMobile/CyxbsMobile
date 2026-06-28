@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +59,8 @@ import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
 import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -325,14 +330,18 @@ private fun InfoRow(
   val repeatText = recurrenceRowLabel(state.outputRecurrence)
   val remindText = formatRemindAhead(state.remindMinutes)
 
+  // 重复/提醒前缀图标（复用 widget 里的事务图标，风格统一）。
+  val repeatIcon = rememberIcAddtodoRepeat()
+  val remindIcon = rememberIcAddtodoNotice()
+
   Row(
     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     InfoSegment(text = dateText, editable = editable, onClick = onClickDate)
     InfoSegment(text = timeText ?: if (editable) "设置时间" else null, placeholder = timeText == null, editable = editable, onClick = onClickTime)
-    InfoSegment(text = repeatText ?: if (editable) "重复" else null, placeholder = repeatText == null, editable = editable, onClick = onClickRepeat)
-    InfoSegment(text = remindText ?: if (editable) "提醒" else null, placeholder = remindText == null, editable = editable, onClick = onClickRemind)
+    InfoSegment(text = repeatText ?: if (editable) "重复" else null, placeholder = repeatText == null, editable = editable, icon = repeatIcon, onClick = onClickRepeat)
+    InfoSegment(text = remindText ?: if (editable) "提醒" else null, placeholder = remindText == null, editable = editable, icon = remindIcon, onClick = onClickRemind)
   }
 }
 
@@ -341,19 +350,24 @@ private fun InfoSegment(
   text: String?,
   editable: Boolean,
   placeholder: Boolean = false,
+  icon: ImageVector? = null,
   onClick: () -> Unit = {},
 ) {
   if (text == null) return
   val colors = LocalAppColors.current
-  Text(
-    text = text,
-    fontSize = 13.sp,
-    maxLines = 1,
-    color = if (placeholder) colors.tvLv3.copy(alpha = 0.4f) else colors.tvLv2,
+  val color = if (placeholder) colors.tvLv3.copy(alpha = 0.4f) else colors.tvLv2
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
       .padding(end = 12.dp)
       .then(if (editable) Modifier.clickableNoIndicator(onClick = onClick) else Modifier),
-  )
+  ) {
+    if (icon != null) {
+      Image(imageVector = icon, contentDescription = null, modifier = Modifier.size(13.dp))
+      Spacer(modifier = Modifier.width(3.dp))
+    }
+    Text(text = text, fontSize = 13.sp, maxLines = 1, color = color)
+  }
 }
 
 /* ---------------- 时分滚轮（点时间段后替换备注区） ---------------- */

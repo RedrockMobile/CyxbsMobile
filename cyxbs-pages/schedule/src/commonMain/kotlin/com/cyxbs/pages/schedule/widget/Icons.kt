@@ -28,6 +28,22 @@ private fun PreviewCompose() {
       imageVector = rememberIcPicManageChange(),
       contentDescription = null,
     )
+    Image(
+      imageVector = rememberIcAddtodoNotice(),
+      contentDescription = null,
+    )
+    Image(
+      imageVector = rememberIcAddtodoRepeat(),
+      contentDescription = null,
+    )
+    Image(
+      imageVector = rememberIcAddtodoCategory(),
+      contentDescription = null,
+    )
+    Image(
+      imageVector = rememberIcDetailClassifyMore(),
+      contentDescription = null,
+    )
   }
 }
 
