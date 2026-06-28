@@ -13,6 +13,7 @@ kotlin {
       implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.utils)
+      implementation(projects.cyxbsComponents.account.api)
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
