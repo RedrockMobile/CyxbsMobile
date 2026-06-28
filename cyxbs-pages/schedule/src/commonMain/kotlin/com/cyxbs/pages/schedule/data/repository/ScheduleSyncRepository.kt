@@ -15,12 +15,14 @@ import com.cyxbs.pages.schedule.data.model.LegacyRecurrenceMigration
 import com.cyxbs.pages.schedule.data.model.ScheduleMutations
 import com.cyxbs.pages.schedule.data.model.ScheduleOccurrences
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
+import com.cyxbs.pages.schedule.data.remote.IScheduleRemoteDataSource
 import com.cyxbs.pages.schedule.data.remote.ScheduleRemoteDataSource
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 import com.cyxbs.pages.schedule.recurrence.RecurrenceOverride
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +47,12 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class ScheduleSyncRepository(
   private val localDataSource: ScheduleLocalDataSource = SplitSettingsScheduleLocalDataSource(),
-  private val remoteDataSource: ScheduleRemoteDataSource = ScheduleRemoteDataSource,
+  private val remoteDataSource: IScheduleRemoteDataSource = ScheduleRemoteDataSource,
+  // 防抖同步所用作用域：默认走全局 appCoroutineScope；单测传入受控 scope。
+  // 注：account 依赖走 KtProvider hook（见 getCurrentAccount），无需注入；
+  // 而 appCoroutineScope 在 desktop 为 lateinit、非服务，hook 无法替换，故此处注入。
+  private val scope: CoroutineScope = appCoroutineScope,
+  private val syncDebounceMillis: Long = 5000L,
 ) {
 
   private val syncMutex = Mutex()
@@ -64,7 +71,6 @@ class ScheduleSyncRepository(
 
   /** 防抖同步任务，5 秒内多次修改只触发一次同步。 */
   private var debounceSyncJob: Job? = null
-  private val syncDebounceMillis = 5000L
 
   /**
    * 初始化仓库。
@@ -430,7 +436,7 @@ class ScheduleSyncRepository(
    */
   private fun scheduleDebouncedSync() {
     debounceSyncJob?.cancel()
-    debounceSyncJob = appCoroutineScope.launch {
+    debounceSyncJob = scope.launch {
       delay(syncDebounceMillis.milliseconds)
       sync()
     }
