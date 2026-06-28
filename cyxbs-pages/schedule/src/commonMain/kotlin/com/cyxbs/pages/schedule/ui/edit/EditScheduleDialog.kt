@@ -511,19 +511,20 @@ private fun DatePickerSheet(
 ) {
   if (!show) return
   val colors = LocalAppColors.current
-  val calendarState = rememberCalendarState(initialClickDate = initial)
+  // 点日历某天即确认并关闭（onClick 回调），无需再点「确定」；保留「取消」兜底。
+  val calendarState = rememberCalendarState(
+    initialClickDate = initial,
+    onClick = { date -> onConfirm(date) },
+  )
   ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-      Text("选择日期", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2,
-        modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp))
-      CalendarCompose(modifier = Modifier.fillMaxWidth().height(280.dp), state = calendarState)
-      Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.End) {
+      Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("选择日期", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2)
+        Spacer(modifier = Modifier.weight(1f))
         Text("取消", fontSize = 16.sp, color = colors.tvLv3.copy(alpha = 0.5f),
           modifier = Modifier.clickableNoIndicator(onClick = onDismiss))
-        Spacer(modifier = Modifier.width(24.dp))
-        Text("确定", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.positive,
-          modifier = Modifier.clickableNoIndicator { onConfirm(calendarState.clickDate) })
       }
+      CalendarCompose(modifier = Modifier.fillMaxWidth().height(280.dp), state = calendarState)
     }
   }
 }
