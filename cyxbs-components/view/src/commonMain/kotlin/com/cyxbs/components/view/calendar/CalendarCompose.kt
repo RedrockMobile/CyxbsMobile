@@ -63,6 +63,10 @@ fun CalendarCompose(
   },
   content: @Composable ColumnScope.() -> Unit = {},
 ) {
+  // 行高测量出来后，落地可能存在的「默认展开」请求（state.expand() 在测量前调用时会延后到此处）。
+  LaunchedEffect(state) {
+    snapshotFlow { state.lineHeightState.value }.collect { state.tryApplyExpand() }
+  }
   Column(
     modifier = Modifier.fillMaxSize()
       .nestedScroll(remember(state) { CalendarNestedScroll(state) })

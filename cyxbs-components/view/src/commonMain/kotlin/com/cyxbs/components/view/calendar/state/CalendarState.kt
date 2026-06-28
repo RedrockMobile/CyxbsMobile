@@ -175,6 +175,34 @@ class CalendarState(
   val fraction: Float by derivedStateOfStructure {
     verticalScrollState.value.offset / maxVerticalScrollOffset
   }
+
+  // 默认展开支持：展开偏移 = maxVerticalScrollOffset，依赖测量后的行高（首帧前为 0），
+  // 故 expand() 先记 pending，待 CalendarCompose 测量出行高后由 tryApplyExpand() 落地。
+  var pendingExpand = false
+    private set
+
+  /**
+   * 展开为整月视图（公共方法，供默认展开等场景调用）。
+   * 若在测量完成前调用，会延后到测量出行高后自动生效。
+   */
+  fun expand() {
+    pendingExpand = true
+    tryApplyExpand()
+  }
+
+  /** 折叠为单周视图。 */
+  fun collapse() {
+    pendingExpand = false
+    verticalScrollState.value = VerticalScrollState.Collapsed
+  }
+
+  /** 若存在待展开请求且已测量出行高，则落地展开；由 CalendarCompose 在行高变化时调用。 */
+  internal fun tryApplyExpand() {
+    if (pendingExpand && maxVerticalScrollOffset > 0F) {
+      verticalScrollState.value = VerticalScrollState.Expanded(maxVerticalScrollOffset)
+      pendingExpand = false
+    }
+  }
 }
 
 @Composable

@@ -58,6 +58,9 @@ import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.view.calendar.CalendarCompose
+import com.cyxbs.components.view.calendar.CalendarDateCompose
+import com.cyxbs.components.view.calendar.WeekTextCompose
+import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
 import com.cyxbs.components.view.wheel.WheelSelectBackground
 import com.cyxbs.components.view.wheel.WheelSelectCompose
@@ -309,7 +312,35 @@ private fun ColumnScope.EditContent(
           state.endTime = reanchorTimeString(state.endTime, date)
         },
       )
-      CalendarCompose(modifier = Modifier.fillMaxWidth().weight(1f), state = calendarState)
+      LaunchedEffect(calendarState) { calendarState.expand() } // 默认展开整月
+      CalendarCompose(
+        modifier = Modifier.fillMaxWidth().weight(1f),
+        state = calendarState,
+        // 自定义日历头：左「YYYY年M月」，右「< >」快速切月（替换默认 MonthTextCompose）。
+        calendar = {
+          Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              text = "${calendarState.clickDate.year}年${calendarState.clickDate.monthNumber}月",
+              fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+              text = "<", fontSize = 18.sp, color = colors.positive,
+              modifier = Modifier.clickableNoIndicator {
+                calendarState.updateClickDate(calendarState.clickDate.minusMonths(1))
+              }.padding(horizontal = 10.dp),
+            )
+            Text(
+              text = ">", fontSize = 18.sp, color = colors.positive,
+              modifier = Modifier.clickableNoIndicator {
+                calendarState.updateClickDate(calendarState.clickDate.plusMonths(1))
+              }.padding(horizontal = 10.dp),
+            )
+          }
+          calendarState.WeekTextCompose()
+          calendarState.CalendarMonthCompose { date, show -> calendarState.CalendarDateCompose(date, show) }
+        },
+      )
     }
     else -> Box {
       BasicTextField(
