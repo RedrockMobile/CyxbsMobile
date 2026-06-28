@@ -24,6 +24,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -137,6 +139,7 @@ fun CalendarState.MonthTextCompose(
 @Composable
 fun CalendarState.WeekTextCompose(
   modifier: Modifier = Modifier,
+  fontSize: TextUnit = 10.sp,
 ) {
   Row(modifier = modifier.layout { measurable, constraints ->
     // 日历宽度严格以 7 的倍数进行计算，这里同步处理
@@ -151,7 +154,7 @@ fun CalendarState.WeekTextCompose(
         modifier = Modifier.weight(1F),
         text = it,
         textAlign = TextAlign.Center,
-        fontSize = 10.sp
+        fontSize = fontSize
       )
     }
   }
@@ -168,6 +171,9 @@ sealed interface CalendarDateShowValue {
 fun CalendarState.CalendarDateCompose(
   date: Date,
   show: CalendarDateShowValue,
+  dayFontSize: TextUnit = 19.sp,
+  lunarFontSize: TextUnit = 9.sp,
+  maxCellHeight: Dp = 56.dp,
 ) {
   val today = today.invoke()
   Layout(
@@ -189,14 +195,14 @@ fun CalendarState.CalendarDateCompose(
       shape = CircleShape
     ),
     content = {
-      CalendarDateDayCompose(date, today, show)
-      CalendarDateLunarCompose(date, today, show)
+      CalendarDateDayCompose(date, today, show, dayFontSize)
+      CalendarDateLunarCompose(date, today, show, lunarFontSize)
       CalendarDateRestCompose(date, today, show)
     },
-    measurePolicy = remember {
+    measurePolicy = remember(maxCellHeight) {
       { measurables, constraints ->
         val width = constraints.maxWidth
-        val height = minOf(constraints.maxWidth, constraints.maxHeight, 56.dp.roundToPx())
+        val height = minOf(constraints.maxWidth, constraints.maxHeight, maxCellHeight.roundToPx())
         val newConstraints = Constraints(maxWidth = width, maxHeight = height)
         val dayPlaceable = measurables[0].measure(newConstraints)
         val lunarPlaceable = measurables[1].measure(newConstraints)
@@ -226,6 +232,7 @@ private fun CalendarDateDayCompose(
   date: Date,
   today: Date,
   show: CalendarDateShowValue,
+  fontSize: TextUnit = 19.sp,
 ) {
   Text(
     modifier = Modifier,
@@ -235,7 +242,7 @@ private fun CalendarDateDayCompose(
       date == today -> Color(0xFF1C71FF)
       else -> Color.Black
     },
-    fontSize = 19.sp,
+    fontSize = fontSize,
     fontWeight = FontWeight.Bold,
   )
 }
@@ -245,6 +252,7 @@ private fun CalendarDateLunarCompose(
   date: Date,
   today: Date,
   show: CalendarDateShowValue,
+  fontSize: TextUnit = 9.sp,
 ) {
   val specialDay = remember(date) { Festival.get(date) ?: SolarTerms.get(date)?.chinese }
   Text(
@@ -257,7 +265,7 @@ private fun CalendarDateLunarCompose(
       specialDay != null -> Color(0xFF1C71FF)
       else -> Color.Gray
     },
-    fontSize = 9.sp,
+    fontSize = fontSize,
   )
 }
 
