@@ -143,6 +143,65 @@ class ScheduleMainViewModel : BaseViewModel() {
     }
   }
 
+  /**
+   * 统一编辑入口保存：新建 / 按三态更新。
+   *
+   * @param occurrenceDate 编辑「重复系列某一次」时的锚点日期；编辑整条或新建可为 null。
+   */
+  fun saveSchedule(
+    state: com.cyxbs.pages.schedule.ui.edit.EditScheduleState,
+    scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
+    occurrenceDate: com.cyxbs.components.config.time.Date?,
+  ) {
+    val origin = state.origin
+    launchByViewModelScope {
+      if (origin == null) {
+        repository.createSchedule(
+          title = state.outputTitle,
+          detail = state.outputDetail,
+          type = state.type,
+          startTime = state.outputStartTime,
+          endTime = state.outputEndTime,
+          recurrence = state.outputRecurrence,
+        )
+        return@launchByViewModelScope
+      }
+      when (scope) {
+        com.cyxbs.pages.schedule.ui.edit.EditScope.ALL ->
+          repository.updateSchedule(state.toEntity(origin))
+        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_ONLY ->
+          if (occurrenceDate != null) repository.editThisOccurrence(
+            origin.todoId, occurrenceDate,
+            com.cyxbs.pages.schedule.ui.edit.buildOccurrenceOverride(occurrenceDate, state.toEntity(origin), origin),
+          )
+        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_AND_FOLLOWING ->
+          if (occurrenceDate != null) repository.editThisAndFollowing(
+            origin.todoId, occurrenceDate,
+            com.cyxbs.pages.schedule.ui.edit.buildFollowingSeries(state.toEntity(origin), occurrenceDate),
+          )
+      }
+    }
+  }
+
+  /**
+   * 统一编辑入口删除：按三态删除。
+   */
+  fun deleteScheduleScoped(
+    todoId: Long,
+    scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
+    occurrenceDate: com.cyxbs.components.config.time.Date?,
+  ) {
+    launchByViewModelScope {
+      when (scope) {
+        com.cyxbs.pages.schedule.ui.edit.EditScope.ALL -> repository.deleteSchedule(todoId)
+        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_ONLY ->
+          if (occurrenceDate != null) repository.deleteThisOccurrence(todoId, occurrenceDate)
+        com.cyxbs.pages.schedule.ui.edit.EditScope.THIS_AND_FOLLOWING ->
+          if (occurrenceDate != null) repository.deleteThisAndFollowing(todoId, occurrenceDate)
+      }
+    }
+  }
+
   /** 进入批量管理模式。 */
   fun enterManageMode() {
     _isManageMode.value = true

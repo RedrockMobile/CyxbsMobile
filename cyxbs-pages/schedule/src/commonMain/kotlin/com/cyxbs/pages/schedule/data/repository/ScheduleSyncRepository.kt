@@ -207,6 +207,8 @@ class ScheduleSyncRepository(
     startTime: String? = null,
     endTime: String? = null,
     remindMode: ScheduleRemindMode = ScheduleRemindMode(),
+    recurrence: Recurrence? = null,
+    remindMinutes: Int = -1,
   ) {
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
@@ -219,6 +221,8 @@ class ScheduleSyncRepository(
         startTime = startTime,
         endTime = endTime ?: "",
         remindMode = remindMode,
+        recurrence = recurrence,
+        remindMinutes = remindMinutes,
         isDone = 0,
         isPinned = 0,
         isOvered = 0,
@@ -368,6 +372,22 @@ class ScheduleSyncRepository(
         lastModifyTime = Clock.System.now().toEpochMilliseconds(),
       )
       localDataSource.upsertLocal(account, created, recordPending = true)
+      reloadSchedules(account)
+    }
+    scheduleDebouncedSync()
+  }
+
+  /**
+   * 「删除此次及后续」：把原系列 UNTIL 截断到 [occurrenceDate] 前一天（不新建新系列）。
+   */
+  suspend fun deleteThisAndFollowing(todoId: Long, occurrenceDate: Date) {
+    syncMutex.withLock {
+      val account = getCurrentAccount() ?: return
+      val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
+      if (todo.recurrence == null) return
+      val truncated = ScheduleMutations.truncateBefore(todo, occurrenceDate)
+        .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
+      localDataSource.upsertLocal(account, truncated, recordPending = true)
       reloadSchedules(account)
     }
     scheduleDebouncedSync()

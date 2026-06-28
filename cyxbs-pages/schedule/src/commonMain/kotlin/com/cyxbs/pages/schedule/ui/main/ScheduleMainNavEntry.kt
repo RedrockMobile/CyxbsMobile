@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -34,12 +36,15 @@ import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_SCHEDULE_MAIN
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.view.calendar.CalendarCompose
 import com.cyxbs.components.view.calendar.layout.createCalendarContentOffsetMeasurePolicy
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
+import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
+import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
+import com.cyxbs.pages.schedule.ui.edit.orderedCategories
 import com.cyxbs.pages.schedule.ui.timeline.HourHeight
 import com.cyxbs.pages.schedule.ui.timeline.ScheduleTimelinePane
 import com.cyxbs.pages.schedule.ui.timeline.allDaySchedulesForDate
@@ -86,10 +91,16 @@ fun SchedulePage(
   val colors = LocalAppColors.current
   val syncState by viewModel.syncState.collectAsState()
   val allSchedules by viewModel.allSchedules.collectAsState()
+  val categoriesPool by viewModel.categories.collectAsState()
 
   LaunchedEffect(Unit) {
     viewModel.initialize()
   }
+
+  // 统一编辑弹窗状态：editingEntity=null 表示新建；editingDate 为点击那一天（重复系列三态用）。
+  var showEdit by remember { mutableStateOf(false) }
+  var editingEntity by remember { mutableStateOf<ScheduleEntity?>(null) }
+  var editingDate by remember { mutableStateOf<Date?>(null) }
 
   val calendarState = rememberCalendarState(
     initialClickDate = TodayNoEffect,
@@ -134,8 +145,12 @@ fun SchedulePage(
           modifier = Modifier.layout(calendarState.createCalendarContentOffsetMeasurePolicy()),
           timed = dayEvents,
           scrollState = scrollState,
-          // TODO 阶段5：点击某条日程打开 affair 风格编辑弹窗
-          onScheduleClick = { "编辑功能开发中（阶段5）".toast() },
+          // 点击某条日程：打开统一编辑弹窗，并带上「点击那一天」用于重复系列三态。
+          onScheduleClick = { entity ->
+            editingEntity = entity
+            editingDate = clickDate
+            showEdit = true
+          },
         )
       }
     }
@@ -144,8 +159,11 @@ fun SchedulePage(
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(end = 24.dp, bottom = 36.dp),
-      // TODO 阶段5：新建日程
-      onClick = { "新建功能开发中（阶段5）".toast() },
+      onClick = {
+        editingEntity = null
+        editingDate = null
+        showEdit = true
+      },
       backgroundColor = colors.positive,
     ) {
       Icon(Icons.Default.Add, contentDescription = "添加日程", tint = Color.White)
@@ -154,6 +172,24 @@ fun SchedulePage(
 
   // 同步状态提示
   SyncStateIndicator(syncState)
+
+  // 统一编辑弹窗（新建 / 编辑，含重复规则编辑器与三态）
+  val currentEditing = editingEntity
+  EditScheduleDialog(
+    show = showEdit,
+    editSchedule = currentEditing,
+    occurrenceDate = editingDate,
+    categories = remember(categoriesPool, allSchedules) {
+      orderedCategories(categoriesPool, allSchedules)
+    },
+    onAddCategory = { viewModel.addCategory(it) },
+    onDeleteCategory = { viewModel.removeCategory(it) },
+    onDismiss = { showEdit = false },
+    onConfirm = { state, scope -> viewModel.saveSchedule(state, scope, editingDate) },
+    onDelete = if (currentEditing != null) {
+      { scope -> viewModel.deleteScheduleScoped(currentEditing.todoId, scope, editingDate) }
+    } else null,
+  )
 }
 
 /**
