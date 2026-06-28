@@ -448,30 +448,30 @@ private fun TimeWheelPane(
   }
 }
 
-/** 时间段 / 截止 分段框框切换（沿用 todo cmp 的 TodoTimeTypeToggle 样式）。 */
+/** 时间段 / 截止 分段框框切换（紧凑胶囊，左对齐）。 */
 @Composable
 private fun ScheduleTimeTypeToggle(isInterval: Boolean, onChange: (Boolean) -> Unit) {
-  Row(modifier = Modifier.fillMaxWidth()) {
-    TimeTypeChip("时间段", selected = isInterval, modifier = Modifier.weight(1f)) { onChange(true) }
+  Row {
+    TimeTypeChip("时间段", selected = isInterval) { onChange(true) }
     Spacer(modifier = Modifier.width(8.dp))
-    TimeTypeChip("截止", selected = !isInterval, modifier = Modifier.weight(1f)) { onChange(false) }
+    TimeTypeChip("截止", selected = !isInterval) { onChange(false) }
   }
 }
 
 @Composable
-private fun TimeTypeChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun TimeTypeChip(text: String, selected: Boolean, onClick: () -> Unit) {
   val colors = LocalAppColors.current
   val accent = colors.positive
   Text(
     text = text,
     textAlign = TextAlign.Center,
-    fontSize = 14.sp,
+    fontSize = 12.sp,
     color = if (selected) accent else colors.tvLv3.copy(alpha = 0.5f),
-    modifier = modifier
-      .border(1.dp, if (selected) accent else colors.tvLv3.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-      .background(if (selected) accent.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
+    modifier = Modifier
+      .border(1.dp, if (selected) accent else colors.tvLv3.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+      .background(if (selected) accent.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(6.dp))
       .clickableNoIndicator(onClick = onClick)
-      .padding(vertical = 9.dp),
+      .padding(horizontal = 14.dp, vertical = 5.dp),
   )
 }
 
