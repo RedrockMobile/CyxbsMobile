@@ -9,6 +9,7 @@ import com.cyxbs.pages.schedule.data.remote.SyncTimeResponse
 import com.cyxbs.pages.schedule.recurrence.Freq
 import com.cyxbs.pages.schedule.recurrence.RRule
 import com.cyxbs.pages.schedule.recurrence.Recurrence
+import com.cyxbs.pages.schedule.recurrence.RecurrenceOverride
 import com.cyxbs.pages.schedule.support.FakeScheduleLocalDataSource
 import com.cyxbs.pages.schedule.support.FakeScheduleRemoteDataSource
 import com.cyxbs.pages.schedule.support.TEST_STU_NUM
@@ -155,5 +156,74 @@ class ScheduleSyncRepositoryTest {
     val id = repo.todos.value.first().todoId
     repo.pinSchedule(id, true)
     assertEquals(1, local.getById(TEST_STU_NUM, id)!!.isPinned)
+  }
+
+  @Test
+  fun delete_and_flush_pending_delete() = runTest {
+    val repo = newRepo()
+    local.seedSyncTime(50)
+    remote.syncTimeResponse = SyncTimeResponse(syncTime = 50, isSyncTimeExist = true) // 不增量拉取
+    remote.deleteSyncTime = 80
+    repo.createSchedule(title = "待删")
+    val id = repo.todos.value.first().todoId
+    repo.deleteSchedule(id)
+    repo.sync()
+    assertTrue(remote.deleted.flatten().contains(id))
+    assertTrue(local.getPendingOperations(TEST_STU_NUM).isEmpty())
+    assertNull(local.getById(TEST_STU_NUM, id))
+  }
+
+  @Test
+  fun sync_failure_sets_error_state() = runTest {
+    val repo = newRepo()
+    remote.failNext = RuntimeException("boom") // 全量重建 getAllSchedules 失败
+    repo.sync()
+    assertTrue(repo.syncState.value is ScheduleSyncState.Error)
+  }
+
+  @Test
+  fun flush_pending_failure_marks_needs_rebuild() = runTest {
+    val repo = newRepo()
+    local.seedSyncTime(50)
+    remote.syncTimeResponse = SyncTimeResponse(syncTime = 50, isSyncTimeExist = true) // 不拉取
+    remote.failPush = RuntimeException("push boom")
+    repo.createSchedule(title = "x")
+    repo.sync()
+    assertTrue(repo.syncState.value is ScheduleSyncState.Error)
+    assertTrue(local.loadSnapshot(TEST_STU_NUM).meta.needsFullRebuild)
+  }
+
+  @Test
+  fun incremental_falls_back_to_full_when_sync_time_missing() = runTest {
+    val repo = newRepo()
+    local.seedSyncTime(50)
+    remote.syncTimeResponse = SyncTimeResponse(syncTime = 0, isSyncTimeExist = false) // 基线失效
+    remote.listResponse = ScheduleListResponse(changedScheduleArray = listOf(entity(9)), syncTime = 70)
+    repo.sync()
+    assertEquals(listOf(9L), local.getAll(TEST_STU_NUM).map { it.todoId })
+  }
+
+  @Test
+  fun incremental_merges_deletions() = runTest {
+    val repo = newRepo()
+    local.replaceAll(TEST_STU_NUM, listOf(entity(1)), syncTime = 50, preservePending = true)
+    remote.syncTimeResponse = SyncTimeResponse(syncTime = 60, isSyncTimeExist = true)
+    remote.deltaResponse = ScheduleDeltaResponse(
+      changedScheduleArray = emptyList(),
+      delScheduleArray = listOf(1L),
+      syncTime = 60,
+    )
+    repo.sync()
+    assertTrue(local.getAll(TEST_STU_NUM).isEmpty())
+  }
+
+  @Test
+  fun edit_this_occurrence_writes_override() = runTest {
+    val repo = newRepo()
+    repo.updateSchedule(entity(1, recurrence = Recurrence(RRule(Freq.WEEKLY))))
+    repo.editThisOccurrence(1, Date(2026, 1, 12), RecurrenceOverride(recurrenceId = Date(2026, 1, 12), title = "改"))
+    val rec = local.getById(TEST_STU_NUM, 1)!!.recurrence!!
+    assertEquals(1, rec.overrides.size)
+    assertEquals("改", rec.overrides.first().title)
   }
 }

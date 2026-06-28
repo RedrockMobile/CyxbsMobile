@@ -3,6 +3,7 @@ package com.cyxbs.pages.schedule.recurrence
 import com.cyxbs.components.config.time.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class RecurrenceParserTest {
 
@@ -79,5 +80,23 @@ class RecurrenceParserTest {
         "EXDATE;VALUE=DATE:20260117",
       RecurrenceParser.serializeFull(r),
     )
+  }
+
+  @Test
+  fun parse_missing_freq_throws() {
+    assertFailsWith<IllegalArgumentException> { RecurrenceParser.parse("INTERVAL=2;BYDAY=MO") }
+  }
+
+  @Test
+  fun bymonth_round_trip() {
+    val rule = RRule(Freq.YEARLY, byMonth = listOf(3, 6))
+    val s = RecurrenceParser.serialize(rule)
+    assertEquals("FREQ=YEARLY;BYMONTH=3,6", s)
+    assertEquals(rule, RecurrenceParser.parse(s))
+  }
+
+  @Test
+  fun parse_ignores_unknown_and_empty_segments() {
+    assertEquals(RRule(Freq.DAILY), RecurrenceParser.parse("FREQ=DAILY;;X=Y;FOO"))
   }
 }

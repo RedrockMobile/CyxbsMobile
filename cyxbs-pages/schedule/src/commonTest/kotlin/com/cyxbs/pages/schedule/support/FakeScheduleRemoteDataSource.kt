@@ -21,6 +21,12 @@ class FakeScheduleRemoteDataSource : IScheduleRemoteDataSource {
   /** 设置后，下一次任意远端调用返回失败，并自动清空。 */
   var failNext: Throwable? = null
 
+  /** 仅让下一次 push 失败（用于单独测 flushPending 上传失败分支）。 */
+  var failPush: Throwable? = null
+
+  /** 仅让下一次 delete 失败。 */
+  var failDelete: Throwable? = null
+
   val pushed = mutableListOf<List<ScheduleEntity>>()
   val deleted = mutableListOf<List<Long>>()
 
@@ -37,6 +43,7 @@ class FakeScheduleRemoteDataSource : IScheduleRemoteDataSource {
     firstPush: Int,
   ): Result<SyncTimeOnlyResponse> {
     pushed.add(todos)
+    failPush?.let { failPush = null; return Result.failure(it) }
     return failOr { SyncTimeOnlyResponse(pushSyncTime) }
   }
 
@@ -46,6 +53,7 @@ class FakeScheduleRemoteDataSource : IScheduleRemoteDataSource {
     force: Int,
   ): Result<SyncTimeOnlyResponse> {
     deleted.add(todoIds)
+    failDelete?.let { failDelete = null; return Result.failure(it) }
     return failOr { SyncTimeOnlyResponse(deleteSyncTime) }
   }
 

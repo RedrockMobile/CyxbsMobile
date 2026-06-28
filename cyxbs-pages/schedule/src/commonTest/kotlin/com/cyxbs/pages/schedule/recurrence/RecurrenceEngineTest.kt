@@ -5,6 +5,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimeDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -172,5 +173,67 @@ class RecurrenceEngineTest {
     )
     // 1/5 已过、1/12 被 EXDATE，下一次应是 1/19
     assertEquals(Date(2026, 1, 19), next?.date)
+  }
+
+  @Test
+  fun monthly_interval() {
+    val r = Recurrence(RRule(Freq.MONTHLY, interval = 2))
+    val dates = expand(r, Date(2026, 1, 15), Date(2026, 1, 1), Date(2026, 7, 31))
+    assertEquals(listOf(1, 3, 5, 7).map { Date(2026, it, 15) }, dates)
+  }
+
+  @Test
+  fun yearly_interval() {
+    val r = Recurrence(RRule(Freq.YEARLY, interval = 2))
+    val dates = expand(r, Date(2026, 3, 10), Date(2026, 1, 1), Date(2031, 12, 31))
+    assertEquals(listOf(Date(2026, 3, 10), Date(2028, 3, 10), Date(2030, 3, 10)), dates)
+  }
+
+  @Test
+  fun yearly_bymonth_multiple() {
+    val r = Recurrence(RRule(Freq.YEARLY, byMonth = listOf(3, 6)))
+    val dates = expand(r, Date(2026, 3, 10), Date(2026, 1, 1), Date(2026, 12, 31))
+    assertEquals(listOf(Date(2026, 3, 10), Date(2026, 6, 10)), dates)
+  }
+
+  @Test
+  fun monthly_bymonthday_positive_multiple() {
+    val r = Recurrence(RRule(Freq.MONTHLY, byMonthDay = listOf(1, 15)))
+    val dates = expand(r, Date(2026, 1, 1), Date(2026, 1, 1), Date(2026, 2, 28))
+    assertEquals(
+      listOf(Date(2026, 1, 1), Date(2026, 1, 15), Date(2026, 2, 1), Date(2026, 2, 15)),
+      dates,
+    )
+  }
+
+  @Test
+  fun monthly_byday_expands_weekdays() {
+    val r = Recurrence(RRule(Freq.MONTHLY, byDay = listOf(1))) // 每月的每个周一
+    val dates = expand(r, mon, Date(2026, 1, 1), Date(2026, 1, 31))
+    assertEquals(listOf(5, 12, 19, 26).map { Date(2026, 1, it) }, dates)
+  }
+
+  @Test
+  fun range_start_truncates_recurring() {
+    val r = Recurrence(RRule(Freq.WEEKLY))
+    val dates = expand(r, mon, Date(2026, 1, 19), Date(2026, 2, 2))
+    assertEquals(listOf(Date(2026, 1, 19), Date(2026, 1, 26), Date(2026, 2, 2)), dates)
+  }
+
+  @Test
+  fun override_moving_out_of_range_disappears() {
+    val r = Recurrence(
+      rrule = RRule(Freq.WEEKLY),
+      overrides = listOf(RecurrenceOverride(recurrenceId = Date(2026, 1, 12), newDate = Date(2026, 3, 1))),
+    )
+    val dates = expand(r, mon, Date(2026, 1, 1), Date(2026, 1, 31))
+    assertEquals(listOf(Date(2026, 1, 5), Date(2026, 1, 19), Date(2026, 1, 26)), dates)
+  }
+
+  @Test
+  fun next_from_returns_null_when_exhausted() {
+    val r = Recurrence(RRule(Freq.DAILY, count = 1)) // 唯一一次 1/5
+    val next = RecurrenceEngine.nextFrom(r, mon, start, end, from = MinuteTimeDate(2026, 1, 6, 0, 0))
+    assertNull(next)
   }
 }
