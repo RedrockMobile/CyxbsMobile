@@ -645,6 +645,31 @@ private fun PreviewScheduleEditTime() {
   }
 }
 
+/** 截止型样例：无开始时间、只有截止时间，进编辑时间态时 deadlineOnly 默认为 true。 */
+private fun previewSampleDeadline() = com.cyxbs.pages.schedule.data.model.ScheduleEntity(
+  todoId = 2L,
+  title = "交实验报告",
+  detail = "提交到学习通",
+  startTime = null,
+  endTime = "2026年6月28日 23:00",
+  remindMinutes = 30,
+  lastModifyTime = 0L,
+)
+
+/** 编辑态·点时间段后·截止型：header「截止时间 / 改为时间段」+ 只有一个结束时分滚轮。 */
+@Preview
+@Composable
+private fun PreviewScheduleEditDeadline() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleDeadline()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, editingTime = true,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onDoneTime = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
 /** 新建态（空表单）：占位文案。 */
 @Preview
 @Composable
