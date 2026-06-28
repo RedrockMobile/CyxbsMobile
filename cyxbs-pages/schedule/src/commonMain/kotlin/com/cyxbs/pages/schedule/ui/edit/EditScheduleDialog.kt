@@ -39,8 +39,10 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
@@ -529,6 +531,95 @@ private fun ScopeRow(text: String, onClick: () -> Unit) {
     text = text, fontSize = 16.sp, color = LocalAppColors.current.tvLv2,
     modifier = Modifier.fillMaxWidth().clickableNoIndicator(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
   )
+}
+
+/* ================= @Preview（Android Studio 里直接预览，无需跑 app） ================= */
+//
+// 预览的是「内容部分」(ShowContent/EditContent)，不含 ScheduleBottomSheet 外壳——底部弹窗靠
+// LaunchedEffect+动画展开，静态预览里高度为 0 看不到，所以这里直接渲染内容、用 AppTheme 提供配色。
+// 周数显式传入示例开学日(2026-03-02 周一)，避免预览读 SchoolCalendar 设置。
+
+private fun previewSampleSchedule() = com.cyxbs.pages.schedule.data.model.ScheduleEntity(
+  todoId = 1L,
+  title = "项目答辩",
+  detail = "综合楼 503，记得带 U 盘",
+  startTime = "2026年6月28日 10:00",
+  endTime = "2026年6月28日 11:30",
+  recurrence = com.cyxbs.pages.schedule.recurrence.Recurrence(
+    rrule = com.cyxbs.pages.schedule.recurrence.RRule(
+      freq = com.cyxbs.pages.schedule.recurrence.Freq.WEEKLY,
+      byDay = listOf(7),
+    ),
+  ),
+  remindMinutes = 10,
+  lastModifyTime = 0L,
+)
+
+/** 示例开学第一天（周一），用于预览第N周。 */
+private val previewFirstMonday = Date(2026, 3, 2)
+
+@Composable
+private fun PreviewFrame(content: @Composable () -> Unit) {
+  AppTheme {
+    Box(
+      modifier = Modifier
+        .width(360.dp)
+        .background(LocalAppColors.current.topBg)
+        .padding(20.dp),
+    ) { content() }
+  }
+}
+
+/** 查看态：标题 + ✎/🗑 + 单行信息栏(日期·第N周·周几·时间段·重复·提醒) + 备注。 */
+@Preview
+@Composable
+private fun PreviewScheduleShow() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    ShowContent(state = state, firstMonday = previewFirstMonday, onEdit = {}, onDelete = {})
+  }
+}
+
+/** 编辑态（默认）：标题输入 + ✓/✕ + 可点信息栏 + 备注输入。 */
+@Preview
+@Composable
+private fun PreviewScheduleEdit() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, editingTime = false,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onDoneTime = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
+/** 编辑态·点时间段后：下方备注区变时分滚轮。 */
+@Preview
+@Composable
+private fun PreviewScheduleEditTime() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, editingTime = true,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onDoneTime = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
+/** 新建态（空表单）：占位文案。 */
+@Preview
+@Composable
+private fun PreviewScheduleNew() {
+  PreviewFrame {
+    val state = remember { EditScheduleState(null) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, editingTime = false,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onDoneTime = {}, onSave = {}, onCancel = {},
+    )
+  }
 }
 
 /** 把中文时间串的「日期」改写为 [date]，保留「时分」；空串/无法解析原样返回。 */
