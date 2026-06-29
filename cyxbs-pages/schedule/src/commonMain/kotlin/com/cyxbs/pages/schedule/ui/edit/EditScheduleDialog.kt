@@ -503,12 +503,14 @@ private fun WheelPair(
   minuteLine: Animatable<Float, *>,
   modifier: Modifier = Modifier,
 ) {
+  val colors = LocalAppColors.current
   @Suppress("UNCHECKED_CAST")
   Row(modifier = modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
     WheelSelectCompose(
       selectedLine = hourLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
       options = hours, modifier = Modifier.weight(1f).fillMaxHeight(),
     )
+    Text(":", fontSize = 16.sp, color = colors.tvLv2)
     WheelSelectCompose(
       selectedLine = minuteLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
       options = minutes, modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -545,10 +547,14 @@ private fun RemindInline(
     }
     if (current >= 0) {
       Spacer(modifier = Modifier.height(8.dp))
-      Row(modifier = Modifier.fillMaxWidth().height(82.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
-        OneWheel(numbers, nLine, modifier = Modifier.weight(1f))
-        OneWheel(units, unitLine, modifier = Modifier.weight(1f))
+      Row(
+        modifier = Modifier.fillMaxWidth().height(82.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 6.dp))
+        OneWheel(numbers, nLine, modifier = Modifier.width(48.dp))
+        OneWheel(units, unitLine, modifier = Modifier.width(52.dp))
       }
       LaunchedEffect(Unit) {
         snapshotFlow { nLine.value.roundToInt() to unitLine.value.roundToInt() }.collect { (n, u) ->

@@ -80,13 +80,17 @@ internal fun RecurrenceEditInline(
     if (draft.isRepeating) {
       Spacer(modifier = Modifier.height(8.dp))
       // 一行滚轮：每 [N] [天/周/月]（按次数时同一行追加「共 [N] 次」，避免再占一行放不下）
-      Row(modifier = Modifier.fillMaxWidth().height(82.dp), verticalAlignment = Alignment.CenterVertically) {
+      Row(
+        modifier = Modifier.fillMaxWidth().height(82.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
         Text("每", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 4.dp))
-        OneWheel(numbers, intervalLine, modifier = Modifier.weight(1f))
-        OneWheel(units, unitLine, modifier = Modifier.weight(1f))
+        OneWheel(numbers, intervalLine, modifier = Modifier.width(44.dp))
+        OneWheel(units, unitLine, modifier = Modifier.width(48.dp))
         if (draft.endOption == RepeatEndOption.COUNT) {
           Text("共", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(horizontal = 4.dp))
-          OneWheel(counts, countLine, modifier = Modifier.weight(1f))
+          OneWheel(counts, countLine, modifier = Modifier.width(44.dp))
           Text("次", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 4.dp))
         }
       }
