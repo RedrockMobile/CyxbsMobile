@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.components.view.wheel.WheelSelectBackground
 import com.cyxbs.components.view.wheel.WheelSelectCompose
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleCalendarPickerDialog
 import kotlinx.collections.immutable.ImmutableList
@@ -174,19 +172,17 @@ private fun RepeatChip(text: String, selected: Boolean, onClick: () -> Unit) {
   )
 }
 
-/** 单列滚轮。 */
+/** 单列滚轮（无背景带）。 */
 @Composable
 private fun OneWheel(
   options: ImmutableList<String>,
   line: Animatable<Float, *>,
   modifier: Modifier = Modifier,
 ) {
-  WheelSelectBackground(modifier = modifier.fillMaxHeight()) {
-    @Suppress("UNCHECKED_CAST")
-    WheelSelectCompose(
-      selectedLine = line as Animatable<Float, AnimationVector1D>,
-      options = options,
-      modifier = Modifier.fillMaxSize(),
-    )
-  }
+  @Suppress("UNCHECKED_CAST")
+  WheelSelectCompose(
+    selectedLine = line as Animatable<Float, AnimationVector1D>,
+    options = options,
+    modifier = modifier.fillMaxHeight(),
+  )
 }

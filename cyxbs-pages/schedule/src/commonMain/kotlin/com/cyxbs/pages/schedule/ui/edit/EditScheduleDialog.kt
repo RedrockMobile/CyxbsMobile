@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -62,7 +61,6 @@ import com.cyxbs.components.view.calendar.CalendarDateCompose
 import com.cyxbs.components.view.calendar.WeekTextCompose
 import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
-import com.cyxbs.components.view.wheel.WheelSelectBackground
 import com.cyxbs.components.view.wheel.WheelSelectCompose
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
@@ -507,18 +505,14 @@ private fun WheelPair(
 ) {
   @Suppress("UNCHECKED_CAST")
   Row(modifier = modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-    WheelSelectBackground(modifier = Modifier.weight(1f).fillMaxHeight()) {
-      WheelSelectCompose(
-        selectedLine = hourLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-        options = hours, modifier = Modifier.fillMaxSize(),
-      )
-    }
-    WheelSelectBackground(modifier = Modifier.weight(1f).fillMaxHeight()) {
-      WheelSelectCompose(
-        selectedLine = minuteLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-        options = minutes, modifier = Modifier.fillMaxSize(),
-      )
-    }
+    WheelSelectCompose(
+      selectedLine = hourLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+      options = hours, modifier = Modifier.weight(1f).fillMaxHeight(),
+    )
+    WheelSelectCompose(
+      selectedLine = minuteLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+      options = minutes, modifier = Modifier.weight(1f).fillMaxHeight(),
+    )
   }
 }
 
@@ -573,14 +567,12 @@ private fun OneWheel(
   line: Animatable<Float, *>,
   modifier: Modifier = Modifier,
 ) {
-  WheelSelectBackground(modifier = modifier.fillMaxHeight()) {
-    @Suppress("UNCHECKED_CAST")
-    WheelSelectCompose(
-      selectedLine = line as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-      options = options,
-      modifier = Modifier.fillMaxSize(),
-    )
-  }
+  @Suppress("UNCHECKED_CAST")
+  WheelSelectCompose(
+    selectedLine = line as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    options = options,
+    modifier = modifier.fillMaxHeight(),
+  )
 }
 
 /* ---------------- 三态选择 ---------------- */
