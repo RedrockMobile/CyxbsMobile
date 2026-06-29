@@ -552,7 +552,9 @@ private fun RemindInline(
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text("提前", fontSize = 13.sp, color = colors.tvLv2)
+        Box(modifier = Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+          Text("提前", fontSize = 13.sp, color = colors.tvLv2)
+        }
         OneWheel(numbers, nLine, modifier = Modifier.width(28.dp))
         OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
       }
