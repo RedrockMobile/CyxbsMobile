@@ -80,19 +80,19 @@ internal fun RecurrenceEditInline(
     if (draft.isRepeating) {
       Spacer(modifier = Modifier.height(8.dp))
       // 一行滚轮：每 [N] [天/周/月]（按次数时同一行追加「共 [N] 次」，避免再占一行放不下）
+      // 滚轮收紧到字形宽度，元素间用统一 spacedBy，避免居中留白导致间距看起来不均。
       Row(
         modifier = Modifier.fillMaxWidth().height(82.dp),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        // 滚轮等宽，标签右/左边距取滚轮宽的一半，使「每-1」与「1-周」间距一致。
-        Text("每", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 20.dp))
-        OneWheel(numbers, intervalLine, modifier = Modifier.width(40.dp))
-        OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
+        Text("每", fontSize = 13.sp, color = colors.tvLv2)
+        OneWheel(numbers, intervalLine, modifier = Modifier.width(28.dp))
+        OneWheel(units, unitLine, modifier = Modifier.width(28.dp))
         if (draft.endOption == RepeatEndOption.COUNT) {
-          Text("共", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 20.dp, end = 20.dp))
-          OneWheel(counts, countLine, modifier = Modifier.width(40.dp))
-          Text("次", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 20.dp))
+          Text("共", fontSize = 13.sp, color = colors.tvLv2)
+          OneWheel(counts, countLine, modifier = Modifier.width(28.dp))
+          Text("次", fontSize = 13.sp, color = colors.tvLv2)
         }
       }
       // 滚轮值实时写回 freq/interval

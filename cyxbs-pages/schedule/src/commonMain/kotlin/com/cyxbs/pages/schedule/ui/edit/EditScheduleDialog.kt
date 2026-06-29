@@ -549,11 +549,11 @@ private fun RemindInline(
       Spacer(modifier = Modifier.height(8.dp))
       Row(
         modifier = Modifier.fillMaxWidth().height(82.dp),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 20.dp))
-        OneWheel(numbers, nLine, modifier = Modifier.width(40.dp))
+        Text("提前", fontSize = 13.sp, color = colors.tvLv2)
+        OneWheel(numbers, nLine, modifier = Modifier.width(28.dp))
         OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
       }
       LaunchedEffect(Unit) {
