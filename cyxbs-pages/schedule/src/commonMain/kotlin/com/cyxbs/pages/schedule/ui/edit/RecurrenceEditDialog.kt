@@ -85,13 +85,14 @@ internal fun RecurrenceEditInline(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text("每", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 4.dp))
-        OneWheel(numbers, intervalLine, modifier = Modifier.width(44.dp))
-        OneWheel(units, unitLine, modifier = Modifier.width(48.dp))
+        // 滚轮等宽，标签右/左边距取滚轮宽的一半，使「每-1」与「1-周」间距一致。
+        Text("每", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 20.dp))
+        OneWheel(numbers, intervalLine, modifier = Modifier.width(40.dp))
+        OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
         if (draft.endOption == RepeatEndOption.COUNT) {
-          Text("共", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(horizontal = 4.dp))
-          OneWheel(counts, countLine, modifier = Modifier.width(44.dp))
-          Text("次", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 4.dp))
+          Text("共", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 20.dp, end = 20.dp))
+          OneWheel(counts, countLine, modifier = Modifier.width(40.dp))
+          Text("次", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 20.dp))
         }
       }
       // 滚轮值实时写回 freq/interval

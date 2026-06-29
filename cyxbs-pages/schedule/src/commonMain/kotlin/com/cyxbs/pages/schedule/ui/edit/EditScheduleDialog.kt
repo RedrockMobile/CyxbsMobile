@@ -552,9 +552,9 @@ private fun RemindInline(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 6.dp))
-        OneWheel(numbers, nLine, modifier = Modifier.width(48.dp))
-        OneWheel(units, unitLine, modifier = Modifier.width(52.dp))
+        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 20.dp))
+        OneWheel(numbers, nLine, modifier = Modifier.width(40.dp))
+        OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
       }
       LaunchedEffect(Unit) {
         snapshotFlow { nLine.value.roundToInt() to unitLine.value.roundToInt() }.collect { (n, u) ->
