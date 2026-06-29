@@ -550,9 +550,9 @@ private fun RemindInline(
       TimeTypeChip("提前", selected = current >= 0) { if (current < 0) onChoose(10) }
     }
     if (current >= 0) {
-      Spacer(modifier = Modifier.height(12.dp))
-      Row(modifier = Modifier.fillMaxWidth().height(110.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("提前", fontSize = 14.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
+      Spacer(modifier = Modifier.height(8.dp))
+      Row(modifier = Modifier.fillMaxWidth().height(82.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("提前", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
         OneWheel(numbers, nLine, modifier = Modifier.weight(1f))
         OneWheel(units, unitLine, modifier = Modifier.weight(1f))
       }

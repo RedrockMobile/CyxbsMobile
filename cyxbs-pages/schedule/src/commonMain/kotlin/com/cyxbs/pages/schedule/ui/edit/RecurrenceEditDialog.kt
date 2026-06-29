@@ -80,12 +80,17 @@ internal fun RecurrenceEditInline(
     }
 
     if (draft.isRepeating) {
-      Spacer(modifier = Modifier.height(12.dp))
-      // 每 [N] [天/周/月]
-      Row(modifier = Modifier.fillMaxWidth().height(110.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("每", fontSize = 14.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
+      Spacer(modifier = Modifier.height(8.dp))
+      // 一行滚轮：每 [N] [天/周/月]（按次数时同一行追加「共 [N] 次」，避免再占一行放不下）
+      Row(modifier = Modifier.fillMaxWidth().height(82.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("每", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 4.dp))
         OneWheel(numbers, intervalLine, modifier = Modifier.weight(1f))
         OneWheel(units, unitLine, modifier = Modifier.weight(1f))
+        if (draft.endOption == RepeatEndOption.COUNT) {
+          Text("共", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(horizontal = 4.dp))
+          OneWheel(counts, countLine, modifier = Modifier.weight(1f))
+          Text("次", fontSize = 13.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 4.dp))
+        }
       }
       // 滚轮值实时写回 freq/interval
       LaunchedEffect(Unit) {
@@ -94,36 +99,28 @@ internal fun RecurrenceEditInline(
           if (d.isRepeating) onChangeS.value(d.copy(interval = (i + 1).coerceAtLeast(1), freq = unitIndexToFreq(u)))
         }
       }
+      if (draft.endOption == RepeatEndOption.COUNT) {
+        LaunchedEffect(Unit) {
+          snapshotFlow { countLine.value.roundToInt() }.collect { onChangeS.value(draftS.value.copy(count = (it + 1).coerceAtLeast(1))) }
+        }
+      }
 
       Spacer(modifier = Modifier.height(8.dp))
       // 结束：永不 / 按次数 / 按日期
-      Row {
+      Row(verticalAlignment = Alignment.CenterVertically) {
         EndOption.entries.forEachIndexed { idx, opt ->
           if (idx > 0) Spacer(modifier = Modifier.width(8.dp))
           RepeatChip(opt.label, selected = draft.endOption == opt.value) { onChange(draft.copy(endOption = opt.value)) }
         }
-      }
-      when (draft.endOption) {
-        RepeatEndOption.COUNT -> {
-          Row(modifier = Modifier.fillMaxWidth().height(110.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("共", fontSize = 14.sp, color = colors.tvLv2, modifier = Modifier.padding(end = 8.dp))
-            OneWheel(counts, countLine, modifier = Modifier.weight(1f))
-            Text("次", fontSize = 14.sp, color = colors.tvLv2, modifier = Modifier.padding(start = 8.dp))
-          }
-          LaunchedEffect(Unit) {
-            snapshotFlow { countLine.value.roundToInt() }.collect { onChangeS.value(draftS.value.copy(count = (it + 1).coerceAtLeast(1))) }
-          }
-        }
-        RepeatEndOption.UNTIL -> {
-          Spacer(modifier = Modifier.height(8.dp))
+        if (draft.endOption == RepeatEndOption.UNTIL) {
+          Spacer(modifier = Modifier.width(8.dp))
           Text(
-            text = draft.until?.let { "截止 $it" } ?: "选择截止日期",
-            fontSize = 14.sp,
+            text = draft.until?.let { "$it" } ?: "选择日期",
+            fontSize = 13.sp,
             color = if (draft.until == null) colors.tvLv3.copy(alpha = 0.5f) else colors.positive,
             modifier = Modifier.clickable { showUntilPicker = true }.padding(vertical = 6.dp),
           )
         }
-        RepeatEndOption.NEVER -> {}
       }
     }
   }
