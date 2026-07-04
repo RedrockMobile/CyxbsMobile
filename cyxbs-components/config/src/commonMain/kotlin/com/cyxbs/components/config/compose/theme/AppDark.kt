@@ -9,6 +9,4 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * @author 985892345
  * @date 2025/1/4
  */
-val LocalAppDark: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf {
-  error("未配置 AppTheme")
-}
+val LocalAppDark: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }

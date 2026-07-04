@@ -17,9 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,7 +75,7 @@ internal fun RecurrenceEditInline(
   // 上次三轮取整值，用于判断是哪个轮被拨动，从而做联动。
   val prev = remember { mutableStateOf(Triple(leftLine.value.roundToInt(), nLine.value.roundToInt(), unitLine.value.roundToInt())) }
 
-  Column(modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+  Column(modifier = modifier.fillMaxWidth()) {
     // 三联动滚轮：仅/每 · N · 次/天/周/月
     Row(
       modifier = Modifier.fillMaxWidth().height(82.dp),
@@ -114,51 +112,57 @@ internal fun RecurrenceEditInline(
     }
 
     if (draft.isRepeating) {
-      // 每周 → 周几多选
-      if (draft.freq == RepeatFreqOption.WEEKLY) {
-        Spacer(modifier = Modifier.height(8.dp))
-        SectionLabel("周几")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          (1..7).forEach { iso ->
-            ToggleChip("周${weekNumberToChinese(iso)}", selected = iso in draft.byDay) {
-              onChange(draft.copy(byDay = draft.byDay.toggle(iso)))
+      Column(
+        modifier = Modifier
+          .fillMaxWidth(),
+      ) {
+        // 每周 → 周几多选
+        if (draft.freq == RepeatFreqOption.WEEKLY) {
+          Spacer(modifier = Modifier.height(8.dp))
+          SectionLabel("周几")
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            (1..7).forEach { iso ->
+              ToggleChip("周${weekNumberToChinese(iso)}", selected = iso in draft.byDay) {
+                onChange(draft.copy(byDay = draft.byDay.toggle(iso)))
+              }
+            }
+          }
+        }
+
+        // 每月 → 几号多选 + 月末倒数
+        if (draft.freq == RepeatFreqOption.MONTHLY) {
+          Spacer(modifier = Modifier.height(8.dp))
+          SectionLabel("几号")
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            (1..31).forEach { d ->
+              DayToggle(d.toString(), selected = d in draft.byMonthDay) {
+                onChange(draft.copy(byMonthDay = draft.byMonthDay.toggle(d)))
+              }
+            }
+          }
+          Spacer(modifier = Modifier.height(6.dp))
+          SectionLabel("月末倒数")
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(-1 to "末", -2 to "倒2", -3 to "倒3", -4 to "倒4", -5 to "倒5").forEach { (v, label) ->
+              ToggleChip(label, selected = v in draft.byMonthDay) {
+                onChange(draft.copy(byMonthDay = draft.byMonthDay.toggle(v)))
+              }
             }
           }
         }
       }
 
-      // 每月 → 几号多选 + 月末倒数
-      if (draft.freq == RepeatFreqOption.MONTHLY) {
-        Spacer(modifier = Modifier.height(8.dp))
-        SectionLabel("几号")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-          (1..31).forEach { d ->
-            DayToggle(d.toString(), selected = d in draft.byMonthDay) {
-              onChange(draft.copy(byMonthDay = draft.byMonthDay.toggle(d)))
-            }
-          }
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        SectionLabel("月末倒数")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          listOf(-1 to "末", -2 to "倒2", -3 to "倒3", -4 to "倒4", -5 to "倒5").forEach { (v, label) ->
-            ToggleChip(label, selected = v in draft.byMonthDay) {
-              onChange(draft.copy(byMonthDay = draft.byMonthDay.toggle(v)))
-            }
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(8.dp))
       // 结束：永不 / 按次数 / 按日期
+      Spacer(modifier = Modifier.height(8.dp))
       SectionLabel("结束")
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        EndOption.entries.forEachIndexed { idx, opt ->
-          if (idx > 0) Spacer(modifier = Modifier.width(8.dp))
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        EndOption.entries.forEach { opt ->
           ToggleChip(opt.label, selected = draft.endOption == opt.value) { onChange(draft.copy(endOption = opt.value)) }
         }
         if (draft.endOption == RepeatEndOption.UNTIL) {
-          Spacer(modifier = Modifier.width(8.dp))
           Text(
             text = draft.until?.let { "$it" } ?: "选择日期",
             fontSize = 13.sp,

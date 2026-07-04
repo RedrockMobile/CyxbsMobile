@@ -78,6 +78,10 @@ private val itemList = listOf(
   ActionItem("资料编辑") {
     AppScheme.jump("cyxbs://$NAV_EDIT_INFO")
   },
+  ActionItem("日程编辑") {
+    AppScheme.jump("cyxbs://schedule/edit")
+  },
+
 
 
   // 退出登陆放到最后，其他测试页面放到上面👆

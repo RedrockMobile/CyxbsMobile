@@ -37,7 +37,7 @@ fun main() = runApp {
 //      resizable = false,
     ) {
       remember {
-        this.window.minimumSize = java.awt.Dimension(360, 600)
+        this.window.minimumSize = java.awt.Dimension(300, 600)
       }
       AppTheme {
         AppNavDisplay()

@@ -134,28 +134,31 @@ fun buildRecurrenceLabels(recurrence: Recurrence?): List<String> {
   labels += when (r.freq) {
     Freq.DAILY -> if (n == 1) "每天" else "每${n}天"
     Freq.WEEKLY -> {
-      val days = r.byDay.distinct().sorted().joinToString("、") { "周${weekNumberToChinese(it)}" }
+      val days = r.byDay.distinct().sorted()
+      val daysStr = if (days.size == 7) "全天" else days.joinToString("", "周") { weekNumberToChinese(it) }
       val prefix = if (n == 1) "每周" else "每${n}周"
-      if (days.isEmpty()) prefix else "$prefix $days"
+      if (daysStr.isEmpty()) prefix else if (days.size == 7 && n == 1) "每天" else "$prefix$daysStr"
     }
     Freq.MONTHLY -> {
-      val days = r.byMonthDay.distinct().sorted().joinToString("、") {
-        if (it < 0) "倒数第${-it}天" else "${it}日"
+      val days = r.byMonthDay.distinct().sortedBy {
+        if (it < 0) it * -100 else it // 负数显示在最后
+      }.joinToString("、", postfix = "日") {
+        if (it < 0) "${-it}" else "$it"
       }
       val prefix = if (n == 1) "每月" else "每${n}月"
-      if (days.isEmpty()) prefix else "$prefix $days"
+      if (days.isEmpty()) prefix else "$prefix$days"
     }
     Freq.YEARLY -> {
       val md = if (r.byMonth.isNotEmpty() && r.byMonthDay.isNotEmpty()) {
-        "${r.byMonth.first()}月${r.byMonthDay.first()}日"
+        "${r.byMonth.first()}月${r.byMonthDay.first()}号"
       } else ""
       val prefix = if (n == 1) "每年" else "每${n}年"
-      if (md.isEmpty()) prefix else "$prefix $md"
+      if (md.isEmpty()) prefix else "$prefix$md"
     }
   }
   when {
     r.until != null -> labels += "至${r.until}"
-    r.count != null -> labels += "共${r.count}次"
+    r.count != null -> labels += "共${r.count}次" // todo 显示当前是第几次
   }
   return labels
 }

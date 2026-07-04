@@ -1,27 +1,29 @@
 package com.cyxbs.pages.schedule.ui.edit
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
@@ -45,7 +47,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,6 +63,9 @@ import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavArgument
+import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.view.calendar.CalendarCompose
 import com.cyxbs.components.view.calendar.CalendarDateCompose
@@ -66,11 +77,14 @@ import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
 import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCalendar
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 
@@ -89,6 +103,28 @@ import kotlin.time.Clock
 
 /** 弹窗内容固定高度，对齐课表 item 弹窗（[com.cyxbs.pages.course.dialog] 的 280dp），两处观感一致。 */
 private val EditSheetHeight = 280.dp
+private val RepeatEditPreviewHeight = 410.dp
+
+@Serializable
+object EditScheduleDialogNavArgument : AppNavArgument
+
+@AppNav(route = "schedule/edit")
+class EditScheduleDialogPreview : AppNavEntry<EditScheduleDialogNavArgument>() {
+  override fun isNeedLogin(argument: EditScheduleDialogNavArgument): Boolean {
+    return false
+  }
+
+  @Composable
+  override fun Content(argument: EditScheduleDialogNavArgument) {
+    EditScheduleDialog(
+      show = true,
+      editSchedule = previewSampleSchedule(),
+      occurrenceDate = Date.now(),
+      onDismiss = {},
+      onConfirm = { _, _ -> }
+    )
+  }
+}
 
 @Composable
 fun EditScheduleDialog(
@@ -117,21 +153,35 @@ fun EditScheduleDialog(
   val requestDismiss = { if (state.isChanged) showUnsavedExit = true else onDismiss() }
   val doSave = {
     if (needScope) scopeChooser = ScopeAction.SAVE
-    else { onConfirm(state, EditScope.ALL); onDismiss() }
+    else {
+      onConfirm(state, EditScope.ALL); onDismiss()
+    }
   }
   val doDelete = {
     if (onDelete != null) {
       if (needScope) scopeChooser = ScopeAction.DELETE
-      else { onDelete(EditScope.ALL); onDismiss() }
+      else {
+        onDelete(EditScope.ALL); onDismiss()
+      }
     }
   }
 
   ScheduleBottomSheet(
     show = true,
     onDismiss = onDismiss,
-    onDismissRequest = { if (state.isChanged) { showUnsavedExit = true; false } else true },
+    onDismissRequest = {
+      if (state.isChanged) {
+        showUnsavedExit = true; false
+      } else true
+    },
   ) {
-    Column(modifier = Modifier.fillMaxWidth().height(EditSheetHeight).padding(top = 16.dp, start = 16.dp, end = 16.dp)) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = EditSheetHeight)
+        .animateContentSize()
+        .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+    ) {
       when (mode) {
         Mode.SHOW -> ShowContent(
           state = state,
@@ -139,6 +189,7 @@ fun EditScheduleDialog(
           onEdit = { mode = Mode.EDIT },
           onDelete = doDelete,
         )
+
         Mode.EDIT -> EditContent(
           state = state,
           firstMonday = firstMonday,
@@ -210,12 +261,16 @@ private fun ShowContent(
       modifier = Modifier.weight(1f).basicMarquee(),
     )
     Icon(
-      painter = rememberVectorPainter(Icons.Outlined.Edit), contentDescription = "编辑",
-      tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onEdit),
+      painter = rememberVectorPainter(Icons.Outlined.Edit),
+      contentDescription = "编辑",
+      tint = colors.tvLv2,
+      modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onEdit),
     )
     Icon(
-      painter = rememberVectorPainter(Icons.Outlined.Delete), contentDescription = "删除",
-      tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onDelete),
+      painter = rememberVectorPainter(Icons.Outlined.Delete),
+      contentDescription = "删除",
+      tint = colors.tvLv2,
+      modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onDelete),
     )
   }
   Spacer(modifier = Modifier.height(10.dp))
@@ -254,27 +309,36 @@ private fun ColumnScope.EditContent(
         modifier = Modifier.fillMaxWidth(),
       )
       if (state.title.text.isEmpty()) {
-        Text("请输入标题", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = colors.tvLv2.copy(alpha = 0.3f))
+        Text(
+          "请输入标题",
+          fontSize = 20.sp,
+          fontWeight = FontWeight.Bold,
+          color = colors.tvLv2.copy(alpha = 0.3f)
+        )
       }
     }
     if (inSubEdit) {
       // 正在编辑时间段/日期：右上是「返回」← 收起子编辑区回到表单（改动已实时写回，不会丢）。
       Icon(
-        painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack), contentDescription = "返回",
-        tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onBackSub),
+        painter = rememberVectorPainter(Icons.AutoMirrored.Rounded.ArrowBack),
+        contentDescription = "返回",
+        tint = colors.tvLv2,
+        modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onBackSub),
       )
     } else {
       val canSave = state.canConfirm
       Icon(
         painter = rememberVectorPainter(Icons.Rounded.Check), contentDescription = "保存",
-        tint = if (canSave) colors.positive else colors.tvLv3.copy(alpha = 0.4f),
+        tint = if (canSave) colors.tvLv2 else colors.tvLv2.copy(alpha = 0.4f),
         modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
       )
     }
     // 取消 ✕ 始终显示（编辑子区时也能取消整个编辑）。
     Icon(
-      painter = rememberVectorPainter(Icons.Rounded.Close), contentDescription = "取消",
-      tint = colors.tvLv2, modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
+      painter = rememberVectorPainter(Icons.Rounded.Close),
+      contentDescription = "取消",
+      tint = colors.tvLv2,
+      modifier = Modifier.padding(start = 12.dp).clickableNoIndicator(onClick = onCancel),
     )
   }
   Spacer(modifier = Modifier.height(10.dp))
@@ -298,7 +362,7 @@ private fun ColumnScope.EditContent(
       )
       LaunchedEffect(calendarState) { calendarState.expand() } // 默认展开整月
       CalendarCompose(
-        modifier = Modifier.fillMaxWidth().weight(1f),
+        modifier = Modifier.fillMaxWidth(),
         state = calendarState,
         // 只留星期行 + 月份网格：去掉默认的左侧年月列(MonthTextCompose)，
         // 年月/第N周 已由上面的信息栏展示，无需在日历里重复。
@@ -308,23 +372,23 @@ private fun ColumnScope.EditContent(
           calendarState.CalendarMonthCompose { date, show ->
             calendarState.CalendarDateCompose(
               date = date, show = show,
-              dayFontSize = 12.sp, lunarFontSize = 7.sp, maxCellHeight = 29.dp,
+              dayFontSize = 14.sp, lunarFontSize = 9.sp, maxCellHeight = 38.dp,
             )
           }
         },
       )
     }
-    // 重复：下方就地变 RFC5545 重复规则编辑器，实时写回 state.recurrence
+    // 重复：内容较多，外层弹窗会增高；结束条件固定在底部，主体选择区内部滚动。
     EditSubArea.REPEAT -> RecurrenceEditInline(
       draft = state.recurrence,
       onChange = { state.recurrence = it },
-      modifier = Modifier.weight(1f),
+      modifier = Modifier.fillMaxWidth(),
     )
     // 提醒：下方就地变提前分钟选项，实时写回 state.remindMinutes
     EditSubArea.REMIND -> RemindInline(
       current = state.remindMinutes,
       onChoose = { state.remindMinutes = it },
-      modifier = Modifier.weight(1f),
+      modifier = Modifier,
     )
     // 默认：备注输入
     EditSubArea.NOTE -> Box {
@@ -339,6 +403,7 @@ private fun ColumnScope.EditContent(
       }
     }
   }
+  Spacer(modifier = Modifier.height(16.dp))
 }
 
 /* ---------------- 单行信息栏 ---------------- */
@@ -354,55 +419,174 @@ private fun InfoRow(
   onClickRemind: () -> Unit = {},
 ) {
   val date = state.anchorDate
-  // 日期段：日期 + 第N周(学期内) + 周几，合为一个可点（→日历）。
-  val dateText = buildString {
-    append(formatInfoDate(date))
-    formatWeekOfTerm(firstMonday, date)?.let { append(' ').append(it) }
-    append(' ').append(formatWeekday(date))
+  val colors = LocalAppColors.current
+  val placeholderColor = colors.tvLv2.copy(alpha = 0.4f)
+  // 📅日期 第几周 周几
+  val dateIcon = rememberIcAddtodoCalendar()
+  val dateSegment = remember(colors, editable, firstMonday, date, dateIcon, onClickDate) {
+    InfoTextSegment(
+      id = "date",
+      text = buildString {
+        append(formatInfoDate(date))
+        formatWeekOfTerm(firstMonday, date)?.let { append(' ').append(it) }
+        append(' ').append(formatWeekday(date))
+      },
+      icon = dateIcon,
+      color = colors.tvLv2,
+      onClick = if (editable) onClickDate else null,
+    )
   }
-  val timeText = formatTimeRange(state.startMinuteOfDay, state.endMinuteOfDay)
-  val repeatText = recurrenceRowLabel(state.outputRecurrence)
-  val remindText = formatRemindAhead(state.remindMinutes)
-
-  // 重复/提醒前缀图标（复用 widget 里的事务图标，风格统一）。
-  val repeatIcon = rememberIcAddtodoRepeat()
-  val remindIcon = rememberIcAddtodoNotice()
-
-  Row(
-    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-    verticalAlignment = Alignment.CenterVertically,
+  // 🕙时间段
+  val timeIcon = rememberIcAddtodoTime()
+  val timeSegment = remember(
+    colors,
+    editable,
+    state.startMinuteOfDay,
+    state.endMinuteOfDay,
+    placeholderColor,
+    timeIcon,
+    onClickTime
   ) {
-    InfoSegment(text = dateText, editable = editable, onClick = onClickDate)
-    InfoSegment(text = timeText ?: if (editable) "设置时间" else null, placeholder = timeText == null, editable = editable, onClick = onClickTime)
-    InfoSegment(text = repeatText ?: if (editable) "重复" else null, placeholder = repeatText == null, editable = editable, icon = repeatIcon, onClick = onClickRepeat)
-    InfoSegment(text = remindText ?: if (editable) "提醒" else null, placeholder = remindText == null, editable = editable, icon = remindIcon, onClick = onClickRemind)
+    val text = formatTimeRange(state.startMinuteOfDay, state.endMinuteOfDay)
+    InfoTextSegment(
+      id = "time",
+      text = text ?: if (editable) "设置时间" else null,
+      icon = timeIcon,
+      color = if (text == null) placeholderColor else colors.tvLv2,
+      onClick = if (editable) onClickTime else null,
+    )
+  }
+  // 🔁重复规则
+  val repeatIcon = rememberIcAddtodoRepeat()
+  val repeatSegment =
+    remember(
+      colors,
+      editable,
+      state.outputRecurrence,
+      repeatIcon,
+      onClickRepeat
+    ) {
+      val text = recurrenceRowLabel(state.outputRecurrence)
+      InfoTextSegment(
+        id = "repeat",
+        text = text ?: "仅一次",
+        icon = repeatIcon,
+        color = colors.tvLv2,
+        onClick = if (editable) onClickRepeat else null,
+      )
+    }
+  // ⏰提醒时间
+  val remindIcon = rememberIcAddtodoNotice()
+  val remindSegment =
+    remember(colors, editable, state.remindMinutes, remindIcon, onClickRemind) {
+      val text = formatRemindAhead(state.remindMinutes)
+      InfoTextSegment(
+        id = "remind",
+        text = text ?: "不提醒",
+        icon = remindIcon,
+        color = colors.tvLv2,
+        onClick = if (editable) onClickRemind else null,
+      )
+    }
+  val dateTimeSegments = remember(dateSegment, timeSegment) {
+    listOf(dateSegment, timeSegment).filter { it.text != null }
+  }
+  val actionSegments = remember(repeatSegment, remindSegment) {
+    listOf(repeatSegment, remindSegment).filter { it.text != null }
+  }
+  // icon
+  val inlineContent = remember(dateTimeSegments) {
+    dateTimeSegments.associate { segment ->
+      segment.id to InlineTextContent(
+        placeholder = Placeholder(
+          width = 13.sp,
+          height = 13.sp,
+          placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+        ),
+      ) {
+        Icon(
+          imageVector = segment.icon,
+          contentDescription = null,
+          modifier = Modifier.size(13.dp)
+        )
+      }
+    }
+  }
+  // 富文本
+  val annotatedText = remember(dateTimeSegments) {
+    buildAnnotatedString {
+      dateTimeSegments.forEachIndexed { index, segment ->
+        if (index > 0) append("  ")
+        val start = length
+        appendInlineContent(segment.id)
+        append(" ")
+        append(segment.text.orEmpty())
+        addStyle(SpanStyle(color = segment.color), start, length)
+        segment.onClick?.let { onClick ->
+          addLink(
+            LinkAnnotation.Clickable(
+              tag = segment.id,
+              styles = TextLinkStyles(style = SpanStyle(color = segment.color)),
+            ) {
+              onClick()
+            },
+            start,
+            length,
+          )
+        }
+      }
+    }
+  }
+
+  FlowRow(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    // 日期和时间仍使用单个富文本，统一字体度量，避免桌面端纯数字/英文文本高度不一致。
+    BasicText(
+      text = annotatedText,
+      style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),
+      inlineContent = inlineContent,
+      maxLines = 1,
+    )
+    actionSegments.forEach { segment ->
+      InfoSegmentItem(segment)
+    }
   }
 }
 
 @Composable
-private fun InfoSegment(
-  text: String?,
-  editable: Boolean,
-  placeholder: Boolean = false,
-  icon: ImageVector? = null,
-  onClick: () -> Unit = {},
-) {
-  if (text == null) return
-  val colors = LocalAppColors.current
-  val color = if (placeholder) colors.tvLv3.copy(alpha = 0.4f) else colors.tvLv2
+private fun InfoSegmentItem(segment: InfoTextSegment) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier
-      .padding(end = 12.dp)
-      .then(if (editable) Modifier.clickableNoIndicator(onClick = onClick) else Modifier),
+    modifier = Modifier.then(
+      if (segment.onClick != null) Modifier.clickableNoIndicator { segment.onClick.invoke() } else Modifier
+    )
   ) {
-    if (icon != null) {
-      Image(imageVector = icon, contentDescription = null, modifier = Modifier.size(13.dp))
-      Spacer(modifier = Modifier.width(3.dp))
-    }
-    Text(text = text, fontSize = 13.sp, maxLines = 1, color = color)
+    Icon(
+      imageVector = segment.icon,
+      contentDescription = null,
+      modifier = Modifier.size(13.dp),
+    )
+    Spacer(modifier = Modifier.width(3.dp))
+    Text(
+      text = segment.text.orEmpty(),
+      fontSize = 13.sp,
+      lineHeight = 13.sp,
+      color = segment.color,
+      maxLines = 1,
+    )
   }
 }
+
+private data class InfoTextSegment(
+  val id: String,
+  val text: String?,
+  val icon: ImageVector,
+  val color: Color,
+  val onClick: (() -> Unit)?,
+)
 
 /* ---------------- 时分滚轮（点时间段后替换备注区） ---------------- */
 
@@ -428,9 +612,9 @@ private fun TimeWheelPane(
     // 时间段 / 截止 分段框框切换（沿用 todo cmp 的样式）。
     ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { deadlineOnly = !it })
     // 去掉「完成」按钮后，滚轮整体下移一点。
-    Spacer(modifier = Modifier.height(18.dp))
+    Spacer(modifier = Modifier.height(12.dp))
     Row(
-      modifier = Modifier.fillMaxWidth().height(120.dp),
+      modifier = Modifier.fillMaxWidth().height(100.dp),
       horizontalArrangement = Arrangement.Center,
       verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -488,8 +672,15 @@ private fun TimeTypeChip(text: String, selected: Boolean, onClick: () -> Unit) {
     fontSize = 12.sp,
     color = if (selected) accent else colors.tvLv3.copy(alpha = 0.5f),
     modifier = Modifier
-      .border(1.dp, if (selected) accent else colors.tvLv3.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-      .background(if (selected) accent.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(6.dp))
+      .border(
+        1.dp,
+        if (selected) accent else colors.tvLv3.copy(alpha = 0.15f),
+        RoundedCornerShape(6.dp)
+      )
+      .background(
+        if (selected) accent.copy(alpha = 0.1f) else Color.Transparent,
+        RoundedCornerShape(6.dp)
+      )
       .clickableNoIndicator(onClick = onClick)
       .padding(horizontal = 14.dp, vertical = 5.dp),
   )
@@ -543,7 +734,7 @@ private fun RemindInline(
     Row {
       TimeTypeChip("不提醒", selected = current < 0) { onChoose(-1) }
       Spacer(modifier = Modifier.width(8.dp))
-      TimeTypeChip("提前", selected = current >= 0) { if (current < 0) onChoose(10) }
+      TimeTypeChip("提醒", selected = current >= 0) { if (current < 0) onChoose(10) }
     }
     if (current >= 0) {
       Spacer(modifier = Modifier.height(8.dp))
@@ -606,7 +797,10 @@ private fun EditScopeChooserSheet(
       ScopeRow(if (isDelete) "删除整个系列" else "整个系列") { onChoose(EditScope.ALL) }
       Spacer(modifier = Modifier.height(8.dp))
       Text(
-        text = "取消", fontSize = 16.sp, color = colors.tvLv3.copy(alpha = 0.6f), textAlign = TextAlign.Center,
+        text = "取消",
+        fontSize = 16.sp,
+        color = colors.tvLv3.copy(alpha = 0.6f),
+        textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().clickableNoIndicator(onClick = onDismiss).padding(14.dp),
       )
     }
@@ -617,7 +811,8 @@ private fun EditScopeChooserSheet(
 private fun ScopeRow(text: String, onClick: () -> Unit) {
   Text(
     text = text, fontSize = 16.sp, color = LocalAppColors.current.tvLv2,
-    modifier = Modifier.fillMaxWidth().clickableNoIndicator(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
+    modifier = Modifier.fillMaxWidth().clickableNoIndicator(onClick = onClick)
+      .padding(horizontal = 20.dp, vertical = 14.dp),
   )
 }
 
@@ -627,12 +822,12 @@ private fun ScopeRow(text: String, onClick: () -> Unit) {
 // LaunchedEffect+动画展开，静态预览里高度为 0 看不到，所以这里直接渲染内容、用 AppTheme 提供配色。
 // 周数显式传入示例开学日(2026-03-02 周一)，避免预览读 SchoolCalendar 设置。
 
-private fun previewSampleSchedule() = com.cyxbs.pages.schedule.data.model.ScheduleEntity(
+private fun previewSampleSchedule() = ScheduleEntity(
   todoId = 1L,
   title = "项目答辩",
   detail = "综合楼 503，记得带 U 盘",
-  startTime = "2026年6月28日 10:00",
-  endTime = "2026年6月28日 11:30",
+  startTime = "2026年7月4日 10:00",
+  endTime = "2026年7月4日 11:30",
   recurrence = com.cyxbs.pages.schedule.recurrence.Recurrence(
     rrule = com.cyxbs.pages.schedule.recurrence.RRule(
       freq = com.cyxbs.pages.schedule.recurrence.Freq.WEEKLY,
@@ -647,7 +842,10 @@ private fun previewSampleSchedule() = com.cyxbs.pages.schedule.data.model.Schedu
 private val previewFirstMonday = Date(2026, 3, 2)
 
 @Composable
-private fun PreviewFrame(content: @Composable ColumnScope.() -> Unit) {
+private fun PreviewFrame(
+  height: androidx.compose.ui.unit.Dp = EditSheetHeight,
+  content: @Composable ColumnScope.() -> Unit,
+) {
   AppTheme {
     // 用 Column 提供纵向排布作用域（ShowContent/EditContent 内部直接发多个同级子项，
     // 真实弹窗里靠外层 Column 堆叠；预览必须同样包一层 Column，否则会全叠在一起）。
@@ -655,7 +853,7 @@ private fun PreviewFrame(content: @Composable ColumnScope.() -> Unit) {
     Column(
       modifier = Modifier
         .width(360.dp)
-        .height(EditSheetHeight)
+        .height(height)
         .background(LocalAppColors.current.topBg)
         .padding(top = 16.dp, start = 16.dp, end = 16.dp),
     ) { content() }
@@ -701,7 +899,7 @@ private fun PreviewScheduleEditTime() {
 }
 
 /** 截止型样例：无开始时间、只有截止时间，进编辑时间态时 deadlineOnly 默认为 true。 */
-private fun previewSampleDeadline() = com.cyxbs.pages.schedule.data.model.ScheduleEntity(
+private fun previewSampleDeadline() = ScheduleEntity(
   todoId = 2L,
   title = "交实验报告",
   detail = "提交到学习通",
@@ -743,8 +941,31 @@ private fun PreviewScheduleEditDate() {
 @Preview
 @Composable
 private fun PreviewScheduleEditRepeat() {
-  PreviewFrame {
+  PreviewFrame(height = RepeatEditPreviewHeight) {
     val state = remember { EditScheduleState(previewSampleSchedule()) }
+    EditContent(
+      state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.REPEAT,
+      onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},
+      onBackSub = {}, onSave = {}, onCancel = {},
+    )
+  }
+}
+
+private fun previewSampleMonthlySchedule() = previewSampleSchedule().copy(
+  recurrence = com.cyxbs.pages.schedule.recurrence.Recurrence(
+    rrule = com.cyxbs.pages.schedule.recurrence.RRule(
+      freq = com.cyxbs.pages.schedule.recurrence.Freq.MONTHLY,
+      byMonthDay = listOf(1, 15, 28, -1),
+    ),
+  ),
+)
+
+/** 编辑态·重复·每月：月内日期较多，弹窗增高且「结束」固定在底部。 */
+@Preview
+@Composable
+private fun PreviewScheduleEditRepeatMonthly() {
+  PreviewFrame(height = RepeatEditPreviewHeight) {
+    val state = remember { EditScheduleState(previewSampleMonthlySchedule()) }
     EditContent(
       state = state, firstMonday = previewFirstMonday, subArea = EditSubArea.REPEAT,
       onClickDate = {}, onClickTime = {}, onClickRepeat = {}, onClickRemind = {},

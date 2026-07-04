@@ -27,8 +27,8 @@ fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = MAX_WEEK_OF_TERM):
   return if (week in 1..maxWeek) week else null
 }
 
-/** 日期缩写：`6.28`（月.日，不补零）。 */
-fun formatInfoDate(date: Date): String = "${date.monthNumber}.${date.dayOfMonth}"
+/** 日期：`6月28日`。 */
+fun formatInfoDate(date: Date): String = "${date.monthNumber}月${date.dayOfMonth}日"
 
 /** 第N周：在学期内返回「第13周」，否则 null（不显示）。 */
 fun formatWeekOfTerm(firstMonday: Date?, date: Date): String? =
@@ -52,7 +52,7 @@ fun formatClock(minuteOfDay: Int): String {
  */
 fun formatTimeRange(startMin: Int?, endMin: Int?): String? = when {
   startMin != null && endMin != null -> "${formatClock(startMin)}-${formatClock(endMin)}"
-  startMin != null -> formatClock(startMin)
+  startMin != null -> "截止${formatClock(startMin)}"
   endMin != null -> "截止${formatClock(endMin)}"
   else -> null
 }
@@ -64,11 +64,8 @@ fun formatRemindAhead(remindMinutes: Int): String? = when {
   remindMinutes < 0 -> null
   remindMinutes == 0 -> "准时"
   remindMinutes % 60 == 0 -> "提前${remindMinutes / 60}小时"
-  else -> "提前${remindMinutes}分"
+  else -> "提前${remindMinutes}分种"
 }
-
-/** 提前提醒的候选项（分钟）：-1=不提醒、0=准时、5/10/15/30 分、60=1 小时。 */
-val REMIND_AHEAD_OPTIONS = listOf(-1, 0, 5, 10, 15, 30, 60)
 
 /** 提前提醒选项的菜单文案（含「不提醒」）。 */
 fun remindOptionLabel(remindMinutes: Int): String =

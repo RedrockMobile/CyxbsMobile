@@ -1,12 +1,23 @@
 package com.cyxbs.components.view.calendar.state
 
-import androidx.compose.runtime.*
-import com.cyxbs.components.view.calendar.scroll.HorizontalScrollState
-import com.cyxbs.components.view.calendar.scroll.VerticalScrollState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
+import com.cyxbs.components.view.calendar.scroll.HorizontalScrollState
+import com.cyxbs.components.view.calendar.scroll.VerticalScrollState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -84,7 +95,8 @@ class CalendarState(
 
   init {
     clickEventFlow.onEach {
-      onClick?.invoke(it.new) ?: updateClickDate(it.new)
+      updateClickDate(it.new)
+      onClick?.invoke(it.new)
     }.launchIn(coroutineScope)
   }
 

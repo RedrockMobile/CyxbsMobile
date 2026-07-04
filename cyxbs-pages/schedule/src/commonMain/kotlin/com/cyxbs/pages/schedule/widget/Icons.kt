@@ -1,10 +1,9 @@
 package com.cyxbs.pages.schedule.widget
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -13,13 +12,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppDark
 import com.cyxbs.components.utils.compose.dark
-import org.jetbrains.compose.resources.painterResource
 
 
 @Preview
 @Composable
 private fun PreviewCompose() {
-  Column {
+  Row {
     Image(
       imageVector = rememberIcPicManage(),
       contentDescription = null,
@@ -34,6 +32,14 @@ private fun PreviewCompose() {
     )
     Image(
       imageVector = rememberIcAddtodoRepeat(),
+      contentDescription = null,
+    )
+    Image(
+      imageVector = rememberIcAddtodoCalendar(),
+      contentDescription = null,
+    )
+    Image(
+      imageVector = rememberIcAddtodoTime(),
       contentDescription = null,
     )
     Image(
@@ -230,7 +236,13 @@ fun rememberIcAddtodoNotice(): ImageVector {
         close()
       }
       // 右上铃铛内弧（stroke，圆头端点，alpha 0.8）
-      path(stroke = brush, strokeLineWidth = 1.5f, strokeLineCap = StrokeCap.Round, strokeAlpha = 0.8f, fillAlpha = 0.8f) {
+      path(
+        stroke = brush,
+        strokeLineWidth = 1.5f,
+        strokeLineCap = StrokeCap.Round,
+        strokeAlpha = 0.8f,
+        fillAlpha = 0.8f
+      ) {
         moveTo(14f, 9f)
         curveTo(14f, 6.791f, 12.209f, 5f, 10f, 5f)
       }
@@ -290,6 +302,117 @@ fun rememberIcAddtodoRepeat(): ImageVector {
         verticalLineTo(6.75f)
         curveTo(8.75f, 6.336f, 8.414f, 6f, 8f, 6f)
         close()
+      }
+    }.build()
+  }
+}
+
+/**
+ * 日程日期入口图标：日历外框 + 顶部装订点 + 日期网格。
+ *
+ * 自动根据 [LocalAppDark] 切换日间/夜间颜色，结果通过 `remember` 缓存。
+ *
+ * @author Codex
+ * @date 2026/7/4
+ */
+@Composable
+fun rememberIcAddtodoCalendar(): ImageVector {
+  val color = 0xFF294169.dark(0xFFA1ADBD)
+  return remember(color) {
+    val brush = SolidColor(color)
+    ImageVector.Builder(
+      name = "TodoIcAddtodoCalendar",
+      defaultWidth = 20.dp,
+      defaultHeight = 20.dp,
+      viewportWidth = 20f,
+      viewportHeight = 20f,
+    ).apply {
+      // 日历主体轮廓
+      path(stroke = brush, strokeLineWidth = 1.67f) {
+        moveTo(1.95f, 4.87f)
+        curveTo(1.95f, 3.49f, 3.07f, 2.38f, 4.45f, 2.38f)
+        horizontalLineTo(15.55f)
+        curveTo(16.93f, 2.38f, 18.05f, 3.49f, 18.05f, 4.87f)
+        verticalLineTo(16.25f)
+        curveTo(18.05f, 17.63f, 16.93f, 18.75f, 15.55f, 18.75f)
+        horizontalLineTo(4.45f)
+        curveTo(3.07f, 18.75f, 1.95f, 17.63f, 1.95f, 16.25f)
+        verticalLineTo(4.87f)
+        close()
+      }
+      // 顶部分隔线
+      path(stroke = brush, strokeLineWidth = 1.67f, strokeLineCap = StrokeCap.Round) {
+        moveTo(2.79f, 7.65f)
+        horizontalLineTo(17.21f)
+      }
+      // 顶部装订点
+      path(stroke = brush, strokeLineWidth = 1.67f, strokeLineCap = StrokeCap.Round) {
+        moveTo(6.12f, 1.27f)
+        verticalLineTo(4.60f)
+        moveTo(13.88f, 1.27f)
+        verticalLineTo(4.60f)
+      }
+      // 日期网格点
+      path(fill = brush, fillAlpha = 0.85f, strokeAlpha = 0.85f) {
+        moveTo(5.56f, 10.70f)
+        moveToRelative(-0.83f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
+        moveTo(10f, 10.70f)
+        moveToRelative(-0.83f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
+        moveTo(14.44f, 10.70f)
+        moveToRelative(-0.83f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
+        moveTo(5.56f, 14.03f)
+        moveToRelative(-0.83f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
+        moveTo(10f, 14.03f)
+        moveToRelative(-0.83f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
+        arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
+      }
+    }.build()
+  }
+}
+
+/**
+ * 日程时间段入口图标：时钟。
+ *
+ * 自动根据 [LocalAppDark] 切换日间/夜间颜色，结果通过 `remember` 缓存。
+ *
+ * @author Codex
+ * @date 2026/7/4
+ */
+@Composable
+fun rememberIcAddtodoTime(): ImageVector {
+  val color = 0xFF294169.dark(0xFFA1ADBD)
+  return remember(color) {
+    val brush = SolidColor(color)
+    ImageVector.Builder(
+      name = "TodoIcAddtodoTimeRange",
+      defaultWidth = 20.dp,
+      defaultHeight = 20.dp,
+      viewportWidth = 20f,
+      viewportHeight = 20f,
+    ).apply {
+      // 时钟外圈
+      path(stroke = brush, strokeLineWidth = 1.51f) {
+        moveTo(10f, 2.18f)
+        curveTo(5.40f, 2.18f, 1.68f, 5.91f, 1.68f, 10.51f)
+        curveTo(1.68f, 15.11f, 5.40f, 18.83f, 10f, 18.83f)
+        curveTo(14.60f, 18.83f, 18.32f, 15.11f, 18.32f, 10.51f)
+        curveTo(18.32f, 5.91f, 14.60f, 2.18f, 10f, 2.18f)
+        close()
+      }
+      // 时针与分针
+      path(stroke = brush, strokeLineWidth = 1.51f, strokeLineCap = StrokeCap.Round) {
+        moveTo(10f, 5.97f)
+        verticalLineTo(10.51f)
+        lineTo(13.12f, 12.48f)
       }
     }.build()
   }

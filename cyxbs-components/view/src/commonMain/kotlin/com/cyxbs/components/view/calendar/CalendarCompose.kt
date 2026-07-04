@@ -2,7 +2,16 @@ package com.cyxbs.components.view.calendar
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.Text
@@ -29,16 +38,16 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
-import com.cyxbs.components.view.calendar.scroll.CalendarNestedScroll
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.Festival
 import com.cyxbs.components.config.time.SolarTerms
 import com.cyxbs.components.config.time.toChineseCalendar
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.px2dpCompose
+import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
+import com.cyxbs.components.view.calendar.scroll.CalendarNestedScroll
 import com.cyxbs.components.view.calendar.state.CalendarState
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
-import com.cyxbs.components.utils.compose.px2dpCompose
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -70,7 +79,7 @@ fun CalendarCompose(
     snapshotFlow { state.lineHeightState.value }.collect { state.tryApplyExpand() }
   }
   Column(
-    modifier = Modifier.fillMaxSize()
+    modifier = Modifier.fillMaxWidth()
       .nestedScroll(remember(state) { CalendarNestedScroll(state) })
       .then(modifier)
   ) {

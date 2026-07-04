@@ -234,6 +234,17 @@ object fields:
   }
 ```
 
+## :cyxbs-pages:schedule
+
+### schedule
+
+- entry: `com.cyxbs.pages.schedule.ui.main.ScheduleMainNavEntry`
+- argument: `com.cyxbs.pages.schedule.api.ScheduleMainNavArgument`
+
+```text
+deeplink: cyxbs://schedule
+```
+
 ## :cyxbs-pages:schoolcar
 
 ### school_car
