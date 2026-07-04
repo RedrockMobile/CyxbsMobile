@@ -136,7 +136,16 @@ class RecurrenceEditModelTest {
   @Test
   fun labels_monthly_with_count() {
     val labels = buildRecurrenceLabels(Recurrence(rrule = RRule(freq = Freq.MONTHLY, byMonthDay = listOf(1, 15), count = 10)))
-    assertEquals(listOf("每月 1日、15日", "共10次"), labels)
+    assertEquals(listOf("每月1,15日", "共10次"), labels)
+  }
+
+  /** 标签：每月连续两天及以上压缩为范围。 */
+  @Test
+  fun labels_monthly_compresses_consecutive_days() {
+    val labels = buildRecurrenceLabels(
+      Recurrence(rrule = RRule(freq = Freq.MONTHLY, byMonthDay = listOf(1, 2, 3, 5, 6, 8, 9, 10, -1, -3, -4)))
+    )
+    assertEquals(listOf("每月1-3,5-6,8-10日,倒1,倒3-4"), labels)
   }
 
   /** 摘要：不重复返回「不重复」。 */

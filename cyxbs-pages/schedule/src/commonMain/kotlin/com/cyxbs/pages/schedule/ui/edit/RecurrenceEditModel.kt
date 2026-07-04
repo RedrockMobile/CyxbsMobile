@@ -39,7 +39,7 @@ data class RecurrenceDraft(
   val byDay: List<Int> = emptyList(),
   val byMonthDay: List<Int> = emptyList(),
   val endOption: RepeatEndOption = RepeatEndOption.NEVER,
-  val count: Int = 10,
+  val count: Int = 3,
   val until: Date? = null,
 ) {
   /** 是否为重复日程。 */
@@ -140,11 +140,7 @@ fun buildRecurrenceLabels(recurrence: Recurrence?): List<String> {
       if (daysStr.isEmpty()) prefix else if (days.size == 7 && n == 1) "每天" else "$prefix$daysStr"
     }
     Freq.MONTHLY -> {
-      val days = r.byMonthDay.distinct().sortedBy {
-        if (it < 0) it * -100 else it // 负数显示在最后
-      }.joinToString("、", postfix = "日") {
-        if (it < 0) "${-it}" else "$it"
-      }
+      val days = formatMonthDayLabels(r.byMonthDay)
       val prefix = if (n == 1) "每月" else "每${n}月"
       if (days.isEmpty()) prefix else "$prefix$days"
     }
@@ -161,6 +157,39 @@ fun buildRecurrenceLabels(recurrence: Recurrence?): List<String> {
     r.count != null -> labels += "共${r.count}次" // todo 显示当前是第几次
   }
   return labels
+}
+
+/**
+ * 月重复的日期标签：连续 2 天及以上压缩为 `A-B`。
+ * 例如 `1,2,3,5,6,-1,-3,-4` → `1-3,5-6日,倒1,倒3-4`。
+ */
+private fun formatMonthDayLabels(days: List<Int>): String {
+  if (days.isEmpty()) return ""
+  val positives = days.distinct().filter { it > 0 }.sorted()
+  val negatives = days.distinct().filter { it < 0 }.map { -it }.sorted() // -1=倒1，-2=倒2...
+  val labels = mutableListOf<String>()
+
+  formatMonthDaySegments(positives).takeIf { it.isNotEmpty() }?.let { labels += "${it}日" }
+  formatMonthDaySegments(negatives).takeIf { it.isNotEmpty() }?.let { value ->
+    labels += value.split(",").joinToString(",") { "倒$it" }
+  }
+  return labels.joinToString(",")
+}
+
+private fun formatMonthDaySegments(days: List<Int>): String {
+  val segments = mutableListOf<String>()
+  var index = 0
+  while (index < days.size) {
+    val start = days[index]
+    var end = start
+    while (index + 1 < days.size && days[index + 1] == end + 1) {
+      index += 1
+      end = days[index]
+    }
+    segments += if (end - start >= 1) "${start}-${end}" else "$start"
+    index += 1
+  }
+  return segments.joinToString(",")
 }
 
 /** 单行重复摘要，用于入口行右侧展示；不重复返回「不重复」。 */

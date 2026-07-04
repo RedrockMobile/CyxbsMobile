@@ -1,0 +1,308 @@
+package com.cyxbs.pages.schedule.ui.edit.area
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.view.wheel.WheelSelectCompose
+import com.cyxbs.pages.schedule.ui.dialog.ScheduleCalendarPickerDialog
+import com.cyxbs.pages.schedule.ui.edit.RecurrenceDraft
+import com.cyxbs.pages.schedule.ui.edit.RepeatEndOption
+import com.cyxbs.pages.schedule.ui.edit.RepeatFreqOption
+import com.cyxbs.pages.schedule.ui.edit.ToggleChip
+import com.cyxbs.pages.schedule.ui.edit.weekNumberToChinese
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toPersistentList
+import kotlin.math.roundToInt
+
+/**
+ * 重复规则编辑器（RFC5545 RRULE）—— **单位按钮 + 次数滚轮 + 多选**版，渲染在编辑弹窗下方区域（[com.cyxbs.pages.schedule.ui.edit.EditSubArea.REPEAT]）。
+ *
+ * 频率用「仅一次 / 日 / 周 / 月」按钮切换，只有重复间隔 N 用滚轮调整。
+ * - 「仅一次」即不重复，不显示次数滚轮与结束条件。
+ * - 「日 / 周 / 月」即「每 N 天/周/月」。每周 → 下方多选周几；每月 → 下方多选几号 + 月末倒数（-1=最后一天）。
+ * 结束「永不 / 按次数 / 按日期」。改动通过 [onChange] 实时写回 [RecurrenceDraft]。
+ *
+ * 「每周」未选周几时默认锚点星期、「每月」未选几号时默认锚点日（由 [com.cyxbs.pages.schedule.ui.edit.toRRule] 补 BY*）。
+ */
+@Composable
+internal fun EditScheduleRecurrenceArea(
+  draft: RecurrenceDraft,
+  onChange: (RecurrenceDraft) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val colors = LocalAppColors.current
+  val draftS = rememberUpdatedState(draft)
+  val onChangeS = rememberUpdatedState(onChange)
+  var showUntilPicker by remember { mutableStateOf(false) }
+  val selectedUnit = when {
+    !draft.isRepeating -> RepeatUnitOption.ONCE
+    draft.freq == RepeatFreqOption.DAILY -> RepeatUnitOption.DAY
+    draft.freq == RepeatFreqOption.MONTHLY -> RepeatUnitOption.MONTH
+    else -> RepeatUnitOption.WEEK
+  }
+
+  val numberOptions = remember { (1..99).map { it.toString() }.toPersistentList() }
+  val nLine = remember { Animatable((draft.interval - 1).coerceIn(0, 98).toFloat()) }
+
+  Column(modifier = modifier.fillMaxWidth()) {
+    Row {
+      RepeatUnitOption.entries.forEachIndexed { index, option ->
+        if (index > 0) Spacer(modifier = Modifier.width(8.dp))
+        ToggleChip(
+          option.label,
+          selected = selectedUnit == option
+        ) {
+          val d = draftS.value
+          onChangeS.value(
+            when (option) {
+              RepeatUnitOption.ONCE -> d.copy(freq = RepeatFreqOption.NONE)
+              RepeatUnitOption.DAY -> d.copy(
+                freq = RepeatFreqOption.DAILY,
+                interval = d.interval.coerceIn(1, 99)
+              )
+
+              RepeatUnitOption.WEEK -> d.copy(
+                freq = RepeatFreqOption.WEEKLY,
+                interval = d.interval.coerceIn(1, 99)
+              )
+
+              RepeatUnitOption.MONTH -> d.copy(
+                freq = RepeatFreqOption.MONTHLY,
+                interval = d.interval.coerceIn(1, 99)
+              )
+            }
+          )
+        }
+      }
+    }
+
+    if (draft.isRepeating) {
+      Spacer(modifier = Modifier.height(8.dp))
+      Row(
+        modifier = Modifier.fillMaxWidth().height(74.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(modifier = Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+          Text("每", fontSize = 16.sp, color = colors.tvLv2)
+        }
+        OneWheel(numberOptions, nLine, modifier = Modifier.width(28.dp))
+        Box(modifier = Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+          Text(selectedUnit.suffix, fontSize = 16.sp, color = colors.tvLv2)
+        }
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { nLine.value.roundToInt() }
+          .collect { n ->
+            val d = draftS.value
+            if (d.isRepeating) {
+              onChangeS.value(d.copy(interval = (n + 1).coerceIn(1, 99)))
+            }
+          }
+      }
+
+      Column(
+        modifier = Modifier
+          .fillMaxWidth(),
+      ) {
+        // 每周 → 周几多选
+        if (draft.freq == RepeatFreqOption.WEEKLY) {
+          SectionLabel("周几")
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+          ) {
+            (1..7).forEach { iso ->
+              ToggleChip(
+                "周${weekNumberToChinese(iso)}",
+                selected = iso in draft.byDay
+              ) {
+                onChange(draft.copy(byDay = draft.byDay.toggle(iso)))
+              }
+            }
+          }
+          Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        // 每月 → 几号多选 + 月末倒数
+        if (draft.freq == RepeatFreqOption.MONTHLY) {
+          SectionLabel("几号")
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+          ) {
+            ((1..31) + (-1 downTo -9)).forEach { d ->
+              DayToggle(d.toString(), selected = d in draft.byMonthDay) {
+                onChange(draft.copy(byMonthDay = draft.byMonthDay.toggle(d)))
+              }
+            }
+          }
+          Spacer(modifier = Modifier.height(6.dp))
+        }
+      }
+
+      // 结束：永不 / 按次数 / 按日期
+      SectionLabel("结束")
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+      ) {
+        EndOption.entries.forEach { opt ->
+          ToggleChip(
+            opt.label,
+            selected = draft.endOption == opt.value
+          ) { onChange(draft.copy(endOption = opt.value)) }
+        }
+        if (draft.endOption == RepeatEndOption.UNTIL) {
+          Text(
+            text = draft.until?.let { "$it" } ?: "选择日期",
+            fontSize = 13.sp,
+            color = if (draft.until == null) colors.tvLv3.copy(alpha = 0.5f) else colors.positive,
+            modifier = Modifier.clickable { showUntilPicker = true }.padding(vertical = 6.dp),
+          )
+        }
+      }
+      if (draft.endOption == RepeatEndOption.COUNT) {
+        CountStepper(draft.count) { onChange(draft.copy(count = it)) }
+      }
+    }
+  }
+
+  // UNTIL 日期选择（复用日历选择器，只取日期部分）
+  ScheduleCalendarPickerDialog(
+    show = showUntilPicker,
+    onDismiss = { showUntilPicker = false },
+    onConfirm = { year, month, day, _, _ ->
+      onChange(draft.copy(until = runCatching { Date(year, month, day) }.getOrNull()))
+      showUntilPicker = false
+    },
+  )
+}
+
+private enum class RepeatUnitOption(val label: String, val suffix: String) {
+  ONCE("仅一次", "次"),
+  DAY("日", "天"),
+  WEEK("周", "周"),
+  MONTH("月", "月"),
+}
+
+private enum class EndOption(val label: String, val value: RepeatEndOption) {
+  NEVER("永不", RepeatEndOption.NEVER),
+  COUNT("按次数", RepeatEndOption.COUNT),
+  UNTIL("按日期", RepeatEndOption.UNTIL),
+}
+
+/** 切换列表中某元素的「选中」：存在则移除、不存在则加入并保持升序。 */
+private fun List<Int>.toggle(v: Int): List<Int> =
+  if (v in this) this - v else (this + v).sorted()
+
+@Composable
+private fun SectionLabel(text: String) {
+  Text(
+    text = text, fontSize = 12.sp, color = LocalAppColors.current.tvLv3.copy(alpha = 0.7f),
+    modifier = Modifier.padding(bottom = 4.dp)
+  )
+}
+
+/** 结束次数的步进。 */
+@Composable
+private fun CountStepper(count: Int, onChange: (Int) -> Unit) {
+  val colors = LocalAppColors.current
+  Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    StepBox("－") { onChange((count - 1).coerceAtLeast(1)) }
+    Text(
+      "共 $count 次",
+      fontSize = 13.sp,
+      color = colors.tvLv2,
+      modifier = Modifier.padding(horizontal = 14.dp)
+    )
+    StepBox("＋") { onChange((count + 1).coerceAtMost(999)) }
+  }
+}
+
+@Composable
+private fun StepBox(text: String, onClick: () -> Unit) {
+  val colors = LocalAppColors.current
+  Box(
+    modifier = Modifier.size(24.dp)
+      .background(colors.positive.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+      .clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) { Text(text, fontSize = 16.sp, color = colors.positive) }
+}
+
+/** 月内日期小方格（多选）。 */
+@Composable
+private fun DayToggle(text: String, selected: Boolean, onClick: () -> Unit) {
+  val colors = LocalAppColors.current
+  val accent = colors.positive
+  Box(
+    modifier = Modifier
+      .size(30.dp)
+      .border(
+        1.dp,
+        if (selected) accent else colors.tvLv3.copy(alpha = 0.12f),
+        RoundedCornerShape(6.dp)
+      )
+      .background(
+        if (selected) accent.copy(alpha = 0.1f) else Color.Transparent,
+        RoundedCornerShape(6.dp)
+      )
+      .clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(text, fontSize = 12.sp, color = if (selected) accent else colors.tvLv3)
+  }
+}
+
+/** 单列滚轮（无背景带）。 */
+@Composable
+private fun OneWheel(
+  options: ImmutableList<String>,
+  line: Animatable<Float, AnimationVector1D>,
+  modifier: Modifier = Modifier,
+) {
+  WheelSelectCompose(
+    selectedLine = line,
+    options = options,
+    modifier = modifier.fillMaxHeight(),
+    textStyle = TextStyle(
+      fontSize = 16.sp,
+      textAlign = TextAlign.Center,
+      color = Color.Black,
+    )
+  )
+}

@@ -1,10 +1,10 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -34,19 +33,17 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -57,6 +54,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.AppTheme
@@ -67,26 +65,18 @@ import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.components.view.calendar.CalendarCompose
-import com.cyxbs.components.view.calendar.CalendarDateCompose
-import com.cyxbs.components.view.calendar.WeekTextCompose
-import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
-import com.cyxbs.components.view.calendar.state.rememberCalendarState
-import com.cyxbs.components.view.wheel.WheelSelectCompose
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
-import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
+import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleCalendarArea
+import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea
+import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRemindArea
+import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleTimeArea
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCalendar
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
-import kotlinx.collections.immutable.toPersistentList
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
-import kotlin.math.roundToInt
-import kotlin.time.Clock
 
 /**
  * 添加 / 查看 / 编辑日程的统一底部弹窗 —— **邮子清单与课表共用同一套**，外观对齐课表事务(affair)。
@@ -94,7 +84,7 @@ import kotlin.time.Clock
  * 形态（见与用户确认的文本草图）：标题行 + **单行信息栏**(日期·第N周·周几·时间段·重复·提醒) + 备注。
  * - 查看态(Show)：只读，右上 ✎ 编辑 / 🗑 删除。
  * - 编辑态(Edit)：标题/备注可输入；信息栏每段可点——下方区域就地切换：日期→日历、时间段→时分滚轮、
- *   重复→[RecurrenceEditInline]、提醒→提前分钟选择（均实时写回，← 返回）。
+ *   重复→[com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea]、提醒→提前分钟选择（均实时写回，← 返回）。
  * - 周数由 commonMain 的 [SchoolCalendar] 推导（学期内显示「第N周」，否则只显示日期），不依赖课表帧，
  *   所以邮子清单与课表能真正共用、长得一样。
  *
@@ -350,42 +340,17 @@ private fun ColumnScope.EditContent(
   Spacer(modifier = Modifier.height(10.dp))
   when (subArea) {
     // 时间段：下方变时分滚轮
-    EditSubArea.TIME -> TimeWheelPane(state = state)
+    EditSubArea.TIME -> EditScheduleTimeArea(state = state)
     // 日期：下方就地变日历，点某天实时改写开始/结束的日期（周数随之重算）；← 返回
-    EditSubArea.DATE -> {
-      val calendarState = rememberCalendarState(
-        initialClickDate = state.anchorDate,
-        onClick = { date ->
-          state.startTime = reanchorTimeString(state.startTime, date)
-          state.endTime = reanchorTimeString(state.endTime, date)
-        },
-      )
-      LaunchedEffect(calendarState) { calendarState.expand() } // 默认展开整月
-      CalendarCompose(
-        modifier = Modifier.fillMaxWidth(),
-        state = calendarState,
-        // 只留星期行 + 月份网格：去掉默认的左侧年月列(MonthTextCompose)，
-        // 年月/第N周 已由上面的信息栏展示，无需在日历里重复。
-        // 弹窗空间小，用更小的字号与格子高度，保证整月放得下。
-        calendar = {
-          calendarState.WeekTextCompose(fontSize = 8.sp)
-          calendarState.CalendarMonthCompose { date, show ->
-            calendarState.CalendarDateCompose(
-              date = date, show = show,
-              dayFontSize = 14.sp, lunarFontSize = 9.sp, maxCellHeight = 38.dp,
-            )
-          }
-        },
-      )
-    }
+    EditSubArea.DATE -> EditScheduleCalendarArea(state = state)
     // 重复：内容较多，外层弹窗会增高；结束条件固定在底部，主体选择区内部滚动。
-    EditSubArea.REPEAT -> RecurrenceEditInline(
+    EditSubArea.REPEAT -> EditScheduleRecurrenceArea(
       draft = state.recurrence,
       onChange = { state.recurrence = it },
       modifier = Modifier.fillMaxWidth(),
     )
     // 提醒：下方就地变提前分钟选项，实时写回 state.remindMinutes
-    EditSubArea.REMIND -> RemindInline(
+    EditSubArea.REMIND -> EditScheduleRemindArea(
       current = state.remindMinutes,
       onChoose = { state.remindMinutes = it },
       modifier = Modifier,
@@ -423,7 +388,14 @@ private fun InfoRow(
   val placeholderColor = colors.tvLv2.copy(alpha = 0.4f)
   // 📅日期 第几周 周几
   val dateIcon = rememberIcAddtodoCalendar()
-  val dateSegment = remember(colors, editable, firstMonday, date, dateIcon, onClickDate) {
+  val dateSegment = remember(
+    colors,
+    editable,
+    firstMonday,
+    date,
+    dateIcon,
+    onClickDate
+  ) {
     InfoTextSegment(
       id = "date",
       text = buildString {
@@ -488,55 +460,6 @@ private fun InfoRow(
         onClick = if (editable) onClickRemind else null,
       )
     }
-  val dateTimeSegments = remember(dateSegment, timeSegment) {
-    listOf(dateSegment, timeSegment).filter { it.text != null }
-  }
-  val actionSegments = remember(repeatSegment, remindSegment) {
-    listOf(repeatSegment, remindSegment).filter { it.text != null }
-  }
-  // icon
-  val inlineContent = remember(dateTimeSegments) {
-    dateTimeSegments.associate { segment ->
-      segment.id to InlineTextContent(
-        placeholder = Placeholder(
-          width = 13.sp,
-          height = 13.sp,
-          placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
-        ),
-      ) {
-        Icon(
-          imageVector = segment.icon,
-          contentDescription = null,
-          modifier = Modifier.size(13.dp)
-        )
-      }
-    }
-  }
-  // 富文本
-  val annotatedText = remember(dateTimeSegments) {
-    buildAnnotatedString {
-      dateTimeSegments.forEachIndexed { index, segment ->
-        if (index > 0) append("  ")
-        val start = length
-        appendInlineContent(segment.id)
-        append(" ")
-        append(segment.text.orEmpty())
-        addStyle(SpanStyle(color = segment.color), start, length)
-        segment.onClick?.let { onClick ->
-          addLink(
-            LinkAnnotation.Clickable(
-              tag = segment.id,
-              styles = TextLinkStyles(style = SpanStyle(color = segment.color)),
-            ) {
-              onClick()
-            },
-            start,
-            length,
-          )
-        }
-      }
-    }
-  }
 
   FlowRow(
     modifier = Modifier.fillMaxWidth(),
@@ -545,38 +468,17 @@ private fun InfoRow(
   ) {
     // 日期和时间仍使用单个富文本，统一字体度量，避免桌面端纯数字/英文文本高度不一致。
     BasicText(
-      text = annotatedText,
+      text = dateSegment.annotatedText + AnnotatedString("  ") + timeSegment.annotatedText,
       style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),
-      inlineContent = inlineContent,
-      maxLines = 1,
+      inlineContent = dateSegment.inlineContent + timeSegment.inlineContent,
     )
-    actionSegments.forEach { segment ->
-      InfoSegmentItem(segment)
+    listOf(repeatSegment, remindSegment).forEach {
+      BasicText(
+        text = it.annotatedText,
+        style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),
+        inlineContent = it.inlineContent,
+      )
     }
-  }
-}
-
-@Composable
-private fun InfoSegmentItem(segment: InfoTextSegment) {
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier.then(
-      if (segment.onClick != null) Modifier.clickableNoIndicator { segment.onClick.invoke() } else Modifier
-    )
-  ) {
-    Icon(
-      imageVector = segment.icon,
-      contentDescription = null,
-      modifier = Modifier.size(13.dp),
-    )
-    Spacer(modifier = Modifier.width(3.dp))
-    Text(
-      text = segment.text.orEmpty(),
-      fontSize = 13.sp,
-      lineHeight = 13.sp,
-      color = segment.color,
-      maxLines = 1,
-    )
   }
 }
 
@@ -586,193 +488,65 @@ private data class InfoTextSegment(
   val icon: ImageVector,
   val color: Color,
   val onClick: (() -> Unit)?,
-)
-
-/* ---------------- 时分滚轮（点时间段后替换备注区） ---------------- */
-
-@Composable
-private fun TimeWheelPane(
-  state: EditScheduleState,
 ) {
-  val colors = LocalAppColors.current
-  val now = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }
-  val startMin0 = state.startMinuteOfDay ?: (now.hour * 60 + now.minute)
-  val endMin0 = state.endMinuteOfDay ?: ((startMin0 + 60).coerceAtMost(23 * 60 + 59))
-  // 截止型：原本没有开始时间。提供一个开关在「时间段 / 仅截止」之间切换。
-  var deadlineOnly by remember { mutableStateOf(state.outputStartTime == null && state.outputEndTime != null) }
-
-  val startHour = remember { Animatable((startMin0 / 60).toFloat()) }
-  val startMinute = remember { Animatable((startMin0 % 60).toFloat()) }
-  val endHour = remember { Animatable((endMin0 / 60).toFloat()) }
-  val endMinute = remember { Animatable((endMin0 % 60).toFloat()) }
-  val hours = remember { (0..23).map { it.toString().padStart(2, '0') }.toPersistentList() }
-  val minutes = remember { (0..59).map { it.toString().padStart(2, '0') }.toPersistentList() }
-
-  Column(modifier = Modifier.fillMaxWidth()) {
-    // 时间段 / 截止 分段框框切换（沿用 todo cmp 的样式）。
-    ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { deadlineOnly = !it })
-    // 去掉「完成」按钮后，滚轮整体下移一点。
-    Spacer(modifier = Modifier.height(12.dp))
-    Row(
-      modifier = Modifier.fillMaxWidth().height(100.dp),
-      horizontalArrangement = Arrangement.Center,
-      verticalAlignment = Alignment.CenterVertically,
+  // icon
+  val inlineContent = mapOf(
+    id to InlineTextContent(
+      placeholder = Placeholder(
+        width = 13.sp,
+        height = 13.sp,
+        placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+      ),
     ) {
-      if (deadlineOnly) {
-        // 截止型只有一个滚轮：居中、占一半宽度，避免背景铺满整行显得太宽。
-        WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.fillMaxWidth(0.5f))
-      } else {
-        WheelPair(hours, minutes, startHour, startMinute, modifier = Modifier.weight(1f))
-        Text("—", modifier = Modifier.padding(horizontal = 8.dp), color = colors.tvLv2)
-        WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.weight(1f))
-      }
-    }
-  }
-
-  // 滚轮值（及 截止/时间段 切换）实时写回 state：顶部「返回」← 收起即生效，无需单独「完成」按钮。
-  LaunchedEffect(deadlineOnly) {
-    snapshotFlow {
-      listOf(
-        startHour.value.roundToInt(), startMinute.value.roundToInt(),
-        endHour.value.roundToInt(), endMinute.value.roundToInt(),
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        modifier = Modifier.size(13.dp)
       )
-    }.collect {
-      val date = state.anchorDate
-      val eH = endHour.value.roundToInt().coerceIn(0, 23)
-      val eM = endMinute.value.roundToInt().coerceIn(0, 59)
-      state.endTime = formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, eH, eM)
-      state.startTime = if (deadlineOnly) {
-        "" // 截止型：清空开始
-      } else {
-        val sH = startHour.value.roundToInt().coerceIn(0, 23)
-        val sM = startMinute.value.roundToInt().coerceIn(0, 59)
-        formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, sH, sM)
-      }
+    }
+  )
+
+  // 富文本
+  val annotatedText = buildAnnotatedString {
+    val start = length
+    appendInlineContent(id)
+    append(" ")
+    append(text.orEmpty())
+    addStyle(SpanStyle(color = color), start, length)
+    onClick?.let { onClick ->
+      addLink(
+        LinkAnnotation.Clickable(
+          tag = id,
+          styles = TextLinkStyles(style = SpanStyle(color = color)),
+        ) {
+          onClick()
+        },
+        start,
+        length,
+      )
     }
   }
 }
 
-/** 时间段 / 截止 分段框框切换（紧凑胶囊，左对齐）。 */
-@Composable
-private fun ScheduleTimeTypeToggle(isInterval: Boolean, onChange: (Boolean) -> Unit) {
-  Row {
-    TimeTypeChip("时间段", selected = isInterval) { onChange(true) }
-    Spacer(modifier = Modifier.width(8.dp))
-    TimeTypeChip("截止", selected = !isInterval) { onChange(false) }
-  }
-}
 
+/** 多选/分段胶囊。 */
 @Composable
-private fun TimeTypeChip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun ToggleChip(text: String, selected: Boolean, fontSize: TextUnit = 13.sp, onClick: () -> Unit) {
   val colors = LocalAppColors.current
   val accent = colors.positive
   Text(
     text = text,
+    fontSize = fontSize,
     textAlign = TextAlign.Center,
-    fontSize = 12.sp,
-    color = if (selected) accent else colors.tvLv3.copy(alpha = 0.5f),
+    color = if (selected) accent else colors.tvLv3.copy(alpha = 0.6f),
     modifier = Modifier
-      .border(
-        1.dp,
-        if (selected) accent else colors.tvLv3.copy(alpha = 0.15f),
-        RoundedCornerShape(6.dp)
-      )
-      .background(
-        if (selected) accent.copy(alpha = 0.1f) else Color.Transparent,
-        RoundedCornerShape(6.dp)
-      )
-      .clickableNoIndicator(onClick = onClick)
-      .padding(horizontal = 14.dp, vertical = 5.dp),
+      .border(1.dp, if (selected) accent else colors.tvLv3.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+      .background(if (selected) accent.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(6.dp))
+      .clickable(onClick = onClick)
+      .padding(horizontal = 10.dp, vertical = 5.dp),
   )
 }
 
-@Composable
-private fun WheelPair(
-  hours: kotlinx.collections.immutable.ImmutableList<String>,
-  minutes: kotlinx.collections.immutable.ImmutableList<String>,
-  hourLine: Animatable<Float, *>,
-  minuteLine: Animatable<Float, *>,
-  modifier: Modifier = Modifier,
-) {
-  val colors = LocalAppColors.current
-  @Suppress("UNCHECKED_CAST")
-  Row(modifier = modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-    WheelSelectCompose(
-      selectedLine = hourLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-      options = hours, modifier = Modifier.weight(1f).fillMaxHeight(),
-    )
-    Text(":", fontSize = 16.sp, color = colors.tvLv2)
-    WheelSelectCompose(
-      selectedLine = minuteLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-      options = minutes, modifier = Modifier.weight(1f).fillMaxHeight(),
-    )
-  }
-}
-
-/* ---------------- 提前提醒选择（内联滚轮） ---------------- */
-
-/**
- * 提前提醒：「不提醒 / 提前」分段 + 滚轮设「提前 N 分钟/小时」。
- * [current] 为 remindMinutes（-1 不提醒；整小时存为 N*60）。改动实时回调 [onChoose]。
- */
-@Composable
-private fun RemindInline(
-  current: Int,
-  onChoose: (Int) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val colors = LocalAppColors.current
-  val onChooseS = rememberUpdatedState(onChoose)
-  val isHour = current >= 60 && current % 60 == 0
-  val initN = (if (current < 0) 10 else if (isHour) current / 60 else current).coerceIn(1, 59)
-  val nLine = remember { Animatable((initN - 1).toFloat()) }
-  val unitLine = remember { Animatable((if (isHour) 1 else 0).toFloat()) } // 0=分钟,1=小时
-  val numbers = remember { (1..59).map { it.toString() }.toPersistentList() }
-  val units = remember { listOf("分钟", "小时").toPersistentList() }
-
-  Column(modifier = modifier.fillMaxWidth()) {
-    Row {
-      TimeTypeChip("不提醒", selected = current < 0) { onChoose(-1) }
-      Spacer(modifier = Modifier.width(8.dp))
-      TimeTypeChip("提醒", selected = current >= 0) { if (current < 0) onChoose(10) }
-    }
-    if (current >= 0) {
-      Spacer(modifier = Modifier.height(8.dp))
-      Row(
-        modifier = Modifier.fillMaxWidth().height(82.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Box(modifier = Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-          Text("提前", fontSize = 13.sp, color = colors.tvLv2)
-        }
-        OneWheel(numbers, nLine, modifier = Modifier.width(28.dp))
-        OneWheel(units, unitLine, modifier = Modifier.width(40.dp))
-      }
-      LaunchedEffect(Unit) {
-        snapshotFlow { nLine.value.roundToInt() to unitLine.value.roundToInt() }.collect { (n, u) ->
-          val v = (n + 1).coerceIn(1, 59)
-          onChooseS.value(if (u == 1) v * 60 else v)
-        }
-      }
-    }
-  }
-}
-
-/** 单列滚轮（与 [WheelPair] 同款，单列）。 */
-@Composable
-private fun OneWheel(
-  options: kotlinx.collections.immutable.ImmutableList<String>,
-  line: Animatable<Float, *>,
-  modifier: Modifier = Modifier,
-) {
-  @Suppress("UNCHECKED_CAST")
-  WheelSelectCompose(
-    selectedLine = line as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-    options = options,
-    modifier = modifier.fillMaxHeight(),
-  )
-}
 
 /* ---------------- 三态选择 ---------------- */
 
@@ -1002,10 +776,3 @@ private fun PreviewScheduleNew() {
   }
 }
 
-/** 把中文时间串的「日期」改写为 [date]，保留「时分」；空串/无法解析原样返回。 */
-private fun reanchorTimeString(time: String, date: Date): String {
-  if (time.isBlank()) return time
-  val parsed = com.cyxbs.pages.schedule.ui.timeline.parseScheduleDateTime(time) ?: return time
-  val min = parsed.minuteOfDay ?: 0
-  return formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, min / 60, min % 60)
-}
