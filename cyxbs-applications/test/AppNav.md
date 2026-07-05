@@ -236,6 +236,15 @@ object fields:
 
 ## :cyxbs-pages:schedule
 
+### schedule/edit
+
+- entry: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogPreview`
+- argument: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogNavArgument`
+
+```text
+deeplink: cyxbs://schedule/edit
+```
+
 ### schedule
 
 - entry: `com.cyxbs.pages.schedule.ui.main.ScheduleMainNavEntry`

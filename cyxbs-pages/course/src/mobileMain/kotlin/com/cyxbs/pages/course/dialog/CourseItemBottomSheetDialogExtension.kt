@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -20,7 +19,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.Stable
@@ -44,8 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.WindowInsetsRulers
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Dp
@@ -54,6 +50,7 @@ import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.Wrapper
+import com.cyxbs.components.utils.compose.imePaddingWithHeight
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
@@ -80,7 +77,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -198,56 +194,11 @@ private fun MobileCourseBottomSheetDialog(
     val height = 280.dp
     val imeOverlapHeight = remember { mutableIntStateOf(0) }
     Box(
-      modifier = Modifier.imePadding(imeOverlapHeight)
+      modifier = Modifier.imePaddingWithHeight(imeOverlapHeight.intValue)
     ) {
       ShowBeginFinalTime(state)
       CurrentItemShowTop(state)
       BottomSheet(state, height, imeOverlapHeight)
-    }
-  }
-}
-
-/**
- * @param overlapHeight 键盘最终状态与布局重叠的高度
- */
-@Composable
-private fun Modifier.imePadding(
-  overlapHeight: IntState,
-  onFraction: ((fraction: Float, imeOffset: Float) -> Unit)? = null
-): Modifier {
-  return if (overlapHeight.intValue == 0) imePadding()
-  else layout { measure, constraints ->
-    val placeable = measure.measure(constraints)
-    layout(placeable.width, placeable.height) {
-      val ime = WindowInsetsRulers.Ime
-      val animationProperties = ime.getAnimation(this)
-      if (animationProperties.isVisible) {
-        // 键盘可见
-        val height = placeable.height.toFloat()
-        val sourceBottom = animationProperties.source.bottom.current(height)
-        val currentBottom = ime.current.bottom.current(height)
-        if (animationProperties.isAnimating) {
-          // 键盘上升或下降动画中
-          val targetBottom = animationProperties.target.bottom.current(height)
-          val top = minOf(sourceBottom, targetBottom)
-          val bottom = maxOf(sourceBottom, targetBottom)
-          val imeHeight = bottom - top
-          val fraction = (bottom - currentBottom) / imeHeight
-          val offset = overlapHeight.intValue - imeHeight
-          onFraction?.invoke(fraction, offset)
-          placeable.place(x = 0, y = (offset * fraction).roundToInt())
-        } else {
-          // 键盘完全展开
-          val imeHeight = abs(sourceBottom - currentBottom)
-          val offset = overlapHeight.intValue - imeHeight
-          onFraction?.invoke(1F, offset)
-          placeable.place(x = 0, y = offset.roundToInt())
-        }
-      } else {
-        // 键盘不可见
-        onFraction?.invoke(0F, 0F)
-        placeable.place(x = 0, y = 0)
-      }
     }
   }
 }

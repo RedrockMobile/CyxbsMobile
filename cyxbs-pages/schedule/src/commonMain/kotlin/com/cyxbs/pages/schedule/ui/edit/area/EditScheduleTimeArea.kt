@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.wheel.WheelSelectCompose
-import com.cyxbs.pages.schedule.ui.edit.EditScheduleState
+import com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState
 import com.cyxbs.pages.schedule.ui.edit.ToggleChip
 import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
 import kotlinx.collections.immutable.toPersistentList
@@ -41,7 +41,7 @@ import kotlin.time.Clock
  */
 @Composable
 internal fun EditScheduleTimeArea(
-  state: EditScheduleState,
+  state: EditScheduleModelState,
 ) {
   val colors = LocalAppColors.current
   val now = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }

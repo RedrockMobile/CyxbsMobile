@@ -12,7 +12,7 @@ import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
 
 /** 保存：新建 / 按三态更新。 */
 suspend fun ScheduleSyncRepository.applyScheduleEdit(
-  state: EditScheduleState,
+  state: EditScheduleModelState,
   scope: EditScope,
   occurrenceDate: Date?,
 ) {

@@ -165,6 +165,10 @@ class CalendarState(
   // 是否允许垂直嵌套滑动
   var enableVerticalScroll: Boolean = true
 
+  // 折叠态下是否允许「惯性滑动(fling)」直接展开日历。
+  // 为 false 时，惯性甩到顶不会顺势展开，必须手动拖动(UserInput)才能展开（收起方向不受影响）。
+  var flingExpandFromCollapsed: Boolean = false
+
   // 日历日期视图的宽度，不包含其他东西
   internal var layoutWidth by mutableIntStateOf(0)
 
@@ -223,6 +227,7 @@ fun rememberCalendarState(
   startDate: Date = Date(1901, 1, 1),
   endDate: Date = Date(2099, 12, 31),
   today: () -> Date = { Today },
+  flingExpandFromCollapsed: Boolean = false, // 折叠态下是否允许惯性滑动直接展开日历
   onClick: ((Date) -> Unit)? = null,
 ): CalendarState {
   val coroutineScope = rememberCoroutineScope()
@@ -237,5 +242,8 @@ fun rememberCalendarState(
       onClick = onClick,
       today = today,
     )
-  }.apply { this.onClick = onClick }
+  }.apply {
+    this.onClick = onClick
+    this.flingExpandFromCollapsed = flingExpandFromCollapsed
+  }
 }

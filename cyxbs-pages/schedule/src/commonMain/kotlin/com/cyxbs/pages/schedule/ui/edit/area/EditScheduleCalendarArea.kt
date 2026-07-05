@@ -12,7 +12,7 @@ import com.cyxbs.components.view.calendar.CalendarDateCompose
 import com.cyxbs.components.view.calendar.WeekTextCompose
 import com.cyxbs.components.view.calendar.month.CalendarMonthCompose
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
-import com.cyxbs.pages.schedule.ui.edit.EditScheduleState
+import com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState
 import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
 
 /**
@@ -23,7 +23,7 @@ import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
  */
 @Composable
 internal fun EditScheduleCalendarArea(
-  state: EditScheduleState,
+  state: EditScheduleModelState,
 ) {
   val calendarState = rememberCalendarState(
     initialClickDate = state.anchorDate,

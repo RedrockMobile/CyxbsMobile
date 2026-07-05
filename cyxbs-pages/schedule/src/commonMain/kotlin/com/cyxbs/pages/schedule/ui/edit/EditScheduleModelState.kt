@@ -23,7 +23,7 @@ import com.cyxbs.pages.schedule.ui.timeline.parseScheduleDateTime
  * @param origin 编辑的原始日程（新建为 null），用作 [isChanged] 比较基准与重复 base（保留 exdate/overrides）。
  */
 @Stable
-class EditScheduleState(val origin: ScheduleEntity?) {
+class EditScheduleModelState(val origin: ScheduleEntity?) {
   val title = TextFieldState(origin?.title ?: "")
   val detail = TextFieldState(origin?.detail ?: "")
   var type by mutableStateOf(origin?.type ?: ScheduleEntity.TYPE_OTHER)
@@ -122,7 +122,7 @@ class EditScheduleState(val origin: ScheduleEntity?) {
   }
 }
 
-/** 按 [editSchedule] 记忆一份 [EditScheduleState]；切换编辑对象时重建。 */
+/** 按 [editSchedule] 记忆一份 [EditScheduleModelState]；切换编辑对象时重建。 */
 @Composable
-internal fun rememberEditScheduleState(editSchedule: ScheduleEntity?): EditScheduleState =
-  remember(editSchedule) { EditScheduleState(editSchedule) }
+internal fun rememberEditScheduleModelState(editSchedule: ScheduleEntity?): EditScheduleModelState =
+  remember(editSchedule) { EditScheduleModelState(editSchedule) }

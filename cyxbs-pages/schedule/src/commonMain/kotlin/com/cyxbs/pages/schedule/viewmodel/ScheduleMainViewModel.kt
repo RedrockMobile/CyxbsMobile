@@ -1,6 +1,5 @@
 package com.cyxbs.pages.schedule.viewmodel
 
-import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
@@ -8,10 +7,7 @@ import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /**
  * todo 主页面 ViewModel。
@@ -151,7 +147,7 @@ class ScheduleMainViewModel : BaseViewModel() {
    * @param occurrenceDate 编辑「重复系列某一次」时的锚点日期；编辑整条或新建可为 null。
    */
   fun saveSchedule(
-    state: com.cyxbs.pages.schedule.ui.edit.EditScheduleState,
+    state: com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState,
     scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
     occurrenceDate: com.cyxbs.components.config.time.Date?,
   ) {

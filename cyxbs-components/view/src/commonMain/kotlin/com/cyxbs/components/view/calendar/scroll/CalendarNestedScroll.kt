@@ -36,6 +36,12 @@ class CalendarNestedScroll(
     if (abs(available.y) > abs(available.x) &&
       (state.fraction == 0F && available.y > 0F || state.fraction == 1F && available.y < 0F)
     ) {
+      // 折叠态下若禁用惯性展开，则惯性(fling)来源不消费，需手动拖动(UserInput)才展开
+      if (state.fraction == 0F && available.y > 0F &&
+        !state.flingExpandFromCollapsed && source != NestedScrollSource.UserInput
+      ) {
+        return super.onPostScroll(consumed, available, source)
+      }
       return Offset(x = 0F, y = scrollBy(available.y))
     }
     return super.onPostScroll(consumed, available, source)
