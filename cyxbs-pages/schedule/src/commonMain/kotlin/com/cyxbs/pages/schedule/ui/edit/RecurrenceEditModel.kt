@@ -1,9 +1,11 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.pages.schedule.recurrence.Freq
 import com.cyxbs.pages.schedule.recurrence.RRule
 import com.cyxbs.pages.schedule.recurrence.Recurrence
+import com.cyxbs.pages.schedule.recurrence.RecurrenceEngine
 
 /**
  * 重复规则编辑器的「纯逻辑层」：把 UI 友好的 [RecurrenceDraft] 与领域模型 [RRule]/[Recurrence]
@@ -100,7 +102,7 @@ fun Recurrence?.toDraft(): RecurrenceDraft {
       r.count != null -> RepeatEndOption.COUNT
       else -> RepeatEndOption.NEVER
     },
-    count = r.count ?: 10,
+    count = r.count ?: 3,
     until = r.until,
   )
 }
@@ -119,6 +121,55 @@ fun RecurrenceDraft.toRecurrence(anchor: Date, base: Recurrence? = null): Recurr
     exdate = base?.exdate ?: emptyList(),
     overrides = base?.overrides ?: emptyList(),
   )
+}
+
+/** 按当前草稿规则计算从 [anchor] 到 [until]（含当天）的基础发生次数，用于 UNTIL 编辑态预览。 */
+fun RecurrenceDraft.countUntil(anchor: Date, until: Date): Int {
+  val rrule = copy(endOption = RepeatEndOption.UNTIL, until = until)
+    .toRRule(anchor)
+    ?.copy(count = null, until = until)
+    ?: return 0
+  return RecurrenceEngine.expandInRange(
+    recurrence = Recurrence(rrule = rrule),
+    anchorDate = anchor,
+    anchorStart = null,
+    anchorEnd = MinuteTime(0, 0),
+    rangeStart = anchor,
+    rangeEnd = until,
+  ).size
+}
+
+/** 当前草稿规则从 [anchor] 开始的第一次实际发生日期，用于限制 UNTIL 不能选到首次发生之前。 */
+fun RecurrenceDraft.firstOccurrenceOnOrAfter(anchor: Date): Date {
+  val rrule = copy(endOption = RepeatEndOption.COUNT, count = 1)
+    .toRRule(anchor)
+    ?.copy(count = null, until = null)
+    ?: return anchor
+  return RecurrenceEngine.expandInRange(
+    recurrence = Recurrence(rrule = rrule),
+    anchorDate = anchor,
+    anchorStart = null,
+    anchorEnd = MinuteTime(0, 0),
+    rangeStart = anchor,
+    rangeEnd = anchor.plusYears(100),
+  ).firstOrNull()?.date ?: anchor
+}
+
+/** 当前草稿规则按 [count] 次结束时的最后一次实际发生日期，用于 COUNT 编辑态预览。 */
+fun RecurrenceDraft.endDateAtCount(anchor: Date, count: Int = this.count): Date {
+  val safeCount = count.coerceAtLeast(1)
+  val rrule = copy(endOption = RepeatEndOption.COUNT, count = safeCount)
+    .toRRule(anchor)
+    ?.copy(count = safeCount, until = null)
+    ?: return anchor
+  return RecurrenceEngine.expandInRange(
+    recurrence = Recurrence(rrule = rrule),
+    anchorDate = anchor,
+    anchorStart = null,
+    anchorEnd = MinuteTime(0, 0),
+    rangeStart = anchor,
+    rangeEnd = anchor.plusYears(100),
+  ).lastOrNull()?.date ?: anchor
 }
 
 /**

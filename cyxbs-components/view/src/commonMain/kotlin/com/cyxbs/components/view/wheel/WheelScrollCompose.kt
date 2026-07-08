@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
@@ -62,61 +63,64 @@ fun WheelSelectCompose(
   onDragStart: (() -> Unit)? = null,
   onDragStopped: (() -> Unit)? = null,
 ) {
+  val selectedLineInternal by rememberUpdatedState(selectedLine)
+  val optionsInternal by rememberUpdatedState(options)
   val textStyleState = rememberUpdatedState(textStyle)
   val selectedTextSizeRatioState = rememberUpdatedState(selectedTextSizeRatio)
-  val itemProvider = remember(selectedLine, options) {
+  val itemProvider = rememberDerivedStateOfStructure {
+    // 如果不使用 DerivedStateOf，则在 options 发生由多变少时会导致崩溃
     WheelScrollItemProvider(
-      items = options,
+      items = optionsInternal,
       textStyle = textStyleState,
-      draggedLine = { selectedLine.value },
+      draggedLine = { selectedLineInternal.value },
       selectedTextSizeRatio = selectedTextSizeRatioState,
     )
   }
   val parentHeight = remember { mutableIntStateOf(0) }
-  val measurePolicy = remember(selectedLine, options) {
+  val measurePolicy = remember(options) {
     WheelScrollMeasurePolicy(
       items = options,
-      draggedLine = { selectedLine.value },
+      draggedLine = { selectedLineInternal.value },
       parentHeight = parentHeight,
     )
   }
-  var draggedOffset by remember { mutableFloatStateOf(0F) }
-  val channel = remember {
+  var draggedOffset by remember(selectedLine, options) { mutableFloatStateOf(0F) }
+  val channel = remember(selectedLine, options) {
     Channel<Float>(
       capacity = 1,
       onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
   }
-  remember(selectedLine, options) {
-    selectedLine.updateBounds(
-      lowerBound = maxOf(0F, selectedLine.lowerBound ?: 0F),
-      upperBound = minOf(options.size - 1F, selectedLine.upperBound ?: (options.size - 1F)),
+  remember(options) {
+    selectedLineInternal.updateBounds(
+      lowerBound = maxOf(0F, selectedLineInternal.lowerBound ?: 0F),
+      upperBound = minOf(options.size - 1F, selectedLineInternal.upperBound ?: (options.size - 1F)),
     )
   }
   var isDragging by remember { mutableStateOf(false) }
   LazyLayout(
-    itemProvider = remember<() -> LazyLayoutItemProvider> { { itemProvider } },
+    itemProvider = remember<() -> LazyLayoutItemProvider> { { itemProvider.value } },
     measurePolicy = measurePolicy,
     modifier = modifier.draggable(
       orientation = Orientation.Vertical,
       state = rememberDraggableState {
         val itemHeight = parentHeight.intValue / 3F
         draggedOffset = (draggedOffset - it)
-          .coerceIn(0F, itemHeight * (options.size - 1).coerceAtLeast(0))
+          .coerceIn(0F, itemHeight * (optionsInternal.size - 1).coerceAtLeast(0))
           .coerceIn(
-            selectedLine.lowerBound?.times(itemHeight),
-            selectedLine.upperBound?.times(itemHeight)
+            selectedLineInternal.lowerBound?.times(itemHeight),
+            selectedLineInternal.upperBound?.times(itemHeight)
           )
-        val value = (draggedOffset / itemHeight).coerceIn(0F, options.size - 1F)
+        val value = (draggedOffset / itemHeight).coerceIn(0F, optionsInternal.size - 1F)
         channel.trySend(value)
         onDrag?.invoke()
       },
       onDragStarted = {
         isDragging = true
         try {
-          selectedLine.stop()
+          selectedLineInternal.stop()
         } catch (e: CancellationException) { }
-        draggedOffset = selectedLine.value * (parentHeight.intValue / 3F)
+        draggedOffset = selectedLineInternal.value * (parentHeight.intValue / 3F)
         onDragStart?.invoke()
       },
       onDragStopped = { velocity ->
@@ -126,11 +130,11 @@ fun WheelSelectCompose(
             frictionMultiplier = 100F
           )
           val targetValue = decayAnimationSpec.calculateTargetValue(
-            initialValue = selectedLine.value,
+            initialValue = selectedLineInternal.value,
             initialVelocity = -velocity,
-          ).coerceIn(0F, options.size - 1F)
-            .coerceIn(selectedLine.lowerBound, selectedLine.upperBound)
-          selectedLine.animateTo(
+          ).coerceIn(0F, optionsInternal.size - 1F)
+            .coerceIn(selectedLineInternal.lowerBound, selectedLineInternal.upperBound)
+          selectedLineInternal.animateTo(
             targetValue = targetValue.roundToInt().toFloat(),
             animationSpec = tween(
               durationMillis = 300,
@@ -144,12 +148,12 @@ fun WheelSelectCompose(
       },
     ).clipToBounds(),
   )
-  LaunchedEffect(selectedLine) {
+  LaunchedEffect(Unit) {
     while (isActive) {
       val value = channel.receive()
       if (isDragging) {
         try {
-          selectedLine.snapTo(value)
+          selectedLineInternal.snapTo(value)
         } catch (e: CancellationException) {
         }
       }

@@ -348,6 +348,8 @@ private fun ScheduleContent(
     // 重复：内容较多，外层弹窗会增高；结束条件固定在底部，主体选择区内部滚动。
     ScheduleUi.Edit.Repeat -> EditScheduleRecurrenceArea(
       draft = modelState.recurrence,
+      anchorDate = modelState.anchorDate,
+      firstMonday = firstMonday,
       onChange = { modelState.recurrence = it },
       modifier = Modifier.fillMaxWidth(),
     )

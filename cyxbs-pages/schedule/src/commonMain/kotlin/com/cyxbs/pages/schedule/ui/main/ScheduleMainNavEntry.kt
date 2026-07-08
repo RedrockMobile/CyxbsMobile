@@ -102,6 +102,7 @@ fun SchedulePage(
 
   val calendarState = rememberCalendarState(
     initialClickDate = TodayNoEffect,
+    endDate = TodayNoEffect.plusYears(8).lastDate,
   )
   val clickDate = calendarState.clickDate
 

@@ -45,11 +45,12 @@ class ScheduleInfoRowTest {
     assertNull(weekOfTerm(firstMonday, firstMonday.plusWeeks(25)))
   }
 
-  /** 日期缩写「月.日」。 */
+  /** 日期：今年不显示年份，非今年显示年份后两位。 */
   @Test
   fun info_date_format() {
-    assertEquals("1.1", formatInfoDate(Date(2024, 1, 1)))
-    assertEquals("6.28", formatInfoDate(Date(2026, 6, 28)))
+    val today = Date(2026, 7, 8)
+    assertEquals("7月4日", formatInfoDate(Date(2026, 7, 4), today))
+    assertEquals("25年7月4日", formatInfoDate(Date(2025, 7, 4), today))
   }
 
   /** 星期中文（2024-01-01 为周一）。 */

@@ -3,10 +3,12 @@ package com.cyxbs.pages.schedule.ui.edit.area
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.view.calendar.CalendarCompose
 import com.cyxbs.components.view.calendar.CalendarDateCompose
 import com.cyxbs.components.view.calendar.WeekTextCompose
@@ -27,12 +29,8 @@ internal fun EditScheduleCalendarArea(
 ) {
   val calendarState = rememberCalendarState(
     initialClickDate = state.anchorDate,
-    onClick = { date ->
-      state.startTime = reanchorTimeString(state.startTime, date)
-      state.endTime = reanchorTimeString(state.endTime, date)
-    },
+    endDate = TodayNoEffect.plusYears(8).lastDate,
   )
-  LaunchedEffect(calendarState) { calendarState.expand() } // 默认展开整月
   CalendarCompose(
     modifier = Modifier.fillMaxWidth(),
     state = calendarState,
@@ -49,6 +47,13 @@ internal fun EditScheduleCalendarArea(
       }
     },
   )
+  LaunchedEffect(Unit) { calendarState.expand() } // 默认展开整月
+  LaunchedEffect(Unit) {
+    snapshotFlow { calendarState.clickDate }.collect { date ->
+      state.startTime = reanchorTimeString(state.startTime, date)
+      state.endTime = reanchorTimeString(state.endTime, date)
+    }
+  }
 }
 
 /** 把中文时间串的「日期」改写为 [date]，保留「时分」；空串/无法解析原样返回。 */

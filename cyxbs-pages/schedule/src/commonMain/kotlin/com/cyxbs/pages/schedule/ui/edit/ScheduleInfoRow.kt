@@ -1,6 +1,8 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.TodayNoEffect
+import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.schedule.recurrence.Freq
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 
@@ -11,15 +13,12 @@ import com.cyxbs.pages.schedule.recurrence.Recurrence
  * 文案缩写规则见各函数；不适用的段返回 null，由 UI 跳过不显示。
  */
 
-/** 一学期最多按 25 周算；超出即视作「不在当前学期」，只显示日期、不显示第N周。 */
-const val MAX_WEEK_OF_TERM = 25
-
 /**
  * 由开学第一天（周一）推导 [date] 的学期周数；不在学期内（开学前 / 超过 [maxWeek] / 未知开学日）返回 null。
  *
  * 与 [com.cyxbs.components.config.time.SchoolCalendar.getWeekOfTerm] 同口径：第1周从开学第一天起。
  */
-fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = MAX_WEEK_OF_TERM): Int? {
+fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = 30): Int? {
   if (firstMonday == null) return null
   val diff = firstMonday.daysUntil(date)
   if (diff < 0) return null
@@ -27,8 +26,13 @@ fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = MAX_WEEK_OF_TERM):
   return if (week in 1..maxWeek) week else null
 }
 
-/** 日期：`6月28日`。 */
-fun formatInfoDate(date: Date): String = "${date.monthNumber}月${date.dayOfMonth}日"
+/** 日期：今年显示 `7月4日`，非今年显示年份后两位，如 `25年7月4日`。 */
+fun formatInfoDate(date: Date, today: Date = TodayNoEffect): String = buildString {
+  if (date.year != today.year) {
+    append((date.year % 100).toString().padStart(2, '0')).append('年')
+  }
+  append(date.monthNumber).append('月').append(date.dayOfMonth).append('日')
+}
 
 /** 第N周：在学期内返回「第13周」，否则 null（不显示）。 */
 fun formatWeekOfTerm(firstMonday: Date?, date: Date): String? =

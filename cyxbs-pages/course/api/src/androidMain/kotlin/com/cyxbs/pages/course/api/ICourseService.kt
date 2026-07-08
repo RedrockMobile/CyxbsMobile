@@ -19,12 +19,11 @@ interface ICourseService {
     /**
      * 课表能显示的最大周数
      */
-    var maxWeek: Int = defaultSp.getInt("课表最大周数", 21)
-      private set
+    val maxWeek: Int
+      get() = CourseUtils.maxWeek
 
     fun setMaxWeek(maxWeek: Int) {
-      defaultSp.edit { putInt("课表最大周数", maxWeek) }
-      this.maxWeek = maxWeek
+      CourseUtils.setMaxWeek(maxWeek)
     }
   }
 

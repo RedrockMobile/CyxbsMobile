@@ -118,6 +118,55 @@ class RecurrenceEditModelTest {
     assertEquals(Freq.WEEKLY, out.rrule!!.freq)
   }
 
+  /** UNTIL 预览次数按基础 RRULE 展开，含截止当天。 */
+  @Test
+  fun countUntil_includes_until_date() {
+    val draft = RecurrenceDraft(freq = RepeatFreqOption.DAILY)
+    assertEquals(3, draft.countUntil(Date(2026, 7, 1), Date(2026, 7, 3)))
+  }
+
+  /** UNTIL 预览次数复用周多选与间隔规则。 */
+  @Test
+  fun countUntil_uses_weekly_byday_and_interval() {
+    val draft = RecurrenceDraft(
+      freq = RepeatFreqOption.WEEKLY,
+      interval = 2,
+      byDay = listOf(1, 3),
+    )
+    assertEquals(4, draft.countUntil(Date(2026, 7, 6), Date(2026, 7, 22)))
+  }
+
+  /** 第一次实际发生日期按周频率的已选星期顺延。 */
+  @Test
+  fun firstOccurrenceOnOrAfter_uses_weekly_byday() {
+    val draft = RecurrenceDraft(
+      freq = RepeatFreqOption.WEEKLY,
+      byDay = listOf(3),
+    )
+    assertEquals(Date(2026, 7, 8), draft.firstOccurrenceOnOrAfter(Date(2026, 7, 6)))
+  }
+
+  /** 第一次实际发生日期按月频率的已选日期顺延。 */
+  @Test
+  fun firstOccurrenceOnOrAfter_uses_monthly_bymonthday() {
+    val draft = RecurrenceDraft(
+      freq = RepeatFreqOption.MONTHLY,
+      byMonthDay = listOf(15),
+    )
+    assertEquals(Date(2026, 7, 15), draft.firstOccurrenceOnOrAfter(Date(2026, 7, 8)))
+  }
+
+  /** 按次数结束日期取第 count 次实际发生日期。 */
+  @Test
+  fun endDateAtCount_returns_last_count_occurrence() {
+    val draft = RecurrenceDraft(
+      freq = RepeatFreqOption.WEEKLY,
+      byDay = listOf(1, 3),
+      count = 4,
+    )
+    assertEquals(Date(2026, 7, 15), draft.endDateAtCount(Date(2026, 7, 6)))
+  }
+
   /** 标签：每2天。 */
   @Test
   fun labels_daily_interval() {
@@ -129,7 +178,7 @@ class RecurrenceEditModelTest {
   @Test
   fun labels_weekly_days() {
     val labels = buildRecurrenceLabels(Recurrence(rrule = RRule(freq = Freq.WEEKLY, byDay = listOf(1, 3))))
-    assertEquals(listOf("每周 周一、周三"), labels)
+    assertEquals(listOf("每周周一三"), labels)
   }
 
   /** 标签：每月 + 结束次数 两块。 */
