@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schedule.ui.edit.area
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,13 +21,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.wheel.WheelSelectCompose
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState
 import com.cyxbs.pages.schedule.ui.edit.ToggleChip
 import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -113,8 +115,8 @@ private fun ScheduleTimeTypeToggle(isInterval: Boolean, onChange: (Boolean) -> U
 
 @Composable
 private fun WheelPair(
-  hours: kotlinx.collections.immutable.ImmutableList<String>,
-  minutes: kotlinx.collections.immutable.ImmutableList<String>,
+  hours: ImmutableList<String>,
+  minutes: ImmutableList<String>,
   hourLine: Animatable<Float, *>,
   minuteLine: Animatable<Float, *>,
   modifier: Modifier = Modifier,
@@ -124,12 +126,29 @@ private fun WheelPair(
   Row(modifier = modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
     WheelSelectCompose(
       selectedLine = hourLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-      options = hours, modifier = Modifier.weight(1f).fillMaxHeight(),
+      options = hours,
+      modifier = Modifier.weight(1f).fillMaxHeight(),
     )
-    Text(":", fontSize = 16.sp, color = colors.tvLv2)
+    // 字体中的冒号字形并非相对数字的视觉中心对称，因此自行绘制以保证上下两点严格居中。
+    Canvas(modifier = Modifier.width(4.dp).height(14.dp)) {
+      val radius = 1.dp.toPx()
+      val offsetY = 3.dp.toPx()
+      val center = Offset(size.width / 2, size.height / 2)
+      drawCircle(
+        color = colors.tvLv2,
+        radius = radius,
+        center = center.copy(y = center.y - offsetY),
+      )
+      drawCircle(
+        color = colors.tvLv2,
+        radius = radius,
+        center = center.copy(y = center.y + offsetY),
+      )
+    }
     WheelSelectCompose(
       selectedLine = minuteLine as Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-      options = minutes, modifier = Modifier.weight(1f).fillMaxHeight(),
+      options = minutes,
+      modifier = Modifier.weight(1f).fillMaxHeight(),
     )
   }
 }

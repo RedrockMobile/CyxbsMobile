@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.layout.LazyLayoutItemProvider
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
@@ -42,7 +42,7 @@ class WheelScrollItemProvider(
       modifier = Modifier.fillMaxSize(),
       contentAlignment = Alignment.Center,
     ) {
-      BasicText(
+      Text(
         text = items[index],
         style = rememberDerivedStateOfStructure(index) {
           val unselected = textStyle.value

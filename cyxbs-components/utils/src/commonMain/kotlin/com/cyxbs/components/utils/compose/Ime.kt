@@ -1,8 +1,11 @@
 package com.cyxbs.components.utils.compose
 
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.focus.FocusEventModifierNode
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
@@ -95,15 +98,17 @@ private data object BringIntoViewFullBoundsElement :
   override fun update(node: BringIntoViewFullBoundsNode) {}
 }
 
-private class BringIntoViewFullBoundsNode : Modifier.Node(), BringIntoViewModifierNode, LayoutModifierNode {
+private class BringIntoViewFullBoundsNode : Modifier.Node(), BringIntoViewModifierNode, LayoutModifierNode,
+  FocusEventModifierNode {
 
   private val imeIsVisibleFlow = MutableStateFlow(false)
+  private val hasFocus = mutableStateOf(false)
 
   override fun onAttach() {
     super.onAttach()
     coroutineScope.launch {
       imeIsVisibleFlow.collect {
-        if (it) {
+        if (it && hasFocus.value) {
           // ime 首次弹起时需要手动 bringIntoView 一次
           // 因为在安卓上首次点击弹起键盘会直接使用光标的位置
           // 官方还没有完全切换为 BringIntoViewModifierNode
@@ -123,15 +128,23 @@ private class BringIntoViewFullBoundsNode : Modifier.Node(), BringIntoViewModifi
     bringIntoView()
   }
 
+  override fun onFocusEvent(focusState: FocusState) {
+    // onFocusEvent 比 ime 真正弹起要先触发
+    // 所以还是需要在 measure 中拿到 ime.getAnimation(this).isVisible 再去触发 bringIntoView()
+    hasFocus.value = focusState.hasFocus
+  }
+
   override fun MeasureScope.measure(
     measurable: Measurable,
     constraints: Constraints
   ): MeasureResult {
     val placeable = measurable.measure(constraints)
     return layout(placeable.width, placeable.height) {
-      val ime = WindowInsetsRulers.Ime
-      val animationProperties = ime.getAnimation(this)
-      imeIsVisibleFlow.value = animationProperties.isVisible
+      if (hasFocus.value) {
+        val ime = WindowInsetsRulers.Ime
+        val animationProperties = ime.getAnimation(this)
+        imeIsVisibleFlow.value = animationProperties.isVisible
+      }
       placeable.place(0, 0)
     }
   }
