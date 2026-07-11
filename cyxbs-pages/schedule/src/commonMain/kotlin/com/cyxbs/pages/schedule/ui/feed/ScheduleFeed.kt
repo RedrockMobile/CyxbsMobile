@@ -54,7 +54,7 @@ import org.jetbrains.compose.resources.stringResource
 fun ScheduleFeed(
   state: ScheduleFeedUiState,
   onCardClick: () -> Unit,
-  onItemClick: (Long) -> Unit,
+  onItemClick: (Long, Date?) -> Unit,
   onItemCheck: (Long, Date?) -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -107,7 +107,7 @@ private fun ScheduleFeedHint(text: String) {
 @Composable
 private fun ScheduleFeedItem(
   item: ScheduleFeedItemUi,
-  onItemClick: (Long) -> Unit,
+  onItemClick: (Long, Date?) -> Unit,
   onItemCheck: (Long, Date?) -> Unit,
 ) {
   val colors = LocalAppColors.current
@@ -148,7 +148,7 @@ private fun ScheduleFeedItem(
         modifier = Modifier
           .weight(1f)
           .padding(end = 15.dp)
-          .clickableSingle { onItemClick(item.id) },
+          .clickableSingle { onItemClick(item.id, item.recurrenceId) },
       )
     }
     if (item.timeText != null) {

@@ -8,6 +8,11 @@ useKtProvider() // api 模块服务提供
 useNavigation() // navigation 跳转
 
 kotlin {
+  android {
+    withDeviceTest {
+      instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+  }
   sourceSets {
     commonMain.dependencies {
       subprojects.forEach { implementation(it) }
@@ -26,6 +31,15 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
+    }
+    val androidDeviceTest by getting {
+      dependencies {
+        implementation(kotlin("test"))
+        implementation("androidx.test:core:1.7.0")
+        implementation("androidx.test:runner:1.7.0")
+        implementation("androidx.test:rules:1.7.0")
+        implementation("androidx.test.ext:junit:1.3.0")
+      }
     }
   }
 }

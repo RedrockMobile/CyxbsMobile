@@ -41,6 +41,7 @@ import com.cyxbs.components.view.calendar.layout.createCalendarContentOffsetMeas
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
+import com.cyxbs.pages.schedule.calendar.ScheduleCalendarAutoSync
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
@@ -90,6 +91,7 @@ fun SchedulePage(
   val colors = LocalAppColors.current
   val syncState by viewModel.syncState.collectAsState()
   val allSchedules by viewModel.allSchedules.collectAsState()
+  ScheduleCalendarAutoSync(allSchedules)
 
   LaunchedEffect(Unit) {
     viewModel.initialize()
@@ -99,6 +101,22 @@ fun SchedulePage(
   var showEdit by remember { mutableStateOf(false) }
   var editingEntity by remember { mutableStateOf<ScheduleEntity?>(null) }
   var editingDate by remember { mutableStateOf<Date?>(null) }
+  var consumedDeepLink by remember(argument.todoId, argument.recurrenceId) { mutableStateOf(false) }
+
+  /**
+   * Deep link 可能早于本地快照加载完成到达，因此等待目标 todo 出现在完整快照后再打开编辑弹窗。
+   * recurrenceId 保持原始 occurrence 锚点语义，直接传给三态编辑，不用它替换实体日期。
+   */
+  LaunchedEffect(argument.todoId, argument.recurrenceId, allSchedules) {
+    val todoId = argument.todoId ?: return@LaunchedEffect
+    if (consumedDeepLink) return@LaunchedEffect
+    allSchedules.firstOrNull { it.todoId == todoId }?.let { entity ->
+      editingEntity = entity
+      editingDate = argument.recurrenceId
+      showEdit = true
+      consumedDeepLink = true
+    }
+  }
 
   val calendarState = rememberCalendarState(
     initialClickDate = TodayNoEffect,
@@ -132,6 +150,7 @@ fun SchedulePage(
     Column(modifier = Modifier.fillMaxSize()) {
       ScheduleWeekHeader(
         clickDate = clickDate,
+        schedules = allSchedules,
         onBack = { argument.popBackStack() },
         onBackToday = { calendarState.updateClickDate(TodayNoEffect) },
       )

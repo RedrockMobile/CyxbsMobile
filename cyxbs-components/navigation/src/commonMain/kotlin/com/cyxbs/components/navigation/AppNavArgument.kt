@@ -79,7 +79,7 @@ fun AppNavArgument.encodeToUrl(): Uri {
     .scheme(AppScheme.SCHEME)
     .authority(segments.first()) // 第一段为 authority
     .apply {
-      // 其余端为 path
+      // 其余段为 path
       segments.drop(1).forEach { appendPath(it) }
     }
     .build()

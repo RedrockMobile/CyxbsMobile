@@ -44,9 +44,9 @@ internal actual fun PlatformMobileHomePage(
   val activity = LocalActivity.current as BaseActivity
   DisposableEffect(Unit) {
     // 处理 intent.action
-    execIntentAction(activity.intent, false, courseBottomNavViewModel)
+    execIntentAction(activity.intent, courseBottomNavViewModel)
     val onNewIntentListener = Consumer<Intent> { intent ->
-      execIntentAction(intent, true, courseBottomNavViewModel)
+      execIntentAction(intent, courseBottomNavViewModel)
     }
     activity.addOnNewIntentListener(onNewIntentListener)
     onDispose {
@@ -70,7 +70,6 @@ internal actual fun PlatformMobileHomePage(
 
 private fun execIntentAction(
   intent: Intent,
-  isNewIntent: Boolean,
   courseBottomNavViewModel: CourseBottomSheetViewModel,
 ) {
   when (intent.action) {
@@ -100,14 +99,13 @@ private fun execIntentAction(
       }
     }
   }
-  if (isNewIntent) {
-    val url = intent.data
-    if (url != null) {
-      runCatching {
-        AppScheme.jump(url.toString())
-      }.onFailure {
-        logg(it.stackTraceToString())
-      }
+  // data URI 在冷启动和 singleTask 的 onNewIntent 中都必须处理；否则系统日历首次唤起 App 只会停在主页。
+  val url = intent.data
+  if (url != null) {
+    runCatching {
+      AppScheme.jump(url.toString())
+    }.onFailure {
+      logg(it.stackTraceToString())
     }
   }
 }

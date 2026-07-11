@@ -35,6 +35,8 @@ import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.utils.get.Num2CN
+import com.cyxbs.pages.schedule.calendar.ScheduleCalendarSettingsButton
+import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -50,6 +52,7 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun ScheduleWeekHeader(
   clickDate: Date,
+  schedules: List<ScheduleEntity>,
   onBack: () -> Unit,
   onBackToday: () -> Unit,
   modifier: Modifier = Modifier,
@@ -111,6 +114,8 @@ fun ScheduleWeekHeader(
     }
 
     Spacer(modifier = Modifier.weight(1f))
+
+    ScheduleCalendarSettingsButton(schedules)
 
     AnimatedVisibility(
       visible = !isCurrentWeek,

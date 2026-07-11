@@ -42,7 +42,7 @@ actual object PlatformDiscoverFunctions : DiscoverFunctions() {
   }
 
   override fun clickTodo() {
-    ScheduleMainNavArgument.navigate()
+    ScheduleMainNavArgument().navigate()
     TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YZQD_ENTRY)
   }
 

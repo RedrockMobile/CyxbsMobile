@@ -251,7 +251,11 @@ deeplink: cyxbs://schedule/edit
 - argument: `com.cyxbs.pages.schedule.api.ScheduleMainNavArgument`
 
 ```text
-deeplink: cyxbs://schedule
+deeplink: cyxbs://schedule?todoId=[Long?]&recurrenceId=[Date?]
+object fields:
+  [recurrenceId]: Date? {
+    value: Int
+  }
 ```
 
 ## :cyxbs-pages:schoolcar

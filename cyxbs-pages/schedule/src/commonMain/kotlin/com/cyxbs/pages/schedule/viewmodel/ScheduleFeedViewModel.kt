@@ -53,12 +53,12 @@ class ScheduleFeedViewModel : BaseViewModel() {
 
   /** 点击整张卡片：跳转邮子清单主页 */
   fun onCardClick() {
-    ScheduleMainNavArgument.navigate()
+    ScheduleMainNavArgument().navigate()
   }
 
-  /** 点击某条待办标题：跳转邮子清单主页（详情页已并入主页底部弹窗，列表内点击该条即可编辑） */
-  fun onItemClick(id: Long) {
-    ScheduleMainNavArgument.navigate()
+  /** 点击某条待办标题：携带 todoId 与 occurrence 原始锚点，主页加载后直接打开统一编辑弹窗。 */
+  fun onItemClick(id: Long, recurrenceId: Date?) {
+    ScheduleMainNavArgument(todoId = id, recurrenceId = recurrenceId).navigate()
   }
 
   /** 勾选某条待办完成；重复型必须携带该次的原始 occurrence 锚点。 */
