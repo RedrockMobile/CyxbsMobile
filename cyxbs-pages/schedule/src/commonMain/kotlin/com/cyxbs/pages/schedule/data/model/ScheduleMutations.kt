@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schedule.data.model
 
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.pages.schedule.recurrence.OccurrenceStatus
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 import com.cyxbs.pages.schedule.recurrence.RecurrenceOverride
 
@@ -17,7 +18,7 @@ object ScheduleMutations {
     return r.rrule != null || r.rdate.isNotEmpty()
   }
 
-  /** 把某一次加入 EXDATE（删除/完成某一次）。 */
+  /** 把某一次加入 EXDATE（删除某一次）。 */
   fun addExdate(todo: ScheduleEntity, occurrenceDate: Date): ScheduleEntity {
     val rec = todo.recurrence ?: Recurrence()
     if (occurrenceDate in rec.exdate) return todo
@@ -27,9 +28,30 @@ object ScheduleMutations {
   /** 写入/替换某一次的 override（仅此次编辑）；按 recurrenceId 去重。 */
   fun applyOverride(todo: ScheduleEntity, patch: RecurrenceOverride): ScheduleEntity {
     val rec = todo.recurrence ?: Recurrence()
-    val overrides = rec.overrides.filterNot { it.recurrenceId == patch.recurrenceId } + patch
+    val old = rec.overrides.firstOrNull { it.recurrenceId == patch.recurrenceId }
+    val merged = if (patch.status == null && old?.status != null) patch.copy(status = old.status) else patch
+    val overrides = rec.overrides.filterNot { it.recurrenceId == patch.recurrenceId } + merged
     return todo.copy(recurrence = rec.copy(overrides = overrides))
   }
+
+  /** 更新某一次的状态；保留该 occurrence 已有的改期、时间和文案覆盖。 */
+  fun updateOccurrenceStatus(
+    todo: ScheduleEntity,
+    occurrenceDate: Date,
+    status: String?,
+  ): ScheduleEntity {
+    val rec = todo.recurrence ?: Recurrence()
+    val old = rec.overrides.firstOrNull { it.recurrenceId == occurrenceDate }
+    val updated = (old ?: RecurrenceOverride(recurrenceId = occurrenceDate)).copy(
+      status = status,
+      cancelled = false,
+    )
+    return applyOverride(todo, updated)
+  }
+
+  /** 标记某一次已完成。 */
+  fun completeOccurrence(todo: ScheduleEntity, occurrenceDate: Date): ScheduleEntity =
+    updateOccurrenceStatus(todo, occurrenceDate, OccurrenceStatus.COMPLETED)
 
   /**
    * 「此次及后续」中对原系列的截断：UNTIL 设到 [occurrenceDate] 前一天、清空 count，

@@ -32,7 +32,7 @@ fun buildOccurrenceOverride(
   val editedStart = ScheduleOccurrences.parseDateTime(edited.startTime)?.time
   val editedEnd = ScheduleOccurrences.parseDateTime(edited.endTime)?.time
   // 用户若把这一次挪到了别的日期：取编辑后主时间（开始优先，否则截止）的日期，与原锚点不同才算改期。
-  val newDate = ScheduleOccurrences.parseDateTime(edited.startTime ?: edited.endTime)?.date
+  val newDate = ScheduleOccurrences.parseDateTime(edited.startTime)?.date
     ?.takeIf { it != occurrenceDate }
   return RecurrenceOverride(
     recurrenceId = occurrenceDate,
@@ -55,7 +55,7 @@ fun buildOccurrenceOverride(
 fun buildFollowingSeries(edited: ScheduleEntity, occurrenceDate: Date): ScheduleEntity {
   val rule = edited.recurrence?.rrule
   return edited.copy(
-    startTime = reanchorDate(edited.startTime, occurrenceDate),
+    startTime = reanchorDate(edited.startTime, occurrenceDate) ?: "",
     endTime = reanchorDate(edited.endTime, occurrenceDate) ?: "",
     recurrence = rule?.let { Recurrence(rrule = it) },
   )

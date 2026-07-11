@@ -10,6 +10,7 @@ import com.cyxbs.components.config.time.MinuteTime
  * @param start 开始时间；null 表示截止型（只有一个时刻，课表上画标记线/点）
  * @param end 结束时间（截止型时即该时刻）
  * @param isOverridden 是否被 [RecurrenceOverride] 改写过
+ * @param status 该次 occurrence 的状态协议值；null 表示正常、未完成，未知值原样保留
  * @param recurrenceId 对应的原始系列锚点日期（override 改期后仍指向原锚点），
  *                     用于"仅此次/删此次"等按原始日期定位的操作
  */
@@ -18,5 +19,6 @@ data class Occurrence(
   val start: MinuteTime?,
   val end: MinuteTime,
   val isOverridden: Boolean,
+  val status: String?,
   val recurrenceId: Date,
 )

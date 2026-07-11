@@ -2,6 +2,7 @@ package com.cyxbs.pages.schedule.data.model
 
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.recurrence.Freq
+import com.cyxbs.pages.schedule.recurrence.OccurrenceStatus
 import com.cyxbs.pages.schedule.recurrence.RRule
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 import com.cyxbs.pages.schedule.recurrence.RecurrenceOverride
@@ -47,6 +48,32 @@ class ScheduleMutationsTest {
     val second = ScheduleMutations.applyOverride(first, RecurrenceOverride(recurrenceId = day, title = "B"))
     assertEquals(1, second.recurrence!!.overrides.size)
     assertEquals("B", second.recurrence!!.overrides.first().title)
+  }
+
+  @Test
+  fun complete_occurrence_preserves_existing_override() {
+    val day = Date(2026, 1, 12)
+    val e = entity(
+      Recurrence(
+        rrule = RRule(Freq.WEEKLY),
+        overrides = listOf(RecurrenceOverride(recurrenceId = day, title = "改后标题")),
+      )
+    )
+    val completed = ScheduleMutations.completeOccurrence(e, day)
+    val override = completed.recurrence!!.overrides.single()
+    assertEquals("改后标题", override.title)
+    assertEquals(OccurrenceStatus.COMPLETED, override.status)
+  }
+
+  @Test
+  fun apply_override_preserves_existing_status_when_patch_omits_it() {
+    val day = Date(2026, 1, 12)
+    val completed = ScheduleMutations.completeOccurrence(entity(Recurrence(RRule(Freq.WEEKLY))), day)
+    val edited = ScheduleMutations.applyOverride(
+      completed,
+      RecurrenceOverride(recurrenceId = day, detail = "新备注"),
+    )
+    assertEquals(OccurrenceStatus.COMPLETED, edited.recurrence!!.overrides.single().status)
   }
 
   // 验证 truncateBefore（此次及后续）：UNTIL 设为前一天、清空 count，并丢弃截断点之后的 rdate/exdate/override

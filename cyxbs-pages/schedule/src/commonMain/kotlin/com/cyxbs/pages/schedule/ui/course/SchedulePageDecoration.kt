@@ -14,6 +14,7 @@ import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleOccurrences
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
+import com.cyxbs.pages.schedule.recurrence.OccurrenceStatus
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
@@ -62,6 +63,7 @@ class SchedulePageDecoration(
         val list = ArrayList<ScheduleItemWhatTime>()
         todos.forEach { todo ->
           ScheduleOccurrences.expandInRange(todo, realBegin, rangeEnd).forEach { occ ->
+            if (occ.status == OccurrenceStatus.COMPLETED) return@forEach
             val start = occ.start ?: return@forEach // v1：仅时间段型上网格
             val page = courseFrame.getPage(occ.date) ?: return@forEach
             list += ScheduleItemWhatTime(

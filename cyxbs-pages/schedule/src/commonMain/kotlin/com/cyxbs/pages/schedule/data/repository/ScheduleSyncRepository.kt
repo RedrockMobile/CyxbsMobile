@@ -2,18 +2,19 @@ package com.cyxbs.pages.schedule.data.repository
 
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.network.ApiException
-import com.cyxbs.pages.schedule.data.local.SplitSettingsScheduleLocalDataSource
 import com.cyxbs.pages.schedule.data.local.ScheduleLocalDataSource
 import com.cyxbs.pages.schedule.data.local.ScheduleSettingsKeys
+import com.cyxbs.pages.schedule.data.local.SplitSettingsScheduleLocalDataSource
+import com.cyxbs.pages.schedule.data.model.LegacyRecurrenceMigration
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleLocalMeta
-import com.cyxbs.pages.schedule.data.model.SchedulePendingOperation
-import com.cyxbs.pages.schedule.data.model.LegacyRecurrenceMigration
 import com.cyxbs.pages.schedule.data.model.ScheduleMutations
 import com.cyxbs.pages.schedule.data.model.ScheduleOccurrences
+import com.cyxbs.pages.schedule.data.model.SchedulePendingOperation
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
 import com.cyxbs.pages.schedule.data.remote.IScheduleRemoteDataSource
 import com.cyxbs.pages.schedule.data.remote.ScheduleRemoteDataSource
@@ -218,7 +219,7 @@ class ScheduleSyncRepository(
         title = title,
         detail = detail,
         type = type,
-        startTime = startTime,
+        startTime = startTime ?: "",
         endTime = endTime ?: "",
         remindMode = remindMode,
         recurrence = recurrence,
@@ -289,30 +290,24 @@ class ScheduleSyncRepository(
   }
 
   /**
-   * 完成日程（RFC5545 语义）。
+   * 完成 todo。
    *
-   * - 单次（无重复）：直接删除。
-   * - 重复：把对应的那一次加入 EXDATE（不影响系列其余）。
+   * - 单次：更新实体级 [ScheduleEntity.isDone]，保留完成记录；
+   * - 重复：在对应 occurrence 的 override 中记录完成状态，不影响系列其余 occurrence。
    *
-   * @param occurrenceDate 被完成的那一次的「原始锚点日期」(occurrence.recurrenceId)；
-   *   重复型必须由 UI 传入；为 null 时回退为最近一次 occurrence。
+   * @param occurrenceDate 重复型必传该次的原始锚点日期 (occurrence.recurrenceId)。
    */
   suspend fun completeSchedule(todoId: Long, occurrenceDate: Date? = null) {
     syncMutex.withLock {
       val account = getCurrentAccount() ?: return
       val todo = localDataSource.getById(account, todoId)?.let(LegacyRecurrenceMigration::migrate) ?: return
-      if (!ScheduleMutations.isRecurring(todo)) {
-        localDataSource.deleteLocal(account, todoId, recordPending = true)
+      val updated = if (ScheduleMutations.isRecurring(todo)) {
+        val target = occurrenceDate ?: return
+        ScheduleMutations.completeOccurrence(todo, target)
       } else {
-        val target = occurrenceDate ?: firstUpcomingOccurrence(todo)
-        if (target == null) {
-          localDataSource.deleteLocal(account, todoId, recordPending = true)
-        } else {
-          val updated = ScheduleMutations.addExdate(todo, target)
-            .copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
-          localDataSource.upsertLocal(account, updated, recordPending = true)
-        }
-      }
+        todo.copy(isDone = 1)
+      }.copy(lastModifyTime = Clock.System.now().toEpochMilliseconds())
+      localDataSource.upsertLocal(account, updated, recordPending = true)
       reloadSchedules(account)
     }
     scheduleDebouncedSync()
@@ -393,12 +388,6 @@ class ScheduleSyncRepository(
     scheduleDebouncedSync()
   }
 
-  /** 取该日程从今天起最近一次 occurrence 的原始锚点日期，用于无指定时的完成回退。 */
-  private fun firstUpcomingOccurrence(todo: ScheduleEntity): Date? {
-    val today = Date.now()
-    return ScheduleOccurrences.expandInRange(todo, today, today.plusYears(1)).firstOrNull()?.recurrenceId
-  }
-
   /**
    * 清空当前账号所有本地数据。
    *
@@ -428,7 +417,7 @@ class ScheduleSyncRepository(
    */
   suspend fun isFirstUse(): Boolean {
     val account = getCurrentAccount() ?: return false
-    val settings = com.cyxbs.components.config.sp.AccountSettings.get(account)
+    val settings = AccountSettings.get(account)
     return !settings.getBoolean(ScheduleSettingsKeys.SP_SCHEDULE_CMP_FIRST_USE_DONE, false)
   }
 
@@ -437,7 +426,7 @@ class ScheduleSyncRepository(
    */
   suspend fun markFirstUseDone() {
     val account = getCurrentAccount() ?: return
-    val settings = com.cyxbs.components.config.sp.AccountSettings.get(account)
+    val settings = AccountSettings.get(account)
     settings.putBoolean(ScheduleSettingsKeys.SP_SCHEDULE_CMP_FIRST_USE_DONE, true)
   }
 

@@ -1,9 +1,13 @@
 package com.cyxbs.pages.schedule.viewmodel
 
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
+import com.cyxbs.pages.schedule.data.model.ScheduleMutations
+import com.cyxbs.pages.schedule.data.model.ScheduleOccurrences
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
+import com.cyxbs.pages.schedule.recurrence.OccurrenceStatus
 import com.cyxbs.pages.schedule.ui.feed.ScheduleFeedItemUi
 import com.cyxbs.pages.schedule.ui.feed.ScheduleFeedUiState
 import kotlin.time.Clock
@@ -57,20 +61,33 @@ class ScheduleFeedViewModel : BaseViewModel() {
     ScheduleMainNavArgument.navigate()
   }
 
-  /** 勾选某条待办完成：按重复提醒规则更新下次提醒或删除 */
-  fun onItemCheck(id: Long) {
+  /** 勾选某条待办完成；重复型必须携带该次的原始 occurrence 锚点。 */
+  fun onItemCheck(id: Long, recurrenceId: Date?) {
     launchByViewModelScope {
-      repository.completeSchedule(id)
+      repository.completeSchedule(id, recurrenceId)
     }
   }
 
-  /** 过滤未完成、非新手教程项（todoId > 3）的前 3 条，映射成 UI 状态 */
+  /** 过滤未完成、非新手教程项（todoId > 3）的前 3 条，映射成 UI 状态。 */
   private fun updateList(todos: List<ScheduleEntity>) {
-    val visible = todos.filter { it.isDone == 0 && it.todoId > 3 }.take(3)
+    val today = Date.now()
+    val visible = todos.asSequence()
+      .filter { it.isDone == 0 && it.todoId > 3 }
+      .mapNotNull { todo ->
+        if (!ScheduleMutations.isRecurring(todo)) {
+          todo.toFeedItemUi()
+        } else {
+          ScheduleOccurrences.expandInRange(todo, today, today.plusYears(1))
+            .firstOrNull { it.status != OccurrenceStatus.COMPLETED }
+            ?.let { todo.toFeedItemUi(it.recurrenceId) }
+        }
+      }
+      .take(3)
+      .toList()
     _uiState.value = if (visible.isEmpty()) {
       ScheduleFeedUiState.Empty
     } else {
-      ScheduleFeedUiState.Data(visible.map { it.toFeedItemUi() })
+      ScheduleFeedUiState.Data(visible)
     }
   }
 }
@@ -79,7 +96,7 @@ class ScheduleFeedViewModel : BaseViewModel() {
  * 把 [ScheduleEntity] 映射成 feed UI 模型，时间文案与超时判断逻辑搬自旧
  * androidMain `Schedule.toFeedItemUi()`。
  */
-private fun ScheduleEntity.toFeedItemUi(): ScheduleFeedItemUi {
+private fun ScheduleEntity.toFeedItemUi(recurrenceId: Date? = null): ScheduleFeedItemUi {
   val now = Clock.System.now().toEpochMilliseconds()
   val notify = remindMode.notifyDateTime
   // endTime 与 notifyDateTime 同时为空串则不展示时间行
@@ -97,7 +114,13 @@ private fun ScheduleEntity.toFeedItemUi(): ScheduleFeedItemUi {
     else -> 0L
   }
   val isOverTime = timeText != null && now > itemTime && itemTime != 0L
-  return ScheduleFeedItemUi(id = todoId, title = title, timeText = timeText, isOverTime = isOverTime)
+  return ScheduleFeedItemUi(
+    id = todoId,
+    recurrenceId = recurrenceId,
+    title = title,
+    timeText = timeText,
+    isOverTime = isOverTime,
+  )
 }
 
 /**

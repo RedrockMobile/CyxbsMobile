@@ -7,6 +7,7 @@ import com.cyxbs.pages.schedule.data.remote.ScheduleDeltaResponse
 import com.cyxbs.pages.schedule.data.remote.ScheduleListResponse
 import com.cyxbs.pages.schedule.data.remote.SyncTimeResponse
 import com.cyxbs.pages.schedule.recurrence.Freq
+import com.cyxbs.pages.schedule.recurrence.OccurrenceStatus
 import com.cyxbs.pages.schedule.recurrence.RRule
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 import com.cyxbs.pages.schedule.recurrence.RecurrenceOverride
@@ -67,7 +68,7 @@ class ScheduleSyncRepositoryTest {
     endTime: String = "2026年1月5日 09:00",
   ) = ScheduleEntity(
     todoId = id, title = "t$id", lastModifyTime = 0L,
-    recurrence = recurrence, startTime = startTime, endTime = endTime,
+    recurrence = recurrence, startTime = startTime ?: "", endTime = endTime,
   )
 
   // 验证新建：本地写入该 todo，并记录一条 UPSERT 待同步操作
@@ -84,24 +85,30 @@ class ScheduleSyncRepositoryTest {
     )
   }
 
-  // 验证完成单次（无重复）：直接删除
+  // 验证完成单次（无重复）：保留实体并更新 isDone
   @Test
-  fun complete_single_deletes() = runTest {
+  fun complete_single_updates_is_done() = runTest {
     val repo = newRepo()
     repo.createSchedule(title = "x")
     val id = repo.todos.value.first().todoId
     repo.completeSchedule(id)
-    assertNull(local.getById(TEST_STU_NUM, id))
+    assertEquals(1, local.getById(TEST_STU_NUM, id)?.isDone)
+    assertTrue(local.getPendingOperations(TEST_STU_NUM).any {
+      it.kind == SchedulePendingOperation.Kind.UPSERT && it.todo?.todoId == id
+    })
   }
 
-  // 验证完成重复的某一次：把该次加入 EXDATE，系列保留
+  // 验证完成重复的某一次：写入 occurrence 状态，系列保留且不写 EXDATE
   @Test
-  fun complete_recurring_adds_exdate() = runTest {
+  fun complete_recurring_updates_occurrence_status() = runTest {
     val repo = newRepo()
     repo.updateSchedule(entity(1, recurrence = Recurrence(RRule(Freq.WEEKLY))))
-    repo.completeSchedule(1, occurrenceDate = Date(2026, 1, 12))
+    val day = Date(2026, 1, 12)
+    repo.completeSchedule(1, occurrenceDate = day)
     val saved = local.getById(TEST_STU_NUM, 1)!!
-    assertTrue(Date(2026, 1, 12) in saved.recurrence!!.exdate)
+    assertEquals(OccurrenceStatus.COMPLETED, saved.recurrence!!.overrides.single().status)
+    assertTrue(saved.recurrence.exdate.isEmpty())
+    assertEquals(0, saved.isDone)
   }
 
   // 验证删除某一次（三态之"删此次"）：写入 EXDATE

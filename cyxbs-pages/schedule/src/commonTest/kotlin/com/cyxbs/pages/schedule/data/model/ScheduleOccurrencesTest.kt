@@ -52,7 +52,7 @@ class ScheduleOccurrencesTest {
   fun anchor_deadline_has_null_start() {
     val todo = ScheduleEntity(
       todoId = 1L, title = "t", lastModifyTime = 0L,
-      startTime = null, endTime = "2026年1月5日 09:00",
+      startTime = "", endTime = "2026年1月5日 09:00",
     )
     val (date, start, end) = ScheduleOccurrences.anchor(todo)!!
     assertEquals(Date(2026, 1, 5), date)

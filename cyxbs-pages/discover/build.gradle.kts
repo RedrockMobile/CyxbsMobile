@@ -15,7 +15,7 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(projects.cyxbsPages.todo.api)
+      implementation(projects.cyxbsPages.schedule.api)
       implementation(projects.cyxbsPages.sport.api)
       implementation(projects.cyxbsPages.volunteer.api)
       implementation(projects.cyxbsPages.electricity.api)

@@ -1,10 +1,13 @@
 package com.cyxbs.pages.schedule.viewmodel
 
 import com.cyxbs.components.base.ui.BaseViewModel
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncRepository
 import com.cyxbs.pages.schedule.data.repository.ScheduleSyncState
+import com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState
+import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
 import kotlinx.coroutines.flow.StateFlow
@@ -58,21 +61,6 @@ class ScheduleMainViewModel : BaseViewModel() {
 
       // 新手教程：首次使用且列表为空时插入引导 todo
       if (repository.isFirstUse() && repository.todos.value.isEmpty()) {
-        repository.createSchedule(
-          title = "长按可以拖动我哟",
-          detail = "这是邮子清单的入门引导",
-          type = ScheduleEntity.TYPE_OTHER,
-        )
-        repository.createSchedule(
-          title = "点击右下角 + 添加新的 todo",
-          detail = "支持设置截止时间、分类、重复提醒",
-          type = ScheduleEntity.TYPE_OTHER,
-        )
-        repository.createSchedule(
-          title = "点击查看代办详情，可以修改信息",
-          detail = "也可以左滑置顶或删除",
-          type = ScheduleEntity.TYPE_OTHER,
-        )
         repository.markFirstUseDone()
       }
     }
@@ -96,8 +84,8 @@ class ScheduleMainViewModel : BaseViewModel() {
     title: String,
     detail: String = "",
     type: String = ScheduleEntity.TYPE_OTHER,
-    startTime: String? = null,
-    endTime: String? = null,
+    startTime: String = "",
+    endTime: String = "",
     remindMode: ScheduleRemindMode = ScheduleRemindMode(),
   ) {
     launchByViewModelScope {
@@ -135,9 +123,9 @@ class ScheduleMainViewModel : BaseViewModel() {
   /**
    * 完成 todo。
    */
-  fun completeSchedule(todoId: Long) {
+  fun completeSchedule(todoId: Long, occurrenceDate: Date? = null) {
     launchByViewModelScope {
-      repository.completeSchedule(todoId)
+      repository.completeSchedule(todoId, occurrenceDate)
     }
   }
 
@@ -147,9 +135,9 @@ class ScheduleMainViewModel : BaseViewModel() {
    * @param occurrenceDate 编辑「重复系列某一次」时的锚点日期；编辑整条或新建可为 null。
    */
   fun saveSchedule(
-    state: com.cyxbs.pages.schedule.ui.edit.EditScheduleModelState,
-    scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
-    occurrenceDate: com.cyxbs.components.config.time.Date?,
+    state: EditScheduleModelState,
+    scope: EditScope,
+    occurrenceDate: Date?,
   ) {
     launchByViewModelScope {
       repository.applyScheduleEdit(state, scope, occurrenceDate)
@@ -161,8 +149,8 @@ class ScheduleMainViewModel : BaseViewModel() {
    */
   fun deleteScheduleScoped(
     todoId: Long,
-    scope: com.cyxbs.pages.schedule.ui.edit.EditScope,
-    occurrenceDate: com.cyxbs.components.config.time.Date?,
+    scope: EditScope,
+    occurrenceDate: Date?,
   ) {
     launchByViewModelScope {
       repository.applyScheduleDelete(todoId, scope, occurrenceDate)

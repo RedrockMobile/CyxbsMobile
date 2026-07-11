@@ -55,10 +55,10 @@ fun parseScheduleDateTime(raw: String?): ScheduleDateTime? {
 }
 
 /** 是否为「时间段类型」：同时存在开始与结束时间。 */
-fun ScheduleEntity.isInterval(): Boolean = !startTime.isNullOrBlank() && endTime.isNotBlank()
+fun ScheduleEntity.isInterval(): Boolean = startTime.isNotBlank() && endTime.isNotBlank()
 
 /** 是否为「未排期」：既没有开始时间也没有结束时间，无所属日期。 */
-fun ScheduleEntity.isUnscheduled(): Boolean = startTime.isNullOrBlank() && endTime.isBlank()
+fun ScheduleEntity.isUnscheduled(): Boolean = startTime.isBlank() && endTime.isBlank()
 
 /**
  * 该 todo 所属的日期：
@@ -115,7 +115,6 @@ internal fun DayTimedSchedule.isFullDay(): Boolean = isInterval && startMin <= 0
 internal fun timedSchedulesForDate(all: List<ScheduleEntity>, date: Date): List<DayTimedSchedule> {
   val result = ArrayList<DayTimedSchedule>()
   for (todo in all) {
-    if (todo.isDone == 1) continue
     if (!startTimeIsInterval(todo)) {
       // 截止类型
       val dt = parseScheduleDateTime(todo.endTime) ?: continue
@@ -147,7 +146,7 @@ internal fun timedSchedulesForDate(all: List<ScheduleEntity>, date: Date): List<
  */
 internal fun allDaySchedulesForDate(all: List<ScheduleEntity>, date: Date): List<ScheduleEntity> {
   return all.filter { todo ->
-    if (todo.isDone == 1 || todo.isUnscheduled()) return@filter false
+    if (todo.isUnscheduled()) return@filter false
     val owner = todo.ownerDate() ?: return@filter false
     if (owner != date) return@filter false
     // 没有任何时分才算「全天」
@@ -160,9 +159,9 @@ internal fun allDaySchedulesForDate(all: List<ScheduleEntity>, date: Date): List
   }
 }
 
-/** 全部未完成且未排期的待办（常驻「未排期」区，不随日期过滤）。 */
+/** 全部未排期的待办（常驻「未排期」区，不随日期过滤）。 */
 internal fun unscheduledSchedules(all: List<ScheduleEntity>): List<ScheduleEntity> {
-  return all.filter { it.isDone == 0 && it.isUnscheduled() }
+  return all.filter { it.isUnscheduled() }
 }
 
 /** 格式化时间字符串，对齐老端 `"yyyy年M月d日 HH:mm"`（时分补零）。 */

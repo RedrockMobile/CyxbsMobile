@@ -24,7 +24,7 @@ class EditScheduleScopeTest {
     recurrence: Recurrence? = null,
   ) = ScheduleEntity(
     todoId = 1L, title = title, detail = detail,
-    startTime = startTime, endTime = endTime, recurrence = recurrence, lastModifyTime = 0L,
+    startTime = startTime ?: "", endTime = endTime, recurrence = recurrence, lastModifyTime = 0L,
   )
 
   /** 「此次及后续」新系列：开始/结束的【日期】改写到 occurrenceDate，但保留各自【时分】。 */

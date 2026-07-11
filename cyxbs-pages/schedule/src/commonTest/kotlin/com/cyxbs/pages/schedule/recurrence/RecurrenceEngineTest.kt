@@ -157,6 +157,43 @@ class RecurrenceEngineTest {
     assertEquals(listOf(Date(2026, 1, 5), Date(2026, 1, 19)), dates)
   }
 
+  @Test
+  fun completed_override_keeps_occurrence_with_status() {
+    val day = Date(2026, 1, 12)
+    val r = Recurrence(
+      rrule = RRule(Freq.WEEKLY),
+      overrides = listOf(
+        RecurrenceOverride(
+          recurrenceId = day,
+          newDate = Date(2026, 1, 13),
+          status = OccurrenceStatus.COMPLETED,
+        )
+      ),
+    )
+    val occurrence = RecurrenceEngine.expandInRange(
+      r, mon, start, end, Date(2026, 1, 1), Date(2026, 1, 20),
+    ).first { it.recurrenceId == day }
+    assertEquals(Date(2026, 1, 13), occurrence.date)
+    assertEquals(OccurrenceStatus.COMPLETED, occurrence.status)
+  }
+
+  @Test
+  fun next_from_skips_completed_occurrence() {
+    val r = Recurrence(
+      rrule = RRule(Freq.WEEKLY),
+      overrides = listOf(
+        RecurrenceOverride(
+          recurrenceId = Date(2026, 1, 12),
+          status = OccurrenceStatus.COMPLETED,
+        )
+      ),
+    )
+    val next = RecurrenceEngine.nextFrom(
+      r, mon, start, end, from = MinuteTimeDate(2026, 1, 8, 8, 0),
+    )
+    assertEquals(Date(2026, 1, 19), next?.date)
+  }
+
   // 验证无 rrule/rdate 的单次日程：以锚点为唯一 occurrence；不在区间内则为空
   @Test
   fun single_event_uses_anchor() {

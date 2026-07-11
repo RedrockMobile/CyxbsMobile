@@ -16,9 +16,6 @@ import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProvider
 class TestApp : BaseApp() {
   override fun initProvider() {
     TestKtProviderInitializer.tryInitKtProvider()
-    appHandler.postDelayed({
-      AppScheme.jump("cyxbs://schedule/edit")
-    }, 3 * 1000)
   }
 }
 

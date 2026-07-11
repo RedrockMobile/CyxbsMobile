@@ -164,7 +164,7 @@ fun EditScheduleDialog(
   val doSave = {
     if (needScope) scopeChooser = ScopeAction.SAVE
     else {
-      onConfirm(modelState, EditScope.ALL); onDismiss()
+      onConfirm(modelState, EditScope.ALL)
     }
   }
   val doDelete = {
@@ -405,7 +405,8 @@ private fun TitleRightIcons(
       } else {
         val canSave = modelState.canConfirm
         Icon(
-          painter = rememberVectorPainter(Icons.Rounded.Check), contentDescription = "保存",
+          painter = rememberVectorPainter(Icons.Rounded.Check),
+          contentDescription = "保存",
           tint = if (canSave) colors.tvLv2 else colors.tvLv2.copy(alpha = 0.4f),
           modifier = Modifier.padding(start = 12.dp).clickableNoIndicator { if (canSave) onSave() },
         )
@@ -472,7 +473,7 @@ private fun InfoRow(
     val text = formatTimeRange(modelState.startMinuteOfDay, modelState.endMinuteOfDay)
     InfoTextSegment(
       id = "time",
-      text = text ?: if (editable) "设置时间" else null,
+      text = text ?: if (editable) "设置时间" else "未设置",
       icon = timeIcon,
       color = if (text == null) placeholderColor else colors.tvLv2,
       onClick = if (editable) onClickTime else null,

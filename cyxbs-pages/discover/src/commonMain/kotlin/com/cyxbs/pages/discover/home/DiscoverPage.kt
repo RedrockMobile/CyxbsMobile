@@ -66,8 +66,8 @@ import com.cyxbs.pages.discover.home.widget.MsgImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
 import com.cyxbs.pages.electricity.api.IElectricityService
+import com.cyxbs.pages.schedule.api.IScheduleService
 import com.cyxbs.pages.sport.api.ISportService
-import com.cyxbs.pages.todo.api.ITodoService
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_news_jwzx
@@ -405,7 +405,7 @@ private fun FeedSection() {
         .background(color = LocalAppColors.current.tvLv4)
     )
     // 邮子清单
-    ITodoService::class.impl().TodoFeed(Modifier.fillMaxWidth())
+    IScheduleService::class.impl().ScheduleFeed(Modifier.fillMaxWidth())
     Spacer(
       modifier = Modifier.fillMaxWidth().height(1.dp)
         .alpha(0.1F)

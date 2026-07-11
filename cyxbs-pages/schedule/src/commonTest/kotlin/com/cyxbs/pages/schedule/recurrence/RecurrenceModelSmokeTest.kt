@@ -1,6 +1,9 @@
 package com.cyxbs.pages.schedule.recurrence
 
+import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.time.Date
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -41,5 +44,19 @@ class RecurrenceModelSmokeTest {
     assertEquals(day, ov.recurrenceId)
     assertTrue(ov.cancelled)
     assertNull(ov.newDate)
+  }
+
+  @Test
+  fun override_status_round_trip_and_unknown_value() {
+    val override = RecurrenceOverride(
+      recurrenceId = Date(2026, 6, 28),
+      status = OccurrenceStatus.COMPLETED,
+    )
+    assertEquals(override, defaultJson.decodeFromString(defaultJson.encodeToString(override)))
+
+    val unknown = defaultJson.decodeFromString<RecurrenceOverride>(
+      """{"recurrence_id":"2026-06-28","status":"future_status"}"""
+    )
+    assertEquals("future_status", unknown.status)
   }
 }

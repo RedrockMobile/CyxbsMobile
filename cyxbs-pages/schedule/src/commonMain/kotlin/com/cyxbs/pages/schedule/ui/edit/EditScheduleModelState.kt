@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.pages.schedule.data.model.ScheduleEntity
+import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
 import com.cyxbs.pages.schedule.recurrence.Recurrence
 import com.cyxbs.pages.schedule.ui.timeline.ScheduleDateTime
 import com.cyxbs.pages.schedule.ui.timeline.parseScheduleDateTime
@@ -31,9 +32,7 @@ class EditScheduleModelState(val origin: ScheduleEntity?) {
   var endTime by mutableStateOf(origin?.endTime ?: "")
 
   // 新建默认优先「时间段」；编辑时按数据判断（有 startTime 为时间段）。
-  var isInterval by mutableStateOf(
-    if (origin == null) true else origin.startTime?.isNotBlank() == true,
-  )
+  var isInterval by mutableStateOf(origin?.startTime?.isNotBlank() ?: true,)
 
   // 重复规则草稿：编辑时从原 recurrence 反解，新建为「不重复」。
   var recurrence by mutableStateOf(origin?.recurrence.toDraft())
@@ -96,10 +95,10 @@ class EditScheduleModelState(val origin: ScheduleEntity?) {
     title = outputTitle,
     detail = outputDetail,
     type = type,
-    startTime = outputStartTime,
+    startTime = outputStartTime ?: "",
     endTime = outputEndTime ?: "",
     recurrence = outputRecurrence,
-    remindMode = base?.remindMode ?: com.cyxbs.pages.schedule.data.model.ScheduleRemindMode(),
+    remindMode = base?.remindMode ?: ScheduleRemindMode(),
     remindMinutes = remindMinutes,
     isDone = base?.isDone ?: 0,
     isPinned = base?.isPinned ?: 0,

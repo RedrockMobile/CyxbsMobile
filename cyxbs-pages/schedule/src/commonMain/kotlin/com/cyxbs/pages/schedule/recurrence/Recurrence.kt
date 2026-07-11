@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  *
  * - [rrule] 为 null 且 [rdate] 为空 表示单次日程（不重复）。
  * - [rrule] 规则型重复；[rdate] 额外枚举的散点日期；二者取并集。
- * - [exdate] 从展开结果中剔除的日期（删除某一次 / 完成某一次）。
+ * - [exdate] 从展开结果中剔除的日期（删除某一次）。
  * - [overrides] 对某一次的改写（仅此次编辑 / 移动单次）。
  */
 @Serializable
@@ -22,6 +22,16 @@ data class Recurrence(
 )
 
 /**
+ * 重复系列中单次 occurrence 的状态协议值。
+ *
+ * 持久化字段使用 String 而非 enum，使低版本客户端可以安全读取未来新增的状态值。
+ */
+object OccurrenceStatus {
+  const val COMPLETED = "completed"
+  const val CANCELLED = "cancelled"
+}
+
+/**
  * 对重复系列中某一次的改写，对应 RFC5545 的 RECURRENCE-ID 覆盖。
  *
  * @param recurrenceId 命中的原始 occurrence 日期（系列锚点意义上的那一天）
@@ -30,7 +40,8 @@ data class Recurrence(
  * @param newEnd 改后的结束时间；null 表示不变
  * @param title 改后的标题；null 表示不变
  * @param detail 改后的备注；null 表示不变
- * @param cancelled 为 true 时等价于把该次加入 EXDATE（保留语义信息）
+ * @param status 该次 occurrence 的状态；null 表示正常、未完成
+ * @param cancelled 旧版取消字段；仅用于兼容历史数据，新数据使用 [status]
  */
 @Serializable
 data class RecurrenceOverride(
@@ -40,5 +51,6 @@ data class RecurrenceOverride(
   @SerialName("new_end") val newEnd: MinuteTime? = null,
   @SerialName("title") val title: String? = null,
   @SerialName("detail") val detail: String? = null,
+  @SerialName("status") val status: String? = null,
   @SerialName("cancelled") val cancelled: Boolean = false,
 )

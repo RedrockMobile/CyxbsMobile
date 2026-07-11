@@ -20,11 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,12 +53,10 @@ private val EventGap: Dp = 4.dp
 /** 整日块（当日/未排期，跨 0-24 点）单块的最大宽度。 */
 private val FullDayBlockMaxWidth: Dp = 96.dp
 
-/** 整日块整条（最右侧）占用的最大宽度上限——不占满事件区，给左侧有时刻事件留空间。 */
-private val FullDayStripMax: Dp = 132.dp
-
 /** N 个整日块占用的右侧条总宽：单块封顶 [FullDayBlockMaxWidth]，整条封顶 [FullDayStripMax]，块多则缩。 */
-private fun fullDayStripWidth(n: Int): Dp =
-  if (n <= 0) 0.dp else minOf(FullDayBlockMaxWidth * n, FullDayStripMax)
+private fun fullDayStripWidth(n: Int, totalWidth: Dp): Dp {
+  return if (n <= 0) 0.dp else minOf(FullDayBlockMaxWidth * n, totalWidth * 0.5F)
+}
 
 /**
  * 第三层时间轴的「当天」视图：左侧 00..24 灰色小时刻度，右侧按分钟摆放事件。
@@ -160,7 +160,6 @@ private fun EventArea(
   val fullDay = remember(timed) { timed.filter { it.isFullDay() } }
   val timedOnly = remember(timed) { timed.filterNot { it.isFullDay() } }
   val positions = remember(timedOnly) { layoutTimedSchedules(timedOnly) }
-  val stripWidth = fullDayStripWidth(fullDay.size)
 
   // middleBg + 8dp 圆角由父级固定卡片承载（不随滚动）；这里只画每小时一条淡参考线（随内容滚动），
   // 参考线只画在左侧有时刻区域（不穿过右侧整日条）。
@@ -171,6 +170,7 @@ private fun EventArea(
         val strokeWidth = 1.dp.toPx()
         val hourPx = HourHeight.toPx()
         val inset = EventGap.toPx()
+        val stripWidth = fullDayStripWidth(fullDay.size, size.width.toDp())
         val leftWidth = size.width - stripWidth.toPx()
         for (h in 1..23) {
           val y = hourPx * h
@@ -209,6 +209,7 @@ private fun EventArea(
     val width = constraints.maxWidth
     val totalHeightPx = TimelineHeight.roundToPx()
     val gapPx = EventGap.roundToPx()
+    val stripWidth = fullDayStripWidth(fullDay.size, width.toDp())
     val stripPx = stripWidth.roundToPx()
     val leftWidth = (width - stripPx).coerceAtLeast(0)
     val n = fullDay.size
@@ -286,7 +287,15 @@ private fun FullDayTitleOverlay(
 ) {
   Row(
     modifier = modifier
-      .width(fullDayStripWidth(fullDay.size))
+      .layout { measurables, constraints ->
+        // 仅占有一半的宽度
+        val width = constraints.maxWidth
+        val stripWidth = fullDayStripWidth(fullDay.size, width.toDp()).roundToPx()
+        val placeable = measurables.measure(constraints.copy(maxWidth = stripWidth))
+        layout(placeable.width, placeable.height) {
+          placeable.place(x = 0, y = 0)
+        }
+      }
       .padding(horizontal = EventGap),
     horizontalArrangement = Arrangement.spacedBy(EventGap),
   ) {

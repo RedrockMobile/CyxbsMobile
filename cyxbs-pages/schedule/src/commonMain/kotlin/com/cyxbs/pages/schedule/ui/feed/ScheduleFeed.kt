@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.utils.compose.clickableSingle
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_empty_notify
@@ -54,7 +55,7 @@ fun ScheduleFeed(
   state: ScheduleFeedUiState,
   onCardClick: () -> Unit,
   onItemClick: (Long) -> Unit,
-  onItemCheck: (Long) -> Unit,
+  onItemCheck: (Long, Date?) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -107,7 +108,7 @@ private fun ScheduleFeedHint(text: String) {
 private fun ScheduleFeedItem(
   item: ScheduleFeedItemUi,
   onItemClick: (Long) -> Unit,
-  onItemCheck: (Long) -> Unit,
+  onItemCheck: (Long, Date?) -> Unit,
 ) {
   val colors = LocalAppColors.current
   // 本地完成态：点击勾选圈后立即置灰（对齐旧版点击瞬间变色），动画结束再触发 onItemCheck
@@ -133,7 +134,7 @@ private fun ScheduleFeedItem(
         checked = checked,
         uncheckedColor = circleUncheckedColor,
         onClick = { checked = true },
-        onAnimEnd = { onItemCheck(item.id) },
+        onAnimEnd = { onItemCheck(item.id, item.recurrenceId) },
         modifier = Modifier.padding(start = 15.dp),
       )
       // 旧 XML 标题 marginStart 45dp = 圈 start 15dp + 圈 17dp + 13dp 间隔

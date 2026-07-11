@@ -29,15 +29,20 @@ suspend fun ScheduleSyncRepository.applyScheduleEdit(
     )
     return
   }
+  val newEntity = state.toEntity(origin)
+  if (state.origin == newEntity) {
+    // 完全相同无需修改
+    return
+  }
   when (scope) {
-    EditScope.ALL -> updateSchedule(state.toEntity(origin))
+    EditScope.ALL -> updateSchedule(newEntity)
     EditScope.THIS_ONLY -> if (occurrenceDate != null) editThisOccurrence(
       origin.todoId, occurrenceDate,
-      buildOccurrenceOverride(occurrenceDate, state.toEntity(origin), origin),
+      buildOccurrenceOverride(occurrenceDate, newEntity, origin),
     )
     EditScope.THIS_AND_FOLLOWING -> if (occurrenceDate != null) editThisAndFollowing(
       origin.todoId, occurrenceDate,
-      buildFollowingSeries(state.toEntity(origin), occurrenceDate),
+      buildFollowingSeries(newEntity, occurrenceDate),
     )
   }
 }

@@ -22,7 +22,10 @@ data class ScheduleEntity(
   /** todo 详情/备注，允许为空字符串。 */
   @SerialName("detail")
   val detail: String = "",
-  /** 是否已完成：0 未完成，1 已完成；保持 Int 是为了对齐后端协议。 */
+  /**
+   * 非重复 todo 的完成状态：0 未完成，1 已完成；保持 Int 是为了对齐后端协议。
+   * 重复系列中单次 occurrence 的完成状态记录在 [Recurrence.overrides]。
+   */
   @SerialName("is_done")
   val isDone: Int = 0,
   /** 提醒与重复规则，对应后端 `remind_mode`。 */
@@ -36,7 +39,7 @@ data class ScheduleEntity(
   val type: String = TYPE_OTHER,
   /** 开始时间字符串；新版本支持字段，与 end_time 一起表示时间段类型的 todo，不下发时表示截止类型 todo。 */
   @SerialName("start_time")
-  val startTime: String? = null,
+  val startTime: String = "",
   /** 截止时间字符串；第一阶段继续沿用旧端与后端的中文时间格式。 */
   @SerialName("end_time")
   val endTime: String = "",

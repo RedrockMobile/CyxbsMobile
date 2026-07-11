@@ -57,7 +57,8 @@ object RecurrenceEngine {
     val result = ArrayList<Occurrence>()
     for (date in base) {
       val ov = overrideMap[date]
-      if (ov?.cancelled == true) continue
+      val status = ov?.status ?: if (ov?.cancelled == true) OccurrenceStatus.CANCELLED else null
+      if (status == OccurrenceStatus.CANCELLED) continue
       val effectiveDate = ov?.newDate ?: date
       if (effectiveDate < rangeStart || effectiveDate > rangeEnd) continue
       result.add(
@@ -66,6 +67,7 @@ object RecurrenceEngine {
           start = ov?.newStart ?: anchorStart,
           end = ov?.newEnd ?: anchorEnd,
           isOverridden = ov != null,
+          status = status,
           recurrenceId = date,
         )
       )
@@ -90,6 +92,7 @@ object RecurrenceEngine {
     val rangeEnd = from.date.plusYears(horizonYears)
     val occurrences = expandInRange(recurrence, anchorDate, anchorStart, anchorEnd, from.date, rangeEnd)
     return occurrences
+      .filter { it.status != OccurrenceStatus.COMPLETED }
       .filter { MinuteTimeDate(it.date, it.start ?: it.end) >= from }
       .minByOrNull { MinuteTimeDate(it.date, it.start ?: it.end) }
   }
