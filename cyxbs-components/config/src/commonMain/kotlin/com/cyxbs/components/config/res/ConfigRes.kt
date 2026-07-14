@@ -30,4 +30,5 @@ object ConfigRes {
      *   决定要不要给 Text 设置 `fontFamily`，否则会回退到平台默认字体
      */
     fun impactFontFamily(): FontFamily? = platformImpactFontFamily()
+    fun impactMinFontFamily(): FontFamily? = platformImpactMinFontFamily()
 }

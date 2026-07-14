@@ -48,7 +48,7 @@ private fun SportConstraintSet.wh100vInfinity() {
         }
         constrain(sportImage){
             end.linkTo(parent.end,4.dp)
-            bottom.linkTo(detailTotal.bottom)
+            top.linkTo(topBar.bottom)
         }
         constrain(sportDetailRun){
             linkTo(start=parent.start,end = parent.end)

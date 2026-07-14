@@ -236,6 +236,15 @@ object fields:
 
 ## :cyxbs-pages:schedule
 
+### schedule/edit
+
+- entry: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogPreview`
+- argument: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogNavArgument`
+
+```text
+deeplink: cyxbs://schedule/edit
+```
+
 ### schedule
 
 - entry: `com.cyxbs.pages.schedule.ui.main.ScheduleMainNavEntry`
@@ -254,4 +263,15 @@ deeplink: cyxbs://schedule
 
 ```text
 deeplink: cyxbs://school_car
+```
+
+## :cyxbs-pages:sport
+
+### sport
+
+- entry: `com.cyxbs.pages.sport.ui.SportNavEntry`
+- argument: `com.cyxbs.pages.sport.api.SportNavArgument`
+
+```text
+deeplink: cyxbs://sport
 ```

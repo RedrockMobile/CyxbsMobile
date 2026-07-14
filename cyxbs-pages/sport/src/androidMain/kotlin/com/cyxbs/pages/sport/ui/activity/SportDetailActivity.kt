@@ -18,7 +18,6 @@ import com.cyxbs.components.utils.extensions.setOnDoubleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.sport.R
 import com.cyxbs.pages.sport.model.SportDetailBean
-import com.cyxbs.pages.sport.model.SportDetailRepository
 import com.cyxbs.pages.sport.ui.adapter.SportRvAdapter
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.scwang.smart.refresh.layout.SmartRefreshLayout
@@ -61,6 +60,7 @@ class SportDetailActivity : BaseActivity() {
     private val sportTvDetailAward by R.id.sport_tv_detail_award.view<TextView>()
     private val sportClDetailTop by R.id.sport_cl_detail_top.view<View>()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.sport_activity_sport_detail)
@@ -76,23 +76,11 @@ class SportDetailActivity : BaseActivity() {
             sportSrlDetailList.setEnableRefresh(true)
             sportSrlDetailList.setOnRefreshListener {
                 doIfLogin {
-                    SportDetailRepository.refresh() // 刷新数据
+
                 }
             }
         }
-        //添加数据（共享数据源已下沉 commonMain，改为收集 StateFlow）
-        SportDetailRepository.sportData.collectLaunch { result ->
-            sportSrlDetailList.finishRefresh()
-            if (result == null) {
-                showError()
-            } else result.onSuccess {
-                loadData(it)
-            }.onFailure {
-                if (!mIsHoliday) {
-                    showError()
-                }
-            }
-        }
+
     }
 
     /**

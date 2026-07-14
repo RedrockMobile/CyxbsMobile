@@ -6,3 +6,6 @@ import com.cyxbs.components.config.R
 
 internal actual fun platformImpactFontFamily(): FontFamily? =
   FontFamily(Font(R.font.impact))
+
+internal actual fun platformImpactMinFontFamily(): FontFamily? =
+  FontFamily(Font(R.font.impact_min))

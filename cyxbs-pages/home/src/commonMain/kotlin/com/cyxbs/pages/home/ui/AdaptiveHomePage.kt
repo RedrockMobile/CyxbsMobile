@@ -33,6 +33,7 @@ import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
+import com.cyxbs.components.navigation.NAV_SPORT
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.CourseNavArgument
@@ -81,7 +82,9 @@ private val itemList = listOf(
   ActionItem("日程编辑") {
     AppScheme.jump("cyxbs://schedule/edit")
   },
-
+  ActionItem("体育打卡") {
+    AppScheme.jump("cyxbs://$NAV_SPORT")
+  },
 
 
   // 退出登陆放到最后，其他测试页面放到上面👆

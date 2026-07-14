@@ -3,6 +3,7 @@ package com.cyxbs.pages.sport.service
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.cyxbs.pages.sport.api.ISportService
+import com.cyxbs.pages.sport.api.SportNavArgument
 import com.cyxbs.pages.sport.ui.SportFeed as SportFeedComposable
 import com.g985892345.provider.api.annotation.ImplProvider
 
@@ -24,4 +25,6 @@ object SportServiceImpl : ISportService {
   }
 }
 
-internal expect fun jumpSportDetail()
+internal fun jumpSportDetail() {
+  SportNavArgument.navigate()
+}

@@ -9,3 +9,5 @@ import androidx.compose.ui.text.font.FontFamily
  * - 其它平台暂未提供对应字体文件，返回 `null`
  */
 internal expect fun platformImpactFontFamily(): FontFamily?
+
+internal expect fun platformImpactMinFontFamily(): FontFamily?

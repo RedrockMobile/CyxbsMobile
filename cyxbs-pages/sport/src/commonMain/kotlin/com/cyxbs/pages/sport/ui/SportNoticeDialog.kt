@@ -24,9 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableSingle
-import com.cyxbs.pages.sport.model.SportNoticeRepository
+import com.cyxbs.pages.sport.viewModel.SportViewModel
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_notice_confirm
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_notice_load_fail
@@ -45,6 +46,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SportNoticeDialog(onDismiss: () -> Unit) {
   val colors = LocalAppColors.current
+  val viewModel: SportViewModel = viewModel()
   Dialog(onDismissRequest = onDismiss) {
     Column(
       modifier = Modifier
@@ -60,7 +62,7 @@ fun SportNoticeDialog(onDismiss: () -> Unit) {
         fontWeight = FontWeight.Bold,
       )
       AnimatedContent(
-        targetState = SportNoticeRepository.noticeData.collectAsStateWithLifecycle().value,
+        targetState = viewModel.noticeData.collectAsStateWithLifecycle(null).value,
       ) { result ->
         val notices = result?.getOrNull()
         when {
