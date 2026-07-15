@@ -57,6 +57,7 @@ private fun SportConstraintSet.wh100vInfinity() {
         constrain(sportRecord){
             linkTo(start = parent.start, end = parent.end)
             top.linkTo(sportDetailRun.bottom)
+            bottom.linkTo(parent.bottom)
         }
     }
 }

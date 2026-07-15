@@ -2,6 +2,7 @@ package com.cyxbs.components.config.res
 
 import androidx.compose.ui.text.font.FontFamily
 import cyxbsmobile.cyxbs_components.config.generated.resources.Res
+import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_404
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_circle_add
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_compose_app_logo
 import cyxbsmobile.cyxbs_components.config.generated.resources.config_ic_compose_back
@@ -21,6 +22,7 @@ object ConfigRes {
     fun configIcPlaceHolder() : DrawableResource = Res.drawable.config_ic_compose_place_holder
     fun configIcDefaultAvatar(): DrawableResource = Res.drawable.config_ic_default_avatar
     fun configIcCircleAdd(): DrawableResource = Res.drawable.config_ic_circle_add
+    fun configIc404(): DrawableResource = Res.drawable.config_ic_404
 
     /**
      * Impact 字体（用于电费、课时分数等数字强调样式）。

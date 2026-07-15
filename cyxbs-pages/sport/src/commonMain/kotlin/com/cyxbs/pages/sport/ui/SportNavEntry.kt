@@ -2,6 +2,7 @@ package com.cyxbs.pages.sport.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layoutId
@@ -37,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.res.ConfigRes
-import com.cyxbs.components.config.res.ConfigRes.impactMinFontFamily
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_SPORT
@@ -51,6 +50,8 @@ import com.cyxbs.pages.sport.widget.SportRecordUi
 import com.cyxbs.pages.sport.widget.currentTermText
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_award
+import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_holiday
+import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_no_data
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_not_valid
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_other
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_run
@@ -91,7 +92,12 @@ fun SportPage(argument: SportNavArgument) {
         SportImage(modifier = Modifier.layoutId(SportElement.SportImage), argument)
         SportDetailRun(modifier = Modifier.layoutId(SportElement.SportDetailRun), argument)
         if (state is SportDetailUiState.Content) {
-            SportRecord(modifier = Modifier.layoutId(SportElement.SportRecord), records = state.records)
+            SportRecord(
+                modifier = Modifier.layoutId(SportElement.SportRecord),
+                records = state.records
+            )
+        } else {
+            DetailHint(modifier = Modifier.layoutId(SportElement.SportRecord))
         }
     }
 }
@@ -108,7 +114,10 @@ private fun createConstraintSet(): ConstraintSet {
 }
 
 @Composable
-private fun TopBarCompose(modifier: Modifier = Modifier, argument: SportNavArgument) {
+private fun TopBarCompose(
+    modifier: Modifier = Modifier,
+    argument: SportNavArgument
+) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
@@ -148,7 +157,10 @@ private fun TopBarCompose(modifier: Modifier = Modifier, argument: SportNavArgum
 }
 
 @Composable
-private fun DetailTotalTitle(modifier: Modifier = Modifier, argument: SportNavArgument) {
+private fun DetailTotalTitle(
+    modifier: Modifier = Modifier,
+    argument: SportNavArgument
+) {
     Text(
         modifier = modifier
             .padding(start = 15.dp),
@@ -159,7 +171,10 @@ private fun DetailTotalTitle(modifier: Modifier = Modifier, argument: SportNavAr
 }
 
 @Composable
-private fun DetailTotal(modifier: Modifier = Modifier, argument: SportNavArgument) {
+private fun DetailTotal(
+    modifier: Modifier = Modifier,
+    argument: SportNavArgument
+) {
     val impactFontFamily = remember { ConfigRes.impactFontFamily() }
     val impactMinFontFamily = remember { ConfigRes.impactMinFontFamily() }
     val viewmodel: SportViewModel = viewModel()
@@ -203,7 +218,10 @@ private fun DetailTotal(modifier: Modifier = Modifier, argument: SportNavArgumen
 }
 
 @Composable
-private fun SportImage(modifier: Modifier = Modifier, argument: SportNavArgument) {
+private fun SportImage(
+    modifier: Modifier = Modifier,
+    argument: SportNavArgument
+) {
     Image(
         modifier = modifier
             .padding(start = 45.dp, top = 5.dp),
@@ -213,7 +231,10 @@ private fun SportImage(modifier: Modifier = Modifier, argument: SportNavArgument
 }
 
 @Composable
-private fun SportDetailRun(modifier: Modifier = Modifier, argument: SportNavArgument) {
+private fun SportDetailRun(
+    modifier: Modifier = Modifier,
+    argument: SportNavArgument
+) {
     val viewmodel: SportViewModel = viewModel()
     val sportUiState by viewmodel.uiState.collectAsStateWithLifecycle()
     Row(
@@ -319,7 +340,7 @@ private fun SportRecord(
             .clip(RoundedCornerShape(24.dp))
             .background(0xFFFBFCFF.dark(0xFF1D1D1D)),
 
-    ) {
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -402,7 +423,7 @@ private fun LabelItem(
                 painter = painterResource(Res.drawable.sport_ic_valid),
                 contentDescription = null,
             )
-        }else{
+        } else {
             Image(
                 modifier = Modifier
                     .padding(end = 15.dp),
@@ -442,7 +463,7 @@ private fun Info(
             content = type,
             drawableResource = if (type == "跑步") {
                 Res.drawable.sport_ic_run
-            }else{
+            } else {
                 Res.drawable.sport_ic_other
             }
         )
@@ -472,6 +493,53 @@ private fun InfoItem(
             text = content,
             fontSize = 14.sp,
             color = 0xFF697C9B.dark(0xFF606061)
+        )
+    }
+}
+
+@Composable
+private fun DetailHint(
+    modifier: Modifier = Modifier,
+) {
+    val viewModel: SportViewModel = viewModel()
+    val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    HintItem(
+        modifier = modifier,
+        drawableResource = when (state) {
+            is SportDetailUiState.Holiday -> Res.drawable.sport_ic_holiday
+            is SportDetailUiState.Empty -> Res.drawable.sport_ic_no_data
+            else -> ConfigRes.configIc404()
+        },
+        content = when (state) {
+            is SportDetailUiState.Holiday -> "大家都放假了，好好度假吧"
+            is SportDetailUiState.Empty -> "暂时还没有记录哦~"
+            else -> "数据错误"
+        }
+    )
+}
+
+@Composable
+private fun HintItem(
+    modifier: Modifier = Modifier,
+    drawableResource: DrawableResource,
+    content: String
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Image(
+            modifier = Modifier
+                .padding(bottom = 10.dp),
+            painter = painterResource(drawableResource),
+            contentDescription = null
+        )
+        Text(
+            modifier = Modifier,
+            text = content,
+            fontSize = 14.sp
         )
     }
 }
