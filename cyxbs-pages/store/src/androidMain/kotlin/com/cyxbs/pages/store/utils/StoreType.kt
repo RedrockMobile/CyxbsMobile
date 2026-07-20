@@ -39,7 +39,7 @@ class StoreType {
       when (task.title) {
         DAILY_SIGN.title -> {
 //          startActivity(MINE_CHECK_IN)
-          "${AppScheme.SCHEME}://${NAV_SIGN}"
+          AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
         }
         JOIN_FOOD.title-> {
           //startActivity(FOOD_ENTRY)

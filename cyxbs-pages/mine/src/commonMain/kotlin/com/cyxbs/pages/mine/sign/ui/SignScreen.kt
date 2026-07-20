@@ -36,10 +36,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.pages.mine.sign.widget.WeekSignProgress
 import com.cyxbs.pages.mine.sign.util.SignUtil
 import com.cyxbs.pages.mine.sign.viewmodel.SignComposeViewModel
 import com.cyxbs.pages.mine.sign.viewmodel.SignState
+import com.cyxbs.pages.mine.sign.widget.WeekSignProgress
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_back
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_bg_sign
