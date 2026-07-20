@@ -14,6 +14,7 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.config.route.DISCOVER_SPORT
 import com.cyxbs.components.utils.extensions.gone
+import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.setOnDoubleClickListener
 import com.cyxbs.components.utils.extensions.visible
 import com.cyxbs.pages.sport.R
@@ -22,6 +23,7 @@ import com.cyxbs.pages.sport.model.SportDetailRepository
 import com.cyxbs.pages.sport.ui.adapter.SportRvAdapter
 import com.g985892345.provider.api.annotation.KClassProvider
 import com.scwang.smart.refresh.layout.SmartRefreshLayout
+import kotlinx.coroutines.flow.collectLatest
 import java.util.Calendar
 
 /**
@@ -82,6 +84,7 @@ class SportDetailActivity : BaseActivity() {
         }
         //添加数据（共享数据源已下沉 commonMain，改为收集 StateFlow）
         SportDetailRepository.sportData.collectLaunch { result ->
+            logg("stop refresh")
             sportSrlDetailList.finishRefresh()
             if (result == null) {
                 showError()

@@ -9,6 +9,8 @@ import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.food.api.FoodNavArgument
 import com.cyxbs.pages.store.api.IStoreService.Task.DAILY_SIGN
@@ -36,7 +38,8 @@ class StoreType {
     fun jumpOtherUi(context: Context, task: StampCenter.Task) {
       when (task.title) {
         DAILY_SIGN.title -> {
-          startActivity(MINE_CHECK_IN)
+//          startActivity(MINE_CHECK_IN)
+          "${AppScheme.SCHEME}://${NAV_SIGN}"
         }
         JOIN_FOOD.title-> {
           //startActivity(FOOD_ENTRY)

@@ -209,6 +209,15 @@ deeplink: cyxbs://about
 deeplink: cyxbs://edit_info
 ```
 
+### sign
+
+- entry: `com.cyxbs.pages.mine.sign.ui.SignNavEntry`
+- argument: `com.cyxbs.pages.mine.sign.ui.SignNavArgument`
+
+```text
+deeplink: cyxbs://sign
+```
+
 ## :cyxbs-pages:notification
 
 ### dialog/notice
@@ -235,6 +244,15 @@ object fields:
 ```
 
 ## :cyxbs-pages:schedule
+
+### schedule/edit
+
+- entry: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogPreview`
+- argument: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogNavArgument`
+
+```text
+deeplink: cyxbs://schedule/edit
+```
 
 ### schedule
 

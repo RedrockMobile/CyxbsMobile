@@ -67,7 +67,7 @@ fun SportFeed(
   modifier: Modifier = Modifier,
   onJumpDetail: () -> Unit,
 ) {
-  val result by SportDetailRepository.sportData.collectAsStateWithLifecycle()
+  val result by SportDetailRepository.sportData.collectAsStateWithLifecycle(null)
   val accountState by IAccountService::class.impl().state.collectAsStateWithLifecycle()
   val isLogin = accountState is AccountState.Login
   val loginDialogState = rememberLoginDialogState()
