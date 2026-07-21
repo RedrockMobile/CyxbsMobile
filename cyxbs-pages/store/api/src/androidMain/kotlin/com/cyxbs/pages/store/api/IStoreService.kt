@@ -31,7 +31,7 @@ interface IStoreService {
   }
   
   enum class Task(val title: String, val type: TaskType) {
-    // 以下跳转到 module_qa 的 DailySignActivity
+    // 跳转到 KMP 签到页
     DAILY_SIGN("今日打卡", TaskType.BASE),
     
     //以下跳转到美食板块

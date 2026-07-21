@@ -37,7 +37,6 @@ class StoreType {
     fun jumpOtherUi(context: Context, task: StampCenter.Task) {
       when (task.title) {
         DAILY_SIGN.title -> {
-//          startActivity(MINE_CHECK_IN)
           AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
         }
 

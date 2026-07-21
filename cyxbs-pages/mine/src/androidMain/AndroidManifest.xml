@@ -22,9 +22,6 @@
             android:name="com.cyxbs.pages.mine.edit.AvatarPickerActivity"
             android:theme="@style/mine_AvatarPickerTheme" />
         <activity
-            android:name="com.cyxbs.pages.mine.page.sign.DailySignActivity"
-            android:launchMode="singleTop" />
-        <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait" />
     </application>

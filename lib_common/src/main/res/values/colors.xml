@@ -64,14 +64,6 @@ TODO 以后不要再把颜色写在这里面 ！！！
 
 
     <!--    我的-->
-    <!--    签到页面TextView颜色-->
-    <color name="common_blue_sign_text_color">#839BFA</color>
-    <!--    分割线颜色-->
-    <color name="common_sever_view_color">#BDCCE5</color>
-
-    <!--    按钮颜色-->
-    <color name="common_grey_button">#E1DFE0</color>
-    <color name="common_grey_button_text">#C3C0C1</color>
     <color name="common_grey_text">#C4C2C2</color>
 
     <!--    tab_layout颜色-->
@@ -84,21 +76,7 @@ TODO 以后不要再把颜色写在这里面 ！！！
     <color name="common_mine_about_text_color_blue">#0BCCF0</color>
     <!--    签到部分颜色-->
     <color name="common_mine_sign_btn_ripple">#0D47A1</color>
-    <color name="common_mine_sign_bg_grey">#E1E6F0</color>
-    <color name="common_mine_sign_divider_grey">#E1E6F0</color>
-    <color name="common_mine_sign_divider_blue">#3A35D2</color>
-    <color name="common_mine_sign_divider_blue_light">#B3E5FC</color>
-    <color name="common_mine_sign_integral_text">#4841E2</color>
-    <color name="common_mine_sign_ring_blue">#3A35D2</color>
-    <color name="common_mine_sign_ring_outside">#ffffff</color>
-    <color name="common_mine_sign_bubble_text_color">#A24841E2</color>
-    <color name="common_mine_sign_integral_text_background">#D4DAFF</color>
-    <color name="common_mine_sign_store_round_brown_background">#F8E2DF</color>
-    <color name="common_mine_sign_store_line">#E2EDFB</color>
-    <color name="common_mine_sign_store_item_tv_integral">#3A34D2</color>
-    <color name="common_mine_sign_store_item_bg">#F0F2FB</color>
     <color name="common_mine_sign_store_bg">#F8F9FC</color>
-    <color name="common_mine_sign_store_my_product_text_color">#FFA192</color>
 
     <!--    我的模块提问，回答，评论的颜色-->
     <color name="common_mine_list_item_tv_disappear_at">#6C84AB</color>

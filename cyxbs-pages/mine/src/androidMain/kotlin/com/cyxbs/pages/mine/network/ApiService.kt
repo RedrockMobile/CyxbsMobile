@@ -9,7 +9,6 @@ import com.cyxbs.pages.mine.network.model.ConfirmQuestion
 import com.cyxbs.pages.mine.network.model.Email
 import com.cyxbs.pages.mine.network.model.EmailCode
 import com.cyxbs.pages.mine.network.model.IdsGetCode
-import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.network.model.SecurityQuestion
 import com.mredrock.cyxbs.common.bean.RedrockApiStatus
 import com.mredrock.cyxbs.common.bean.RedrockApiWrapper
@@ -26,17 +25,6 @@ import retrofit2.http.POST
  * Created by zia on 2018/8/15.
  */
 interface ApiService:IApi {
-
-    /**
-     * 签到部分
-     */
-    @POST("/magipoke-intergral/QA/Integral/checkIn")
-    fun checkIn(): Observable<RedrockApiStatus>
-
-    //获取积分
-    @POST("/magipoke-intergral/QA/User/getScoreStatus")
-    fun getScoreStatus(): Observable<RedrockApiWrapper<ScoreStatus>>
-
 
     /**
      * 说明：修改密码模块的接口存在两种情况
@@ -206,4 +194,3 @@ interface ApiService:IApi {
     @POST("/user-secret/user/judge/origin")
     fun checkDefaultPassword(@Field("stu_num") stu_num: String): Observable<RedrockApiStatus>
 }
-
