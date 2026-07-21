@@ -6,6 +6,7 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.mine.sign.model.bean.SignStatus
 import com.cyxbs.pages.mine.sign.model.service.SignService
 import com.cyxbs.pages.mine.sign.util.SignUtil
+import com.cyxbs.pages.mine.sign.util.postDailySignTask
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,6 +29,9 @@ class SignComposeViewModel : BaseViewModel() {
   private val _signState: MutableStateFlow<SignState> = MutableStateFlow(SignState.UNSIGNED)
   val signState: StateFlow<SignState> get() = _signState.asStateFlow()
 
+  private val _isChecking: MutableStateFlow<Boolean> = MutableStateFlow(false)
+  val isChecking: StateFlow<Boolean> get() = _isChecking.asStateFlow()
+
   // 发送动画的事件
   private val _updateProgressEvent: MutableSharedFlow<SignEvent> = MutableSharedFlow(
     extraBufferCapacity = 1
@@ -42,65 +46,86 @@ class SignComposeViewModel : BaseViewModel() {
    * 刷新状态
    * @param animateLine 是否发送启动动画事件
    */
-  fun refreshScoreStatus(animateLine: Boolean = false) {
+  fun refreshScoreStatus(
+    animateLine: Boolean = false,
+    onRefreshSuccess: (() -> Unit)? = null,
+  ) {
     launchByViewModelScope {
-      runCatchingCoroutine {
-        SignService::class.impl().getSignStatus()
-      }.mapCatching {
-        it.data
-      }.getOrElse {
-        toast("获取积分失败，请稍后再试")
-        null
-      }?.let { signStatus ->
-        // 数据显示的是周日->周一，需要反转成周一->周日
-        _signStatus.value = signStatus.copy(
-          weekInfo = signStatus.weekInfo.reversed()
-        )
-        if (signStatus.canCheckIn && signStatus.isChecked) {
-          _signState.value = SignState.SIGNED
-        } else if (signStatus.canCheckIn && !signStatus.isChecked) {
-          _signState.value = SignState.UNSIGNED
-        } else {
-          _signState.value = SignState.INVOCATION
-        }
-
-        val todayIndex = SignUtil.getTodayOfWeek()
-        if (animateLine && todayIndex in 0..5) {
-          _updateProgressEvent.emit(
-            SignEvent.AnimateWeekLine(
-              index = todayIndex,
-              weekInfo = signStatus.weekInfo
-            )
-          )
-        }
-      }
+      refreshScoreStatusInternal(animateLine, onRefreshSuccess)
     }
   }
 
+  private suspend fun refreshScoreStatusInternal(
+    animateLine: Boolean = false,
+    onRefreshSuccess: (() -> Unit)? = null,
+  ): Boolean {
+    val result = runCatchingCoroutine {
+      SignService::class.impl().getSignStatus()
+    }.mapCatching {
+      it.throwApiExceptionIfFail()
+      it.data
+    }
+    if (result.isFailure) {
+      toast("获取积分失败，请稍后再试")
+      return false
+    }
+
+    val signStatus = result.getOrThrow()
+    // 数据显示的是周日->周一，需要反转成周一->周日
+    val uiSignStatus = signStatus.copy(
+      weekInfo = signStatus.weekInfo.reversed()
+    )
+    _signStatus.value = uiSignStatus
+    if (signStatus.canCheckIn && signStatus.isChecked) {
+      _signState.value = SignState.SIGNED
+    } else if (signStatus.canCheckIn && !signStatus.isChecked) {
+      _signState.value = SignState.UNSIGNED
+    } else {
+      _signState.value = SignState.INVOCATION
+    }
+
+    val todayIndex = SignUtil.getTodayOfWeek()
+    if (animateLine && todayIndex in 0..5) {
+      _updateProgressEvent.emit(
+        SignEvent.AnimateWeekLine(
+          index = todayIndex,
+          weekInfo = uiSignStatus.weekInfo
+        )
+      )
+    }
+    onRefreshSuccess?.invoke()
+    return true
+  }
+
   /**
-   * 执行签到
+  * 执行签到
    */
   fun checkIn() {
+    if (_isChecking.value) return
+    _isChecking.value = true
     launchByViewModelScope {
-      runCatchingCoroutine {
-        SignService::class.impl().checkIn()
-      }.onSuccess { response ->
-        when {
-          response.status == 405 -> {
-            toast("寒暑假不可签到")
-            refreshScoreStatus() // 保留旧版的重新请求，但不播动画
-          }
-
-          response.isSuccess() -> {
-            refreshScoreStatus(animateLine = true)
-          }
-
-          else -> {
-            toast("签到失败，请稍后再试")
+      try {
+        val result = runCatchingCoroutine {
+          SignService::class.impl().checkIn().also { response ->
+            if (response.status != 405) {
+              response.throwApiExceptionIfFail()
+            }
           }
         }
-      }.onFailure {
-        toast("签到失败，请稍后再试")
+        if (result.isFailure) {
+          toast("签到失败，请稍后再试")
+          return@launchByViewModelScope
+        }
+
+        val response = result.getOrThrow()
+        if (response.status == 405) {
+          toast("寒暑假不可签到")
+          refreshScoreStatusInternal()
+        } else if (refreshScoreStatusInternal(animateLine = true)) {
+          postDailySignTask()
+        }
+      } finally {
+        _isChecking.value = false
       }
     }
   }

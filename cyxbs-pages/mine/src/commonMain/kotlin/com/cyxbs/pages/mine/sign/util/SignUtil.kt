@@ -15,12 +15,14 @@ import kotlin.time.Clock
  */
 object SignUtil {
 
-  private val localDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+  private fun currentLocalDateTime() =
+    Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
 
   /**
    * 获取当前学年（比如2026-2027）
    */
   fun getYearPair(): String {
+    val localDateTime = currentLocalDateTime()
     val currentYear = localDateTime.year
     val currentMonth = localDateTime.month
     return if (currentMonth < Month.AUGUST) {
@@ -41,6 +43,7 @@ object SignUtil {
    * 获取当前是春季学期还是秋季学期
    */
   fun getSemesterOfTerm(): String {
+    val localDateTime = currentLocalDateTime()
     val isFirstSemester = localDateTime.month > Month.JULY
     return if (isFirstSemester) "秋" else "春"
   }
@@ -74,7 +77,7 @@ object SignUtil {
    * 获取当天星期几（星期一为0，星期天为6）
    */
   fun getTodayOfWeek(): Int {
-    return localDateTime.dayOfWeek.ordinal
+    return currentLocalDateTime().dayOfWeek.ordinal
   }
 
 }

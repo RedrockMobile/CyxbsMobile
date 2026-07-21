@@ -5,7 +5,6 @@ import com.cyxbs.components.config.route.DECLARE_ENTRY
 import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_VOLUNTEER
 import com.cyxbs.components.config.route.MAIN_ENTRY
-import com.cyxbs.components.config.route.MINE_CHECK_IN
 import com.cyxbs.components.config.route.QA_ENTRY
 import com.cyxbs.components.config.route.UFIELD_MAIN_ENTRY
 import com.cyxbs.components.config.service.startActivity
@@ -33,7 +32,7 @@ class StoreType {
     const val DRESS = 1 // 装扮
     const val GOODS = 0 // 邮货
   }
-  
+
   object Task { // 邮票中心首页的邮票任务, 在进度修改时要我们自己上传任务进度 (会涉及不同模块)
     fun jumpOtherUi(context: Context, task: StampCenter.Task) {
       when (task.title) {
@@ -41,25 +40,31 @@ class StoreType {
 //          startActivity(MINE_CHECK_IN)
           AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
         }
-        JOIN_FOOD.title-> {
+
+        JOIN_FOOD.title -> {
           //startActivity(FOOD_ENTRY)
           //因为新版本的Food页面是一个MainActivity的一个Compose页面，所以这里先跳转到MainActivity
           startActivity(MAIN_ENTRY)
           FoodNavArgument.navigate()
 
         }
-        JOIN_NOCLASS.title-> {
+
+        JOIN_NOCLASS.title -> {
           startActivity(DISCOVER_NO_CLASS)
         }
-        JOIN_DECLARE.title-> {
+
+        JOIN_DECLARE.title -> {
           startActivity(DECLARE_ENTRY)
         }
-        JOIN_QA.title->{
+
+        JOIN_QA.title -> {
           startActivity(QA_ENTRY)
         }
-        JOIN_UFIELD.title-> {
+
+        JOIN_UFIELD.title -> {
           startActivity(UFIELD_MAIN_ENTRY)
         }
+
         LOGIN_VOLUNTEER.title -> {
           startActivity(DISCOVER_VOLUNTEER)
         }
@@ -73,7 +78,7 @@ class StoreType {
       }
     }
   }
-  
+
   object ExchangeError { // 请求兑换时使用
     const val OTHER_ERROR = Int.MIN_VALUE // 其他错误, 乱打的数字防止出现重复
     const val NOT_ENOUGH_MONEY = 50000 // 钱不够

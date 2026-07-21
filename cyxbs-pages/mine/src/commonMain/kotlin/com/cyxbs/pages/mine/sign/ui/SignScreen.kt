@@ -172,6 +172,7 @@ fun SignContent(
   val viewmodel: SignComposeViewModel = viewModel()
   val signState = viewmodel.signState.collectAsStateWithLifecycle()
   val signStatus = viewmodel.signStatus.collectAsStateWithLifecycle()
+  val isChecking = viewmodel.isChecking.collectAsStateWithLifecycle()
   Surface(
     modifier = modifier
       .fillMaxWidth()
@@ -204,6 +205,7 @@ fun SignContent(
           modifier = Modifier.align(Alignment.CenterHorizontally),
           signStatus = signStatus
         )
+        val isSignEnabled = !isChecking.value && !signStatus.isChecked && signStatus.canCheckIn
         Button(
           modifier = Modifier
             .padding(top = 30.dp)
@@ -212,18 +214,20 @@ fun SignContent(
             .height(40.dp),
           shape = RoundedCornerShape(25.dp),
           colors = ButtonDefaults.buttonColors(
-            backgroundColor = if (signStatus.isChecked or !signStatus.canCheckIn) {
-              Color(0xFFE1DFE0)
-            } else {
+            backgroundColor = if (isSignEnabled) {
               Color(0xFF3D35E2)
-            },
-            contentColor = if (signStatus.isChecked or !signStatus.canCheckIn) {
-              Color(0xFFC3C0C1)
             } else {
+              Color(0xFFE1DFE0)
+            },
+            contentColor = if (isSignEnabled) {
               Color.White
-            }
+            } else {
+              Color(0xFFC3C0C1)
+            },
+            disabledBackgroundColor = Color(0xFFE1DFE0),
+            disabledContentColor = Color(0xFFC3C0C1),
           ),
-          enabled = (!signStatus.isChecked && signStatus.canCheckIn),
+          enabled = isSignEnabled,
           onClick = {
             viewmodel.checkIn()
           }

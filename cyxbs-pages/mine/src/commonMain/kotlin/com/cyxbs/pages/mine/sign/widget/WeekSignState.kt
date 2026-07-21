@@ -103,3 +103,17 @@ fun String.toWeekLineStates(
     }
   }
 }
+
+/**
+ * 根据本周今天之前的连续签到天数，计算今天可获得的积分。
+ */
+fun String.getTodayScore(
+  todayIndex: Int = SignUtil.getTodayOfWeek(),
+): Int {
+  var continuousSignedDays = 0
+  for (index in (todayIndex - 1) downTo 0) {
+    if (getOrNull(index) != '1') break
+    continuousSignedDays++
+  }
+  return intArrayOf(10, 15, 20, 25, 30, 30, 30)[continuousSignedDays]
+}

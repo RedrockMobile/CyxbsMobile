@@ -69,6 +69,10 @@ fun WeekSignProgress(
   val dayStates = remember(signStatus.weekInfo) {
     signStatus.weekInfo.toWeekDayStates()
   }
+  val todayIndex = SignUtil.getTodayOfWeek()
+  val todayScore = remember(signStatus.weekInfo, todayIndex) {
+    signStatus.weekInfo.getTodayScore(todayIndex)
+  }
 
   val greyColor = 0xFFE1E6F0.dark(0xFF5A5A5A)
   val blueColor = 0xFF3A35D2.dark(0xFF2CDEFF)
@@ -126,8 +130,8 @@ fun WeekSignProgress(
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
           // 仅今天显示气泡，其他列必须占同样高度
-          if (index == SignUtil.getTodayOfWeek()) {
-            SignScoreBubble(score = 10)
+          if (index == todayIndex) {
+            SignScoreBubble(score = todayScore)
           } else {
             Spacer(Modifier.height(bubbleHeight))
           }

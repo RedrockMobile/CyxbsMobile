@@ -27,7 +27,7 @@ object DiscoverNavPlatformImpl : DiscoverNavPlatform {
   }
 
   override fun jumpCheckIn() {
-    startActivity(MINE_CHECK_IN)
+    startActivity(MINE_CHECK_IN) // 已迁移至SignNavEntry
   }
 
   override fun jumpJwNewsList() {
