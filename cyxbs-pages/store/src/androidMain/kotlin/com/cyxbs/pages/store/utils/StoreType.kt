@@ -37,7 +37,9 @@ class StoreType {
     fun jumpOtherUi(context: Context, task: StampCenter.Task) {
       when (task.title) {
         DAILY_SIGN.title -> {
-          AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
+          if (AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")) {
+            startActivity(MAIN_ENTRY) // 还需要返回到主Activity
+          }
         }
 
         JOIN_FOOD.title -> {
