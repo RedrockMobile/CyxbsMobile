@@ -138,6 +138,7 @@ private fun TopBarCompose(argument: AboutNavArgument, modifier: Modifier = Modif
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 20.dp)
+                    .size(16.dp)
                     .clickableSingle {
                         argument.popBackStack()
                     }

@@ -32,7 +32,7 @@ import java.util.Calendar
  */
 @KClassProvider(clazz = Activity::class, name = DISCOVER_SPORT)
 class SportDetailActivity : BaseActivity() {
-    
+
     /**
      * RecyclerView的adapter
      */

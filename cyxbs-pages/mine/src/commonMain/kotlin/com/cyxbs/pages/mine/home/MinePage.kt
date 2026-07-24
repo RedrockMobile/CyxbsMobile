@@ -37,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.service.implOrNull
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.ImageAvatarCompose
@@ -316,7 +318,7 @@ private fun SignArea(
       .background(color = LocalAppColors.current.topBg, shape = shape)
       .clickableNoIndicator {
         loginDialogState.doIfLogin(function = "签到") {
-          platform?.jumpSign() ?: toast("暂不支持跳转")
+          AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
         }
       }
   ) {

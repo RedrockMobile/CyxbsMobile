@@ -49,6 +49,8 @@ import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
@@ -60,10 +62,10 @@ import com.cyxbs.pages.discover.home.viewmodel.DiscoverComposeViewModel
 import com.cyxbs.pages.discover.home.widget.BannerConfig
 import com.cyxbs.pages.discover.home.widget.CheckInImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionIndicator
+import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.InfiniteBanner
 import com.cyxbs.pages.discover.home.widget.JwNewsFlipper
 import com.cyxbs.pages.discover.home.widget.MsgImageVector
-import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
 import com.cyxbs.pages.electricity.api.IElectricityService
 import com.cyxbs.pages.sport.api.ISportService
@@ -77,8 +79,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 
 /* ---------------- 颜色（对齐 discover 模块原 light/dark） ---------------- */
 private val JwLabelBgColor @Composable get() = 0xFFAFD2FB.dark(0xFF5A5A5A) // discover_academic_online_colors_background
@@ -160,7 +162,7 @@ private fun Header() {
           .size(22.5.dp)
           .clickableNoIndicator {
             loginDialogState.doIfLogin(function = "签到") {
-              platform?.jumpCheckIn() ?: toast("暂不支持跳转")
+              AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
             }
           },
       )
@@ -186,6 +188,7 @@ private fun greetingText(): String {
       val dayText = if (dow == 7) "日" else Num2CN.number2ChineseNumber(dow)
       "第${Num2CN.number2ChineseNumber(nowWeek)}周 周$dayText"
     }
+
     monthNumber == 8 || monthNumber == 9 -> "欢迎新同学～"
     nowWeek !in 1..21 && isSummerVacationMonth -> "暑假快乐鸭"
     nowWeek !in 1..21 && !isSummerVacationMonth -> "寒假快乐鸭"

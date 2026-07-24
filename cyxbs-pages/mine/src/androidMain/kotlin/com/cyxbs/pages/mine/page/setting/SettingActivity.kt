@@ -42,7 +42,7 @@ class SettingActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.mine_activity_setting)
-        val toolbar = findViewById<JToolbar>(R.id.toolbar)
+        val toolbar = findViewById<JToolbar>(com.cyxbs.components.view.R.id.toolbar)
         //初始化toolbar
 
         toolbar.apply {

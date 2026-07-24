@@ -6,8 +6,7 @@ import kotlinx.serialization.Serializable
 /**
  * 签到状态（commonMain ktorfit 版）
  *
- * 由原 androidMain [com.cyxbs.pages.mine.network.model.ScoreStatus] 精简而来，
- * 只保留「我的」主页展示用到的两个字段。
+ * 仅保留「我的」主页展示用到的两个字段。
  */
 @Serializable
 data class SignStatusBean(
