@@ -9,16 +9,17 @@ object SportRepository {
 
     private val detailService = SportDetailApiService::class.impl()
 
-    private val noticeService =  SportNoticeApiService::class.impl()
+    private val noticeService = SportNoticeApiService::class.impl()
 
-    suspend fun getSportDetailData() : Result<SportDetailBean> {
+    suspend fun getSportDetailData(): Result<SportDetailBean> {
         return runCatchingCoroutine {
             detailService.getSportDetailData()
         }.mapCatching {
             it.data
         }
     }
-    suspend fun getSportNoticeData() : Result<List<NoticeItem>>{
+
+    suspend fun getSportNoticeData(): Result<List<NoticeItem>> {
         return runCatchingCoroutine {
             noticeService.getSportNoticeData()
         }.mapCatching {

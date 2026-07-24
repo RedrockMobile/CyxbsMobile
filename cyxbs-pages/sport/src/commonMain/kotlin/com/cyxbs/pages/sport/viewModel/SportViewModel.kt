@@ -1,24 +1,22 @@
 package com.cyxbs.pages.sport.viewModel
 
+import androidx.lifecycle.viewModelScope
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.SchoolCalendar
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
-import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.sport.model.NoticeItem
 import com.cyxbs.pages.sport.model.SportDetailBean
 import com.cyxbs.pages.sport.model.SportRepository
-import com.cyxbs.pages.sport.network.SportDetailApiService
-import com.cyxbs.pages.sport.network.SportNoticeApiService
 import com.cyxbs.pages.sport.widget.SportDetailUiState
 import com.cyxbs.pages.sport.widget.toDetailUiState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -34,24 +32,28 @@ class SportViewModel : BaseViewModel() {
     val uiState: StateFlow<SportDetailUiState> get() = _uiState
     private val _uiState = MutableStateFlow<SportDetailUiState>(SportDetailUiState.Loading)
 
-    private var isRefreshing = false
+    val _isRefreshing: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> get() = _isRefreshing.asStateFlow()
 
-    fun refresh(): Boolean {
-        if (isRefreshing) return false
+    fun refresh(isFirstLoading: Boolean = false): Boolean {
+        if (_isRefreshing.value) return false
 
-        isRefreshing = true
+        _isRefreshing.value = true
 
         val week = SchoolCalendar.getWeekOfTerm() ?: 22
-        appCoroutineScope.launch {
-            _uiState.value = SportDetailUiState.Loading
+        viewModelScope.launch {
+            if (isFirstLoading) {
+                _uiState.value = SportDetailUiState.Loading
+            }
             SportRepository.getSportDetailData()
                 .onSuccess { bean ->
                     _uiState.value = bean.toDetailUiState()
                 }
                 .onFailure {
                     _uiState.value = SportDetailUiState.Error
-                    logg("${it.stackTraceToString()}")}
-            isRefreshing = false
+                    logg("${it.stackTraceToString()}")
+                }
+            _isRefreshing.value = false
         }
 
         return true
@@ -61,11 +63,11 @@ class SportViewModel : BaseViewModel() {
         IAccountService::class.impl().state
             .onEach {
                 when (it) {
-                    is AccountState.Login -> refresh()
+                    is AccountState.Login -> refresh(isFirstLoading = true)
                     is AccountState.Logout -> _sportData.emit(null)
                     else -> Unit
                 }
-            }.launchIn(appCoroutineScope)
+            }.launchIn(viewModelScope)
     }
 
     init {
@@ -73,10 +75,10 @@ class SportViewModel : BaseViewModel() {
     }
 
     fun getNoticeInfo() {
-        appCoroutineScope.launch {
+        viewModelScope.launch {
             SportRepository.getSportNoticeData()
-                .onSuccess { _noticeData.emit(Result.success(it))}
-                .onFailure { _noticeData.emit(Result.failure(it))}
+                .onSuccess { _noticeData.emit(Result.success(it)) }
+                .onFailure { _noticeData.emit(Result.failure(it)) }
         }
     }
 }

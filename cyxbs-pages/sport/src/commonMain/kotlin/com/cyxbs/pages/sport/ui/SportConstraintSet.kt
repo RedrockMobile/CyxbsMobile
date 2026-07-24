@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintSetScope
+import androidx.constraintlayout.compose.Dimension
 
 enum class SportElement {
     TopBar,
@@ -38,26 +39,28 @@ private fun SportConstraintSet.wh100vInfinity() {
             linkTo(start = parent.start, end = parent.end)
             top.linkTo(parent.top, 16.dp)
         }
-        constrain(detailTotalTitle){
-            start.linkTo(parent.start,4.dp)
-            top.linkTo(topBar.bottom,4.dp)
+        constrain(detailTotalTitle) {
+            start.linkTo(parent.start, 4.dp)
+            top.linkTo(topBar.bottom, 4.dp)
         }
-        constrain(detailTotal){
-            start.linkTo(parent.start,16.dp)
+        constrain(detailTotal) {
+            start.linkTo(parent.start, 16.dp)
             top.linkTo(detailTotalTitle.bottom)
         }
-        constrain(sportImage){
-            end.linkTo(parent.end,4.dp)
+        constrain(sportImage) {
+            end.linkTo(parent.end, 4.dp)
             top.linkTo(topBar.bottom)
         }
-        constrain(sportDetailRun){
-            linkTo(start=parent.start,end = parent.end)
+        constrain(sportDetailRun) {
+            linkTo(start = parent.start, end = parent.end)
             top.linkTo(detailTotal.bottom)
         }
-        constrain(sportRecord){
+        constrain(sportRecord) {
             linkTo(start = parent.start, end = parent.end)
             top.linkTo(sportDetailRun.bottom)
             bottom.linkTo(parent.bottom)
+            height = Dimension.fillToConstraints
+            width = Dimension.fillToConstraints
         }
     }
 }

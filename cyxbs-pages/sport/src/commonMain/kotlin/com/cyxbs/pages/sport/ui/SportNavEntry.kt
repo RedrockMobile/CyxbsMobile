@@ -15,17 +15,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +50,9 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.sport.api.SportNavArgument
 import com.cyxbs.pages.sport.viewModel.SportViewModel
+import com.cyxbs.pages.sport.widget.RefreshHeader
+import com.cyxbs.pages.sport.widget.RefreshNestedScrollConnection
+import com.cyxbs.pages.sport.widget.RefreshState
 import com.cyxbs.pages.sport.widget.SportDetailUiState
 import com.cyxbs.pages.sport.widget.SportRecordUi
 import com.cyxbs.pages.sport.widget.currentTermText
@@ -91,14 +99,10 @@ fun SportPage(argument: SportNavArgument) {
         DetailTotal(modifier = Modifier.layoutId(SportElement.DetailTotal), argument)
         SportImage(modifier = Modifier.layoutId(SportElement.SportImage), argument)
         SportDetailRun(modifier = Modifier.layoutId(SportElement.SportDetailRun), argument)
-        if (state is SportDetailUiState.Content) {
-            SportRecord(
-                modifier = Modifier.layoutId(SportElement.SportRecord),
-                records = state.records
-            )
-        } else {
-            DetailHint(modifier = Modifier.layoutId(SportElement.SportRecord))
-        }
+        SportRecord(
+            modifier = Modifier.layoutId(SportElement.SportRecord),
+            state = state
+        )
     }
 }
 
@@ -248,7 +252,7 @@ private fun SportDetailRun(
                 .padding(start = 19.dp),
             title = "跑步:",
             done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> ""
+                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
                 is SportDetailUiState.Empty -> state.summary.runDone
                 is SportDetailUiState.Holiday -> state.summary.runDone
                 is SportDetailUiState.Content -> state.summary.runDone
@@ -266,7 +270,7 @@ private fun SportDetailRun(
                 .padding(start = 35.dp),
             title = "其他:",
             done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> ""
+                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
                 is SportDetailUiState.Empty -> state.summary.otherDone
                 is SportDetailUiState.Holiday -> state.summary.otherDone
                 is SportDetailUiState.Content -> state.summary.otherDone
@@ -284,7 +288,7 @@ private fun SportDetailRun(
                 .padding(start = 35.dp, end = 10.dp),
             title = "奖励:",
             done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> ""
+                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
                 is SportDetailUiState.Empty -> state.summary.award
                 is SportDetailUiState.Holiday -> state.summary.award
                 is SportDetailUiState.Content -> state.summary.award
@@ -331,28 +335,82 @@ private fun SportDetailItem(
 @Composable
 private fun SportRecord(
     modifier: Modifier = Modifier,
-    records: List<SportRecordUi>
+    state: SportDetailUiState
 ) {
+    val viewModel: SportViewModel = viewModel()
+    val listState = rememberLazyListState()
+    val triggerOffset = with(LocalDensity.current) {
+        70.dp.toPx()
+    }
+    val refreshState = remember {
+        RefreshState(
+            triggerOffset = triggerOffset,
+            onRefresh = {
+                viewModel.refresh(isFirstLoading = false)
+            }
+        )
+    }
+
+    val refreshNestedScrollConnection = remember(listState, refreshState) {
+        RefreshNestedScrollConnection(
+            state = refreshState,
+            canPull = {
+                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+            },
+        )
+    }
     Box(
         modifier = modifier
-            .padding(top = 8.dp)
-            .fillMaxSize()
             .clip(RoundedCornerShape(24.dp))
-            .background(0xFFFBFCFF.dark(0xFF1D1D1D)),
-
+            .background(0xFFFBFCFF.dark(0xFF1D1D1D))
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(64.dp)
+                .graphicsLayer {
+                    translationY =
+                        refreshState.pullOffset - refreshState.triggerOffset
+                },
+            contentAlignment = Alignment.Center,
         ) {
+            RefreshHeader(
+                state = refreshState
+            )
+        }
+
         LazyColumn(
+            userScrollEnabled = !refreshState.isRefreshing,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 15.dp, end = 15.dp),
-            contentPadding = PaddingValues(vertical = 10.dp)
+                .padding(start = 15.dp, end = 15.dp)
+                .graphicsLayer {
+                    translationY = refreshState.pullOffset
+                }
+                .nestedScroll(refreshNestedScrollConnection),
+            contentPadding = PaddingValues(vertical = 5.dp)
         ) {
-            items(records.size) { index ->
-                ContentItem(
-                    modifier = Modifier,
-                    record = records[index]
-                )
+            if (state is SportDetailUiState.Content) {
+                items(state.records.size) { index ->
+                    ContentItem(
+                        modifier = Modifier,
+                        record = state.records[index]
+                    )
+                }
+            } else {
+                if (state !is SportDetailUiState.Loading) {
+                    item {
+                        DetailHint(modifier = Modifier.fillParentMaxSize(), state = state)
+                    }
+                }
             }
+        }
+    }
+    val vmRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    LaunchedEffect(vmRefreshing) {
+        if (refreshState.isRefreshing && state !is SportDetailUiState.Loading) {
+            refreshState.finishRefresh()
         }
     }
 }
@@ -366,8 +424,8 @@ private fun ContentItem(
         modifier = modifier
             .padding(top = 10.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(0xFFFFFFFF.dark(0xFF2d2d2d)),
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White),
     ) {
         Column {
             LabelItem(
@@ -499,12 +557,11 @@ private fun InfoItem(
 
 @Composable
 private fun DetailHint(
+    state: SportDetailUiState,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: SportViewModel = viewModel()
-    val state = viewModel.uiState.collectAsStateWithLifecycle().value
     HintItem(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize(),
         drawableResource = when (state) {
             is SportDetailUiState.Holiday -> Res.drawable.sport_ic_holiday
             is SportDetailUiState.Empty -> Res.drawable.sport_ic_no_data
@@ -525,8 +582,7 @@ private fun HintItem(
     content: String
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize(),
+        modifier = modifier,
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
