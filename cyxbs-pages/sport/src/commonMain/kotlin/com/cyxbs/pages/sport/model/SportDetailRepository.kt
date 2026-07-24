@@ -7,9 +7,8 @@ import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.sport.model.network.SportApiService
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -31,8 +30,8 @@ object SportDetailRepository {
    * - null：未登录 / 已退出登录
    * - Result：一次请求的成功或失败结果
    */
-  val sportData: SharedFlow<Result<SportDetailBean>?> get() = _sportData
-  private val _sportData = MutableSharedFlow<Result<SportDetailBean>?>(replay = 1)
+  val sportData: StateFlow<Result<SportDetailBean>?> get() = _sportData
+  private val _sportData = MutableStateFlow<Result<SportDetailBean>?>(null)
 
   private var isRefreshing = false
 
@@ -46,8 +45,8 @@ object SportDetailRepository {
       runCatchingCoroutine {
         SportApiService::class.impl().getSportDetail()
       }.mapCatching { it.data }
-        .onSuccess { _sportData.emit(Result.success(it)) }
-        .onFailure { _sportData.emit(Result.failure(it)) }
+        .onSuccess { _sportData.value = Result.success(it) }
+        .onFailure { _sportData.value = Result.failure(it) }
         .onFailure {
           logg("${it.stackTraceToString()}")
         }
@@ -61,7 +60,7 @@ object SportDetailRepository {
       .onEach {
         when (it) {
           is AccountState.Login -> refresh()
-          is AccountState.Logout -> _sportData.emit(null)
+          is AccountState.Logout -> _sportData.value = null
           else -> Unit
         }
       }.launchIn(appCoroutineScope)
