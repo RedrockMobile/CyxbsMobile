@@ -4,6 +4,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.mine.sign.model.bean.SignStatus
+import com.cyxbs.pages.mine.sign.model.repository.SignRepository
 import com.cyxbs.pages.mine.sign.model.service.SignService
 import com.cyxbs.pages.mine.sign.util.SignUtil
 import com.cyxbs.pages.mine.sign.util.postDailySignTask
@@ -98,7 +99,7 @@ class SignComposeViewModel : BaseViewModel() {
   }
 
   /**
-  * 执行签到
+   * 执行签到
    */
   fun checkIn() {
     if (_isChecking.value) return
@@ -123,6 +124,7 @@ class SignComposeViewModel : BaseViewModel() {
           refreshScoreStatusInternal()
         } else if (refreshScoreStatusInternal(animateLine = true)) {
           postDailySignTask()
+          SignRepository.notifyStatusChanged()
         }
       } finally {
         _isChecking.value = false
