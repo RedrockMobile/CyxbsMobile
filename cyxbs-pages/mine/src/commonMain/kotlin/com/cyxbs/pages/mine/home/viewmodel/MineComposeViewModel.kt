@@ -13,6 +13,7 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.mine.home.MineNavPlatform
 import com.cyxbs.pages.mine.home.network.MineApiService
+import com.cyxbs.pages.mine.sign.model.repository.SignRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * 「我的」主页 ViewModel（commonMain）
@@ -55,20 +55,24 @@ class MineComposeViewModel : BaseViewModel() {
   init {
     // 个人信息从账户中心获取，获取前先触发一次刷新
     IAccountEditService::class.impl().refreshInfo()
-    refreshSignStatus()
+    launchByViewModelScope {
+      refreshSignStatus()
+      // 如果签到页面发生了改变，就重新请求数据
+      SignRepository.statusChangedEvent.collect {
+        refreshSignStatus()
+      }
+    }
   }
 
-  private fun refreshSignStatus() {
+  private suspend fun refreshSignStatus() {
     if (!accountService.isLogin()) return
-    viewModelScope.launch {
-      runCatchingCoroutine {
-        MineApiService::class.impl().getScoreStatus()
-      }.mapCatching {
-        it.data
-      }.onSuccess {
-        serialDays.intValue = it.serialDays
-        isChecked.value = it.isChecked
-      }
+    runCatchingCoroutine {
+      MineApiService::class.impl().getScoreStatus()
+    }.mapCatching {
+      it.data
+    }.onSuccess {
+      serialDays.intValue = it.serialDays
+      isChecked.value = it.isChecked
     }
   }
 }
