@@ -25,6 +25,7 @@ kotlin {
       implementation(projects.cyxbsPages.schoolcar.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.home.api)
+      implementation(projects.cyxbsPages.noclass.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

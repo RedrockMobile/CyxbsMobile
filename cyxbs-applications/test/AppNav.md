@@ -209,6 +209,26 @@ deeplink: cyxbs://about
 deeplink: cyxbs://edit_info
 ```
 
+## :cyxbs-pages:noclass
+
+### no_class_group_detail
+
+- entry: `com.cyxbs.pages.noclass.ui.GroupDetailNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.GroupDetailNavArgument`
+
+```text
+deeplink: cyxbs://no_class_group_detail?groupId=[String]&groupName=[String]
+```
+
+### no_class
+
+- entry: `com.cyxbs.pages.noclass.ui.NoClassNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.NoClassNavArgument`
+
+```text
+deeplink: cyxbs://no_class
+```
+
 ## :cyxbs-pages:notification
 
 ### dialog/notice
@@ -235,6 +255,15 @@ object fields:
 ```
 
 ## :cyxbs-pages:schedule
+
+### schedule/edit
+
+- entry: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogPreview`
+- argument: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogNavArgument`
+
+```text
+deeplink: cyxbs://schedule/edit
+```
 
 ### schedule
 

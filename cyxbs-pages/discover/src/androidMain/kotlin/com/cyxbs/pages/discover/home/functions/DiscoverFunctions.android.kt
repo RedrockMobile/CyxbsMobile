@@ -2,7 +2,6 @@ package com.cyxbs.pages.discover.home.functions
 
 import com.cyxbs.components.config.route.DISCOVER_CALENDAR
 import com.cyxbs.components.config.route.DISCOVER_GRADES
-import com.cyxbs.components.config.route.DISCOVER_NO_CLASS
 import com.cyxbs.components.config.route.DISCOVER_SPORT
 import com.cyxbs.components.config.route.DISCOVER_TODO_MAIN
 import com.cyxbs.components.config.service.startActivity
@@ -22,7 +21,7 @@ actual object PlatformDiscoverFunctions : DiscoverFunctions() {
   }
 
   override fun clickNoClass() {
-    startActivity(DISCOVER_NO_CLASS)
+    super.clickNoClass()
     TrackingUtils.trackClickEvent2(ClickEvent.CLICK_MKY_ENTRY)
   }
 
