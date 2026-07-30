@@ -58,7 +58,7 @@ class NoClassTemporaryAdapter : ListAdapter<Student,NoClassTemporaryAdapter.VH>(
         val tvId : TextView = itemView.findViewById(R.id.noclass_tv_member_id)
         val slideMenu : SlideMenuLayout = itemView.findViewById(R.id.noclass_item_group_member_slide_layout)
         init {
-            itemView.findViewById<TextView?>(R.id.noclass_item_tv_delete).apply {
+            itemView.findViewById<TextView>(R.id.noclass_item_tv_delete).apply {
                 setOnClickListener {
                     slideMenu.closeRightSlide()
                     val stu = getItem(bindingAdapterPosition)
