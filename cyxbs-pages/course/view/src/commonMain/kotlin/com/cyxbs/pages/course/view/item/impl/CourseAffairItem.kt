@@ -84,7 +84,7 @@ private fun CourseAffairItem.Content(
     bottomText = affairDateModel.idModel.content.mergeFlow.collectAsState("").value,
     textColor = LocalAppColors.current.tvLv2,
     backgroundColor = Color.Transparent,
-    modifierList = remember { createCourseDefaultModifierList().add(AffairBackgroundItemModifier) },
+    modifierList = remember { createCourseDefaultModifierList().adding(AffairBackgroundItemModifier) },
     onClick = onClick,
   )
 }

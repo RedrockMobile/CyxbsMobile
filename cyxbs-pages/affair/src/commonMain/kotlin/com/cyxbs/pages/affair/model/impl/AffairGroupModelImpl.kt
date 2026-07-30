@@ -95,12 +95,12 @@ class AffairGroupModelImpl(
   }
 
   fun addAffairInternal(idModel: AffairIdModelImpl) {
-    _itemList.value = itemList.value.add(idModel)
+    _itemList.value = itemList.value.adding(idModel)
     addedAffair.tryEmit(idModel)
   }
 
   fun removeAffairInternal(idModel: AffairIdModelImpl) {
-    val newList = itemList.value.remove(idModel)
+    val newList = itemList.value.removing(idModel)
     if (newList !== itemList.value) {
       _itemList.value = newList
       deletedAffair.tryEmit(idModel)

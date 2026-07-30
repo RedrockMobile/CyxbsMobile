@@ -176,9 +176,9 @@ object AffairRepository2 {
         val index = list.indexOfFirst { it.localId == newAffair.localId }
         if (index > 0) {
           // 已经存在，此时应该是本地临时事务的上传
-          list.set(index, newAffair)
+          list.replacingAt(index, newAffair)
         } else {
-          list.add(newAffair)
+          list.adding(newAffair)
         }
       }.also {
         saveAffair(stuNum, it)
@@ -239,7 +239,7 @@ object AffairRepository2 {
     }.onSuccess {
       editAffairList(stuNum) { list ->
         val index = list.indexOfFirst { it.localId == affair.localId }
-        list.set(index, affair)
+        list.replacingAt(index, affair)
       }.also {
         saveAffair(stuNum, it)
       }
@@ -285,7 +285,7 @@ object AffairRepository2 {
     }.onSuccess {
       editAffairList(stuNum) {
         val index = it.indexOfFirst { it.localId == localId }
-        it.removeAt(index)
+        it.removingAt(index)
       }.also {
         saveAffair(stuNum, it)
       }

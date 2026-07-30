@@ -24,16 +24,16 @@ kotlinJvmTarget = "17"
 #                                            Android
 ####################################################################################################
 # https://developer.android.com/build/releases/gradle-plugin?hl=zh-cn
-agp = "9.2.1"
+agp = "9.3.1"
 android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "37"
 # https://developer.android.com/jetpack/androidx/releases/appcompat
 androidx-appcompat = "1.7.1"
 # https://developer.android.com/jetpack/androidx/releases/lifecycle
-androidx-lifecycle = "2.10.0"
+androidx-lifecycle = "2.11.0"
 # https://developer.android.com/jetpack/androidx/releases/core
-androidx-core-ktx = "1.18.0"
+androidx-core-ktx = "1.19.0"
 # https://developer.android.com/jetpack/androidx/releases/core
 androidx-core-animation = "1.0.0"
 # https://developer.android.com/kotlin/ktx/extensions-list#androidxcollection
@@ -53,7 +53,7 @@ androidx-work = "2.11.2"
 #                                              控件
 ####################################################################################################
 # https://developer.android.com/jetpack/androidx/releases/constraintlayout
-androidx-constraintlayout = "2.2.1"
+androidx-constraintlayout = "2.2.2"
 # https://developer.android.com/jetpack/androidx/releases/recyclerview
 androidx-recyclerview = "1.4.0"
 # https://developer.android.com/jetpack/androidx/releases/cardview
@@ -87,27 +87,27 @@ dialog = "3.3.0" # 作者已停止维护
 wheelPicker = "1.1.3"
 # https://github.com/wangjiegulu/WheelView
 # 又一个滚轮选择器（为什么会有多个？我也不知道，但这个 17 年后就没维护了）
-wheelView = "4.1.9"
+wheelView = "4.1.15"
 
 ####################################################################################################
 #                                              Kotlin
 ####################################################################################################
 # https://github.com/JetBrains/kotlin/releases
-kotlin = "2.3.21"
+kotlin = "2.4.10"
 # https://github.com/google/ksp/releases
-ksp = "2.3.6" # ksp 版本与 kotlin 版本强绑定，升级 kotlin 记得去更 ksp
+ksp = "2.3.10" # KSP 2.3 起版本不再与 Kotlin 编译器版本绑定，但升级工具链时仍需验证兼容性
 # https://github.com/Kotlin/kotlinx.coroutines
 kotlinx-coroutines = "1.11.0"
 # https://github.com/Kotlin/kotlinx.collections.immutable
-kotlinx-collections = "0.4.0"
+kotlinx-collections = "0.5.1"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.11.0"
 # https://github.com/Kotlin/kotlinx-datetime
 kotlinx-datetime = "0.8.0"
 # https://github.com/Kotlin/kotlinx-atomicfu
-kotlinx-atomicfu = "0.32.1"
+kotlinx-atomicfu = "0.33.0"
 # https://github.com/ktorio/ktor
-ktor = "3.5.0"
+ktor = "3.5.1"
 ########################################### KMP 第三方依赖 ###########################################
 # https://github.com/eygraber/uri-kmp
 kmp-uri = "0.0.21"
@@ -116,19 +116,19 @@ kmp-ktProvider = "1.5.0" # 985892345 的 kt 多平台跨模块服务提供框架
 # https://github.com/russhwolf/multiplatform-settings
 kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit
-kmp-ktorfit = "2.7.3"
+kmp-ktorfit = "2.7.5"
 
 
 ####################################################################################################
 #                                              Compose
 ####################################################################################################
 # https://github.com/JetBrains/compose-multiplatform/releases
-compose-multiplatform = "1.11.0"
+compose-multiplatform = "1.11.1"
 # 官网文档可能更新不及时，版本请看 compose 发布时给出的版本
 compose-navigation3 = "1.1.1"
 # https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-lifecycle.html
 # 看 compose 发布时给出的版本
-compose-lifecycle = "2.11.0-beta01"
+compose-lifecycle = "2.11.0"
 # 看 compose 发布时给出的版本
 compose-savedstate = "1.4.0"
 # 看 compose 发布时给出的版本
@@ -138,15 +138,15 @@ compose-adaptive = "1.3.0-alpha07"
 # 多平台版本，非官方 https://github.com/Lavmee/constraintlayout-compose-multiplatform
 compose-constraintLayout = "0.7.0"
 # 官方约束布局，但只有安卓版本 https://developer.android.com/jetpack/androidx/releases/constraintlayout
-compose-constraintLayout-android = "1.1.1"
+compose-constraintLayout-android = "1.1.2"
 # https://github.com/alexzhirkevich/compottie
-compose-lottie = "2.1.0"
+compose-lottie = "2.2.4"
 
 ####################################################################################################
 #                                               三方库
 ####################################################################################################
 # https://developer.umeng.com/docs/67966/detail/206987
-umeng-common = "9.9.1"
+umeng-common = "9.9.6"
 umeng-asms = "1.8.7.2"
 umeng-push = "6.7.6"
 # https://github.com/Tencent/VasDolly
@@ -157,14 +157,14 @@ bugly = "4.1.9.3"
 # https://github.com/greenrobot/EventBus
 eventBus = "3.3.1"
 # https://github.com/bumptech/glide/releases
-glide = "5.0.7"
+glide = "5.0.9"
 # https://github.com/Yalantis/uCrop
 # 一个裁剪图片的库
 ucrop = "2.2.11-native"
 # https://github.com/square/retrofit
 retrofit = "3.0.0"
 # https://github.com/square/okhttp
-okhttp = "5.3.2"
+okhttp = "5.4.0"
 # https://github.com/google/gson
 gson = "2.14.0"
 # https://github.com/ReactiveX/RxJava
@@ -187,17 +187,17 @@ kotlinpoet = "2.3.0"
 # kmp大图浏览 https://github.com/jvziyaoyao/scale
 scale = "1.1.1-beta.3"
 # coil kmp网络图片加载框架 https://github.com/coil-kt/coil
-coil = "3.4.0"
+coil = "3.5.0"
 # filekit 跨平台的文件操作三方库 https://github.com/vinceglb/FileKit
-filekit = "0.14.1"
+filekit = "0.14.2"
 # 文件操作库 https://github.com/square/okio
-okio = "3.17.0"
+okio = "3.18.1"
 # 权限申请的第三方库 https://github.com/icerockdev/moko-permissions
 moko-permissions = "0.20.1"
 # 高德地图的定位 https://lbs.amap.com/api/android-location-sdk/guide/create-project/android-studio-create-project
-amap = "11.1.200"
+amap = "11.2.000"
 # 多平台 BuildConfig 生成 https://github.com/gmazzo/gradle-buildconfig-plugin
-buildconfig = "6.0.9"
+buildconfig = "6.0.10"
 
 [libraries]
 ####################################################################################################
@@ -413,6 +413,3 @@ views = [
     "material",
     "flexbox",
 ]
-
-
-
