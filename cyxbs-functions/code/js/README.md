@@ -106,9 +106,10 @@ val result = client.installAndExecute<Int>(
 字节码缓存键包含源码哈希、QuickJS 版本、执行策略、Bundle ID、Bundle 版本和宿主 API 版本。
 任一兼容条件变化都会重新编译。字节码文件自身还带有 SHA-256，损坏缓存不会交给 QuickJS。
 
-当前 QuickJS-kt 1.0.5 在加载 ES Module 字节码时可能产生 Native 崩溃，所以只有打成单文件的
-普通 `SCRIPT` 会缓存字节码；Module 文件图暂时直接执行源码。升级到 1.0.8 后需要先完成三端
-Module 字节码回归，再放开该限制。
+QuickJS-kt 1.0.8 可以加载不含 `import` 的独立 ES Module 字节码，但入口字节码引用其他已注册
+Module 时，在 Desktop 与 iOS 上仍会触发 `js_create_module_function` 原生崩溃。因此当前只有打成
+单文件的普通 `SCRIPT` 会缓存字节码；Module 文件图继续直接执行源码。后续升级 QuickJS-kt 时，
+必须先通过三端多 Module 字节码回归，才能放开该限制。
 
 字节码缓存是可删除数据，可以调用：
 
@@ -123,5 +124,6 @@ client.clearBytecodeCache()
 - 内部远端源码必须验签，并保存在 App 私有目录。
 - 教学脚本只能使用白名单 Bundle。
 - 每次执行使用独立 Runtime，并应用内存和栈限制。
-- QuickJS-kt 1.0.5 还不能可靠中断无限循环；教学场景正式开放前必须在 1.0.8 上接入执行中断。
+- 单次执行默认限制为 5 秒，超时或主动取消会通过 QuickJS-kt 1.0.8 的原生中断机制终止无限循环；
+  业务可以通过 `QuickJsRuntimeConfig` 调整限制，设置为 0 时必须自行承担无法自动超时的风险。
 - 普通 JavaScript 运行异常不会自动回退并重复执行源码，避免网络、存储等宿主副作用发生两次。

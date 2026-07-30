@@ -44,6 +44,44 @@ class QuickJsRuntimeTest {
   }
 
   /**
+   * 验证不含 import 的独立 ES Module 字节码能够加载；带依赖的 Module 文件图由 Client 保持源码执行。
+   */
+  @Test
+  fun compileAndEvaluateStandaloneModuleBytecode() = runTest {
+    val runtime = QuickJsRuntime()
+    try {
+      val bytecode = runtime.compile(
+        code = "globalThis.__moduleBytecodeValue = 40 + 2",
+        filename = "module-bytecode.mjs",
+        asModule = true,
+      )
+
+      runtime.evaluate<Unit>(bytecode)
+
+      assertEquals(42, runtime.evaluate<Int>("globalThis.__moduleBytecodeValue"))
+    } finally {
+      runtime.close()
+    }
+  }
+
+  /**
+   * 验证无限循环会被 1.0.8 提供的原生超时机制中断，避免长期占用执行线程。
+   */
+  @Test
+  fun interruptInfiniteLoopOnTimeout() = runTest {
+    val runtime = QuickJsRuntime(
+      config = QuickJsRuntimeConfig(evaluationTimeoutMillis = 50L),
+    )
+    try {
+      kotlin.test.assertFailsWith<com.dokar.quickjs.QuickJsInterruptedException> {
+        runtime.evaluate<Unit>("while (true) {}")
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  /**
    * 验证 Promise Pending Job 会被持续调度，并可通过顶层 await 把最终结果返回 Kotlin。
    */
   @Test

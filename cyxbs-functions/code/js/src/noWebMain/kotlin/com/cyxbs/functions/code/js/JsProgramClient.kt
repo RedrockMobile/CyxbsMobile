@@ -17,11 +17,7 @@ enum class JsExecutableOrigin {
   /** 命中与当前引擎、策略和 Bundle 完全匹配的本地字节码。 */
   BYTECODE_CACHE,
 
-  /**
-   * 当前程序形态不适合安全复用字节码，直接执行源码。
-   *
-   * QuickJS-kt 1.0.5 的 Module 字节码加载存在原生崩溃风险，因此多模块程序暂时走该路径。
-   */
+  /** 当前程序形态不适合安全复用字节码，直接执行源码。 */
   SOURCE_DIRECT,
 }
 
@@ -120,7 +116,10 @@ class JsProgramClient(
     reference: JsProgramRef,
     environment: JsExecutionEnvironment,
   ): JsExecutionResult<T> {
-    return executeInternal(reference = reference, environment = environment) { runtime, executable ->
+    return executeInternal(
+      reference = reference,
+      environment = environment,
+    ) { runtime, executable ->
       when (executable) {
         is PreparedJsExecutable.Bytecode -> runtime.evaluate<T>(executable.value)
         is PreparedJsExecutable.Source -> runtime.evaluate<T>(
@@ -144,7 +143,7 @@ class JsProgramClient(
   }
 
   /**
-   * 执行公共流程，并把最终字节码交给保留 reified 类型信息的调用点。
+   * 执行公共流程，并把最终可执行产物交给保留 reified 类型信息的调用点。
    */
   @PublishedApi
   internal suspend fun <T> executeInternal(
@@ -270,8 +269,8 @@ class JsProgramClient(
     /**
      * 判断当前程序能否安全使用字节码缓存。
      *
-     * QuickJS-kt 1.0.5 在加载 ES Module 字节码时可能发生 Native 崩溃，所以当前只缓存已经
-     * 打成单文件的普通脚本。升级 QuickJS-kt 后必须先完成三端回归，才能扩展该条件。
+     * QuickJS-kt 1.0.8 加载带 import 的 ES Module 字节码仍可能发生 Native 崩溃，所以当前只缓存
+     * 已经打成单文件的普通脚本。升级依赖后必须先完成三端 Module 文件图回归，才能扩展该条件。
      */
     private fun supportsBytecodeCache(sourcePackage: JsSourcePackage): Boolean {
       return sourcePackage.mode == JsProgramMode.SCRIPT && sourcePackage.files.size == 1
@@ -294,14 +293,10 @@ class JsProgramClient(
 @PublishedApi
 internal sealed interface PreparedJsExecutable {
 
-  /**
-   * 已通过完整性与兼容键校验的 QuickJS 字节码。
-   */
+  /** 已通过完整性与兼容键校验的 QuickJS 字节码。 */
   class Bytecode(val value: ByteArray) : PreparedJsExecutable
 
-  /**
-   * 不启用字节码缓存时直接执行的源码入口。
-   */
+  /** 不启用字节码缓存时直接执行的源码入口。 */
   data class Source(
     val code: String,
     val filename: String,

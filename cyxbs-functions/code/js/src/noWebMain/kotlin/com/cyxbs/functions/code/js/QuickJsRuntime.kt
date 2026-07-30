@@ -11,14 +11,19 @@ import kotlinx.coroutines.Dispatchers
  *
  * @param memoryLimitBytes 单个运行时允许使用的最大内存，非正数表示不限制。
  * @param maxStackSizeBytes JavaScript 栈空间上限，必须大于 0。
+ * @param evaluationTimeoutMillis 单次 JavaScript 执行超时；设为 0 表示不限制。
  */
 data class QuickJsRuntimeConfig(
   val memoryLimitBytes: Long = 32L * 1024L * 1024L,
   val maxStackSizeBytes: Long = 256L * 1024L,
+  val evaluationTimeoutMillis: Long = 5_000L,
 ) {
 
   init {
     require(maxStackSizeBytes > 0) { "maxStackSizeBytes must be greater than 0." }
+    require(evaluationTimeoutMillis >= 0) {
+      "evaluationTimeoutMillis must not be negative."
+    }
   }
 }
 
@@ -28,7 +33,7 @@ data class QuickJsRuntimeConfig(
  * 该类维护一个长生命周期的 JavaScript 上下文，适合连续执行代码、注册宿主函数和加载 ES Module。
  * 实例不再使用时必须调用 [close]，关闭后不可继续执行或注册能力。
  * 当前依赖版本不会自动解包入口表达式直接返回的 Promise，调用方应在源码中使用顶层 `await` 获取最终值。
- * 当前版本也不提供执行中断能力，因此不应在主线程执行不可信代码或无限循环。
+ * 单次执行受 [QuickJsRuntimeConfig.evaluationTimeoutMillis] 限制，也可以通过 [interruptEvaluation] 主动中断。
  *
  * @param jobDispatcher 执行异步宿主函数的协程调度器。
  * @param config 运行时资源与执行限制。
@@ -45,6 +50,7 @@ class QuickJsRuntime(
   internal val engine: QuickJs = QuickJs.create(jobDispatcher).apply {
     memoryLimit = config.memoryLimitBytes
     maxStackSize = config.maxStackSizeBytes
+    evaluationTimeoutMillis = config.evaluationTimeoutMillis
   }
 
   /**
@@ -58,6 +64,16 @@ class QuickJsRuntime(
    */
   val isClosed: Boolean
     get() = engine.isClosed
+
+  /**
+   * 主动中断正在执行的 JavaScript。
+   *
+   * 可从其他线程安全调用；没有执行任务时调用不会产生副作用。被中断的执行会抛出
+   * `QuickJsInterruptedException`，调用方可将其映射为超时或用户取消状态。
+   */
+  fun interruptEvaluation() {
+    engine.interruptEvaluation()
+  }
 
   /**
    * 执行 JavaScript 源码并把结果转换为 [T]。
