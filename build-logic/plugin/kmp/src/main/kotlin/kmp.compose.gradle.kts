@@ -50,9 +50,9 @@ plugins.withId("com.android.kotlin.multiplatform.library") {
 
 composeCompiler {
   // https://developer.android.com/jetpack/compose/performance/stability/diagnose#compose-compiler
-  reportsDestination.set(
-    layout.buildDirectory.get().asFile.resolve("compose_compiler")
-  )
+//  reportsDestination.set(
+//    layout.buildDirectory.get().asFile.resolve("compose_compiler")
+//  )
 
   // 对 Compose 配置外部类的稳定性
   // 只允许配置已有第三方库里面的类，如果是自己的类请打上 @Stable 注解
