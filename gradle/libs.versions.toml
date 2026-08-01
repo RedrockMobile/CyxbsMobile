@@ -120,7 +120,7 @@ kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit
 kmp-ktorfit = "2.7.5"
 # https://github.com/dokar3/quickjs-kt
-kmp-quickjs = "1.0.8"
+kmp-quickjs = "1.0.9-module-loader-local.2"
 
 
 ####################################################################################################

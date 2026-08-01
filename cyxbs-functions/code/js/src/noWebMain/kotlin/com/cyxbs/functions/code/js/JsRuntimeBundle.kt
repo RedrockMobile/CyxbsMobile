@@ -108,12 +108,14 @@ class JsRuntimeBundle(
     get() = capabilities.mapTo(linkedSetOf()) { it.id }
 
   /**
-   * 将预置模块与宿主能力安装到独立 Runtime。
+   * 将 Bundle 的宿主能力安装到独立 Runtime。
+   *
+   * [modules] 必须在 Runtime 创建前合并进 [JsModuleLoader]，因为新的 Module 加载流程属于
+   * Runtime 级配置，不能在 Context 创建后追加。
+   *
+   * @param runtime 已配置 Module loader 的独立 Runtime。
    */
   internal fun install(runtime: QuickJsRuntime) {
-    modules.forEach { (name, code) ->
-      runtime.addModule(name = name, code = code)
-    }
     capabilities.forEach { it.install(runtime) }
   }
 

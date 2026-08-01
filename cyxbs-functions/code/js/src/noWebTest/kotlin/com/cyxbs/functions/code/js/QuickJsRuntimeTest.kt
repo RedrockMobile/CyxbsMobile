@@ -44,7 +44,7 @@ class QuickJsRuntimeTest {
   }
 
   /**
-   * 验证不含 import 的独立 ES Module 字节码能够加载；带依赖的 Module 文件图由 Client 保持源码执行。
+   * 验证不含 import 的独立 ES Module 字节码能够直接加载。
    */
   @Test
   fun compileAndEvaluateStandaloneModuleBytecode() = runTest {
@@ -116,20 +116,24 @@ class QuickJsRuntimeTest {
   }
 
   /**
-   * 验证多个 ES Module 可以注册，并由入口模块通过标准 import 调用。
+   * 验证 ES Module 可以通过 Runtime 级 loader 按需提供，并由入口代码通过标准 import 调用。
    */
   @Test
   fun loadEsModule() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = QuickJsRuntime(
+      moduleLoader = JsModuleLoader { name ->
+        if (name == "answer") {
+          JsModuleContent.Source("export const value = 42;")
+        } else {
+          null
+        }
+      },
+    )
     var captured: Int? = null
     try {
       runtime.bindFunction("capture") { args ->
         captured = (args.single() as Number).toInt()
       }
-      runtime.addModule(
-        name = "answer",
-        code = "export const value = 42;",
-      )
 
       runtime.evaluate<Any?>(
         code = """
@@ -141,6 +145,135 @@ class QuickJsRuntimeTest {
       )
 
       assertEquals(42, captured)
+    } finally {
+      runtime.close()
+    }
+  }
+
+  /**
+   * 验证静态依赖图可按需编译，并在新 Runtime 中混用有效缓存与失效源码。
+   */
+  @Test
+  fun compileModuleGraphAndRefreshChangedSource() = runTest {
+    val initialSources = mapOf(
+      "leaf" to "export const value = 21;",
+      "middle" to """
+        import { value } from "leaf";
+        export const doubled = value * 2;
+      """.trimIndent(),
+    )
+    val initialCache = mutableMapOf<String, ByteArray>()
+    val initialLoader = object : JsModuleLoader {
+      override fun load(name: String): JsModuleContent? {
+        return initialCache[name]?.let(JsModuleContent::Bytecode)
+          ?: initialSources[name]?.let(JsModuleContent::Source)
+      }
+
+      override fun onCompiled(name: String, bytecode: ByteArray) {
+        // 立即放入内存缓存，使临时解析 Context 结束后的正式执行可以复用同一份字节码。
+        initialCache[name] = bytecode
+      }
+    }
+    val entryBytecode = QuickJsRuntime(moduleLoader = initialLoader).let { runtime ->
+      try {
+        runtime.compile(
+          code = """
+            import { doubled } from "middle";
+            capture(doubled);
+          """.trimIndent(),
+          filename = "entry",
+          asModule = true,
+        ).also { bytecode ->
+          assertEquals(setOf("entry", "middle", "leaf"), runtime.resolveModuleGraph(bytecode))
+        }
+      } finally {
+        runtime.close()
+      }
+    }
+
+    assertEquals(setOf("leaf", "middle"), initialCache.keys)
+
+    val refreshedSources = initialSources + mapOf(
+      "middle" to """
+        import { value } from "leaf";
+        export const doubled = value * 2 + 1;
+      """.trimIndent(),
+    )
+    val refreshedCache = initialCache.toMutableMap().apply {
+      remove("middle")
+    }
+    val recompiledNames = mutableListOf<String>()
+    val refreshedLoader = object : JsModuleLoader {
+      override fun load(name: String): JsModuleContent? {
+        return refreshedCache[name]?.let(JsModuleContent::Bytecode)
+          ?: refreshedSources[name]?.let(JsModuleContent::Source)
+      }
+
+      override fun onCompiled(name: String, bytecode: ByteArray) {
+        refreshedCache[name] = bytecode
+        recompiledNames += name
+      }
+    }
+    val refreshedRuntime = QuickJsRuntime(moduleLoader = refreshedLoader)
+    var captured: Int? = null
+    try {
+      refreshedRuntime.bindFunction("capture") { args ->
+        captured = (args.single() as Number).toInt()
+      }
+
+      assertEquals(
+        setOf("entry", "middle", "leaf"),
+        refreshedRuntime.resolveModuleGraph(entryBytecode),
+      )
+      assertEquals(listOf("middle"), recompiledNames)
+      refreshedRuntime.evaluate<Any?>(entryBytecode)
+
+      assertEquals(43, captured)
+      assertEquals(listOf("middle"), recompiledNames)
+    } finally {
+      refreshedRuntime.close()
+    }
+  }
+
+  /**
+   * 验证动态 import 会在执行到对应语句时按需编译，并立即通知业务层新字节码。
+   */
+  @Test
+  fun collectDynamicImportBytecodeDuringEvaluation() = runTest {
+    val compiledModules = mutableMapOf<String, ByteArray>()
+    val runtime = QuickJsRuntime(
+      moduleLoader = object : JsModuleLoader {
+        override fun load(name: String): JsModuleContent? {
+          return compiledModules[name]?.let(JsModuleContent::Bytecode)
+            ?: if (name == "dynamic-answer") {
+              JsModuleContent.Source("export const value = 42;")
+            } else {
+              null
+            }
+        }
+
+        override fun onCompiled(name: String, bytecode: ByteArray) {
+          compiledModules[name] = bytecode
+        }
+      },
+    )
+    var captured: Int? = null
+    try {
+      runtime.bindFunction("capture") { args ->
+        captured = (args.single() as Number).toInt()
+      }
+
+      runtime.evaluate<Any?>(
+        code = """
+          const answer = await import("dynamic-answer");
+          capture(answer.value);
+        """.trimIndent(),
+        filename = "dynamic-entry",
+        asModule = true,
+      )
+
+      assertEquals(42, captured)
+      assertEquals(setOf("dynamic-answer"), compiledModules.keys)
     } finally {
       runtime.close()
     }

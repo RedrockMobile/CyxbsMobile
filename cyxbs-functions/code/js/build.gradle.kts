@@ -1,6 +1,11 @@
+import java.util.Properties
+
 plugins {
   id("manager.lib")
 }
+
+val androidDeviceTestApplicationId = "com.cyxbs.functions.code.js.test"
+val androidDeviceTestRunner = "androidx.test.runner.AndroidJUnitRunner"
 
 kotlin {
   android {
@@ -41,4 +46,57 @@ kotlin {
       }
     }
   }
+}
+
+// 优先读取标准环境变量，并兼容 Android Studio 通常写入的 local.properties。
+val localSdkDirectory = rootProject.file("local.properties")
+  .takeIf { it.isFile }
+  ?.inputStream()
+  ?.use { input ->
+    Properties().apply { load(input) }.getProperty("sdk.dir")
+  }
+val sdkDirectory = sequenceOf(
+  providers.environmentVariable("ANDROID_SDK_ROOT").orNull,
+  providers.environmentVariable("ANDROID_HOME").orNull,
+  localSdkDirectory,
+).firstOrNull { !it.isNullOrBlank() }
+checkNotNull(sdkDirectory) {
+  "未找到 Android SDK，请配置 ANDROID_SDK_ROOT、ANDROID_HOME 或 local.properties 的 sdk.dir"
+}
+val adbExecutable = rootProject.file("$sdkDirectory/platform-tools/adb").also {
+  check(it.isFile) { "未找到 adb：${it.absolutePath}" }
+}
+
+val androidDeviceSerial = providers.gradleProperty("androidDeviceSerial")
+  .orElse(providers.environmentVariable("ANDROID_SERIAL"))
+val instrumentationArguments = buildList {
+  androidDeviceSerial.orNull
+    ?.takeIf { it.isNotBlank() }
+    ?.let {
+      add("-s")
+      add(it)
+    }
+  addAll(
+    listOf(
+      "shell",
+      "am",
+      "instrument",
+      "-w",
+      "$androidDeviceTestApplicationId/$androidDeviceTestRunner",
+    ),
+  )
+}
+
+/**
+ * 覆盖安装并运行 Android 真机测试，测试结束后保留测试 APK。
+ *
+ * 多设备连接时可通过 `-PandroidDeviceSerial=<serial>` 指定目标设备。该任务刻意不依赖
+ * `connectedAndroidDeviceTest`，避免其在执行结束后卸载测试 APK，导致部分系统重复弹出安装确认。
+ */
+tasks.register<Exec>("persistentAndroidDeviceTest") {
+  group = "verification"
+  description = "覆盖安装并运行 Android 真机测试，执行结束后保留测试 APK"
+  dependsOn("installAndroidDeviceTest")
+  executable(adbExecutable)
+  args(instrumentationArguments)
 }

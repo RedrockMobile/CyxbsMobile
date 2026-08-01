@@ -157,14 +157,18 @@ class JsProgramClient(
       environment.policy.validate(sourcePackage = sourcePackage, bundle = environment.bundle)
       environment.sourceVerifier.verify(sourcePackage)
 
-      val runtime = QuickJsRuntime(config = environment.policy.runtimeConfig)
+      // Module loader 必须在创建 Runtime 时确定；策略校验已保证源码包与 Bundle 不会出现同名模块。
+      val moduleSources = environment.bundle.modules +
+          sourcePackage.files.filterKeys { it != sourcePackage.entry }
+      val moduleLoader = JsModuleLoader { name ->
+        moduleSources[name]?.let(JsModuleContent::Source)
+      }
+      val runtime = QuickJsRuntime(
+        config = environment.policy.runtimeConfig,
+        moduleLoader = moduleLoader,
+      )
       try {
         environment.bundle.install(runtime)
-        sourcePackage.files.forEach { (name, code) ->
-          if (name != sourcePackage.entry) {
-            runtime.addModule(name = name, code = code)
-          }
-        }
 
         val origin: JsExecutableOrigin
         val executable: PreparedJsExecutable
@@ -269,8 +273,8 @@ class JsProgramClient(
     /**
      * 判断当前程序能否安全使用字节码缓存。
      *
-     * QuickJS-kt 1.0.8 加载带 import 的 ES Module 字节码仍可能发生 Native 崩溃，所以当前只缓存
-     * 已经打成单文件的普通脚本。升级依赖后必须先完成三端 Module 文件图回归，才能扩展该条件。
+     * 当前 [JsBytecodeCache] 的键和值只描述整个程序和单份入口字节码，尚不能独立失效、保存和复用
+     * Module 图中的每个节点。因此这里只缓存单文件脚本，Module 增量缓存将在存储协议扩展后接入。
      */
     private fun supportsBytecodeCache(sourcePackage: JsSourcePackage): Boolean {
       return sourcePackage.mode == JsProgramMode.SCRIPT && sourcePackage.files.size == 1

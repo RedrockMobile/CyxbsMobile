@@ -164,8 +164,8 @@ class JsProgramClientTest {
   /**
    * 验证源码包、业务模块和共享 Bundle 模块可以共同组成 ES Module 执行图。
    *
-   * 带 import 的 Module 字节码在 QuickJS-kt 1.0.8 中仍可能触发原生崩溃，因此这里同时验证
-   * Client 会保持源码直执行，不会误用字节码缓存。
+   * Client 的持久化层目前仍以单个程序缓存键保存一个字节码，因此这里同时验证尚未接入
+   * 按 Module 缓存的业务流程会保持源码直执行。
    */
   @Test
   fun executeModulesFromPackageAndBundle() = runTest {

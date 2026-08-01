@@ -106,10 +106,21 @@ val result = client.installAndExecute<Int>(
 字节码缓存键包含源码哈希、QuickJS 版本、执行策略、Bundle ID、Bundle 版本和宿主 API 版本。
 任一兼容条件变化都会重新编译。字节码文件自身还带有 SHA-256，损坏缓存不会交给 QuickJS。
 
-QuickJS-kt 1.0.8 可以加载不含 `import` 的独立 ES Module 字节码，但入口字节码引用其他已注册
-Module 时，在 Desktop 与 iOS 上仍会触发 `js_create_module_function` 原生崩溃。因此当前只有打成
-单文件的普通 `SCRIPT` 会缓存字节码；Module 文件图继续直接执行源码。后续升级 QuickJS-kt 时，
-必须先通过三端多 Module 字节码回归，才能放开该限制。
+当前使用的 QuickJS-kt 本地验证版本已修复多 Module 字节码加载，并提供 Runtime 级
+`ModuleLoader`。业务层通过 `JsModuleLoader.load()` 按名称返回有效缓存
+`JsModuleContent.Bytecode`，缓存未命中时返回 `JsModuleContent.Source`；源码编译完成后，
+`JsModuleLoader.onCompiled()` 会立即返回该 Module 的新字节码。
+
+`onCompiled()` 在 QuickJS 解析 Module 的同步边界内调用，必须快速返回且不得重入同一个
+`QuickJsRuntime`。需要写磁盘或数据库时，应在回调中把字节码投递给业务自己的异步队列，
+持久化错误也由业务处理。静态依赖可以在执行前通过 `resolveModuleGraph()` 解析和收集，动态
+`import()` 则在实际执行到对应语句时通过同一个回调返回。
+
+`JsProgramClient` 的持久化协议目前仍以一个程序缓存键保存一份入口字节码，尚未保存每个 Module
+各自的源码哈希和字节码。因此 Client 当前仍只缓存单文件 `SCRIPT`，Module 文件图继续执行源码；
+这属于业务缓存层的后续工作，不再是引擎加载限制。需要自行探索增量缓存的业务可以在创建
+`QuickJsRuntime` 时传入 `JsModuleLoader`，先编译入口 Module，再调用
+`resolveModuleGraph()` 收集静态依赖字节码，最后执行入口以继续处理动态 import。
 
 字节码缓存是可删除数据，可以调用：
 
