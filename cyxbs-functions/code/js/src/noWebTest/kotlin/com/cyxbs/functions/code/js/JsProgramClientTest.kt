@@ -4,7 +4,10 @@ import com.cyxbs.functions.code.js.bundle.JsAsyncFunctionCapability
 import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
 import com.cyxbs.functions.code.js.bundle.JsSyncFunctionCapability
 import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.storage.JsBytecodeCache
+import com.cyxbs.functions.code.js.storage.JsBytecodeCacheKey
 import com.cyxbs.functions.code.js.storage.InMemoryJsProgramStorage
+import com.dokar.quickjs.QuickJsException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -168,9 +171,6 @@ class JsProgramClientTest {
 
   /**
    * 验证源码包、业务模块和共享 Bundle 模块可以共同组成 ES Module 执行图。
-   *
-   * Client 的持久化层目前仍以单个程序缓存键保存一个字节码，因此这里同时验证尚未接入
-   * 按 Module 缓存的业务流程会保持源码直执行。
    */
   @Test
   fun executeModulesFromPackageAndBundle() = runTest {
@@ -216,13 +216,174 @@ class JsProgramClientTest {
       requiredCapabilities = setOf("teaching.capture"),
     )
 
-    val result = client.installAndExecute<Any?>(
+    val first = client.installAndExecute<Any?>(
       sourcePackage = sourcePackage,
+      environment = environment,
+    )
+    assertEquals(42, captured)
+    captured = null
+    val second = client.execute<Any?>(
+      reference = sourcePackage.reference,
       environment = environment,
     )
 
     assertEquals(42, captured)
-    assertEquals(JsExecutableOrigin.SOURCE_DIRECT, result.origin)
+    assertEquals(JsExecutableOrigin.COMPILED_SOURCE, first.origin)
+    assertEquals(setOf("main.js", "shared", "increment"), first.compiledModules)
+    assertTrue(first.cachedModules.isEmpty())
+    assertEquals(JsExecutableOrigin.BYTECODE_CACHE, second.origin)
+    assertTrue(second.compiledModules.isEmpty())
+    assertEquals(setOf("main.js", "shared", "increment"), second.cachedModules)
+  }
+
+  /**
+   * 验证同一 packageId 发布新版本时，只重新编译源码发生变化的静态依赖 Module。
+   */
+  @Test
+  fun recompileOnlyChangedStaticModuleAcrossVersions() = runTest {
+    val storage = InMemoryJsProgramStorage()
+    val client = JsProgramClient(sourceStore = storage, bytecodeCache = storage)
+    val environment = JsExecutionEnvironment.forTeaching(
+      bundle = JsRuntimeBundle(
+        id = "teaching-incremental",
+        version = 1,
+        hostApiVersion = 1,
+        capabilities = listOf(
+          JsSyncFunctionCapability(
+            id = "teaching.capture",
+            functionName = "capture",
+          ) { null },
+        ),
+      ),
+      policy = JsExecutionPolicy.teaching(
+        allowedCapabilityIds = setOf("teaching.capture"),
+      ),
+    )
+    val firstPackage = staticModulePackage(
+      version = "1",
+      middleSource = """
+        import { value } from "leaf";
+        export const result = value + 1;
+      """.trimIndent(),
+    )
+    val secondPackage = staticModulePackage(
+      version = "2",
+      middleSource = """
+        import { value } from "leaf";
+        export const result = value + 2;
+      """.trimIndent(),
+    )
+
+    val first = client.installAndExecute<Any?>(firstPackage, environment)
+    val second = client.installAndExecute<Any?>(secondPackage, environment)
+
+    assertEquals(setOf("main.js", "middle", "leaf"), first.compiledModules)
+    assertTrue(first.cachedModules.isEmpty())
+    assertEquals(JsExecutableOrigin.BYTECODE_CACHE, second.origin)
+    assertEquals(setOf("middle"), second.compiledModules)
+    assertEquals(setOf("main.js", "leaf"), second.cachedModules)
+  }
+
+  /**
+   * 验证动态 import 只在执行到对应语句时加载，并在源码变化后仅重编译动态依赖。
+   */
+  @Test
+  fun cacheDynamicImportAndRecompileChangedModule() = runTest {
+    val storage = InMemoryJsProgramStorage()
+    val corruptingCache = CorruptingBytecodeCache(storage)
+    val client = JsProgramClient(sourceStore = storage, bytecodeCache = corruptingCache)
+    var captured: Int? = null
+    val bundle = JsRuntimeBundle(
+      id = "teaching-dynamic",
+      version = 1,
+      hostApiVersion = 1,
+      capabilities = listOf(
+        JsSyncFunctionCapability(
+          id = "teaching.capture",
+          functionName = "capture",
+        ) { args ->
+          captured = (args.single() as Number).toInt()
+          null
+        },
+      ),
+    )
+    val environment = JsExecutionEnvironment.forTeaching(
+      bundle = bundle,
+      policy = JsExecutionPolicy.teaching(
+        allowedCapabilityIds = setOf("teaching.capture"),
+      ),
+    )
+    val firstPackage = dynamicModulePackage(version = "1", value = 41)
+    val secondPackage = dynamicModulePackage(version = "2", value = 42)
+
+    val first = client.installAndExecute<Any?>(firstPackage, environment)
+    assertEquals(41, captured)
+    assertEquals(setOf("main.js", "dynamic"), first.compiledModules)
+    assertTrue(first.cachedModules.isEmpty())
+
+    captured = null
+    val cached = client.execute<Any?>(firstPackage.reference, environment)
+    assertEquals(41, captured)
+    assertTrue(cached.compiledModules.isEmpty())
+    assertEquals(setOf("main.js", "dynamic"), cached.cachedModules)
+
+    corruptingCache.resetReadCount()
+    corruptingCache.corruptReadNumber = 2
+    assertFailsWith<QuickJsException> {
+      client.execute<Any?>(firstPackage.reference, environment)
+    }
+
+    captured = null
+    corruptingCache.resetReadCount()
+    corruptingCache.corruptReadNumber = null
+    val repaired = client.execute<Any?>(firstPackage.reference, environment)
+    assertEquals(41, captured)
+    assertEquals(JsExecutableOrigin.BYTECODE_CACHE, repaired.origin)
+    assertEquals(setOf("dynamic"), repaired.compiledModules)
+    assertEquals(setOf("main.js"), repaired.cachedModules)
+
+    captured = null
+    val changed = client.installAndExecute<Any?>(secondPackage, environment)
+    assertEquals(42, captured)
+    assertEquals(JsExecutableOrigin.BYTECODE_CACHE, changed.origin)
+    assertEquals(setOf("dynamic"), changed.compiledModules)
+    assertEquals(setOf("main.js"), changed.cachedModules)
+  }
+
+  /**
+   * 验证静态准备阶段遇到不可解析缓存时，会在新 Runtime 中回退源码并修复缓存。
+   */
+  @Test
+  fun fallbackToSourceWhenStaticBytecodeIsInvalid() = runTest {
+    val storage = InMemoryJsProgramStorage()
+    val corruptingCache = CorruptingBytecodeCache(storage)
+    val client = JsProgramClient(sourceStore = storage, bytecodeCache = corruptingCache)
+    val environment = JsExecutionEnvironment.forTeaching()
+    val sourcePackage = JsSourcePackage.create(
+      packageId = "teaching.invalid-cache",
+      version = "1",
+      entry = "main.js",
+      mode = JsProgramMode.MODULE,
+      files = mapOf(
+        "main.js" to "import { value } from 'answer'; globalThis.result = value;",
+        "answer" to "export const value = 42;",
+      ),
+    )
+
+    val first = client.installAndExecute<Any?>(sourcePackage, environment)
+    assertEquals(setOf("main.js", "answer"), first.compiledModules)
+
+    corruptingCache.corruptReads = true
+    val recovered = client.execute<Any?>(sourcePackage.reference, environment)
+    assertEquals(JsExecutableOrigin.COMPILED_SOURCE, recovered.origin)
+    assertEquals(setOf("main.js", "answer"), recovered.compiledModules)
+    assertTrue(recovered.cachedModules.isEmpty())
+
+    corruptingCache.corruptReads = false
+    val cached = client.execute<Any?>(sourcePackage.reference, environment)
+    assertEquals(JsExecutableOrigin.BYTECODE_CACHE, cached.origin)
+    assertTrue(cached.compiledModules.isEmpty())
+    assertEquals(setOf("main.js", "answer"), cached.cachedModules)
   }
 
   /**
@@ -269,5 +430,70 @@ class JsProgramClientTest {
       files = mapOf(QuickJsRuntime.DEFAULT_FILENAME to code),
       requiredCapabilities = requiredCapabilities,
     )
+  }
+
+  /** 创建包含两级静态依赖的增量缓存测试包。 */
+  private fun staticModulePackage(
+    version: String,
+    middleSource: String,
+  ): JsSourcePackage {
+    return JsSourcePackage.create(
+      packageId = "teaching.incremental",
+      version = version,
+      entry = "main.js",
+      mode = JsProgramMode.MODULE,
+      files = mapOf(
+        "main.js" to """
+          import { result } from "middle";
+          capture(result);
+        """.trimIndent(),
+        "middle" to middleSource,
+        "leaf" to "export const value = 40;",
+      ),
+      requiredCapabilities = setOf("teaching.capture"),
+    )
+  }
+
+  /** 创建仅包含一个动态依赖的增量缓存测试包。 */
+  private fun dynamicModulePackage(
+    version: String,
+    value: Int,
+  ): JsSourcePackage {
+    return JsSourcePackage.create(
+      packageId = "teaching.dynamic",
+      version = version,
+      entry = "main.js",
+      mode = JsProgramMode.MODULE,
+      files = mapOf(
+        "main.js" to """
+          const loaded = await import("dynamic");
+          capture(loaded.value);
+        """.trimIndent(),
+        "dynamic" to "export const value = $value;",
+      ),
+      requiredCapabilities = setOf("teaching.capture"),
+    )
+  }
+
+  /**
+   * 在读取命中时返回不可解析内容，用于模拟通过缓存层读取后 QuickJS 仍无法接受的缓存。
+   */
+  private class CorruptingBytecodeCache(
+    private val delegate: JsBytecodeCache,
+  ) : JsBytecodeCache by delegate {
+
+    var corruptReads: Boolean = false
+    var corruptReadNumber: Int? = null
+    private var readCount: Int = 0
+
+    fun resetReadCount() {
+      readCount = 0
+    }
+
+    override suspend fun readBytecode(key: JsBytecodeCacheKey): ByteArray? {
+      val bytecode = delegate.readBytecode(key) ?: return null
+      readCount++
+      return if (corruptReads || readCount == corruptReadNumber) byteArrayOf(0) else bytecode
+    }
   }
 }

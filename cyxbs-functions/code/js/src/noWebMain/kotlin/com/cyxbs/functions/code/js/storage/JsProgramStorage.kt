@@ -49,6 +49,7 @@ value class JsBytecodeCacheKey(val value: String) {
 /**
  * 可删除、可重建的 QuickJS 字节码缓存。
  *
+ * 每个入口或依赖 Module 使用独立 [JsBytecodeCacheKey]，同一次程序执行可能读写多个缓存项。
  * 实现读取到损坏内容时应把它视为未命中，而不是把未知字节交给 QuickJS 执行。
  */
 interface JsBytecodeCache {

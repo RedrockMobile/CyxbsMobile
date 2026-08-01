@@ -1,7 +1,6 @@
 package com.cyxbs.functions.code.js
 
-import com.cyxbs.functions.code.js.runtime.JsModuleContent
-import com.cyxbs.functions.code.js.runtime.JsModuleLoader
+import com.cyxbs.functions.code.js.internal.JsProgramExecutor
 import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
 import com.cyxbs.functions.code.js.storage.JsBytecodeCache
 import com.cyxbs.functions.code.js.storage.JsBytecodeCacheKey
@@ -12,36 +11,38 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okio.Buffer
-import okio.ByteString.Companion.toByteString
 
 /**
- * 本次运行实际使用的可执行产物来源。
+ * 本次运行入口文件实际使用的可执行产物来源。
+ *
+ * 依赖 Module 可以在同一次执行中混合使用缓存和源码，具体集合由
+ * [JsExecutionResult.compiledModules] 与 [JsExecutionResult.cachedModules] 给出。
  */
 enum class JsExecutableOrigin {
   /** 缓存未命中，在本机由源码编译得到。 */
   COMPILED_SOURCE,
 
-  /** 命中与当前引擎、策略和 Bundle 完全匹配的本地字节码。 */
+  /** 入口命中与当前引擎、策略和 Bundle 完全匹配的本地字节码。 */
   BYTECODE_CACHE,
-
-  /** 当前程序形态不适合安全复用字节码，直接执行源码。 */
-  SOURCE_DIRECT,
 }
 
 /**
  * JavaScript 执行结果。
  *
  * @param value 映射到 Kotlin 的返回值。
- * @param origin 本次使用源码编译还是字节码缓存。
+ * @param origin 本次入口使用源码编译还是字节码缓存。
  * @param engineVersion 实际执行使用的 QuickJS 版本。
  * @param reference 源码包引用。
+ * @param compiledModules 本次按实际依赖路径由源码新编译的入口或依赖 Module 名称。
+ * @param cachedModules 本次实际交给 QuickJS 使用的持久化缓存 Module 名称。
  */
 data class JsExecutionResult<T>(
   val value: T,
   val origin: JsExecutableOrigin,
   val engineVersion: String,
   val reference: JsProgramRef,
+  val compiledModules: Set<String>,
+  val cachedModules: Set<String>,
 )
 
 /**
@@ -133,12 +134,15 @@ class JsProgramClient(
   /**
    * 加载、校验并执行已安装源码包。
    *
-   * 缓存命中时直接执行字节码；未命中时在端上编译入口源码、原子写入缓存后执行。普通 JS
-   * 运行异常不会自动回退源码，以免已产生宿主副作用的脚本被重复执行。
+   * 入口和每个依赖 Module 都使用独立缓存键；源码未变化的 Module 可以跨源码包业务版本复用，
+   * 变化的 Module 会在实际依赖路径到达时重新编译。静态依赖准备阶段若缓存不可解析，会在尚未
+   * 执行顶层代码时使用新 Runtime 回退源码。动态 import 或普通 JS 运行异常不会自动重试，以免
+   * 已产生宿主副作用的脚本被重复执行；失败期间首次使用的动态 Module 缓存会被删除，供下次
+   * 执行回退源码修复。
    *
    * @param reference 已安装源码包引用。
    * @param environment 当前业务场景和能力 Bundle。
-   * @return 执行值及缓存命中信息。
+   * @return 执行值、入口来源及本次实际编译和命中的 Module 集合。
    * @throws JsProgramNotFoundException [reference] 对应的源码包尚未安装或已经被删除。
    * @throws JsPolicyViolationException 源码包或 Bundle 不满足当前执行策略。
    * @throws JsSourceVerificationException 源码来源或签名校验失败。
@@ -164,15 +168,8 @@ class JsProgramClient(
     return executeInternal(
       reference = reference,
       environment = environment,
-    ) { runtime, executable ->
-      when (executable) {
-        is PreparedJsExecutable.Bytecode -> runtime.evaluate<T>(executable.value)
-        is PreparedJsExecutable.Source -> runtime.evaluate<T>(
-          code = executable.code,
-          filename = executable.filename,
-          asModule = executable.asModule,
-        )
-      }
+    ) { runtime, entryBytecode ->
+      runtime.evaluate<T>(entryBytecode)
     }
   }
 
@@ -211,7 +208,7 @@ class JsProgramClient(
   internal suspend fun <T> executeInternal(
     reference: JsProgramRef,
     environment: JsExecutionEnvironment,
-    evaluator: suspend (runtime: QuickJsRuntime, executable: PreparedJsExecutable) -> T,
+    evaluator: suspend (runtime: QuickJsRuntime, entryBytecode: ByteArray) -> T,
   ): JsExecutionResult<T> {
     return withContext(executionDispatcher) {
       val sourcePackage = sourceStore.readSource(reference)
@@ -219,155 +216,17 @@ class JsProgramClient(
       environment.policy.validate(sourcePackage = sourcePackage, bundle = environment.bundle)
       environment.sourceVerifier.verify(sourcePackage)
 
-      // Module loader 必须在创建 Runtime 时确定；策略校验已保证源码包与 Bundle 不会出现同名模块。
-      val moduleSources = environment.bundle.modules +
-          sourcePackage.files.filterKeys { it != sourcePackage.entry }
-      val moduleLoader = JsModuleLoader { name ->
-        moduleSources[name]?.let(JsModuleContent::Source)
-      }
-      val runtime = QuickJsRuntime(
-        config = environment.policy.runtimeConfig,
-        moduleLoader = moduleLoader,
+      JsProgramExecutor(
+        bytecodeCache = bytecodeCache,
+        cacheErrorHandler = cacheErrorHandler,
+      ).execute(
+        sourcePackage = sourcePackage,
+        environment = environment,
+        evaluator = evaluator,
       )
-      try {
-        environment.bundle.install(runtime)
-
-        val origin: JsExecutableOrigin
-        val executable: PreparedJsExecutable
-        if (!supportsBytecodeCache(sourcePackage)) {
-          origin = JsExecutableOrigin.SOURCE_DIRECT
-          executable = PreparedJsExecutable.Source(
-            code = sourcePackage.entrySource(),
-            filename = sourcePackage.entry,
-            asModule = sourcePackage.mode == JsProgramMode.MODULE,
-          )
-        } else {
-          val cacheKey = createCacheKey(
-            sourcePackage = sourcePackage,
-            environment = environment,
-            engineVersion = runtime.engineVersion,
-          )
-          val cachedBytecode = readBytecodeSafely(cacheKey)
-          if (cachedBytecode != null) {
-            origin = JsExecutableOrigin.BYTECODE_CACHE
-            executable = PreparedJsExecutable.Bytecode(cachedBytecode)
-          } else {
-            origin = JsExecutableOrigin.COMPILED_SOURCE
-            val bytecode = runtime.compile(
-              code = sourcePackage.entrySource(),
-              filename = sourcePackage.entry,
-              asModule = false,
-            )
-            writeBytecodeSafely(key = cacheKey, bytecode = bytecode)
-            executable = PreparedJsExecutable.Bytecode(bytecode)
-          }
-        }
-
-        JsExecutionResult(
-          value = evaluator(runtime, executable),
-          origin = origin,
-          engineVersion = runtime.engineVersion,
-          reference = reference,
-        )
-      } finally {
-        runtime.close()
-      }
     }
   }
 
-  /**
-   * 缓存读取失败时退化为未命中，但协程取消必须继续向上传播。
-   */
-  internal suspend fun readBytecodeSafely(key: JsBytecodeCacheKey): ByteArray? {
-    return try {
-      bytecodeCache.readBytecode(key)
-    } catch (throwable: Throwable) {
-      if (throwable is CancellationException) throw throwable
-      cacheErrorHandler.onError(key, throwable)
-      null
-    }
-  }
-
-  /**
-   * 缓存写入失败不影响本次执行，但协程取消必须继续向上传播。
-   */
-  internal suspend fun writeBytecodeSafely(
-    key: JsBytecodeCacheKey,
-    bytecode: ByteArray,
-  ) {
-    try {
-      bytecodeCache.writeBytecode(key = key, bytecode = bytecode)
-    } catch (throwable: Throwable) {
-      if (throwable is CancellationException) throw throwable
-      cacheErrorHandler.onError(key, throwable)
-    }
-  }
-
-  companion object {
-    private const val BYTECODE_CACHE_FORMAT_VERSION = 1
-    private const val RUNTIME_ADAPTER_VERSION = 1
-
-    /**
-     * 根据源码、引擎和宿主环境生成字节码缓存键。
-     *
-     * QuickJS 或 Bundle 升级后键会自然变化，旧字节码不会进入新 Runtime。
-     */
-    internal fun createCacheKey(
-      sourcePackage: JsSourcePackage,
-      environment: JsExecutionEnvironment,
-      engineVersion: String,
-    ): JsBytecodeCacheKey {
-      val buffer = Buffer()
-      buffer.writeInt(BYTECODE_CACHE_FORMAT_VERSION)
-      buffer.writeInt(RUNTIME_ADAPTER_VERSION)
-      buffer.writeStableString(sourcePackage.contentHash)
-      buffer.writeStableString(sourcePackage.entry)
-      buffer.writeStableString(sourcePackage.mode.name)
-      buffer.writeStableString(engineVersion)
-      buffer.writeStableString(environment.policy.id)
-      buffer.writeStableString(environment.bundle.id)
-      buffer.writeInt(environment.bundle.version)
-      buffer.writeInt(environment.bundle.hostApiVersion)
-      val digest = buffer.readByteArray().toByteString().sha256().hex()
-      return JsBytecodeCacheKey(digest)
-    }
-
-    /**
-     * 判断当前程序能否安全使用字节码缓存。
-     *
-     * 当前 [JsBytecodeCache] 的键和值只描述整个程序和单份入口字节码，尚不能独立失效、保存和复用
-     * Module 图中的每个节点。因此这里只缓存单文件脚本，Module 增量缓存将在存储协议扩展后接入。
-     */
-    private fun supportsBytecodeCache(sourcePackage: JsSourcePackage): Boolean {
-      return sourcePackage.mode == JsProgramMode.SCRIPT && sourcePackage.files.size == 1
-    }
-
-    /**
-     * 向缓存键缓冲区写入带长度的 UTF-8 字符串。
-     */
-    private fun Buffer.writeStableString(value: String) {
-      val bytes = value.encodeToByteArray()
-      writeInt(bytes.size)
-      write(bytes)
-    }
-  }
-}
-
-/**
- * 已完成场景判断、等待交给 QuickJS 执行的程序形态。
- */
-@PublishedApi
-internal sealed interface PreparedJsExecutable {
-
-  /** 已通过完整性与兼容键校验的 QuickJS 字节码。 */
-  class Bytecode(val value: ByteArray) : PreparedJsExecutable
-
-  /** 不启用字节码缓存时直接执行的源码入口。 */
-  data class Source(
-    val code: String,
-    val filename: String,
-    val asModule: Boolean,
-  ) : PreparedJsExecutable
 }
 
 /**
