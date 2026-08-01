@@ -2,6 +2,7 @@ package com.cyxbs.functions.code.js.runtime
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction
+import com.dokar.quickjs.binding.define
 import com.dokar.quickjs.binding.function
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -200,6 +201,31 @@ class QuickJsRuntime(
     block: (args: Array<Any?>) -> Any?,
   ) {
     engine.function(name = name, block = block)
+  }
+
+  /**
+   * 向 JavaScript 全局对象注册一个只包含同步函数的命名空间。
+   *
+   * 该接口用于 `console.log` 一类对象式宿主桥，避免业务通过执行初始化脚本伪造对象。回调发生在
+   * QuickJS binding 边界内，必须快速返回，且不得同步重入当前 Runtime。
+   *
+   * @param name 挂载到 `globalThis` 的对象名。
+   * @param functions JavaScript 方法名到同步宿主实现的映射。
+   */
+  fun bindObjectFunctions(
+    name: String,
+    functions: Map<String, (args: Array<Any?>) -> Any?>,
+  ) {
+    require(name.isNotBlank()) { "Object binding name must not be blank." }
+    require(functions.isNotEmpty()) { "Object binding functions must not be empty." }
+    require(functions.keys.all { it.isNotBlank() }) {
+      "Object binding function names must not be blank."
+    }
+    engine.define(name) {
+      functions.forEach { (functionName, block) ->
+        function(functionName) { args -> block(args) }
+      }
+    }
   }
 
   /**

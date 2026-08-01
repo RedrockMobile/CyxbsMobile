@@ -68,35 +68,53 @@ val teachingBundle = JsRuntimeBundle(
   version = 1,
   hostApiVersion = 1,
   capabilities = listOf(
-    JsSyncFunctionCapability(
-      id = "teaching.output",
-      functionName = "print",
-    ) { args ->
-      appendTeachingOutput(args.joinToString())
-      null
+    JsTeachingConsoleCapability { message ->
+      teachingOutput.tryEmit(message)
     },
+    JsTeachingInputCapability(
+      input = { prompt -> awaitTeachingInput(prompt) },
+    ),
   ),
 )
 
 val teachingEnvironment = JsExecutionEnvironment.forTeaching(
   bundle = teachingBundle,
   policy = JsExecutionPolicy.teaching(
-    allowedCapabilityIds = setOf("teaching.output"),
+    allowedCapabilityIds = setOf(
+      JsTeachingConsoleCapability.ID,
+      JsTeachingInputCapability.ID,
+    ),
   ),
 )
 
 val sourcePackage = JsSourcePackage.create(
   packageId = "teaching.user-code",
   version = "1",
-  files = mapOf("main.js" to "print(40 + 2); 42"),
-  requiredCapabilities = setOf("teaching.output"),
+  mode = JsProgramMode.MODULE,
+  files = mapOf(
+    "main.js" to "console.log('Hello', await readLine('Name?'));",
+  ),
+  requiredCapabilities = setOf(
+    JsTeachingConsoleCapability.ID,
+    JsTeachingInputCapability.ID,
+  ),
 )
 
-val result = client.installAndExecute<Int>(
+val result = client.installAndExecute<Any?>(
   sourcePackage = sourcePackage,
   environment = teachingEnvironment,
 )
 ```
+
+`JsTeachingConsoleCapability` 提供 `console.log/info/warn/error` 和 `print`；输出回调位于 QuickJS
+同步 binding 边界，只应投递消息，不能阻塞或重入 Runtime。`JsTeachingInputCapability` 提供需要
+`await` 的 `readLine`。取消 `execute()` 所在协程会取消输入等待并中断正在运行的 JavaScript，
+可直接作为教学页面“停止运行”按钮的底层行为。
+
+QuickJS 原生提供标准 `JSON.parse()` 和 `JSON.stringify()`，不需要额外开放宿主能力。教学控制台
+会把普通对象、数组和嵌套值编码成合法 JSON 文本，顶层字符串仍按 `console.log` 习惯直接显示。
+Kotlin 与 JavaScript 需要交换复杂业务数据时，当前推荐通过宿主函数传递 JSON 字符串，并在脚本
+侧显式解析；这样协议可序列化、可记录，也不会把 Runtime 内对象泄漏到执行生命周期之外。
 
 网络、数据保存和动态 UI 等高权限桥必须分别建成独立 `JsHostCapability`，不要把一个全能对象暴露
 给教学 Bundle。
@@ -116,11 +134,14 @@ val result = client.installAndExecute<Int>(
 持久化错误也由业务处理。静态依赖可以在执行前通过 `resolveModuleGraph()` 解析和收集，动态
 `import()` 则在实际执行到对应语句时通过同一个回调返回。
 
-`JsProgramClient` 的持久化协议目前仍以一个程序缓存键保存一份入口字节码，尚未保存每个 Module
-各自的源码哈希和字节码。因此 Client 当前仍只缓存单文件 `SCRIPT`，Module 文件图继续执行源码；
-这属于业务缓存层的后续工作，不再是引擎加载限制。需要自行探索增量缓存的业务可以在创建
-`QuickJsRuntime` 时传入 `JsModuleLoader`，先编译入口 Module，再调用
-`resolveModuleGraph()` 收集静态依赖字节码，最后执行入口以继续处理动态 import。
+`JsProgramClient` 会为入口、静态依赖和动态 `import()` 依赖分别建立缓存项。缓存键包含 Module
+所有者、名称、源码哈希、QuickJS 版本、策略与 Bundle 环境，因此同一 `packageId` 发布新版本时，
+未变化的 Module 可以继续复用，只有实际依赖路径上源码发生变化的 Module 会重新编译。
+
+静态依赖会在执行顶层代码前通过 `resolveModuleGraph()` 解析；遇到不可解析缓存时，Client 会使用
+全新 Runtime 从源码安全重建。动态依赖只能在执行到 `import()` 时发现，若其缓存导致执行失败，
+Client 会删除本次新加载的动态缓存，但不会自动重跑可能已经产生宿主副作用的入口代码。业务可从
+`JsExecutionResult.compiledModules` 和 `cachedModules` 查看本次实际编译与命中的 Module。
 
 字节码缓存是可删除数据，可以调用：
 

@@ -3,16 +3,27 @@ package com.cyxbs.functions.code.js
 import com.cyxbs.functions.code.js.bundle.JsAsyncFunctionCapability
 import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
 import com.cyxbs.functions.code.js.bundle.JsSyncFunctionCapability
+import com.cyxbs.functions.code.js.bundle.teaching.JsConsoleLevel
+import com.cyxbs.functions.code.js.bundle.teaching.JsConsoleMessage
+import com.cyxbs.functions.code.js.bundle.teaching.JsTeachingConsoleCapability
+import com.cyxbs.functions.code.js.bundle.teaching.JsTeachingInputCapability
 import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
 import com.cyxbs.functions.code.js.storage.JsBytecodeCache
 import com.cyxbs.functions.code.js.storage.JsBytecodeCacheKey
 import com.cyxbs.functions.code.js.storage.InMemoryJsProgramStorage
 import com.dokar.quickjs.QuickJsException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * JavaScript 业务加载、场景隔离与字节码缓存测试。
@@ -167,6 +178,133 @@ class JsProgramClientTest {
         environment = environment,
       )
     }
+  }
+
+  /**
+   * 验证教学 Bundle 可以提供标准控制台输出和可挂起的行输入，且两项能力必须显式进入白名单。
+   */
+  @Test
+  fun executeWithTeachingConsoleAndLineInput() = runTest {
+    val storage = InMemoryJsProgramStorage()
+    val client = JsProgramClient(sourceStore = storage, bytecodeCache = storage)
+    val messages = mutableListOf<JsConsoleMessage>()
+    var requestedPrompt: String? = null
+    val bundle = JsRuntimeBundle(
+      id = "teaching-io",
+      version = 1,
+      hostApiVersion = 1,
+      capabilities = listOf(
+        JsTeachingConsoleCapability(messages::add),
+        JsTeachingInputCapability(
+          input = { prompt ->
+            requestedPrompt = prompt
+            "Cyxbs"
+          },
+        ),
+      ),
+    )
+    val environment = JsExecutionEnvironment.forTeaching(
+      bundle = bundle,
+      policy = JsExecutionPolicy.teaching(
+        allowedCapabilityIds = setOf(
+          JsTeachingConsoleCapability.ID,
+          JsTeachingInputCapability.ID,
+        ),
+      ),
+    )
+    val sourcePackage = JsSourcePackage.create(
+      packageId = "teaching.io",
+      version = "1",
+      entry = "main.js",
+      mode = JsProgramMode.MODULE,
+      files = mapOf(
+        "main.js" to """
+          const name = await readLine("Your name?");
+          console.log("Hello", name, 40 + 2);
+          console.log({
+            course: "KMP\nJS",
+            score: 42,
+            passed: true,
+            tags: ["json", null],
+            nested: { quote: '"' },
+          });
+          console.warn("Check input");
+          print("Done");
+        """.trimIndent(),
+      ),
+      requiredCapabilities = setOf(
+        JsTeachingConsoleCapability.ID,
+        JsTeachingInputCapability.ID,
+      ),
+    )
+
+    client.installAndExecute<Any?>(sourcePackage, environment)
+
+    assertEquals("Your name?", requestedPrompt)
+    assertEquals(
+      listOf(
+        JsConsoleMessage(JsConsoleLevel.LOG, listOf("Hello", "Cyxbs", "42")),
+        JsConsoleMessage(
+          JsConsoleLevel.LOG,
+          listOf(
+            "{\"course\":\"KMP\\nJS\",\"score\":42,\"passed\":true," +
+              "\"tags\":[\"json\",null],\"nested\":{\"quote\":\"\\\"\"}}",
+          ),
+        ),
+        JsConsoleMessage(JsConsoleLevel.WARN, listOf("Check input")),
+        JsConsoleMessage(JsConsoleLevel.LOG, listOf("Done")),
+      ),
+      messages,
+    )
+  }
+
+  /**
+   * 验证业务取消执行协程时，Client 会借助 QuickJS 原生 interrupt 停止已经进入的无限循环。
+   */
+  @Test
+  fun cancelRunningTeachingProgram() = runTest {
+    val storage = InMemoryJsProgramStorage()
+    val client = JsProgramClient(sourceStore = storage, bytecodeCache = storage)
+    val started = CompletableDeferred<Unit>()
+    val capabilityId = "teaching.execution-started"
+    val bundle = JsRuntimeBundle(
+      id = "teaching-cancellation",
+      version = 1,
+      hostApiVersion = 1,
+      capabilities = listOf(
+        JsSyncFunctionCapability(
+          id = capabilityId,
+          functionName = "notifyExecutionStarted",
+        ) {
+          started.complete(Unit)
+          null
+        },
+      ),
+    )
+    val environment = JsExecutionEnvironment.forTeaching(
+      bundle = bundle,
+      policy = JsExecutionPolicy.teaching(
+        allowedCapabilityIds = setOf(capabilityId),
+      ),
+    )
+    val sourcePackage = sourcePackage(
+      packageId = "teaching.cancellation",
+      code = "notifyExecutionStarted(); while (true) {}",
+      requiredCapabilities = setOf(capabilityId),
+    )
+    client.install(sourcePackage, environment)
+
+    val execution = backgroundScope.launch {
+      client.execute<Unit>(sourcePackage.reference, environment)
+    }
+    withContext(Dispatchers.Default) {
+      withTimeout(5.seconds) {
+        started.await()
+        execution.cancelAndJoin()
+      }
+    }
+
+    assertTrue(execution.isCancelled)
   }
 
   /**

@@ -98,6 +98,25 @@ class QuickJsRuntimeTest {
   }
 
   /**
+   * 验证 QuickJS 原生提供标准 JSON 解析与序列化，不依赖额外宿主 capability。
+   */
+  @Test
+  fun parseAndStringifyJson() = runTest {
+    val runtime = QuickJsRuntime()
+    try {
+      val json = """{"name":"Cyxbs","items":[1,true,null]}"""
+
+      val result = runtime.evaluate<String>(
+        code = "JSON.stringify(JSON.parse('$json'))",
+      )
+
+      assertEquals(json, result)
+    } finally {
+      runtime.close()
+    }
+  }
+
+  /**
    * 验证 Kotlin suspend 宿主函数会以 Promise 形式暴露给 JavaScript。
    */
   @Test
