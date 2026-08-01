@@ -146,6 +146,8 @@ internal class JsProgramExecutor(
       }
 
       if (sourcePackage.mode == JsProgramMode.MODULE) {
+        // 这里只解析、编译静态 import，不执行 Module 顶层代码，使损坏缓存能在产生业务副作用前安全回退源码；
+        // onCompiled 会立即写入内存，正式 evaluate 时会复用而不是重复编译。
         runtime.resolveModuleGraph(entryBytecode)
       }
 

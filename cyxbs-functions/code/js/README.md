@@ -10,6 +10,7 @@
 - `JsExecutionPolicy`：区分内部、教学场景的内存、源码大小、模块数和能力白名单。
 - `JsExecutionEnvironment`：把策略、Bundle 和来源校验器组合成一次业务环境。
 - `JsProgramClient`：统一安装、加载、编译缓存和执行入口。
+- `JsDiagnostic`：把执行异常转换为编辑器可直接展示的分类、源码位置和 JavaScript 堆栈。
 - `OkioJsProgramStorage`：Android、iOS、Desktop 共用的源码与字节码持久化。
 
 每次 `execute()` 都会创建独立 QuickJS Runtime。内部业务复用的是不可变 Bundle，不会共享
@@ -118,6 +119,29 @@ Kotlin 与 JavaScript 需要交换复杂业务数据时，当前推荐通过宿�
 
 网络、数据保存和动态 UI 等高权限桥必须分别建成独立 `JsHostCapability`，不要把一个全能对象暴露
 给教学 Bundle。
+
+## 错误诊断
+
+`execute()` 保持 QuickJS、协程和宿主能力的原始异常语义。教学编辑器只在展示错误时调用
+`toJsDiagnostic()`，即可获得稳定分类以及 QuickJS 能够提供的文件、行列和 JavaScript 堆栈：
+
+```kotlin
+try {
+  client.execute<Any?>(reference, teachingEnvironment)
+} catch (throwable: Throwable) {
+  val diagnostic = throwable.toJsDiagnostic()
+  editor.showDiagnostic(
+    message = diagnostic.message,
+    fileName = diagnostic.fileName,
+    line = diagnostic.lineNumber,
+    column = diagnostic.columnNumber,
+  )
+}
+```
+
+语法错误、Module 解析错误和普通运行错误使用独立分类；协程取消映射为 `CANCELLED`。QuickJS
+无法区分执行超时与调用方主动调用 `interruptEvaluation()`，两者统一映射为 `INTERRUPTED`。
+非 QuickJS 异常统一归为 `HOST_ERROR`，业务仍可在转换前按自己的存储、验签或网络异常细分。
 
 ## 字节码策略
 
