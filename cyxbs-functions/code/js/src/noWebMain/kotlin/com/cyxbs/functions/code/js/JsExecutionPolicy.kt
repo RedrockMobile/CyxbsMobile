@@ -1,5 +1,8 @@
 package com.cyxbs.functions.code.js
 
+import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
+import com.cyxbs.functions.code.js.runtime.QuickJsRuntimeConfig
+
 /**
  * JavaScript 的业务执行场景。
  */

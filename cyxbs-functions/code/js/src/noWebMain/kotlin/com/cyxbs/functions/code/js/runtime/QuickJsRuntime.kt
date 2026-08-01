@@ -1,4 +1,4 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.runtime
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction

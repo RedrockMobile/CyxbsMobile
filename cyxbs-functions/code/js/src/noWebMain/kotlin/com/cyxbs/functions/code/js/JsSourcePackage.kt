@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.js
 
+import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
 import kotlinx.serialization.Serializable
 import okio.Buffer
 import okio.ByteString.Companion.toByteString

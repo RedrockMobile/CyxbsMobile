@@ -1,5 +1,10 @@
 package com.cyxbs.functions.code.js
 
+import com.cyxbs.functions.code.js.bundle.JsAsyncFunctionCapability
+import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
+import com.cyxbs.functions.code.js.bundle.JsSyncFunctionCapability
+import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.storage.InMemoryJsProgramStorage
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,4 +1,4 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.runtime
 
 /**
  * 业务层向单个 [QuickJsRuntime] 提供的 ES Module 内容。

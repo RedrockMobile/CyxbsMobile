@@ -1,4 +1,4 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.runtime
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest

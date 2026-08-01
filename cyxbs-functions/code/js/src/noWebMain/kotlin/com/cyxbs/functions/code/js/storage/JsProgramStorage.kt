@@ -1,5 +1,7 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.storage
 
+import com.cyxbs.functions.code.js.JsProgramRef
+import com.cyxbs.functions.code.js.JsSourcePackage
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.jvm.JvmInline
@@ -12,7 +14,7 @@ import kotlin.jvm.JvmInline
 interface JsSourcePackageStore {
 
   /**
-   * 保存或覆盖相同 [JsProgramRef] 的源码包。
+   * 保存或覆盖相同 [com.cyxbs.functions.code.js.JsProgramRef] 的源码包。
    */
   suspend fun writeSource(sourcePackage: JsSourcePackage)
 

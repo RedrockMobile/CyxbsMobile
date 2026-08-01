@@ -1,4 +1,6 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.bundle
+
+import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
 
 /**
  * 可安装到 QuickJS Runtime 的单项宿主能力。
@@ -110,7 +112,7 @@ class JsRuntimeBundle(
   /**
    * 将 Bundle 的宿主能力安装到独立 Runtime。
    *
-   * [modules] 必须在 Runtime 创建前合并进 [JsModuleLoader]，因为新的 Module 加载流程属于
+   * [modules] 必须在 Runtime 创建前合并进 [com.cyxbs.functions.code.js.runtime.JsModuleLoader]，因为新的 Module 加载流程属于
    * Runtime 级配置，不能在 Context 创建后追加。
    *
    * @param runtime 已配置 Module loader 的独立 Runtime。

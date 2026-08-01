@@ -1,5 +1,13 @@
 package com.cyxbs.functions.code.js
 
+import com.cyxbs.functions.code.js.runtime.JsModuleContent
+import com.cyxbs.functions.code.js.runtime.JsModuleLoader
+import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.storage.JsBytecodeCache
+import com.cyxbs.functions.code.js.storage.JsBytecodeCacheKey
+import com.cyxbs.functions.code.js.storage.JsSourcePackageStore
+import com.dokar.quickjs.QuickJsException
+import com.dokar.quickjs.QuickJsInterruptedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +81,19 @@ class JsProgramClient(
    *
    * 内部场景会调用业务提供的签名校验器；教学场景默认信任本机编辑器生成的源码。策略校验在
    * 写入前完成，避免超限包污染本地存储。
+   *
+   * [JsSourcePackageVerifier] 与 [JsSourcePackageStore] 实现抛出的其他异常不会被捕获或包装，
+   * 调用方应按自身实现处理。
+   *
+   * @throws JsPolicyViolationException 源码包或 Bundle 不满足当前执行策略。
+   * @throws JsSourceVerificationException 源码来源或签名校验失败。
+   * @throws CancellationException 安装过程所在协程被取消。
    */
+  @Throws(
+    JsPolicyViolationException::class,
+    JsSourceVerificationException::class,
+    CancellationException::class,
+  )
   suspend fun install(
     sourcePackage: JsSourcePackage,
     environment: JsExecutionEnvironment,
@@ -88,7 +108,11 @@ class JsProgramClient(
    * 删除指定源码包。
    *
    * 字节码键包含多项运行环境信息，无法只凭引用枚举；对应缓存会在业务清理缓存目录时删除。
+   * [JsSourcePackageStore] 实现抛出的存储异常会原样透传。
+   *
+   * @throws CancellationException 删除过程所在协程被取消。
    */
+  @Throws(CancellationException::class)
   suspend fun uninstall(reference: JsProgramRef) {
     sourceStore.removeSource(reference)
   }
@@ -97,7 +121,11 @@ class JsProgramClient(
    * 清空全部本地字节码缓存。
    *
    * 源码包不会被删除；下一次执行会按当前 QuickJS 和 Bundle 重新编译。
+   * [JsBytecodeCache] 实现抛出的存储异常会原样透传。
+   *
+   * @throws CancellationException 清理过程所在协程被取消。
    */
+  @Throws(CancellationException::class)
   suspend fun clearBytecodeCache() {
     bytecodeCache.clearBytecode()
   }
@@ -111,7 +139,24 @@ class JsProgramClient(
    * @param reference 已安装源码包引用。
    * @param environment 当前业务场景和能力 Bundle。
    * @return 执行值及缓存命中信息。
+   * @throws JsProgramNotFoundException [reference] 对应的源码包尚未安装或已经被删除。
+   * @throws JsPolicyViolationException 源码包或 Bundle 不满足当前执行策略。
+   * @throws JsSourceVerificationException 源码来源或签名校验失败。
+   * @throws QuickJsInterruptedException 执行超时或被 [QuickJsRuntime.interruptEvaluation] 主动中断。
+   * @throws QuickJsException QuickJS 初始化、编译、Module 加载或执行失败。
+   * @throws CancellationException 执行过程所在协程被取消。
+   *
+   * [JsSourcePackageStore]、[JsSourcePackageVerifier] 和 [JsBytecodeCacheErrorHandler] 实现抛出的
+   * 其他异常不会被捕获或包装。字节码缓存自身的普通读写异常只会通知
+   * [JsBytecodeCacheErrorHandler]，不会阻断源码执行。
    */
+  @Throws(
+    JsProgramNotFoundException::class,
+    JsPolicyViolationException::class,
+    JsSourceVerificationException::class,
+    QuickJsException::class,
+    CancellationException::class,
+  )
   suspend inline fun <reified T> execute(
     reference: JsProgramRef,
     environment: JsExecutionEnvironment,
@@ -133,7 +178,24 @@ class JsProgramClient(
 
   /**
    * 安装源码包后立即执行。
+   *
+   * 异常边界与依次调用 [install]、[execute] 相同；源码存储成功后若执行失败，已安装源码不会
+   * 自动回滚。
+   *
+   * @throws JsProgramNotFoundException 对应的源码包尚未安装或已经被删除。
+   * @throws JsPolicyViolationException 源码包或 Bundle 不满足当前执行策略。
+   * @throws JsSourceVerificationException 源码来源或签名校验失败。
+   * @throws QuickJsInterruptedException 执行超时或被 [QuickJsRuntime.interruptEvaluation] 主动中断。
+   * @throws QuickJsException QuickJS 初始化、编译、Module 加载或执行失败。
+   * @throws CancellationException 安装或执行过程所在协程被取消。
    */
+  @Throws(
+    JsProgramNotFoundException::class,
+    JsPolicyViolationException::class,
+    JsSourceVerificationException::class,
+    QuickJsException::class,
+    CancellationException::class,
+  )
   suspend inline fun <reified T> installAndExecute(
     sourcePackage: JsSourcePackage,
     environment: JsExecutionEnvironment,
