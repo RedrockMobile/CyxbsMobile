@@ -4,6 +4,7 @@ plugins {
 }
 
 useKtProvider() // api 模块服务提供
+useNavigation() // 注册编辑器测试页面
 
 kotlin {
   sourceSets {
@@ -14,6 +15,10 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.view)
     }
+    noWebMain.dependencies {
+      implementation(libs.kmp.kodemirror.view)
+      implementation(libs.kmp.kodemirror.basicSetup)
+      implementation(libs.kmp.kodemirror.langJavaScript)
+    }
   }
 }
-

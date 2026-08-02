@@ -76,6 +76,17 @@ object fields:
 
 解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
 
+## :cyxbs-functions:code
+
+### code/editor-test
+
+- entry: `com.cyxbs.functions.code.editor.preview.CodeEditorTestNavEntry`
+- argument: `com.cyxbs.functions.code.editor.preview.CodeEditorTestNavArgument`
+
+```text
+deeplink: cyxbs://code/editor-test
+```
+
 ## :cyxbs-functions:update
 
 ### dialog/update

@@ -85,8 +85,9 @@ private val itemList = listOf(
   ActionItem("签到") {
     AppScheme.jump("cyxbs://$NAV_SIGN")
   },
-
-
+  ActionItem("代码编辑器", Platform.Web) {
+    AppScheme.jump("cyxbs://code/editor-test")
+  },
 
   // 退出登陆放到最后，其他测试页面放到上面👆
   ActionItem("退出登录") {

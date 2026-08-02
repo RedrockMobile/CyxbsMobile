@@ -1,0 +1,66 @@
+package com.cyxbs.functions.code.editor.highlight
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import com.monkopedia.kodemirror.basicsetup.basicSetup
+import com.monkopedia.kodemirror.lang.javascript.javascript
+import com.monkopedia.kodemirror.state.plus
+import com.monkopedia.kodemirror.view.EditorSession
+import com.monkopedia.kodemirror.view.KodeMirror
+import com.monkopedia.kodemirror.view.rememberEditorSession
+
+/**
+ * JavaScript 编辑器状态。
+ *
+ * 状态内部持有 KodeMirror 会话，对外只暴露当前源码，避免业务代码依赖第三方编辑器类型。
+ * [code] 会读取编辑器的最新文档，可直接在“运行”操作触发时获取用户输入。
+ */
+@Stable
+class JavaScriptCodeEditorState internal constructor(
+  internal val session: EditorSession,
+) {
+
+  /** 当前编辑器中的完整 JavaScript 源码。 */
+  val code: String
+    get() = session.state.doc.toString()
+}
+
+/**
+ * 创建并记住一个 JavaScript 编辑器状态。
+ *
+ * @param initialCode 首次创建状态时使用的源码；后续重组不会覆盖用户已经编辑的内容。
+ * @return 可读取当前源码并在多个组合节点间共享的编辑器状态。
+ */
+@Composable
+fun rememberJavaScriptCodeEditorState(
+  initialCode: String = "",
+): JavaScriptCodeEditorState {
+  val session = rememberEditorSession(
+    doc = initialCode,
+    // basicSetup 已包含行号、折叠、括号匹配、搜索和补全；语言扩展负责 JS 解析与高亮。
+    extensions = basicSetup + javascript().extension,
+  )
+  return remember(session) { JavaScriptCodeEditorState(session) }
+}
+
+/**
+ * 使用纯 Compose KodeMirror 渲染可编辑的 JavaScript 代码视图。
+ *
+ * 当前组件仅进入 Android、iOS 与 Desktop 的 `noWebMain`。调用方应为组件提供有界高度，
+ * KodeMirror 才能在编辑区域内部正确滚动并保持光标可见。
+ *
+ * @param state 由 [rememberJavaScriptCodeEditorState] 创建的编辑器状态。
+ * @param modifier 应用到编辑器根节点的布局修饰符。
+ */
+@Composable
+fun JavaScriptCodeEditor(
+  state: JavaScriptCodeEditorState,
+  modifier: Modifier = Modifier,
+) {
+  KodeMirror(
+    session = state.session,
+    modifier = modifier,
+  )
+}
