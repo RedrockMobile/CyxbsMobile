@@ -32,13 +32,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.mine.sign.model.bean.SignStatus
 import com.cyxbs.pages.mine.sign.util.SignUtil
 import com.cyxbs.pages.mine.sign.viewmodel.SignComposeViewModel
-import com.cyxbs.pages.mine.sign.viewmodel.SignEvent
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_sign_bubble
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_sign_diamond
@@ -62,6 +62,8 @@ fun WeekSignProgress(
       WeekSignState()
     }
   }
+  val animationRequest = viewmodel.weekLineAnimation.collectAsStateWithLifecycle().value
+  val startedAnimationId = remember { mutableStateOf<Long?>(null) }
   // 将weekInfo转为State
   val lineStates = remember(signStatus.weekInfo) {
     signStatus.weekInfo.toWeekLineStates()
@@ -107,12 +109,18 @@ fun WeekSignProgress(
           WeekLineState.BLUE -> blueColor
           WeekLineState.LIGHT_BLUE -> lightBlueColor
         }
+        val isWaitingForAnimation = animationRequest?.let { request ->
+          request.id != startedAnimationId.value &&
+              request.index == index &&
+              request.weekInfo == signStatus.weekInfo &&
+              lineStates[index] == WeekLineState.BLUE
+        } == true
         drawWeekLine(
           start = Offset(startX, centerY),
           end = Offset(endX, centerY),
           backgroundColor = greyColor,
           foregroundColor = lineColor,
-          progress = weekSignStates[index].progress,
+          progress = if (isWaitingForAnimation) 0f else weekSignStates[index].progress,
           strokeWidth = stokeWidth
         )
       }
@@ -157,37 +165,29 @@ fun WeekSignProgress(
     }
   }
 
-  // 先缓存事件，再等待weekInfo
-  val pendingAnimation = remember {
-    mutableStateOf<SignEvent.AnimateWeekLine?>(null)
-  }
-  LaunchedEffect(viewmodel.updateProgressEvent) {
-    viewmodel.updateProgressEvent.collect { event ->
-      when (event) {
-        is SignEvent.AnimateWeekLine -> {
-          pendingAnimation.value = event
-        }
-      }
-    }
-  }
-  // 真正执行动画的地方
+  // 新状态首帧已按 0f 绘制，随后才启动前景线的渐进动画。
   LaunchedEffect(
-    pendingAnimation.value,
+    animationRequest?.id,
     signStatus.weekInfo,
   ) {
-    val event = pendingAnimation.value ?: return@LaunchedEffect
+    val event = animationRequest ?: return@LaunchedEffect
 
-    // 新状态尚未完成重组时，保留事件，等待下一次重组
     if (event.weekInfo != signStatus.weekInfo) return@LaunchedEffect
 
     val index = event.index
-    if (lineStates.getOrNull(index) == WeekLineState.BLUE) {
-      weekSignStates[index].setProgress(0f)
-      weekSignStates[index].animateProgress(1f)
+    if (lineStates.getOrNull(index) != WeekLineState.BLUE) {
+      viewmodel.finishWeekLineAnimation(event.id)
+      return@LaunchedEffect
     }
 
-    // animateProgress 完成后再清掉，避免 Effect 被提前取消
-    pendingAnimation.value = null
+    val lineState = weekSignStates[index]
+    lineState.setProgress(0f)
+    startedAnimationId.value = event.id
+    try {
+      lineState.animateProgress(1f)
+    } finally {
+      viewmodel.finishWeekLineAnimation(event.id)
+    }
   }
 
 }

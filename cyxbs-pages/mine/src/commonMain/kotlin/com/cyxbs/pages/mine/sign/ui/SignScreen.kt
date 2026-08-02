@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -77,8 +78,10 @@ fun SignScreen(
     ) {
       SignTopBar(onBack = onBack)
       SignHeader()
-      Spacer(modifier = Modifier.weight(1f))
       AnimatedVisibility(
+        modifier = Modifier
+          .fillMaxWidth()
+          .weight(1f),
         visibleState = panelVisible,
         enter = slideInVertically(
           initialOffsetY = { height -> height },
@@ -88,7 +91,12 @@ fun SignScreen(
           )
         )
       ) {
-        SignContent()
+        Box(
+          modifier = Modifier.fillMaxSize(),
+          contentAlignment = Alignment.BottomCenter,
+        ) {
+          SignContent()
+        }
       }
     }
   }
@@ -173,69 +181,73 @@ fun SignContent(
   val signState = viewmodel.signState.collectAsStateWithLifecycle()
   val signStatus = viewmodel.signStatus.collectAsStateWithLifecycle()
   val isChecking = viewmodel.isChecking.collectAsStateWithLifecycle()
-  Surface(
-    modifier = modifier
-      .fillMaxWidth()
-      .aspectRatio(1.04f),
-    shape = RoundedCornerShape(
-      topStart = 16.dp,
-      topEnd = 16.dp
-    ),
-    color = LocalAppColors.current.bottomBg
-  ) {
-    signStatus.value?.let { signStatus ->
-      Column(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(horizontal = 18.dp)
-      ) {
-        Text(
-          modifier = Modifier.padding(top = 32.dp),
-          text = when (signState.value) {
-            SignState.SIGNED -> "今日第${signStatus.rank}位打卡"
-            SignState.UNSIGNED -> "还没有打卡哦"
-            SignState.INVOCATION -> "寒暑假不可签到呢(●'ᴗ'σ)σணღ*"
-          },
-          fontSize = 22.sp,
-          fontWeight = FontWeight.Bold,
-          color = LocalAppColors.current.tvLv2
-        )
-        Spacer(Modifier.height(42.dp))
-        WeekSignProgress(
-          modifier = Modifier.align(Alignment.CenterHorizontally),
-          signStatus = signStatus
-        )
-        val isSignEnabled = !isChecking.value && !signStatus.isChecked && signStatus.canCheckIn
-        Button(
+  BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+    Surface(
+      modifier = Modifier
+        .fillMaxWidth()
+        .then(
+          if (maxWidth < 600.dp) Modifier.aspectRatio(1.04f) else Modifier.height(360.dp)
+        ),
+      shape = RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp
+      ),
+      color = LocalAppColors.current.bottomBg
+    ) {
+      signStatus.value?.let { signStatus ->
+        Column(
           modifier = Modifier
-            .padding(top = 30.dp)
-            .align(Alignment.CenterHorizontally)
-            .width(120.dp)
-            .height(40.dp),
-          shape = RoundedCornerShape(25.dp),
-          colors = ButtonDefaults.buttonColors(
-            backgroundColor = if (isSignEnabled) {
-              Color(0xFF3D35E2)
-            } else {
-              Color(0xFFE1DFE0)
-            },
-            contentColor = if (isSignEnabled) {
-              Color.White
-            } else {
-              Color(0xFFC3C0C1)
-            },
-            disabledBackgroundColor = Color(0xFFE1DFE0),
-            disabledContentColor = Color(0xFFC3C0C1),
-          ),
-          enabled = isSignEnabled,
-          onClick = {
-            viewmodel.checkIn()
-          }
+            .fillMaxSize()
+            .padding(horizontal = 18.dp)
         ) {
+          Text(
+            modifier = Modifier.padding(top = 32.dp),
+            text = when (signState.value) {
+              SignState.SIGNED -> "今日第${signStatus.rank}位打卡"
+              SignState.UNSIGNED -> "还没有打卡哦"
+              SignState.INVOCATION -> "寒暑假不可签到呢(●'ᴗ'σ)σணღ*"
+            },
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = LocalAppColors.current.tvLv2
+          )
+          Spacer(Modifier.height(42.dp))
+          WeekSignProgress(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            signStatus = signStatus
+          )
+          val isSignEnabled = !isChecking.value && !signStatus.isChecked && signStatus.canCheckIn
+          Button(
+            modifier = Modifier
+              .padding(top = 30.dp)
+              .align(Alignment.CenterHorizontally)
+              .width(120.dp)
+              .height(40.dp),
+            shape = RoundedCornerShape(25.dp),
+            colors = ButtonDefaults.buttonColors(
+              backgroundColor = if (isSignEnabled) {
+                Color(0xFF3D35E2)
+              } else {
+                Color(0xFFE1DFE0)
+              },
+              contentColor = if (isSignEnabled) {
+                Color.White
+              } else {
+                Color(0xFFC3C0C1)
+              },
+              disabledBackgroundColor = Color(0xFFE1DFE0),
+              disabledContentColor = Color(0xFFC3C0C1),
+            ),
+            enabled = isSignEnabled,
+            onClick = {
+              viewmodel.checkIn()
+            }
+          ) {
           Text(
             text = if (signStatus.canCheckIn && signStatus.isChecked) "已签到" else "签到",
             fontSize = 18.sp
           )
+          }
         }
       }
     }

@@ -8,11 +8,10 @@ import com.cyxbs.pages.mine.sign.model.repository.SignRepository
 import com.cyxbs.pages.mine.sign.model.service.SignService
 import com.cyxbs.pages.mine.sign.util.SignUtil
 import com.cyxbs.pages.mine.sign.util.postDailySignTask
-import kotlinx.coroutines.flow.MutableSharedFlow
+import com.cyxbs.pages.mine.sign.widget.WeekLineState
+import com.cyxbs.pages.mine.sign.widget.toWeekLineStates
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**  
@@ -33,11 +32,10 @@ class SignComposeViewModel : BaseViewModel() {
   private val _isChecking: MutableStateFlow<Boolean> = MutableStateFlow(false)
   val isChecking: StateFlow<Boolean> get() = _isChecking.asStateFlow()
 
-  // 发送动画的事件
-  private val _updateProgressEvent: MutableSharedFlow<SignEvent> = MutableSharedFlow(
-    extraBufferCapacity = 1
-  )
-  val updateProgressEvent: SharedFlow<SignEvent> get() = _updateProgressEvent.asSharedFlow()
+  private var nextAnimationId = 0L
+  private val _weekLineAnimation = MutableStateFlow<SignEvent.AnimateWeekLine?>(null)
+  val weekLineAnimation: StateFlow<SignEvent.AnimateWeekLine?> =
+    _weekLineAnimation.asStateFlow()
 
   init {
     refreshScoreStatus()
@@ -76,6 +74,18 @@ class SignComposeViewModel : BaseViewModel() {
     val uiSignStatus = signStatus.copy(
       weekInfo = signStatus.weekInfo.reversed()
     )
+    val todayIndex = SignUtil.getTodayOfWeek()
+    if (animateLine && todayIndex in 0..5 &&
+      uiSignStatus.weekInfo.toWeekLineStates(todayIndex)[todayIndex] == WeekLineState.BLUE
+    ) {
+      // 必须先写入动画请求，再发布新状态，避免新蓝线先以完整进度绘制一帧。
+      _weekLineAnimation.value = SignEvent.AnimateWeekLine(
+        id = ++nextAnimationId,
+        index = todayIndex,
+        weekInfo = uiSignStatus.weekInfo,
+      )
+    }
+
     _signStatus.value = uiSignStatus
     if (signStatus.canCheckIn && signStatus.isChecked) {
       _signState.value = SignState.SIGNED
@@ -85,17 +95,14 @@ class SignComposeViewModel : BaseViewModel() {
       _signState.value = SignState.INVOCATION
     }
 
-    val todayIndex = SignUtil.getTodayOfWeek()
-    if (animateLine && todayIndex in 0..5) {
-      _updateProgressEvent.emit(
-        SignEvent.AnimateWeekLine(
-          index = todayIndex,
-          weekInfo = uiSignStatus.weekInfo
-        )
-      )
-    }
     onRefreshSuccess?.invoke()
     return true
+  }
+
+  fun finishWeekLineAnimation(id: Long) {
+    if (_weekLineAnimation.value?.id == id) {
+      _weekLineAnimation.value = null
+    }
   }
 
   /**
@@ -142,7 +149,8 @@ enum class SignState {
 
 sealed interface SignEvent {
   data class AnimateWeekLine(
+    val id: Long,
     val index: Int,
-    val weekInfo: String
+    val weekInfo: String,
   ) : SignEvent
 }
