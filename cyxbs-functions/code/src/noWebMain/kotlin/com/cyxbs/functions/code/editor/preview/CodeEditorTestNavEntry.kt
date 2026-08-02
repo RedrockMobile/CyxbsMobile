@@ -28,8 +28,9 @@ import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.functions.code.editor.highlight.JavaScriptCodeEditor
 import com.cyxbs.functions.code.editor.highlight.rememberJavaScriptCodeEditorState
 import com.cyxbs.functions.code.js.diagnostic.toJsDiagnostic
-import com.cyxbs.functions.code.js.JsTeachingCodeResult
-import com.cyxbs.functions.code.js.JsTeachingCodeRunner
+import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
+import com.cyxbs.functions.code.js.teaching.JsTeachingCodeResult
+import com.cyxbs.functions.code.js.teaching.JsTeachingCodeRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -51,7 +52,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   @Composable
   override fun Content(argument: CodeEditorTestNavArgument) {
     val editorState = rememberJavaScriptCodeEditorState(initialCode = DEFAULT_CODE)
-    val runner = remember { JsTeachingCodeRunner.create() }
+    val runner = remember {
+      JsTeachingCodeRunner.create(QuickJsRuntimeFactory)
+    }
     val coroutineScope = rememberCoroutineScope()
     var isRunning by remember { mutableStateOf(false) }
     var output by remember { mutableStateOf("点击运行查看控制台输出") }
@@ -128,7 +131,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       append('[').append(message.level).append("] ").appendLine(message.text)
     }
     append("返回值：").append(value)
-    append("\n产物来源：").append(executableOrigin)
   }
 
   private companion object {
