@@ -11,7 +11,7 @@ internal sealed interface QuickJsModuleContent {
 }
 
 /**
- * QuickJS 内部 Module Loader，承载字节码复用与编译结果回收。
+ * QuickJS 内部 Module Loader，承载字节码复用、编译结果回收与失败通知。
  *
  * 该接口不会跨出实现模块；回调期间只能操作内存，不执行阻塞持久化。
  */
@@ -22,4 +22,7 @@ internal interface QuickJsModuleLoader {
 
   /** 接收 QuickJS 刚从源码编译出的单个 Module 字节码。 */
   fun onCompiled(name: String, bytecode: ByteArray) = Unit
+
+  /** 记录加载失败的 Module；回调期间不得执行阻塞操作。 */
+  fun onLoadFailed(name: String) = Unit
 }

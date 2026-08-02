@@ -11,7 +11,6 @@ import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleLoader
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
 import com.dokar.quickjs.QuickJsInterruptedException
-import com.dokar.quickjs.QuickJsModuleException
 import com.dokar.quickjs.binding.asyncFunction
 import com.dokar.quickjs.binding.define
 import com.dokar.quickjs.binding.function
@@ -81,6 +80,10 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
 
           override fun onCompiled(name: String, bytecode: ByteArray) {
             moduleLoader.onCompiled(name = name, bytecode = bytecode)
+          }
+
+          override fun onLoadFailed(name: String) {
+            moduleLoader.onLoadFailed(name)
           }
         },
       )
@@ -209,7 +212,6 @@ private fun QuickJsException.toJsRuntimeException(): JsRuntimeException {
   }.ifBlank { "JavaScript execution failed." }
   val kind = when {
     this is QuickJsInterruptedException -> JsRuntimeErrorKind.INTERRUPTED
-    this is QuickJsModuleException -> JsRuntimeErrorKind.MODULE_RESOLUTION_ERROR
     stableMessage.substringBefore(':') == "SyntaxError" -> JsRuntimeErrorKind.SYNTAX_ERROR
     stableMessage.contains("could not load module", ignoreCase = true) ->
       JsRuntimeErrorKind.MODULE_RESOLUTION_ERROR
@@ -222,7 +224,6 @@ private fun QuickJsException.toJsRuntimeException(): JsRuntimeException {
     lineNumber = lineNumber,
     columnNumber = columnNumber,
     jsStack = rawStack,
-    moduleName = (this as? QuickJsModuleException)?.moduleName,
     cause = this,
   )
 }

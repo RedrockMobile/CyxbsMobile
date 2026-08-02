@@ -98,7 +98,6 @@ class JsDiagnosticTest {
 
       assertEquals(JsDiagnosticKind.MODULE_RESOLUTION_ERROR, diagnostic.kind)
       assertContains(diagnostic.message, "could not load module")
-      assertEquals("missing", error.moduleName)
     } finally {
       runtime.close()
     }

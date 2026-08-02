@@ -182,11 +182,9 @@ class QuickJsCachingRuntimeTest {
       moduleLoader = JsModuleLoader { name -> moduleSources[name] },
     )
     try {
-      val exception = assertFailsWith<JsRuntimeException> {
+      assertFailsWith<JsRuntimeException> {
         failedRuntime.evaluate<Unit>(code = code, filename = filename, asModule = true)
       }
-
-      assertEquals(corruptedModuleName, exception.moduleName)
     } finally {
       failedRuntime.close()
     }
@@ -194,6 +192,43 @@ class QuickJsCachingRuntimeTest {
     assertNull(QuickJsBytecodeCache.readModule(corruptedModuleKey))
     assertContentEquals(validModuleBytecode, QuickJsBytecodeCache.readModule(validModuleKey))
     assertNotNull(QuickJsBytecodeCache.readEntry(entryKey))
+  }
+
+  /** 被 JavaScript 捕获的动态 import 失败仍会精准失效对应的持久化缓存。 */
+  @Test
+  fun handledDynamicImportFailureInvalidatesNamedModuleCache() = runTest {
+    val filename = "cache-handled-dynamic-import-entry.js"
+    val moduleName = "cache-handled-dynamic-import"
+    val moduleSource = "export const value = 42;"
+    val code = "try { await import('$moduleName'); } catch (_) {}"
+    val moduleKey = createQuickJsCacheKey(
+      kind = "module",
+      name = moduleName,
+      source = moduleSource,
+      engineVersion = engineVersion(),
+    )
+
+    val initialRuntime = QuickJsRuntimeFactory.create(
+      moduleLoader = JsModuleLoader { name -> moduleSource.takeIf { name == moduleName } },
+    )
+    try {
+      initialRuntime.evaluate<Unit>(code = code, filename = filename, asModule = true)
+    } finally {
+      initialRuntime.close()
+    }
+    assertNotNull(QuickJsBytecodeCache.readModule(moduleKey))
+    QuickJsBytecodeCache.writeModule(moduleKey, byteArrayOf(1, 2, 3, 4))
+
+    val failedRuntime = QuickJsRuntimeFactory.create(
+      moduleLoader = JsModuleLoader { name -> moduleSource.takeIf { name == moduleName } },
+    )
+    try {
+      failedRuntime.evaluate<Unit>(code = code, filename = filename, asModule = true)
+    } finally {
+      failedRuntime.close()
+    }
+
+    assertNull(QuickJsBytecodeCache.readModule(moduleKey))
   }
 
   /** 无缓存工厂不会读取或覆盖同一源码对应的损坏持久化入口。 */

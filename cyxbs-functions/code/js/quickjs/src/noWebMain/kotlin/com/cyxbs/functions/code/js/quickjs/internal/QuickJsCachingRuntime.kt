@@ -2,8 +2,6 @@ package com.cyxbs.functions.code.js.quickjs.internal
 
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntime
-import com.cyxbs.functions.code.js.runtime.JsRuntimeErrorKind
-import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import kotlinx.coroutines.CancellationException
 import okio.Buffer
@@ -110,12 +108,12 @@ internal class QuickJsCachingRuntime(
       runtime.resolveModuleGraph(entryBytecode)
     } catch (throwable: Throwable) {
       if (throwable is CancellationException) throw throwable
-      val failedModuleName = (throwable as? JsRuntimeException)?.moduleName
-      if (failedModuleName == null && entryUsedCache) {
+      val failedModuleNames = moduleState.takeFailedModuleNames()
+      if (failedModuleNames.isEmpty() && entryUsedCache) {
         cacheWrite { QuickJsBytecodeCache.removeEntry(entryKey) }
       }
-      invalidateFailedModuleCache(
-        failedModuleName = failedModuleName,
+      invalidateFailedModuleCaches(
+        failedModuleNames = failedModuleNames,
         cachedModuleNames = moduleState.usedCachedModuleNames(),
         moduleKeys = moduleKeys,
       )
@@ -125,16 +123,20 @@ internal class QuickJsCachingRuntime(
 
     val cachedBeforeEvaluation = moduleState.usedCachedModuleNames()
     try {
-      return runtime.evaluateBytecodeValue(entryBytecode)
+      val result = runtime.evaluateBytecodeValue(entryBytecode)
+      invalidateFailedModuleCaches(
+        failedModuleNames = moduleState.takeFailedModuleNames(),
+        cachedModuleNames = moduleState.usedCachedModuleNames() - cachedBeforeEvaluation,
+        moduleKeys = moduleKeys,
+      )
+      return result
     } catch (throwable: Throwable) {
       // 动态 import 可能在入口已产生副作用后才失败，因此只删除本次新触达的缓存，绝不自动重跑。
-      if (throwable is JsRuntimeException && throwable.kind != JsRuntimeErrorKind.VALUE_CONVERSION_ERROR) {
-        invalidateFailedModuleCache(
-          failedModuleName = throwable.moduleName,
-          cachedModuleNames = moduleState.usedCachedModuleNames() - cachedBeforeEvaluation,
-          moduleKeys = moduleKeys,
-        )
-      }
+      invalidateFailedModuleCaches(
+        failedModuleNames = moduleState.takeFailedModuleNames(),
+        cachedModuleNames = moduleState.usedCachedModuleNames() - cachedBeforeEvaluation,
+        moduleKeys = moduleKeys,
+      )
       throw throwable
     } finally {
       persistCompiled(
@@ -186,14 +188,16 @@ internal class QuickJsCachingRuntime(
    *
    * 源码 Module 加载失败不需要清缓存；缺少名称时也不能猜测并连带删除其他有效依赖。
    */
-  private suspend fun invalidateFailedModuleCache(
-    failedModuleName: String?,
+  private suspend fun invalidateFailedModuleCaches(
+    failedModuleNames: Set<String>,
     cachedModuleNames: Set<String>,
     moduleKeys: Map<String, QuickJsCacheKey>,
   ) {
-    val name = failedModuleName?.takeIf { it in cachedModuleNames } ?: return
-    val key = moduleKeys[name] ?: return
-    cacheWrite { QuickJsBytecodeCache.removeModule(key) }
+    failedModuleNames.forEach { name ->
+      if (name !in cachedModuleNames) return@forEach
+      val key = moduleKeys[name] ?: return@forEach
+      cacheWrite { QuickJsBytecodeCache.removeModule(key) }
+    }
   }
 
   private fun createRuntime(moduleState: JsModuleCacheState): QuickJsRuntime {

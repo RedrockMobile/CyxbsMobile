@@ -16,6 +16,7 @@ internal class JsModuleCacheState(
   private val seededCacheNames = mutableSetOf<String>()
   private val usedCacheNames = linkedSetOf<String>()
   private val loadedNames = linkedSetOf<String>()
+  private val failedNames = linkedSetOf<String>()
   private val compiled = linkedMapOf<String, ByteArray>()
 
   /** 在执行前放入已经通过缓存键和完整性校验的 Module 字节码。 */
@@ -43,11 +44,20 @@ internal class JsModuleCacheState(
     compiled[name] = copied
   }
 
+  override fun onLoadFailed(name: String) {
+    failedNames += name
+  }
+
   /** 返回本次确实交给 QuickJS 使用过的持久化缓存 Module。 */
   fun usedCachedModuleNames(): Set<String> = usedCacheNames.toSet()
 
   /** 返回静态或动态解析期间实际到达的 Module 名称。 */
   fun loadedModuleNames(): Set<String> = loadedNames.toSet()
+
+  /** 取出并清空上一批 QuickJS 调用期间报告的失败 Module。 */
+  fun takeFailedModuleNames(): Set<String> {
+    return failedNames.toSet().also { failedNames.clear() }
+  }
 
   /** 返回本次由源码新编译的依赖 Module 字节码快照。 */
   fun compiledBytecodes(): Map<String, ByteArray> {
