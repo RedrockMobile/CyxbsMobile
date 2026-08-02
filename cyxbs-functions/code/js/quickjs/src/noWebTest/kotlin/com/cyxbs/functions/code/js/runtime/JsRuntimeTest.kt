@@ -1,24 +1,28 @@
 package com.cyxbs.functions.code.js.runtime
 
+import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleContent as JsModuleContent
+import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleLoader
+import com.cyxbs.functions.code.js.quickjs.QuickJsRuntime as JsRuntime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * 跨 Android 设备、iOS 与 Desktop 复用的 QuickJS 基础能力测试。
+ * 跨 Android 设备、iOS 与 Desktop 复用的 JavaScript Runtime 基础能力测试。
  */
-class QuickJsRuntimeTest {
+class JsRuntimeTest {
 
   /**
    * 验证基础表达式执行和 Kotlin 数值转换。
    */
   @Test
   fun evaluateBasicExpression() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       assertEquals(42, runtime.evaluate<Int>("40 + 2"))
     } finally {
@@ -26,12 +30,27 @@ class QuickJsRuntimeTest {
     }
   }
 
+  /** 验证不兼容的 Kotlin 结果类型会转换为模块稳定异常。 */
+  @Test
+  fun rejectIncompatibleResultType() = runTest {
+    val runtime = JsRuntime()
+    try {
+      val exception = assertFailsWith<JsRuntimeException> {
+        runtime.evaluate<Boolean>("40 + 2")
+      }
+
+      assertEquals(JsRuntimeErrorKind.VALUE_CONVERSION_ERROR, exception.kind)
+    } finally {
+      runtime.close()
+    }
+  }
+
   /**
-   * 验证源码可先编译为字节码，再由同一 QuickJS 版本执行。
+   * 验证源码可先编译为字节码，再由同一 Runtime 版本执行。
    */
   @Test
   fun compileAndEvaluateBytecode() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       val bytecode = runtime.compile(
         code = "21 * 2",
@@ -48,7 +67,7 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun compileAndEvaluateStandaloneModuleBytecode() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       val bytecode = runtime.compile(
         code = "globalThis.__moduleBytecodeValue = 40 + 2",
@@ -69,13 +88,14 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun interruptInfiniteLoopOnTimeout() = runTest {
-    val runtime = QuickJsRuntime(
-      config = QuickJsRuntimeConfig(evaluationTimeoutMillis = 50L),
+    val runtime = JsRuntime(
+      config = JsRuntimeConfig(evaluationTimeoutMillis = 50L),
     )
     try {
-      kotlin.test.assertFailsWith<com.dokar.quickjs.QuickJsInterruptedException> {
+      val exception = assertFailsWith<JsRuntimeException> {
         runtime.evaluate<Unit>("while (true) {}")
       }
+      assertEquals(JsRuntimeErrorKind.INTERRUPTED, exception.kind)
     } finally {
       runtime.close()
     }
@@ -86,7 +106,7 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun awaitPromiseResult() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       val result = runtime.evaluate<Int>(
         "await Promise.resolve(40).then(value => value + 2)",
@@ -98,11 +118,11 @@ class QuickJsRuntimeTest {
   }
 
   /**
-   * 验证 QuickJS 原生提供标准 JSON 解析与序列化，不依赖额外宿主 capability。
+   * 验证 Runtime 原生提供标准 JSON 解析与序列化，不依赖额外宿主 capability。
    */
   @Test
   fun parseAndStringifyJson() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       val json = """{"name":"Cyxbs","items":[1,true,null]}"""
 
@@ -121,7 +141,7 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun invokeSuspendHostFunction() = runTest {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     try {
       runtime.bindAsyncFunction("doubleAsync") { args ->
         delay(1.milliseconds)
@@ -139,10 +159,10 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun loadEsModule() = runTest {
-    val runtime = QuickJsRuntime(
+    val runtime = JsRuntime(
       moduleLoader = JsModuleLoader { name ->
         if (name == "answer") {
-          JsModuleContent.Source("export const value = 42;")
+          "export const value = 42;"
         } else {
           null
         }
@@ -182,7 +202,7 @@ class QuickJsRuntimeTest {
       """.trimIndent(),
     )
     val initialCache = mutableMapOf<String, ByteArray>()
-    val initialLoader = object : JsModuleLoader {
+    val initialLoader = object : QuickJsModuleLoader {
       override fun load(name: String): JsModuleContent? {
         return initialCache[name]?.let(JsModuleContent::Bytecode)
           ?: initialSources[name]?.let(JsModuleContent::Source)
@@ -193,7 +213,7 @@ class QuickJsRuntimeTest {
         initialCache[name] = bytecode
       }
     }
-    val entryBytecode = QuickJsRuntime(moduleLoader = initialLoader).let { runtime ->
+    val entryBytecode = JsRuntime(internalModuleLoader = initialLoader).let { runtime ->
       try {
         runtime.compile(
           code = """
@@ -222,7 +242,7 @@ class QuickJsRuntimeTest {
       remove("middle")
     }
     val recompiledNames = mutableListOf<String>()
-    val refreshedLoader = object : JsModuleLoader {
+    val refreshedLoader = object : QuickJsModuleLoader {
       override fun load(name: String): JsModuleContent? {
         return refreshedCache[name]?.let(JsModuleContent::Bytecode)
           ?: refreshedSources[name]?.let(JsModuleContent::Source)
@@ -233,7 +253,7 @@ class QuickJsRuntimeTest {
         recompiledNames += name
       }
     }
-    val refreshedRuntime = QuickJsRuntime(moduleLoader = refreshedLoader)
+    val refreshedRuntime = JsRuntime(internalModuleLoader = refreshedLoader)
     var captured: Int? = null
     try {
       refreshedRuntime.bindFunction("capture") { args ->
@@ -260,8 +280,8 @@ class QuickJsRuntimeTest {
   @Test
   fun collectDynamicImportBytecodeDuringEvaluation() = runTest {
     val compiledModules = mutableMapOf<String, ByteArray>()
-    val runtime = QuickJsRuntime(
-      moduleLoader = object : JsModuleLoader {
+    val runtime = JsRuntime(
+      internalModuleLoader = object : QuickJsModuleLoader {
         override fun load(name: String): JsModuleContent? {
           return compiledModules[name]?.let(JsModuleContent::Bytecode)
             ?: if (name == "dynamic-answer") {
@@ -303,7 +323,7 @@ class QuickJsRuntimeTest {
    */
   @Test
   fun closeRuntimeIdempotently() {
-    val runtime = QuickJsRuntime()
+    val runtime = JsRuntime()
     assertFalse(runtime.isClosed)
 
     runtime.close()

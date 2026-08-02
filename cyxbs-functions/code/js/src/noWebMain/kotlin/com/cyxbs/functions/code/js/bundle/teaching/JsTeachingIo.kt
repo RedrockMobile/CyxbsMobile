@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.js.bundle.teaching
 
 import com.cyxbs.functions.code.js.bundle.JsHostCapability
-import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.runtime.JsRuntime
 
 /**
  * 教学控制台消息级别。
@@ -16,7 +16,7 @@ enum class JsConsoleLevel {
 /**
  * JavaScript 控制台输出的一条不可变消息。
  *
- * 参数会在 QuickJS binding 回调期间转换成字符串，避免业务在 Runtime 关闭后持有原生 JS 对象。
+ * 参数会在引擎 binding 回调期间转换成字符串，避免业务在 Runtime 关闭后持有原生 JS 对象。
  *
  * @param level 输出级别。
  * @param arguments 按调用参数顺序格式化后的文本。
@@ -34,7 +34,7 @@ data class JsConsoleMessage(
 /**
  * 接收教学 JavaScript 的控制台输出。
  *
- * 回调发生在 QuickJS 同步 binding 边界内，使用方必须快速返回，不得阻塞或同步重入当前 Runtime。
+ * 回调发生在引擎同步 binding 边界内，使用方必须快速返回，不得阻塞或同步重入当前 Runtime。
  * 若需要写数据库、文件或切换线程，应只在这里投递消息。回调异常不会被捕获，会传回当前执行。
  */
 fun interface JsConsoleSink {
@@ -57,7 +57,7 @@ class JsTeachingConsoleCapability(
   override val id: String = ID,
 ) : JsHostCapability {
 
-  override fun install(runtime: QuickJsRuntime) {
+  override fun install(runtime: JsRuntime) {
     runtime.bindObjectFunctions(
       name = "console",
       functions = linkedMapOf(
@@ -86,7 +86,7 @@ class JsTeachingConsoleCapability(
     const val ID: String = "teaching.console"
 
     /**
-     * 把 QuickJS 已转换的参数变成可安全跨越 Runtime 生命周期的文本。
+     * 把引擎已转换的参数变成可安全跨越 Runtime 生命周期的文本。
      */
     private fun formatConsoleArgument(value: Any?): String = when (value) {
       null -> "null"
@@ -97,7 +97,7 @@ class JsTeachingConsoleCapability(
     }
 
     /**
-     * 将 QuickJS 已转换的普通对象和数组编码为合法 JSON，便于教学控制台稳定展示嵌套数据。
+     * 将引擎已转换的普通对象和数组编码为合法 JSON，便于教学控制台稳定展示嵌套数据。
      */
     private fun formatJsonValue(value: Any?): String = when (value) {
       null, Unit -> "null"
@@ -151,7 +151,7 @@ class JsTeachingConsoleCapability(
 /**
  * 教学脚本请求一行文本输入的提供方。
  *
- * 实现可以挂起等待 UI 输入。取消 JavaScript 执行所在协程会同时取消等待，并触发 QuickJS 原生中断。
+ * 实现可以挂起等待 UI 输入。取消 JavaScript 执行所在协程会同时取消等待，并请求底层引擎中断。
  */
 fun interface JsLineInput {
 
@@ -167,8 +167,8 @@ fun interface JsLineInput {
 /**
  * 向教学脚本提供异步 `readLine(prompt?)`。
  *
- * JavaScript 侧必须通过 `await readLine()` 获取结果。等待输入的时间不计入 QuickJS 的纯 JS 执行
- * 超时，调用方如需限制整次运行耗时，应对 [com.cyxbs.functions.code.js.JsProgramClient.execute]
+ * JavaScript 侧必须通过 `await readLine()` 获取结果。等待输入的时间不计入引擎的纯 JS 执行
+ * 超时，调用方如需限制整次运行耗时，应对 [com.cyxbs.functions.code.js.program.JsProgramClient.execute]
  * 所在协程使用 `withTimeout` 或主动取消。
  *
  * @param input 实际输入提供方。
@@ -179,7 +179,7 @@ class JsTeachingInputCapability(
   override val id: String = ID,
 ) : JsHostCapability {
 
-  override fun install(runtime: QuickJsRuntime) {
+  override fun install(runtime: JsRuntime) {
     runtime.bindAsyncFunction("readLine") { args ->
       require(args.size <= 1) { "readLine accepts at most one prompt argument." }
       input.readLine(args.firstOrNull()?.toString())

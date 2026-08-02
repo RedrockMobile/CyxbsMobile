@@ -1,7 +1,7 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.program
 
 import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
-import com.cyxbs.functions.code.js.runtime.QuickJsRuntimeConfig
+import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 
 /**
  * JavaScript 的业务执行场景。
@@ -17,9 +17,9 @@ enum class JsExecutionScene {
 /**
  * JavaScript 执行策略与资源上限。
  *
- * @param id 策略稳定标识，也会参与字节码缓存隔离。
+ * @param id 策略稳定标识，用于诊断和区分业务约束。
  * @param scene 业务场景。
- * @param runtimeConfig QuickJS 内存与栈限制。
+ * @param runtimeConfig JavaScript Runtime 的资源与执行限制。
  * @param maxPackageSourceBytes 单个源码包最大 UTF-8 字节数。
  * @param maxPackageFiles 单个源码包最大文件数。
  * @param maxBundleSourceBytes Bundle 预置模块最大 UTF-8 字节数。
@@ -30,7 +30,7 @@ enum class JsExecutionScene {
 data class JsExecutionPolicy(
   val id: String,
   val scene: JsExecutionScene,
-  val runtimeConfig: QuickJsRuntimeConfig,
+  val runtimeConfig: JsRuntimeConfig,
   val maxPackageSourceBytes: Long,
   val maxPackageFiles: Int,
   val maxBundleSourceBytes: Long,
@@ -97,7 +97,7 @@ data class JsExecutionPolicy(
      */
     fun internal(
       id: String = "internal",
-      runtimeConfig: QuickJsRuntimeConfig = QuickJsRuntimeConfig(
+      runtimeConfig: JsRuntimeConfig = JsRuntimeConfig(
         memoryLimitBytes = 64L * 1024L * 1024L,
         maxStackSizeBytes = 512L * 1024L,
       ),
@@ -126,7 +126,7 @@ data class JsExecutionPolicy(
     fun teaching(
       id: String = "teaching",
       allowedCapabilityIds: Set<String> = emptySet(),
-      runtimeConfig: QuickJsRuntimeConfig = QuickJsRuntimeConfig(
+      runtimeConfig: JsRuntimeConfig = JsRuntimeConfig(
         memoryLimitBytes = 16L * 1024L * 1024L,
         maxStackSizeBytes = 256L * 1024L,
       ),

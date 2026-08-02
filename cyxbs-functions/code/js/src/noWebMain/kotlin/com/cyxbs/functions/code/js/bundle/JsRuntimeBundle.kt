@@ -1,9 +1,9 @@
 package com.cyxbs.functions.code.js.bundle
 
-import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.runtime.JsRuntime
 
 /**
- * 可安装到 QuickJS Runtime 的单项宿主能力。
+ * 可安装到 JavaScript Runtime 的单项宿主能力。
  *
  * 每项能力必须拥有稳定 ID，执行策略会按 ID 做白名单校验。实现中可以注册一个或多个函数，
  * 但修改函数语义或名称后必须提升所属 [JsRuntimeBundle.version]。
@@ -16,7 +16,7 @@ interface JsHostCapability {
    *
    * 该方法每次执行脚本都会在新的 Runtime 上调用，不能假设多个脚本共享全局 JS 状态。
    */
-  fun install(runtime: QuickJsRuntime)
+  fun install(runtime: JsRuntime)
 }
 
 /**
@@ -32,7 +32,7 @@ class JsSyncFunctionCapability(
   private val block: (args: Array<Any?>) -> Any?,
 ) : JsHostCapability {
 
-  override fun install(runtime: QuickJsRuntime) {
+  override fun install(runtime: JsRuntime) {
     runtime.bindFunction(name = functionName, block = block)
   }
 }
@@ -50,7 +50,7 @@ class JsAsyncFunctionCapability(
   private val block: suspend (args: Array<Any?>) -> Any?,
 ) : JsHostCapability {
 
-  override fun install(runtime: QuickJsRuntime) {
+  override fun install(runtime: JsRuntime) {
     runtime.bindAsyncFunction(name = functionName, block = block)
   }
 }
@@ -108,18 +108,6 @@ class JsRuntimeBundle(
    */
   val capabilityIds: Set<String>
     get() = capabilities.mapTo(linkedSetOf()) { it.id }
-
-  /**
-   * 将 Bundle 的宿主能力安装到独立 Runtime。
-   *
-   * [modules] 必须在 Runtime 创建前合并进 [com.cyxbs.functions.code.js.runtime.JsModuleLoader]，因为新的 Module 加载流程属于
-   * Runtime 级配置，不能在 Context 创建后追加。
-   *
-   * @param runtime 已配置 Module loader 的独立 Runtime。
-   */
-  internal fun install(runtime: QuickJsRuntime) {
-    capabilities.forEach { it.install(runtime) }
-  }
 
   companion object {
     private val ID_REGEX = Regex("[A-Za-z0-9._-]{1,128}")

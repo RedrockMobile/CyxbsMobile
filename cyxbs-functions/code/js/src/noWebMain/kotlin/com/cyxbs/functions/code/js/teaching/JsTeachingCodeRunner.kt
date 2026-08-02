@@ -1,9 +1,12 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.teaching
 
 import com.cyxbs.functions.code.js.bundle.teaching.JsConsoleMessage
-import com.cyxbs.functions.code.js.teaching.DefaultJsTeachingCodeRunner
-import com.dokar.quickjs.QuickJsException
-import com.dokar.quickjs.QuickJsInterruptedException
+import com.cyxbs.functions.code.js.program.JsPolicyViolationException
+import com.cyxbs.functions.code.js.program.JsProgramClient
+import com.cyxbs.functions.code.js.program.JsSourceVerificationException
+import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
+import com.cyxbs.functions.code.js.runtime.JsRuntimeException
+import com.cyxbs.functions.code.js.storage.InMemoryJsProgramStorage
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -11,12 +14,10 @@ import kotlinx.coroutines.CancellationException
  *
  * @param value JavaScript 最后一个表达式映射到 Kotlin 后的值。
  * @param consoleMessages 本次执行通过 `console.*` 或 `print` 产生的有序输出。
- * @param executableOrigin 入口本次来自源码编译还是进程内字节码缓存。
  */
 data class JsTeachingCodeResult(
   val value: Any?,
   val consoleMessages: List<JsConsoleMessage>,
-  val executableOrigin: JsExecutableOrigin,
 )
 
 /**
@@ -30,17 +31,16 @@ interface JsTeachingCodeRunner {
    * 编译并执行用户输入的单文件 JavaScript。
    *
    * @param code 待执行的 JavaScript 源码，按普通 Script 语义编译。
-   * @return 表达式结果、控制台输出以及可执行产物来源。
+   * @return 表达式结果与控制台输出。
    * @throws JsPolicyViolationException 源码体积或教学能力不满足教学策略。
    * @throws JsSourceVerificationException 本地源码校验器拒绝当前源码。
-   * @throws QuickJsInterruptedException JavaScript 执行超时或被主动中断。
-   * @throws QuickJsException QuickJS 初始化、编译或执行失败。
+   * @throws JsRuntimeException JavaScript Runtime 初始化、编译、执行或中断失败。
    * @throws CancellationException 执行所在协程被取消。
    */
   @Throws(
     JsPolicyViolationException::class,
     JsSourceVerificationException::class,
-    QuickJsException::class,
+    JsRuntimeException::class,
     CancellationException::class,
   )
   suspend fun execute(code: String): JsTeachingCodeResult
@@ -50,8 +50,18 @@ interface JsTeachingCodeRunner {
     /**
      * 创建一个独立的教学 Runner。
      *
-     * 每个实例拥有自己的进程内源码和字节码缓存；需要复用缓存时，业务应复用同一个实例。
+     * 每个实例只在进程内保存教学源码，并固定禁止 Runtime 实现读写持久化字节码缓存。
+     *
+     * @param runtimeFactory 教学代码使用的 JavaScript Runtime 工厂。
      */
-    fun create(): JsTeachingCodeRunner = DefaultJsTeachingCodeRunner()
+    fun create(runtimeFactory: JsRuntimeFactory): JsTeachingCodeRunner {
+      return DefaultJsTeachingCodeRunner(
+        JsProgramClient(
+          sourceStore = InMemoryJsProgramStorage(),
+          runtimeFactory = runtimeFactory,
+          allowBytecodeCache = false,
+        ),
+      )
+    }
   }
 }

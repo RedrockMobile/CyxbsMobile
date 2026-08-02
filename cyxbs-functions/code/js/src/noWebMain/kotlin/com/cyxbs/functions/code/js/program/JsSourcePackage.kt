@@ -1,6 +1,6 @@
-package com.cyxbs.functions.code.js
+package com.cyxbs.functions.code.js.program
 
-import com.cyxbs.functions.code.js.runtime.QuickJsRuntime
+import com.cyxbs.functions.code.js.runtime.JsRuntime
 import kotlinx.serialization.Serializable
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
@@ -32,7 +32,7 @@ data class JsProgramRef(
 /**
  * 远端下发或教学编辑器生成的 JavaScript 源码包。
  *
- * 源码是唯一需要长期保存的原始产物，QuickJS 字节码只作为可失效缓存。构造时会重新计算
+ * 源码是唯一需要长期保存的原始产物，引擎生成的字节码只作为可失效缓存。构造时会重新计算
  * [contentHash]，避免存储、传输或反序列化后继续使用内容不一致的包。
  *
  * @param packageId 包标识，只允许字母、数字、点、下划线和短横线。
@@ -118,7 +118,7 @@ data class JsSourcePackage(
     fun create(
       packageId: String,
       version: String,
-      entry: String = QuickJsRuntime.DEFAULT_FILENAME,
+      entry: String = JsRuntime.DEFAULT_FILENAME,
       mode: JsProgramMode = JsProgramMode.SCRIPT,
       files: Map<String, String>,
       requiredHostApiVersion: Int = 1,

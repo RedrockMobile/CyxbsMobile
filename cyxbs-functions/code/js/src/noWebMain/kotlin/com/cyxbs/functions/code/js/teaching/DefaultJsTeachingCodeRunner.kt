@@ -1,19 +1,16 @@
 package com.cyxbs.functions.code.js.teaching
 
-import com.cyxbs.functions.code.js.JsExecutionEnvironment
-import com.cyxbs.functions.code.js.JsExecutionPolicy
-import com.cyxbs.functions.code.js.JsPolicyViolationException
-import com.cyxbs.functions.code.js.JsProgramClient
-import com.cyxbs.functions.code.js.JsProgramMode
-import com.cyxbs.functions.code.js.JsSourcePackage
-import com.cyxbs.functions.code.js.JsSourceVerificationException
-import com.cyxbs.functions.code.js.JsTeachingCodeResult
-import com.cyxbs.functions.code.js.JsTeachingCodeRunner
+import com.cyxbs.functions.code.js.program.JsExecutionEnvironment
+import com.cyxbs.functions.code.js.program.JsExecutionPolicy
+import com.cyxbs.functions.code.js.program.JsPolicyViolationException
+import com.cyxbs.functions.code.js.program.JsProgramClient
+import com.cyxbs.functions.code.js.program.JsProgramMode
+import com.cyxbs.functions.code.js.program.JsSourcePackage
+import com.cyxbs.functions.code.js.program.JsSourceVerificationException
 import com.cyxbs.functions.code.js.bundle.JsRuntimeBundle
 import com.cyxbs.functions.code.js.bundle.teaching.JsConsoleMessage
 import com.cyxbs.functions.code.js.bundle.teaching.JsTeachingConsoleCapability
-import com.cyxbs.functions.code.js.storage.InMemoryJsProgramStorage
-import com.dokar.quickjs.QuickJsException
+import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,21 +18,21 @@ import kotlinx.coroutines.sync.withLock
 /**
  * 基于现有 [JsProgramClient] 的教学 JavaScript Runner。
  *
- * 源码和字节码仅保存在当前对象的内存中，适合编辑器即时运行和预览；进程退出后不会持久化。
+ * 源码仅保存在当前对象的内存中，适合编辑器即时运行和预览；创建 Client 时固定禁用持久化缓存。
  * 同一个 Runner 的并发执行会串行化，避免固定教学源码引用在安装与读取之间被另一轮运行覆盖。
  */
-internal class DefaultJsTeachingCodeRunner : JsTeachingCodeRunner {
-  private val storage = InMemoryJsProgramStorage()
-  private val client = JsProgramClient(sourceStore = storage, bytecodeCache = storage)
+internal class DefaultJsTeachingCodeRunner(
+  private val client: JsProgramClient,
+) : JsTeachingCodeRunner {
   private val executionMutex = Mutex()
 
   /**
-   * 在互斥区内组装最小教学 Bundle，并复用同一 Client 完成源码安装、编译缓存和执行。
+   * 在互斥区内组装最小教学 Bundle，并复用同一 Client 完成源码安装和执行。
    */
   @Throws(
     JsPolicyViolationException::class,
     JsSourceVerificationException::class,
-    QuickJsException::class,
+    JsRuntimeException::class,
     CancellationException::class,
   )
   override suspend fun execute(code: String): JsTeachingCodeResult {
@@ -71,7 +68,6 @@ internal class DefaultJsTeachingCodeRunner : JsTeachingCodeRunner {
       JsTeachingCodeResult(
         value = result.value,
         consoleMessages = consoleMessages.toList(),
-        executableOrigin = result.origin,
       )
     }
   }
