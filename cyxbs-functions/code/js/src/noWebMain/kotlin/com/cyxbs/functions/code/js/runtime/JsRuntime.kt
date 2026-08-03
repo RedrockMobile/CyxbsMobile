@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.js.runtime
 
+import com.g985892345.provider.manager.KtProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,21 @@ fun interface JsRuntimeFactory {
    */
   @Throws(JsRuntimeException::class)
   fun create(options: JsRuntimeOptions): JsRuntime
+
+  companion object {
+
+    /** 默认 JavaScript 引擎在 KtProvider 中使用的名称。 */
+    const val DEFAULT_PROVIDER_NAME: String = "quickjs"
+
+    /**
+     * 从 KtProvider 获取指定 JavaScript 引擎，未安装对应实现时返回 null。
+     *
+     * 默认选择 QuickJS；调用方只依赖公共 Runtime 接口，具体引擎模块负责注册实现。
+     */
+    fun implOrNull(name: String = DEFAULT_PROVIDER_NAME): JsRuntimeFactory? {
+      return KtProvider.implOrNull(JsRuntimeFactory::class, name)
+    }
+  }
 }
 
 /**

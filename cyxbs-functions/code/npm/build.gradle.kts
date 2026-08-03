@@ -20,6 +20,11 @@ kotlin {
     }
     desktopTest {
       dependsOn(noWebTest)
+      dependencies {
+        implementation(projects.cyxbsFunctions.code.js.quickjs)
+        implementation(libs.kmp.ktProvider.testing)
+        implementation(libs.ktor.client.okhttp)
+      }
     }
     iosArm64Test {
       dependsOn(noWebTest)

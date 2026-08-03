@@ -338,11 +338,11 @@ class NpmPackageDownloaderTest {
     const val ENTRY_VERSION = "1.4.0"
     const val DOWNLOAD_BASE_URL = "https://cdn.example/npm"
     const val ENTRY_URL =
-      "https://cdn.example/npm/%40cyxbs%2Flanguage-javascript/1.4.0.tgz"
+      "https://cdn.example/npm/%40cyxbs%2Flanguage-javascript/-/language-javascript-1.4.0.tgz"
     const val DEPENDENCY = "@lezer/javascript"
     const val DEPENDENCY_VERSION = "1.5.4"
     const val DEPENDENCY_URL =
-      "https://cdn.example/npm/%40lezer%2Fjavascript/1.5.4.tgz"
+      "https://cdn.example/npm/%40lezer%2Fjavascript/-/javascript-1.5.4.tgz"
     const val UNRELATED = "@cyxbs/language-python"
   }
 }

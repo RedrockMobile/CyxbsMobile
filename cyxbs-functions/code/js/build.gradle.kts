@@ -6,6 +6,7 @@ kotlin {
   sourceSets {
     noWebMain.dependencies {
       implementation(libs.okio)
+      implementation(libs.kmp.ktProvider.manager)
     }
 
     val noWebTest = create("noWebTest") {

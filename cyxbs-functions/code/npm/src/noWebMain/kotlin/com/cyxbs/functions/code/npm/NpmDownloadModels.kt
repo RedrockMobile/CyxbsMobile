@@ -50,3 +50,9 @@ class NpmStorageException(
   message: String,
   cause: Throwable? = null,
 ) : NpmException(message, cause)
+
+/** npm tgz 格式、package.json 或 Module 导出结构无法安全解析。 */
+class NpmModuleResolutionException(
+  message: String,
+  cause: Throwable? = null,
+) : NpmException(message, cause)

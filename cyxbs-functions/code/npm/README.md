@@ -5,11 +5,12 @@
 1. 根据入口包计算后端依赖图的完整闭包；
 2. 先向 npm registry 校验所有缺失包的名称、精确版本和 SRI；
 3. 全部预检通过后，才从后端给出的 URL 下载 tarball；
-4. 校验真实响应的 SRI，并通过临时文件和原子移动写入缓存。
+4. 校验真实响应的 SRI，并通过临时文件和原子移动写入缓存；
+5. 按需将完整闭包解包到只读内存 Module 图，供 QuickJS 等引擎同步解析和加载。
 
 npm 返回的 `dependencies` 不参与客户端解析，依赖关系只以后端快照为准。该模块不依赖
-`code:language`，因此动态语言、普通 JS 插件等消费者都可以复用。当前阶段不负责 tar 解包、
-`exports` 解析或 QuickJS Module 名称映射。
+`code:language`，因此动态语言、普通 JS 插件等消费者都可以复用。`NpmModuleGraphFactory` 支持常见
+ESM `exports`、`module`、`main`、包子路径和相对 import；它不依赖具体 JavaScript 引擎。
 
 ## 网络请求协议
 
@@ -55,17 +56,17 @@ GET https://registry.npmjs.org/%40cyxbs%2Flanguage-javascript/1.4.0
 ### 3. tarball 下载
 
 ```text
-GET {baseUrl}/{encodedPackageName}/{encodedVersion}.tgz
+GET {baseUrl}/{encodedPackageName}/-/{unscopedName}-{encodedVersion}.tgz
 ```
 
 例如：
 
 ```text
-GET https://cdn.example/npm/%40cyxbs%2Flanguage-javascript/1.4.0.tgz
+GET https://cdn.example/npm/%40cyxbs%2Flanguage-javascript/-/language-javascript-1.4.0.tgz
 ```
 
-`baseUrl` 来自发布快照顶层 `urls`。多个地址按声明顺序回退；响应必须匹配快照中的 SRI 才会写入
-缓存。缓存命中的包不会请求精确版本元数据，也不会重新下载 tarball。
+`baseUrl` 来自发布快照顶层 `urls`，路径与 npm registry 标准 tarball 路由一致。多个地址按声明顺序
+回退；响应必须匹配快照中的 SRI 才会写入缓存。缓存命中的包不会请求精确版本元数据，也不会重新下载。
 
 请求顺序固定为：业务层获取快照 → 计算入口依赖闭包 → 检查缓存 → 预检全部缺失包元数据 → 下载
 缺失 tarball。任意元数据预检失败时，不会开始 tarball 下载。

@@ -48,7 +48,7 @@ class NpmPackageDownloader(
    *
    * 该方法不会请求发布快照。对缓存缺失的包，会先请求
    * `{registryBaseUrl}/{encodedPackageName}/{encodedVersion}`；全部预检通过后再请求
-   * `{baseUrl}/{encodedPackageName}/{encodedVersion}.tgz`。缓存命中的包不会产生网络请求。
+   * `{baseUrl}/{encodedPackageName}/-/{unscopedName}-{encodedVersion}.tgz`。缓存命中的包不会产生网络请求。
    *
    * @return 全部归档均重新校验或下载成功后的入口描述，归档按依赖优先顺序排列。
    * @throws NpmSnapshotException 后端快照、入口或依赖闭包无效。
@@ -118,7 +118,7 @@ class NpmPackageDownloader(
   }
 
   /**
-   * 按公共下载源顺序请求 `{baseUrl}/{encodedPackageName}/{encodedVersion}.tgz`。
+   * 按公共下载源顺序请求 npm registry 标准 tarball 路径。
    *
    * 只有响应通过 SRI 校验后才返回 tarball；当前地址失败时继续尝试下一个基础地址。
    */

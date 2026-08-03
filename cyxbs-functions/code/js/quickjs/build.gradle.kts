@@ -4,6 +4,8 @@ plugins {
   id("manager.lib")
 }
 
+useKtProvider()
+
 val androidDeviceTestApplicationId = "com.cyxbs.functions.code.js.quickjs.test"
 val androidDeviceTestRunner = "androidx.test.runner.AndroidJUnitRunner"
 

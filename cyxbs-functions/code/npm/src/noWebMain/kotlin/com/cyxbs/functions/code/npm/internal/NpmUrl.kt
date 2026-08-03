@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.npm.internal
 
 /**
- * 根据统一 npm 下载源规则生成精确版本 tarball 地址。
+ * 根据 npm registry 标准路由生成精确版本 tarball 地址。
  *
  * [baseUrl] 已由快照解析器校验为不含 query、fragment 和用户信息的 HTTPS 基础地址。
  */
@@ -14,7 +14,9 @@ internal fun buildNpmPackageDownloadUrl(
     append(baseUrl.trimEnd('/'))
     append('/')
     append(packageName.encodeNpmPathSegment())
-    append('/')
+    append("/-/")
+    append(packageName.substringAfterLast('/').encodeNpmPathSegment())
+    append('-')
     append(version.encodeNpmPathSegment())
     append(".tgz")
   }
