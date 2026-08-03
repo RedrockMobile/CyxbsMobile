@@ -12,6 +12,8 @@ internal class JsModuleCacheState(
   private val sourceLoader: JsModuleLoader?,
 ) : QuickJsModuleLoader {
 
+  override val normalizer = sourceLoader?.normalizer
+
   private val bytecodes = mutableMapOf<String, ByteArray>()
   private val seededCacheNames = mutableSetOf<String>()
   private val usedCacheNames = linkedSetOf<String>()

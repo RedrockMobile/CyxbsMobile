@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import com.dokar.quickjs.ModuleContent as EngineModuleContent
 import com.dokar.quickjs.ModuleLoader as EngineModuleLoader
+import com.dokar.quickjs.ModuleNormalizer as EngineModuleNormalizer
 
 /**
  * quickjs-kt 的内部 Runtime 适配器。
@@ -59,6 +60,8 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
   private val engine: QuickJs = runQuickJsOperation {
     val moduleLoader = internalModuleLoader ?: options.moduleLoader?.let { sourceLoader ->
       object : QuickJsModuleLoader {
+        override val normalizer = sourceLoader.normalizer
+
         override fun load(name: String): QuickJsModuleContent? {
           return sourceLoader.load(name)?.let(QuickJsModuleContent::Source)
         }
@@ -70,6 +73,13 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
       QuickJs.create(
         jobDispatcher = options.jobDispatcher,
         moduleLoader = object : EngineModuleLoader {
+          override val normalizer: EngineModuleNormalizer? =
+            moduleLoader.normalizer?.let { normalizer ->
+              EngineModuleNormalizer { baseName, requestedName ->
+                normalizer.normalize(baseName = baseName, requestedName = requestedName)
+              }
+            }
+
           override fun load(name: String): EngineModuleContent? {
             return when (val content = moduleLoader.load(name)) {
               is QuickJsModuleContent.Source -> EngineModuleContent.Source(content.code)

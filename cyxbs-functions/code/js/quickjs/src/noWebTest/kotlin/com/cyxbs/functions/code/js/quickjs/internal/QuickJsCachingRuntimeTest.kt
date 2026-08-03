@@ -3,7 +3,9 @@ package com.cyxbs.functions.code.js.quickjs.internal
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntime
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsModuleLoader
+import com.cyxbs.functions.code.js.runtime.JsModuleNormalizer
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
+import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import com.cyxbs.functions.code.js.runtime.create
 import com.cyxbs.functions.code.js.runtime.evaluate
 import kotlinx.coroutines.test.runTest
@@ -75,6 +77,49 @@ class QuickJsCachingRuntimeTest {
 
     assertEquals(setOf("cache-dependency"), QuickJsBytecodeCache.readManifest(entryKey))
     assertNotNull(QuickJsBytecodeCache.readModule(moduleKey))
+  }
+
+  /** Module 名称解析在启用或关闭字节码缓存时都必须透传到 QuickJS。 */
+  @Test
+  fun moduleNormalizerWorksWithAndWithoutBytecodeCache() = runTest {
+    listOf(false, true).forEach { allowBytecodeCache ->
+      val filename = "normalizer-$allowBytecodeCache-entry.js"
+      val canonicalName = "packages/answer.js"
+      val normalized = mutableListOf<Pair<String, String>>()
+      val loader = object : JsModuleLoader {
+        override val normalizer = JsModuleNormalizer { baseName, requestedName ->
+          normalized += baseName to requestedName
+          canonicalName
+        }
+
+        override fun load(name: String): String? {
+          return "export const value = 42;".takeIf { name == canonicalName }
+        }
+      }
+      var captured: Int? = null
+      val runtime = QuickJsRuntimeFactory.create(
+        JsRuntimeOptions(
+          moduleLoader = loader,
+          allowBytecodeCache = allowBytecodeCache,
+        ),
+      )
+      try {
+        runtime.bindFunction("capture") { args ->
+          captured = (args.single() as Number).toInt()
+          null
+        }
+        runtime.evaluate<Unit>(
+          code = "import { value } from 'answer-alias'; capture(value);",
+          filename = filename,
+          asModule = true,
+        )
+      } finally {
+        runtime.close()
+      }
+
+      assertEquals(42, captured)
+      assertEquals(setOf(filename to "answer-alias"), normalized.toSet())
+    }
   }
 
   /** 依赖源码哈希变化后只允许使用新源码对应的缓存，不能继续执行旧 Module 字节码。 */

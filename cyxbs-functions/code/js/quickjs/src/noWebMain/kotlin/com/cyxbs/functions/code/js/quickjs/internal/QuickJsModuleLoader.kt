@@ -1,5 +1,7 @@
 package com.cyxbs.functions.code.js.quickjs.internal
 
+import com.cyxbs.functions.code.js.runtime.JsModuleNormalizer
+
 /** QuickJS 内部使用的源码或兼容字节码 Module 内容。 */
 internal sealed interface QuickJsModuleContent {
 
@@ -16,6 +18,10 @@ internal sealed interface QuickJsModuleContent {
  * 该接口不会跨出实现模块；回调期间只能操作内存，不执行阻塞持久化。
  */
 internal interface QuickJsModuleLoader {
+
+  /** 可选的 Module 名称解析器；为空时保留 QuickJS 默认解析行为。 */
+  val normalizer: JsModuleNormalizer?
+    get() = null
 
   /** 返回源码、兼容字节码或缺失结果。 */
   fun load(name: String): QuickJsModuleContent?

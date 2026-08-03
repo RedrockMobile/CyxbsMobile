@@ -38,7 +38,9 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
       "desktopMain",
       "iosMain",
       "webJsMain",
+      "noWebMain",
       "jbComposeMain",
+      "noMobileMain", // 保证 noWebMain 在前，noMobile 因为与 noWeb 首字母相同，但前者少见，n 就用于 noWeb 新建
     ).map { SourceSet(project, it) }
 
     if (sourceSetList.all { it.kotlinFileChildren.isEmpty() }) {
@@ -51,6 +53,7 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
           "d 表示 desktopMain (仅桌面端)\n" +
           "i 表示 iosMain (仅 iOS)\n" +
           "w 表示 webJsMain (仅网页端)\n" +
+          "n 表示 noWebMain (webJsMain 取反)\n" +
           "j 表示 jbComposeMain (仅使用 jb Compose 的平台，androidMain + jbComposeMain = commonMain)\n")
       sc.nextLine().forEach { char ->
         sourceSetList.find { it.name.startsWith(char) }?.codeFile?.mkdirs()

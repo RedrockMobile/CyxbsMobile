@@ -1,0 +1,31 @@
+plugins {
+  id("manager.lib")
+}
+
+kotlin {
+  sourceSets {
+    noWebMain.dependencies {
+      implementation(libs.kotlinx.coroutines)
+      implementation(libs.kotlinx.serialization)
+      implementation(libs.ktor.core)
+      implementation(libs.okio)
+    }
+
+    val noWebTest = create("noWebTest") {
+      dependsOn(commonTest.get())
+      dependencies {
+        implementation(kotlin("test"))
+        implementation(libs.kotlinx.coroutines.test)
+      }
+    }
+    desktopTest {
+      dependsOn(noWebTest)
+    }
+    iosArm64Test {
+      dependsOn(noWebTest)
+    }
+    iosSimulatorArm64Test {
+      dependsOn(noWebTest)
+    }
+  }
+}
