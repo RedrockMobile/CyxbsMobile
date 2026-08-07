@@ -7,7 +7,7 @@
     android:background="@android:color/white"
     android:fitsSystemWindows="true">
 
-    <com.cyxbs.components.base.webView.LiteJsWebView
+    <com.cyxbs.components.base.webview.LiteJsWebView
         android:id="@+id/protocol_webView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

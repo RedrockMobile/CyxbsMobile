@@ -2,7 +2,7 @@ package com.cyxbs.pages.discover.pages.discover
 
 import androidx.core.net.toUri
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.base.webView.WebViewActivity
+import com.cyxbs.components.base.webview.WebViewActivity
 import com.cyxbs.components.config.route.DISCOVER_NEWS
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
 import com.cyxbs.components.config.service.impl

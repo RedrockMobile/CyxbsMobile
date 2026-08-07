@@ -7,7 +7,7 @@
         <activity android:name=".pages.SecretActivity"
             android:launchMode="singleInstance"/>
         <activity android:name=".crash.NetworkApiResultActivity" />
-        <activity android:name=".webView.WebViewActivity"
+        <activity android:name=".webview.WebViewActivity"
           android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
           />
     </application>

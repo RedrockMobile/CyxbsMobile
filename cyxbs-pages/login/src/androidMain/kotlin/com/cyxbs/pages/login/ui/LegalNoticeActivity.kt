@@ -6,7 +6,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.base.webView.LiteJsWebView
+import com.cyxbs.components.base.webview.LiteJsWebView
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.pages.login.R
 

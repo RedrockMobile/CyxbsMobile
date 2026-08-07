@@ -16,6 +16,7 @@ kotlin {
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.login.api)
+      implementation(libs.multiweb.compose)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

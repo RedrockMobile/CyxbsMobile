@@ -1,4 +1,4 @@
-package com.cyxbs.components.base.webView
+package com.cyxbs.components.base.webview
 
 import android.Manifest
 import android.app.Activity
@@ -91,12 +91,12 @@ class WebViewActivity : BaseActivity() {
 
     override fun startWebView(url: String) {
       val uri = url.toUri()
-      start(
+      WebViewNavArgument(
         url = url,
         hideTitle = uri.getQueryParameter(ARG_HIDE_TITLE)?.toBooleanStrictOrNull() ?: false,
         title = uri.getQueryParameter(ARG_TITLE),
         defaultTitle = uri.getQueryParameter(ARG_DEFAULT_TITLE) ?: DEFAULT_TITLE,
-      )
+      ).navigate()
     }
   }
 

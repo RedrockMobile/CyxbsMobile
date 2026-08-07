@@ -1,4 +1,4 @@
-package com.cyxbs.components.base.webView
+package com.cyxbs.components.base.webview
 
 import android.webkit.JavascriptInterface
 import com.cyxbs.components.account.api.IAccountService

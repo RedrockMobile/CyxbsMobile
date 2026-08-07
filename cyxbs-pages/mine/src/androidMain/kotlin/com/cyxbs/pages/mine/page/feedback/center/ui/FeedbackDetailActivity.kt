@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.view.View
 import android.webkit.WebSettings
 import android.widget.TextView
-import com.cyxbs.components.base.webView.LiteJsWebView
+import com.cyxbs.components.base.webview.LiteJsWebView
 import com.cyxbs.pages.mine.R
 import com.mredrock.cyxbs.common.ui.BaseActivity
 

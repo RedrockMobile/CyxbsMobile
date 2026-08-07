@@ -1,4 +1,4 @@
-package com.cyxbs.components.base.webView
+package com.cyxbs.components.base.webview
 
 import android.annotation.SuppressLint
 import android.content.Context

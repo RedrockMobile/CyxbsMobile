@@ -66,6 +66,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   val anchorItemStateList = mutableStateListOf<AnchorItemState>()
   val mapInfo = mutableStateOf<MapInfo?>(null)
   val buttonInfoItemList = mutableStateListOf<ButtonInfoItem>()
+  private var hasInitializedFocus = false
 
   // 下载地图进度dialog相关信息
   val progressDialogState = mutableStateOf(false)
@@ -197,6 +198,8 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 初始化聚焦信息
   fun initFocus(placeId: String) {
+    if (hasInitializedFocus) return
+    hasInitializedFocus = true
     // 如果初始化时bottomSheet展开的，说明当前是从image页pop回来的，不需要重新focus
     if (bottomSheetState.state == BottomSheetValueState.Expanded) return
     mapInfo.value?.let { mapInfo ->
