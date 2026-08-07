@@ -7,6 +7,7 @@ import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.base.webview.initializeDesktopWebViewRuntime
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
@@ -22,26 +23,29 @@ import org.jetbrains.compose.resources.painterResource
  * @date 2024/12/29
  */
 
-fun main() = runApp {
-  MultiplatformKtProviderInitializer.tryInitKtProvider()
-  InitialManager.init(isMainProcess = true)
-  FileKit.init(appId = "com.mredrock.cyxbs")
-  launchApplication {
-    val width = 900
-    val height = 600
-    Window(
-      onCloseRequest = ::exitApplication,
-      title = "桌上重邮",
-      state = rememberWindowState(width = width.dp, height = height.dp),
-      icon = painterResource(ConfigRes.configIcAppLogo())
-//      resizable = false,
-    ) {
-      remember {
-        this.window.minimumSize = java.awt.Dimension(300, 600)
-      }
-      AppTheme {
-        AppNavDisplay()
-        PlatformToastCompose()
+fun main() {
+  runApp {
+    MultiplatformKtProviderInitializer.tryInitKtProvider()
+    InitialManager.init(isMainProcess = true)
+    FileKit.init(appId = "com.mredrock.cyxbs")
+    initializeDesktopWebViewRuntime()
+    launchApplication {
+      val width = 900
+      val height = 600
+      Window(
+        onCloseRequest = ::exitApplication,
+        title = "桌上重邮",
+        state = rememberWindowState(width = width.dp, height = height.dp),
+        icon = painterResource(ConfigRes.configIcAppLogo())
+//        resizable = false,
+      ) {
+        remember {
+          this.window.minimumSize = java.awt.Dimension(300, 600)
+        }
+        AppTheme {
+          AppNavDisplay()
+          PlatformToastCompose()
+        }
       }
     }
   }
