@@ -1,0 +1,199 @@
+package npm
+
+import org.gradle.api.Project
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
+import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
+
+/**
+ * npm JavaScript 发布包的共享 Runtime 分包配置。
+ *
+ * 默认将 Kotlin/JS 基础模块放到独立 Runtime 包；Runtime 包自身将 [bundleKotlinRuntime] 设为 true，
+ * 其他业务包则在发布产物中移除这些模块，并把相对 import 改写为 npm 子路径。
+ * 普通业务模块应用 `manager.npmJs` 后即可使用默认配置，只有切换 Registry、Runtime 版本或
+ * Kotlin 工具链导致基础 Module 文件名变化时，才需要显式修改本扩展。
+ */
+abstract class NpmJsPackageExtension {
+  /** 当前包是否就是共享 Runtime 包，设为 true 时保留所有 Kotlin/JS 基础模块。 */
+  abstract val bundleKotlinRuntime: Property<Boolean>
+
+  /** 业务包需要依赖的共享 Runtime npm 包名。 */
+  abstract val runtimePackageName: Property<String>
+
+  /** 业务包写入 package.json 的共享 Runtime 精确版本。 */
+  abstract val runtimePackageVersion: Property<String>
+
+  /** 由共享 Runtime 包提供的 Kotlin/JS Module 文件名。 */
+  abstract val runtimeModuleFiles: SetProperty<String>
+
+  /** 提供最终 JavaScript Module 的聚合 production library 目录。 */
+  abstract val moduleSourceDirectory: DirectoryProperty
+
+  /** 提供当前 npm 包名、版本、入口和类型声明的原始 production library 目录。 */
+  abstract val packageMetadataDirectory: DirectoryProperty
+
+  /** 除当前模块 production library 外，生成聚合 Module 所需的额外任务路径。 */
+  abstract val additionalSourceTaskPaths: SetProperty<String>
+
+  /** 执行 pack 与 publish 时使用的 npm CLI 可执行文件。 */
+  abstract val npmExecutable: Property<String>
+
+  /** publish 任务的 npm Registry 地址，可在切换内部仓库时统一覆盖。 */
+  abstract val registryUrl: Property<String>
+
+  /** publish 任务写入的 npm dist-tag。 */
+  abstract val publishTag: Property<String>
+
+  /** publish 任务使用的 npm access，作用域公开包默认为 public。 */
+  abstract val publishAccess: Property<String>
+}
+
+/** 项目内 npm JavaScript Runtime 的稳定发布约定。 */
+object NpmJsPackageDefaults {
+  const val DISTRIBUTION_PROJECT_PATH = ":cyxbs-functions:code:npm:distribution"
+  const val RUNTIME_PACKAGE_NAME = "@cyxbs-mobile/kotlin-js-runtime"
+  const val RUNTIME_PACKAGE_VERSION = "0.1.0"
+
+  val RUNTIME_MODULE_FILES = setOf(
+    "kotlin-kotlin-stdlib.mjs",
+    "kotlin_org_jetbrains_kotlin_kotlin_dom_api_compat.mjs",
+    "kotlinx-atomicfu.mjs",
+    "kotlinx-coroutines-core.mjs",
+    "kotlinx-serialization-kotlinx-serialization-core.mjs",
+    "kotlinx-serialization-kotlinx-serialization-json.mjs",
+  )
+}
+
+/**
+ * 为应用当前 manager 插件的项目注册统一 npm 分包任务。
+ *
+ * 具体模块仍通过 Kotlin/JS 的 production library 生成原始产物；[PrepareNpmJsPackageTask] 再生成
+ * 可直接执行 npm pack 或 npm publish 的最终目录。业务模块会自动注册到全局
+ * distribution，其 pack 与 publish 任务也会分别保证 Runtime 已打包与已发布。
+ *
+ * 模块关系如下，其中箭头表示 Gradle 的 `jsMainApi` 依赖：
+ * ```text
+ * distribution ──> 所有应用 manager.npmJs 的业务模块 ──> 业务使用的 api-bridge
+ * ```
+ * 这里是 distribution 聚合业务模块，而不是业务模块依赖 distribution。业务模块仅在执行 npm
+ * 打包任务时复用 distribution 的聚合 production 产物，因此不会形成 Kotlin 源码依赖环。
+ *
+ * 对外任务按副作用从小到大分为：
+ * ```text
+ * prepareNpmJsPackage  生成可发布目录；不生成 tgz，不访问网络
+ *          │
+ *          ▼
+ * packNpmJsPackage     生成 Runtime 与当前业务包的 tgz；不访问 Registry
+ *
+ * publishNpmJsPackage  检查/按需发布 Runtime，再发布当前业务包；访问并修改 Registry
+ * ```
+ * 日常发布只需执行 `publishNpmJsPackage`；检查分包内容时执行 prepare，本地安装或 CI 留存制品时
+ * 执行 pack。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，不是业务方需要直接调用的入口。
+ */
+fun Project.configureNpmJsPackaging() {
+  val packageProject = this
+  val distributionProject = if (path == NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH) {
+    null
+  } else {
+    project(NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH)
+  }
+  val extension = extensions.create<NpmJsPackageExtension>("npmJsPackage").apply {
+    bundleKotlinRuntime.convention(false)
+    runtimePackageName.convention(NpmJsPackageDefaults.RUNTIME_PACKAGE_NAME)
+    runtimePackageVersion.convention(NpmJsPackageDefaults.RUNTIME_PACKAGE_VERSION)
+    runtimeModuleFiles.convention(NpmJsPackageDefaults.RUNTIME_MODULE_FILES)
+    moduleSourceDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
+    packageMetadataDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
+    additionalSourceTaskPaths.convention(emptySet())
+    npmExecutable.convention("npm")
+    registryUrl.convention("https://registry.npmjs.org")
+    publishTag.convention("latest")
+    publishAccess.convention("public")
+    if (distributionProject != null) {
+      // 业务包必须与 Runtime 从同一次 production DCE 结果切分，避免跨包 mangled ABI 不一致。
+      moduleSourceDirectory.set(
+        distributionProject.layout.buildDirectory.dir("dist/js/productionLibrary"),
+      )
+      additionalSourceTaskPaths.add(
+        "${distributionProject.path}:jsNodeProductionLibraryDistribution",
+      )
+    }
+  }
+  val preparePackage = tasks.register<PrepareNpmJsPackageTask>("prepareNpmJsPackage") {
+    group = "npm"
+    description = "本地生成完成 Runtime 分包的 npm 发布目录；不生成 tgz，也不访问网络。"
+    dependsOn("jsNodeProductionLibraryDistribution")
+    dependsOn(extension.additionalSourceTaskPaths)
+    moduleSourceDirectory.set(extension.moduleSourceDirectory)
+    packageMetadataDirectory.set(extension.packageMetadataDirectory)
+    outputDirectory.set(layout.buildDirectory.dir("npm/package"))
+    bundleKotlinRuntime.set(extension.bundleKotlinRuntime)
+    runtimePackageName.set(extension.runtimePackageName)
+    runtimePackageVersion.set(extension.runtimePackageVersion)
+    runtimeModuleFiles.set(extension.runtimeModuleFiles)
+  }
+  val packPackage = tasks.register<PackNpmJsPackageTask>("packNpmJsPackage") {
+    group = "npm"
+    description = "本地生成 Runtime 与当前业务 npm 包的 tgz；不访问 Registry。"
+    dependsOn(preparePackage)
+    packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
+    destinationDirectory.set(layout.buildDirectory.dir("npm/tarball"))
+    npmExecutable.set(extension.npmExecutable)
+  }
+  val publishPackage = tasks.register<PublishNpmJsPackageTask>("publishNpmJsPackage") {
+    group = "npm"
+    description = "检查并按需发布共享 Runtime，再将当前业务包发布到 Registry。"
+    dependsOn(preparePackage)
+    packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
+    npmExecutable.set(extension.npmExecutable)
+    registryUrl.set(extension.registryUrl)
+    publishTag.set(extension.publishTag)
+    publishAccess.set(extension.publishAccess)
+  }
+  if (distributionProject != null) {
+    // distribution 也使用同一插件。等待其插件完成应用，可同时避免业务模块与 distribution
+    // 的配置先后顺序影响依赖注册及任务查找。
+    distributionProject.pluginManager.withPlugin("manager.npmJs") {
+      // 每个业务模块都作为 distribution 的 jsMainApi 依赖进入同一次 Kotlin/JS production DCE。
+      // 因而公共 Kotlin Runtime 和跨模块 mangled 符号只生成一次，之后才能安全切成多个 npm 包。
+      val distributionDependency = distributionProject.dependencies.project(
+        mapOf("path" to packageProject.path),
+      )
+      distributionProject.dependencies.add("jsMainApi", distributionDependency)
+
+      val prepareRuntime = distributionProject.tasks.named<PrepareNpmJsPackageTask>(
+        "prepareNpmJsPackage",
+      )
+      val packRuntime = distributionProject.tasks.named<PackNpmJsPackageTask>(
+        "packNpmJsPackage",
+      )
+      packPackage.configure {
+        // 从任一业务模块执行 pack 时，同时产出共享 Runtime tgz。两份 tgz 各自保存在所属模块的
+        // build/npm/tarball 下，便于本地安装时验证与线上发布相同的依赖组合。
+        dependsOn(packRuntime)
+      }
+      val ensureRuntime = packageProject.tasks.register<EnsureNpmJsRuntimePublishedTask>(
+        "ensureNpmJsRuntimePublished",
+      ) {
+        // 不设置 group，避免它出现在业务方的 npm 任务入口中；publish 会自动依赖它。
+        description = "内部任务：联网校验并按需发布当前业务包依赖的共享 Kotlin/JS Runtime。"
+        dependsOn(prepareRuntime)
+        runtimePackageDirectory.set(prepareRuntime.flatMap { it.outputDirectory })
+        runtimePackageName.set(extension.runtimePackageName)
+        runtimePackageVersion.set(extension.runtimePackageVersion)
+        npmExecutable.set(extension.npmExecutable)
+        registryUrl.set(extension.registryUrl)
+        publishTag.set(extension.publishTag)
+        publishAccess.set(extension.publishAccess)
+      }
+      publishPackage.configure {
+        // Gradle 依赖保证 Runtime 检查发生在业务包 publish 之前。若 Runtime 同版本内容不一致，
+        // ensure 会直接失败，当前业务包不会被上传，避免发布引用错误 ABI 的版本。
+        dependsOn(ensureRuntime)
+      }
+    }
+  }
+}
