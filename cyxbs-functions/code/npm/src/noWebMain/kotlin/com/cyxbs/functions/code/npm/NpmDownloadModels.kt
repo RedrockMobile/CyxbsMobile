@@ -67,6 +67,33 @@ sealed interface NpmEntryVersion {
   data class Exact(val value: String) : NpmEntryVersion
 }
 
+/**
+ * 控制本次入口加载是否主动向 npm registry 检查远端版本。
+ *
+ * 无论采用哪种策略，新依赖图都必须完整解析、下载并通过 SRI 校验后才会原子切换；已经运行的
+ * Runtime 继续由旧图租约保护，不会在执行中途更换依赖。
+ */
+enum class NpmRefreshPolicy {
+
+  /**
+   * 默认的低频刷新策略。
+   *
+   * - [NpmEntryVersion.Latest]：每个 [NpmPackagePool] 实例首次使用该入口时检查一次 registry，
+   *   后续加载直接复用本地精确图；App 重启并创建新包池后会再次检查。
+   * - [NpmEntryVersion.Exact]：已有匹配的本地精确图时不请求 registry。
+   * - Latest 首次检查失败但旧图完整时，自动回退旧图继续运行；同一包池实例内不会反复重试。
+   */
+  AUTO,
+
+  /**
+   * 本次加载必须在 Runtime 创建前重新请求 registry，即使当前包池实例已经刷新过该入口。
+   *
+   * 远端解析、下载或校验失败时直接抛出异常，本次不允许静默执行旧版本；已经保存的旧图不会被
+   * 破坏，业务可以在捕获异常后自行决定是否再以 [AUTO] 降级运行。
+   */
+  FORCE,
+}
+
 /** npm 解析、校验、网络或缓存链路的稳定异常基类。 */
 open class NpmException(
   message: String,

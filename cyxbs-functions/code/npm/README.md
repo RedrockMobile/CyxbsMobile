@@ -45,5 +45,9 @@ NpmJsExecutor(packagePool).executeValue(
 校验成功后才会原子切换，切换后异步触发可达性 GC；当前入口图和活动租约均不可达的旧包会被删除。
 `Exact` 不执行启动检查。
 
+单次执行传入 `NpmRefreshPolicy.FORCE` 时，即使当前包池已经刷新过也会在创建 Runtime 前重新请求；
+刷新失败会保留旧图但直接结束本次执行，业务如需降级可再次使用 `AUTO`。默认 `AUTO` 不改变上述
+每实例首次检查和失败回退行为。
+
 当前 semver 支持精确版本、`latest`、caret、tilde、wildcard、比较器组合、连字符区间和 `||`；npm
 alias、git、file、workspace 协议会明确失败。

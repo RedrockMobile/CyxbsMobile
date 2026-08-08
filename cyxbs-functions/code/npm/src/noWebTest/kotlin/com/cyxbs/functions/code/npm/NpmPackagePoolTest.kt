@@ -16,6 +16,7 @@ import okio.SYSTEM
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
@@ -200,6 +201,59 @@ class NpmPackagePoolTest {
       restartedPool.acquireEntry(NpmEntryRequest(TARGET)).release()
       assertTrue(registry.metadataRequests.isEmpty())
       assertTrue(registry.archiveRequests.isEmpty())
+    }
+  }
+
+  @Test
+  fun forceRefreshesLatestAgainWithinTheSamePoolInstance() = runTest {
+    withPool { registry, pool, _ ->
+      val request = NpmEntryRequest(TARGET)
+      registry.publish(packageVersion(TARGET, "1.0.0"))
+      pool.acquireEntry(request).release()
+      advanceUntilIdle()
+
+      registry.publish(
+        packageVersion(TARGET, "1.0.0"),
+        packageVersion(TARGET, "2.0.0"),
+      )
+      registry.clearRequestHistory()
+
+      // AUTO 已在当前包池实例尝试过一次，只复用本地精确图。
+      val cached = pool.acquireEntry(request)
+      assertEquals("1.0.0", cached.preparedEntry.entryPackage.version)
+      cached.release()
+      assertTrue(registry.metadataRequests.isEmpty())
+
+      // FORCE 忽略实例内刷新记录，在 Runtime 创建前重新请求并切换完整新图。
+      val refreshed = pool.acquireEntry(request, NpmRefreshPolicy.FORCE)
+      assertEquals("2.0.0", refreshed.preparedEntry.entryPackage.version)
+      refreshed.release()
+      assertTrue(TARGET in registry.metadataRequests)
+      assertTrue(registry.archiveRequests.any { it.contains("target-2.0.0") })
+    }
+  }
+
+  @Test
+  fun forceRefreshFailureKeepsOldGraphButDoesNotFallbackForThisRun() = runTest {
+    withPool { registry, pool, _ ->
+      val request = NpmEntryRequest(TARGET)
+      registry.publish(packageVersion(TARGET, "1.0.0"))
+      pool.acquireEntry(request).release()
+      advanceUntilIdle()
+
+      registry.clearRequestHistory()
+      registry.failMetadata(TARGET)
+      assertFailsWith<NpmDownloadException> {
+        pool.acquireEntry(request, NpmRefreshPolicy.FORCE)
+      }
+      assertTrue(TARGET in registry.metadataRequests)
+
+      // FORCE 失败没有破坏旧图；是否降级由业务显式选择，AUTO 可继续运行旧版。
+      registry.clearRequestHistory()
+      val fallback = pool.acquireEntry(request)
+      assertEquals("1.0.0", fallback.preparedEntry.entryPackage.version)
+      fallback.release()
+      assertTrue(registry.metadataRequests.isEmpty())
     }
   }
 

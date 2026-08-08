@@ -109,6 +109,8 @@ class NpmPackagePool(
    * Runtime 关闭。使用完必须调用 [NpmPreparedEntryLease.release]，否则该入口不会被 GC。
    * `Latest` 的远端刷新、完整闭包下载与校验全部在本方法返回前完成，不会在 Runtime 执行期间更新。
    *
+   * @param refreshPolicy [NpmRefreshPolicy.AUTO] 按包池生命周期低频刷新并允许回退旧图；
+   * [NpmRefreshPolicy.FORCE] 本次必须请求远端，失败时保留旧图但直接抛出异常。
    * @throws NpmResolutionException 包名、版本范围或 registry 依赖范围无效。
    * @throws NpmRegistryMismatchException registry 元数据身份、SRI 或 tarball URL 无效。
    * @throws NpmDownloadException 元数据或归档下载失败。
@@ -124,7 +126,10 @@ class NpmPackagePool(
     NpmStorageException::class,
     CancellationException::class,
   )
-  suspend fun acquireEntry(request: NpmEntryRequest): NpmPreparedEntryLease {
+  suspend fun acquireEntry(
+    request: NpmEntryRequest,
+    refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
+  ): NpmPreparedEntryLease {
     return mutex.withLock {
       validateRequest(request)
       val now = clock()
@@ -145,9 +150,10 @@ class NpmPackagePool(
         }
       }
 
-      val refreshLatest = request.version is NpmEntryVersion.Latest &&
+      val automaticLatestRefresh = request.version is NpmEntryVersion.Latest &&
         latestRefreshAttempts.add(request.toRefreshKey())
-      val resolveRemotely = !requestMatches || refreshLatest
+      val resolveRemotely = !requestMatches || automaticLatestRefresh ||
+        refreshPolicy == NpmRefreshPolicy.FORCE
       var selectedEntry: PersistedNpmEntry
       var remoteApplied = false
       var uncommittedRemote: RemoteResolution? = null
@@ -175,7 +181,11 @@ class NpmPackagePool(
         } catch (exception: NpmException) {
           uncommittedRemote?.let { cleanupUncommittedArchives(it.packages, state.packages) }
           // latest 刷新失败时只回退已经完整可执行的旧图；首次加载或固定版本变化必须直接失败。
-          if (!refreshLatest || !requestMatches) throw exception
+          if (refreshPolicy == NpmRefreshPolicy.FORCE ||
+            !automaticLatestRefresh || !requestMatches
+          ) {
+            throw exception
+          }
           selectedEntry = selectSavedEntry()
         }
       } else {
@@ -211,15 +221,17 @@ class NpmPackagePool(
    *
    * block 返回后若仍持有 [NpmPreparedEntry] 中的文件路径，调用方不得继续访问这些路径。
    *
+   * @param refreshPolicy 本次入口的远端刷新策略，具体差异见 [NpmRefreshPolicy]。
    * @throws NpmException 准备入口期间的版本、网络、校验、存储或 Module 数据异常。
    * @throws CancellationException 调用协程或 [block] 被取消。
    */
   @Throws(NpmException::class, CancellationException::class)
   suspend fun <T> withEntry(
     request: NpmEntryRequest,
+    refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
     block: suspend (NpmPreparedEntry) -> T,
   ): T {
-    val lease = acquireEntry(request)
+    val lease = acquireEntry(request, refreshPolicy)
     return try {
       block(lease.preparedEntry)
     } finally {
