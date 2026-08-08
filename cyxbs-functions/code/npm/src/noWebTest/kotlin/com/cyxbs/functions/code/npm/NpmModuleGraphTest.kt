@@ -63,10 +63,18 @@ class NpmModuleGraphTest {
       )
       val graph = NpmModuleGraphFactory(fileSystem = fileSystem).create(
         NpmPreparedEntry(
-          releaseTime = "2026.08.03 12:01:10",
-          entryPackage = "@cyxbs/language-javascript",
+          resolvedAtEpochMillis = 0,
+          entryPackage = NpmPackageId("@cyxbs/language-javascript", "1.4.0"),
           entryModule = "index.js",
           archives = listOf(dependencyArchive, entryArchive),
+          resolvedPackages = listOf(
+            resolvedPackage("example-dependency", "1.0.0"),
+            resolvedPackage(
+              "@cyxbs/language-javascript",
+              "1.4.0",
+              "example-dependency" to NpmPackageId("example-dependency", "1.0.0"),
+            ),
+          ),
         ),
       )
 
@@ -82,6 +90,64 @@ class NpmModuleGraphTest {
 
       val featureName = graph.normalize(entryName, "example-dependency/features/offset")
       assertEquals("export const offset = 2;", graph.load(featureName))
+    } finally {
+      fileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun resolveBareImportAgainstOwningPackageVersionGraph() = runTest {
+    val fileSystem = FileSystem.SYSTEM
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "cyxbs-npm-multiversion-test-${Random.nextLong().toString(16)}"
+    fileSystem.createDirectories(root)
+    try {
+      val sharedV1 = writeArchive(
+        fileSystem,
+        root / "shared-v1.tgz",
+        packageFiles("shared", "1.0.0", "export const version = 'v1';"),
+      )
+      val sharedV2 = writeArchive(
+        fileSystem,
+        root / "shared-v2.tgz",
+        packageFiles("shared", "2.0.0", "export const version = 'v2';"),
+      )
+      val bridge = writeArchive(
+        fileSystem,
+        root / "bridge.tgz",
+        packageFiles("bridge", "1.0.0", "export { version } from 'shared';"),
+      )
+      val entry = writeArchive(
+        fileSystem,
+        root / "entry.tgz",
+        packageFiles("entry", "1.0.0", "export { version } from 'shared';"),
+      )
+      val graph = NpmModuleGraphFactory(fileSystem = fileSystem).create(
+        NpmPreparedEntry(
+          resolvedAtEpochMillis = 0,
+          entryPackage = NpmPackageId("entry", "1.0.0"),
+          entryModule = "index.js",
+          archives = listOf(sharedV1, sharedV2, bridge, entry),
+          resolvedPackages = listOf(
+            resolvedPackage("shared", "1.0.0"),
+            resolvedPackage("shared", "2.0.0"),
+            resolvedPackage("bridge", "1.0.0", "shared" to NpmPackageId("shared", "2.0.0")),
+            resolvedPackage(
+              "entry",
+              "1.0.0",
+              "shared" to NpmPackageId("shared", "1.0.0"),
+              "bridge" to NpmPackageId("bridge", "1.0.0"),
+            ),
+          ),
+        ),
+      )
+
+      val entryName = graph.entryModuleName
+      val entryShared = graph.normalize(entryName, "shared")
+      val bridgeName = graph.normalize(entryName, "bridge")
+      val bridgeShared = graph.normalize(bridgeName, "shared")
+      assertEquals("export const version = 'v1';", graph.load(entryShared))
+      assertEquals("export const version = 'v2';", graph.load(bridgeShared))
     } finally {
       fileSystem.deleteRecursively(root, mustExist = false)
     }
@@ -134,6 +200,28 @@ class NpmModuleGraphTest {
     val bytes = value.encodeToByteArray()
     require(bytes.size < length)
     bytes.copyInto(this, destinationOffset = offset)
+  }
+
+  /** 构造只有默认 ESM 入口的测试包文件。 */
+  private fun packageFiles(name: String, version: String, source: String): Map<String, String> {
+    return mapOf(
+      "package/package.json" to
+        """{"name": "$name", "version": "$version", "type": "module", "exports": "./index.js"}""",
+      "package/index.js" to source,
+    )
+  }
+
+  /** 构造固定依赖版本的执行图节点。 */
+  private fun resolvedPackage(
+    name: String,
+    version: String,
+    vararg dependencies: Pair<String, NpmPackageId>,
+  ): NpmResolvedPackage {
+    return NpmResolvedPackage(
+      id = NpmPackageId(name, version),
+      integrity = "test-integrity",
+      dependencies = dependencies.toMap(),
+    )
   }
 
   private companion object {

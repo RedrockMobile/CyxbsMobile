@@ -5,7 +5,7 @@ import com.cyxbs.functions.code.npm.NpmStorageException
 import kotlinx.coroutines.CancellationException
 import okio.Path
 
-/** 已通过快照 SRI 校验并保存到本地的 npm tarball。 */
+/** 已通过 registry SRI 校验并保存到本地的 npm tarball。 */
 data class NpmPackageArchive(
   val packageName: String,
   val version: String,
@@ -53,4 +53,17 @@ interface NpmPackageArchiveStore {
     integrity: String,
     bytes: ByteArray,
   ): NpmPackageArchive
+
+  /**
+   * 删除指定坐标与内容身份的归档。
+   *
+   * 默认空实现兼容已有只读/业务自定义存储；需要由 [com.cyxbs.functions.code.npm.NpmPackagePool]
+   * 执行磁盘 GC 的实现必须覆盖该方法。
+   */
+  @Throws(NpmStorageException::class, CancellationException::class)
+  suspend fun remove(
+    packageName: String,
+    version: String,
+    integrity: String,
+  ) = Unit
 }

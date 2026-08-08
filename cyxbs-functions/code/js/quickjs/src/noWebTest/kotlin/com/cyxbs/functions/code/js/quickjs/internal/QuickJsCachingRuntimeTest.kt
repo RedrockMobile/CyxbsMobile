@@ -16,6 +16,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 /** QuickJS 内部缓存、静态依赖预检和失败停止测试。 */
 class QuickJsCachingRuntimeTest {
@@ -294,6 +296,24 @@ class QuickJsCachingRuntimeTest {
     }
 
     assertContentEquals(invalidBytecode, QuickJsBytecodeCache.readEntry(key))
+  }
+
+  /** entry、Module 和依赖清单分别按自身最后使用时间执行 14 天 GC。 */
+  @Test
+  fun bytecodeArtifactsExpireIndependentlyAfterFourteenDays() = runTest {
+    val entryKey = entryKey("gc-entry", "gc-entry.js")
+    val moduleKey = entryKey("gc-module", "gc-module.js")
+    QuickJsBytecodeCache.writeEntry(entryKey, byteArrayOf(1, 2, 3))
+    QuickJsBytecodeCache.writeModule(moduleKey, byteArrayOf(4, 5, 6))
+    QuickJsBytecodeCache.writeManifest(entryKey, setOf("gc-module"))
+
+    QuickJsBytecodeCache.collectGarbage(
+      Clock.System.now().toEpochMilliseconds() + 15.days.inWholeMilliseconds,
+    )
+
+    assertNull(QuickJsBytecodeCache.readEntry(entryKey))
+    assertNull(QuickJsBytecodeCache.readModule(moduleKey))
+    assertTrue(QuickJsBytecodeCache.readManifest(entryKey).isEmpty())
   }
 
   private fun entryKey(code: String, filename: String): QuickJsCacheKey {

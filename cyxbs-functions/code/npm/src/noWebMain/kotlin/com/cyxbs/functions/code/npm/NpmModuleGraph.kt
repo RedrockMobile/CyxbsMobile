@@ -23,32 +23,53 @@ import okio.SYSTEM
  */
 class NpmModuleGraph internal constructor(
   val entryModuleName: String,
-  private val packages: Map<String, NpmPackageModules>,
+  private val packages: Map<NpmPackageId, NpmPackageModules>,
   private val modules: Map<String, NpmModuleRecord>,
 ) {
 
   /**
    * 将相对 import、裸包名或包子路径解析为标准 Module 名称。
    *
-   * 不属于当前 npm 快照的名称保持原值，便于业务在外层组合其他 Module 来源。
+   * 不属于当前 npm 依赖图的名称保持原值，便于业务在外层组合其他 Module 来源。
    *
    * @throws NpmModuleResolutionException 已锁定包请求了不存在或未导出的文件。
    */
   @Throws(NpmModuleResolutionException::class)
   fun normalize(baseName: String, requestedName: String): String {
+    return normalizeOrNull(baseName, requestedName) ?: when {
+      requestedName.startsWith("./") || requestedName.startsWith("../") -> {
+        normalizeRelativePath(baseName, requestedName)
+      }
+      else -> requestedName
+    }
+  }
+
+  /**
+   * 只解析当前 npm 图明确拥有的请求，无法处理时返回 null 交给组合 Loader。
+   *
+   * 该边界避免 npm Loader 抢先改写业务 Loader 中普通 Module 的相对路径。
+   */
+  internal fun normalizeOrNull(baseName: String, requestedName: String): String? {
     if (requestedName.startsWith("./") || requestedName.startsWith("../")) {
       val owner = modules[baseName]
-      if (owner == null) return normalizeRelativePath(baseName, requestedName)
+      if (owner == null) return null
       val baseDirectory = owner.path.substringBeforeLast('/', missingDelimiterValue = "")
       val target = normalizePackagePath(
         if (baseDirectory.isEmpty()) requestedName else "$baseDirectory/$requestedName",
       )
       return owner.packageModules.resolveFile(target).canonicalName
     }
-    if (requestedName.startsWith('/') || requestedName.contains(':')) return requestedName
+    if (requestedName.startsWith('/') || requestedName.contains(':')) {
+      return requestedName.takeIf(modules::containsKey)
+    }
 
-    val request = parsePackageRequest(requestedName) ?: return requestedName
-    val packageModules = packages[request.packageName] ?: return requestedName
+    val request = parsePackageRequest(requestedName) ?: return null
+    val owner = modules[baseName]?.packageModules
+    val packageModules = when {
+      owner?.name == request.packageName -> owner
+      owner != null -> owner.dependencies[request.packageName]
+      else -> packages.values.singleOrNull { it.name == request.packageName }
+    } ?: return null
     return if (request.subpath.isEmpty()) {
       packageModules.entry.canonicalName
     } else {
@@ -115,7 +136,7 @@ class NpmModuleGraphFactory(
           "Npm package '${archive.packageName}@${archive.version}' contains no JavaScript modules.",
         )
       }
-      archive.packageName to ExtractedNpmPackage(
+      NpmPackageId(archive.packageName, archive.version) to ExtractedNpmPackage(
         name = archive.packageName,
         version = archive.version,
         packageJson = packageJson,
@@ -126,15 +147,40 @@ class NpmModuleGraphFactory(
       throw NpmModuleResolutionException("Prepared npm entry contains duplicate package archives.")
     }
 
-    val packages = extracted.mapValues { (packageName, item) ->
-      val entryOverride = preparedEntry.entryModule.takeIf {
-        packageName == preparedEntry.entryPackage
+    val rootId = preparedEntry.entryPackage
+    val resolvedById = preparedEntry.resolvedPackages.associateBy(NpmResolvedPackage::id)
+    if (resolvedById.keys != extracted.keys || resolvedById.size != preparedEntry.resolvedPackages.size) {
+      throw NpmModuleResolutionException(
+        "Prepared npm entry archives do not match its resolved package graph.",
+      )
+    }
+    preparedEntry.archives.forEach { archive ->
+      val resolved = resolvedById[NpmPackageId(archive.packageName, archive.version)]
+      if (resolved != null && resolved.integrity != archive.integrity) {
+        throw NpmModuleResolutionException(
+          "Prepared npm package '${archive.packageName}@${archive.version}' has inconsistent SRI.",
+        )
+      }
+    }
+    val packages = extracted.mapValues { (id, item) ->
+      val entryOverride = preparedEntry.entryModule?.takeIf {
+        id == rootId && it.isNotBlank()
       }
       item.toPackageModules(entryOverride)
     }
-    val entryPackage = packages[preparedEntry.entryPackage]
+    packages.forEach { (id, packageModules) ->
+      packageModules.dependencies = resolvedById.getValue(id).dependencies.mapValues {
+        (dependencyName, dependencyId) ->
+        packages[dependencyId]
+          ?: throw NpmModuleResolutionException(
+            "Npm package '${id.name}@${id.version}' dependency " +
+              "'$dependencyName@${dependencyId.version}' is missing.",
+          )
+      }
+    }
+    val entryPackage = packages[rootId]
       ?: throw NpmModuleResolutionException(
-        "Prepared npm entry package '${preparedEntry.entryPackage}' is missing.",
+        "Prepared npm entry package '${rootId.name}@${rootId.version}' is missing.",
       )
     val modules = packages.values
       .flatMap { it.modules.values }
@@ -200,6 +246,8 @@ internal class NpmPackageModules(
   val modules: Map<String, NpmModuleRecord>,
 ) {
   lateinit var entry: NpmModuleRecord
+  /** 当前入口解析结果为本包锁定的直接依赖；相同包版本在不同入口中可以指向不同兼容版本。 */
+  lateinit var dependencies: Map<String, NpmPackageModules>
 
   fun resolveRootExport(): String {
     val exports = packageJson["exports"]

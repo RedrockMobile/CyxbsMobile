@@ -5,6 +5,7 @@ plugins {
 kotlin {
   sourceSets {
     noWebMain.dependencies {
+      api(projects.cyxbsFunctions.code.js)
       implementation(libs.kotlinx.coroutines)
       implementation(libs.kotlinx.serialization)
       implementation(libs.ktor.core)

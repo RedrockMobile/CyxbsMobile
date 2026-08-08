@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.npm.storage
 
 import com.cyxbs.functions.code.npm.NpmIntegrityException
-import com.cyxbs.functions.code.npm.NpmSnapshotException
+import com.cyxbs.functions.code.npm.NpmResolutionException
 import com.cyxbs.functions.code.npm.NpmStorageException
 import com.cyxbs.functions.code.npm.internal.NpmIntegrity
 import kotlinx.coroutines.CancellationException
@@ -67,7 +67,7 @@ class OkioNpmPackageArchiveStore(
     val parsedIntegrity = NpmIntegrity.parse(integrity, packageName)
     if (!parsedIntegrity.matches(bytes)) {
       throw NpmIntegrityException(
-        "Npm package '$packageName@$version' does not match the release snapshot integrity.",
+        "Npm package '$packageName@$version' does not match the registry integrity.",
       )
     }
     return withFileLock("write") {
@@ -78,6 +78,20 @@ class OkioNpmPackageArchiveStore(
         version = version,
         integrity = parsedIntegrity.encoded,
         archivePath = target,
+      )
+    }
+  }
+
+  /** 删除 GC 已确认不再被任何入口依赖的归档。 */
+  override suspend fun remove(
+    packageName: String,
+    version: String,
+    integrity: String,
+  ) {
+    withFileLock("remove") {
+      fileSystem.delete(
+        archivePath(packageName, version, integrity),
+        mustExist = false,
       )
     }
   }
@@ -97,7 +111,7 @@ class OkioNpmPackageArchiveStore(
       throw exception
     } catch (exception: NpmIntegrityException) {
       throw exception
-    } catch (exception: NpmSnapshotException) {
+    } catch (exception: NpmResolutionException) {
       throw NpmStorageException("Invalid integrity was supplied to npm archive cache.", exception)
     } catch (exception: NpmStorageException) {
       throw exception
