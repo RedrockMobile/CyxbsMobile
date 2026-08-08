@@ -14,7 +14,7 @@ kotlin {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.kotlinx.coroutines.test)
-        implementation(project(":cyxbs-functions:code:js:quickjs"))
+        implementation(projects.cyxbsFunctions.code.js.quickjs)
       }
     }
     desktopTest {

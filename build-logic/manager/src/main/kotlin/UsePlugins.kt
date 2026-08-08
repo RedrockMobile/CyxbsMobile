@@ -35,6 +35,33 @@ fun Project.useKtProvider(isNeedKsp: Boolean = !name.startsWith("api")) {
 }
 
 /**
+ * 使用基于 npm 下发的 Kotlin/JS Service。
+ *
+ * commonMain 只声明带 `@NpmJsService` 的业务接口；KSP 会在 Android、iOS、Desktop 生成端上代理，
+ * 并在 Kotlin/JS 目标为 object 实现生成分发器。生成工厂继续通过 KtProvider 自动发现，npm 坐标
+ * 则由业务在加载时传入。
+ */
+fun Project.useNpmJsService() {
+  // Service 接口通常声明在 api 模块中，不能沿用 useKtProvider 对 api 模块默认跳过 KSP 的规则。
+  useKtProvider(isNeedKsp = true)
+  extensions.configure<KotlinMultiplatformExtension> {
+    sourceSets.commonMain.dependencies {
+      api(project(":cyxbs-functions:code:npm:api-bridge"))
+      implementation(libsEx.`kotlinx-serialization`)
+    }
+    // Kotlin/JS 发布物只依赖稳定协议；下载、缓存和 Runtime 实现只进入端上目标。
+    sourceSets.findByName("noWebMain")?.dependencies {
+      implementation(project(":cyxbs-functions:code:npm"))
+    }
+  }
+  // wasmJs 当前只消费 commonMain 协议，不生成依赖端上 Runtime 的代理。
+  kspMultiplatform(
+    dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
+    includeWasmJs = false,
+  )
+}
+
+/**
  * 使用 Room，已默认支持与 Kt 协程一起使用
  * @param rxjava 依赖 room-rxjava
  * @param paging 依赖 room-paging
@@ -117,7 +144,10 @@ fun Project.useNavigation(isNeedKsp: Boolean = !name.startsWith("api")) {
   }
 }
 
-private fun Project.kspMultiplatform(dependencyNotation: Any) {
+private fun Project.kspMultiplatform(
+  dependencyNotation: Any,
+  includeWasmJs: Boolean = true,
+) {
   val isMultiplatform = extensions.findByType(KotlinMultiplatformExtension::class) != null
   dependencies {
     if (isMultiplatform) {
@@ -133,7 +163,7 @@ private fun Project.kspMultiplatform(dependencyNotation: Any) {
       if (configurations.findByName("kspJs") != null) {
         "kspJs"(dependencyNotation)
       }
-      if (configurations.findByName("kspWasmJs") != null) {
+      if (includeWasmJs && configurations.findByName("kspWasmJs") != null) {
         "kspWasmJs"(dependencyNotation)
       }
       if (configurations.findByName("kspDesktop") != null) {

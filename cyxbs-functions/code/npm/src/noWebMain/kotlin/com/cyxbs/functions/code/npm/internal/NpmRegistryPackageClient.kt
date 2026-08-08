@@ -1,8 +1,9 @@
 package com.cyxbs.functions.code.npm.internal
 
-import com.cyxbs.functions.code.npm.NpmDownloadException
-import com.cyxbs.functions.code.npm.NpmRegistryMismatchException
-import com.cyxbs.functions.code.npm.NpmResolutionException
+import com.cyxbs.functions.code.npm.model.NpmDownloadException
+import com.cyxbs.functions.code.npm.model.NpmPackageId
+import com.cyxbs.functions.code.npm.model.NpmRegistryMismatchException
+import com.cyxbs.functions.code.npm.model.NpmResolutionException
 import com.cyxbs.functions.code.npm.transport.NpmHttpTransport
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
@@ -85,7 +86,7 @@ internal class NpmRegistryPackageClient(
         )
       }
       NpmRegistryVersion(
-        id = com.cyxbs.functions.code.npm.NpmPackageId(packageName, versionText),
+        id = NpmPackageId(packageName, versionText),
         semver = version,
         integrity = integrity,
         dependencies = item.dependencies,
@@ -141,7 +142,7 @@ internal data class NpmRegistryPackageMetadata(
 
 /** registry 中已经校验、可直接参与依赖图解析的具体版本。 */
 internal data class NpmRegistryVersion(
-  val id: com.cyxbs.functions.code.npm.NpmPackageId,
+  val id: NpmPackageId,
   val semver: NpmSemver,
   val integrity: NpmIntegrity,
   val dependencies: Map<String, String>,

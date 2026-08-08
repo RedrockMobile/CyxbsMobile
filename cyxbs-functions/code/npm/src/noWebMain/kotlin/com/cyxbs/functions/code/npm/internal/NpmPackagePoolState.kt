@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.npm.internal
 
-import com.cyxbs.functions.code.npm.NpmStorageException
+import com.cyxbs.functions.code.npm.model.NpmStorageException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

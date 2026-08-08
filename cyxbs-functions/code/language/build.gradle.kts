@@ -4,8 +4,12 @@ plugins {
 
 kotlin {
   sourceSets {
+    commonMain.dependencies {
+      api(projects.cyxbsFunctions.code.language.apiBridge)
+    }
+
     noWebMain.dependencies {
-      implementation(project(":cyxbs-functions:code:js"))
+      implementation(projects.cyxbsFunctions.code.js)
       implementation(libs.okio)
       implementation(libs.kotlinx.serialization)
     }
@@ -15,7 +19,7 @@ kotlin {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.kotlinx.coroutines.test)
-        implementation(project(":cyxbs-functions:code:js:quickjs"))
+        implementation(projects.cyxbsFunctions.code.js.quickjs)
       }
     }
     desktopTest {

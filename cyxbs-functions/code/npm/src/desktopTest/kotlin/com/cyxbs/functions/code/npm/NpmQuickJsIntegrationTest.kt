@@ -2,6 +2,10 @@ package com.cyxbs.functions.code.npm
 
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.npm.model.NpmEntryRequest
+import com.cyxbs.functions.code.npm.model.NpmEntryVersion
+import com.cyxbs.functions.code.npm.module.NpmModuleGraphFactory
+import com.cyxbs.functions.code.npm.pool.NpmPackagePool
 import com.cyxbs.functions.code.npm.transport.KtorNpmHttpTransport
 import com.g985892345.provider.cyxbsmobile.cyxbsfunctions.code.js.quickjs.QuickjsKtProviderInitializer
 import com.g985892345.provider.testing.withKtProviderTest

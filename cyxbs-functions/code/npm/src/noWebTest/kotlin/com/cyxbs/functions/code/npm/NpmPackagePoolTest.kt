@@ -1,6 +1,12 @@
 package com.cyxbs.functions.code.npm
 
 import com.cyxbs.functions.code.npm.internal.encodeNpmPathSegment
+import com.cyxbs.functions.code.npm.model.NpmDownloadException
+import com.cyxbs.functions.code.npm.model.NpmEntryRequest
+import com.cyxbs.functions.code.npm.model.NpmEntryVersion
+import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
+import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
+import com.cyxbs.functions.code.npm.pool.NpmPackagePool
 import com.cyxbs.functions.code.npm.transport.NpmHttpTransport
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -18,12 +24,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 
 /** 全局包池的远端首次解析、本地代际重解析、租约与可达性 GC 测试。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NpmPackagePoolTest {
+
+  /** 默认配置始终返回同一个进程级包池，保证租约、刷新与 GC 状态不会分裂。 */
+  @Test
+  fun defaultPoolIsProcessSingleton() {
+    assertSame(NpmPackagePool.Default, NpmPackagePool.Default)
+  }
 
   @Test
   fun firstLoadUsesRemoteAndOtherEntryChangeTriggersLocalOnlyReresolution() = runTest {
@@ -484,12 +497,13 @@ private class FakeNpmRegistry : NpmHttpTransport {
     metadataRequestHeaders.clear()
   }
 
-  override suspend fun get(url: String): ByteArray {
+  override suspend fun get(url: String, headers: Map<String, String>): ByteArray {
     archives[url]?.let {
       archiveRequests += url
       return it
     }
     metadata[url]?.let {
+      metadataRequestHeaders += headers
       val packageName = metadata.entries.single { entry -> entry.key == url }
         .key.substringAfterLast('/')
       metadataRequests += packageName
@@ -497,11 +511,6 @@ private class FakeNpmRegistry : NpmHttpTransport {
       return it
     }
     error("Unexpected npm test request: $url")
-  }
-
-  override suspend fun get(url: String, headers: Map<String, String>): ByteArray {
-    if (url in metadata) metadataRequestHeaders += headers
-    return get(url)
   }
 
   private fun metadataUrl(name: String): String {

@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.npm.internal
 
-import com.cyxbs.functions.code.npm.NpmModuleResolutionException
+import com.cyxbs.functions.code.npm.model.NpmModuleResolutionException
 import okio.BufferedSource
 import okio.FileSystem
 import okio.Path

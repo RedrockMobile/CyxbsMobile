@@ -1,5 +1,9 @@
 package com.cyxbs.functions.code.npm
 
+import com.cyxbs.functions.code.npm.model.NpmPackageId
+import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
+import com.cyxbs.functions.code.npm.model.NpmResolvedPackage
+import com.cyxbs.functions.code.npm.module.NpmModuleGraphFactory
 import com.cyxbs.functions.code.npm.storage.NpmPackageArchive
 import kotlinx.coroutines.test.runTest
 import okio.Buffer

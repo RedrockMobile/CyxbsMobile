@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.npm.internal
 
-import com.cyxbs.functions.code.npm.NpmResolutionException
+import com.cyxbs.functions.code.npm.model.NpmResolutionException
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
 import okio.ByteString.Companion.toByteString

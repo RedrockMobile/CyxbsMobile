@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.npm.internal
 
-import com.cyxbs.functions.code.npm.NpmResolutionException
+import com.cyxbs.functions.code.npm.model.NpmResolutionException
 
 /**
  * npm 依赖解析使用的轻量语义版本。

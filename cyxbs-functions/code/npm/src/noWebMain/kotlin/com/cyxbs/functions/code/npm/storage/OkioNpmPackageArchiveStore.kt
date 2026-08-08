@@ -1,8 +1,8 @@
 package com.cyxbs.functions.code.npm.storage
 
-import com.cyxbs.functions.code.npm.NpmIntegrityException
-import com.cyxbs.functions.code.npm.NpmResolutionException
-import com.cyxbs.functions.code.npm.NpmStorageException
+import com.cyxbs.functions.code.npm.model.NpmIntegrityException
+import com.cyxbs.functions.code.npm.model.NpmResolutionException
+import com.cyxbs.functions.code.npm.model.NpmStorageException
 import com.cyxbs.functions.code.npm.internal.NpmIntegrity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

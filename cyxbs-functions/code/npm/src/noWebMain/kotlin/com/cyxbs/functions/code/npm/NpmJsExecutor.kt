@@ -1,11 +1,16 @@
 package com.cyxbs.functions.code.npm
 
-import com.cyxbs.functions.code.js.runtime.JsModuleLoader
-import com.cyxbs.functions.code.js.runtime.JsModuleNormalizer
 import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.npm.internal.NpmGraphJsModuleLoader
+import com.cyxbs.functions.code.npm.model.NpmEntryRequest
+import com.cyxbs.functions.code.npm.model.NpmException
+import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
+import com.cyxbs.functions.code.npm.module.NpmModuleGraph
+import com.cyxbs.functions.code.npm.module.NpmModuleGraphFactory
+import com.cyxbs.functions.code.npm.pool.NpmPackagePool
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -21,9 +26,12 @@ import kotlinx.coroutines.CancellationException
  * Module Loader 必须在 [JsRuntimeFactory.create] 时安装，因此本类接收 Runtime 工厂，而不能接收已经
  * 创建完成的 [JsRuntime]。[withRuntime] 会把配置完整的 Runtime 交给业务，适合宿主桥和
  * DynamicLanguage 等需要自定义执行协议的场景。
+ *
+ * @param packagePool App 级长生命周期 npm 全局包池；默认使用 [NpmPackagePool.Default]。
+ * @param moduleGraphFactory 将已准备归档转换为只读 Module 图的工厂。
  */
 class NpmJsExecutor(
-  private val packagePool: NpmPackagePool,
+  private val packagePool: NpmPackagePool = NpmPackagePool.Default,
   private val moduleGraphFactory: NpmModuleGraphFactory = NpmModuleGraphFactory(),
 ) {
 
@@ -152,26 +160,5 @@ class NpmJsExecutor(
         runtime.close()
       }
     }
-  }
-}
-
-/**
- * 优先解析 npm 图，无法处理时再委托业务 Loader。
- *
- * 两层 Loader 都只访问同步内存，满足 JavaScript 引擎持锁回调不得阻塞或重入 Runtime 的约束。
- */
-private class NpmGraphJsModuleLoader(
-  private val graph: NpmModuleGraph,
-  private val fallback: JsModuleLoader?,
-) : JsModuleLoader {
-
-  override val normalizer = JsModuleNormalizer { baseName, requestedName ->
-    graph.normalizeOrNull(baseName, requestedName)
-      ?: fallback?.normalizer?.normalize(baseName, requestedName)
-      ?: requestedName
-  }
-
-  override fun load(name: String): String? {
-    return graph.load(name) ?: fallback?.load(name)
   }
 }

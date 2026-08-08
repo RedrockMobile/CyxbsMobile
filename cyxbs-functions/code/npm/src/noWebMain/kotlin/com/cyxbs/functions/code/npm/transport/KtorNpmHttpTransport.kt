@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.npm.transport
 
-import com.cyxbs.functions.code.npm.NpmDownloadException
+import com.cyxbs.components.utils.network.HttpClientNoToken
+import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -13,13 +14,18 @@ import kotlinx.coroutines.CancellationException
  * 调用方负责在 HttpClient 中配置平台 engine、超时、代理和证书策略；该实现只统一检查状态码并
  * 将响应读取为字节数组，包体大小由 npm 包发布流程保证。
  */
-class KtorNpmHttpTransport(
-  private val httpClient: HttpClient,
+class KtorNpmHttpTransport private constructor(
+  httpClientProvider: () -> HttpClient,
 ) : NpmHttpTransport {
 
-  override suspend fun get(url: String): ByteArray {
-    return get(url, emptyMap())
-  }
+  /** 使用项目默认无 Token Client，并延迟到首次网络请求再初始化。 */
+  constructor() : this({ HttpClientNoToken })
+
+  /** 复用调用方提供的 [httpClient]。 */
+  constructor(httpClient: HttpClient) : this({ httpClient })
+
+  // 默认包池可在网络与 KtProvider 初始化前创建，因此不能在构造 Transport 时立即读取默认 Client。
+  private val httpClient by lazy(httpClientProvider)
 
   /** 将调用方声明的元数据协议请求头转发给 npm registry。 */
   override suspend fun get(url: String, headers: Map<String, String>): ByteArray {

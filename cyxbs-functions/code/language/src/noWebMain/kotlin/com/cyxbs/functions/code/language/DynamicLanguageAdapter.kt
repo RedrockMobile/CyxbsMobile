@@ -1,57 +1,13 @@
 package com.cyxbs.functions.code.language
 
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
+import com.cyxbs.functions.code.language.api.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.api.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.api.bridge.DynamicLanguageMetadata
 import com.cyxbs.functions.code.language.internal.JsRuntimeDynamicLanguageAdapter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-
-/**
- * 动态语言包在端上声明的协议元数据。
- *
- * @param languageId 语言稳定标识，例如 `javascript`、`python`。
- * @param displayName 用于调试和教学 UI 展示的语言名称。
- * @param protocolVersion Kotlin 与 JavaScript 桥协议版本。
- */
-data class DynamicLanguageMetadata(
-  val languageId: String,
-  val displayName: String,
-  val protocolVersion: Int,
-)
-
-/**
- * 动态语法分析返回的一段高亮区间。
- *
- * [styleIds] 使用动态语言包给出的稳定样式标识，调用方负责将其映射为当前主题颜色。区间采用
- * Kotlin 字符串的 UTF-16 偏移，与 KodeMirror 和 JavaScript 字符串位置保持一致。
- */
-data class DynamicHighlightSpan(
-  val from: Int,
-  val to: Int,
-  val styleIds: List<String>,
-)
-
-/** 动态语言包返回的单个补全候选。 */
-data class DynamicCompletionItem(
-  val label: String,
-  val displayLabel: String? = null,
-  val detail: String? = null,
-  val info: String? = null,
-  val type: String? = null,
-  val boost: Int = 0,
-  val apply: String? = null,
-)
-
-/**
- * 一次补全查询的结果。
- *
- * [from] 与 [to] 表示应用候选时要替换的源码区间；无可用补全时适配器直接返回 `null`。
- */
-data class DynamicCompletionResult(
-  val from: Int,
-  val to: Int,
-  val options: List<DynamicCompletionItem>,
-)
 
 /**
  * 动态语言 Runtime 的资源限制。

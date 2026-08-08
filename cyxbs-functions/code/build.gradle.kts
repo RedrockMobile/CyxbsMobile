@@ -9,13 +9,14 @@ useNavigation() // 注册编辑器测试页面
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.view)
     }
     noWebMain.dependencies {
+      implementation(projects.cyxbsFunctions.code.js)
+      implementation(projects.cyxbsFunctions.code.js.quickjs)
       implementation(libs.kmp.kodemirror.view)
       implementation(libs.kmp.kodemirror.basicSetup)
       implementation(libs.kmp.kodemirror.langJavaScript)

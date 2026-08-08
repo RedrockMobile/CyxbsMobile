@@ -2,13 +2,22 @@ plugins {
   id("manager.lib")
 }
 
+useKtProvider()
+
 kotlin {
   sourceSets {
+    commonMain.dependencies {
+      api(projects.cyxbsFunctions.code.npm.apiBridge)
+      implementation(projects.cyxbsComponents.utils)
+    }
+
     noWebMain.dependencies {
       api(projects.cyxbsFunctions.code.js)
       implementation(libs.kotlinx.coroutines)
       implementation(libs.kotlinx.serialization)
       implementation(libs.ktor.core)
+      implementation(libs.kmp.ktProvider.api)
+      implementation(libs.kmp.ktProvider.manager)
       implementation(libs.okio)
     }
 

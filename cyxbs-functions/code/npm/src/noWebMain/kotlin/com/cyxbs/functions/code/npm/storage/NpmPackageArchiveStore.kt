@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.npm.storage
 
-import com.cyxbs.functions.code.npm.NpmIntegrityException
-import com.cyxbs.functions.code.npm.NpmStorageException
+import com.cyxbs.functions.code.npm.model.NpmIntegrityException
+import com.cyxbs.functions.code.npm.model.NpmStorageException
 import kotlinx.coroutines.CancellationException
 import okio.Path
 
@@ -57,7 +57,7 @@ interface NpmPackageArchiveStore {
   /**
    * 删除指定坐标与内容身份的归档。
    *
-   * 默认空实现兼容已有只读/业务自定义存储；需要由 [com.cyxbs.functions.code.npm.NpmPackagePool]
+   * 默认空实现兼容已有只读/业务自定义存储；需要由 [com.cyxbs.functions.code.npm.pool.NpmPackagePool]
    * 执行磁盘 GC 的实现必须覆盖该方法。
    */
   @Throws(NpmStorageException::class, CancellationException::class)
