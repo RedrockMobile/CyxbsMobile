@@ -1,18 +1,10 @@
-import npm.NpmJsPackageDefaults
-
 plugins {
   id("manager.npmJs")
 }
 
-version = NpmJsPackageDefaults.RUNTIME_PACKAGE_VERSION
+version = "0.1.0"
 
 kotlin {
-  js {
-    compilations["main"].packageJson {
-      name = NpmJsPackageDefaults.RUNTIME_PACKAGE_NAME
-      version = NpmJsPackageDefaults.RUNTIME_PACKAGE_VERSION
-    }
-  }
   sourceSets {
     jsMain.dependencies {
       // `configureNpmJsPackaging()` 会监听每个应用 manager.npmJs 的业务模块，并将它自动添加到

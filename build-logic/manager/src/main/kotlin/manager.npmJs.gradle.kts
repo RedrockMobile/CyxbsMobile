@@ -1,14 +1,35 @@
+import com.google.devtools.ksp.gradle.KspExtension
 import npm.configureNpmJsPackaging
+import npm.npmPackageNameFromProjectPath
+import org.gradle.api.GradleException
+import org.gradle.kotlin.dsl.apply
+import org.gradle.kotlin.dsl.configure
 
 plugins {
   kotlin("multiplatform")
+  id(libsEx.plugins.ksp)
 }
+
+// withPlugin 会同时命中已经应用和之后应用的插件，模块无法通过调整 plugins 声明顺序绕过隔离。
+listOf("kmp.compose", "manager.lib").forEach { incompatiblePluginId ->
+  pluginManager.withPlugin(incompatiblePluginId) {
+    throw GradleException(
+      "Plugin 'manager.npmJs' cannot be used together with '$incompatiblePluginId' in $path.",
+    )
+  }
+}
+
+val npmPackageName = npmPackageNameFromProjectPath(path)
 
 /**
  * 可发布到 npm、供端上 JavaScript Runtime 加载的纯 Kotlin/JS 模块约定。
  *
- * 这里只统一编译产物形态；npm 坐标和业务依赖仍由具体模块声明。发布文件限制为运行代码与类型声明，
- * source map 继续保留在 CI 构建产物中，但不会进入客户端下载的 npm tgz。
+ * npm 包名固定由 Gradle 模块路径生成，版本固定读取 `project.version`。插件同时启用 npm Service
+ * 所需的 KSP、Serialization 与稳定桥协议，模块不得再叠加 `kmp.compose` 或
+ * `manager.lib`，避免把端上业务依赖带入 JavaScript 发布物。
+ *
+ * 发布文件限制为运行代码与类型声明，source map 继续保留在 CI 构建产物中，但不会进入客户端
+ * 下载的 npm tgz。
  *
  * 应用插件后会把当前模块自动加入 `:cyxbs-functions:code:npm:distribution` 的聚合编译，并提供：
  * - `prepareNpmJsPackage`：仅生成最终发布目录，用于检查分包结果；不调用 npm、不联网。
@@ -25,6 +46,7 @@ kotlin {
     useEsModules()
     generateTypeScriptDefinitions()
     compilations["main"].packageJson {
+      name = npmPackageName
       customField("type", "module")
       customField("files", listOf("**/*.mjs", "**/*.d.mts"))
     }
@@ -33,6 +55,34 @@ kotlin {
   sourceSets {
     jsTest.dependencies {
       implementation(kotlin("test"))
+    }
+  }
+}
+
+kotlin {
+  sourceSets.commonMain.dependencies {
+    api(project(":cyxbs-functions:code:npm:api-bridge"))
+    implementation(libsEx.`kotlinx-serialization`)
+  }
+}
+kspMultiplatform(
+  dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
+  targets = setOf(Multiplatform.KspTarget.JS),
+)
+extensions.configure<KspExtension> {
+  arg("npmJsService.packageName", npmPackageName)
+}
+
+afterEvaluate {
+  val npmPackageVersion = project.version.toString()
+  if (npmPackageVersion == Project.DEFAULT_VERSION) {
+    throw GradleException("$path must declare project.version when using manager.npmJs.")
+  }
+  kotlin {
+    js {
+      compilations["main"].packageJson {
+        version = npmPackageVersion
+      }
     }
   }
 }

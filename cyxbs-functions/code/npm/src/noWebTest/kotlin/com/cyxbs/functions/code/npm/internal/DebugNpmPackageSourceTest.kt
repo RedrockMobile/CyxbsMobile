@@ -21,9 +21,9 @@ class DebugNpmPackageSourceTest {
   @Test
   fun localDebugPackageMergesWithRegistryAndStableVersionCanOverrideIt() {
     withSource { source, root, fileSystem ->
-      val packageName = "@cyxbs-mobile/language-javascript"
+      val packageName = "@cyxbs-mobile/cyxbs-functions-code-language-js"
       val debugVersion = "0.1.1-debug.20260809153042"
-      val archivePath = root / "@cyxbs-mobile" / "language-javascript.tgz"
+      val archivePath = root / "@cyxbs-mobile" / "cyxbs-functions-code-language-js.tgz"
       fileSystem.createDirectories(requireNotNull(archivePath.parent))
       val archiveBytes = writeArchive(
         fileSystem = fileSystem,
@@ -31,7 +31,7 @@ class DebugNpmPackageSourceTest {
         packageJson = """{
           "name": "$packageName",
           "version": "$debugVersion",
-          "dependencies": {"@cyxbs-mobile/kotlin-js-runtime": "0.1.0"}
+          "dependencies": {"@cyxbs-mobile/cyxbs-functions-code-npm-distribution": "0.1.0"}
         }""".trimIndent(),
       )
 

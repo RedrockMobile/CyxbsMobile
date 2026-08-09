@@ -1,5 +1,9 @@
+import com.google.devtools.ksp.gradle.KspExtension
+import npm.npmPackageNameFromProjectPath
+import org.gradle.api.GradleException
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.kotlin.dsl.configure
 import rule.ModuleNamespaceCheckRule
 
 plugins {
@@ -7,11 +11,26 @@ plugins {
   id("com.android.kotlin.multiplatform.library")
 }
 
+// withPlugin 会同时命中已经应用和之后应用的插件，模块无法通过调整 plugins 声明顺序绕过隔离。
+listOf("kmp.compose", "manager.lib").forEach { incompatiblePluginId ->
+  pluginManager.withPlugin(incompatiblePluginId) {
+    throw GradleException(
+      "Plugin 'manager.npmJsApiBridge' cannot be used together with '$incompatiblePluginId' in $path.",
+    )
+  }
+}
+
+val npmPackageName = npmPackageNameFromProjectPath(path)
+val hostKspTargets = Multiplatform.KspTarget.NON_WEB
+
 /**
  * npm JavaScript 动态实现与端上 Kotlin 调用方共同依赖的跨平台协议桥约定。
  *
- * Bridge 只负责声明稳定接口和 DTO，因此不引入 kmp.base 的完整业务依赖。Serialization、KSP 和
- * 具体 Service 协议由使用模块按需启用，底层 npm bridge 本身不会反向依赖上层实现。
+ * Bridge 只负责声明稳定接口和 DTO，因此不引入完整业务依赖。npm 包名固定由 Gradle 模块路径
+ * 生成，版本固定读取 `project.version`；插件自动启用 npm Service 所需的 Serialization、KSP、
+ * KtProvider 与端上代理依赖，并禁止叠加 `kmp.compose` 或 `manager.lib`。
+ * 底层 `:cyxbs-functions:code:npm:api-bridge` 只定义注解和基础协议，因此会跳过反向依赖自身的
+ * Service 代理配置，但仍使用相同的平台及 npm 坐标约定。
  */
 kotlin {
   android {
@@ -39,6 +58,7 @@ kotlin {
     useEsModules()
     generateTypeScriptDefinitions()
     compilations["main"].packageJson {
+      name = npmPackageName
       customField("type", "module")
       customField("files", listOf("**/*.mjs", "**/*.d.mts"))
     }
@@ -69,6 +89,45 @@ kotlin {
       }
       iosArm64Main { dependsOn(iosMain) }
       iosSimulatorArm64Main { dependsOn(iosMain) }
+    }
+  }
+}
+
+if (path != ":cyxbs-functions:code:npm:api-bridge") {
+  // 底层 api-bridge 定义注解和协议本身，不能反向依赖自己；业务 Bridge 才启用代理生成链路。
+  useKtProvider(
+    isNeedKsp = true,
+    kspTargets = hostKspTargets,
+    dependencySourceSetName = "noWebMain",
+  )
+  kotlin {
+    sourceSets.commonMain.dependencies {
+      api(project(":cyxbs-functions:code:npm:api-bridge"))
+      implementation(libsEx.`kotlinx-serialization`)
+    }
+    sourceSets.getByName("noWebMain").dependencies {
+      implementation(project(":cyxbs-functions:code:npm"))
+    }
+  }
+  kspMultiplatform(
+    dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
+    targets = hostKspTargets,
+  )
+  extensions.configure<KspExtension> {
+    arg("npmJsService.packageName", npmPackageName)
+  }
+}
+
+afterEvaluate {
+  val npmPackageVersion = project.version.toString()
+  if (npmPackageVersion == Project.DEFAULT_VERSION) {
+    throw GradleException("$path must declare project.version when using manager.npmJsApiBridge.")
+  }
+  kotlin {
+    js {
+      compilations["main"].packageJson {
+        version = npmPackageVersion
+      }
     }
   }
 }

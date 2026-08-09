@@ -3,4 +3,4 @@ plugins {
   alias(libs.plugins.kotlinSerialization)
 }
 
-useNpmJsService()
+version = "0.1.0"

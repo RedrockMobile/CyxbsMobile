@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.language.js
 
-import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript
+import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_cyxbs_functions_code_language_js
 import com.cyxbs.functions.code.language.api.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.api.bridge.DynamicLanguageMetadata
 import kotlinx.coroutines.await
@@ -18,8 +18,8 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
   /** 显式初始化应可重复调用，并按 commonMain 协议完成参数及返回值的 JSON 转换。 */
   @Test
   fun generatedDispatcherInvokesService() = runTest {
-    __cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript()
-    __cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript()
+    __cyxbsNpmJsServiceInitialize__cyxbs_mobile_cyxbs_functions_code_language_js()
+    __cyxbsNpmJsServiceInitialize__cyxbs_mobile_cyxbs_functions_code_language_js()
     val bridge: dynamic = js("globalThis.CyxbsNpmJsService")
     assertTrue(bridge != undefined)
     assertEquals(_JavaScriptDynamicLanguageServiceNpmJsDispatcher.schemaHash, bridge.describe(SERVICE_ID))

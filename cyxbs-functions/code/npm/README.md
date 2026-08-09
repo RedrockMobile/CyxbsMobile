@@ -22,13 +22,17 @@
 ```kotlin
 NpmJsExecutor(packagePool).executeValue(
   request = NpmEntryRequest(
-    packageName = "@cyxbs-mobile/language-js",
+    packageName = "@cyxbs-mobile/cyxbs-functions-code-language-js",
     version = NpmEntryVersion.Latest,
   ),
   runtimeFactory = runtimeFactory,
-  code = """import "@cyxbs-mobile/language-js";""",
+  code = """import "@cyxbs-mobile/cyxbs-functions-code-language-js";""",
 )
 ```
+
+应用 `manager.npmJs` 或 `manager.npmJsApiBridge` 的模块无需手写 npm 坐标：包名固定为
+`@cyxbs-mobile/` 加完整 Gradle 模块路径（将 `:` 转为 `-`），版本固定使用该模块的
+`project.version`。
 
 需要绑定宿主桥或执行多步逻辑时使用 `withRuntime()`；Runtime 会在依赖完整更新后创建，并在回调
 结束后关闭。

@@ -54,8 +54,7 @@ abstract class NpmJsPackageExtension {
 /** 项目内 npm JavaScript Runtime 的稳定发布约定。 */
 object NpmJsPackageDefaults {
   const val DISTRIBUTION_PROJECT_PATH = ":cyxbs-functions:code:npm:distribution"
-  const val RUNTIME_PACKAGE_NAME = "@cyxbs-mobile/kotlin-js-runtime"
-  const val RUNTIME_PACKAGE_VERSION = "0.1.0"
+  const val NPM_SCOPE = "@cyxbs-mobile"
 
   val RUNTIME_MODULE_FILES = setOf(
     "kotlin-kotlin-stdlib.mjs",
@@ -65,6 +64,25 @@ object NpmJsPackageDefaults {
     "kotlinx-serialization-kotlinx-serialization-core.mjs",
     "kotlinx-serialization-kotlinx-serialization-json.mjs",
   )
+}
+
+/**
+ * 将 Gradle 模块路径转换为项目内唯一且可直接发布的 npm 包名。
+ *
+ * 例如 `:cyxbs-functions:code:language:js` 会得到
+ * `@cyxbs-mobile/cyxbs-functions-code-language-js`。路径片段统一转为小写，非 npm 安全字符折叠为
+ * `-`，因此模块移动会被视为 npm 坐标变更。
+ */
+fun npmPackageNameFromProjectPath(projectPath: String): String {
+  val normalizedPath = projectPath
+    .trim(':')
+    .lowercase()
+    .replace(Regex("[^a-z0-9._~-]+"), "-")
+    .trim('-')
+  require(normalizedPath.isNotEmpty()) {
+    "Cannot derive an npm package name from Gradle project path '$projectPath'."
+  }
+  return "${NpmJsPackageDefaults.NPM_SCOPE}/$normalizedPath"
 }
 
 /**
@@ -103,10 +121,18 @@ fun Project.configureNpmJsPackaging() {
   } else {
     project(NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH)
   }
+  val runtimeProject = distributionProject ?: packageProject
   val extension = extensions.create<NpmJsPackageExtension>("npmJsPackage").apply {
     bundleKotlinRuntime.convention(false)
-    runtimePackageName.convention(NpmJsPackageDefaults.RUNTIME_PACKAGE_NAME)
-    runtimePackageVersion.convention(NpmJsPackageDefaults.RUNTIME_PACKAGE_VERSION)
+    runtimePackageName.convention(npmPackageNameFromProjectPath(runtimeProject.path))
+    // Provider 延迟读取 distribution 的 project.version，避免插件应用阶段仍得到 unspecified。
+    runtimePackageVersion.convention(runtimeProject.provider {
+      runtimeProject.version.toString().also { runtimeVersion ->
+        require(runtimeVersion != Project.DEFAULT_VERSION) {
+          "${runtimeProject.path} must declare project.version before npm packaging."
+        }
+      }
+    })
     runtimeModuleFiles.convention(NpmJsPackageDefaults.RUNTIME_MODULE_FILES)
     moduleSourceDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
     packageMetadataDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))

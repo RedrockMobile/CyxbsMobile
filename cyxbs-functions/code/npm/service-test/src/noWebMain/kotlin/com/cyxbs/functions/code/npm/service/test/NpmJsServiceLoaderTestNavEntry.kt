@@ -139,7 +139,7 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
   }
 
   private companion object {
-    const val PACKAGE_NAME = "@cyxbs-mobile/npm-service-test"
+    const val PACKAGE_NAME = "@cyxbs-mobile/cyxbs-functions-code-npm-service-test-js-impl"
     const val PACKAGE_VERSION = "latest"
     const val TEST_INPUT = "Cyxbs"
     const val TEST_VALUE = 6

@@ -292,7 +292,7 @@ class KspNpmJsServiceProcessor(
   private fun generateJsInitializer() {
     val packageName = checkNotNull(npmPackageName) {
       "A module containing npm JavaScript Service implementations must pass its npm package name " +
-        "to useNpmJsService(packageName)."
+        "by applying manager.npmJs so npmJsService.packageName is configured."
     }
     val initializer = FunSpec.builder(packageName.jsInitializerName())
       .addAnnotation(AnnotationSpec.builder(JS_EXPORT).build())
