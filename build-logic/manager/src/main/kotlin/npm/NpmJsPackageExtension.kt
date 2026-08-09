@@ -1,6 +1,7 @@
 package npm
 
 import org.gradle.api.Project
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
@@ -9,10 +10,10 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 /**
- * npm JavaScript 发布包的共享 Runtime 分包配置。
+ * npm JavaScript 发布包的共享 Runtime 与项目 Module 分包配置。
  *
  * 默认将 Kotlin/JS 基础模块放到独立 Runtime 包；Runtime 包自身将 [bundleKotlinRuntime] 设为 true，
- * 其他业务包则在发布产物中移除这些模块，并把相对 import 改写为 npm 子路径。
+ * 其他业务包则在发布产物中移除这些模块，并把 Runtime 与跨项目相对 import 改写为 npm 请求。
  * 普通业务模块应用 `manager.npmJs` 后即可使用默认配置，只有切换 Registry、Runtime 版本或
  * Kotlin 工具链导致基础 Module 文件名变化时，才需要显式修改本扩展。
  */
@@ -104,11 +105,11 @@ fun npmPackageNameFromProjectPath(projectPath: String): String {
  * prepareNpmJsPackage  生成可发布目录；不生成 tgz，不访问网络
  *          │
  *          ▼
- * packNpmJsPackage     生成 Runtime 与当前业务包的 tgz；不访问 Registry
+ * packNpmJsPackage     生成 Runtime、项目依赖与当前业务包的独立 tgz；不访问 Registry
  *
  * installDebugNpmBundle 生成 debug tgz，ADB 原子替换 App 私有源并重启；不发布到 Registry
  *
- * publishNpmJsPackage  检查/按需发布 Runtime，再发布当前业务包；访问并修改 Registry
+ * publishNpmJsPackage  按依赖拓扑检查/发布 Runtime、项目依赖与当前包；访问并修改 Registry
  * ```
  * 日常发布只需执行 `publishNpmJsPackage`；检查分包内容时执行 prepare，CI 留存制品执行 pack，
  * Android 真机验证执行 install。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，不是业务方
@@ -116,6 +117,10 @@ fun npmPackageNameFromProjectPath(projectPath: String): String {
  */
 fun Project.configureNpmJsPackaging() {
   val packageProject = this
+  val packageRegistry = npmJsPackageRegistry().apply {
+    // manager.npmJs 与 manager.npmJsBridge 都注册到同一张表，供切包任务识别项目边界。
+    register(packageProject)
+  }
   val distributionProject = if (path == NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH) {
     null
   } else {
@@ -158,15 +163,20 @@ fun Project.configureNpmJsPackaging() {
     dependsOn(extension.additionalSourceTaskPaths)
     moduleSourceDirectory.set(extension.moduleSourceDirectory)
     packageMetadataDirectory.set(extension.packageMetadataDirectory)
+    modulePackageMetadataFiles.from(packageRegistry.packageMetadataFiles)
     outputDirectory.set(layout.buildDirectory.dir("npm/package"))
     bundleKotlinRuntime.set(extension.bundleKotlinRuntime)
     runtimePackageName.set(extension.runtimePackageName)
     runtimePackageVersion.set(extension.runtimePackageVersion)
     runtimeModuleFiles.set(extension.runtimeModuleFiles)
   }
+  packageRegistry.preparedPackageDirectories.from(
+    preparePackage.flatMap { it.outputDirectory },
+  )
+  packageRegistry.preparedPackageDirectories.builtBy(preparePackage)
   val packPackage = tasks.register<PackNpmJsPackageTask>("packNpmJsPackage") {
     group = "npm"
-    description = "本地生成 Runtime 与当前业务 npm 包的 tgz；不访问 Registry。"
+    description = "按依赖拓扑生成 Runtime、项目依赖与当前 npm 包的独立 tgz；不访问 Registry。"
     dependsOn(preparePackage)
     packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
     destinationDirectory.set(layout.buildDirectory.dir("npm/tarball"))
@@ -174,7 +184,7 @@ fun Project.configureNpmJsPackaging() {
   }
   val publishPackage = tasks.register<PublishNpmJsPackageTask>("publishNpmJsPackage") {
     group = "npm"
-    description = "检查并按需发布共享 Runtime，再将当前业务包发布到 Registry。"
+    description = "按依赖拓扑检查并发布共享 Runtime、项目依赖与当前包。"
     dependsOn(preparePackage)
     packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
     npmExecutable.set(extension.npmExecutable)
@@ -223,13 +233,16 @@ fun Project.configureNpmJsPackaging() {
         // ensure 会直接失败，当前业务包不会被上传，避免发布引用错误 ABI 的版本。
         dependsOn(ensureRuntime)
       }
-      packageProject.tasks.register<InstallDebugNpmBundleTask>("installDebugNpmBundle") {
+      val installDebugBundle = packageProject.tasks.register<InstallDebugNpmBundleTask>(
+        "installDebugNpmBundle",
+      ) {
         group = "npm"
         description = "比较 Registry 稳定包；存在变化时生成 debug bundle、ADB 覆盖并重启。"
         // 注入阶段需要读取当前 Gradle 属性与本机 Android SDK，不复用该任务的 configuration cache。
         notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
         dependsOn(preparePackage, prepareRuntime)
         packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
+        localPackageDirectories.from(packageRegistry.preparedPackageDirectories)
         runtimePackageDirectory.set(prepareRuntime.flatMap { it.outputDirectory })
         runtimePackageName.set(extension.runtimePackageName)
         runtimeStableVersion.set(extension.runtimePackageVersion)
@@ -243,6 +256,54 @@ fun Project.configureNpmJsPackaging() {
         // 每次执行都需要重新查询 Registry；任务内部会在所有候选包均未变化时跳过 ADB 与重启。
         outputs.upToDateWhen { false }
       }
+      packageProject.gradle.projectsEvaluated {
+        // 当前包改为独立 npm 依赖后，pack/publish 必须先完成直接项目依赖；依赖任务自身会继续
+        // 处理下一层，从而形成与 Gradle 源码依赖一致的发布拓扑，而不会发布无关语言包。
+        directNpmJsPackageDependencies().forEach { dependencyProject ->
+          val dependencyPrepare = dependencyProject.tasks.named<PrepareNpmJsPackageTask>(
+            "prepareNpmJsPackage",
+          )
+          packPackage.configure {
+            dependsOn(dependencyProject.tasks.named<PackNpmJsPackageTask>("packNpmJsPackage"))
+          }
+          publishPackage.configure {
+            dependsOn(
+              dependencyProject.tasks.named<PublishNpmJsPackageTask>("publishNpmJsPackage"),
+            )
+          }
+          // 注册表包含所有模块目录，但任务执行时只遍历入口可达包；显式依赖保证直接依赖的
+          // prepare 已进入当前任务图，其他目录的 builtBy 负责补齐更深层依赖。
+          installDebugBundle.configure {
+            dependsOn(dependencyPrepare)
+          }
+        }
+      }
     }
   }
 }
+
+/**
+ * 返回当前 JS 产物直接依赖、且同样使用项目 npm 发布约定的 Gradle 模块。
+ *
+ * 只读取会进入 JS main 产物的配置；宿主 noWebMain 依赖不会误入 npm 发布拓扑。
+ */
+private fun Project.directNpmJsPackageDependencies(): Set<Project> {
+  return NPM_JS_MAIN_CONFIGURATIONS.asSequence()
+    .mapNotNull(configurations::findByName)
+    .flatMap { configuration ->
+      configuration.dependencies.asSequence().filterIsInstance<ProjectDependency>()
+    }
+    .map { dependency -> rootProject.project(dependency.path) }
+    .filter { dependencyProject ->
+      dependencyProject.pluginManager.hasPlugin("manager.npmJs") ||
+          dependencyProject.pluginManager.hasPlugin("manager.npmJsBridge")
+    }
+    .toCollection(linkedSetOf())
+}
+
+private val NPM_JS_MAIN_CONFIGURATIONS = setOf(
+  "commonMainApi",
+  "commonMainImplementation",
+  "jsMainApi",
+  "jsMainImplementation",
+)

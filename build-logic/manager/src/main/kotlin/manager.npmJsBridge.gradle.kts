@@ -1,4 +1,5 @@
 import com.google.devtools.ksp.gradle.KspExtension
+import npm.configureNpmJsPackaging
 import npm.npmPackageNameFromProjectPath
 import org.gradle.api.GradleException
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -30,7 +31,8 @@ val hostKspTargets = Multiplatform.KspTarget.NON_WEB
  * 生成，版本固定读取 `project.version`；插件自动启用 npm Service 所需的 Serialization、KSP、
  * KtProvider 与端上代理依赖，并禁止叠加 `kmp.compose` 或 `manager.lib`。
  * 底层 `:cyxbs-functions:code:npm:js-bridge` 只定义注解和基础协议，因此会跳过反向依赖自身的
- * Service 代理配置，但仍使用相同的平台及 npm 坐标约定。
+ * Service 代理配置，但仍使用相同的平台及 npm 坐标约定。每个 Bridge 模块也会注册独立 npm
+ * 分包任务，供其他 JavaScript 包以精确版本依赖，而不会把 Bridge 实现复制进自身产物。
  */
 kotlin {
   android {
@@ -131,3 +133,5 @@ afterEvaluate {
     }
   }
 }
+
+configureNpmJsPackaging()

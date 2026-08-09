@@ -33,9 +33,9 @@ val npmPackageName = npmPackageNameFromProjectPath(path)
  *
  * 应用插件后会把当前模块自动加入 `:cyxbs-functions:code:npm:distribution` 的聚合编译，并提供：
  * - `prepareNpmJsPackage`：仅生成最终发布目录，用于检查分包结果；不调用 npm、不联网。
- * - `packNpmJsPackage`：本地生成 Runtime 和当前业务包的 tgz；不访问 Registry。
- * - `installDebugNpmBundle`：生成带时间版本的测试 tgz，通过 ADB 替换 App 私有 debug 源并重启。
- * - `publishNpmJsPackage`：先联网保证 Runtime 已发布，再发布当前业务包。
+ * - `packNpmJsPackage`：按依赖拓扑生成 Runtime、项目依赖与当前包的独立 tgz；不访问 Registry。
+ * - `installDebugNpmBundle`：按依赖拓扑生成带时间版本的测试 tgz，ADB 替换私有 debug 源并重启。
+ * - `publishNpmJsPackage`：按依赖拓扑保证 Runtime 与项目依赖已发布，再发布当前包。
  *
  * 正常发布只需执行最后一个任务；真机验证执行 install，prepare/pack 用于检查产物与 CI 制品留存。
  */

@@ -32,6 +32,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /** 无参数的 NpmJsServiceLoader 手动测试页面路由。 */
 @Serializable
@@ -76,16 +78,30 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
             coroutineScope.launch {
               isRunning = true
               output = "正在刷新 metadata、解析依赖并创建 Service…"
+              val totalStartedAt = TimeSource.Monotonic.markNow()
+              val stageTimings = mutableListOf<StageTiming>()
               var service: NpmJsServiceLoaderTestService? = null
+              var resultText: String? = null
+              var failureText: String? = null
               try {
-                service = NpmJsServiceLoader().load(
-                  serviceClass = NpmJsServiceLoaderTestService::class,
-                  packageName = PACKAGE_NAME,
-                  version = PACKAGE_VERSION,
-                  refreshPolicy = NpmRefreshPolicy.FORCE,
-                )
-                val result = service.execute(TEST_INPUT, TEST_VALUE)
-                output = buildString {
+                val loader = stageTimings.measureStage("构造 NpmJsServiceLoader") {
+                  NpmJsServiceLoader()
+                }
+                val loadedService = stageTimings.measureStage(
+                  "加载 Service（刷新、下载、校验、建图、Runtime 初始化）",
+                ) {
+                  loader.load(
+                    serviceClass = NpmJsServiceLoaderTestService::class,
+                    packageName = PACKAGE_NAME,
+                    version = PACKAGE_VERSION,
+                    refreshPolicy = NpmRefreshPolicy.FORCE,
+                  )
+                }
+                service = loadedService
+                val result = stageTimings.measureStage("首次 JS Service 调用") {
+                  loadedService.execute(TEST_INPUT, TEST_VALUE)
+                }
+                resultText = buildString {
                   appendLine("调用成功")
                   appendLine("bundleMarker：${result.bundleMarker}")
                   appendLine("input：${result.input}")
@@ -94,14 +110,35 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
                 }
               } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
-                output = throwable.toDisplayText()
+                failureText = throwable.toDisplayText()
               } finally {
                 withContext(NonCancellable) {
+                  val serviceToClose = service
                   try {
-                    service?.close()
+                    if (serviceToClose != null) {
+                      stageTimings.measureStage("关闭 Service") {
+                        serviceToClose.close()
+                      }
+                    }
                   } catch (closeFailure: Throwable) {
-                    output += "\n关闭 Service 失败：${closeFailure.message}"
+                    failureText = buildString {
+                      failureText?.let(::appendLine)
+                      append("关闭 Service 失败：${closeFailure.message}")
+                    }
                   }
+                }
+                val totalDuration = totalStartedAt.elapsedNow()
+                output = buildString {
+                  resultText?.let(::append)
+                  if (resultText != null && failureText != null) appendLine()
+                  append(failureText ?: if (resultText == null) "执行已结束，但没有返回结果。" else "")
+                  appendLine()
+                  appendLine()
+                  appendLine("耗时统计：")
+                  stageTimings.forEach { timing ->
+                    appendLine("- ${timing.name}：${timing.duration.toDisplayMilliseconds()}")
+                  }
+                  append("- 总耗时（包含清理）：${totalDuration.toDisplayMilliseconds()}")
                 }
                 isRunning = false
               }
@@ -138,7 +175,35 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
     }
   }
 
+  /** 将单阶段耗时保留到微秒后按毫秒展示，避免快速阶段全部显示为 0 ms。 */
+  private fun Duration.toDisplayMilliseconds(): String {
+    val microseconds = inWholeMicroseconds
+    val milliseconds = microseconds / MICROSECONDS_PER_MILLISECOND
+    val fraction = (microseconds % MICROSECONDS_PER_MILLISECOND).toString().padStart(3, '0')
+    return "$milliseconds.$fraction ms"
+  }
+
+  /** 执行并记录一个阶段；即使阶段抛出异常，也保留截至失败时的耗时。 */
+  private suspend fun <T> MutableList<StageTiming>.measureStage(
+    name: String,
+    block: suspend () -> T,
+  ): T {
+    val startedAt = TimeSource.Monotonic.markNow()
+    try {
+      return block()
+    } finally {
+      this += StageTiming(name, startedAt.elapsedNow())
+    }
+  }
+
+  /** 页面侧可观察阶段的单次耗时，不改变正式 npm 加载链路。 */
+  private data class StageTiming(
+    val name: String,
+    val duration: Duration,
+  )
+
   private companion object {
+    const val MICROSECONDS_PER_MILLISECOND = 1_000L
     const val PACKAGE_NAME = "@cyxbs-mobile/cyxbs-functions-code-npm-service-test-js-impl"
     const val PACKAGE_VERSION = "latest"
     const val TEST_INPUT = "Cyxbs"

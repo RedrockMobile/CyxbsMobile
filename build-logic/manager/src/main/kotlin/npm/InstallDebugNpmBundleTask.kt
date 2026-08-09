@@ -5,11 +5,13 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
@@ -25,18 +27,21 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
- * 生成当前业务包的本地 debug npm bundle，并通过 ADB 注入 App 私有 debug 目录。
+ * 生成入口包及其本地项目依赖的 debug npm bundle，并通过 ADB 注入 App 私有 debug 目录。
  *
  * ```text
- * prepare 业务包 + Runtime
+ * prepare 入口包 + 本地依赖池 + Runtime
  *          │
  *          ├── Runtime 与 registry 稳定版一致 ──> 复用稳定坐标，不生成 Runtime tgz
  *          └── Runtime 与 registry 稳定版不同 ──> 生成同时间戳的新 Runtime tgz
  *                              │
  *                              ▼
- *        业务包写入最终 Runtime 精确坐标，再与 registry 稳定版比较 SRI
- *                    │                            │
- *                    └── 不同：生成 debug tgz       └──  一致：不生成
+ *        按依赖拓扑从叶子到入口解析每个包，并写入最终依赖精确坐标
+ *                    │
+ *          与 registry 稳定版逐包比较 SRI
+ *                    │
+ *                    ├── 不同：生成 debug tgz
+ *                    └── 一致：继续使用稳定坐标
  *                              │
  *                 至少一个包变化后才 force-stop App
  *                              │
@@ -48,9 +53,10 @@ import javax.inject.Inject
  * ```
  *
  * debug 版本格式为 `<下一稳定补丁版本>-debug.<yyyyMMddHHmmss>`，时间固定使用上海时区。同次任务
- * 的业务包与 Runtime 共用一个时间戳。变化检测始终使用稳定版本号计算候选 tgz 的 SRI，时间戳只在
- * 已确认内容或依赖坐标变化后写入。设备旧源不参与检测，有变化时直接原子覆盖固定路径；进入正常
- * npm 包池后的归档仍遵循包池 14 天可达性 GC。
+ * 的入口包、依赖包与 Runtime 共用一个时间戳。变化检测始终使用稳定版本号和已经解析的下级精确
+ * 坐标计算候选 tgz 的 SRI，时间戳只在已确认内容或依赖坐标变化后写入。这样依赖代码变化会先生成
+ * 新依赖版本，再自然推动上层包生成引用该版本的新产物。设备旧源不参与检测，有变化时直接原子
+ * 覆盖固定路径；进入正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
  */
 @DisableCachingByDefault(because = "任务需要读取并修改已连接 Android 设备的 App 私有目录")
 abstract class InstallDebugNpmBundleTask : DefaultTask() {
@@ -58,6 +64,16 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   @get:InputDirectory
   @get:PathSensitive(PathSensitivity.RELATIVE)
   abstract val packageDirectory: DirectoryProperty
+
+  /**
+   * 构建中所有可独立发布模块的 prepare 目录。
+   *
+   * 任务只会从 [packageDirectory] 的 dependencies 开始遍历本地可达包；无关语言包即使出现在
+   * 集合中也不会查询 Registry、打包或注入设备。
+   */
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val localPackageDirectories: ConfigurableFileCollection
 
   @get:InputDirectory
   @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -107,15 +123,28 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       buildTimestamp = buildTimestamp,
       outputRoot = outputRoot,
     )
-    val business = prepareBusinessPackage(
-      source = packageSource,
-      runtimeVersion = runtimeResolution.version,
-      buildTimestamp = buildTimestamp,
-      outputRoot = outputRoot,
-    )
+    val localPackages = readLocalPackageSources(packageSource)
+    val packageResolutions = linkedMapOf<String, BusinessPackageResolution>()
+    resolveLocalPackageOrder(localPackages, readPackageName(packageSource))
+      .forEachIndexed { index, source ->
+        val dependencyVersions = source.dependencies.mapNotNull { dependencyName ->
+          packageResolutions[dependencyName]?.let { resolution ->
+            dependencyName to resolution.version
+          }
+        }.toMap()
+        packageResolutions[source.name] = resolveBusinessPackage(
+          source = source,
+          dependencyVersions = dependencyVersions,
+          runtimeVersion = runtimeResolution.version,
+          buildTimestamp = buildTimestamp,
+          outputRoot = outputRoot,
+          outputIndex = index,
+        )
+      }
+    val changedPackages = packageResolutions.values.filter { it.archive != null }
 
-    if (runtimeResolution.archive == null && business == null) {
-      logger.lifecycle("Local npm package and Runtime match their registry stable versions; skip ADB.")
+    if (runtimeResolution.archive == null && changedPackages.isEmpty()) {
+      logger.lifecycle("Local npm package graph and Runtime match registry stable versions; skip ADB.")
       return
     }
 
@@ -127,8 +156,14 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     runtimeResolution.archive?.let { archive ->
       installArchive(adb, deviceArguments, appId, runtimePackageName.get(), archive)
     }
-    business?.let { packageInfo ->
-      installArchive(adb, deviceArguments, appId, packageInfo.name, packageInfo.archive)
+    changedPackages.forEach { packageInfo ->
+      installArchive(
+        adb,
+        deviceArguments,
+        appId,
+        packageInfo.name,
+        checkNotNull(packageInfo.archive),
+      )
     }
     runAdb(
       adb,
@@ -142,8 +177,8 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       "1",
     )
     logger.lifecycle(
-      "Installed changed local debug npm bundle; business={}, Runtime {}@{}.",
-      business?.let { "${it.name}@${it.version}" } ?: "unchanged",
+      "Installed changed local debug npm graph; packages={}, Runtime {}@{}.",
+      changedPackages.joinToString { "${it.name}@${it.version}" }.ifEmpty { "unchanged" },
       runtimePackageName.get(),
       runtimeResolution.version,
     )
@@ -175,39 +210,124 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   /**
    * 先以远端稳定版本和最终 Runtime 坐标计算 SRI；一致时不生成，存在代码或依赖变化时才加时间戳。
    */
-  private fun prepareBusinessPackage(
-    source: File,
+  private fun resolveBusinessPackage(
+    source: LocalPackageSource,
+    dependencyVersions: Map<String, String>,
     runtimeVersion: String,
     buildTimestamp: String,
     outputRoot: File,
-  ): BusinessDebugPackage? {
-    val directory = copyPackage(source, outputRoot.resolve("business-candidate"))
+    outputIndex: Int,
+  ): BusinessPackageResolution {
+    val directory = copyPackage(
+      source.directory,
+      outputRoot.resolve("business-$outputIndex-candidate"),
+    )
     val packageJsonFile = directory.resolve(PACKAGE_JSON)
     val packageJson = readPackageJson(packageJsonFile)
-    val name = packageJson.string("name")
-      ?: throw GradleException("Prepared npm business package has no name.")
-    val stableVersion = packageJson.string("version")
-      ?: throw GradleException("Prepared npm business package has no version.")
-    packageJson.addProperty("version", stableVersion)
+    packageJson.addProperty("version", source.stableVersion)
     val dependencies = packageJson.getAsJsonObject("dependencies") ?: JsonObject()
-    dependencies.addProperty(runtimePackageName.get(), runtimeVersion)
+    if (dependencies.has(runtimePackageName.get())) {
+      dependencies.addProperty(runtimePackageName.get(), runtimeVersion)
+    }
+    dependencyVersions.forEach { (packageName, version) ->
+      dependencies.addProperty(packageName, version)
+    }
     packageJson.add("dependencies", dependencies)
     writePackageJson(packageJsonFile, packageJson)
     val localStableIntegrity = readPackIntegrity(directory)
-    val remoteStableIntegrity = readRemoteIntegrity(directory, name, stableVersion)
+    val remoteStableIntegrity = readRemoteIntegrity(
+      directory,
+      source.name,
+      source.stableVersion,
+    )
     if (remoteStableIntegrity == localStableIntegrity) {
-      logger.lifecycle("Reuse registry npm business package {}@{}.", name, stableVersion)
-      return null
+      logger.lifecycle(
+        "Reuse registry npm business package {}@{}.",
+        source.name,
+        source.stableVersion,
+      )
+      return BusinessPackageResolution(source.name, source.stableVersion, null)
     }
 
-    val debugVersion = debugVersionAfter(stableVersion, buildTimestamp)
+    val debugVersion = debugVersionAfter(source.stableVersion, buildTimestamp)
     packageJson.addProperty("version", debugVersion)
     writePackageJson(packageJsonFile, packageJson)
-    return BusinessDebugPackage(
-      name = name,
+    return BusinessPackageResolution(
+      name = source.name,
       version = debugVersion,
-      archive = pack(directory, outputRoot.resolve("business-tarball")),
+      archive = pack(directory, outputRoot.resolve("business-$outputIndex-tarball")),
     )
+  }
+
+  /**
+   * 读取入口及构建内其他可发布包，按 npm 包名建立本地源码池。
+   *
+   * 同名包指向不同目录时立即失败，避免调试注入选择到不确定的构建产物。Runtime 由独立流程
+   * 处理，因此不会作为普通业务依赖再次遍历。
+   */
+  private fun readLocalPackageSources(entryDirectory: File): Map<String, LocalPackageSource> {
+    val result = linkedMapOf<String, LocalPackageSource>()
+    (localPackageDirectories.files + entryDirectory)
+      .map(File::getCanonicalFile)
+      .distinct()
+      .forEach { directory ->
+        val packageJson = readPackageJson(directory.resolve(PACKAGE_JSON))
+        val name = packageJson.string("name")
+          ?: throw GradleException("Prepared npm package '$directory' has no name.")
+        if (name == runtimePackageName.get()) return@forEach
+        val version = packageJson.string("version")
+          ?: throw GradleException("Prepared npm package '$name' has no version.")
+        val dependencies = packageJson.getAsJsonObject("dependencies")
+          ?.keySet()
+          ?.toSet()
+          .orEmpty()
+        val source = LocalPackageSource(name, version, directory, dependencies)
+        val previous = result.put(name, source)
+        if (previous != null && previous.directory != directory) {
+          throw GradleException(
+            "npm package '$name' has multiple local prepare directories: " +
+                "'${previous.directory}' and '$directory'.",
+          )
+        }
+      }
+    return result
+  }
+
+  /** 返回本地项目依赖优先、入口最后的稳定拓扑；循环依赖会阻止生成不确定的 debug 坐标。 */
+  private fun resolveLocalPackageOrder(
+    packages: Map<String, LocalPackageSource>,
+    entryName: String,
+  ): List<LocalPackageSource> {
+    if (entryName !in packages) {
+      throw GradleException("Entry npm package '$entryName' is absent from the local package pool.")
+    }
+    val result = mutableListOf<LocalPackageSource>()
+    val resolved = mutableSetOf<String>()
+    val resolving = linkedSetOf<String>()
+    fun visit(packageName: String) {
+      if (packageName in resolved) return
+      if (!resolving.add(packageName)) {
+        val cycle = (resolving.dropWhile { it != packageName } + packageName).joinToString(" -> ")
+        throw GradleException("Local npm project dependency cycle detected: $cycle")
+      }
+      val source = packages.getValue(packageName)
+      source.dependencies
+        .asSequence()
+        .filter(packages::containsKey)
+        .sorted()
+        .forEach(::visit)
+      resolving.remove(packageName)
+      resolved.add(packageName)
+      result.add(source)
+    }
+    visit(entryName)
+    return result
+  }
+
+  /** 读取 prepare 目录对应的 npm 包名，供依赖拓扑确定入口。 */
+  private fun readPackageName(directory: File): String {
+    return readPackageJson(directory.resolve(PACKAGE_JSON)).string("name")
+      ?: throw GradleException("Prepared npm entry package has no name.")
   }
 
   /** 把固定版本改为下一补丁版本的 debug 预发布，保证未来同版本正式包仍高于它。 */
@@ -407,7 +527,20 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
 
   private data class RuntimeResolution(val version: String, val archive: File?)
 
-  private data class BusinessDebugPackage(val name: String, val version: String, val archive: File)
+  /** 一个可独立发布的本地业务包及其稳定依赖声明。 */
+  private data class LocalPackageSource(
+    val name: String,
+    val stableVersion: String,
+    val directory: File,
+    val dependencies: Set<String>,
+  )
+
+  /** 本次调试解析后的精确版本；[archive] 为空表示继续复用 Registry 稳定包。 */
+  private data class BusinessPackageResolution(
+    val name: String,
+    val version: String,
+    val archive: File?,
+  )
 
   private data class CommandResult(
     val exitCode: Int,
