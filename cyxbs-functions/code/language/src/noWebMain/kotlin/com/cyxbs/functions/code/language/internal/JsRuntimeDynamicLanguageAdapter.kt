@@ -7,12 +7,12 @@ import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.create
 import com.cyxbs.functions.code.js.runtime.evaluate
-import com.cyxbs.functions.code.language.api.bridge.DynamicCompletionItem
-import com.cyxbs.functions.code.language.api.bridge.DynamicCompletionResult
-import com.cyxbs.functions.code.language.api.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.DynamicLanguageAdapter
 import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
-import com.cyxbs.functions.code.language.api.bridge.DynamicLanguageMetadata
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageMetadata
 import com.cyxbs.functions.code.language.DynamicLanguageModuleGraph
 import com.cyxbs.functions.code.language.DynamicLanguageProtocolException
 import com.cyxbs.functions.code.language.DynamicLanguageRuntimeConfig

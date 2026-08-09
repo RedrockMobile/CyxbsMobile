@@ -1,9 +1,9 @@
 package com.cyxbs.functions.code.language
 
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
-import com.cyxbs.functions.code.language.api.bridge.DynamicCompletionResult
-import com.cyxbs.functions.code.language.api.bridge.DynamicHighlightSpan
-import com.cyxbs.functions.code.language.api.bridge.DynamicLanguageMetadata
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageMetadata
 import com.cyxbs.functions.code.language.internal.JsRuntimeDynamicLanguageAdapter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

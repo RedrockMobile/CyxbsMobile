@@ -531,9 +531,9 @@ class KspNpmJsServiceProcessor(
 
   private companion object {
     const val SERVICE_ANNOTATION =
-      "com.cyxbs.functions.code.npm.api.bridge.NpmJsService"
+      "com.cyxbs.functions.code.npm.js.bridge.NpmJsService"
     const val SERVICE_INSTANCE =
-      "com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInstance"
+      "com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance"
     const val CLOSE_METHOD = "close"
     const val NULL_JSON = "null"
     const val JS_INITIALIZER_PREFIX = "__cyxbsNpmJsServiceInitialize_"

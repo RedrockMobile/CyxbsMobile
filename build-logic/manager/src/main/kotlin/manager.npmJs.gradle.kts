@@ -61,7 +61,7 @@ kotlin {
 
 kotlin {
   sourceSets.commonMain.dependencies {
-    api(project(":cyxbs-functions:code:npm:api-bridge"))
+    api(project(":cyxbs-functions:code:npm:js-bridge"))
     implementation(libsEx.`kotlinx-serialization`)
   }
 }

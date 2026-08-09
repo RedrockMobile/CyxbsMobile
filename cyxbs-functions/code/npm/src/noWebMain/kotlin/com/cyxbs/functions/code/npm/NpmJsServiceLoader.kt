@@ -8,9 +8,9 @@ import com.cyxbs.functions.code.npm.model.NpmEntryVersion
 import com.cyxbs.functions.code.npm.module.NpmModuleGraphFactory
 import com.cyxbs.functions.code.npm.pool.NpmPackagePool
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInstance
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInvocationException
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceProtocolException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import com.cyxbs.functions.code.npm.internal.NpmGraphJsModuleLoader
 import com.cyxbs.functions.code.npm.model.NpmException
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease

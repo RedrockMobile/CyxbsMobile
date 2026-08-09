@@ -7,7 +7,7 @@ useKtProvider()
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      api(projects.cyxbsFunctions.code.npm.apiBridge)
+      api(projects.cyxbsFunctions.code.npm.jsBridge)
       implementation(projects.cyxbsComponents.utils)
     }
 

@@ -30,7 +30,7 @@ NpmJsExecutor(packagePool).executeValue(
 )
 ```
 
-应用 `manager.npmJs` 或 `manager.npmJsApiBridge` 的模块无需手写 npm 坐标：包名固定为
+应用 `manager.npmJs` 或 `manager.npmJsBridge` 的模块无需手写 npm 坐标：包名固定为
 `@cyxbs-mobile/` 加完整 Gradle 模块路径（将 `:` 转为 `-`），版本固定使用该模块的
 `project.version`。
 

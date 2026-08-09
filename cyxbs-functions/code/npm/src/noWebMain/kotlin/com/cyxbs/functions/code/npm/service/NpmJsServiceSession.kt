@@ -3,8 +3,8 @@ package com.cyxbs.functions.code.npm.service
 import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInvocationException
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceProtocolException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

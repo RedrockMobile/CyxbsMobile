@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.npm.service
 
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInstance
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance
 import kotlin.reflect.KClass
 
 /**

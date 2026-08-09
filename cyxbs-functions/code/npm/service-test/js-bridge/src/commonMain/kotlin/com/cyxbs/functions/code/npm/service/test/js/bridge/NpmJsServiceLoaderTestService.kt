@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.npm.service.test.js.bridge
 
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsService
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInstance
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsService
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance
 import kotlinx.serialization.Serializable
 
 /**

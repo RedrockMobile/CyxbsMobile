@@ -5,7 +5,7 @@ plugins {
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      api(projects.cyxbsFunctions.code.language.apiBridge)
+      api(projects.cyxbsFunctions.code.language.jsBridge)
     }
 
     noWebMain.dependencies {

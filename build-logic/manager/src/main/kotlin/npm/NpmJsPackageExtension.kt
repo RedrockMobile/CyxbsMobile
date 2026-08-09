@@ -94,7 +94,7 @@ fun npmPackageNameFromProjectPath(projectPath: String): String {
  *
  * 模块关系如下，其中箭头表示 Gradle 的 `jsMainApi` 依赖：
  * ```text
- * distribution ──> 所有应用 manager.npmJs 的业务模块 ──> 业务使用的 api-bridge
+ * distribution ──> 所有应用 manager.npmJs 的业务模块 ──> 业务使用的 js-bridge
  * ```
  * 这里是 distribution 聚合业务模块，而不是业务模块依赖 distribution。业务模块仅在执行 npm
  * 打包任务时复用 distribution 的聚合 production 产物，因此不会形成 Kotlin 源码依赖环。

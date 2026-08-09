@@ -6,8 +6,8 @@ import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import com.cyxbs.functions.code.npm.model.NpmPackageId
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInvocationException
-import com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceProtocolException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import com.g985892345.provider.cyxbsmobile.cyxbsfunctions.code.js.quickjs.QuickjsKtProviderInitializer
 import com.g985892345.provider.testing.withKtProviderTest
 import kotlinx.coroutines.test.runTest
