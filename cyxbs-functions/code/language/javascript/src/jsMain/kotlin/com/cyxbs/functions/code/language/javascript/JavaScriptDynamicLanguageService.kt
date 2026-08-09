@@ -5,12 +5,13 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageMetadata
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighter
 
 /**
  * JavaScript 动态语言 npm 包的 Kotlin/JS 入口实现。
  *
- * 当前实现提供可执行的最小关键词高亮与补全，用于验证 npm Service 的生成、打包和调用链路；后续
- * CodeMirror/Lezer 接入只需替换本 object 内部实现，端上接口和加载代码无需变化。
+ * 语法高亮由 @lezer/javascript 完成，输出 CodeMirror 标准的 `tok-*` 样式标识；补全暂时提供
+ * JavaScript 教学常用关键词，后续可在不改变端上协议的前提下扩展为语义补全。
  */
 object JavaScriptDynamicLanguageService : DynamicLanguageService {
 
@@ -23,13 +24,7 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
   }
 
   override suspend fun highlight(source: String): List<DynamicHighlightSpan> {
-    return KEYWORD_REGEX.findAll(source).map { match ->
-      DynamicHighlightSpan(
-        from = match.range.first,
-        to = match.range.last + 1,
-        styleIds = listOf(KEYWORD_STYLE),
-      )
-    }.toList()
+    return LezerSyntaxHighlighter.highlight(parser, source)
   }
 
   override suspend fun complete(
@@ -98,8 +93,5 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     "undefined",
     "var",
     "while",
-  )
-  private val KEYWORD_REGEX = Regex(
-    "\\b(?:${KEYWORDS.joinToString("|")})\\b",
   )
 }
