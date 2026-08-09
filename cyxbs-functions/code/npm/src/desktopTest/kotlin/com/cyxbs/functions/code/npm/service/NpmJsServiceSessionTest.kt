@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.npm.service
 
+import com.cyxbs.functions.code.js.runtime.JsModuleLoader
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import com.cyxbs.functions.code.npm.model.NpmPackageId
@@ -21,7 +22,7 @@ class NpmJsServiceSessionTest {
   /** 验证同步或异步 JavaScript 返回值都能经过顶层 await 和 JSON 协议返回。 */
   @Test
   fun initializeInvokeAndClose() = withQuickJsSession { session, isReleased ->
-    session.initialize(SERVICE_SOURCE, ENTRY_MODULE)
+    session.initialize(ENTRY_MODULE, PACKAGE_NAME)
 
     assertEquals("\"hello\"", session.invoke("echo", "[\"hello\"]"))
     assertEquals("5", session.invoke("addAsync", "[2,3]"))
@@ -38,7 +39,7 @@ class NpmJsServiceSessionTest {
   @Test
   fun invocationFailureIsConvertedAndLeaseIsReleased() =
     withQuickJsSession { session, isReleased ->
-      session.initialize(SERVICE_SOURCE, ENTRY_MODULE)
+      session.initialize(ENTRY_MODULE, PACKAGE_NAME)
 
       val failure = assertFailsWith<NpmJsServiceInvocationException> {
         session.invoke("fail", "[]")
@@ -55,8 +56,22 @@ class NpmJsServiceSessionTest {
     schemaHash = "unexpected-schema",
   ) { session, isReleased ->
     assertFailsWith<NpmJsServiceProtocolException> {
-      session.initialize(SERVICE_SOURCE, ENTRY_MODULE)
+      session.initialize(ENTRY_MODULE, PACKAGE_NAME)
     }
+
+    session.close()
+    assertTrue(isReleased())
+  }
+
+  /** 入口没有导出固定初始化函数时必须立即失败，不能继续执行 describe 或创建业务代理。 */
+  @Test
+  fun missingInitializerExportStopsInitialization() = withQuickJsSession(
+    entrySource = "export const unrelated = true;",
+  ) { session, isReleased ->
+    val failure = assertFailsWith<NpmJsServiceInvocationException> {
+      session.initialize(ENTRY_MODULE, PACKAGE_NAME)
+    }
+    assertTrue(failure.cause != null)
 
     session.close()
     assertTrue(isReleased())
@@ -69,6 +84,7 @@ class NpmJsServiceSessionTest {
    */
   private fun withQuickJsSession(
     schemaHash: String = SCHEMA_HASH,
+    entrySource: String = SERVICE_SOURCE,
     block: suspend (NpmJsServiceSession, () -> Boolean) -> Unit,
   ) {
     withKtProviderTest(QuickjsKtProviderInitializer) {
@@ -89,7 +105,12 @@ class NpmJsServiceSessionTest {
         )
         val session = NpmJsServiceSession(
           runtime = runtimeFactory.create(
-            JsRuntimeOptions(allowBytecodeCache = false),
+            JsRuntimeOptions(
+              allowBytecodeCache = false,
+              moduleLoader = JsModuleLoader { name ->
+                entrySource.takeIf { name == ENTRY_MODULE }
+              },
+            ),
           ),
           lease = lease,
           serviceId = SERVICE_ID,
@@ -104,31 +125,34 @@ class NpmJsServiceSessionTest {
     const val SERVICE_ID = "com.cyxbs.functions.code.npm.service.TestService"
     const val SCHEMA_HASH = "test-schema"
     const val ENTRY_MODULE = "test-service.mjs"
+    const val PACKAGE_NAME = "@cyxbs-mobile/test-service"
 
     val SERVICE_SOURCE = """
-      globalThis.CyxbsNpmJsService = {
-        describe(serviceId) {
-          return serviceId === "$SERVICE_ID" ? "$SCHEMA_HASH" : null;
-        },
-        async invoke(serviceId, method, argumentsJson) {
-          if (serviceId !== "$SERVICE_ID") {
-            throw new Error("Unknown service: " + serviceId);
-          }
-          const args = JSON.parse(argumentsJson);
-          switch (method) {
-            case "echo":
-              return JSON.stringify(args[0]);
-            case "addAsync":
-              return JSON.stringify(await Promise.resolve(args[0] + args[1]));
-            case "fail":
-              throw new Error("expected test failure");
-            case "${'$'}close":
-              return "null";
-            default:
-              throw new Error("Unknown method: " + method);
-          }
-        },
-      };
+      export function __cyxbsNpmJsServiceInitialize__cyxbs_mobile_test_service() {
+        globalThis.CyxbsNpmJsService = {
+          describe(serviceId) {
+            return serviceId === "$SERVICE_ID" ? "$SCHEMA_HASH" : null;
+          },
+          async invoke(serviceId, method, argumentsJson) {
+            if (serviceId !== "$SERVICE_ID") {
+              throw new Error("Unknown service: " + serviceId);
+            }
+            const args = JSON.parse(argumentsJson);
+            switch (method) {
+              case "echo":
+                return JSON.stringify(args[0]);
+              case "addAsync":
+                return JSON.stringify(await Promise.resolve(args[0] + args[1]));
+              case "fail":
+                throw new Error("expected test failure");
+              case "${'$'}close":
+                return "null";
+              default:
+                throw new Error("Unknown method: " + method);
+            }
+          },
+        };
+      }
     """.trimIndent()
   }
 }

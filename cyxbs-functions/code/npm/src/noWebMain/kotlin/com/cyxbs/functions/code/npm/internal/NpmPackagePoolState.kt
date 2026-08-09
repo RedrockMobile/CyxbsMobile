@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.npm.internal
 
+import com.cyxbs.functions.code.npm.model.NpmPackageSource
 import com.cyxbs.functions.code.npm.model.NpmStorageException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -46,6 +47,7 @@ internal data class PersistedNpmPackage(
   val integrity: String,
   val tarballUrl: String,
   val dependencySpecs: Map<String, String>,
+  val source: NpmPackageSource = NpmPackageSource.REGISTRY,
 )
 
 /** 一个入口最后一次完整解析成功的结果。 */

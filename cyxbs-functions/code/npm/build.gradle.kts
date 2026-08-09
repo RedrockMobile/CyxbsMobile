@@ -13,6 +13,7 @@ kotlin {
 
     noWebMain.dependencies {
       api(projects.cyxbsFunctions.code.js)
+      implementation(projects.cyxbsComponents.config)
       implementation(libs.kotlinx.coroutines)
       implementation(libs.kotlinx.serialization)
       implementation(libs.ktor.core)

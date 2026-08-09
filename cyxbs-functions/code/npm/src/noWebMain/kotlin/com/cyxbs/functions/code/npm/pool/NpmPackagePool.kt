@@ -18,6 +18,7 @@ import com.cyxbs.functions.code.npm.model.NpmEntryVersion
 import com.cyxbs.functions.code.npm.model.NpmException
 import com.cyxbs.functions.code.npm.model.NpmIntegrityException
 import com.cyxbs.functions.code.npm.model.NpmPackageId
+import com.cyxbs.functions.code.npm.model.NpmPackageSource
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
 import com.cyxbs.functions.code.npm.model.NpmRegistryMismatchException
@@ -178,19 +179,24 @@ class NpmPackagePool(
       if (resolveRemotely) {
         try {
           val remote = resolveFromRegistry(request, now).also { uncommittedRemote = it }
-          ensureRemoteArchives(remote.packages)
-          val merged = mergePackages(state.packages, remote.packages)
-          val nextGeneration = if (merged.size == state.packages.size) {
-            state.generation
+          if (shouldKeepSavedLatest(request, refreshPolicy, saved, requestMatches, remote.entry)) {
+            // 网络不可用时本地 debug metadata 可能比已保存图更旧；AUTO 不允许因此回退版本。
+            selectedEntry = selectSavedEntry()
           } else {
-            state.generation + 1
+            ensureRemoteArchives(remote.packages)
+            val merged = mergePackages(state.packages, remote.packages)
+            val nextGeneration = if (merged.size == state.packages.size) {
+              state.generation
+            } else {
+              state.generation + 1
+            }
+            selectedEntry = remote.entry.copy(poolGeneration = nextGeneration)
+            state = state.copy(
+              generation = nextGeneration,
+              packages = merged,
+            )
+            remoteApplied = true
           }
-          selectedEntry = remote.entry.copy(poolGeneration = nextGeneration)
-          state = state.copy(
-            generation = nextGeneration,
-            packages = merged,
-          )
-          remoteApplied = true
         } catch (exception: CancellationException) {
           throw exception
         } catch (exception: NpmStorageException) {
@@ -587,6 +593,30 @@ class NpmPackagePool(
     }
   }
 
+  /**
+   * AUTO/latest 刷新只接受不低于当前完整图的根版本。
+   *
+   * 本地 debug metadata 可在 registry 断网时独立工作，但设备目录里可能残留低版本测试包；如果
+   * 允许它覆盖已经保存的高版本，App 重启后的首次刷新反而会降级。FORCE 是调用方明确要求以本次
+   * metadata 为准，因此不应用该保护。
+   */
+  private fun shouldKeepSavedLatest(
+    request: NpmEntryRequest,
+    refreshPolicy: NpmRefreshPolicy,
+    saved: PersistedNpmEntry?,
+    requestMatches: Boolean,
+    remote: PersistedNpmEntry,
+  ): Boolean {
+    if (refreshPolicy != NpmRefreshPolicy.AUTO || request.version !is NpmEntryVersion.Latest ||
+      !requestMatches || saved == null
+    ) {
+      return false
+    }
+    val savedVersion = NpmSemver.parseOrNull(saved.rootVersion) ?: return false
+    val remoteVersion = NpmSemver.parseOrNull(remote.rootVersion) ?: return false
+    return remoteVersion < savedVersion
+  }
+
   companion object {
 
     /**
@@ -688,6 +718,11 @@ private fun NpmRegistryVersion.toPersistedPackage() = PersistedNpmPackage(
   integrity = integrity.encoded,
   tarballUrl = tarballUrl,
   dependencySpecs = dependencies,
+  source = if (tarballUrl.startsWith(LOCAL_DEBUG_TARBALL_BASE_URL)) {
+    NpmPackageSource.LOCAL_DEBUG
+  } else {
+    NpmPackageSource.REGISTRY
+  },
 )
 
 /** DFS 后序保证依赖优先；visiting 集合使依赖环只输出一次。 */
@@ -736,10 +771,13 @@ private suspend fun PersistedNpmEntry.toPreparedEntry(
         id = id,
         integrity = packageInfo.integrity,
         dependencies = node.dependencies.mapValues { (_, value) -> value.toPublic() },
+        source = packageInfo.source,
       )
     },
   )
 }
+
+private const val LOCAL_DEBUG_TARBALL_BASE_URL = "https://cyxbs.local.debug/"
 
 /** MutableMap.getOrPut 的 suspend 版本，避免 metadata 重复请求。 */
 private suspend inline fun <K, V> MutableMap<K, V>.getOrPutSuspending(

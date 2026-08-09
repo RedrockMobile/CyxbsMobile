@@ -23,6 +23,8 @@ kotlin {
             && it.name != "lib_common" // lib_common 由其他模块间接依赖
             // 先临时这样取消依赖，后续会单独根据 Project 内部属性来做 js 模块的区分
             && !it.path.contains(":cyxbs-functions:code:language:js")
+            && !it.path.contains(":cyxbs-functions:code:npm:distribution")
+            && !it.path.contains(":cyxbs-functions:code:npm:service-test:js-impl")
       }.forEach {
         api(it)
       }

@@ -13,6 +13,7 @@ class KspNpmJsServiceProcessorProvider : SymbolProcessorProvider {
       codeGenerator = environment.codeGenerator,
       logger = environment.logger,
       isJsTarget = environment.platforms.any { it is JsPlatformInfo },
+      npmPackageName = environment.options["npmJsService.packageName"],
     )
   }
 }

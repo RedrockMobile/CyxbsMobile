@@ -87,6 +87,17 @@ object fields:
 deeplink: cyxbs://code/editor-test
 ```
 
+## :cyxbs-functions:code:npm:service-test
+
+### code/npm-service-test
+
+- entry: `com.cyxbs.functions.code.npm.service.test.NpmJsServiceLoaderTestNavEntry`
+- argument: `com.cyxbs.functions.code.npm.service.test.NpmJsServiceLoaderTestNavArgument`
+
+```text
+deeplink: cyxbs://code/npm-service-test
+```
+
 ## :cyxbs-functions:update
 
 ### dialog/update

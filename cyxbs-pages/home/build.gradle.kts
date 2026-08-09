@@ -23,6 +23,10 @@ kotlin {
       implementation(projects.cyxbsPages.notification.api)
       implementation(projects.cyxbsPages.map.api)
     }
+    noWebMain.dependencies {
+      // 仅把手动测试页面和对应 Provider 装入 Android、iOS 与 Desktop。
+      implementation(projects.cyxbsFunctions.code.npm.serviceTest)
+    }
     androidMain.dependencies {
       implementation(projects.cyxbsPages.course.widget)
       implementation(libs.bundles.projectBase)
@@ -30,4 +34,3 @@ kotlin {
     }
   }
 }
-

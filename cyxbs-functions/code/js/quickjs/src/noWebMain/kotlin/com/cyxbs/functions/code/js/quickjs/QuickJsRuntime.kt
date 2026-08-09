@@ -8,6 +8,7 @@ import com.cyxbs.functions.code.js.runtime.JsModuleLoader
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleContent
 import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleLoader
+import com.cyxbs.functions.code.js.quickjs.internal.QuickJsTimerBridge
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
 import com.dokar.quickjs.QuickJsInterruptedException
@@ -107,6 +108,8 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
   internal val engineVersion: String
     get() = engine.version
 
+  private val timerBridge = QuickJsTimerBridge(engine)
+
   override val isClosed: Boolean
     get() = engine.isClosed
 
@@ -117,6 +120,7 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
     filename: String,
     asModule: Boolean,
   ): Any? {
+    ensureHostEnvironment()
     return runQuickJsOperation {
       engine.evaluate<Any?>(code = code, filename = filename, asModule = asModule)
     }
@@ -184,12 +188,19 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
   /** 执行当前 QuickJS 版本生成的字节码。 */
   @Throws(JsRuntimeException::class, CancellationException::class)
   internal suspend fun evaluateBytecodeValue(bytecode: ByteArray): Any? {
+    ensureHostEnvironment()
     return runQuickJsOperation { engine.evaluate<Any?>(bytecode) }
   }
 
   /** 仅供实现模块测试保留 quickjs-kt 的具体目标类型转换能力。 */
   internal suspend inline fun <reified T> evaluate(bytecode: ByteArray): T {
+    ensureHostEnvironment()
     return runQuickJsOperation { engine.evaluate<T>(bytecode) }
+  }
+
+  /** 首次执行前安装 QuickJS 缺失的通用宿主能力，并统一转换初始化异常。 */
+  private suspend fun ensureHostEnvironment() {
+    runQuickJsOperation { timerBridge.ensureInstalled() }
   }
 
   /** 释放 QuickJS Runtime、Context、Module 与未完成异步任务。 */

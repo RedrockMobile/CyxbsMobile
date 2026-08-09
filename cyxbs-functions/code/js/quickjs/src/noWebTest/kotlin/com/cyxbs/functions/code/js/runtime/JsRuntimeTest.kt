@@ -117,6 +117,31 @@ class JsRuntimeTest {
     }
   }
 
+  /** 验证 QuickJS 默认提供可等待、可取消且支持附加参数的基础计时器。 */
+  @Test
+  fun provideTimeoutHostBridge() = runTest {
+    val runtime = JsRuntime()
+    try {
+      val result = runtime.evaluate<Int>(
+        """
+          let result = 0;
+          const cancelled = setTimeout(() => { result = -1; }, 0);
+          clearTimeout(cancelled);
+          await new Promise(resolve => {
+            setTimeout((left, right) => {
+              result = left + right;
+              resolve();
+            }, 1, 40, 2);
+          });
+          result;
+        """.trimIndent(),
+      )
+      assertEquals(42, result)
+    } finally {
+      runtime.close()
+    }
+  }
+
   /**
    * 验证 Runtime 原生提供标准 JSON 解析与序列化，不依赖额外宿主 capability。
    */

@@ -97,12 +97,13 @@ class NpmJsServiceLoader(
     } catch (throwable: Throwable) {
       lease.releaseAfterFailure(throwable)
     }
-    val entrySource = graph.load(graph.entryModuleName)
-      ?: lease.releaseAfterFailure(
+    if (graph.load(graph.entryModuleName) == null) {
+      lease.releaseAfterFailure(
         NpmJsServiceProtocolException(
           "Prepared npm Service entry '${graph.entryModuleName}' is missing from its Module graph.",
         ),
       )
+    }
     val runtime = try {
       runtimeFactory.create(
         runtimeOptions.copy(
@@ -131,7 +132,7 @@ class NpmJsServiceLoader(
       schemaHash = factory.schemaHash,
     )
     return try {
-      session.initialize(entrySource, graph.entryModuleName)
+      session.initialize(graph.entryModuleName, packageName)
       factory.create(session)
     } catch (throwable: Throwable) {
       session.closeAfterFailure(throwable)

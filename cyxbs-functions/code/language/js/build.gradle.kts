@@ -21,4 +21,4 @@ kotlin {
   }
 }
 
-useNpmJsService()
+useNpmJsService("@cyxbs-mobile/language-javascript")

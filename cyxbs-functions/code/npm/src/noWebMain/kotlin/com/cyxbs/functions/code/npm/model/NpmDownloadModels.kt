@@ -37,7 +37,18 @@ data class NpmResolvedPackage(
   val id: NpmPackageId,
   val integrity: String,
   val dependencies: Map<String, NpmPackageId>,
+  /** 包归档的来源，供后续 Bundle 管理页区分线上缓存与本地调试替换。 */
+  val source: NpmPackageSource = NpmPackageSource.REGISTRY,
 )
+
+/** npm 包归档进入全局池时的来源；来源不改变依赖解析、SRI 校验与 GC 语义。 */
+enum class NpmPackageSource {
+  /** 由普通 registry metadata 声明并通过网络下载。 */
+  REGISTRY,
+
+  /** 由 debug 构建推入 App 私有目录，再通过本地虚拟 tarball URL 进入包池。 */
+  LOCAL_DEBUG,
+}
 
 /**
  * 一个可复用 npm 入口的请求。

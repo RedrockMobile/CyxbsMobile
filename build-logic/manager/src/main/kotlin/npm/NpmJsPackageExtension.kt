@@ -88,10 +88,13 @@ object NpmJsPackageDefaults {
  *          ▼
  * packNpmJsPackage     生成 Runtime 与当前业务包的 tgz；不访问 Registry
  *
+ * installDebugNpmBundle 生成 debug tgz，ADB 原子替换 App 私有源并重启；不发布到 Registry
+ *
  * publishNpmJsPackage  检查/按需发布 Runtime，再发布当前业务包；访问并修改 Registry
  * ```
- * 日常发布只需执行 `publishNpmJsPackage`；检查分包内容时执行 prepare，本地安装或 CI 留存制品时
- * 执行 pack。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，不是业务方需要直接调用的入口。
+ * 日常发布只需执行 `publishNpmJsPackage`；检查分包内容时执行 prepare，CI 留存制品执行 pack，
+ * Android 真机验证执行 install。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，不是业务方
+ * 需要直接调用的入口。
  */
 fun Project.configureNpmJsPackaging() {
   val packageProject = this
@@ -193,6 +196,26 @@ fun Project.configureNpmJsPackaging() {
         // Gradle 依赖保证 Runtime 检查发生在业务包 publish 之前。若 Runtime 同版本内容不一致，
         // ensure 会直接失败，当前业务包不会被上传，避免发布引用错误 ABI 的版本。
         dependsOn(ensureRuntime)
+      }
+      packageProject.tasks.register<InstallDebugNpmBundleTask>("installDebugNpmBundle") {
+        group = "npm"
+        description = "比较 Registry 稳定包；存在变化时生成 debug bundle、ADB 覆盖并重启。"
+        // 注入阶段需要读取当前 Gradle 属性与本机 Android SDK，不复用该任务的 configuration cache。
+        notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+        dependsOn(preparePackage, prepareRuntime)
+        packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
+        runtimePackageDirectory.set(prepareRuntime.flatMap { it.outputDirectory })
+        runtimePackageName.set(extension.runtimePackageName)
+        runtimeStableVersion.set(extension.runtimePackageVersion)
+        npmExecutable.set(extension.npmExecutable)
+        registryUrl.set(extension.registryUrl)
+        applicationId.set(
+          packageProject.providers.gradleProperty("npmDebugApplicationId")
+            .orElse("com.mredrock.cyxbs.test"),
+        )
+        workingDirectory.set(packageProject.layout.buildDirectory.dir("npm/debug-bundle"))
+        // 每次执行都需要重新查询 Registry；任务内部会在所有候选包均未变化时跳过 ADB 与重启。
+        outputs.upToDateWhen { false }
       }
     }
   }

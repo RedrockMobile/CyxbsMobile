@@ -4,6 +4,7 @@ import com.cyxbs.functions.code.npm.internal.encodeNpmPathSegment
 import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
+import com.cyxbs.functions.code.npm.model.NpmPackageSource
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
 import com.cyxbs.functions.code.npm.pool.NpmPackagePool
@@ -351,6 +352,48 @@ class NpmPackagePoolTest {
     }
   }
 
+  @Test
+  fun automaticLatestRefreshDoesNotDowngradePersistedEntry() = runTest {
+    withPoolStorage { registry, root, fileSystem, clock, backgroundScope ->
+      registry.publish(packageVersion(TARGET, "2.0.0"))
+      createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+        .release()
+      advanceUntilIdle()
+
+      // 模拟重启后 registry 仅能看到残留的低版本本地 debug metadata。
+      registry.publish(packageVersion(TARGET, "1.0.0"))
+      registry.clearRequestHistory()
+      val refreshed = createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+
+      assertEquals("2.0.0", refreshed.preparedEntry.entryPackage.version)
+      refreshed.release()
+      assertTrue(TARGET in registry.metadataRequests)
+      assertFalse(registry.archiveRequests.any { it.contains("target-1.0.0") })
+    }
+  }
+
+  @Test
+  fun localDebugTarballSourceIsExposedByPreparedGraph() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(
+          name = TARGET,
+          version = "1.0.1-debug.20260809153042",
+          archiveUrl = "https://cyxbs.local.debug/target.tgz",
+        ),
+      )
+
+      val entry = pool.acquireEntry(NpmEntryRequest(TARGET))
+      assertEquals(
+        NpmPackageSource.LOCAL_DEBUG,
+        entry.preparedEntry.resolvedPackages.single().source,
+      )
+      entry.release()
+    }
+  }
+
   /** 为每个测试建立独立的真实 Okio 目录，并保证结束后清理。 */
   private suspend fun TestScope.withPool(
     block: suspend (FakeNpmRegistry, NpmPackagePool, MutableClock) -> Unit,
@@ -432,6 +475,7 @@ private fun packageVersion(
   name: String,
   version: String,
   dependencies: Map<String, String> = emptyMap(),
+  archiveUrl: String? = null,
 ): FakePackageVersion {
   val bytes = "archive:$name@$version".encodeToByteArray()
   val fileName = name.substringAfterLast('/')
@@ -439,7 +483,7 @@ private fun packageVersion(
     name = name,
     version = version,
     dependencies = dependencies,
-    archiveUrl = "https://cdn.test/$fileName-$version.tgz",
+    archiveUrl = archiveUrl ?: "https://cdn.test/$fileName-$version.tgz",
     archiveBytes = bytes,
     integrity = "sha512-${bytes.toByteString().sha512().base64()}",
   )

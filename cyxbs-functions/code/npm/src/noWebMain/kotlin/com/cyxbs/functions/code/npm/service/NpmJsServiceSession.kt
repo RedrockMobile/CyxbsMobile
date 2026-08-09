@@ -49,8 +49,16 @@ class NpmJsServiceSession internal constructor(
     }
   }
 
-  /** 执行 npm 入口并确认端上接口与下发实现使用相同的协议摘要。 */
-  internal suspend fun initialize(entrySource: String, entryModuleName: String) {
+  /**
+   * 导入 npm 入口、显式注册其中全部 Service，并确认端上接口与下发实现使用相同协议摘要。
+   *
+   * 入口必须导出 KSP 生成的固定初始化函数；缺失导出或依赖解析失败都会终止初始化，不会继续调用。
+   *
+   * @param entryModuleName 已由 npm Module 图规范化的入口名称。
+   * @param packageName 完整 npm 包名，必须与生成实现时传入 `useNpmJsService` 的值一致。非字母数字
+   * 字符会统一替换为 `_`，因此发布侧应保证规范化后的包名不与其他业务包冲突。
+   */
+  internal suspend fun initialize(entryModuleName: String, packageName: String) {
     mutex.withLock {
       if (closed) {
         throw NpmJsServiceProtocolException(
@@ -58,9 +66,11 @@ class NpmJsServiceSession internal constructor(
         )
       }
       if (initialized) return@withLock
+      val initializerName = packageName.jsInitializerName()
       evaluate(
-        code = entrySource,
-        filename = entryModuleName,
+        code = "import { $initializerName as initializeServices } from " +
+          "${jsString(entryModuleName)};\ninitializeServices();",
+        filename = "__cyxbs_npm_service_initialize__.mjs",
         asModule = true,
         action = "initialize",
       )
@@ -187,9 +197,22 @@ class NpmJsServiceSession internal constructor(
   private companion object {
     const val CLOSE_METHOD = "\$close"
     const val EMPTY_ARGUMENTS = "[]"
+    const val JS_INITIALIZER_PREFIX = "__cyxbsNpmJsServiceInitialize_"
 
     /** 使用 JSON 字符串规则生成可安全嵌入脚本的字面量。 */
     fun jsString(value: String): String = JsonPrimitive(value).toString()
+
+    /** 与 KSP 保持一致，将包名中的非字母数字字符统一替换为 `_`。 */
+    fun String.jsInitializerName(): String {
+      val packageSuffix = map { character ->
+        if (character in 'a'..'z' || character in 'A'..'Z' || character in '0'..'9') {
+          character
+        } else {
+          '_'
+        }
+      }.joinToString("")
+      return JS_INITIALIZER_PREFIX + packageSuffix
+    }
 
     /** 聚合关闭阶段异常并保留发生顺序。 */
     fun Throwable?.append(next: Throwable): Throwable {

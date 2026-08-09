@@ -13,6 +13,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
@@ -49,13 +50,26 @@ class KspNpmJsServiceProcessor(
   private val codeGenerator: CodeGenerator,
   private val logger: KSPLogger,
   private val isJsTarget: Boolean,
+  private val npmPackageName: String?,
 ) : SymbolProcessor {
 
   private val generated = mutableSetOf<String>()
+  private val jsRegistrations = linkedMapOf<String, JsRegistration>()
 
   /** 根据当前编译目标选择端上代理生成或 Kotlin/JS 实现分发。 */
   override fun process(resolver: Resolver): List<KSAnnotated> {
     return if (isJsTarget) processJsImplementations(resolver) else processHostServices(resolver)
+  }
+
+  /**
+   * JS 所有处理轮次结束后，生成包级唯一的显式初始化入口。
+   *
+   * 聚合必须延后到 finish，避免其他 KSP 在后续轮次生成的 Service 实现被遗漏。
+   */
+  override fun finish() {
+    if (isJsTarget && jsRegistrations.isNotEmpty()) {
+      generateJsInitializer()
+    }
   }
 
   /** 非 Web 目标扫描注解接口，生成代理及 KtProvider 绑定。 */
@@ -237,7 +251,7 @@ class KspNpmJsServiceProcessor(
       .writeTo(codeGenerator, false, listOfNotNull(model.declaration.containingFile))
   }
 
-  /** 生成 internal `_Dispatcher` 及一个带 `_` 前缀的导出注册点。 */
+  /** 生成 internal `_Dispatcher`，并记录到当前 npm 包的聚合初始化入口。 */
   private fun generateJs(model: ServiceModel, implementation: KSClassDeclaration) {
     val names = model.generatedNames(implementation)
     val generationKey = "js:${model.serviceId}:${implementation.qualifiedName?.asString()}"
@@ -257,21 +271,55 @@ class KspNpmJsServiceProcessor(
       )
       .build()
 
-    val registration = PropertySpec.builder(names.registration, Boolean::class)
-      .addAnnotation(AnnotationSpec.builder(JS_EXPORT).build())
-      .initializer("%T.register(%N)", JS_REGISTRY, names.dispatcher)
-      .build()
     FileSpec.builder(implementation.packageName.asString(), names.jsFile)
+      .addType(dispatcher)
+      .build()
+      .writeTo(codeGenerator, false, listOfNotNull(implementation.containingFile))
+    val sourceFile = implementation.containingFile
+      ?: invalid("npm JavaScript Service implementation must belong to a source file.", implementation)
+    jsRegistrations[generationKey] = JsRegistration(
+      dispatcher = ClassName(implementation.packageName.asString(), names.dispatcher),
+      sourceFile = sourceFile,
+    )
+  }
+
+  /**
+   * 生成 npm 包固定导出的初始化函数，由端上 Loader 在校验协议前显式调用。
+   *
+   * 一个 JS 编译模块无论包含多少 Service 都只生成一个入口；重复调用由 Registry 的同实例注册
+   * 语义保证幂等。显式 ABI 不依赖 Kotlin/JS 顶层属性求值策略。
+   */
+  private fun generateJsInitializer() {
+    val packageName = checkNotNull(npmPackageName) {
+      "A module containing npm JavaScript Service implementations must pass its npm package name " +
+        "to useNpmJsService(packageName)."
+    }
+    val initializer = FunSpec.builder(packageName.jsInitializerName())
+      .addAnnotation(AnnotationSpec.builder(JS_EXPORT).build())
+      .addKdoc(
+        "注册当前 npm 包内由 KSP 发现的全部 JavaScript Service。\n\n" +
+          "仅供端上 NpmJsServiceLoader 调用；重复调用安全。\n",
+      )
+      .apply {
+        jsRegistrations.values.forEach { registration ->
+          addStatement("%T.register(%T)", JS_REGISTRY, registration.dispatcher)
+        }
+      }
+      .build()
+    FileSpec.builder(JS_INITIALIZER_PACKAGE, JS_INITIALIZER_FILE)
       .addAnnotation(
         AnnotationSpec.builder(OPT_IN)
           .useSiteTarget(AnnotationSpec.UseSiteTarget.FILE)
           .addMember("%T::class", EXPERIMENTAL_JS_EXPORT)
           .build(),
       )
-      .addType(dispatcher)
-      .addProperty(registration)
+      .addFunction(initializer)
       .build()
-      .writeTo(codeGenerator, false, listOfNotNull(implementation.containingFile))
+      .writeTo(
+        codeGenerator,
+        true,
+        jsRegistrations.values.map(JsRegistration::sourceFile).distinct(),
+      )
   }
 
   /** 生成端上代理方法：参数编码为 JSON 数组，结果按声明返回类型解码。 */
@@ -407,7 +455,6 @@ class KspNpmJsServiceProcessor(
       proxy = "_${serviceTail}NpmJsProxy",
       factory = "_${serviceTail}NpmJsFactory",
       dispatcher = "_${implementationTail ?: serviceTail}NpmJsDispatcher",
-      registration = "_${implementationTail ?: serviceTail}NpmJsRegistration",
       hostFile = "_${serviceTail}NpmJsHost",
       jsFile = "_${implementationTail ?: serviceTail}NpmJsJs",
     )
@@ -426,6 +473,18 @@ class KspNpmJsServiceProcessor(
     return MessageDigest.getInstance("SHA-256")
       .digest(toByteArray())
       .joinToString("") { byte -> "%02x".format(byte) }
+  }
+
+  /** 将 npm 包名转换为跨编译目标一致且合法的 Kotlin/JavaScript 初始化函数名。 */
+  private fun String.jsInitializerName(): String {
+    val packageSuffix = map { character ->
+      if (character in 'a'..'z' || character in 'A'..'Z' || character in '0'..'9') {
+        character
+      } else {
+        '_'
+      }
+    }.joinToString("")
+    return JS_INITIALIZER_PREFIX + packageSuffix
   }
 
   /** KtProvider 的 name 仅用于区分多个工厂，不参与运行时 Service 查找。 */
@@ -460,9 +519,14 @@ class KspNpmJsServiceProcessor(
     val proxy: String,
     val factory: String,
     val dispatcher: String,
-    val registration: String,
     val hostFile: String,
     val jsFile: String,
+  )
+
+  /** 聚合初始化入口需要引用的生成分发器及其增量编译来源。 */
+  private data class JsRegistration(
+    val dispatcher: ClassName,
+    val sourceFile: KSFile,
   )
 
   private companion object {
@@ -472,6 +536,9 @@ class KspNpmJsServiceProcessor(
       "com.cyxbs.functions.code.npm.api.bridge.NpmJsServiceInstance"
     const val CLOSE_METHOD = "close"
     const val NULL_JSON = "null"
+    const val JS_INITIALIZER_PREFIX = "__cyxbsNpmJsServiceInitialize_"
+    const val JS_INITIALIZER_PACKAGE = "com.cyxbs.generated.npmjs"
+    const val JS_INITIALIZER_FILE = "_NpmJsServiceInitializer"
 
     val SESSION = ClassName("com.cyxbs.functions.code.npm.service", "NpmJsServiceSession")
     val PROXY_FACTORY = ClassName(

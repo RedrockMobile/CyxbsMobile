@@ -13,9 +13,10 @@ plugins {
  * 应用插件后会把当前模块自动加入 `:cyxbs-functions:code:npm:distribution` 的聚合编译，并提供：
  * - `prepareNpmJsPackage`：仅生成最终发布目录，用于检查分包结果；不调用 npm、不联网。
  * - `packNpmJsPackage`：本地生成 Runtime 和当前业务包的 tgz；不访问 Registry。
+ * - `installDebugNpmBundle`：生成带时间版本的测试 tgz，通过 ADB 替换 App 私有 debug 源并重启。
  * - `publishNpmJsPackage`：先联网保证 Runtime 已发布，再发布当前业务包。
  *
- * 正常发布只需执行最后一个任务，前两个任务主要用于本地调试、安装验证和 CI 制品留存。
+ * 正常发布只需执行最后一个任务；真机验证执行 install，prepare/pack 用于检查产物与 CI 制品留存。
  */
 kotlin {
   js {

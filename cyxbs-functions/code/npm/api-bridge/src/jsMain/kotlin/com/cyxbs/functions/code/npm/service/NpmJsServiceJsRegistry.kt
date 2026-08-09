@@ -22,8 +22,9 @@ interface NpmJsServiceJsDispatcher {
 /**
  * Kotlin/JS 包内的 Service 注册中心。
  *
- * 生成代码在模块初始化阶段注册分发器；端上 Runtime 只通过 `globalThis.CyxbsNpmJsService` 的
- * `describe` 和 `invoke` 两个稳定函数访问，不依赖 Kotlin/JS 编译后的符号名称。
+ * 生成代码在端上显式调用包级初始化函数时注册分发器；端上 Runtime 只通过
+ * `globalThis.CyxbsNpmJsService` 的 `describe` 和 `invoke` 两个稳定函数访问，不依赖 Kotlin/JS
+ * 编译后的内部符号名称。
  */
 object NpmJsServiceJsRegistry {
   private val dispatchers = mutableMapOf<String, NpmJsServiceJsDispatcher>()

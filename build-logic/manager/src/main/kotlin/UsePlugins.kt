@@ -40,8 +40,14 @@ fun Project.useKtProvider(isNeedKsp: Boolean = !name.startsWith("api")) {
  * commonMain 只声明带 `@NpmJsService` 的业务接口；KSP 会在 Android、iOS、Desktop 生成端上代理，
  * 并在 Kotlin/JS 目标为 object 实现生成分发器。生成工厂继续通过 KtProvider 自动发现，npm 坐标
  * 则由业务在加载时传入。
+ *
+ * @param npmPackageName 包含 Kotlin/JS Service 实现时必须传入的完整 npm 包名；仅声明接口的桥接
+ * 模块可以留空。KSP 会将其中所有非字母数字字符替换为 `_`，用于生成包级唯一初始化导出。
  */
-fun Project.useNpmJsService() {
+fun Project.useNpmJsService(npmPackageName: String? = null) {
+  require(npmPackageName == null || npmPackageName.isNotBlank()) {
+    "npmPackageName cannot be blank."
+  }
   // Service 接口通常声明在 api 模块中，不能沿用 useKtProvider 对 api 模块默认跳过 KSP 的规则。
   useKtProvider(isNeedKsp = true)
   extensions.configure<KotlinMultiplatformExtension> {
@@ -59,6 +65,11 @@ fun Project.useNpmJsService() {
     dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
     includeWasmJs = false,
   )
+  if (npmPackageName != null) {
+    extensions.configure<KspExtension> {
+      arg("npmJsService.packageName", npmPackageName)
+    }
+  }
 }
 
 /**
