@@ -91,6 +91,9 @@ private val itemList = listOf(
   ActionItem("npm Service", Platform.Web) {
     AppScheme.jump("cyxbs://code/npm-service-test")
   },
+  ActionItem("npm Bundle", Platform.Web) {
+    AppScheme.jump("cyxbs://code/npm-bundles")
+  },
 
   // 退出登陆放到最后，其他测试页面放到上面👆
   ActionItem("退出登录") {

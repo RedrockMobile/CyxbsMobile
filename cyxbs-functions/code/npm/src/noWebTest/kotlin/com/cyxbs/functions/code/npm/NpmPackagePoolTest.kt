@@ -3,9 +3,11 @@ package com.cyxbs.functions.code.npm
 import com.cyxbs.functions.code.npm.internal.encodeNpmPathSegment
 import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveOutcome
 import com.cyxbs.functions.code.npm.diagnostic.NpmPackagePoolMetrics
+import com.cyxbs.functions.code.npm.model.NpmBundleInUseException
 import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
+import com.cyxbs.functions.code.npm.model.NpmPackageId
 import com.cyxbs.functions.code.npm.model.NpmPackageSource
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
@@ -530,6 +532,165 @@ class NpmPackagePoolTest {
       refreshed.release()
       assertTrue(TARGET in registry.metadataRequests)
       assertFalse(registry.archiveRequests.any { it.contains("target-1.0.0") })
+    }
+  }
+
+  /** 管理快照应从入口精确图还原依赖、反向依赖、入口身份和磁盘信息。 */
+  @Test
+  fun bundleSnapshotContainsRelationshipsDatesAndSize() = runTest {
+    withPool { registry, pool, clock ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      clock.now = 123_456L
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+
+      val snapshot = pool.getBundleSnapshot()
+      val target = snapshot.bundles.single { it.id == NpmPackageId(TARGET, "1.0.0") }
+      val shared = snapshot.bundles.single { it.id == NpmPackageId(SHARED, "1.0.0") }
+
+      assertEquals(2, snapshot.bundles.size)
+      assertEquals(1, snapshot.entryCount)
+      assertEquals(1, snapshot.dependencyOccurrenceCount)
+      assertEquals(1, snapshot.deduplicatedDependencyCount)
+      assertTrue(snapshot.totalSizeBytes > 0)
+      assertTrue(target.isEntryBundle)
+      assertEquals(listOf(TARGET), target.entryNames)
+      assertEquals(123_456L, target.lastLoadedAtEpochMillis)
+      assertTrue(target.downloadedAtEpochMillis != null)
+      assertTrue(target.isAvailable)
+      assertEquals(listOf(NpmPackageId(SHARED, "1.0.0")), target.dependencies)
+      assertEquals(listOf(NpmPackageId(TARGET, "1.0.0")), shared.dependents)
+    }
+  }
+
+  /** 同名包必须按 npm 语义版本倒序返回，供管理页稳定区分最新版本和历史版本。 */
+  @Test
+  fun bundleSnapshotSortsSamePackageBySemanticVersionDescending() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(SHARED, "1.9.0"),
+        packageVersion(SHARED, "1.10.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.9.0")),
+        packageVersion(OTHER, "1.0.0", dependencies = mapOf(SHARED to "1.10.0")),
+      )
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      pool.acquireEntry(NpmEntryRequest(OTHER)).release()
+
+      val versions = pool.getBundleSnapshot().bundles
+        .filter { it.id.name == SHARED }
+        .map { it.id.version }
+
+      assertEquals(listOf("1.10.0", "1.9.0"), versions)
+    }
+  }
+
+  /** 多个入口共享同一坐标时，依赖累计保留重复次数，去重数量只计算一次。 */
+  @Test
+  fun bundleSnapshotReportsCrossEntryDependencyDeduplication() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+        packageVersion(OTHER, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      pool.acquireEntry(NpmEntryRequest(OTHER)).release()
+
+      val snapshot = pool.getBundleSnapshot()
+
+      assertEquals(2, snapshot.entryCount)
+      assertEquals(2, snapshot.dependencyOccurrenceCount)
+      assertEquals(1, snapshot.deduplicatedDependencyCount)
+      assertEquals(3, snapshot.bundles.size)
+    }
+  }
+
+  /** 删除入口 Bundle 时只回收失去可达性的包，共享依赖继续服务其他入口。 */
+  @Test
+  fun deletingBundleInvalidatesAffectedEntryAndKeepsSharedDependency() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+        packageVersion(OTHER, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      pool.acquireEntry(NpmEntryRequest(OTHER)).release()
+
+      val result = pool.deleteBundle(NpmPackageId(TARGET, "1.0.0"))
+      val snapshot = pool.getBundleSnapshot()
+
+      assertEquals(listOf(TARGET), result.invalidatedEntryNames)
+      assertEquals(listOf(NpmPackageId(TARGET, "1.0.0")), result.deletedBundles)
+      assertEquals(1, snapshot.entryCount)
+      assertFalse(snapshot.bundles.any { it.id.name == TARGET })
+      assertTrue(snapshot.bundles.any { it.id == NpmPackageId(SHARED, "1.0.0") })
+
+      registry.clearRequestHistory()
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      assertTrue(TARGET in registry.metadataRequests)
+      assertTrue(registry.archiveRequests.any { it.contains("target-1.0.0") })
+      assertFalse(registry.archiveRequests.any { it.contains("shared-1.0.0") })
+    }
+  }
+
+  /** 删除共享依赖时，所有引用入口都失效，随后整组不可达闭包被回收。 */
+  @Test
+  fun deletingSharedDependencyInvalidatesEveryReferencingEntry() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+        packageVersion(OTHER, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      pool.acquireEntry(NpmEntryRequest(OTHER)).release()
+
+      val result = pool.deleteBundle(NpmPackageId(SHARED, "1.0.0"))
+
+      assertEquals(listOf(OTHER, TARGET), result.invalidatedEntryNames)
+      assertEquals(3, result.deletedBundles.size)
+      assertTrue(pool.getBundleSnapshot().bundles.isEmpty())
+    }
+  }
+
+  /** 重新下载只替换同一内容身份的 tgz，不改写入口图和依赖关系。 */
+  @Test
+  fun redownloadBundleReplacesArchiveWithoutChangingGraph() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(packageVersion(TARGET, "1.0.0"))
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+      registry.clearRequestHistory()
+
+      pool.redownloadBundle(NpmPackageId(TARGET, "1.0.0"))
+
+      val snapshot = pool.getBundleSnapshot()
+      assertEquals(1, registry.archiveRequests.size)
+      assertEquals(1, snapshot.entryCount)
+      assertTrue(snapshot.bundles.single().isAvailable)
+    }
+  }
+
+  /** 运行租约必须同时保护单包删除和全量清空。 */
+  @Test
+  fun activeRuntimePreventsBundleDeletionAndClear() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(packageVersion(TARGET, "1.0.0"))
+      val active = pool.acquireEntry(NpmEntryRequest(TARGET))
+
+      assertFailsWith<NpmBundleInUseException> {
+        pool.deleteBundle(NpmPackageId(TARGET, "1.0.0"))
+      }
+      assertFailsWith<NpmBundleInUseException> { pool.clearBundles() }
+      assertEquals(1, pool.getBundleSnapshot().bundles.size)
+
+      active.release()
+      val result = pool.clearBundles()
+      assertEquals(1, result.deletedBundleCount)
+      assertEquals(1, result.invalidatedEntryCount)
+      assertTrue(pool.getBundleSnapshot().bundles.isEmpty())
     }
   }
 

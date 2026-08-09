@@ -11,6 +11,10 @@ data class NpmPackageArchive(
   val version: String,
   val integrity: String,
   val archivePath: Path,
+  /** tgz 的逻辑字节数；自定义存储无法提供时可保留为 0。 */
+  val sizeBytes: Long = 0,
+  /** tgz 最近一次完整写入完成的时间；底层文件系统不支持时为 null。 */
+  val downloadedAtEpochMillis: Long? = null,
 )
 
 /**

@@ -16,6 +16,11 @@ import com.cyxbs.functions.code.npm.internal.PersistedNpmResolvedNode
 import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveOutcome
 import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveTiming
 import com.cyxbs.functions.code.npm.diagnostic.NpmPackagePoolMetrics
+import com.cyxbs.functions.code.npm.model.NpmBundleClearResult
+import com.cyxbs.functions.code.npm.model.NpmBundleDeleteResult
+import com.cyxbs.functions.code.npm.model.NpmBundleInfo
+import com.cyxbs.functions.code.npm.model.NpmBundleInUseException
+import com.cyxbs.functions.code.npm.model.NpmBundleSnapshot
 import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
@@ -309,6 +314,175 @@ class NpmPackagePool(
       val now = clock()
       stateStore.write(collectGarbage(stateStore.read(), now))
     }
+  }
+
+  /**
+   * 在包池锁内构建管理页快照，保证入口关系、磁盘状态和总大小来自同一次读取。
+   *
+   * 归档查询沿用正式加载链路的 SRI 校验；若文件损坏，[NpmPackageArchiveStore.find] 会移除损坏
+   * 文件，本次快照将其标记为不可用，业务可随后调用 [redownloadBundle] 修复。
+   */
+  internal suspend fun getBundleSnapshot(): NpmBundleSnapshot = mutex.withLock {
+    val state = stateStore.read()
+    val dependenciesByPackage = mutableMapOf<PersistedNpmPackageId, MutableSet<PersistedNpmPackageId>>()
+    val dependentsByPackage = mutableMapOf<PersistedNpmPackageId, MutableSet<PersistedNpmPackageId>>()
+    val entriesByPackage = mutableMapOf<PersistedNpmPackageId, MutableList<PersistedNpmEntry>>()
+    val rootEntriesByPackage = mutableMapOf<PersistedNpmPackageId, MutableList<String>>()
+    var dependencyOccurrenceCount = 0
+    val deduplicatedDependencies = mutableSetOf<PersistedNpmPackageId>()
+
+    state.entries.forEach { entry ->
+      val rootId = PersistedNpmPackageId(entry.rootName, entry.rootVersion)
+      rootEntriesByPackage.getOrPut(
+        rootId,
+      ) { mutableListOf() } += entry.entryName
+      entry.nodes.forEach { node ->
+        val id = PersistedNpmPackageId(node.name, node.version)
+        if (id != rootId) {
+          dependencyOccurrenceCount += 1
+          deduplicatedDependencies += id
+        }
+        entriesByPackage.getOrPut(id) { mutableListOf() } += entry
+        node.dependencies.values.forEach { dependency ->
+          dependenciesByPackage.getOrPut(id) { mutableSetOf() } += dependency
+          dependentsByPackage.getOrPut(dependency) { mutableSetOf() } += id
+        }
+      }
+    }
+
+    var totalSizeBytes = 0L
+    val bundles = state.packages.map { packageInfo ->
+      val persistedId = PersistedNpmPackageId(packageInfo.name, packageInfo.version)
+      val archive = archiveStore.find(
+        packageInfo.name,
+        packageInfo.version,
+        packageInfo.integrity,
+      )
+      totalSizeBytes += archive?.sizeBytes ?: 0
+      NpmBundleInfo(
+        id = persistedId.toPublic(),
+        source = packageInfo.source,
+        sizeBytes = archive?.sizeBytes ?: 0,
+        downloadedAtEpochMillis = archive?.downloadedAtEpochMillis,
+        lastLoadedAtEpochMillis = entriesByPackage[persistedId]
+          ?.maxOfOrNull(PersistedNpmEntry::lastUsedAtEpochMillis),
+        entryNames = rootEntriesByPackage[persistedId].orEmpty().distinct().sorted(),
+        dependencies = dependenciesByPackage[persistedId].orEmpty()
+          .map(PersistedNpmPackageId::toPublic)
+          .sortedWith(compareBy(NpmPackageId::name, NpmPackageId::version)),
+        dependents = dependentsByPackage[persistedId].orEmpty()
+          .map(PersistedNpmPackageId::toPublic)
+          .sortedWith(compareBy(NpmPackageId::name, NpmPackageId::version)),
+        isAvailable = archive != null,
+        isInUse = activeLeaseTokens.values.any { persistedId in it.packages },
+      )
+    }.sortedWith { left, right ->
+      val nameComparison = left.id.name.compareTo(right.id.name)
+      if (nameComparison != 0) {
+        nameComparison
+      } else {
+        // 管理页按列表中的首项认定最新版本，因此这里必须遵循 npm 语义版本，不能直接比较字符串。
+        val leftVersion = NpmSemver.parseOrNull(left.id.version)
+        val rightVersion = NpmSemver.parseOrNull(right.id.version)
+        when {
+          leftVersion != null && rightVersion != null -> rightVersion.compareTo(leftVersion)
+          else -> right.id.version.compareTo(left.id.version)
+        }
+      }
+    }
+    NpmBundleSnapshot(
+      bundles = bundles,
+      totalSizeBytes = totalSizeBytes,
+      entryCount = state.entries.size,
+      dependencyOccurrenceCount = dependencyOccurrenceCount,
+      deduplicatedDependencyCount = deduplicatedDependencies.size,
+    )
+  }
+
+  /**
+   * 删除目标 Bundle、引用它的入口图，以及删除入口后不再可达的依赖。
+   *
+   * 活动租约保存了精确包集合；只要目标仍被使用就拒绝整个操作，避免破坏 Runtime 生命周期承诺。
+   */
+  internal suspend fun deleteBundle(id: NpmPackageId): NpmBundleDeleteResult = mutex.withLock {
+    val persistedId = id.toPersisted()
+    val state = stateStore.read()
+    if (state.packages.none { it.name == id.name && it.version == id.version }) {
+      return@withLock NpmBundleDeleteResult(emptyList(), emptyList())
+    }
+    if (activeLeaseTokens.values.any { persistedId in it.packages }) {
+      throw NpmBundleInUseException(
+        "Npm bundle '${id.name}@${id.version}' is still used by an active runtime.",
+      )
+    }
+
+    val invalidatedEntries = state.entries.filter { entry ->
+      entry.nodes.any { it.name == id.name && it.version == id.version }
+    }
+    val invalidatedEntryNames = invalidatedEntries.map(PersistedNpmEntry::entryName).distinct().sorted()
+    val retained = state.copy(entries = state.entries - invalidatedEntries.toSet())
+    val pruned = pruneUnreachablePackages(retained)
+    val retainedIds = pruned.packages
+      .mapTo(mutableSetOf()) { PersistedNpmPackageId(it.name, it.version) }
+    val deletedBundles = state.packages
+      .map { PersistedNpmPackageId(it.name, it.version) }
+      .filterNot { it in retainedIds }
+      .map(PersistedNpmPackageId::toPublic)
+      .sortedWith(compareBy(NpmPackageId::name, NpmPackageId::version))
+    stateStore.write(
+      pruned.copy(
+        generation = if (deletedBundles.isEmpty()) state.generation else state.generation + 1,
+        lastGcAtEpochMillis = clock(),
+      ),
+    )
+    latestRefreshAttempts.removeAll { it.entryName in invalidatedEntryNames }
+    NpmBundleDeleteResult(
+      deletedBundles = deletedBundles,
+      invalidatedEntryNames = invalidatedEntryNames,
+    )
+  }
+
+  /**
+   * 重新下载保存状态中的同一坐标与内容身份。
+   *
+   * [NpmPackageArchiveStore.write] 使用原子替换，因此新 Runtime 只会看到完整旧文件或完整新文件；
+   * 已经创建的 Runtime 使用内存中的 Module 图，不会在本方法返回时被热替换。
+   */
+  internal suspend fun redownloadBundle(id: NpmPackageId) {
+    mutex.withLock {
+      val packageInfo = stateStore.read().packages.firstOrNull {
+        it.name == id.name && it.version == id.version
+      } ?: throw NpmStorageException(
+        "Npm bundle '${id.name}@${id.version}' is not registered in the package pool.",
+      )
+      downloadAndStore(packageInfo)
+    }
+  }
+
+  /** 清空全部入口与 Bundle；活动租约存在时保持状态不变并直接失败。 */
+  internal suspend fun clearBundles(): NpmBundleClearResult = mutex.withLock {
+    if (activeLeaseTokens.isNotEmpty()) {
+      throw NpmBundleInUseException(
+        "Npm package pool still has ${activeLeaseTokens.size} active runtime lease(s).",
+      )
+    }
+    val state = stateStore.read()
+    state.packages.forEach { packageInfo ->
+      archiveStore.remove(packageInfo.name, packageInfo.version, packageInfo.integrity)
+    }
+    stateStore.write(
+      state.copy(
+        generation = state.generation + 1,
+        lastGcAtEpochMillis = clock(),
+        packages = emptyList(),
+        entries = emptyList(),
+      ),
+    )
+    latestRefreshAttempts.clear()
+    NpmBundleClearResult(
+      deletedBundleCount = state.packages.size,
+      invalidatedEntryCount = state.entries.size,
+    )
   }
 
   /**

@@ -54,6 +54,8 @@ class OkioNpmPackageArchiveStore(
         version = version,
         integrity = parsedIntegrity.encoded,
         archivePath = path,
+        sizeBytes = metadata.size ?: bytes.size.toLong(),
+        downloadedAtEpochMillis = metadata.lastModifiedAtMillis ?: metadata.createdAtMillis,
       )
     }
   }
@@ -73,11 +75,14 @@ class OkioNpmPackageArchiveStore(
     return withFileLock("write") {
       val target = archivePath(packageName, version, parsedIntegrity.encoded)
       writeAtomically(target, bytes)
+      val metadata = fileSystem.metadata(target)
       NpmPackageArchive(
         packageName = packageName,
         version = version,
         integrity = parsedIntegrity.encoded,
         archivePath = target,
+        sizeBytes = metadata.size ?: bytes.size.toLong(),
+        downloadedAtEpochMillis = metadata.lastModifiedAtMillis ?: metadata.createdAtMillis,
       )
     }
   }

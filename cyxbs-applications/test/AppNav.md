@@ -87,6 +87,26 @@ object fields:
 deeplink: cyxbs://code/editor-test
 ```
 
+## :cyxbs-functions:code:npm:bundle-manager
+
+### code/npm-bundles/detail
+
+- entry: `com.cyxbs.functions.code.npm.bundle.manager.NpmBundleDetailNavEntry`
+- argument: `com.cyxbs.functions.code.npm.bundle.manager.NpmBundleDetailNavArgument`
+
+```text
+deeplink: cyxbs://code/npm-bundles/detail?packageName={String}&version={String}
+```
+
+### code/npm-bundles
+
+- entry: `com.cyxbs.functions.code.npm.bundle.manager.NpmBundleManagerNavEntry`
+- argument: `com.cyxbs.functions.code.npm.bundle.manager.NpmBundleManagerNavArgument`
+
+```text
+deeplink: cyxbs://code/npm-bundles
+```
+
 ## :cyxbs-functions:code:npm:service-test
 
 ### code/npm-service-test
