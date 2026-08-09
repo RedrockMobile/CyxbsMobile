@@ -2,7 +2,7 @@ package com.cyxbs.pages.discover.pages.discover
 
 import androidx.core.net.toUri
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.base.webview.WebViewActivity
+import com.cyxbs.components.base.webview.WebViewNavArgument
 import com.cyxbs.components.config.route.DISCOVER_NEWS
 import com.cyxbs.components.config.route.DISCOVER_NEWS_ITEM
 import com.cyxbs.components.config.service.impl
@@ -42,9 +42,9 @@ object DiscoverNavPlatformImpl : DiscoverNavPlatform {
     }
     val finalUrl = if (pictureGotoUrl.startsWith("http")) {
       val uri = pictureGotoUrl.toUri()
-      if (uri.getQueryParameter(WebViewActivity.ARG_DEFAULT_TITLE) == null) {
-        // 兼容老逻辑，keyword 作为页面的兜底标题
-        uri.buildUpon().appendQueryParameter(WebViewActivity.ARG_DEFAULT_TITLE, keyword).build()
+      if (uri.getQueryParameter(WebViewNavArgument.DEFAULT_TITLE_QUERY_PARAMETER) == null) {
+        // Banner 关键词作为 WebView 路由的兜底标题。
+        uri.buildUpon().appendQueryParameter(WebViewNavArgument.DEFAULT_TITLE_QUERY_PARAMETER, keyword).build()
           .toString()
       } else pictureGotoUrl
     } else pictureGotoUrl

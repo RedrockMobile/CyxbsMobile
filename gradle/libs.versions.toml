@@ -118,7 +118,7 @@ kmp-settings = "1.3.0"
 # https://github.com/Foso/Ktorfit
 kmp-ktorfit = "2.7.5"
 # https://github.com/generalio/MultiWeb 多平台的WebView
-multiweb = "0.2.3"
+multiweb = "0.2.9"
 
 
 ####################################################################################################

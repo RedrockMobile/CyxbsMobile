@@ -16,6 +16,7 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClientNoToken
 import com.cyxbs.pages.home.api.HomeNavArgument
+import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.LoginBean
 import com.cyxbs.pages.login.bean.LoginFailureBean
@@ -166,10 +167,14 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
   open fun clickForgetPassword() {}
 
   // 点击用户协议
-  open fun clickUserAgreement() {}
+  open fun clickUserAgreement() {
+    ILegalNoticeService::class.impl().startUserAgreementActivity()
+  }
 
   // 点击隐私政策
-  open fun clickPrivacyPolicy() {}
+  open fun clickPrivacyPolicy() {
+    ILegalNoticeService::class.impl().startPrivacyPolicyActivity()
+  }
 
   // 点击游客模式
   fun clickTouristMode() {

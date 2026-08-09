@@ -82,7 +82,6 @@ private class AndroidWebViewPlatformHost(
     navigationPolicy = AndroidWebViewNavigationPolicy,
     extensions = listOf(
       AndroidWebViewCompatibilityExtension(),
-      AndroidWebViewDefaultRenderingExtension(),
       sensorExtension,
       interactionExtension,
       bridgeExtension,

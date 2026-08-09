@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,7 +39,7 @@ import io.github.multiweb.compose.WebViewHostCallbacks
 import io.github.multiweb.compose.rememberWebViewController
 import org.jetbrains.compose.resources.painterResource
 
-/** WebView 页面 UI；布局和标题行为与旧 WebViewActivity 保持一致。 */
+/** 通用 WebView 页面 UI；保留既有页面的布局和标题行为。 */
 @Composable
 internal fun WebViewScreen(argument: WebViewNavArgument) {
   var isFullscreen by remember { mutableStateOf(false) }
@@ -87,7 +87,7 @@ private fun WebViewContent(
     onBackCompleted = onBack,
   )
 
-  Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+  Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
     if (!argument.hideTitle && !isFullscreen) {
       WebViewTopBar(
         title = title,

@@ -21,4 +21,3 @@ plugins {
 
 // 管理 git 提交规范的脚本
 apply(from = "git-hook.gradle.kts")
-

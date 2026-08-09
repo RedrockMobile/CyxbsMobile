@@ -41,7 +41,10 @@ private class DesktopWebViewPlatformHost(
   )
 
   override val initialization = WebViewInitialization(
-    webViewConfig = WebViewConfig(javaScriptEnabled = true),
+    webViewConfig = WebViewConfig(
+      javaScriptEnabled = true,
+      thirdPartyCookiesEnabled = true,
+    ),
     navigationPolicy = DesktopWebViewNavigationPolicy,
     extensions = listOf(bridgeExtension),
   )

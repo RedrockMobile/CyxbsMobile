@@ -1,6 +1,7 @@
 package com.cyxbs.components.navigation
 
 import com.cyxbs.components.init.appCoroutineScope
+import com.eygraber.uri.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -45,8 +46,26 @@ object AppScheme {
    */
   private fun jumpHttp(url: String): Boolean {
     if (!url.startsWith("http://") && !url.startsWith("https://")) return false
-    return com.cyxbs.components.navigation.jumpHttp(url)
+    val uri = Uri.parse(url)
+    val webViewRoute = Uri.Builder()
+      .scheme(SCHEME)
+      .authority(NAV_WEBVIEW)
+      .appendQueryParameter("url", url)
+      .appendQueryParameter(
+        "hideTitle",
+        uri.getQueryParameter("hideTitle")?.toBooleanStrictOrNull()?.toString() ?: "false",
+      )
+      .apply {
+        uri.getQueryParameter("title")?.let { appendQueryParameter("title", it) }
+      }
+      .appendQueryParameter(
+        "defaultTitle",
+        uri.getQueryParameter("defaultTitle") ?: DEFAULT_WEB_VIEW_TITLE,
+      )
+      .build()
+      .toString()
+    return jumpNav(webViewRoute)
   }
-}
 
-internal expect fun jumpHttp(url: String): Boolean
+  private const val DEFAULT_WEB_VIEW_TITLE = "网页"
+}

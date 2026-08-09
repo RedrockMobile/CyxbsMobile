@@ -7,7 +7,10 @@ import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.base.webview.bindDesktopWebViewApplicationExit
 import com.cyxbs.components.base.webview.initializeDesktopWebViewRuntime
+import com.cyxbs.components.base.webview.prepareDesktopWebViewComposeInterop
+import com.cyxbs.components.base.webview.requestDesktopWebViewApplicationExit
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
@@ -24,16 +27,20 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 fun main() {
+  prepareDesktopWebViewComposeInterop()
   runApp {
     MultiplatformKtProviderInitializer.tryInitKtProvider()
     InitialManager.init(isMainProcess = true)
     FileKit.init(appId = "com.mredrock.cyxbs")
     initializeDesktopWebViewRuntime()
     launchApplication {
+      remember {
+        bindDesktopWebViewApplicationExit(::exitApplication)
+      }
       val width = 900
       val height = 600
       Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = ::requestDesktopWebViewApplicationExit,
         title = "桌上重邮",
         state = rememberWindowState(width = width.dp, height = height.dp),
         icon = painterResource(ConfigRes.configIcAppLogo())

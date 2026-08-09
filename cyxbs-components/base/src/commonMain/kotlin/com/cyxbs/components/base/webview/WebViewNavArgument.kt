@@ -20,6 +20,10 @@ data class WebViewNavArgument(
   val defaultTitle: String = DEFAULT_TITLE,
 ) : AppNavArgument {
   companion object {
-    private const val DEFAULT_TITLE = ""
+    /** 未指定且网页没有标题时显示的标题。 */
+    const val DEFAULT_TITLE = "网页"
+
+    /** URL 中传递 [defaultTitle] 时使用的查询参数名。 */
+    const val DEFAULT_TITLE_QUERY_PARAMETER = "defaultTitle"
   }
 }
