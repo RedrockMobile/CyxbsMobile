@@ -25,6 +25,10 @@ import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.functions.code.npm.NpmJsServiceLoader
+import com.cyxbs.functions.code.npm.diagnostic.NpmJsServiceLoadMetrics
+import com.cyxbs.functions.code.npm.diagnostic.NpmJsServiceLoadStage
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveOutcome
+import com.cyxbs.functions.code.npm.diagnostic.NpmRegistrySourceOutcome
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestService
 import kotlinx.coroutines.CancellationException
@@ -87,15 +91,28 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
                 val loader = stageTimings.measureStage("构造 NpmJsServiceLoader") {
                   NpmJsServiceLoader()
                 }
-                val loadedService = stageTimings.measureStage(
-                  "加载 Service（刷新、下载、校验、建图、Runtime 初始化）",
-                ) {
-                  loader.load(
-                    serviceClass = NpmJsServiceLoaderTestService::class,
-                    packageName = PACKAGE_NAME,
-                    version = PACKAGE_VERSION,
-                    refreshPolicy = NpmRefreshPolicy.FORCE,
-                  )
+                val loadMetrics = NpmJsServiceLoadMetrics()
+                val loadedService = try {
+                  stageTimings.measureStage("加载 Service 合计") {
+                    loader.load(
+                      serviceClass = NpmJsServiceLoaderTestService::class,
+                      packageName = PACKAGE_NAME,
+                      version = PACKAGE_VERSION,
+                      refreshPolicy = NpmRefreshPolicy.FORCE,
+                      metrics = loadMetrics,
+                    )
+                  }
+                } finally {
+                  loadMetrics.stageTimings.forEach { timing ->
+                    stageTimings += StageTiming(
+                      name = "  ↳ ${timing.stage.toDisplayName()}",
+                      duration = timing.duration,
+                      succeeded = timing.succeeded,
+                    )
+                    if (timing.stage == NpmJsServiceLoadStage.ACQUIRE_NPM_ENTRY) {
+                      stageTimings += loadMetrics.toPackageTimingRows()
+                    }
+                  }
                 }
                 service = loadedService
                 val result = stageTimings.measureStage("首次 JS Service 调用") {
@@ -136,7 +153,10 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
                   appendLine()
                   appendLine("耗时统计：")
                   stageTimings.forEach { timing ->
-                    appendLine("- ${timing.name}：${timing.duration.toDisplayMilliseconds()}")
+                    appendLine(
+                      "- ${timing.name}：${timing.duration.toDisplayMilliseconds()}" +
+                        if (timing.succeeded) "" else "（失败）",
+                    )
                   }
                   append("- 总耗时（包含清理）：${totalDuration.toDisplayMilliseconds()}")
                 }
@@ -189,17 +209,78 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
     block: suspend () -> T,
   ): T {
     val startedAt = TimeSource.Monotonic.markNow()
+    var succeeded = false
     try {
-      return block()
+      return block().also { succeeded = true }
     } finally {
-      this += StageTiming(name, startedAt.elapsedNow())
+      this += StageTiming(name, startedAt.elapsedNow(), succeeded)
     }
+  }
+
+  /** 将加载器内部阶段转换为手动测试页面使用的中文名称。 */
+  private fun NpmJsServiceLoadStage.toDisplayName(): String = when (this) {
+    NpmJsServiceLoadStage.RESOLVE_PROXY_FACTORY -> "查找并校验代理工厂"
+    NpmJsServiceLoadStage.ACQUIRE_NPM_ENTRY -> "准备 npm 入口"
+    NpmJsServiceLoadStage.BUILD_MODULE_GRAPH -> "解压并构建 Module 图"
+    NpmJsServiceLoadStage.CREATE_RUNTIME -> "创建 JavaScript Runtime"
+    NpmJsServiceLoadStage.INITIALIZE_SERVICE -> "导入并初始化 Service"
+    NpmJsServiceLoadStage.CREATE_SERVICE_PROXY -> "创建 Kotlin Service 代理"
+  }
+
+  /** 将包级 metadata、registry 竞速与归档明细排在“准备 npm 入口”阶段之后。 */
+  private fun NpmJsServiceLoadMetrics.toPackageTimingRows(): List<StageTiming> = buildList {
+    packagePoolMetrics.metadataTimings.forEach { metadata ->
+      add(
+        StageTiming(
+          name = "    ↳ metadata ${metadata.packageName}",
+          duration = metadata.duration,
+          succeeded = metadata.succeeded,
+        ),
+      )
+      packagePoolMetrics.registrySourceTimings
+        .filter { it.packageName == metadata.packageName }
+        .forEach { source ->
+          val selected = if (source.selected) "，已采用" else ""
+          add(
+            StageTiming(
+              name = "      • ${source.registryBaseUrl}（${source.outcome.toDisplayName()}$selected）",
+              duration = source.duration,
+            ),
+          )
+        }
+    }
+    packagePoolMetrics.archiveTimings.forEach { archive ->
+      add(
+        StageTiming(
+          name = "    ↳ tgz ${archive.packageId.name}@${archive.packageId.version}" +
+            "（${archive.outcome.toDisplayName()}）",
+          duration = archive.duration,
+          succeeded = archive.outcome != NpmPackageArchiveOutcome.FAILED,
+        ),
+      )
+    }
+  }
+
+  /** registry 单源结果的页面文案。 */
+  private fun NpmRegistrySourceOutcome.toDisplayName(): String = when (this) {
+    NpmRegistrySourceOutcome.SUCCEEDED -> "成功"
+    NpmRegistrySourceOutcome.FAILED -> "失败"
+    NpmRegistrySourceOutcome.CANCELLED -> "取消"
+  }
+
+  /** tgz 缓存与下载结果的页面文案。 */
+  private fun NpmPackageArchiveOutcome.toDisplayName(): String = when (this) {
+    NpmPackageArchiveOutcome.CACHE_HIT -> "缓存命中"
+    NpmPackageArchiveOutcome.DOWNLOADED -> "已下载"
+    NpmPackageArchiveOutcome.FAILED -> "失败"
+    NpmPackageArchiveOutcome.CANCELLED -> "取消"
   }
 
   /** 页面侧可观察阶段的单次耗时，不改变正式 npm 加载链路。 */
   private data class StageTiming(
     val name: String,
     val duration: Duration,
+    val succeeded: Boolean = true,
   )
 
   private companion object {

@@ -264,7 +264,13 @@ abstract class PrepareNpmJsPackageTask : DefaultTask() {
       }
   }
 
-  /** 写入分包后的 main、类型声明、共享 Runtime 与直接跨项目依赖的精确版本。 */
+  /**
+   * 写入分包后的 main、类型声明、共享 Runtime 与直接跨项目依赖的精确版本。
+   *
+   * 聚合 production 的 package.json 会包含所有业务模块声明的 npm 依赖。Runtime 包只复制显式配置的
+   * Kotlin/JS 基础 Module，因此必须删除这些聚合依赖；否则任意业务包的第三方依赖都会成为所有入口的
+   * 伪传递依赖。开发期的 `devDependencies` 不参与客户端解析，仍按原元数据保留。
+   */
   private fun updatePackageJson(
     outputRoot: File,
     usesRuntime: Boolean,
@@ -275,6 +281,7 @@ abstract class PrepareNpmJsPackageTask : DefaultTask() {
     if (bundleKotlinRuntime.get()) {
       packageJson.addProperty("main", KOTLIN_STDLIB_MODULE)
       packageJson.remove("types")
+      RUNTIME_DEPENDENCY_FIELDS.forEach(packageJson::remove)
     } else {
       val dependencies = packageJson.getAsJsonObject("dependencies") ?: JsonObject()
       if (usesRuntime) {
@@ -406,6 +413,13 @@ abstract class PrepareNpmJsPackageTask : DefaultTask() {
   private companion object {
     const val PACKAGE_JSON = "package.json"
     const val KOTLIN_STDLIB_MODULE = "kotlin-kotlin-stdlib.mjs"
+    val RUNTIME_DEPENDENCY_FIELDS = setOf(
+      "dependencies",
+      "peerDependencies",
+      "optionalDependencies",
+      "bundledDependencies",
+      "bundleDependencies",
+    )
     val RELATIVE_IMPORT = Regex(
       """(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["'](\.{1,2}/[^"']+\.mjs)["']""",
     )

@@ -1,18 +1,23 @@
 package com.cyxbs.functions.code.npm
 
 import com.cyxbs.functions.code.npm.internal.encodeNpmPathSegment
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveOutcome
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackagePoolMetrics
 import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
 import com.cyxbs.functions.code.npm.model.NpmPackageSource
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.model.NpmRefreshPolicy
+import com.cyxbs.functions.code.npm.model.NpmRegistryMismatchException
 import com.cyxbs.functions.code.npm.pool.NpmPackagePool
 import com.cyxbs.functions.code.npm.transport.NpmHttpTransport
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -28,6 +33,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 全局包池的远端首次解析、本地代际重解析、租约与可达性 GC 测试。 */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,6 +83,60 @@ class NpmPackagePoolTest {
 
       assertTrue(registry.metadataRequests.isEmpty())
       assertTrue(registry.archiveRequests.isEmpty())
+    }
+  }
+
+  /** 重启后的 latest 短路必须建立在当前池代际上，不能覆盖其他入口带来的共享依赖更新。 */
+  @Test
+  fun latestShortCircuitKeepsOtherEntryPoolUpdates() = runTest {
+    withPoolStorage { registry, root, fileSystem, clock, backgroundScope ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "^1.0.0")),
+      )
+      val firstPool = createPool(registry, root, fileSystem, clock, backgroundScope)
+      firstPool.acquireEntry(NpmEntryRequest(TARGET)).release()
+
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(SHARED, "1.1.0"),
+        packageVersion(OTHER, "1.0.0", dependencies = mapOf(SHARED to "^1.0.0")),
+      )
+      firstPool.acquireEntry(NpmEntryRequest(OTHER)).release()
+      advanceUntilIdle()
+      registry.clearRequestHistory()
+
+      val refreshed = createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+
+      assertEquals("1.1.0", refreshed.preparedEntry.dependencyVersion(TARGET, SHARED))
+      assertEquals(listOf(TARGET), registry.metadataRequests)
+      refreshed.release()
+    }
+  }
+
+  /** 同一层依赖并发请求 metadata，总耗时取较慢分支而不是各分支耗时之和。 */
+  @Test
+  fun siblingDependencyMetadataRequestsRunConcurrently() = runTest {
+    withPool { registry, pool, _ ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(OTHER, "1.0.0"),
+        packageVersion(
+          TARGET,
+          "1.0.0",
+          dependencies = mapOf(SHARED to "1.0.0", OTHER to "1.0.0"),
+        ),
+      )
+      registry.delayMetadata(SHARED, 100.milliseconds)
+      registry.delayMetadata(OTHER, 100.milliseconds)
+      val startedAt = currentTime
+
+      pool.acquireEntry(NpmEntryRequest(TARGET)).release()
+
+      assertEquals(100L, currentTime - startedAt)
+      assertEquals(1, registry.metadataRequests.count { it == SHARED })
+      assertEquals(1, registry.metadataRequests.count { it == OTHER })
     }
   }
 
@@ -159,6 +219,42 @@ class NpmPackagePoolTest {
       changed.release()
       assertTrue(TARGET in registry.metadataRequests)
       assertTrue(registry.archiveRequests.any { it.contains("target-2.0.0") })
+    }
+  }
+
+  /** 同一包的镜像 tarball URL 可以不同，SRI 与依赖声明一致时仍应复用已校验归档。 */
+  @Test
+  fun samePackageFromDifferentRegistryTarballUrlIsCompatible() = runTest {
+    withPool { registry, pool, _ ->
+      val request = NpmEntryRequest(TARGET)
+      registry.publish(
+        packageVersion(
+          TARGET,
+          "1.0.0",
+          archiveUrl = "https://first.registry.test/target-1.0.0.tgz",
+        ),
+      )
+      pool.acquireEntry(request).release()
+
+      registry.publish(
+        packageVersion(
+          TARGET,
+          "1.0.0",
+          archiveUrl = "https://second.registry.test/target-1.0.0.tgz",
+        ),
+      )
+      registry.clearRequestHistory()
+      val metrics = NpmPackagePoolMetrics()
+
+      val refreshed = pool.acquireEntry(request, NpmRefreshPolicy.FORCE, metrics)
+
+      assertEquals("1.0.0", refreshed.preparedEntry.entryPackage.version)
+      refreshed.release()
+      assertTrue(registry.archiveRequests.isEmpty())
+      assertEquals(
+        listOf(NpmPackageArchiveOutcome.CACHE_HIT),
+        metrics.archiveTimings.map { it.outcome },
+      )
     }
   }
 
@@ -272,7 +368,7 @@ class NpmPackagePoolTest {
   }
 
   @Test
-  fun latestRefreshAlsoUpdatesTransitiveDependencyBeforeRun() = runTest {
+  fun unchangedLatestEntryReusesLockedTransitiveGraphBeforeRun() = runTest {
     withPoolStorage { registry, root, fileSystem, clock, backgroundScope ->
       registry.publish(
         packageVersion(SHARED, "1.0.0"),
@@ -291,15 +387,78 @@ class NpmPackagePoolTest {
         packageVersion(SHARED, "1.1.0"),
         packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "^1.0.0")),
       )
+      registry.clearRequestHistory()
       val refreshed = createPool(registry, root, fileSystem, clock, backgroundScope)
         .acquireEntry(NpmEntryRequest(TARGET))
 
       assertEquals("1.0.0", refreshed.preparedEntry.entryPackage.version)
-      assertEquals("1.1.0", refreshed.preparedEntry.dependencyVersion(TARGET, SHARED))
+      assertEquals("1.0.0", refreshed.preparedEntry.dependencyVersion(TARGET, SHARED))
+      assertEquals(listOf(TARGET), registry.metadataRequests)
       assertTrue(fileSystem.exists(oldSharedArchive))
       advanceUntilIdle()
-      assertFalse(fileSystem.exists(oldSharedArchive))
+      assertTrue(fileSystem.exists(oldSharedArchive))
       refreshed.release()
+    }
+  }
+
+  /** 入口升级后继续解析直接依赖，但依赖版本未变时复用其完整缓存子图。 */
+  @Test
+  fun changedEntryStopsAtUnchangedDependencyVersion() = runTest {
+    withPoolStorage { registry, root, fileSystem, clock, backgroundScope ->
+      registry.publish(
+        packageVersion(CYCLE_B, "1.0.0"),
+        packageVersion(SHARED, "1.0.0", dependencies = mapOf(CYCLE_B to "1.0.0")),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+        .release()
+      advanceUntilIdle()
+
+      registry.publish(
+        packageVersion(CYCLE_B, "1.0.0"),
+        packageVersion(SHARED, "1.0.0", dependencies = mapOf(CYCLE_B to "1.0.0")),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+        packageVersion(TARGET, "2.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      registry.clearRequestHistory()
+
+      val refreshed = createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+
+      assertEquals("2.0.0", refreshed.preparedEntry.entryPackage.version)
+      assertEquals("1.0.0", refreshed.preparedEntry.dependencyVersion(TARGET, SHARED))
+      assertEquals("1.0.0", refreshed.preparedEntry.dependencyVersion(SHARED, CYCLE_B))
+      assertTrue(TARGET in registry.metadataRequests)
+      assertTrue(SHARED in registry.metadataRequests)
+      assertFalse(CYCLE_B in registry.metadataRequests)
+      refreshed.release()
+    }
+  }
+
+  /** FORCE 遇到同版本内容身份或依赖声明被修改时必须失败，不能被版本短路掩盖。 */
+  @Test
+  fun unchangedVersionWithMutatedMetadataIsRejected() = runTest {
+    withPoolStorage { registry, root, fileSystem, clock, backgroundScope ->
+      registry.publish(
+        packageVersion(SHARED, "1.0.0"),
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(SHARED to "1.0.0")),
+      )
+      createPool(registry, root, fileSystem, clock, backgroundScope)
+        .acquireEntry(NpmEntryRequest(TARGET))
+        .release()
+      advanceUntilIdle()
+
+      registry.publish(
+        packageVersion(TARGET, "1.0.0", dependencies = mapOf(OTHER to "1.0.0")),
+      )
+      registry.clearRequestHistory()
+
+      assertFailsWith<NpmRegistryMismatchException> {
+        createPool(registry, root, fileSystem, clock, backgroundScope)
+          .acquireEntry(NpmEntryRequest(TARGET), NpmRefreshPolicy.FORCE)
+      }
+      assertEquals(listOf(TARGET), registry.metadataRequests)
     }
   }
 
@@ -432,6 +591,7 @@ class NpmPackagePoolTest {
     return NpmPackagePool(
       transport = registry,
       rootDirectory = root,
+      registryBaseUrls = listOf("https://registry.npmjs.org"),
       fileSystem = fileSystem,
       ioDispatcher = StandardTestDispatcher(backgroundScope.testScheduler),
       backgroundScope = backgroundScope,
@@ -498,6 +658,7 @@ private class FakeNpmRegistry : NpmHttpTransport {
   private val metadata = mutableMapOf<String, ByteArray>()
   private val metadataFailures = mutableMapOf<String, NpmDownloadException>()
   private val archives = mutableMapOf<String, ByteArray>()
+  private val metadataDelays = mutableMapOf<String, kotlin.time.Duration>()
   val metadataRequests = mutableListOf<String>()
   val archiveRequests = mutableListOf<String>()
   val metadataRequestHeaders = mutableListOf<Map<String, String>>()
@@ -541,6 +702,11 @@ private class FakeNpmRegistry : NpmHttpTransport {
     metadataRequestHeaders.clear()
   }
 
+  /** 为指定包注入虚拟时钟延迟，用于验证依赖 metadata 的并发调度。 */
+  fun delayMetadata(packageName: String, duration: kotlin.time.Duration) {
+    metadataDelays[packageName] = duration
+  }
+
   override suspend fun get(url: String, headers: Map<String, String>): ByteArray {
     archives[url]?.let {
       archiveRequests += url
@@ -551,6 +717,7 @@ private class FakeNpmRegistry : NpmHttpTransport {
       val packageName = metadata.entries.single { entry -> entry.key == url }
         .key.substringAfterLast('/')
       metadataRequests += packageName
+      metadataDelays[packageName]?.let { delay(it) }
       metadataFailures[url]?.let { throw it }
       return it
     }

@@ -8,10 +8,14 @@ import com.cyxbs.functions.code.npm.internal.NpmRegistryVersion
 import com.cyxbs.functions.code.npm.internal.NpmSemver
 import com.cyxbs.functions.code.npm.internal.NpmVersionRange
 import com.cyxbs.functions.code.npm.internal.OkioNpmPackagePoolStateStore
+import com.cyxbs.functions.code.npm.internal.OkioNpmRegistrySelectionStore
 import com.cyxbs.functions.code.npm.internal.PersistedNpmEntry
 import com.cyxbs.functions.code.npm.internal.PersistedNpmPackage
 import com.cyxbs.functions.code.npm.internal.PersistedNpmPackageId
 import com.cyxbs.functions.code.npm.internal.PersistedNpmResolvedNode
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveOutcome
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackageArchiveTiming
+import com.cyxbs.functions.code.npm.diagnostic.NpmPackagePoolMetrics
 import com.cyxbs.functions.code.npm.model.NpmDownloadException
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
@@ -32,7 +36,11 @@ import com.cyxbs.functions.code.npm.transport.NpmHttpTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -43,6 +51,7 @@ import okio.SYSTEM
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.TimeSource
 
 /**
  * 直接基于 npm registry 的全局包池与入口解析器。
@@ -85,14 +94,15 @@ import kotlin.time.Duration.Companion.days
  * @param transport npm 元数据与 tgz 请求实现；默认复用平台 Ktor Client。
  * @param rootDirectory App 私有缓存目录；默认使用系统缓存下固定的 `cyxbs-code/npm/v1`。自定义
  * Pool 不得与 [Default] 或其他存活的 Pool 共享同一实际目录。
- * @param registryBaseUrl npm registry 根地址。
+ * @param registryBaseUrls npm registry 根地址列表。客户端先用少量请求并发探测并持久化最快稳定源，
+ * 此后只请求主源；主源失败时才顺序尝试备用源，选择满 7 天或主源连续失败后重新探测。
  * @param clock 提供当前时间；默认使用系统时钟，测试可注入。
  * @param backgroundScope 执行更新后异步 GC 的长生命周期作用域；取消只会跳过本次清理，后续触发会重试。
  */
 class NpmPackagePool(
   private val transport: NpmHttpTransport = KtorNpmHttpTransport(),
   rootDirectory: Path = DEFAULT_ROOT_DIRECTORY,
-  registryBaseUrl: String = DEFAULT_REGISTRY_BASE_URL,
+  registryBaseUrls: List<String> = DEFAULT_REGISTRY_BASE_URLS,
   fileSystem: FileSystem = FileSystem.SYSTEM,
   ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
   private val backgroundScope: CoroutineScope = CoroutineScope(ioDispatcher),
@@ -113,8 +123,15 @@ class NpmPackagePool(
   private val mutex = Mutex()
   private val registryClient = NpmRegistryPackageClient(
     transport = transport,
-    registryBaseUrl = registryBaseUrl,
+    registryBaseUrls = registryBaseUrls,
     json = json,
+    registrySelectionStore = OkioNpmRegistrySelectionStore(
+      rootDirectory = rootDirectory,
+      fileSystem = fileSystem,
+      ioDispatcher = ioDispatcher,
+      json = json,
+    ),
+    clock = clock,
   )
   private val activeLeaseCount = mutableMapOf<String, Int>()
   private val activeLeaseTokens = mutableMapOf<Long, ActiveNpmEntryLease>()
@@ -129,6 +146,7 @@ class NpmPackagePool(
    *
    * @param refreshPolicy [NpmRefreshPolicy.AUTO] 按包池生命周期低频刷新并允许回退旧图；
    * [NpmRefreshPolicy.FORCE] 本次必须请求远端，失败时保留旧图但直接抛出异常。
+   * @param metrics 可选的单次入口准备诊断对象；记录包级 metadata、registry 源和归档耗时。
    * @throws NpmResolutionException 包名、版本范围或 registry 依赖范围无效。
    * @throws NpmRegistryMismatchException registry 元数据身份、SRI 或 tarball URL 无效。
    * @throws NpmDownloadException 元数据或归档下载失败。
@@ -147,6 +165,7 @@ class NpmPackagePool(
   suspend fun acquireEntry(
     request: NpmEntryRequest,
     refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
+    metrics: NpmPackagePoolMetrics? = null,
   ): NpmPreparedEntryLease {
     return mutex.withLock {
       validateRequest(request)
@@ -155,17 +174,20 @@ class NpmPackagePool(
       val scheduledGcDue = now - state.lastGcAtEpochMillis >= GC_INTERVAL_MILLIS
       val saved = state.entries.firstOrNull { it.entryName == request.entryName }
       val requestMatches = saved?.matches(request) == true
+      val reusableSaved = if (saved != null && requestMatches &&
+        saved.poolGeneration != state.generation
+      ) {
+        // 其他入口可能已把兼容的新版本加入全局池；远端短路前先让本入口跟上当前池代际。
+        resolveFromLocalPool(request, state.packages, now)
+          ?.copy(poolGeneration = state.generation)
+          ?: saved
+      } else {
+        saved
+      }
 
       /** 使用旧解析结果时，仍允许其他入口扩充的本地池触发一次纯本地重解析。 */
       fun selectSavedEntry(): PersistedNpmEntry {
-        val reusable = checkNotNull(saved)
-        return if (reusable.poolGeneration == state.generation) {
-          reusable.touch(now)
-        } else {
-          resolveFromLocalPool(request, state.packages, now)
-            ?.copy(poolGeneration = state.generation)
-            ?: reusable.touch(now)
-        }
+        return checkNotNull(reusableSaved).touch(now)
       }
 
       val automaticLatestRefresh = request.version is NpmEntryVersion.Latest &&
@@ -178,12 +200,25 @@ class NpmPackagePool(
 
       if (resolveRemotely) {
         try {
-          val remote = resolveFromRegistry(request, now).also { uncommittedRemote = it }
-          if (shouldKeepSavedLatest(request, refreshPolicy, saved, requestMatches, remote.entry)) {
+          val remote = resolveFromRegistry(
+            request = request,
+            now = now,
+            reusableEntry = reusableSaved,
+            cachedPackages = state.packages,
+            metrics = metrics,
+          ).also { uncommittedRemote = it }
+          if (shouldKeepSavedLatest(
+              request,
+              refreshPolicy,
+              reusableSaved,
+              requestMatches,
+              remote.entry,
+            )
+          ) {
             // 网络不可用时本地 debug metadata 可能比已保存图更旧；AUTO 不允许因此回退版本。
             selectedEntry = selectSavedEntry()
           } else {
-            ensureRemoteArchives(remote.packages)
+            ensureRemoteArchives(remote.packages, metrics)
             val merged = mergePackages(state.packages, remote.packages)
             val nextGeneration = if (merged.size == state.packages.size) {
               state.generation
@@ -215,7 +250,7 @@ class NpmPackagePool(
         selectedEntry = selectSavedEntry()
       }
 
-      if (!remoteApplied) ensureSavedArchives(selectedEntry, state.packages)
+      if (!remoteApplied) ensureSavedArchives(selectedEntry, state.packages, metrics)
 
       state = state.copy(
         entries = state.entries
@@ -335,45 +370,145 @@ class NpmPackagePool(
   }
 
   /**
-   * 首次解析完全以 registry 为准。
+   * 入口及发生版本变化的依赖以 registry 为准；版本未变化的节点复用上次已锁定的完整子图。
    *
-   * metadata 按包名去重请求；节点按 name/version 去重，因此依赖环不会无限递归，同名包的不同版本仍会
-   * 分别保存。
+   * metadata 按包名共享同一个 Deferred，同一节点的直接依赖会并发解析；递归路径集合负责截断依赖环，
+   * 因而不会出现环内任务互相等待。若远端仍选中缓存中的同一 name/version，且不可变元数据一致，
+   * 该节点以下沿用上次精确解析结果，不再逐层请求；任一层版本变化时仅从该层继续向下解析。
+   * 同名包的不同版本仍会分别保存，最终节点顺序由稳定 DFS 重新生成，不受网络完成顺序影响。
    */
   private suspend fun resolveFromRegistry(
     request: NpmEntryRequest,
     now: Long,
-  ): RemoteResolution {
-    val metadata = mutableMapOf<String, NpmRegistryPackageMetadata>()
+    reusableEntry: PersistedNpmEntry?,
+    cachedPackages: List<PersistedNpmPackage>,
+    metrics: NpmPackagePoolMetrics?,
+  ): RemoteResolution = coroutineScope {
+    val metadataRequests = mutableMapOf<String, Deferred<NpmRegistryPackageMetadata>>()
+    val metadataMutex = Mutex()
+    val graphMutex = Mutex()
     val nodes = linkedMapOf<NpmPackageId, PersistedNpmResolvedNode>()
     val packages = linkedMapOf<NpmPackageId, PersistedNpmPackage>()
-    val visiting = mutableSetOf<NpmPackageId>()
+    val reusableNodes = reusableEntry?.nodes.orEmpty().associateBy { node ->
+      NpmPackageId(node.name, node.version)
+    }
+    val cachedPackagesById = cachedPackages.associateBy { packageInfo ->
+      NpmPackageId(packageInfo.name, packageInfo.version)
+    }
 
-    suspend fun resolve(packageName: String, versionSpec: String): NpmPackageId {
-      val packageMetadata = metadata.getOrPutSuspending(packageName) {
-        registryClient.fetch(packageName)
+    /**
+     * 验证并收集上次入口中从 [root] 可达的完整精确子图。
+     *
+     * 根包必须与本轮 registry 返回的不可变元数据一致；其余节点已经由上次成功加载锁定，只校验状态中的
+     * 包、节点和依赖边是否完整。任何缺失都会放弃短路并回到正常递归，不能提交半张缓存图。
+     */
+    fun reusableSubgraph(
+      root: NpmPackageId,
+      selectedPackage: PersistedNpmPackage,
+    ): List<NpmPackageId>? {
+      val cachedRootPackage = cachedPackagesById[root] ?: return null
+      if (!cachedRootPackage.hasSameImmutableMetadata(selectedPackage)) {
+        throw NpmRegistryMismatchException(
+          "Npm registry changed immutable metadata for '${root.name}@${root.version}'.",
+        )
       }
-      val selected = packageMetadata.select(versionSpec)
+      if (root !in reusableNodes) return null
+
+      val collected = linkedSetOf<NpmPackageId>()
+      fun collect(id: NpmPackageId): Boolean {
+        if (!collected.add(id)) return true
+        val node = reusableNodes[id] ?: return false
+        val packageInfo = cachedPackagesById[id] ?: return false
+        if (node.name != packageInfo.name || node.version != packageInfo.version ||
+          node.dependencies.keys != packageInfo.dependencySpecs.keys
+        ) {
+          return false
+        }
+        return node.dependencies.all { (dependencyName, dependencyId) ->
+          dependencyName == dependencyId.name &&
+            collect(NpmPackageId(dependencyId.name, dependencyId.version))
+        }
+      }
+      return if (collect(root)) collected.toList() else null
+    }
+
+    /** 在图锁内合并节点；并发分支解析出不一致结果时立即拒绝。 */
+    fun putResolvedNode(
+      id: NpmPackageId,
+      node: PersistedNpmResolvedNode,
+      packageInfo: PersistedNpmPackage,
+    ) {
+      val existingNode = nodes[id]
+      if (existingNode != null && existingNode != node) {
+        throw NpmRegistryMismatchException(
+          "Npm dependency graph is inconsistent for '${id.name}@${id.version}'.",
+        )
+      }
+      val existingPackage = packages[id]
+      if (existingPackage != null && !existingPackage.hasSameImmutableMetadata(packageInfo)) {
+        throw NpmRegistryMismatchException(
+          "Npm registry changed immutable metadata for '${id.name}@${id.version}'.",
+        )
+      }
+      nodes[id] = node
+      packages[id] = existingPackage ?: packageInfo
+    }
+
+    /** 同名包的不同版本范围共享一份 registry metadata，避免并发分支发出重复 HTTP 请求。 */
+    suspend fun metadataFor(packageName: String): NpmRegistryPackageMetadata {
+      val requestDeferred = metadataMutex.withLock {
+        metadataRequests[packageName] ?: async {
+          registryClient.fetch(packageName, metrics)
+        }.also { metadataRequests[packageName] = it }
+      }
+      return requestDeferred.await()
+    }
+
+    suspend fun resolve(
+      packageName: String,
+      versionSpec: String,
+      ancestors: Set<NpmPackageId>,
+    ): NpmPackageId {
+      val selected = metadataFor(packageName).select(versionSpec)
       val id = selected.id
-      if (id in nodes || !visiting.add(id)) return id
+      if (id in ancestors) return id
+      val packageInfo = selected.toPersistedPackage()
 
-      val dependencies = linkedMapOf<String, PersistedNpmPackageId>()
-      for ((dependencyName, dependencySpec) in selected.dependencies.entries.sortedBy { it.key }) {
-        val dependency = resolve(dependencyName, dependencySpec)
-        dependencies[dependencyName] = dependency.toPersisted()
+      reusableSubgraph(id, packageInfo)?.let { reusableIds ->
+        graphMutex.withLock {
+          reusableIds.forEach { reusableId ->
+            putResolvedNode(
+              id = reusableId,
+              node = checkNotNull(reusableNodes[reusableId]),
+              packageInfo = checkNotNull(cachedPackagesById[reusableId]),
+            )
+          }
+        }
+        return id
       }
-      visiting.remove(id)
-      nodes[id] = PersistedNpmResolvedNode(
+
+      val dependencyEntries = selected.dependencies.entries.sortedBy { it.key }
+      val resolvedDependencies = dependencyEntries.map { (dependencyName, dependencySpec) ->
+        async {
+          dependencyName to resolve(dependencyName, dependencySpec, ancestors + id)
+        }
+      }.awaitAll()
+      val node = PersistedNpmResolvedNode(
         name = id.name,
         version = id.version,
-        dependencies = dependencies,
+        dependencies = resolvedDependencies.associateTo(linkedMapOf()) { (name, dependency) ->
+          name to dependency.toPersisted()
+        },
       )
-      packages[id] = selected.toPersistedPackage()
+      graphMutex.withLock {
+        putResolvedNode(id, node, packageInfo)
+      }
       return id
     }
 
-    val root = resolve(request.packageName, request.versionSpec())
-    return RemoteResolution(
+    val root = resolve(request.packageName, request.versionSpec(), emptySet())
+    val orderedNodes = orderNodes(root, nodes)
+    RemoteResolution(
       entry = PersistedNpmEntry(
         entryName = request.entryName,
         packageName = request.packageName,
@@ -384,9 +519,11 @@ class NpmPackagePool(
         resolvedAtEpochMillis = now,
         lastUsedAtEpochMillis = now,
         poolGeneration = 0,
-        nodes = orderNodes(root, nodes),
+        nodes = orderedNodes,
       ),
-      packages = packages.values.toList(),
+      packages = orderedNodes.map { node ->
+        packages.getValue(NpmPackageId(node.name, node.version))
+      },
     )
   }
 
@@ -462,16 +599,12 @@ class NpmPackagePool(
   }
 
   /** 为远端本轮锁定的精确版本复用或下载归档；版本选择不会读取本地池。 */
-  private suspend fun ensureRemoteArchives(packages: List<PersistedNpmPackage>) {
+  private suspend fun ensureRemoteArchives(
+    packages: List<PersistedNpmPackage>,
+    metrics: NpmPackagePoolMetrics?,
+  ) {
     packages.forEach { packageInfo ->
-      if (archiveStore.find(
-          packageInfo.name,
-          packageInfo.version,
-          packageInfo.integrity,
-        ) == null
-      ) {
-        downloadAndStore(packageInfo)
-      }
+      ensureArchive(packageInfo, metrics)
     }
   }
 
@@ -493,6 +626,7 @@ class NpmPackagePool(
   private suspend fun ensureSavedArchives(
     entry: PersistedNpmEntry,
     packages: List<PersistedNpmPackage>,
+    metrics: NpmPackagePoolMetrics?,
   ) {
     val metadata = packages.associateBy { NpmPackageId(it.name, it.version) }
     entry.nodes.forEach { node ->
@@ -501,6 +635,18 @@ class NpmPackagePool(
           "Npm entry '${entry.entryName}' references missing package metadata " +
               "'${node.name}@${node.version}'.",
         )
+      ensureArchive(packageInfo, metrics)
+    }
+  }
+
+  /** 检查精确归档并按需下载；即使失败或取消也向可选诊断对象写入本次耗时。 */
+  private suspend fun ensureArchive(
+    packageInfo: PersistedNpmPackage,
+    metrics: NpmPackagePoolMetrics?,
+  ) {
+    val startedAt = metrics?.let { TimeSource.Monotonic.markNow() }
+    var outcome = NpmPackageArchiveOutcome.FAILED
+    try {
       if (archiveStore.find(
           packageInfo.name,
           packageInfo.version,
@@ -508,6 +654,22 @@ class NpmPackagePool(
         ) == null
       ) {
         downloadAndStore(packageInfo)
+        outcome = NpmPackageArchiveOutcome.DOWNLOADED
+      } else {
+        outcome = NpmPackageArchiveOutcome.CACHE_HIT
+      }
+    } catch (exception: CancellationException) {
+      outcome = NpmPackageArchiveOutcome.CANCELLED
+      throw exception
+    } finally {
+      startedAt?.let {
+        metrics.recordArchive(
+          NpmPackageArchiveTiming(
+            packageId = NpmPackageId(packageInfo.name, packageInfo.version),
+            duration = it.elapsedNow(),
+            outcome = outcome,
+          ),
+        )
       }
     }
   }
@@ -530,7 +692,12 @@ class NpmPackagePool(
     )
   }
 
-  /** 同坐标元数据必须不可变；只有真正加入新坐标时才推进池代际。 */
+  /**
+   * 同坐标的内容身份与依赖声明必须不可变；只有真正加入新坐标时才推进池代际。
+   *
+   * registry 镜像通常会把同一归档改写为自己的 tarball URL，因此 URL 和来源不参与不可变比较；
+   * 已完成 SRI 校验的现有记录继续保留，避免仅因本次竞速胜出的镜像不同而产生状态抖动。
+   */
   private fun mergePackages(
     current: List<PersistedNpmPackage>,
     added: List<PersistedNpmPackage>,
@@ -541,10 +708,13 @@ class NpmPackagePool(
     added.forEach { packageInfo ->
       val id = NpmPackageId(packageInfo.name, packageInfo.version)
       val existing = merged[id]
-      if (existing != null && existing != packageInfo) {
-        throw NpmRegistryMismatchException(
-          "Npm registry changed immutable metadata for '${id.name}@${id.version}'.",
-        )
+      if (existing != null) {
+        if (!existing.hasSameImmutableMetadata(packageInfo)) {
+          throw NpmRegistryMismatchException(
+            "Npm registry changed immutable metadata for '${id.name}@${id.version}'.",
+          )
+        }
+        return@forEach
       }
       merged[id] = packageInfo
     }
@@ -630,7 +800,10 @@ class NpmPackagePool(
 
     private val DEFAULT_ROOT_DIRECTORY = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "cyxbs-code" / "npm" / "v1"
-    private const val DEFAULT_REGISTRY_BASE_URL = "https://registry.npmjs.org"
+    private val DEFAULT_REGISTRY_BASE_URLS = listOf(
+      "https://registry.npmmirror.com",
+      "https://registry.npmjs.org",
+    )
     private val ENTRY_TTL_MILLIS = 14.days.inWholeMilliseconds
     private val GC_INTERVAL_MILLIS = 1.days.inWholeMilliseconds
     private val PACKAGE_NAME_REGEX = Regex(
@@ -725,6 +898,14 @@ private fun NpmRegistryVersion.toPersistedPackage() = PersistedNpmPackage(
   },
 )
 
+/** 判断同坐标包会影响内容身份或依赖图的字段是否一致；下载镜像地址不属于包身份。 */
+private fun PersistedNpmPackage.hasSameImmutableMetadata(other: PersistedNpmPackage): Boolean {
+  return name == other.name &&
+    version == other.version &&
+    integrity == other.integrity &&
+    dependencySpecs == other.dependencySpecs
+}
+
 /** DFS 后序保证依赖优先；visiting 集合使依赖环只输出一次。 */
 private fun orderNodes(
   root: NpmPackageId,
@@ -778,12 +959,3 @@ private suspend fun PersistedNpmEntry.toPreparedEntry(
 }
 
 private const val LOCAL_DEBUG_TARBALL_BASE_URL = "https://cyxbs.local.debug/"
-
-/** MutableMap.getOrPut 的 suspend 版本，避免 metadata 重复请求。 */
-private suspend inline fun <K, V> MutableMap<K, V>.getOrPutSuspending(
-  key: K,
-  crossinline defaultValue: suspend () -> V,
-): V {
-  get(key)?.let { return it }
-  return defaultValue().also { put(key, it) }
-}

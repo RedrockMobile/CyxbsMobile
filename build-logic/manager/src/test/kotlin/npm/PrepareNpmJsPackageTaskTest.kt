@@ -89,6 +89,67 @@ class PrepareNpmJsPackageTaskTest {
     }
   }
 
+  /**
+   * Runtime 的 production 元数据会聚合所有业务 npm 依赖，但最终包只包含 Kotlin/JS 基础 Module。
+   *
+   * 因此 Lezer 等业务依赖以及 peer、optional、bundled 声明都必须移除；构建期依赖不影响客户端依赖图，
+   * 可以继续保留。
+   */
+  @Test
+  fun runtimePackageRemovesAggregatedBusinessDependencies() {
+    val testRoot = Files.createTempDirectory("npm-js-runtime-package-test").toFile()
+    try {
+      val moduleRoot = testRoot.resolve("modules").apply { mkdirs() }
+      val metadataRoot = testRoot.resolve("metadata").apply { mkdirs() }
+      val outputRoot = testRoot.resolve("output")
+      val runtimeMain = "kotlin-kotlin-stdlib.mjs"
+      moduleRoot.resolve(runtimeMain).writeText("export const runtimeValue = 1;")
+      val packageJson = metadataRoot.resolve("package.json").apply {
+        writeText(
+          """
+          {
+            "name": "$RUNTIME_PACKAGE",
+            "version": "1.0.0",
+            "main": "aggregated.mjs",
+            "types": "aggregated.d.mts",
+            "dependencies": { "@lezer/javascript": "1.5.4" },
+            "peerDependencies": { "peer-package": "1.0.0" },
+            "optionalDependencies": { "optional-package": "1.0.0" },
+            "bundledDependencies": ["bundled-package"],
+            "devDependencies": { "typescript": "5.9.3" }
+          }
+          """.trimIndent(),
+        )
+      }
+      val project = ProjectBuilder.builder().withProjectDir(testRoot).build()
+      val task = project.tasks.register(
+        "prepareNpmJsRuntimePackageUnderTest",
+        PrepareNpmJsPackageTask::class.java,
+      ).get().apply {
+        moduleSourceDirectory.set(moduleRoot)
+        packageMetadataDirectory.set(metadataRoot)
+        modulePackageMetadataFiles.from(packageJson)
+        outputDirectory.set(outputRoot)
+        bundleKotlinRuntime.set(true)
+        runtimePackageName.set(RUNTIME_PACKAGE)
+        runtimePackageVersion.set("1.0.0")
+        runtimeModuleFiles.set(setOf(runtimeMain))
+      }
+
+      task.preparePackage()
+
+      val preparedPackageJson = outputRoot.resolve("package.json").readText()
+      assertContains(preparedPackageJson, "\"main\": \"$runtimeMain\"")
+      assertContains(preparedPackageJson, "\"devDependencies\"")
+      assertFalse(preparedPackageJson.contains("@lezer/javascript"))
+      assertFalse(preparedPackageJson.contains("peerDependencies"))
+      assertFalse(preparedPackageJson.contains("optionalDependencies"))
+      assertFalse(preparedPackageJson.contains("bundledDependencies"))
+    } finally {
+      testRoot.deleteRecursively()
+    }
+  }
+
   /** 写入测试所需的最小 production package.json。 */
   private fun File.writePackageJson(
     packageName: String,

@@ -3,6 +3,8 @@ package com.cyxbs.functions.code.npm
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.npm.diagnostic.NpmJsServiceLoadMetrics
+import com.cyxbs.functions.code.npm.diagnostic.NpmJsServiceLoadStage
 import com.cyxbs.functions.code.npm.model.NpmEntryRequest
 import com.cyxbs.functions.code.npm.model.NpmEntryVersion
 import com.cyxbs.functions.code.npm.module.NpmModuleGraphFactory
@@ -19,6 +21,7 @@ import com.cyxbs.functions.code.npm.service.NpmJsServiceSession
 import com.g985892345.provider.manager.KtProvider
 import kotlinx.coroutines.CancellationException
 import kotlin.reflect.KClass
+import kotlin.time.TimeSource
 
 /**
  * 以 commonMain Service 接口为入口，准备 npm 依赖并返回对应 Kotlin 代理。
@@ -65,6 +68,7 @@ class NpmJsServiceLoader(
    * @param packageName npm 完整包名，例如 `@cyxbs-mobile/cyxbs-functions-code-language-js`。
    * @param version `latest` 或完整精确 semver；默认在每个包池实例首次使用入口时检查最新版。
    * @param refreshPolicy `AUTO` 按包池生命周期刷新并允许回退旧图；`FORCE` 要求本次刷新成功。
+   * @param metrics 可选的单次加载诊断对象；调用结束后可读取各内部阶段耗时，不支持并发复用。
    * @return 由 KSP 生成且由独立 Runtime 支撑的业务接口代理。
    * @throws NpmJsServiceProtocolException 接口没有生成工厂、工厂身份不一致或远端协议不匹配。
    * @throws NpmJsServiceInvocationException Runtime 创建或 npm 入口初始化失败。
@@ -82,37 +86,44 @@ class NpmJsServiceLoader(
     packageName: String,
     version: String = LATEST_VERSION,
     refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
+    metrics: NpmJsServiceLoadMetrics? = null,
   ): T {
-    val factory = findFactory(serviceClass)
-    validateFactory(serviceClass, factory)
+    val factory = metrics.measureStage(NpmJsServiceLoadStage.RESOLVE_PROXY_FACTORY) {
+      findFactory(serviceClass).also { validateFactory(serviceClass, it) }
+    }
     val serviceId = factory.serviceId
     val request = NpmEntryRequest(
       packageName = packageName,
       version = version.toEntryVersion(),
       entryName = "$serviceId|$packageName|$version",
     )
-    val lease = packagePool.acquireEntry(request, refreshPolicy)
+    val lease = metrics.measureStage(NpmJsServiceLoadStage.ACQUIRE_NPM_ENTRY) {
+      packagePool.acquireEntry(request, refreshPolicy, metrics?.packagePoolMetrics)
+    }
     val graph = try {
-      moduleGraphFactory.create(lease.preparedEntry)
+      metrics.measureStage(NpmJsServiceLoadStage.BUILD_MODULE_GRAPH) {
+        moduleGraphFactory.create(lease.preparedEntry).also { createdGraph ->
+          if (createdGraph.load(createdGraph.entryModuleName) == null) {
+            throw NpmJsServiceProtocolException(
+              "Prepared npm Service entry '${createdGraph.entryModuleName}' is missing from its Module graph.",
+            )
+          }
+        }
+      }
     } catch (throwable: Throwable) {
       lease.releaseAfterFailure(throwable)
     }
-    if (graph.load(graph.entryModuleName) == null) {
-      lease.releaseAfterFailure(
-        NpmJsServiceProtocolException(
-          "Prepared npm Service entry '${graph.entryModuleName}' is missing from its Module graph.",
-        ),
-      )
-    }
     val runtime = try {
-      runtimeFactory.create(
-        runtimeOptions.copy(
-          moduleLoader = NpmGraphJsModuleLoader(
-            graph = graph,
-            fallback = runtimeOptions.moduleLoader,
+      metrics.measureStage(NpmJsServiceLoadStage.CREATE_RUNTIME) {
+        runtimeFactory.create(
+          runtimeOptions.copy(
+            moduleLoader = NpmGraphJsModuleLoader(
+              graph = graph,
+              fallback = runtimeOptions.moduleLoader,
+            ),
           ),
-        ),
-      )
+        )
+      }
     } catch (exception: CancellationException) {
       lease.releaseAfterFailure(exception)
     } catch (exception: JsRuntimeException) {
@@ -132,8 +143,12 @@ class NpmJsServiceLoader(
       schemaHash = factory.schemaHash,
     )
     return try {
-      session.initialize(graph.entryModuleName, packageName)
-      factory.create(session)
+      metrics.measureStage(NpmJsServiceLoadStage.INITIALIZE_SERVICE) {
+        session.initialize(graph.entryModuleName, packageName)
+      }
+      metrics.measureStage(NpmJsServiceLoadStage.CREATE_SERVICE_PROXY) {
+        factory.create(session)
+      }
     } catch (throwable: Throwable) {
       session.closeAfterFailure(throwable)
     }
@@ -178,6 +193,21 @@ class NpmJsServiceLoader(
 
   private companion object {
     const val LATEST_VERSION = "latest"
+  }
+}
+
+/** 执行单个加载阶段；仅在调用方传入指标对象时读取单调时钟并记录成功状态。 */
+private suspend fun <T> NpmJsServiceLoadMetrics?.measureStage(
+  stage: NpmJsServiceLoadStage,
+  block: suspend () -> T,
+): T {
+  val target = this ?: return block()
+  val startedAt = TimeSource.Monotonic.markNow()
+  var succeeded = false
+  try {
+    return block().also { succeeded = true }
+  } finally {
+    target.record(stage, startedAt.elapsedNow(), succeeded)
   }
 }
 
