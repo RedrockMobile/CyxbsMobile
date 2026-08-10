@@ -1,25 +1,4 @@
 plugins {
+  // 应用壳会依赖所有 Gradle 子项目；父模块需保留空的 KMP variant，实际编辑器实现位于 :code:editor。
   id("manager.lib")
-  id("kmp.compose")
-}
-
-useKtProvider() // api 模块服务提供
-useNavigation() // 注册编辑器测试页面
-
-kotlin {
-  sourceSets {
-    commonMain.dependencies {
-      implementation(projects.cyxbsComponents.base)
-      implementation(projects.cyxbsComponents.utils)
-      implementation(projects.cyxbsComponents.config)
-      implementation(projects.cyxbsComponents.view)
-    }
-    noWebMain.dependencies {
-      implementation(projects.cyxbsFunctions.code.js)
-      implementation(projects.cyxbsFunctions.code.js.quickjs)
-      implementation(libs.kmp.kodemirror.view)
-      implementation(libs.kmp.kodemirror.basicSetup)
-      implementation(libs.kmp.kodemirror.langJavaScript)
-    }
-  }
 }

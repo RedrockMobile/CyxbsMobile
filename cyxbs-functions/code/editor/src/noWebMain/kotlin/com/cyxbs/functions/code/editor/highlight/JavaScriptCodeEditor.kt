@@ -5,8 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.monkopedia.kodemirror.basicsetup.basicSetup
-import com.monkopedia.kodemirror.lang.javascript.javascript
-import com.monkopedia.kodemirror.state.plus
 import com.monkopedia.kodemirror.view.EditorSession
 import com.monkopedia.kodemirror.view.KodeMirror
 import com.monkopedia.kodemirror.view.rememberEditorSession
@@ -39,14 +37,17 @@ fun rememberJavaScriptCodeEditorState(
 ): JavaScriptCodeEditorState {
   val session = rememberEditorSession(
     doc = initialCode,
-    // basicSetup 已包含行号、折叠、括号匹配、搜索和补全；语言扩展负责 JS 解析与高亮。
-    extensions = basicSetup + javascript().extension,
+    // 端上只保留语言无关的编辑能力；语法解析与高亮后续由动态语言包提供。
+    extensions = basicSetup,
   )
   return remember(session) { JavaScriptCodeEditorState(session) }
 }
 
 /**
  * 使用纯 Compose KodeMirror 渲染可编辑的 JavaScript 代码视图。
+ *
+ * 组件自身不再绑定 JavaScript 解析器，仅提供行号、折叠、搜索等通用编辑能力；语法解析与
+ * 高亮由动态语言包加载后接入，避免每种语言的解析实现都进入安装包。
  *
  * 当前组件仅进入 Android、iOS 与 Desktop 的 `noWebMain`。调用方应为组件提供有界高度，
  * KodeMirror 才能在编辑区域内部正确滚动并保持光标可见。

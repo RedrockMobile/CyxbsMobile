@@ -31,6 +31,10 @@ object ModuleNamespaceCheckRule : ProjectChecker.ICheckRule {
     if (project.path.contains("cyxbs-applications")) {
       return // 跳过 cyxbs-applications，一般这里面不会新增模块
     }
+    if (project.subprojects.size >= 2) {
+      // 如果其下面有两个子模块，则可允许该模块不存放 src 文件夹
+      return
+    }
     val sourceSetList = listOf(
       "androidMain",
       "commonMain",
