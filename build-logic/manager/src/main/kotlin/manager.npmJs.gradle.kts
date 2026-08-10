@@ -1,6 +1,7 @@
 import com.google.devtools.ksp.gradle.KspExtension
 import npm.configureNpmJsPackaging
-import npm.npmPackageNameFromProjectPath
+import npm.createNpmJsPackageExtension
+import npm.validateNpmPackageName
 import org.gradle.api.GradleException
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
@@ -19,13 +20,14 @@ listOf("kmp.compose", "manager.lib").forEach { incompatiblePluginId ->
   }
 }
 
-val npmPackageName = npmPackageNameFromProjectPath(path)
+val npmJsPackage = createNpmJsPackageExtension()
 
 /**
  * 可发布到 npm、供端上 JavaScript Runtime 加载的纯 Kotlin/JS 模块约定。
  *
- * npm 包名固定由 Gradle 模块路径生成，版本固定读取 `project.version`。插件同时启用 npm Service
- * 所需的 KSP、Serialization 与稳定桥协议，模块不得再叠加 `kmp.compose` 或
+ * npm 包名默认由 Gradle 模块路径生成，也可以通过 `npmJsPackage.packageName` 固定为不受模块移动
+ * 影响的稳定坐标；版本固定读取 `project.version`。插件同时启用 npm Service 所需的 KSP、
+ * Serialization 与稳定桥协议，模块不得再叠加 `kmp.compose` 或
  * `manager.lib`，避免把端上业务依赖带入 JavaScript 发布物。
  *
  * 发布文件限制为运行代码与类型声明，source map 继续保留在 CI 构建产物中，但不会进入客户端
@@ -46,7 +48,6 @@ kotlin {
     useEsModules()
     generateTypeScriptDefinitions()
     compilations["main"].packageJson {
-      name = npmPackageName
       customField("type", "module")
       customField("files", listOf("**/*.mjs", "**/*.d.mts"))
     }
@@ -70,10 +71,12 @@ kspMultiplatform(
   targets = setOf(Multiplatform.KspTarget.JS),
 )
 extensions.configure<KspExtension> {
-  arg("npmJsService.packageName", npmPackageName)
+  // Provider 延迟到模块 build.gradle 完成配置后读取，保证显式稳定包名同时进入 KSP 协议。
+  arg("npmJsService.packageName", npmJsPackage.packageName)
 }
 
 afterEvaluate {
+  val npmPackageName = validateNpmPackageName(npmJsPackage.packageName.get())
   val npmPackageVersion = project.version.toString()
   if (npmPackageVersion == Project.DEFAULT_VERSION) {
     throw GradleException("$path must declare project.version when using manager.npmJs.")
@@ -81,10 +84,12 @@ afterEvaluate {
   kotlin {
     js {
       compilations["main"].packageJson {
+        name = npmPackageName
         version = npmPackageVersion
       }
     }
   }
 }
 
+// Kotlin/JS production distribution 已完成声明后再注册读取该任务的分包链路。
 configureNpmJsPackaging()

@@ -22,11 +22,11 @@
 ```kotlin
 NpmJsExecutor(packagePool).executeValue(
   request = NpmEntryRequest(
-    packageName = "@cyxbs-mobile/cyxbs-functions-code-language-js",
+    packageName = "@cyxbs-mobile/language-javascript",
     version = NpmEntryVersion.Latest,
   ),
   runtimeFactory = runtimeFactory,
-  code = """import "@cyxbs-mobile/cyxbs-functions-code-language-js";""",
+  code = """import "@cyxbs-mobile/language-javascript";""",
 )
 ```
 

@@ -1,6 +1,7 @@
 import com.google.devtools.ksp.gradle.KspExtension
 import npm.configureNpmJsPackaging
-import npm.npmPackageNameFromProjectPath
+import npm.createNpmJsPackageExtension
+import npm.validateNpmPackageName
 import org.gradle.api.GradleException
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -21,14 +22,15 @@ listOf("kmp.compose", "manager.lib").forEach { incompatiblePluginId ->
   }
 }
 
-val npmPackageName = npmPackageNameFromProjectPath(path)
+val npmJsPackage = createNpmJsPackageExtension()
 val hostKspTargets = Multiplatform.KspTarget.NON_WEB
 
 /**
  * npm JavaScript 动态实现与端上 Kotlin 调用方共同依赖的跨平台协议桥约定。
  *
- * Bridge 只负责声明稳定接口和 DTO，因此不引入完整业务依赖。npm 包名固定由 Gradle 模块路径
- * 生成，版本固定读取 `project.version`；插件自动启用 npm Service 所需的 Serialization、KSP、
+ * Bridge 只负责声明稳定接口和 DTO，因此不引入完整业务依赖。npm 包名默认由 Gradle 模块路径
+ * 生成，也可以通过 `npmJsPackage.packageName` 固定为不受模块移动影响的稳定坐标；版本固定读取
+ * `project.version`。插件自动启用 npm Service 所需的 Serialization、KSP、
  * KtProvider 与端上代理依赖，并禁止叠加 `kmp.compose` 或 `manager.lib`。
  * 底层 `:cyxbs-functions:code:npm:js-bridge` 只定义注解和基础协议，因此会跳过反向依赖自身的
  * Service 代理配置，但仍使用相同的平台及 npm 坐标约定。每个 Bridge 模块也会注册独立 npm
@@ -60,7 +62,6 @@ kotlin {
     useEsModules()
     generateTypeScriptDefinitions()
     compilations["main"].packageJson {
-      name = npmPackageName
       customField("type", "module")
       customField("files", listOf("**/*.mjs", "**/*.d.mts"))
     }
@@ -116,11 +117,13 @@ if (path != ":cyxbs-functions:code:npm:js-bridge") {
     targets = hostKspTargets,
   )
   extensions.configure<KspExtension> {
-    arg("npmJsService.packageName", npmPackageName)
+    // Provider 延迟到模块 build.gradle 完成配置后读取，保证显式稳定包名同时进入 KSP 协议。
+    arg("npmJsService.packageName", npmJsPackage.packageName)
   }
 }
 
 afterEvaluate {
+  val npmPackageName = validateNpmPackageName(npmJsPackage.packageName.get())
   val npmPackageVersion = project.version.toString()
   if (npmPackageVersion == Project.DEFAULT_VERSION) {
     throw GradleException("$path must declare project.version when using manager.npmJsBridge.")
@@ -128,10 +131,12 @@ afterEvaluate {
   kotlin {
     js {
       compilations["main"].packageJson {
+        name = npmPackageName
         version = npmPackageVersion
       }
     }
   }
 }
 
+// Kotlin/JS production distribution 已完成声明后再注册读取该任务的分包链路。
 configureNpmJsPackaging()

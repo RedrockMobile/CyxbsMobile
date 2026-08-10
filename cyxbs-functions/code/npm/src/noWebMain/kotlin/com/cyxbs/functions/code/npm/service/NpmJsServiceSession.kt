@@ -55,7 +55,7 @@ class NpmJsServiceSession internal constructor(
    * 入口必须导出 KSP 生成的固定初始化函数；缺失导出或依赖解析失败都会终止初始化，不会继续调用。
    *
    * @param entryModuleName 已由 npm Module 图规范化的入口名称。
-   * @param packageName 完整 npm 包名，必须与 `manager.npmJs` 根据实现模块路径生成的坐标一致。
+   * @param packageName 完整 npm 包名，必须与 `manager.npmJs` 最终生成或显式配置的坐标一致。
    * 非字母数字字符会统一替换为 `_`，因此发布侧应保证规范化后的包名不与其他业务包冲突。
    */
   internal suspend fun initialize(entryModuleName: String, packageName: String) {

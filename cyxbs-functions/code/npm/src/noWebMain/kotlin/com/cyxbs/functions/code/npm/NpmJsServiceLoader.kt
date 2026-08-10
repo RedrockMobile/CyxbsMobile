@@ -65,7 +65,7 @@ class NpmJsServiceLoader(
    * `latest` 的远端检查、依赖下载和协议校验都在本方法返回前完成，运行期间不会切换依赖图。
    *
    * @param serviceClass 带 `@NpmJsService` 且已经生成代理工厂的 commonMain 接口。
-   * @param packageName npm 完整包名，例如 `@cyxbs-mobile/cyxbs-functions-code-language-js`。
+   * @param packageName npm 完整包名，例如 `@cyxbs-mobile/language-javascript`。
    * @param version `latest` 或完整精确 semver；默认在每个包池实例首次使用入口时检查最新版。
    * @param refreshPolicy `AUTO` 按包池生命周期刷新并允许回退旧图；`FORCE` 要求本次刷新成功。
    * @param metrics 可选的单次加载诊断对象；调用结束后可读取各内部阶段耗时，不支持并发复用。

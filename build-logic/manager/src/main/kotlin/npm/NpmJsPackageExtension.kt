@@ -1,11 +1,13 @@
 package npm
 
+import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
@@ -18,6 +20,14 @@ import org.gradle.kotlin.dsl.register
  * Kotlin 工具链导致基础 Module 文件名变化时，才需要显式修改本扩展。
  */
 abstract class NpmJsPackageExtension {
+  /**
+   * 当前模块发布到 Registry 的完整 npm 包名。
+   *
+   * 默认根据 Gradle project path 生成；会被 App、目录或其他长期发布包直接引用的模块应显式设置
+   * 稳定坐标，避免以后移动 Gradle 模块时意外更换远端协议标识。
+   */
+  abstract val packageName: Property<String>
+
   /** 当前包是否就是共享 Runtime 包，设为 true 时保留所有 Kotlin/JS 基础模块。 */
   abstract val bundleKotlinRuntime: Property<Boolean>
 
@@ -70,9 +80,9 @@ object NpmJsPackageDefaults {
 /**
  * 将 Gradle 模块路径转换为项目内唯一且可直接发布的 npm 包名。
  *
- * 例如 `:cyxbs-functions:code:language:js` 会得到
- * `@cyxbs-mobile/cyxbs-functions-code-language-js`。路径片段统一转为小写，非 npm 安全字符折叠为
- * `-`，因此模块移动会被视为 npm 坐标变更。
+ * 例如 `:cyxbs-functions:code:npm:service-test:js-impl` 会得到
+ * `@cyxbs-mobile/cyxbs-functions-code-npm-service-test-js-impl`。路径片段统一转为小写，非 npm
+ * 安全字符折叠为 `-`，因此模块移动会被视为 npm 坐标变更。
  */
 fun npmPackageNameFromProjectPath(projectPath: String): String {
   val normalizedPath = projectPath
@@ -84,6 +94,81 @@ fun npmPackageNameFromProjectPath(projectPath: String): String {
     "Cannot derive an npm package name from Gradle project path '$projectPath'."
   }
   return "${NpmJsPackageDefaults.NPM_SCOPE}/$normalizedPath"
+}
+
+/**
+ * 校验项目发布坐标符合统一 scope 与 npm 小写包名约定。
+ *
+ * 显式稳定包名会进入 KSP 协议、依赖图和客户端缓存键，因此在 Gradle 配置期拒绝错误坐标，避免
+ * 直到 pack 或 publish 阶段才发现不同产物使用了不一致的名称。
+ *
+ * @return 未修改的 [packageName]，便于配置代码在校验后直接赋值。
+ * @throws GradleException 包名不属于项目 scope、包含非法字符或超过 npm 长度限制。
+ */
+fun validateNpmPackageName(packageName: String): String {
+  if (packageName.length > MAX_NPM_PACKAGE_NAME_LENGTH ||
+    !NPM_PACKAGE_NAME_REGEX.matches(packageName)
+  ) {
+    throw GradleException(
+      "npm package name '$packageName' must match " +
+          "'${NpmJsPackageDefaults.NPM_SCOPE}/[a-z0-9][a-z0-9._~-]*' and contain at most " +
+          "$MAX_NPM_PACKAGE_NAME_LENGTH characters.",
+    )
+  }
+  return packageName
+}
+
+/**
+ * 在业务模块脚本执行前创建可覆盖的 npm 包配置。
+ *
+ * 这里只建立 Provider 约定，不读取 Kotlin/JS 任务；[configureNpmJsPackaging] 必须等目标和
+ * production distribution 配置完成后再注册打包任务。
+ */
+fun Project.createNpmJsPackageExtension(): NpmJsPackageExtension {
+  val packageProject = this
+  val distributionProject = if (path == NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH) {
+    null
+  } else {
+    project(NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH)
+  }
+  val runtimeProject = distributionProject ?: packageProject
+  return extensions.create<NpmJsPackageExtension>("npmJsPackage").apply {
+    packageName.convention(npmPackageNameFromProjectPath(path))
+    bundleKotlinRuntime.convention(false)
+    if (distributionProject == null) {
+      runtimePackageName.convention(packageName)
+    } else {
+      // 延迟读取 Runtime 项目的显式坐标，避免它移动模块或覆盖包名后业务包仍依赖旧路径坐标。
+      runtimePackageName.convention(runtimeProject.provider {
+        runtimeProject.extensions.getByType<NpmJsPackageExtension>().packageName.get()
+      })
+    }
+    // Provider 延迟读取 distribution 的 project.version，避免插件应用阶段仍得到 unspecified。
+    runtimePackageVersion.convention(runtimeProject.provider {
+      runtimeProject.version.toString().also { runtimeVersion ->
+        require(runtimeVersion != Project.DEFAULT_VERSION) {
+          "${runtimeProject.path} must declare project.version before npm packaging."
+        }
+      }
+    })
+    runtimeModuleFiles.convention(NpmJsPackageDefaults.RUNTIME_MODULE_FILES)
+    moduleSourceDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
+    packageMetadataDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
+    additionalSourceTaskPaths.convention(emptySet())
+    npmExecutable.convention("npm")
+    registryUrl.convention("https://registry.npmjs.org")
+    publishTag.convention("latest")
+    publishAccess.convention("public")
+    if (distributionProject != null) {
+      // 业务包必须与 Runtime 从同一次 production DCE 结果切分，避免跨包 mangled ABI 不一致。
+      moduleSourceDirectory.set(
+        distributionProject.layout.buildDirectory.dir("dist/js/productionLibrary"),
+      )
+      additionalSourceTaskPaths.add(
+        "${distributionProject.path}:jsNodeProductionLibraryDistribution",
+      )
+    }
+  }
 }
 
 /**
@@ -126,36 +211,7 @@ fun Project.configureNpmJsPackaging() {
   } else {
     project(NpmJsPackageDefaults.DISTRIBUTION_PROJECT_PATH)
   }
-  val runtimeProject = distributionProject ?: packageProject
-  val extension = extensions.create<NpmJsPackageExtension>("npmJsPackage").apply {
-    bundleKotlinRuntime.convention(false)
-    runtimePackageName.convention(npmPackageNameFromProjectPath(runtimeProject.path))
-    // Provider 延迟读取 distribution 的 project.version，避免插件应用阶段仍得到 unspecified。
-    runtimePackageVersion.convention(runtimeProject.provider {
-      runtimeProject.version.toString().also { runtimeVersion ->
-        require(runtimeVersion != Project.DEFAULT_VERSION) {
-          "${runtimeProject.path} must declare project.version before npm packaging."
-        }
-      }
-    })
-    runtimeModuleFiles.convention(NpmJsPackageDefaults.RUNTIME_MODULE_FILES)
-    moduleSourceDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
-    packageMetadataDirectory.convention(layout.buildDirectory.dir("dist/js/productionLibrary"))
-    additionalSourceTaskPaths.convention(emptySet())
-    npmExecutable.convention("npm")
-    registryUrl.convention("https://registry.npmjs.org")
-    publishTag.convention("latest")
-    publishAccess.convention("public")
-    if (distributionProject != null) {
-      // 业务包必须与 Runtime 从同一次 production DCE 结果切分，避免跨包 mangled ABI 不一致。
-      moduleSourceDirectory.set(
-        distributionProject.layout.buildDirectory.dir("dist/js/productionLibrary"),
-      )
-      additionalSourceTaskPaths.add(
-        "${distributionProject.path}:jsNodeProductionLibraryDistribution",
-      )
-    }
-  }
+  val extension = extensions.getByType<NpmJsPackageExtension>()
   val preparePackage = tasks.register<PrepareNpmJsPackageTask>("prepareNpmJsPackage") {
     group = "npm"
     description = "本地生成完成 Runtime 分包的 npm 发布目录；不生成 tgz，也不访问网络。"
@@ -306,4 +362,9 @@ private val NPM_JS_MAIN_CONFIGURATIONS = setOf(
   "commonMainImplementation",
   "jsMainApi",
   "jsMainImplementation",
+)
+
+private const val MAX_NPM_PACKAGE_NAME_LENGTH = 214
+private val NPM_PACKAGE_NAME_REGEX = Regex(
+  "^${Regex.escape(NpmJsPackageDefaults.NPM_SCOPE)}/[a-z0-9][a-z0-9._~-]*$",
 )
