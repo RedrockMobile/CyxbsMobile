@@ -11,12 +11,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.utils.extensions.toast
 import io.github.multiweb.api.NavigationRequest
 import io.github.multiweb.api.NavigationDecision
 import io.github.multiweb.api.NavigationPolicy
@@ -114,7 +117,6 @@ private class AndroidWebViewPlatformHost(
           NativeWebViewBridgeResult.Failure("invalid_route")
         } else {
           navigateInApp(request.path)
-          NativeWebViewBridgeResult.Success()
         }
       }
       is NativeWebViewBridgeRequest.ShowMessage -> {
@@ -139,13 +141,11 @@ private class AndroidWebViewPlatformHost(
     sensorExtension.stopSensors()
   }
 
-  private fun navigateInApp(path: String) {
-    runOnMain {
-      runCatching {
-        com.cyxbs.components.config.service.startActivity(path)
-      }.onFailure {
-        showMessage("暂不支持打开该页面")
-      }
+  private fun navigateInApp(path: String): NativeWebViewBridgeResult {
+    return if (AppScheme.jump(path)) {
+      NativeWebViewBridgeResult.Success()
+    } else {
+      NativeWebViewBridgeResult.Failure("unsupported_route")
     }
   }
 
@@ -176,7 +176,7 @@ private class AndroidWebViewPlatformHost(
   }
 
   private fun showMessage(message: String) {
-    com.cyxbs.components.utils.extensions.toast(message)
+    message.toast()
   }
 
   private fun runOnMain(action: () -> Unit) {
@@ -190,7 +190,7 @@ private class AndroidWebViewPlatformHost(
 
 private object AndroidWebViewNavigationPolicy : NavigationPolicy {
   override fun decide(request: NavigationRequest): NavigationDecision {
-    return when (android.net.Uri.parse(request.url).scheme?.lowercase()) {
+    return when (request.url.toUri().scheme?.lowercase()) {
       "http", "https" -> NavigationDecision.Allow
       else -> NavigationDecision.OpenExternally
     }
