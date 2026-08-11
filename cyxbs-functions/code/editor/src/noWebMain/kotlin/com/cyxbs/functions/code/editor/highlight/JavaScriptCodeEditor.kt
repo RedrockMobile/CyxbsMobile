@@ -3,11 +3,14 @@ package com.cyxbs.functions.code.editor.highlight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicHighlightExtension
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicCompletionExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorPlainTextLanguageExtension
 import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.monkopedia.kodemirror.basicsetup.basicSetup
 import com.monkopedia.kodemirror.state.extensionListOf
 import com.monkopedia.kodemirror.view.EditorSession
@@ -44,12 +47,19 @@ class JavaScriptCodeEditorState internal constructor(
  * 创建并记住一个 JavaScript 编辑器状态。
  *
  * @param initialCode 首次创建状态时使用的源码；后续重组不会覆盖用户已经编辑的内容。
+ * @param languageService 当前已经加载的动态语言服务；可先传 null，加载完成后的重组会让补全源
+ * 立即使用新服务，而不会重建或覆盖编辑器文档。
  * @return 可读取当前源码并在多个组合节点间共享的编辑器状态。
  */
 @Composable
 fun rememberJavaScriptCodeEditorState(
   initialCode: String = "",
+  languageService: DynamicLanguageService? = null,
 ): JavaScriptCodeEditorState {
+  val currentLanguageService = rememberUpdatedState(languageService)
+  val completionExtension = remember {
+    kodeMirrorDynamicCompletionExtension { currentLanguageService.value }
+  }
   val session = rememberEditorSession(
     doc = initialCode,
     // basicSetup 强制要求存在 Language；纯文本占位仅维持编辑能力，不承担实际语法解析。
@@ -57,6 +67,7 @@ fun rememberJavaScriptCodeEditorState(
       basicSetup,
       kodeMirrorPlainTextLanguageExtension,
       kodeMirrorDynamicHighlightExtension,
+      completionExtension,
     ),
   )
   return remember(session) { JavaScriptCodeEditorState(session) }
@@ -66,7 +77,7 @@ fun rememberJavaScriptCodeEditorState(
  * 使用纯 Compose KodeMirror 渲染可编辑的 JavaScript 代码视图。
  *
  * 组件自身不再绑定 JavaScript 解析器，仅提供行号、折叠、搜索等通用编辑能力；语法解析与
- * 高亮由动态语言包加载后接入，避免每种语言的解析实现都进入安装包。
+ * 高亮、补全由动态语言包加载后接入，避免每种语言的解析实现都进入安装包。
  *
  * 当前组件仅进入 Android、iOS 与 Desktop 的 `noWebMain`。调用方应为组件提供有界高度，
  * KodeMirror 才能在编辑区域内部正确滚动并保持光标可见。

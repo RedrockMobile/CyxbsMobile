@@ -60,6 +60,7 @@ class LezerSyntaxHighlighterSession(
   private val parser: LezerParser,
 ) {
   private var previousSource: String? = null
+  private var previousTree: LezerTree? = null
   private var fragments: Array<LezerTreeFragment> = emptyArray()
   private var previousSpans: List<DynamicHighlightSpan> = emptyList()
 
@@ -112,6 +113,7 @@ class LezerSyntaxHighlighterSession(
 
     // 只保留当前树的片段，避免编辑会话增长时旧树仍被缓存引用。
     previousSource = source
+    previousTree = tree
     fragments = LezerTreeFragment.addTree(tree)
     previousSpans = spans
     return DynamicHighlightResult(
@@ -125,6 +127,17 @@ class LezerSyntaxHighlighterSession(
         collectMicroseconds = collectMicroseconds,
       ),
     )
+  }
+
+  /**
+   * 返回 [source] 对应的语法树，并与 [highlight] 共用同一份增量解析缓存。
+   *
+   * 若当前源码尚未高亮，本方法会先完成一次高亮分析；调用方随后请求同一源码高亮时会直接命中
+   * `EXACT` 缓存。该行为让补全与高亮共享解析成本，同时避免向业务协议暴露 Lezer 类型。
+   */
+  fun syntaxTree(source: String): LezerTree {
+    if (previousSource != source || previousTree == null) highlight(source)
+    return checkNotNull(previousTree)
   }
 
   /** 通过最长公共前后缀生成 Lezer 所需的单一最小变更范围。 */

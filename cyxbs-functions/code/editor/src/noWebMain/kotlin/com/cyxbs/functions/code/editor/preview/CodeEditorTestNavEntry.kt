@@ -66,7 +66,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
   @Composable
   override fun Content(argument: CodeEditorTestNavArgument) {
-    val editorState = rememberJavaScriptCodeEditorState(initialCode = DEFAULT_CODE)
     val runner = remember {
       JsTeachingCodeRunner.create(QuickJsRuntimeFactory)
     }
@@ -77,6 +76,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isAnalyzingLanguage by remember { mutableStateOf(false) }
     var loadedLanguage by remember { mutableStateOf<DynamicLanguageInfo?>(null) }
     var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageService?>(null) }
+    val editorState = rememberJavaScriptCodeEditorState(
+      initialCode = DEFAULT_CODE,
+      languageService = dynamicLanguageService,
+    )
     var output by remember { mutableStateOf("点击运行查看控制台输出") }
     var autoHighlightReport by remember { mutableStateOf("加载动态服务后显示实时高亮耗时") }
 

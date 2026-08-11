@@ -20,6 +20,7 @@ kotlin {
       implementation(projects.cyxbsFunctions.code.language)
       implementation(libs.kmp.kodemirror.view)
       implementation(libs.kmp.kodemirror.basicSetup)
+      implementation(libs.kmp.kodemirror.autocomplete)
       implementation(libs.kmp.kodemirror.lezerCommon)
     }
   }

@@ -1,16 +1,18 @@
 package com.cyxbs.functions.code.language.javascript
 
-import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
 import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript
-import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** 验证 KSP 生成的下发端分发器能够注册并调用 Kotlin/JS 业务实现。 */
@@ -85,6 +87,89 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertNotNull(result.metrics.changedRange)
     assertTrue(result.metrics.reusableFragmentCount > 0)
     assertTrue(result.spans.stylesFor(updated, "\"ten\"").contains("tok-string"))
+  }
+
+  /** 补全应包含当前函数参数、局部声明和外层声明，同时屏蔽已经离开的内部块符号。 */
+  @Test
+  fun semanticCompletionRespectsLexicalScopes() = runTest {
+    val source = """
+      const globalValue = 1
+      function greet(person) {
+        if (person) {
+          const insideOnly = person
+        }
+        const message = person
+        return;
+      }
+      ins
+    """.trimIndent()
+    val insidePosition = source.indexOf("return;") + "return;".length
+
+    val inside = JavaScriptDynamicLanguageService.complete(source, insidePosition, explicit = true)
+    val insideLabels = assertNotNull(inside).options.map { it.label }
+    assertTrue("person" in insideLabels)
+    assertTrue("message" in insideLabels)
+    assertTrue("globalValue" in insideLabels)
+    assertTrue("greet" in insideLabels)
+    assertFalse("insideOnly" in insideLabels)
+
+    val outsidePosition = source.lastIndexOf("ins") + 3
+    val outside = JavaScriptDynamicLanguageService.complete(source, outsidePosition, explicit = false)
+    assertFalse(outside?.options.orEmpty().any { it.label == "insideOnly" })
+  }
+
+  /** 块级变量遵守声明顺序，函数声明则可以在源码声明位置之前补全。 */
+  @Test
+  fun semanticCompletionAppliesDeclarationVisibilityRules() = runTest {
+    val source = """
+      function demo() {
+        fut
+        gre
+        const futureValue = 1
+      }
+      function greet() {}
+    """.trimIndent()
+    val futurePosition = source.indexOf("fut") + 3
+    val greetPosition = source.indexOf("gre") + 3
+
+    assertNull(JavaScriptDynamicLanguageService.complete(source, futurePosition, explicit = false))
+    val greetCompletion = JavaScriptDynamicLanguageService.complete(source, greetPosition, explicit = false)
+    assertTrue(assertNotNull(greetCompletion).options.any { it.label == "greet" })
+  }
+
+  /** 数组和自定义类的简单静态类型应提供 receiver 成员，而未知动态 receiver 不猜测。 */
+  @Test
+  fun semanticCompletionProvidesReceiverMembers() = runTest {
+    val source = """
+      class User {
+        greet(name) { return name }
+      }
+      const names = ["Ada"]
+      const user = new User()
+      names.ma
+      user.gr
+      unknown.wh
+    """.trimIndent()
+
+    val arrayPosition = source.indexOf("names.ma") + "names.ma".length
+    val classPosition = source.indexOf("user.gr") + "user.gr".length
+    val unknownPosition = source.indexOf("unknown.wh") + "unknown.wh".length
+
+    val arrayCompletion = JavaScriptDynamicLanguageService.complete(source, arrayPosition, false)
+    assertTrue(assertNotNull(arrayCompletion).options.any { it.label == "map" })
+    val classCompletion = JavaScriptDynamicLanguageService.complete(source, classPosition, false)
+    assertTrue(assertNotNull(classCompletion).options.any { it.label == "greet" })
+    assertNull(JavaScriptDynamicLanguageService.complete(source, unknownPosition, false))
+  }
+
+  /** 注释和字符串内容不应触发普通代码符号补全。 */
+  @Test
+  fun semanticCompletionIgnoresCommentsAndStrings() = runTest {
+    val comment = "const value = 1; // val"
+    val string = "const text = \"val\""
+
+    assertNull(JavaScriptDynamicLanguageService.complete(comment, comment.length, false))
+    assertNull(JavaScriptDynamicLanguageService.complete(string, string.length - 1, false))
   }
 
   /** 显式初始化应可重复调用，并按 commonMain 协议完成参数及返回值的 JSON 转换。 */

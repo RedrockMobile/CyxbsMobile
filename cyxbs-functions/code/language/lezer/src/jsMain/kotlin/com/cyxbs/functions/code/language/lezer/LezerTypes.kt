@@ -18,5 +18,27 @@ external interface LezerParser {
   ): LezerTree
 }
 
-/** Lezer 语法树的不透明句柄，仅供通用高亮适配层消费。 */
-external interface LezerTree
+/**
+ * Lezer 语法树句柄。
+ *
+ * 除高亮遍历外，动态语言包可通过 [topNode] 和 [resolveInner] 构建轻量语义索引；节点位置继续
+ * 使用 JavaScript UTF-16 偏移。这里只暴露只读遍历所需的最小 API，避免绑定整个 @lezer/common。
+ */
+external interface LezerTree {
+
+  /** 整棵语法树的根节点。 */
+  val topNode: LezerSyntaxNode
+
+  /** 返回覆盖 [position] 的最内层节点，[side] 控制边界位置偏向。 */
+  fun resolveInner(position: Int, side: Int = definedExternally): LezerSyntaxNode
+}
+
+/** 动态语言语义分析所需的最小 Lezer 节点视图。 */
+external interface LezerSyntaxNode {
+  val name: String
+  val from: Int
+  val to: Int
+  val parent: LezerSyntaxNode?
+  val firstChild: LezerSyntaxNode?
+  val nextSibling: LezerSyntaxNode?
+}
