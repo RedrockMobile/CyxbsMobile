@@ -13,6 +13,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
@@ -30,7 +31,7 @@ import javax.inject.Inject
  * 生成入口包及其本地项目依赖的 debug npm bundle，并通过 ADB 注入 App 私有 debug 目录。
  *
  * ```text
- * prepare 入口包 + 本地依赖池 + Runtime
+ * prepare 入口包 + 本地依赖池 + 可选 Runtime
  *          │
  *          ├── Runtime 与 registry 稳定版一致 ──> 复用稳定坐标，不生成 Runtime tgz
  *          └── Runtime 与 registry 稳定版不同 ──> 生成同时间戳的新 Runtime tgz
@@ -53,10 +54,11 @@ import javax.inject.Inject
  * ```
  *
  * debug 版本格式为 `<下一稳定补丁版本>-debug.<yyyyMMddHHmmss>`，时间固定使用上海时区。同次任务
- * 的入口包、依赖包与 Runtime 共用一个时间戳。变化检测始终使用稳定版本号和已经解析的下级精确
- * 坐标计算候选 tgz 的 SRI，时间戳只在已确认内容或依赖坐标变化后写入。这样依赖代码变化会先生成
- * 新依赖版本，再自然推动上层包生成引用该版本的新产物。设备旧源不参与检测，有变化时直接原子
- * 覆盖固定路径；进入正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
+ * 的入口包、依赖包与可选 Runtime 共用一个时间戳。变化检测始终使用稳定版本号和已经解析的下级
+ * 精确坐标计算候选 tgz 的 SRI，时间戳只在已确认内容或依赖坐标变化后写入。这样依赖代码变化会先
+ * 生成新依赖版本，再自然推动上层包生成引用该版本的新产物。静态 npm 包不配置 Runtime 输入，仍
+ * 复用相同的版本比较与 ADB 注入链路。设备旧源不参与检测，有变化时直接原子覆盖固定路径；进入
+ * 正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
  */
 @DisableCachingByDefault(because = "任务需要读取并修改已连接 Android 设备的 App 私有目录")
 abstract class InstallDebugNpmBundleTask : DefaultTask() {
@@ -76,13 +78,16 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   abstract val localPackageDirectories: ConfigurableFileCollection
 
   @get:InputDirectory
+  @get:Optional
   @get:PathSensitive(PathSensitivity.RELATIVE)
   abstract val runtimePackageDirectory: DirectoryProperty
 
   @get:Input
+  @get:Optional
   abstract val runtimePackageName: Property<String>
 
   @get:Input
+  @get:Optional
   abstract val runtimeStableVersion: Property<String>
 
   @get:Input
@@ -112,14 +117,12 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   @TaskAction
   fun install() {
     val outputRoot = workingDirectory.get().asFile
-    val runtimeSource = runtimePackageDirectory.get().asFile
     val packageSource = packageDirectory.get().asFile
     fileSystemOperations.delete { delete(outputRoot) }
     outputRoot.mkdirs()
 
     val buildTimestamp = DEBUG_TIME_FORMATTER.format(LocalDateTime.now(DEBUG_ZONE_ID))
-    val runtimeResolution = resolveRuntime(
-      runtimeSource = runtimeSource,
+    val runtimeResolution = resolveOptionalRuntime(
       buildTimestamp = buildTimestamp,
       outputRoot = outputRoot,
     )
@@ -135,7 +138,7 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
         packageResolutions[source.name] = resolveBusinessPackage(
           source = source,
           dependencyVersions = dependencyVersions,
-          runtimeVersion = runtimeResolution.version,
+          runtimeVersion = runtimeResolution?.version,
           buildTimestamp = buildTimestamp,
           outputRoot = outputRoot,
           outputIndex = index,
@@ -143,8 +146,8 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       }
     val changedPackages = packageResolutions.values.filter { it.archive != null }
 
-    if (runtimeResolution.archive == null && changedPackages.isEmpty()) {
-      logger.lifecycle("Local npm package graph and Runtime match registry stable versions; skip ADB.")
+    if (runtimeResolution?.archive == null && changedPackages.isEmpty()) {
+      logger.lifecycle("Local npm package graph matches registry stable versions; skip ADB.")
       return
     }
 
@@ -153,7 +156,7 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     val adb = findAdbExecutable()
     val deviceArguments = selectedDeviceArguments()
     runAdb(adb, deviceArguments, "shell", "am", "force-stop", appId)
-    runtimeResolution.archive?.let { archive ->
+    runtimeResolution?.archive?.let { archive ->
       installArchive(adb, deviceArguments, appId, runtimePackageName.get(), archive)
     }
     changedPackages.forEach { packageInfo ->
@@ -176,27 +179,58 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       appId,
       "1",
     )
+    val runtimeSummary = runtimeResolution?.let { resolution ->
+      "${runtimePackageName.get()}@${resolution.version}"
+    } ?: "not required"
     logger.lifecycle(
-      "Installed changed local debug npm graph; packages={}, Runtime {}@{}.",
+      "Installed changed local debug npm graph; packages={}, Runtime {}.",
       changedPackages.joinToString { "${it.name}@${it.version}" }.ifEmpty { "unchanged" },
-      runtimePackageName.get(),
-      runtimeResolution.version,
+      runtimeSummary,
+    )
+  }
+
+  /**
+   * 解析可选 Runtime；JS 包必须同时配置目录、包名和稳定版本，静态包则三项都不配置。
+   *
+   * @return JS 包的 Runtime 解析结果；静态包返回 null。
+   * @throws GradleException 当 Runtime 输入只配置了一部分时抛出，避免生成依赖坐标不完整的包。
+   */
+  private fun resolveOptionalRuntime(
+    buildTimestamp: String,
+    outputRoot: File,
+  ): RuntimeResolution? {
+    val runtimeSource = runtimePackageDirectory.orNull?.asFile
+    val runtimeName = runtimePackageName.orNull
+    val stableVersion = runtimeStableVersion.orNull
+    if (runtimeSource == null && runtimeName == null && stableVersion == null) return null
+    if (runtimeSource == null || runtimeName == null || stableVersion == null) {
+      throw GradleException(
+        "Runtime package directory, name and stable version must be configured together.",
+      )
+    }
+    return resolveRuntime(
+      runtimeSource = runtimeSource,
+      runtimeName = runtimeName,
+      stableVersion = stableVersion,
+      buildTimestamp = buildTimestamp,
+      outputRoot = outputRoot,
     )
   }
 
   /** 以稳定版本计算候选 SRI；与 registry 一致则复用稳定坐标，否则生成新 debug Runtime。 */
   private fun resolveRuntime(
     runtimeSource: File,
+    runtimeName: String,
+    stableVersion: String,
     buildTimestamp: String,
     outputRoot: File,
   ): RuntimeResolution {
-    val stableVersion = runtimeStableVersion.get()
     val stableDirectory = copyPackage(runtimeSource, outputRoot.resolve("runtime-stable"))
     updatePackageVersion(stableDirectory, stableVersion)
     val stableIntegrity = readPackIntegrity(stableDirectory)
-    val remoteIntegrity = readRemoteIntegrity(stableDirectory, runtimePackageName.get(), stableVersion)
+    val remoteIntegrity = readRemoteIntegrity(stableDirectory, runtimeName, stableVersion)
     if (remoteIntegrity == stableIntegrity) {
-      logger.lifecycle("Reuse registry npm Runtime {}@{}.", runtimePackageName.get(), stableVersion)
+      logger.lifecycle("Reuse registry npm Runtime {}@{}.", runtimeName, stableVersion)
       return RuntimeResolution(stableVersion, null)
     }
 
@@ -213,7 +247,7 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   private fun resolveBusinessPackage(
     source: LocalPackageSource,
     dependencyVersions: Map<String, String>,
-    runtimeVersion: String,
+    runtimeVersion: String?,
     buildTimestamp: String,
     outputRoot: File,
     outputIndex: Int,
@@ -226,8 +260,9 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     val packageJson = readPackageJson(packageJsonFile)
     packageJson.addProperty("version", source.stableVersion)
     val dependencies = packageJson.getAsJsonObject("dependencies") ?: JsonObject()
-    if (dependencies.has(runtimePackageName.get())) {
-      dependencies.addProperty(runtimePackageName.get(), runtimeVersion)
+    val runtimeName = runtimePackageName.orNull
+    if (runtimeName != null && runtimeVersion != null && dependencies.has(runtimeName)) {
+      dependencies.addProperty(runtimeName, runtimeVersion)
     }
     dependencyVersions.forEach { (packageName, version) ->
       dependencies.addProperty(packageName, version)
@@ -274,7 +309,7 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
         val packageJson = readPackageJson(directory.resolve(PACKAGE_JSON))
         val name = packageJson.string("name")
           ?: throw GradleException("Prepared npm package '$directory' has no name.")
-        if (name == runtimePackageName.get()) return@forEach
+        if (name == runtimePackageName.orNull) return@forEach
         val version = packageJson.string("version")
           ?: throw GradleException("Prepared npm package '$name' has no version.")
         val dependencies = packageJson.getAsJsonObject("dependencies")

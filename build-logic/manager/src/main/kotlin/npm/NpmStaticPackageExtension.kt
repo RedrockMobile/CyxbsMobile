@@ -89,6 +89,24 @@ fun Project.configureNpmStaticPackaging() {
     destinationDirectory.set(layout.buildDirectory.dir("npm/tarball"))
     npmExecutable.set(extension.npmExecutable)
   }
+  tasks.register<InstallDebugNpmBundleTask>("installDebugNpmBundle") {
+    group = "npm"
+    description = "比较 Registry 稳定包；存在变化时生成静态 debug bundle、ADB 覆盖并重启。"
+    // 注入阶段读取当前 Gradle 属性与本机 Android SDK，不复用 configuration cache。
+    notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+    dependsOn(preparePackage)
+    packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
+    localPackageDirectories.from(preparePackage.flatMap { it.outputDirectory })
+    npmExecutable.set(extension.npmExecutable)
+    registryUrl.set(extension.registryUrl)
+    applicationId.set(
+      providers.gradleProperty("npmDebugApplicationId")
+        .orElse("com.mredrock.cyxbs.test"),
+    )
+    workingDirectory.set(layout.buildDirectory.dir("npm/debug-bundle"))
+    // 每次执行都重新比较 Registry；内容一致时任务内部会跳过 ADB 与 App 重启。
+    outputs.upToDateWhen { false }
+  }
   tasks.register<PublishNpmJsPackageTask>("publishNpmPackage") {
     group = "npm"
     description = "按精确版本 integrity 检查并按需发布当前静态 npm 包。"
