@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okio.FileSystem
+import okio.SYSTEM
 
 /**
  * 下载并读取 npm 根包中的静态资源，不构建 JavaScript ModuleGraph 或 Runtime。
