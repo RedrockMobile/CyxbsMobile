@@ -26,8 +26,9 @@ import kotlin.time.TimeSource
 /**
  * 以 commonMain Service 接口为入口，准备 npm 依赖并返回对应 Kotlin 代理。
  *
- * 调用方传入带 `@NpmJsService` 的接口、npm 包名和版本；协议摘要、JSON 编解码与代理创建由 KSP
- * 生成代码提供。每个成功加载的实例独占一个 JavaScript Runtime，使用完必须调用
+ * 调用方传入带 `@NpmJsService` 的接口、npm 包名和版本；方法清单、JSON 编解码与代理创建由
+ * KSP 生成代码提供。接口可以只追加方法，旧包缺少的新方法会在调用时明确标记为未实现。每个
+ * 成功加载的实例独占一个 JavaScript Runtime，使用完必须调用
  * [NpmJsServiceInstance.close]。工厂使用真实 [KClass] 建立索引，不依赖可能被混淆的运行时类名。
  *
  * @param packagePool App 级长生命周期 npm 全局包池；默认使用 [NpmPackagePool.Default]。
@@ -140,7 +141,6 @@ class NpmJsServiceLoader(
       runtime = runtime,
       lease = lease,
       serviceId = serviceId,
-      schemaHash = factory.schemaHash,
     )
     return try {
       metrics.measureStage(NpmJsServiceLoadStage.INITIALIZE_SERVICE) {
@@ -175,7 +175,7 @@ class NpmJsServiceLoader(
         "Generated npm JavaScript Service factory identity does not match its lookup key.",
       )
     }
-    if (factory.serviceId.isBlank() || factory.schemaHash.isBlank()) {
+    if (factory.serviceId.isBlank()) {
       throw NpmJsServiceProtocolException(
         "Generated npm JavaScript Service factory is incomplete.",
       )

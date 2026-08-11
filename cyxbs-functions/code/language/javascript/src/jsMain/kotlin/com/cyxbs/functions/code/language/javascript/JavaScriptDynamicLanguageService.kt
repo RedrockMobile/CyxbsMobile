@@ -3,7 +3,6 @@ package com.cyxbs.functions.code.language.javascript
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
-import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageMetadata
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighter
 
@@ -14,15 +13,6 @@ import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighter
  * JavaScript 教学常用关键词，后续可在不改变端上协议的前提下扩展为语义补全。
  */
 object JavaScriptDynamicLanguageService : DynamicLanguageService {
-
-  override suspend fun metadata(): DynamicLanguageMetadata {
-    return DynamicLanguageMetadata(
-      languageId = "javascript",
-      displayName = "JavaScript",
-      protocolVersion = PROTOCOL_VERSION,
-    )
-  }
-
   override suspend fun highlight(source: String): List<DynamicHighlightSpan> {
     return LezerSyntaxHighlighter.highlight(parser, source)
   }
@@ -63,7 +53,6 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     return isLetterOrDigit() || this == '_' || this == '$'
   }
 
-  private const val PROTOCOL_VERSION = 1
   private const val KEYWORD_STYLE = "keyword"
   private val KEYWORDS = listOf(
     "async",

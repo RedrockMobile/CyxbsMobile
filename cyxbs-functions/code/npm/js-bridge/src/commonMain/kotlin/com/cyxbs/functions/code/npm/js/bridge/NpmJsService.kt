@@ -34,6 +34,22 @@ class NpmJsServiceProtocolException(
 ) : IllegalArgumentException(message, cause)
 
 /**
+ * 当前下载的 JavaScript Service 尚未实现端上接口请求的方法。
+ *
+ * npm Service 允许后续只追加新方法；新客户端调用旧包缺失的方法时抛出本异常，调用方可以针对
+ * 单项能力降级，而旧包已经实现的方法仍可继续使用。
+ *
+ * @param serviceId KSP 根据接口全限定名生成的稳定 Service 标识。
+ * @param method 缺少实现的方法名。
+ */
+class NpmJsServiceMethodNotImplementedException(
+  val serviceId: String,
+  val method: String,
+) : UnsupportedOperationException(
+  "npm JavaScript Service '$serviceId' does not implement method '$method'.",
+)
+
+/**
  * npm JavaScript Service 方法执行失败。
  *
  * 该异常不会暴露 QuickJS 等具体引擎类型，底层错误仅通过 [cause] 保留用于诊断。

@@ -17,8 +17,6 @@ import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
-import com.google.devtools.ksp.symbol.Nullability
-import com.google.devtools.ksp.symbol.Variance
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
@@ -141,18 +139,9 @@ class KspNpmJsServiceProcessor(
     if (duplicated != null) {
       invalid("@NpmJsService does not support overloaded method '${duplicated.key}': $serviceId", this)
     }
-    val schema = buildString {
-      append(serviceId)
-      methods.sortedBy(MethodModel::name).forEach { method ->
-        append('|').append(method.name).append('(')
-        append(method.parameters.joinToString(",") { it.type.canonicalName() })
-        append("):").append(method.returnType.canonicalName())
-      }
-    }
     return ServiceModel(
       declaration = this,
       serviceId = serviceId,
-      schemaHash = schema.sha256(),
       methods = methods,
     )
   }
@@ -233,7 +222,6 @@ class KspNpmJsServiceProcessor(
           .build(),
       )
       .addStringProperty("serviceId", model.serviceId)
-      .addStringProperty("schemaHash", model.schemaHash)
       .addFunction(
         FunSpec.builder("create")
           .addModifiers(KModifier.OVERRIDE)
@@ -261,7 +249,7 @@ class KspNpmJsServiceProcessor(
       .addModifiers(KModifier.INTERNAL)
       .addSuperinterface(JS_DISPATCHER)
       .addStringProperty("serviceId", model.serviceId)
-      .addStringProperty("schemaHash", model.schemaHash)
+      .addMethodNamesProperty(model.methods)
       .addFunction(model.jsInvokeFunction(implementationType))
       .addFunction(
         FunSpec.builder(CLOSE_METHOD)
@@ -418,26 +406,6 @@ class KspNpmJsServiceProcessor(
     }
   }
 
-  /** 使用完全限定类型名生成跨平台稳定协议文本。 */
-  private fun KSType.canonicalName(): String {
-    val declarationName = declaration.qualifiedName?.asString() ?: declaration.simpleName.asString()
-    val argumentsName = if (arguments.isEmpty()) "" else arguments.joinToString(
-      prefix = "<",
-      postfix = ">",
-    ) { argument ->
-      val variance = when (argument.variance) {
-        Variance.COVARIANT -> "out "
-        Variance.CONTRAVARIANT -> "in "
-        Variance.STAR -> "*"
-        Variance.INVARIANT -> ""
-      }
-      if (argument.variance == Variance.STAR) variance
-      else variance + (argument.type?.resolve()?.canonicalName() ?: "?")
-    }
-    val nullable = if (nullability == Nullability.NULLABLE) "?" else ""
-    return declarationName + argumentsName + nullable
-  }
-
   private fun KSType.isUnit(): Boolean {
     return declaration.qualifiedName?.asString() == UNIT.canonicalName
   }
@@ -466,6 +434,25 @@ class KspNpmJsServiceProcessor(
       PropertySpec.builder(name, STRING, KModifier.OVERRIDE)
         .initializer("%S", value)
         .build(),
+    )
+  }
+
+  /** 为 JS 分发器生成当前包实际实现的方法名集合，供端上按方法判断向后兼容性。 */
+  private fun TypeSpec.Builder.addMethodNamesProperty(
+    methods: List<MethodModel>,
+  ): TypeSpec.Builder {
+    val initializer = CodeBlock.builder().add("%M(", SET_OF)
+    methods.sortedBy(MethodModel::name).forEachIndexed { index, method ->
+      if (index > 0) initializer.add(", ")
+      initializer.add("%S", method.name)
+    }
+    initializer.add(")")
+    return addProperty(
+      PropertySpec.builder(
+        "methodNames",
+        Set::class.asClassName().parameterizedBy(STRING),
+        KModifier.OVERRIDE,
+      ).initializer(initializer.build()).build(),
     )
   }
 
@@ -500,7 +487,6 @@ class KspNpmJsServiceProcessor(
   private data class ServiceModel(
     val declaration: KSClassDeclaration,
     val serviceId: String,
-    val schemaHash: String,
     val methods: List<MethodModel>,
   )
 
@@ -566,6 +552,7 @@ class KspNpmJsServiceProcessor(
     )
     val ENCODE_TO_STRING = MemberName("kotlinx.serialization", "encodeToString")
     val DECODE_FROM_STRING = MemberName("kotlinx.serialization", "decodeFromString")
+    val SET_OF = MemberName("kotlin.collections", "setOf")
     val JS_EXPORT = ClassName("kotlin.js", "JsExport")
     val EXPERIMENTAL_JS_EXPORT = ClassName("kotlin.js", "ExperimentalJsExport")
     val OPT_IN = ClassName("kotlin", "OptIn")

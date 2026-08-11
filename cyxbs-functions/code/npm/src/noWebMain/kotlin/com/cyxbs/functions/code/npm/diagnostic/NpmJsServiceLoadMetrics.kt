@@ -20,7 +20,7 @@ enum class NpmJsServiceLoadStage {
   /** 创建 JavaScript Runtime 并安装当前 npm 依赖图对应的 Module Loader。 */
   CREATE_RUNTIME,
 
-  /** 导入入口 Module、注册 Service 并核对端上与 JavaScript 侧的协议摘要。 */
+  /** 导入入口 Module、注册 Service 并读取 JavaScript 侧实际实现的方法清单。 */
   INITIALIZE_SERVICE,
 
   /** 使用生成工厂创建最终返回给业务的 Kotlin Service 代理。 */

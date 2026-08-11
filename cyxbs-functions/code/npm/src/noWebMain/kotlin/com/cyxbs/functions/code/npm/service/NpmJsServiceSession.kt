@@ -4,10 +4,14 @@ import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -20,12 +24,12 @@ class NpmJsServiceSession internal constructor(
   private val runtime: JsRuntime,
   private val lease: NpmPreparedEntryLease,
   private val serviceId: String,
-  private val schemaHash: String,
 ) {
   private val mutex = Mutex()
   private var initialized = false
   private var closed = false
   private var nextCallId = 0L
+  private var supportedMethods: Set<String> = emptySet()
 
   /**
    * 执行生成代理指定的方法。
@@ -34,6 +38,7 @@ class NpmJsServiceSession internal constructor(
    * @param argumentsJson 按声明顺序编码的 JSON 数组。
    * @return JavaScript 分发器返回的 JSON 文本。
    * @throws NpmJsServiceProtocolException 会话尚未初始化或已经关闭。
+   * @throws NpmJsServiceMethodNotImplementedException 当前包未实现请求的方法。
    * @throws NpmJsServiceInvocationException JavaScript 方法执行或结果转换失败。
    * @throws CancellationException 调用协程被取消。
    */
@@ -45,12 +50,15 @@ class NpmJsServiceSession internal constructor(
   suspend fun invoke(method: String, argumentsJson: String): String {
     return mutex.withLock {
       checkUsable()
+      if (method !in supportedMethods) {
+        throw NpmJsServiceMethodNotImplementedException(serviceId, method)
+      }
       invokeLocked(method, argumentsJson)
     }
   }
 
   /**
-   * 导入 npm 入口、显式注册其中全部 Service，并确认端上接口与下发实现使用相同协议摘要。
+   * 导入 npm 入口、显式注册其中全部 Service，并读取下发实现实际提供的方法集合。
    *
    * 入口必须导出 KSP 生成的固定初始化函数；缺失导出或依赖解析失败都会终止初始化，不会继续调用。
    *
@@ -74,18 +82,28 @@ class NpmJsServiceSession internal constructor(
         asModule = true,
         action = "initialize",
       )
-      val actualSchema = evaluate(
+      val methodsJson = evaluate(
         code = "globalThis.CyxbsNpmJsService?.describe?.(${jsString(serviceId)}) ?? null",
         filename = "__cyxbs_npm_service_describe__.js",
         asModule = false,
         action = "describe",
-      ) as? String
-      if (actualSchema != schemaHash) {
+      ) as? String ?: throw NpmJsServiceProtocolException(
+        "Npm JavaScript Service '$serviceId' was not registered by the package initializer.",
+      )
+      val methodNames = try {
+        Json.decodeFromString<List<String>>(methodsJson)
+      } catch (exception: SerializationException) {
         throw NpmJsServiceProtocolException(
-          "Npm JavaScript Service '$serviceId' schema mismatch: " +
-              "expected '$schemaHash', actual '${actualSchema ?: "missing"}'.",
+          "Npm JavaScript Service '$serviceId' returned an invalid method description.",
+          exception,
         )
       }
+      if (methodNames.any(String::isBlank) || methodNames.distinct().size != methodNames.size) {
+        throw NpmJsServiceProtocolException(
+          "Npm JavaScript Service '$serviceId' returned invalid or duplicate method names.",
+        )
+      }
+      supportedMethods = methodNames.toSet()
       initialized = true
     }
   }

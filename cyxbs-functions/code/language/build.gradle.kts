@@ -1,17 +1,18 @@
 plugins {
   id("manager.lib")
+  alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.cyxbsFunctions.code.language.jsBridge)
+      implementation(libs.kotlinx.serialization)
     }
 
     noWebMain.dependencies {
-      implementation(projects.cyxbsFunctions.code.js)
-      implementation(libs.okio)
-      implementation(libs.kotlinx.serialization)
+      implementation(projects.cyxbsFunctions.code.npm)
+      implementation(libs.kotlinx.coroutines)
     }
 
     val noWebTest = create("noWebTest") {
@@ -19,7 +20,6 @@ kotlin {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.kotlinx.coroutines.test)
-        implementation(projects.cyxbsFunctions.code.js.quickjs)
       }
     }
     desktopTest {

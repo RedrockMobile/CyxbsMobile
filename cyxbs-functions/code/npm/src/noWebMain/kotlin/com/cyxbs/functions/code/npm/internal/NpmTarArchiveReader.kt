@@ -14,7 +14,25 @@ internal fun readNpmPackageFiles(
 ): Map<String, ByteArray> {
   val source = fileSystem.source(archivePath).gzip().buffer()
   return try {
-    readTarEntries(source)
+    readTarEntries(source, requestedPath = null)
+  } finally {
+    source.close()
+  }
+}
+
+/**
+ * 从已校验 npm tgz 中读取一个指定普通文件。
+ *
+ * 仍会扫描完整 tar 以确认归档结构有效，但不会把无关文件保存在内存中。
+ */
+internal fun readNpmPackageFile(
+  fileSystem: FileSystem,
+  archivePath: Path,
+  packagePath: String,
+): ByteArray? {
+  val source = fileSystem.source(archivePath).gzip().buffer()
+  return try {
+    readTarEntries(source, requestedPath = packagePath)[packagePath]
   } finally {
     source.close()
   }
@@ -25,7 +43,10 @@ internal fun readNpmPackageFiles(
  *
  * 只接受 `package/` 下的普通文件；目录和链接不会进入结果，也不会在宿主文件系统上创建目标路径。
  */
-private fun readTarEntries(source: BufferedSource): Map<String, ByteArray> {
+private fun readTarEntries(
+  source: BufferedSource,
+  requestedPath: String?,
+): Map<String, ByteArray> {
   val files = linkedMapOf<String, ByteArray>()
   var pendingLongPath: String? = null
   var pendingPaxPath: String? = null
@@ -52,7 +73,9 @@ private fun readTarEntries(source: BufferedSource): Map<String, ByteArray> {
         pendingLongPath = null
         if (type == TYPE_REGULAR_FILE || type == TYPE_OLD_REGULAR_FILE) {
           val packagePath = normalizeNpmArchivePath(archivePath)
-          if (files.put(packagePath, payload) != null) {
+          if ((requestedPath == null || requestedPath == packagePath) &&
+            files.put(packagePath, payload) != null
+          ) {
             throw NpmModuleResolutionException(
               "Npm tar archive contains duplicate file '$packagePath'.",
             )

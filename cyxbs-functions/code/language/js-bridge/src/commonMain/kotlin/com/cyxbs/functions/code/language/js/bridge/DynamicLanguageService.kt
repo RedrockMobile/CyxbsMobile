@@ -2,21 +2,11 @@ package com.cyxbs.functions.code.language.js.bridge
 
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsService
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
 import kotlinx.serialization.Serializable
-
-/**
- * JavaScript 动态语言包在端上声明的协议元数据。
- *
- * @param languageId 语言稳定标识，例如 `javascript`、`python`。
- * @param displayName 用于调试和教学 UI 展示的语言名称。
- * @param protocolVersion Kotlin 与 JavaScript 桥协议版本。
- */
-@Serializable
-data class DynamicLanguageMetadata(
-  val languageId: String,
-  val displayName: String,
-  val protocolVersion: Int,
-)
+import kotlinx.serialization.SerializationException
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * 动态语法分析返回的一段高亮区间。
@@ -65,10 +55,20 @@ data class DynamicCompletionResult(
 @NpmJsService
 interface DynamicLanguageService : NpmJsServiceInstance {
 
-  /** 返回当前包的语言标识与协议版本。 */
-  suspend fun metadata(): DynamicLanguageMetadata
-
-  /** 分析完整源码并返回按 UTF-16 偏移排序的高亮区间。 */
+  /**
+   * 分析完整源码并返回按 UTF-16 偏移排序的高亮区间。
+   *
+   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
   suspend fun highlight(source: String): List<DynamicHighlightSpan>
 
   /**
@@ -77,7 +77,17 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param source 当前完整源码。
    * @param position 光标 UTF-16 偏移。
    * @param explicit 是否由用户主动触发补全。
+   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
    */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
   suspend fun complete(
     source: String,
     position: Int,

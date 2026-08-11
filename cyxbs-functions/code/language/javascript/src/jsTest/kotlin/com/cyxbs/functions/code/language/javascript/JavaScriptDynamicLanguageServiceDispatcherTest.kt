@@ -3,11 +3,8 @@ package com.cyxbs.functions.code.language.javascript
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
-import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageMetadata
-import kotlinx.coroutines.await
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -60,13 +57,13 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     __cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript()
     val bridge: dynamic = js("globalThis.CyxbsNpmJsService")
     assertTrue(bridge != undefined)
-    assertEquals(_JavaScriptDynamicLanguageServiceNpmJsDispatcher.schemaHash, bridge.describe(SERVICE_ID))
     assertEquals(SERVICE_ID, _JavaScriptDynamicLanguageServiceNpmJsDispatcher.serviceId)
-    assertTrue(_JavaScriptDynamicLanguageServiceNpmJsDispatcher.schemaHash.isNotBlank())
-
-    val metadataJson = (bridge.invoke(SERVICE_ID, "metadata", "[]") as Promise<String>).await()
-    val metadata = Json.decodeFromString<DynamicLanguageMetadata>(metadataJson)
-    assertEquals("javascript", metadata.languageId)
+    val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
+    assertEquals(
+      setOf("complete", "highlight"),
+      _JavaScriptDynamicLanguageServiceNpmJsDispatcher.methodNames,
+    )
+    assertEquals(setOf("complete", "highlight"), describedMethods.toSet())
 
     val completion = Json.decodeFromString<DynamicCompletionResult?>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(

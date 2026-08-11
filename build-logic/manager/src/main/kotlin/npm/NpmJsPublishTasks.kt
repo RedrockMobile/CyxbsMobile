@@ -120,140 +120,48 @@ abstract class EnsureNpmJsRuntimePublishedTask : DefaultTask() {
   @TaskAction
   fun ensurePublished() {
     val runtimeDirectory = runtimePackageDirectory.get().asFile
-    val localIntegrity = readLocalIntegrity(runtimeDirectory)
-    val remoteIntegrity = readRemoteIntegrity(runtimeDirectory)
-    when {
-      remoteIntegrity == localIntegrity -> {
+    val target = NpmPublicationTarget(
+      packageName = runtimePackageName.get(),
+      packageVersion = runtimePackageVersion.get(),
+      displayName = "npm Runtime",
+      versionBumpHint = "npmJsPackage.runtimePackageVersion",
+    )
+    when (
+      ensureNpmPackagePublished(
+        target = target,
+        packageDirectory = runtimeDirectory,
+        npmExecutable = npmExecutable.get(),
+        registryUrl = registryUrl.get(),
+        publishTag = publishTag.get(),
+        publishAccess = publishAccess.get(),
+        execOperations = execOperations,
+      )
+    ) {
+      NpmPublicationResult.REUSED -> {
         logger.lifecycle(
           "Reuse published npm Runtime {}@{} because integrity matches.",
           runtimePackageName.get(),
           runtimePackageVersion.get(),
         )
       }
-      remoteIntegrity != null -> {
-        throw GradleException(
-          "npm Runtime '${runtimeCoordinate()}' already exists with different integrity. " +
-              "Bump npmJsPackage.runtimePackageVersion before publishing the business package.",
-        )
-      }
-      else -> {
-        val result = executeNpm(
-          workingDirectory = runtimeDirectory,
-          "publish",
-          "--registry",
-          registryUrl.get(),
-          "--tag",
-          publishTag.get(),
-          "--access",
-          publishAccess.get(),
-        )
-        requireSuccess("publish npm Runtime", result)
-        logger.lifecycle("Published missing npm Runtime {}.", runtimeCoordinate())
+      NpmPublicationResult.PUBLISHED -> {
+        logger.lifecycle("Published missing npm Runtime {}.", target.coordinate)
       }
     }
-  }
-
-  /** 通过 npm pack 的 dry-run 结果获取与真实上传 tarball 一致的本地 integrity。 */
-  private fun readLocalIntegrity(runtimeDirectory: File): String {
-    val result = executeNpm(runtimeDirectory, "pack", "--dry-run", "--json")
-    requireSuccess("calculate local npm Runtime integrity", result)
-    return try {
-      JsonParser.parseString(result.standardOutput)
-        .asJsonArray
-        .first()
-        .asJsonObject
-        .get("integrity")
-        .asString
-    } catch (throwable: Throwable) {
-      throw GradleException("npm pack returned no valid Runtime integrity.", throwable)
-    }
-  }
-
-  /** 查询远程精确版本；404 表示未发布，其他 npm 失败不得降级为重新发布。 */
-  private fun readRemoteIntegrity(runtimeDirectory: File): String? {
-    val result = executeNpm(
-      workingDirectory = runtimeDirectory,
-      "view",
-      runtimeCoordinate(),
-      "dist.integrity",
-      "--json",
-      "--registry",
-      registryUrl.get(),
-    )
-    if (result.exitCode == 0) {
-      return try {
-        JsonParser.parseString(result.standardOutput).asString
-      } catch (throwable: Throwable) {
-        throw GradleException("npm view returned no valid Runtime integrity.", throwable)
-      }
-    }
-    val error = result.combinedOutput()
-    if (error.contains("E404") || error.contains("404 Not Found", ignoreCase = true)) {
-      return null
-    }
-    throw commandFailure("query npm Runtime", result)
-  }
-
-  /** 使用同一 npm CLI 与用户认证环境执行命令，并分别保留标准输出和错误输出。 */
-  private fun executeNpm(
-    workingDirectory: File,
-    vararg arguments: String,
-  ): NpmCommandResult {
-    val standardOutput = ByteArrayOutputStream()
-    val errorOutput = ByteArrayOutputStream()
-    val result = execOperations.exec {
-      workingDir(workingDirectory)
-      commandLine(listOf(npmExecutable.get()) + arguments)
-      this.standardOutput = standardOutput
-      this.errorOutput = errorOutput
-      isIgnoreExitValue = true
-    }
-    return NpmCommandResult(
-      exitCode = result.exitValue,
-      standardOutput = standardOutput.toString(StandardCharsets.UTF_8),
-      errorOutput = errorOutput.toString(StandardCharsets.UTF_8),
-    )
-  }
-
-  /** 将 npm 失败转换为包含 CLI 输出的 Gradle 错误，便于 CI 直接诊断。 */
-  private fun requireSuccess(operation: String, result: NpmCommandResult) {
-    if (result.exitCode != 0) throw commandFailure(operation, result)
-  }
-
-  private fun commandFailure(operation: String, result: NpmCommandResult): GradleException {
-    return GradleException(
-      "Failed to $operation (npm exit ${result.exitCode}):\n" +
-          result.combinedOutput().trim().takeLast(MAX_ERROR_OUTPUT_LENGTH),
-    )
-  }
-
-  private fun runtimeCoordinate(): String {
-    return "${runtimePackageName.get()}@${runtimePackageVersion.get()}"
-  }
-
-  /** npm 命令的最小输出模型，避免判断 404 时丢失 stderr。 */
-  private data class NpmCommandResult(
-    val exitCode: Int,
-    val standardOutput: String,
-    val errorOutput: String,
-  ) {
-    fun combinedOutput(): String = "$standardOutput\n$errorOutput"
-  }
-
-  private companion object {
-    const val MAX_ERROR_OUTPUT_LENGTH = 4_000
   }
 }
 
 /**
- * 将 [PrepareNpmJsPackageTask] 生成的发布目录上传到指定 npm Registry。
+ * 确保 [PrepareNpmJsPackageTask] 生成的包已正确发布到指定 npm Registry。
  *
- * 该任务会产生远端副作用且不会参与普通 build；调用方应在执行前通过 npm CLI 完成身份认证。
- * 本任务类一次只发布 [packageDirectory] 指向的当前包。业务模块表现出的“先检查/发布 Runtime，
- * 再发布业务包”由 [NpmJsPackageExtension] 注册任务时建立的 Gradle 依赖保证，不是在本类内部
- * 隐式发布两个包。
+ * 任务先比较本地 `npm pack` 与远端精确版本的 integrity：版本不存在时发布，内容一致时复用，
+ * 同版本内容不一致时失败并要求提升项目版本。它不会参与普通 build；可能发布新包，因此调用方
+ * 仍应在执行前通过 npm CLI 完成身份认证。
+ *
+ * 本任务类一次只处理 [packageDirectory] 指向的当前包。Runtime 和项目 npm 依赖的检查顺序由
+ * [NpmJsPackageExtension] 注册的 Gradle 依赖保证，不在本类内部隐式遍历依赖图。
  */
-@DisableCachingByDefault(because = "npm publish 会修改远端 Registry")
+@DisableCachingByDefault(because = "任务需要查询并可能修改远程 npm Registry")
 abstract class PublishNpmJsPackageTask : DefaultTask() {
   @get:InputDirectory
   @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -275,28 +183,240 @@ abstract class PublishNpmJsPackageTask : DefaultTask() {
   abstract val execOperations: ExecOperations
 
   /**
-   * 发布当前 npm 包。
+   * 校验或发布当前 npm 包。
    *
-   * Registry、dist-tag 与 access 由 [NpmJsPackageExtension] 统一配置；认证失败和版本已存在等错误
-   * 直接保留 npm CLI 的失败结果，防止流水线误判为发布成功。
+   * Registry、dist-tag 与 access 由 [NpmJsPackageExtension] 统一配置。任务每次都会查询远端，
+   * 但只有精确版本不存在时才执行 `npm publish`；因此发布流水线可以安全重试，也可以在只更新
+   * Catalog 时复用未变化的语言包及其依赖。
    *
-   * @throws org.gradle.process.internal.ExecException 当 npm CLI 不可用、认证失败、版本已存在或
-   * Registry 拒绝发布时抛出。
+   * @throws GradleException 当 npm CLI 不可用、Registry 查询失败、同版本内容不一致、包元数据
+   * 非法或发布失败时抛出。
    */
   @TaskAction
   fun publish() {
-    execOperations.exec {
-      workingDir(packageDirectory.get().asFile)
-      commandLine(
-        npmExecutable.get(),
-        "publish",
-        "--registry",
-        registryUrl.get(),
-        "--tag",
-        publishTag.get(),
-        "--access",
-        publishAccess.get(),
+    val directory = packageDirectory.get().asFile
+    val target = readNpmPublicationTarget(directory)
+    when (
+      ensureNpmPackagePublished(
+        target = target,
+        packageDirectory = directory,
+        npmExecutable = npmExecutable.get(),
+        registryUrl = registryUrl.get(),
+        publishTag = publishTag.get(),
+        publishAccess = publishAccess.get(),
+        execOperations = execOperations,
       )
-    }.assertNormalExitValue()
+    ) {
+      NpmPublicationResult.REUSED -> logger.lifecycle(
+        "Reuse published npm package {} because integrity matches.",
+        target.coordinate,
+      )
+      NpmPublicationResult.PUBLISHED -> logger.lifecycle(
+        "Published missing npm package {}.",
+        target.coordinate,
+      )
+    }
   }
 }
+
+/** 从最终发布目录读取稳定 npm 坐标，避免任务 DSL 重复维护包名和版本。 */
+private fun readNpmPublicationTarget(packageDirectory: File): NpmPublicationTarget {
+  val packageJson = packageDirectory.resolve("package.json")
+  return try {
+    val metadata = JsonParser.parseString(packageJson.readText()).asJsonObject
+    val packageName = metadata.get("name")?.asString.orEmpty()
+    val packageVersion = metadata.get("version")?.asString.orEmpty()
+    if (packageName.isBlank() || packageVersion.isBlank()) {
+      throw IllegalArgumentException("name or version is blank")
+    }
+    NpmPublicationTarget(
+      packageName = packageName,
+      packageVersion = packageVersion,
+      displayName = "npm package",
+      versionBumpHint = "the project version",
+    )
+  } catch (throwable: Throwable) {
+    throw GradleException(
+      "Cannot read npm package name and version from '${packageJson.absolutePath}'.",
+      throwable,
+    )
+  }
+}
+
+/**
+ * 比较本地与远端精确版本，并仅在缺失时发布。
+ *
+ * 远端非 404 错误不会降级成 publish，避免网络、认证或 Registry 故障被误判为“版本不存在”。
+ */
+private fun ensureNpmPackagePublished(
+  target: NpmPublicationTarget,
+  packageDirectory: File,
+  npmExecutable: String,
+  registryUrl: String,
+  publishTag: String,
+  publishAccess: String,
+  execOperations: ExecOperations,
+): NpmPublicationResult {
+  val localIntegrity = readLocalIntegrity(
+    target = target,
+    packageDirectory = packageDirectory,
+    npmExecutable = npmExecutable,
+    execOperations = execOperations,
+  )
+  val remoteIntegrity = readRemoteIntegrity(
+    target = target,
+    packageDirectory = packageDirectory,
+    npmExecutable = npmExecutable,
+    registryUrl = registryUrl,
+    execOperations = execOperations,
+  )
+  if (remoteIntegrity == localIntegrity) return NpmPublicationResult.REUSED
+  if (remoteIntegrity != null) {
+    throw GradleException(
+      "${target.displayName} '${target.coordinate}' already exists with different integrity. " +
+          "Bump ${target.versionBumpHint} before publishing.",
+    )
+  }
+
+  val result = executeNpm(
+    workingDirectory = packageDirectory,
+    npmExecutable = npmExecutable,
+    execOperations = execOperations,
+    "publish",
+    "--registry",
+    registryUrl,
+    "--tag",
+    publishTag,
+    "--access",
+    publishAccess,
+  )
+  requireSuccess("publish ${target.displayName} '${target.coordinate}'", result)
+  return NpmPublicationResult.PUBLISHED
+}
+
+/** 通过 npm pack dry-run 获取与真实上传 tarball 一致的本地 integrity。 */
+private fun readLocalIntegrity(
+  target: NpmPublicationTarget,
+  packageDirectory: File,
+  npmExecutable: String,
+  execOperations: ExecOperations,
+): String {
+  val result = executeNpm(
+    workingDirectory = packageDirectory,
+    npmExecutable = npmExecutable,
+    execOperations = execOperations,
+    "pack",
+    "--dry-run",
+    "--json",
+  )
+  requireSuccess("calculate local ${target.displayName} integrity", result)
+  return try {
+    JsonParser.parseString(result.standardOutput)
+      .asJsonArray
+      .first()
+      .asJsonObject
+      .get("integrity")
+      .asString
+  } catch (throwable: Throwable) {
+    throw GradleException(
+      "npm pack returned no valid integrity for ${target.displayName} '${target.coordinate}'.",
+      throwable,
+    )
+  }
+}
+
+/** 查询远端精确版本的 integrity；只有明确 404 才表示尚未发布。 */
+private fun readRemoteIntegrity(
+  target: NpmPublicationTarget,
+  packageDirectory: File,
+  npmExecutable: String,
+  registryUrl: String,
+  execOperations: ExecOperations,
+): String? {
+  val result = executeNpm(
+    workingDirectory = packageDirectory,
+    npmExecutable = npmExecutable,
+    execOperations = execOperations,
+    "view",
+    target.coordinate,
+    "dist.integrity",
+    "--json",
+    "--registry",
+    registryUrl,
+  )
+  if (result.exitCode == 0) {
+    return try {
+      JsonParser.parseString(result.standardOutput).asString
+    } catch (throwable: Throwable) {
+      throw GradleException(
+        "npm view returned no valid integrity for ${target.displayName} '${target.coordinate}'.",
+        throwable,
+      )
+    }
+  }
+  val error = result.combinedOutput()
+  if (error.contains("E404") || error.contains("404 Not Found", ignoreCase = true)) return null
+  throw commandFailure("query ${target.displayName} '${target.coordinate}'", result)
+}
+
+/** 使用同一 npm CLI 与用户认证环境执行命令，并分别保留标准输出和错误输出。 */
+private fun executeNpm(
+  workingDirectory: File,
+  npmExecutable: String,
+  execOperations: ExecOperations,
+  vararg arguments: String,
+): NpmCommandResult {
+  val standardOutput = ByteArrayOutputStream()
+  val errorOutput = ByteArrayOutputStream()
+  val result = execOperations.exec {
+    workingDir(workingDirectory)
+    commandLine(listOf(npmExecutable) + arguments)
+    this.standardOutput = standardOutput
+    this.errorOutput = errorOutput
+    isIgnoreExitValue = true
+  }
+  return NpmCommandResult(
+    exitCode = result.exitValue,
+    standardOutput = standardOutput.toString(StandardCharsets.UTF_8),
+    errorOutput = errorOutput.toString(StandardCharsets.UTF_8),
+  )
+}
+
+/** 将 npm 失败转换为包含 CLI 输出的 Gradle 错误，便于 CI 直接诊断。 */
+private fun requireSuccess(operation: String, result: NpmCommandResult) {
+  if (result.exitCode != 0) throw commandFailure(operation, result)
+}
+
+private fun commandFailure(operation: String, result: NpmCommandResult): GradleException {
+  return GradleException(
+    "Failed to $operation (npm exit ${result.exitCode}):\n" +
+        result.combinedOutput().trim().takeLast(MAX_ERROR_OUTPUT_LENGTH),
+  )
+}
+
+/** 一次待检查或发布的 npm 精确版本。 */
+private data class NpmPublicationTarget(
+  val packageName: String,
+  val packageVersion: String,
+  val displayName: String,
+  val versionBumpHint: String,
+) {
+  val coordinate: String = "$packageName@$packageVersion"
+}
+
+/** npm 精确版本检查后的有效结果。 */
+private enum class NpmPublicationResult {
+  REUSED,
+  PUBLISHED,
+}
+
+/** npm 命令的最小输出模型，避免判断 404 时丢失 stderr。 */
+private data class NpmCommandResult(
+  val exitCode: Int,
+  val standardOutput: String,
+  val errorOutput: String,
+) {
+  fun combinedOutput(): String = "$standardOutput\n$errorOutput"
+}
+
+private const val MAX_ERROR_OUTPUT_LENGTH = 4_000

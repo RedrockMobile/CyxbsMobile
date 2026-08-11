@@ -6,11 +6,18 @@ import kotlinx.coroutines.promise
 /**
  * 仅供 KSP 生成代码实现的 Kotlin/JS Service 分发协议。
  *
- * [argumentsJson] 与返回值均为 JSON 文本，具体参数类型由相同协议摘要的生成代码负责转换。
+ * [argumentsJson] 与返回值均为 JSON 文本，具体参数类型由同一方法两端的生成代码负责转换。
  */
 interface NpmJsServiceJsDispatcher {
   val serviceId: String
-  val schemaHash: String
+
+  /**
+   * 当前 JavaScript 包实际实现的方法名集合。
+   *
+   * 端上 Session 仅在初始化时读取并缓存该集合，用于让新增接口方法兼容尚未实现它的旧包；它不校验
+   * 参数和返回值签名，已有方法的协议错误仍在实际调用时报告。
+   */
+  val methodNames: Set<String>
 
   /** 根据稳定方法名调用 Kotlin/JS 实现并返回 JSON 文本。 */
   suspend fun invoke(method: String, argumentsJson: String): String
@@ -24,7 +31,8 @@ interface NpmJsServiceJsDispatcher {
  *
  * 生成代码在端上显式调用包级初始化函数时注册分发器；端上 Runtime 只通过
  * `globalThis.CyxbsNpmJsService` 的 `describe` 和 `invoke` 两个稳定函数访问，不依赖 Kotlin/JS
- * 编译后的内部符号名称。
+ * 编译后的内部符号名称。`describe` 返回当前包实际实现的方法列表，使新增接口方法不会阻断旧包
+ * 已有方法的调用。
  */
 object NpmJsServiceJsRegistry {
   private val dispatchers = mutableMapOf<String, NpmJsServiceJsDispatcher>()
@@ -51,7 +59,10 @@ object NpmJsServiceJsRegistry {
     if (global.CyxbsNpmJsService != undefined) return
     val bridge: dynamic = js("({})")
     bridge.describe = { serviceId: String ->
-      dispatchers[serviceId]?.schemaHash
+      dispatchers[serviceId]?.methodNames
+        ?.sorted()
+        ?.toTypedArray()
+        ?.let { methodNames -> js("JSON.stringify(methodNames)") }
     }
     bridge.invoke = { serviceId: String, method: String, argumentsJson: String ->
       scope.promise {

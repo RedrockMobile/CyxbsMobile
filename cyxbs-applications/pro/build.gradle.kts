@@ -17,6 +17,7 @@ dependencies {
   project.rootProject.subprojects.filter {
     it.name !in excludeList
         && it != project
+        && it.buildFile.isFile // 排除仅用于组织目录、没有构建脚本和产物的父 Project
         && it.name != "debug" // lib_debug 单独依赖
         && !it.path.contains("cyxbs-applications")
         && !it.path.contains("cyxbs-compiler")
@@ -26,6 +27,9 @@ dependencies {
     val dependency = api(candidate)
     // withPlugin 不受项目配置顺序影响；纯 JS 发布模块应用插件后会自动退出壳依赖图。
     candidate.pluginManager.withPlugin("manager.npmJs") {
+      configurations["api"].dependencies.remove(dependency)
+    }
+    candidate.pluginManager.withPlugin("manager.npmStatic") {
       configurations["api"].dependencies.remove(dependency)
     }
   }

@@ -7,6 +7,7 @@ import com.cyxbs.functions.code.npm.model.NpmPackageId
 import com.cyxbs.functions.code.npm.model.NpmPreparedEntry
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import com.g985892345.provider.cyxbsmobile.cyxbsfunctions.code.js.quickjs.QuickjsKtProviderInitializer
 import com.g985892345.provider.testing.withKtProviderTest
@@ -50,18 +51,22 @@ class NpmJsServiceSessionTest {
       assertTrue(isReleased())
     }
 
-  /** 协议摘要不一致时不允许创建代理，并且失败会话仍可完整关闭。 */
+  /** 新客户端调用旧包尚未提供的方法时应明确标记未实现，且已有方法仍可继续调用。 */
   @Test
-  fun schemaMismatchStopsInitialization() = withQuickJsSession(
-    schemaHash = "unexpected-schema",
-  ) { session, isReleased ->
-    assertFailsWith<NpmJsServiceProtocolException> {
+  fun missingMethodIsMarkedWithoutBlockingExistingMethods() =
+    withQuickJsSession { session, isReleased ->
       session.initialize(ENTRY_MODULE, PACKAGE_NAME)
-    }
 
-    session.close()
-    assertTrue(isReleased())
-  }
+      val failure = assertFailsWith<NpmJsServiceMethodNotImplementedException> {
+        session.invoke("newMethod", "[]")
+      }
+      assertEquals(SERVICE_ID, failure.serviceId)
+      assertEquals("newMethod", failure.method)
+      assertEquals("\"existing\"", session.invoke("echo", "[\"existing\"]"))
+
+      session.close()
+      assertTrue(isReleased())
+    }
 
   /** 入口没有导出固定初始化函数时必须立即失败，不能继续执行 describe 或创建业务代理。 */
   @Test
@@ -83,7 +88,6 @@ class NpmJsServiceSessionTest {
    * [block] 返回前应主动关闭会话；测试会检查 Service 自身的释放流程而非依赖兜底清理。
    */
   private fun withQuickJsSession(
-    schemaHash: String = SCHEMA_HASH,
     entrySource: String = SERVICE_SOURCE,
     block: suspend (NpmJsServiceSession, () -> Boolean) -> Unit,
   ) {
@@ -114,7 +118,6 @@ class NpmJsServiceSessionTest {
           ),
           lease = lease,
           serviceId = SERVICE_ID,
-          schemaHash = schemaHash,
         )
         block(session) { released }
       }
@@ -123,7 +126,6 @@ class NpmJsServiceSessionTest {
 
   private companion object {
     const val SERVICE_ID = "com.cyxbs.functions.code.npm.service.TestService"
-    const val SCHEMA_HASH = "test-schema"
     const val ENTRY_MODULE = "test-service.mjs"
     const val PACKAGE_NAME = "@cyxbs-mobile/test-service"
 
@@ -131,7 +133,9 @@ class NpmJsServiceSessionTest {
       export function __cyxbsNpmJsServiceInitialize__cyxbs_mobile_test_service() {
         globalThis.CyxbsNpmJsService = {
           describe(serviceId) {
-            return serviceId === "$SERVICE_ID" ? "$SCHEMA_HASH" : null;
+            return serviceId === "$SERVICE_ID"
+              ? JSON.stringify(["echo", "addAsync", "fail"])
+              : null;
           },
           async invoke(serviceId, method, argumentsJson) {
             if (serviceId !== "$SERVICE_ID") {

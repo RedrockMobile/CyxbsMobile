@@ -12,7 +12,6 @@ import kotlin.reflect.KClass
 interface NpmJsServiceProxyFactory<out T : NpmJsServiceInstance> {
   val serviceClass: KClass<out T>
   val serviceId: String
-  val schemaHash: String
 
   /** 使用已初始化的 Session 创建业务接口代理。 */
   fun create(session: NpmJsServiceSession): T

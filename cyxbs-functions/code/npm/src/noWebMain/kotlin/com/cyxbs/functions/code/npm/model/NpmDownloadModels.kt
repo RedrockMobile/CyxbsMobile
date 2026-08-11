@@ -146,3 +146,9 @@ class NpmModuleResolutionException(
   message: String,
   cause: Throwable? = null,
 ) : NpmException(message, cause)
+
+/** npm 静态资源路径非法、目标文件缺失或归档无法读取。 */
+class NpmPackageAssetException(
+  message: String,
+  cause: Throwable? = null,
+) : NpmException(message, cause)

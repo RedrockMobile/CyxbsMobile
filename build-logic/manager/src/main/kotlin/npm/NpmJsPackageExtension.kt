@@ -194,11 +194,12 @@ fun Project.createNpmJsPackageExtension(): NpmJsPackageExtension {
  *
  * installDebugNpmBundle 生成 debug tgz，ADB 原子替换 App 私有源并重启；不发布到 Registry
  *
- * publishNpmJsPackage  按依赖拓扑检查/发布 Runtime、项目依赖与当前包；访问并修改 Registry
+ * publishNpmJsPackage  按依赖拓扑检查 Runtime、项目依赖与当前包；仅发布远端缺失版本
  * ```
  * 日常发布只需执行 `publishNpmJsPackage`；检查分包内容时执行 prepare，CI 留存制品执行 pack，
- * Android 真机验证执行 install。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，不是业务方
- * 需要直接调用的入口。
+ * Android 真机验证执行 install。所有待发布包都会比较本地与远端精确版本的 integrity：一致时
+ * 复用，缺失时发布，不一致时要求提升版本。`ensureNpmJsRuntimePublished` 是 publish 的内部依赖，
+ * 不是业务方需要直接调用的入口。
  */
 fun Project.configureNpmJsPackaging() {
   val packageProject = this
