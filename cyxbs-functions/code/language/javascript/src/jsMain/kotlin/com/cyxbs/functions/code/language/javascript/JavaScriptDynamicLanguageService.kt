@@ -2,9 +2,9 @@ package com.cyxbs.functions.code.language.javascript
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
-import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
-import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighter
+import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
 
 /**
  * JavaScript 动态语言 npm 包的 Kotlin/JS 入口实现。
@@ -13,8 +13,11 @@ import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighter
  * JavaScript 教学常用关键词，后续可在不改变端上协议的前提下扩展为语义补全。
  */
 object JavaScriptDynamicLanguageService : DynamicLanguageService {
-  override suspend fun highlight(source: String): List<DynamicHighlightSpan> {
-    return LezerSyntaxHighlighter.highlight(parser, source)
+  private val highlighterSession = LezerSyntaxHighlighterSession(parser)
+
+  /** 使用当前 JavaScript Runtime 内的 Lezer 会话缓存增量高亮，并返回细粒度耗时。 */
+  override suspend fun highlight(source: String): DynamicHighlightResult {
+    return highlighterSession.highlight(source)
   }
 
   override suspend fun complete(

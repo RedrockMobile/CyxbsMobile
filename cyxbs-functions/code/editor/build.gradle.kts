@@ -17,8 +17,10 @@ kotlin {
     noWebMain.dependencies {
       implementation(projects.cyxbsFunctions.code.js)
       implementation(projects.cyxbsFunctions.code.js.quickjs)
+      implementation(projects.cyxbsFunctions.code.language)
       implementation(libs.kmp.kodemirror.view)
       implementation(libs.kmp.kodemirror.basicSetup)
+      implementation(libs.kmp.kodemirror.lezerCommon)
     }
   }
 }

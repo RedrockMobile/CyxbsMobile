@@ -12,7 +12,10 @@ external interface LezerParser {
    *
    * [source] 和语法树节点偏移均沿用 JavaScript UTF-16 索引语义。
    */
-  fun parse(source: String): LezerTree
+  fun parse(
+    source: String,
+    fragments: Array<LezerTreeFragment> = definedExternally,
+  ): LezerTree
 }
 
 /** Lezer 语法树的不透明句柄，仅供通用高亮适配层消费。 */

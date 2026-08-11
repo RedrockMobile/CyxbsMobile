@@ -15,6 +15,7 @@ kotlin {
       api(projects.cyxbsFunctions.code.language.jsBridge)
     }
     jsMain.dependencies {
+      implementation(npm("@lezer/common", "1.5.2"))
       implementation(npm("@lezer/highlight", "1.2.3"))
     }
   }

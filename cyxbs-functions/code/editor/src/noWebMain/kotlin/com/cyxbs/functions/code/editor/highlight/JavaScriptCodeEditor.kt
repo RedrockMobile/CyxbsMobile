@@ -4,7 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicHighlightExtension
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorPlainTextLanguageExtension
+import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.monkopedia.kodemirror.basicsetup.basicSetup
+import com.monkopedia.kodemirror.state.extensionListOf
 import com.monkopedia.kodemirror.view.EditorSession
 import com.monkopedia.kodemirror.view.KodeMirror
 import com.monkopedia.kodemirror.view.rememberEditorSession
@@ -23,6 +28,16 @@ class JavaScriptCodeEditorState internal constructor(
   /** 当前编辑器中的完整 JavaScript 源码。 */
   val code: String
     get() = session.state.doc.toString()
+
+  /**
+   * 将动态语言服务针对当前源码返回的高亮区间应用到编辑器。
+   *
+   * 调用方必须保证 [highlights] 对应当前 [code]；后续文档发生编辑时旧高亮会自动清空，避免
+   * 区间错位，待下一次动态分析完成后再调用本方法即可刷新。
+   */
+  fun applyHighlights(highlights: List<DynamicHighlightSpan>) {
+    session.replaceDynamicHighlights(highlights)
+  }
 }
 
 /**
@@ -37,8 +52,12 @@ fun rememberJavaScriptCodeEditorState(
 ): JavaScriptCodeEditorState {
   val session = rememberEditorSession(
     doc = initialCode,
-    // 端上只保留语言无关的编辑能力；语法解析与高亮后续由动态语言包提供。
-    extensions = basicSetup,
+    // basicSetup 强制要求存在 Language；纯文本占位仅维持编辑能力，不承担实际语法解析。
+    extensions = extensionListOf(
+      basicSetup,
+      kodeMirrorPlainTextLanguageExtension,
+      kodeMirrorDynamicHighlightExtension,
+    ),
   )
   return remember(session) { JavaScriptCodeEditorState(session) }
 }

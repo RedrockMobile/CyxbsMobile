@@ -21,6 +21,51 @@ data class DynamicHighlightSpan(
   val styleIds: List<String>,
 )
 
+/** 动态高亮本次使用的语法树缓存路径。 */
+@Serializable
+enum class DynamicHighlightCacheMode {
+  /** 没有可复用语法树，完整解析当前源码。 */
+  FULL,
+
+  /** 根据前后源码变更区间复用未受影响的旧语法树片段。 */
+  INCREMENTAL,
+
+  /** 源码与上次完全一致，直接复用高亮结果。 */
+  EXACT,
+}
+
+/** 前后两份源码之间用于 Lezer 增量解析的单一最小变更区间。 */
+@Serializable
+data class DynamicHighlightChangedRange(
+  val fromBefore: Int,
+  val toBefore: Int,
+  val fromAfter: Int,
+  val toAfter: Int,
+)
+
+/**
+ * 动态包内部高亮阶段的细粒度指标。
+ *
+ * 时间统一使用微秒，避免跨 Kotlin/JS、Native 和 JVM 传输 [kotlin.time.Duration]。客户端测得的
+ * Service 往返时间减去 [parseMicroseconds] 与 [collectMicroseconds]，可近似观察桥接和序列化成本。
+ */
+@Serializable
+data class DynamicHighlightMetrics(
+  val cacheMode: DynamicHighlightCacheMode,
+  val sourceLength: Int,
+  val changedRange: DynamicHighlightChangedRange? = null,
+  val reusableFragmentCount: Int = 0,
+  val parseMicroseconds: Long,
+  val collectMicroseconds: Long,
+)
+
+/** 动态高亮区间及其语言包内部性能指标。 */
+@Serializable
+data class DynamicHighlightResult(
+  val spans: List<DynamicHighlightSpan>,
+  val metrics: DynamicHighlightMetrics,
+)
+
 /** 动态语言包返回的单个补全候选。 */
 @Serializable
 data class DynamicCompletionItem(
@@ -56,7 +101,10 @@ data class DynamicCompletionResult(
 interface DynamicLanguageService : NpmJsServiceInstance {
 
   /**
-   * 分析完整源码并返回按 UTF-16 偏移排序的高亮区间。
+   * 分析完整源码，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
+   *
+   * 返回的性能指标既用于确认语言包是否复用了增量语法树，也可与端上测得的整体耗时组合，
+   * 近似分析 JavaScript 桥接成本。
    *
    * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
    * @throws NpmJsServiceInvocationException JavaScript 执行失败。
@@ -69,7 +117,7 @@ interface DynamicLanguageService : NpmJsServiceInstance {
     SerializationException::class,
     CancellationException::class,
   )
-  suspend fun highlight(source: String): List<DynamicHighlightSpan>
+  suspend fun highlight(source: String): DynamicHighlightResult
 
   /**
    * 查询指定光标位置的补全候选。

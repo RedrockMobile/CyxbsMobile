@@ -1,6 +1,9 @@
 package com.cyxbs.functions.code.language.javascript
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
+import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
 import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import kotlinx.coroutines.test.runTest
@@ -24,7 +27,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       }
     """.trimIndent()
 
-    val spans = JavaScriptDynamicLanguageService.highlight(source)
+    val spans = JavaScriptDynamicLanguageService.highlight(source).spans
 
     assertTrue(spans.stylesFor(source, "const").contains("tok-keyword"))
     assertTrue(spans.stylesFor(source, "\"hello\"").contains("tok-string"))
@@ -40,7 +43,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
   fun highlightOffsetsUseUtf16() = runTest {
     val source = "const emoji = \"😀\"; const answer = 42"
 
-    val spans = JavaScriptDynamicLanguageService.highlight(source)
+    val spans = JavaScriptDynamicLanguageService.highlight(source).spans
     val answerFrom = source.indexOf("answer")
     val answerSpan = spans.firstOrNull {
       it.from == answerFrom && it.to == answerFrom + "answer".length
@@ -48,6 +51,40 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
 
     assertNotNull(answerSpan)
     assertTrue(answerSpan.styleIds.contains("tok-variableName"))
+  }
+
+  /** 相同源码应直接命中结果缓存，不再次执行 Lezer 解析与高亮遍历。 */
+  @Test
+  fun repeatedSourceReusesExactHighlightResult() = runTest {
+    val source = "const cachedValue = 42"
+    val session = LezerSyntaxHighlighterSession(parser)
+
+    val first = session.highlight(source)
+    val cached = session.highlight(source)
+
+    assertEquals(DynamicHighlightCacheMode.FULL, first.metrics.cacheMode)
+    assertEquals(DynamicHighlightCacheMode.EXACT, cached.metrics.cacheMode)
+    assertEquals(0, cached.metrics.parseMicroseconds)
+    assertEquals(0, cached.metrics.collectMicroseconds)
+    assertTrue(cached.spans.stylesFor(source, "42").contains("tok-number"))
+  }
+
+  /** 小范围编辑应复用未受影响的语法树片段，并输出新源码对应的高亮区间。 */
+  @Test
+  fun smallEditUsesIncrementalSyntaxTreeFragments() = runTest {
+    val session = LezerSyntaxHighlighterSession(parser)
+    val original = buildString {
+      repeat(20) { index -> appendLine("const value$index = $index;") }
+    }
+    val updated = original.replace("value10 = 10", "value10 = \"ten\"")
+
+    session.highlight(original)
+    val result = session.highlight(updated)
+
+    assertEquals(DynamicHighlightCacheMode.INCREMENTAL, result.metrics.cacheMode)
+    assertNotNull(result.metrics.changedRange)
+    assertTrue(result.metrics.reusableFragmentCount > 0)
+    assertTrue(result.spans.stylesFor(updated, "\"ten\"").contains("tok-string"))
   }
 
   /** 显式初始化应可重复调用，并按 commonMain 协议完成参数及返回值的 JSON 转换。 */
@@ -64,6 +101,14 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     assertEquals(setOf("complete", "highlight"), describedMethods.toSet())
+
+    val highlightResult = Json.decodeFromString<DynamicHighlightResult>(
+      _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
+        method = "highlight",
+        argumentsJson = """["const answer = 42"]""",
+      ),
+    )
+    assertTrue(highlightResult.spans.stylesFor("const answer = 42", "42").contains("tok-number"))
 
     val completion = Json.decodeFromString<DynamicCompletionResult?>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(

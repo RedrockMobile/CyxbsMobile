@@ -3,6 +3,9 @@ package com.cyxbs.functions.code.language
 import com.cyxbs.functions.code.language.internal.DynamicLanguagePackageLoader
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
+import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import kotlinx.coroutines.async
@@ -59,7 +62,7 @@ class DynamicLanguageManagerTest {
 
     assertSame(languageService, service)
     assertEquals(1, loader.languageLoadCount)
-    assertEquals(listOf("keyword"), service.highlight("let").single().styleIds)
+    assertEquals(listOf("keyword"), service.highlight("let").spans.single().styleIds)
     assertEquals("const", service.complete("con", 3, false)?.options?.single()?.label)
 
     service.close()
@@ -150,7 +153,18 @@ class DynamicLanguageManagerTest {
   ) : DynamicLanguageService {
     var closeCount = 0
 
-    override suspend fun highlight(source: String): List<DynamicHighlightSpan> = highlightResult
+    /** 测试替身不维护语法树，仅返回可预测的完整解析指标。 */
+    override suspend fun highlight(source: String): DynamicHighlightResult {
+      return DynamicHighlightResult(
+        spans = highlightResult,
+        metrics = DynamicHighlightMetrics(
+          cacheMode = DynamicHighlightCacheMode.FULL,
+          sourceLength = source.length,
+          parseMicroseconds = 0,
+          collectMicroseconds = 0,
+        ),
+      )
+    }
 
     override suspend fun complete(
       source: String,

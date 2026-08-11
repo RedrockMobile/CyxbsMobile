@@ -300,6 +300,7 @@ kmp-ktorfit-gradlePlugin = { module = "de.jensklingenberg.ktorfit:de.jensklingen
 kmp-quickjs = { module = "io.github.dokar3:quickjs-kt", version.ref = "kmp-quickjs" }
 kmp-kodemirror-view = { module = "com.monkopedia.kodemirror:view", version.ref = "kmp-kodemirror" }
 kmp-kodemirror-basicSetup = { module = "com.monkopedia.kodemirror:basic-setup", version.ref = "kmp-kodemirror" }
+kmp-kodemirror-lezerCommon = { module = "com.monkopedia.kodemirror:lezer-common", version.ref = "kmp-kodemirror" }
 
 ####################################################################################################
 #                                              Compose
