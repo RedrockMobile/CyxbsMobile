@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.npm.service.test.js.impl
 
+import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestPayload
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestResult
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestService
 
@@ -19,6 +20,11 @@ object NpmJsServiceLoaderTestServiceJs : NpmJsServiceLoaderTestService {
       multipliedValue = value * MULTIPLIER,
     )
   }
+
+  /** 测试协议只需原样返回参数，使断言聚焦于 KSP 生成的 JSON 编解码行为。 */
+  override suspend fun echoPayload(
+    payload: NpmJsServiceLoaderTestPayload,
+  ): NpmJsServiceLoaderTestPayload = payload
 
   private const val BUNDLE_MARKER = "local-js-service-v1"
   private const val MULTIPLIER = 7

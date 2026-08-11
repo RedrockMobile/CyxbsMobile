@@ -9,5 +9,8 @@ kotlin {
     commonMain.dependencies {
       implementation(projects.cyxbsFunctions.code.npm.serviceTest.jsBridge)
     }
+    jsTest.dependencies {
+      implementation(libs.kotlinx.coroutines.test)
+    }
   }
 }

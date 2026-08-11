@@ -17,6 +17,14 @@ data class NpmJsServiceLoaderTestResult(
   val multipliedValue: Int,
 )
 
+/** 用于验证生成桥接代码 JSON 前向兼容配置的结构化参数。 */
+@Serializable
+data class NpmJsServiceLoaderTestPayload(
+  val value: String,
+  val nullableValue: String?,
+  val optionalValue: String? = null,
+)
+
 /**
  * 专门用于验证 `NpmJsServiceLoader` 完整调用链路的测试协议。
  *
@@ -33,4 +41,7 @@ interface NpmJsServiceLoaderTestService : NpmJsServiceInstance {
    * @return 当前 bundle 标识与 JavaScript 侧计算结果。
    */
   suspend fun execute(input: String, value: Int): NpmJsServiceLoaderTestResult
+
+  /** 原样返回结构化参数，供测试验证未知字段、默认值和显式 `null` 的桥接行为。 */
+  suspend fun echoPayload(payload: NpmJsServiceLoaderTestPayload): NpmJsServiceLoaderTestPayload
 }

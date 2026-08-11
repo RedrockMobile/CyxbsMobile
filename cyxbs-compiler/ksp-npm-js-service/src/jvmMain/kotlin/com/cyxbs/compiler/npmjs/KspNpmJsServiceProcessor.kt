@@ -192,6 +192,7 @@ class KspNpmJsServiceProcessor(
           .initializer("session")
           .build(),
       )
+      .addProperty(serviceJsonProperty())
       .addSuperinterface(serviceType)
       .apply {
         model.methods.forEach { addFunction(it.hostProxyFunction()) }
@@ -250,6 +251,7 @@ class KspNpmJsServiceProcessor(
       .addSuperinterface(JS_DISPATCHER)
       .addStringProperty("serviceId", model.serviceId)
       .addMethodNamesProperty(model.methods)
+      .addProperty(serviceJsonProperty())
       .addFunction(model.jsInvokeFunction(implementationType))
       .addFunction(
         FunSpec.builder(CLOSE_METHOD)
@@ -322,7 +324,7 @@ class KspNpmJsServiceProcessor(
         addCode(buildArgumentsJson(this@hostProxyFunction.parameters))
         addStatement("val resultJson = session.invoke(%S, argumentsJson)", name)
         if (!returnType.isUnit()) {
-          addStatement("return %T.%M(resultJson)", JSON, DECODE_FROM_STRING)
+          addStatement("return %N.%M(resultJson)", SERVICE_JSON_PROPERTY, DECODE_FROM_STRING)
         }
       }
       .build()
@@ -331,7 +333,11 @@ class KspNpmJsServiceProcessor(
   /** 生成 Kotlin/JS 分发入口，根据稳定方法名解码、调用 object 并重新编码。 */
   private fun ServiceModel.jsInvokeFunction(implementationType: ClassName): FunSpec {
     val code = CodeBlock.builder()
-      .addStatement("val arguments = %T.parseToJsonElement(argumentsJson).%M", JSON, JSON_ARRAY)
+      .addStatement(
+        "val arguments = %N.parseToJsonElement(argumentsJson).%M",
+        SERVICE_JSON_PROPERTY,
+        JSON_ARRAY,
+      )
       .beginControlFlow("return when (method)")
     methods.forEach { method ->
       code.beginControlFlow("%S ->", method.name)
@@ -342,10 +348,10 @@ class KspNpmJsServiceProcessor(
         )
       method.parameters.forEachIndexed { index, parameter ->
         code.addStatement(
-          "val %N: %T = %T.%M(arguments[%L])",
+          "val %N: %T = %N.%M(arguments[%L])",
           parameter.name,
           parameter.type.toTypeName(),
-          JSON,
+          SERVICE_JSON_PROPERTY,
           DECODE_FROM_JSON_ELEMENT,
           index,
         )
@@ -356,7 +362,7 @@ class KspNpmJsServiceProcessor(
           .addStatement("%S", NULL_JSON)
       } else {
         code.addStatement("val result = %T.%N($arguments)", implementationType, method.name)
-          .addStatement("%T.%M(result)", JSON, ENCODE_TO_STRING)
+          .addStatement("%N.%M(result)", SERVICE_JSON_PROPERTY, ENCODE_TO_STRING)
       }
       code.endControlFlow()
     }
@@ -377,9 +383,40 @@ class KspNpmJsServiceProcessor(
       .add("val argumentsJson = %M {\n", BUILD_JSON_ARRAY)
       .indent()
     parameters.forEach { parameter ->
-      code.addStatement("add(%T.%M(%N))", JSON, ENCODE_TO_JSON_ELEMENT, parameter.name)
+      code.addStatement(
+        "add(%N.%M(%N))",
+        SERVICE_JSON_PROPERTY,
+        ENCODE_TO_JSON_ELEMENT,
+        parameter.name,
+      )
     }
     return code.unindent().add("}.toString()\n").build()
+  }
+
+  /**
+   * 为 Host 与 JS Dispatcher 生成完全相同的私有 JSON 协议配置。
+   *
+   * 未知字段允许新旧动态包进行增量式数据模型演进；默认值不编码以减少桥接文本，`null` 则保持
+   * 显式传输，避免“字段缺失”和“明确为空”在跨版本解码时产生歧义。
+   */
+  private fun serviceJsonProperty(): PropertySpec {
+    val initializer = CodeBlock.builder()
+      .add("%T {\n", JSON)
+      .indent()
+      .addStatement("ignoreUnknownKeys = true")
+      .addStatement("encodeDefaults = false")
+      .addStatement("explicitNulls = true")
+      .unindent()
+      .add("}")
+      .build()
+    return PropertySpec.builder(SERVICE_JSON_PROPERTY, JSON, KModifier.PRIVATE)
+      .addAnnotation(
+        AnnotationSpec.builder(OPT_IN)
+          .addMember("%T::class", EXPERIMENTAL_SERIALIZATION_API)
+          .build(),
+      )
+      .initializer(initializer)
+      .build()
   }
 
   /** Kotlin/JS 实现必须是生成文件可见的 object，避免构造和实例生命周期产生隐式约定。 */
@@ -525,6 +562,7 @@ class KspNpmJsServiceProcessor(
     const val JS_INITIALIZER_PREFIX = "__cyxbsNpmJsServiceInitialize_"
     const val JS_INITIALIZER_PACKAGE = "com.cyxbs.generated.npmjs"
     const val JS_INITIALIZER_FILE = "_NpmJsServiceInitializer"
+    const val SERVICE_JSON_PROPERTY = "serviceJson"
 
     val SESSION = ClassName("com.cyxbs.functions.code.npm.service", "NpmJsServiceSession")
     val PROXY_FACTORY = ClassName(
@@ -540,6 +578,10 @@ class KspNpmJsServiceProcessor(
       "NpmJsServiceJsRegistry",
     )
     val JSON = ClassName("kotlinx.serialization.json", "Json")
+    val EXPERIMENTAL_SERIALIZATION_API = ClassName(
+      "kotlinx.serialization",
+      "ExperimentalSerializationApi",
+    )
     val BUILD_JSON_ARRAY = MemberName("kotlinx.serialization.json", "buildJsonArray")
     val JSON_ARRAY = MemberName("kotlinx.serialization.json", "jsonArray")
     val ENCODE_TO_JSON_ELEMENT = MemberName(
