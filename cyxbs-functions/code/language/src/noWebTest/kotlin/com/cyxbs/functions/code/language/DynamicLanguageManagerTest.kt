@@ -8,6 +8,11 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
+import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
+import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolReferencesResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -59,11 +64,25 @@ class DynamicLanguageManagerTest {
       languageService = languageService,
     )
     val service = DynamicLanguageManager(loader).load(" JS ")
+    val workspace = DynamicLanguageWorkspace(
+      listOf(DynamicSourceFile(path = "main.js", source = "let")),
+    )
 
     assertSame(languageService, service)
     assertEquals(1, loader.languageLoadCount)
-    assertEquals(listOf("keyword"), service.highlight("let").spans.single().styleIds)
-    assertEquals("const", service.complete("con", 3, false)?.options?.single()?.label)
+    assertEquals(
+      listOf("keyword"),
+      service.highlight(workspace, "main.js").spans.single().styleIds,
+    )
+    assertEquals(
+      "const",
+      service.complete(
+        DynamicLanguageWorkspace(listOf(DynamicSourceFile("main.js", "con"))),
+        "main.js",
+        3,
+        false,
+      )?.options?.single()?.label,
+    )
 
     service.close()
     assertEquals(1, languageService.closeCount)
@@ -154,7 +173,11 @@ class DynamicLanguageManagerTest {
     var closeCount = 0
 
     /** 测试替身不维护语法树，仅返回可预测的完整解析指标。 */
-    override suspend fun highlight(source: String): DynamicHighlightResult {
+    override suspend fun highlight(
+      workspace: DynamicLanguageWorkspace,
+      filePath: String,
+    ): DynamicHighlightResult {
+      val source = workspace.files.first { file -> file.path == filePath }.source
       return DynamicHighlightResult(
         spans = highlightResult,
         metrics = DynamicHighlightMetrics(
@@ -167,10 +190,30 @@ class DynamicLanguageManagerTest {
     }
 
     override suspend fun complete(
-      source: String,
+      workspace: DynamicLanguageWorkspace,
+      filePath: String,
       position: Int,
       explicit: Boolean,
     ): DynamicCompletionResult? = completionResult
+
+    override suspend fun definition(
+      workspace: DynamicLanguageWorkspace,
+      filePath: String,
+      position: Int,
+    ): DynamicSymbolDefinition? = null
+
+    override suspend fun references(
+      workspace: DynamicLanguageWorkspace,
+      filePath: String,
+      position: Int,
+    ): DynamicSymbolReferencesResult? = null
+
+    override suspend fun rename(
+      workspace: DynamicLanguageWorkspace,
+      filePath: String,
+      position: Int,
+      newName: String,
+    ): DynamicRenameResult? = null
 
     override suspend fun close() {
       closeCount += 1

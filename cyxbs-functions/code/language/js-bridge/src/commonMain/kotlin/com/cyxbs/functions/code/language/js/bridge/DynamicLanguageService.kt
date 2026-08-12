@@ -101,11 +101,13 @@ data class DynamicCompletionResult(
 interface DynamicLanguageService : NpmJsServiceInstance {
 
   /**
-   * 分析完整源码，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
+   * 分析工作区中的指定文件，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
    *
    * 返回的性能指标既用于确认语言包是否复用了增量语法树，也可与端上测得的整体耗时组合，
    * 近似分析 JavaScript 桥接成本。
    *
+   * @param workspace 包含未保存内容的完整工作区快照。
+   * @param filePath 本次需要高亮的工作区相对路径。
    * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
    * @throws NpmJsServiceInvocationException JavaScript 执行失败。
    * @throws SerializationException 参数编码或返回值解码不符合接口协议。
@@ -117,12 +119,16 @@ interface DynamicLanguageService : NpmJsServiceInstance {
     SerializationException::class,
     CancellationException::class,
   )
-  suspend fun highlight(source: String): DynamicHighlightResult
+  suspend fun highlight(
+    workspace: DynamicLanguageWorkspace,
+    filePath: String,
+  ): DynamicHighlightResult
 
   /**
    * 查询指定光标位置的补全候选。
    *
-   * @param source 当前完整源码。
+   * @param workspace 包含未保存内容的完整工作区快照。
+   * @param filePath 光标所在文件的工作区相对路径。
    * @param position 光标 UTF-16 偏移。
    * @param explicit 是否由用户主动触发补全。
    * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
@@ -137,8 +143,88 @@ interface DynamicLanguageService : NpmJsServiceInstance {
     CancellationException::class,
   )
   suspend fun complete(
-    source: String,
+    workspace: DynamicLanguageWorkspace,
+    filePath: String,
     position: Int,
     explicit: Boolean,
   ): DynamicCompletionResult?
+
+  /**
+   * 查询光标所在词法符号的定义。
+   *
+   * @param workspace 包含未保存内容的完整工作区快照。
+   * @param filePath 光标所在文件的工作区相对路径。
+   * @param position 光标 UTF-16 偏移；可位于标识符内部或紧邻标识符末尾。
+   * @return 工作区中的符号定义；光标不在可索引符号上时返回 null。
+   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun definition(
+    workspace: DynamicLanguageWorkspace,
+    filePath: String,
+    position: Int,
+  ): DynamicSymbolDefinition?
+
+  /**
+   * 查询光标所在词法符号在工作区中的引用。
+   *
+   * 返回值不重复包含定义区间；语言包无法静态确认的动态属性访问不会被猜测为引用。
+   *
+   * @param workspace 包含未保存内容的完整工作区快照。
+   * @param filePath 光标所在文件的工作区相对路径。
+   * @param position 光标 UTF-16 偏移。
+   * @return 符号及非定义引用；光标不在可索引符号上时返回 null。
+   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun references(
+    workspace: DynamicLanguageWorkspace,
+    filePath: String,
+    position: Int,
+  ): DynamicSymbolReferencesResult?
+
+  /**
+   * 为光标所在词法符号生成工作区安全重命名修改。
+   *
+   * 语言包会拒绝非法标识符、保留字和可能改变词法绑定关系的名称冲突。调用方必须确认所有文件
+   * 仍与 [workspace] 快照一致，再一次性应用返回的全部修改。
+   *
+   * @param workspace 包含未保存内容的完整工作区快照。
+   * @param filePath 光标所在文件的工作区相对路径。
+   * @param position 光标 UTF-16 偏移。
+   * @param newName 调用方期望的新标识符。
+   * @return 可应用或带拒绝原因的结果；光标不在可重命名符号上时返回 null。
+   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun rename(
+    workspace: DynamicLanguageWorkspace,
+    filePath: String,
+    position: Int,
+    newName: String,
+  ): DynamicRenameResult?
 }

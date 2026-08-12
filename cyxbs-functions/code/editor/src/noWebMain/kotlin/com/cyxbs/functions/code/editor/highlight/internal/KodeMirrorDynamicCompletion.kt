@@ -2,7 +2,9 @@ package com.cyxbs.functions.code.editor.highlight.internal
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
 import com.monkopedia.kodemirror.autocomplete.Completion
 import com.monkopedia.kodemirror.autocomplete.CompletionConfig
@@ -20,13 +22,21 @@ import com.monkopedia.kodemirror.state.Extension
  */
 internal fun kodeMirrorDynamicCompletionExtension(
   service: () -> DynamicLanguageService?,
+  workspace: () -> DynamicLanguageWorkspace,
+  filePath: () -> String,
 ): Extension = autocompletion(
   CompletionConfig(
     asyncOverride = listOf completionSource@{ context ->
       val currentService = service() ?: return@completionSource null
       try {
-        currentService.complete(
+        val currentFilePath = filePath()
+        val currentWorkspace = workspace().withCurrentSource(
+          filePath = currentFilePath,
           source = context.state.doc.toString(),
+        )
+        currentService.complete(
+          workspace = currentWorkspace,
+          filePath = currentFilePath,
           position = context.pos.value,
           explicit = context.explicit,
         )?.toKodeMirrorResult()
@@ -37,6 +47,24 @@ internal fun kodeMirrorDynamicCompletionExtension(
     },
   ),
 )
+
+/** 使用编辑器尚未保存的当前文档覆盖工作区快照。 */
+private fun DynamicLanguageWorkspace.withCurrentSource(
+  filePath: String,
+  source: String,
+): DynamicLanguageWorkspace {
+  var replaced = false
+  val updated = files.map { file ->
+    if (file.path == filePath) {
+      replaced = true
+      DynamicSourceFile(filePath, source)
+    } else {
+      file
+    }
+  }
+  require(replaced) { "Workspace does not contain '$filePath'." }
+  return DynamicLanguageWorkspace(updated)
+}
 
 /** 将通用动态语言协议转换为 KodeMirror 的当前文档补全结果。 */
 private fun DynamicCompletionResult.toKodeMirrorResult(): CompletionResult = CompletionResult(
