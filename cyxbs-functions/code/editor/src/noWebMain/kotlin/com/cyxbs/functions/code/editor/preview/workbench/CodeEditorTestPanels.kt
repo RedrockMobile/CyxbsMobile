@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.AlertDialog
@@ -63,7 +64,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -93,11 +96,13 @@ internal fun rememberCodeEditorTestSidePanels(
   isLanguageReady: Boolean,
   isLoadingLanguage: Boolean,
   isAnalyzingSymbol: Boolean,
+  highlightCacheCapacity: Int,
   includeCourse: Boolean,
   projectPath: String = TestProjectPath,
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onLoadLanguage: () -> Unit,
+  onHighlightCacheCapacityChange: (Int) -> Unit,
   onFindDefinition: () -> Unit,
   onFindReferences: () -> Unit,
   onRename: (String) -> Unit,
@@ -173,7 +178,9 @@ internal fun rememberCodeEditorTestSidePanels(
           isLanguageReady = isLanguageReady,
           isLoadingLanguage = isLoadingLanguage,
           isAnalyzingSymbol = isAnalyzingSymbol,
+          highlightCacheCapacity = highlightCacheCapacity,
           onLoadLanguage = onLoadLanguage,
+          onHighlightCacheCapacityChange = onHighlightCacheCapacityChange,
           onFindDefinition = onFindDefinition,
           onFindReferences = onFindReferences,
           onRename = onRename,
@@ -901,12 +908,20 @@ private fun SettingsPanelContent(
   isLanguageReady: Boolean,
   isLoadingLanguage: Boolean,
   isAnalyzingSymbol: Boolean,
+  highlightCacheCapacity: Int,
   onLoadLanguage: () -> Unit,
+  onHighlightCacheCapacityChange: (Int) -> Unit,
   onFindDefinition: () -> Unit,
   onFindReferences: () -> Unit,
   onRename: (String) -> Unit,
 ) {
   var renameTarget by remember { mutableStateOf("learner") }
+  var highlightCacheCapacityInput by remember {
+    mutableStateOf(highlightCacheCapacity.toString())
+  }
+  val highlightCacheInputWidth = (
+    highlightCacheCapacityInput.length.coerceIn(1, 8) * 7 + 8
+  ).dp
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
     SettingsSectionTitle("动态语言服务")
     Text(
@@ -918,6 +933,57 @@ private fun SettingsPanelContent(
     TextButton(enabled = !isLoadingLanguage, onClick = onLoadLanguage) {
       Text(if (isLoadingLanguage) "加载中…" else "加载 / 重新加载")
     }
+    SettingsSectionTitle("文件会话缓存")
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+        text = "文件上限",
+        color = EditorWorkbenchColors.PrimaryText,
+        fontSize = 12.sp,
+        modifier = Modifier.weight(1F),
+      )
+      Column(horizontalAlignment = Alignment.End) {
+        BasicTextField(
+          value = highlightCacheCapacityInput,
+          onValueChange = { input ->
+            if (input.isEmpty() || input.all(Char::isDigit)) {
+              highlightCacheCapacityInput = input
+              input.toIntOrNull()?.let(onHighlightCacheCapacityChange)
+            }
+          },
+          modifier = Modifier.width(highlightCacheInputWidth),
+          singleLine = true,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          textStyle = TextStyle(
+            color = EditorWorkbenchColors.PrimaryText,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+          ),
+          cursorBrush = SolidColor(EditorWorkbenchColors.Accent),
+        )
+        Divider(
+          color = EditorWorkbenchColors.SecondaryText,
+          modifier = Modifier.width(highlightCacheInputWidth),
+        )
+      }
+      Text(
+        text = " 个文件",
+        color = EditorWorkbenchColors.SecondaryText,
+        fontSize = 11.sp,
+      )
+    }
+    Text(
+      text = if (highlightCacheCapacity == 0) {
+        "跨文件缓存已关闭；当前文件会话仍会保留。"
+      } else {
+        "保留最近 $highlightCacheCapacity 个文件的高亮、光标和撤销栈；输入 0 只保留当前文件。"
+      },
+      color = EditorWorkbenchColors.SecondaryText,
+      fontSize = 10.sp,
+      modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+    )
     SettingsSectionTitle("符号工具")
     Row(
       modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),

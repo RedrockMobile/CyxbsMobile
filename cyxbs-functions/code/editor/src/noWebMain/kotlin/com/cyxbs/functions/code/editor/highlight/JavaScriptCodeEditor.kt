@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -33,6 +37,7 @@ import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorPlainTextLan
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorSearchExtension
 import com.cyxbs.functions.code.editor.highlight.internal.KodeMirrorSearchPanel
 import com.cyxbs.functions.code.editor.highlight.internal.codeEditorSearchPanelOpen
+import com.cyxbs.functions.code.editor.highlight.internal.EditorSessionCache
 import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
 import com.cyxbs.functions.code.editor.highlight.internal.toggleCodeEditorSearchPanelVisibility
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
@@ -55,8 +60,11 @@ import com.monkopedia.kodemirror.commands.undoDepth
 import com.monkopedia.kodemirror.commands.undo as kodeMirrorUndo
 import com.monkopedia.kodemirror.state.ChangeSpec
 import com.monkopedia.kodemirror.state.DocPos
+import com.monkopedia.kodemirror.state.EditorState
+import com.monkopedia.kodemirror.state.EditorStateConfig
 import com.monkopedia.kodemirror.state.SelectionSpec
 import com.monkopedia.kodemirror.state.TransactionSpec
+import com.monkopedia.kodemirror.state.asDoc
 import com.monkopedia.kodemirror.state.asInsert
 import com.monkopedia.kodemirror.state.extensionListOf
 import com.monkopedia.kodemirror.view.EditorSession
@@ -79,11 +87,34 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 @Stable
 class JavaScriptCodeEditorState internal constructor(
-  internal val session: EditorSession,
+  session: EditorSession,
+  initialFilePath: String,
+  initialSource: String,
+  private val createSession: (String) -> EditorSession,
   private val languageService: () -> DynamicLanguageService?,
   private val workspace: () -> DynamicLanguageWorkspace,
-  private val activeFilePath: () -> String,
+  highlightCacheCapacity: Int,
 ) {
+  internal var session: EditorSession by mutableStateOf(session)
+    private set
+  private var currentFilePath = initialFilePath
+  private val sessionCache = EditorSessionCache(
+    capacity = highlightCacheCapacity,
+    initialFilePath = initialFilePath,
+    initialSource = initialSource,
+    initialSession = session,
+  )
+
+  /**
+   * 编辑器最多保留的文件会话数量；默认由 [rememberJavaScriptCodeEditorState] 设置为 20。
+   *
+   * 调整为更小的值会立即淘汰最久未访问的文件；设为 0 时只保留当前文件，不跨文件缓存。
+   */
+  var highlightCacheCapacity: Int
+    get() = sessionCache.capacity
+    set(value) {
+      sessionCache.capacity = value
+    }
 
   /** 当前编辑器中的完整 JavaScript 源码。 */
   val code: String
@@ -95,7 +126,7 @@ class JavaScriptCodeEditorState internal constructor(
 
   /** 当前编辑文档在工作区中的相对路径。 */
   val filePath: String
-    get() = activeFilePath()
+    get() = currentFilePath
 
   /** 当前是否存在可撤销的源码编辑；读取时会随 KodeMirror 会话事务自动触发 Compose 重组。 */
   val canUndo: Boolean
@@ -134,7 +165,30 @@ class JavaScriptCodeEditorState internal constructor(
    * 区间错位，待下一次动态分析完成后再调用本方法即可刷新。
    */
   fun applyHighlights(highlights: List<DynamicHighlightSpan>) {
+    sessionCache.updateSource(filePath = filePath, source = code)
+    sessionCache.markHighlighted(filePath = filePath, source = code)
     session.replaceDynamicHighlights(highlights)
+  }
+
+  /**
+   * 检查当前文件会话是否已经携带与源码完全匹配的高亮装饰。
+   *
+   * 文件切换已经恢复完整 KodeMirror 会话，因此命中时无需再次提交装饰事务；未命中时调用方
+   * 应请求动态语言服务重新分析。
+   *
+   * @return 当前会话已带有有效高亮时为 true，否则为 false。
+   */
+  fun hasCachedHighlights(filePath: String, source: String): Boolean {
+    if (this.filePath != filePath || code != source) return false
+    sessionCache.updateSource(filePath = filePath, source = source)
+    return sessionCache.hasHighlights(filePath = filePath, source = source)
+  }
+
+  /** 清空所有文件会话中的高亮装饰；替换动态语言服务后调用以避免规则版本不一致。 */
+  fun clearHighlightCache() {
+    sessionCache.clearHighlights { cachedSession ->
+      cachedSession.replaceDynamicHighlights(emptyList())
+    }
   }
 
   /**
@@ -245,21 +299,32 @@ class JavaScriptCodeEditorState internal constructor(
     return result
   }
 
-  /** 用新源码替换当前文档，并将光标放到 [cursorPosition] 。 */
-  fun replaceDocument(source: String, cursorPosition: Int = 0) {
-    require(cursorPosition in 0..source.length) { "cursorPosition must be inside source." }
-    session.dispatch(
-      TransactionSpec(
-        changes = ChangeSpec.Single(
-          from = DocPos(0),
-          to = DocPos(code.length),
-          insert = source.asInsert(),
+  /**
+   * 切换到 [filePath] 对应的 [source]，并可将光标放到 [cursorPosition]。
+   *
+   * 源码未被外部改写时会直接切换到该文件原有的 KodeMirror 会话，使文档、高亮、光标和撤销栈
+   * 同时恢复；不会再把旧文件装饰映射到新源码后进行第二次刷新。[cursorPosition] 为 null 时
+   * 保留缓存会话原有光标，新创建的会话默认从文档开头开始。
+   */
+  fun replaceDocument(filePath: String, source: String, cursorPosition: Int? = null) {
+    require(cursorPosition == null || cursorPosition in 0..source.length) {
+      "cursorPosition must be inside source."
+    }
+
+    // 用户可能尚未触发下一轮高亮，切走前仍要保存编辑后的源码以便复用同一个会话。
+    sessionCache.updateSource(filePath = currentFilePath, source = code)
+    session = sessionCache.activate(filePath = filePath, source = source) {
+      createSession(source)
+    }
+    currentFilePath = filePath
+    if (cursorPosition != null) {
+      session.dispatch(
+        TransactionSpec(
+          selection = SelectionSpec.CursorSpec(anchor = DocPos(cursorPosition)),
+          scrollIntoView = true,
         ),
-        selection = SelectionSpec.CursorSpec(anchor = DocPos(cursorPosition)),
-        userEvent = "input.openFile",
-        scrollIntoView = true,
-      ),
-    )
+      )
+    }
   }
 
   /** 选中当前文档中的 UTF-16 半开区间，并滚动到可见位置。 */
@@ -360,6 +425,7 @@ class JavaScriptCodeEditorState internal constructor(
  * @param initialCode 首次创建状态时使用的源码；后续重组不会覆盖用户已经编辑的内容。
  * @param languageService 当前已经加载的动态语言服务；可先传 null，加载完成后的重组会让补全源
  * 立即使用新服务，而不会重建或覆盖编辑器文档。
+ * @param highlightCacheCapacity 最多保留的文件会话数量，默认 20；运行时变化不会重建当前状态。
  * @return 可读取当前源码并在多个组合节点间共享的编辑器状态。
  */
 @Composable
@@ -370,6 +436,7 @@ fun rememberJavaScriptCodeEditorState(
     files = listOf(DynamicSourceFile(activeFilePath, initialCode)),
   ),
   languageService: DynamicLanguageService? = null,
+  highlightCacheCapacity: Int = DEFAULT_HIGHLIGHT_CACHE_CAPACITY,
 ): JavaScriptCodeEditorState {
   val currentLanguageService = rememberUpdatedState(languageService)
   val currentWorkspace = rememberUpdatedState(workspace)
@@ -381,10 +448,8 @@ fun rememberJavaScriptCodeEditorState(
       filePath = { currentFilePath.value },
     )
   }
-  val session = rememberEditorSession(
-    doc = initialCode,
-    // basicSetup 强制要求存在 Language；纯文本占位仅维持编辑能力，不承担实际语法解析。
-    extensions = extensionListOf(
+  val editorExtensions = remember(completionExtension) {
+    extensionListOf(
       basicSetup,
       // 预先安装公开搜索状态，避免 openSearchPanel 注入无法定制的 KodeMirror 默认面板。
       kodeMirrorSearchExtension,
@@ -393,20 +458,44 @@ fun rememberJavaScriptCodeEditorState(
       kodeMirrorPlainTextLanguageExtension,
       kodeMirrorDynamicHighlightExtension,
       completionExtension,
-    ),
-  )
-  return remember(session) {
-    JavaScriptCodeEditorState(
-      session = session,
-      languageService = { currentLanguageService.value },
-      workspace = { currentWorkspace.value },
-      activeFilePath = { currentFilePath.value },
     )
   }
+  val session = rememberEditorSession(
+    doc = initialCode,
+    // basicSetup 强制要求存在 Language；纯文本占位仅维持编辑能力，不承担实际语法解析。
+    extensions = editorExtensions,
+  )
+  val state = remember(session) {
+    JavaScriptCodeEditorState(
+      session = session,
+      initialFilePath = activeFilePath,
+      initialSource = initialCode,
+      createSession = { source ->
+        EditorSession(
+          EditorState.create(
+            EditorStateConfig(
+              doc = source.asDoc(),
+              extensions = editorExtensions,
+            ),
+          ),
+        )
+      },
+      languageService = { currentLanguageService.value },
+      workspace = { currentWorkspace.value },
+      highlightCacheCapacity = highlightCacheCapacity,
+    )
+  }
+  SideEffect {
+    state.highlightCacheCapacity = highlightCacheCapacity
+  }
+  return state
 }
 
 /** 未显式创建工作区时使用的单文件路径。 */
 private const val DEFAULT_EDITOR_FILE_PATH = "main.js"
+
+/** 默认保留最近 20 个文件的编辑会话，业务可通过编辑器设置覆盖。 */
+const val DEFAULT_HIGHLIGHT_CACHE_CAPACITY = 20
 
 /** 编辑器代码区使用的深黑底色，与工作台代码背景保持一致。 */
 private val CodeEditorBackground = Color(0xFF0F131B)

@@ -15,6 +15,7 @@ import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.functions.code.editor.highlight.JavaScriptCodeEditor
+import com.cyxbs.functions.code.editor.highlight.DEFAULT_HIGHLIGHT_CACHE_CAPACITY
 import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
 import com.cyxbs.functions.code.editor.highlight.rememberJavaScriptCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
@@ -68,6 +69,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isRunning by remember { mutableStateOf(false) }
     var isLoadingLanguage by remember { mutableStateOf(false) }
     var isAnalyzingSymbol by remember { mutableStateOf(false) }
+    var highlightCacheCapacity by remember { mutableStateOf(DEFAULT_HIGHLIGHT_CACHE_CAPACITY) }
     var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageService?>(null) }
     val sourceFiles = remember {
       mutableStateMapOf<String, String>(
@@ -86,6 +88,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       activeFilePath = activeFilePath,
       workspace = workspace,
       languageService = dynamicLanguageService,
+      highlightCacheCapacity = highlightCacheCapacity,
     )
     val workbenchState = rememberCodeEditorWorkbenchState(initialSidePanelId = FILES_PANEL_ID)
     var output by remember { mutableStateOf("点击右上角运行按钮或底部 Run 查看输出") }
@@ -106,11 +109,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       )
     }
 
-    /** 保存当前文本后切换 KodeMirror 文档，可选中跨文件定义。 */
+    /** 保存当前文本后切换独立文件会话；普通切换保留光标，跨文件定义则定位到指定区间。 */
     fun openFile(filePath: String, selection: DynamicTextRange? = null) {
       sourceFiles[activeFilePath] = editorState.code
       val targetSource = sourceFiles[filePath] ?: error("文件不存在：$filePath")
-      editorState.replaceDocument(targetSource, selection?.from ?: 0)
+      editorState.replaceDocument(filePath, targetSource, selection?.from)
       activeFilePath = filePath
       selection?.let(editorState::selectRange)
     }
@@ -133,6 +136,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         val serviceMark = TimeSource.Monotonic.markNow()
         newService = dynamicLanguageManager.load(javaScript.languageId)
         val serviceDuration = serviceMark.elapsedNow()
+        editorState.clearHighlightCache()
         dynamicLanguageService = newService
         newService = null
         languageStatus = buildLanguageLoadedText(
@@ -174,6 +178,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       val service = dynamicLanguageService ?: return@LaunchedEffect
       val requestedFilePath = activeFilePath
       snapshotFlow { editorState.code }.collectLatest { source ->
+        if (editorState.hasCachedHighlights(requestedFilePath, source)) {
+          autoHighlightReport = "端上文件高亮缓存命中 · $requestedFilePath"
+          return@collectLatest
+        }
         delay(AUTO_HIGHLIGHT_DELAY_MILLIS)
         try {
           val roundTripMark = TimeSource.Monotonic.markNow()
@@ -256,11 +264,15 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isLanguageReady = dynamicLanguageService != null,
       isLoadingLanguage = isLoadingLanguage,
       isAnalyzingSymbol = isAnalyzingSymbol,
+      highlightCacheCapacity = highlightCacheCapacity,
       includeCourse = true,
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
       onLoadLanguage = {
         coroutineScope.launch { loadLanguageService() }
+      },
+      onHighlightCacheCapacityChange = { capacity ->
+        highlightCacheCapacity = capacity
       },
       onFindDefinition = {
         coroutineScope.launch {
