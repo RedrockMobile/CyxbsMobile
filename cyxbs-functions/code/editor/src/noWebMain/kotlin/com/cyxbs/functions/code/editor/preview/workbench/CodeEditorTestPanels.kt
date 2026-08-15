@@ -86,7 +86,8 @@ internal const val RUN_TOOL_WINDOW_ID = "run"
  * 创建仅供编辑器手动测试页使用的侧边能力。
  *
  * [includeCourse] 用于验证教学场景的特殊入口；设为 false 后得到的就是普通代码编辑器侧栏，证明课程
- * 不属于通用工作台的必选依赖。[projectPath] 仅用于文件面板顶部展示，后续可传入真实工程路径。
+ * 不属于通用工作台的必选依赖。[projectPath] 仅用于文件面板顶部展示，后续可传入真实工程路径；
+ * [fileIcon] 与标签栏共享语言图标，避免文件树重新获取或解析动态资源。
  */
 @Composable
 internal fun rememberCodeEditorTestSidePanels(
@@ -99,6 +100,7 @@ internal fun rememberCodeEditorTestSidePanels(
   highlightCacheCapacity: Int,
   includeCourse: Boolean,
   projectPath: String = TestProjectPath,
+  fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)? = null,
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onLoadLanguage: () -> Unit,
@@ -131,6 +133,7 @@ internal fun rememberCodeEditorTestSidePanels(
           activeFilePath = activeFilePath,
           filePaths = sourceFiles.keys.sorted(),
           folderPaths = createdFolderPaths,
+          fileIcon = fileIcon,
           onOpenFile = {
             onOpenFile(it)
             if (layoutMode != com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbenchLayoutMode.Expanded) {
@@ -261,6 +264,7 @@ private fun FilePanelContent(
   activeFilePath: String,
   filePaths: List<String>,
   folderPaths: List<String>,
+  fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)?,
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
@@ -297,6 +301,7 @@ private fun FilePanelContent(
           activeFilePath = activeFilePath,
           expandedFolders = expandedFolders,
           minimumRowWidth = minimumRowWidth,
+          fileIcon = fileIcon,
           onOpenFile = onOpenFile,
         )
       }
@@ -494,6 +499,7 @@ private fun FileTreeNodes(
   activeFilePath: String,
   expandedFolders: MutableMap<String, Boolean>,
   minimumRowWidth: Dp,
+  fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)?,
   onOpenFile: (String) -> Unit,
   depth: Int = 0,
 ) {
@@ -516,6 +522,7 @@ private fun FileTreeNodes(
             activeFilePath = activeFilePath,
             expandedFolders = expandedFolders,
             minimumRowWidth = minimumRowWidth,
+            fileIcon = fileIcon,
             onOpenFile = onOpenFile,
             depth = depth + 1,
           )
@@ -528,6 +535,9 @@ private fun FileTreeNodes(
         expanded = null,
         selected = node.path == activeFilePath,
         minimumWidth = minimumRowWidth,
+        customIcon = fileIcon?.let { icon ->
+          { modifier -> icon(node.path, modifier) }
+        },
         onClick = { onOpenFile(node.path) },
       )
     }
@@ -538,7 +548,8 @@ private fun FileTreeNodes(
  * 文件树中的单行节点。
  *
  * [expanded] 为 null 表示文件，否则表示文件夹的展开状态。固定紧凑高度和层级缩进用于接近桌面
- * IDE 的项目树密度，整行点击区域同时兼顾触摸与鼠标操作。
+ * IDE 的项目树密度，整行点击区域同时兼顾触摸与鼠标操作。[customIcon] 存在时优先绘制语言
+ * 包提供的多色图标，否则使用 [icon] 并应用侧边栏选中颜色。
  */
 @Composable
 private fun FileTreeRow(
@@ -548,6 +559,7 @@ private fun FileTreeRow(
   expanded: Boolean?,
   selected: Boolean,
   minimumWidth: Dp,
+  customIcon: (@Composable (modifier: Modifier) -> Unit)? = null,
   onClick: () -> Unit,
 ) {
   Row(
@@ -573,12 +585,16 @@ private fun FileTreeRow(
     } else {
       androidx.compose.foundation.layout.Spacer(Modifier.width(FileTreeDisclosureIconSize))
     }
-    Icon(
-      imageVector = icon,
-      contentDescription = null,
-      tint = if (selected) EditorWorkbenchColors.Accent else EditorWorkbenchColors.SecondaryText,
-      modifier = Modifier.size(FileTreeNodeIconSize),
-    )
+    if (customIcon == null) {
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = if (selected) EditorWorkbenchColors.Accent else EditorWorkbenchColors.SecondaryText,
+        modifier = Modifier.size(FileTreeNodeIconSize),
+      )
+    } else {
+      customIcon(Modifier.size(FileTreeNodeIconSize))
+    }
     Text(
       text = name,
       color = EditorWorkbenchColors.PrimaryText,

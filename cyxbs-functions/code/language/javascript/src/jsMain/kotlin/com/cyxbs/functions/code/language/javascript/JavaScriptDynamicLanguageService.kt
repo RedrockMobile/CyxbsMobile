@@ -2,6 +2,7 @@ package com.cyxbs.functions.code.language.javascript
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
@@ -21,6 +22,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
   private val semanticSession = JavaScriptSemanticSession { filePath, source ->
     highlighterSession(filePath).syntaxTree(source)
   }
+
+  /** 返回不依赖平台资源的 JavaScript 文件矢量图标。 */
+  override suspend fun fileIcon(): DynamicLanguageIcon = JavaScriptLanguageIcon
 
   /** 每份文件独立缓存 Lezer 语法树，文件切换不会丢失增量分析状态。 */
   override suspend fun highlight(

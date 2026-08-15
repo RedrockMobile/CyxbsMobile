@@ -15,6 +15,7 @@ import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import com.cyxbs.functions.code.npm.internal.NpmGraphJsModuleLoader
 import com.cyxbs.functions.code.npm.model.NpmException
+import com.cyxbs.functions.code.npm.model.NpmPackageId
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
 import com.cyxbs.functions.code.npm.service.NpmJsServiceProxyFactory
 import com.cyxbs.functions.code.npm.service.NpmJsServiceSession
@@ -88,7 +89,34 @@ class NpmJsServiceLoader(
     version: String = LATEST_VERSION,
     refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
     metrics: NpmJsServiceLoadMetrics? = null,
-  ): T {
+  ): T = loadWithInfo(
+    serviceClass = serviceClass,
+    packageName = packageName,
+    version = version,
+    refreshPolicy = refreshPolicy,
+    metrics = metrics,
+  ).service
+
+  /**
+   * 加载 npm Service，并同时返回包池最终选中的入口包身份。
+   *
+   * [NpmJsServiceLoadResult.entryPackage] 来自已经完成刷新、依赖解析和校验的运行租约，调用方可用
+   * 其中的精确版本判断自身派生缓存是否失效，无需让 JavaScript 业务接口重复声明包版本。
+   * Service 的关闭责任与 [load] 相同，仍由调用方负责。
+   */
+  @Throws(
+    NpmJsServiceProtocolException::class,
+    NpmJsServiceInvocationException::class,
+    NpmException::class,
+    CancellationException::class,
+  )
+  suspend fun <T : NpmJsServiceInstance> loadWithInfo(
+    serviceClass: KClass<T>,
+    packageName: String,
+    version: String = LATEST_VERSION,
+    refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
+    metrics: NpmJsServiceLoadMetrics? = null,
+  ): NpmJsServiceLoadResult<T> {
     val factory = metrics.measureStage(NpmJsServiceLoadStage.RESOLVE_PROXY_FACTORY) {
       findFactory(serviceClass).also { validateFactory(serviceClass, it) }
     }
@@ -146,9 +174,13 @@ class NpmJsServiceLoader(
       metrics.measureStage(NpmJsServiceLoadStage.INITIALIZE_SERVICE) {
         session.initialize(graph.entryModuleName, packageName)
       }
-      metrics.measureStage(NpmJsServiceLoadStage.CREATE_SERVICE_PROXY) {
+      val service = metrics.measureStage(NpmJsServiceLoadStage.CREATE_SERVICE_PROXY) {
         factory.create(session)
       }
+      NpmJsServiceLoadResult(
+        service = service,
+        entryPackage = lease.preparedEntry.entryPackage,
+      )
     } catch (throwable: Throwable) {
       session.closeAfterFailure(throwable)
     }
@@ -195,6 +227,17 @@ class NpmJsServiceLoader(
     const val LATEST_VERSION = "latest"
   }
 }
+
+/**
+ * npm Service 代理及其实际运行入口包的加载结果。
+ *
+ * @param service 已初始化并持有 Runtime 租约的业务代理，使用结束后必须关闭。
+ * @param entryPackage 包池最终选中的入口包名和精确版本。
+ */
+data class NpmJsServiceLoadResult<T : NpmJsServiceInstance>(
+  val service: T,
+  val entryPackage: NpmPackageId,
+)
 
 /** 执行单个加载阶段；仅在调用方传入指标对象时读取单调时钟并记录成功状态。 */
 private suspend fun <T> NpmJsServiceLoadMetrics?.measureStage(

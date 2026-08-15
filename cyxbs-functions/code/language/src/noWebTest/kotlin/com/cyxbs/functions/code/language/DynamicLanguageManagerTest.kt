@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.language
 
 import com.cyxbs.functions.code.language.internal.DynamicLanguagePackageLoader
+import com.cyxbs.functions.code.language.internal.LoadedDynamicLanguagePackage
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
@@ -8,6 +9,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIconPath
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
@@ -46,7 +49,7 @@ class DynamicLanguageManagerTest {
     results.forEach { assertSame(results.first(), it) }
   }
 
-  /** 语言别名忽略大小写和首尾空白，并直接返回 npm Loader 创建的 Service。 */
+  /** 语言别名忽略大小写和首尾空白，缓存代理应完整透传除图标外的 Service 能力。 */
   @Test
   fun loadByAliasReturnsService() = runTest {
     val languageService = FakeLanguageService(
@@ -68,8 +71,11 @@ class DynamicLanguageManagerTest {
       listOf(DynamicSourceFile(path = "main.js", source = "let")),
     )
 
-    assertSame(languageService, service)
     assertEquals(1, loader.languageLoadCount)
+    assertEquals(0, languageService.fileIconCallCount)
+    assertEquals(TEST_ICON, service.fileIcon())
+    assertEquals(TEST_ICON, service.fileIcon())
+    assertEquals(1, languageService.fileIconCallCount)
     assertEquals(
       listOf("keyword"),
       service.highlight(workspace, "main.js").spans.single().styleIds,
@@ -86,6 +92,64 @@ class DynamicLanguageManagerTest {
 
     service.close()
     assertEquals(1, languageService.closeCount)
+  }
+
+  /** 项目文件列表恢复图标时不能创建 Runtime 或加载语言 npm 包。 */
+  @Test
+  fun cachedIconsRestoreWithoutLoadingLanguageService() = runTest {
+    val iconCache = DynamicLanguageIconCache.inMemory()
+    iconCache.update(validLanguageInfo(), "1.0.0", TEST_ICON)
+    val loader = FakePackageLoader(catalogJson = Json.encodeToString(validCatalog()))
+    val manager = DynamicLanguageManager(loader, iconCache = iconCache)
+
+    val icons = manager.cachedIcons()
+
+    assertEquals(TEST_ICON, icons[validLanguageInfo()])
+    assertEquals(0, loader.languageLoadCount)
+  }
+
+  /** 相同 npm 版本应复用持久图标，版本变化才重新调用 JS 并覆盖缓存。 */
+  @Test
+  fun languagePackageVersionInvalidatesPersistentIcon() = runTest {
+    val language = validLanguageInfo()
+    val iconCache = DynamicLanguageIconCache.inMemory()
+    iconCache.update(language, "1.0.0", TEST_ICON)
+    val unchangedService = FakeLanguageService(icon = UPDATED_TEST_ICON)
+    val unchangedManager = DynamicLanguageManager(
+      packageLoader = FakePackageLoader(
+        catalogJson = Json.encodeToString(validCatalog()),
+        languageService = unchangedService,
+        npmPackageVersion = "1.0.0",
+      ),
+      iconCache = iconCache,
+    )
+
+    val unchangedProxy = unchangedManager.load("javascript")
+
+    assertEquals(0, unchangedService.fileIconCallCount)
+    assertEquals(TEST_ICON, unchangedProxy.fileIcon())
+    assertEquals(TEST_ICON, unchangedProxy.fileIcon())
+    unchangedProxy.close()
+    assertEquals(TEST_ICON, unchangedManager.cachedIcons()[language])
+
+    val updatedService = FakeLanguageService(icon = UPDATED_TEST_ICON)
+    val updatedManager = DynamicLanguageManager(
+      packageLoader = FakePackageLoader(
+        catalogJson = Json.encodeToString(validCatalog()),
+        languageService = updatedService,
+        npmPackageVersion = "2.0.0",
+      ),
+      iconCache = iconCache,
+    )
+
+    val updatedProxy = updatedManager.load("javascript")
+
+    assertEquals(0, updatedService.fileIconCallCount)
+    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon())
+    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon())
+    updatedProxy.close()
+    assertEquals(1, updatedService.fileIconCallCount)
+    assertEquals(UPDATED_TEST_ICON, updatedManager.cachedIcons()[language])
   }
 
   /** Catalog 中 ID、别名之间发生碰撞时拒绝缓存。 */
@@ -149,6 +213,7 @@ class DynamicLanguageManagerTest {
   private class FakePackageLoader(
     private val catalogJson: String,
     private val languageService: DynamicLanguageService = FakeLanguageService(),
+    private val npmPackageVersion: String = "1.0.0",
   ) : DynamicLanguagePackageLoader {
     var catalogLoadCount = 0
     var languageLoadCount = 0
@@ -158,10 +223,13 @@ class DynamicLanguageManagerTest {
       return catalogJson
     }
 
-    override suspend fun loadLanguage(packageName: String): DynamicLanguageService {
+    override suspend fun loadLanguage(packageName: String): LoadedDynamicLanguagePackage {
       assertEquals("@cyxbs-mobile/language-javascript", packageName)
       languageLoadCount += 1
-      return languageService
+      return LoadedDynamicLanguagePackage(
+        service = languageService,
+        npmPackageVersion = npmPackageVersion,
+      )
     }
   }
 
@@ -169,8 +237,15 @@ class DynamicLanguageManagerTest {
   private class FakeLanguageService(
     private val highlightResult: List<DynamicHighlightSpan> = emptyList(),
     private val completionResult: DynamicCompletionResult? = null,
+    private val icon: DynamicLanguageIcon = TEST_ICON,
   ) : DynamicLanguageService {
     var closeCount = 0
+    var fileIconCallCount = 0
+
+    override suspend fun fileIcon(): DynamicLanguageIcon {
+      fileIconCallCount += 1
+      return icon
+    }
 
     /** 测试替身不维护语法树，仅返回可预测的完整解析指标。 */
     override suspend fun highlight(
@@ -221,6 +296,18 @@ class DynamicLanguageManagerTest {
   }
 
   private companion object {
+    val TEST_ICON = DynamicLanguageIcon(
+      viewportWidth = 24F,
+      viewportHeight = 24F,
+      paths = listOf(DynamicLanguageIconPath("M0 0H24V24H0Z", "#F7DF1E")),
+    )
+
+    val UPDATED_TEST_ICON = DynamicLanguageIcon(
+      viewportWidth = 32F,
+      viewportHeight = 32F,
+      paths = listOf(DynamicLanguageIconPath("M0 0H32V32H0Z", "#3776AB")),
+    )
+
     /** 创建包含 JavaScript 的最小合法 Catalog。 */
     fun validCatalog(): DynamicLanguageCatalog {
       return DynamicLanguageCatalog(

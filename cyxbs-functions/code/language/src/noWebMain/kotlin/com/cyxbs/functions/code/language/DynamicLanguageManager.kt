@@ -1,8 +1,10 @@
 package com.cyxbs.functions.code.language
 
 import com.cyxbs.functions.code.language.internal.DynamicLanguagePackageLoader
+import com.cyxbs.functions.code.language.internal.IconCachingDynamicLanguageService
 import com.cyxbs.functions.code.language.internal.NpmDynamicLanguagePackageLoader
 import com.cyxbs.functions.code.language.internal.validatedLanguages
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
@@ -37,10 +39,14 @@ import kotlinx.serialization.json.Json
 class DynamicLanguageManager internal constructor(
   private val packageLoader: DynamicLanguagePackageLoader,
   private val json: Json = Json { ignoreUnknownKeys = true },
+  private val iconCache: DynamicLanguageIconCache = DynamicLanguageIconCache.inMemory(),
 ) {
 
   /** 使用默认 npm 包池和 JavaScript Runtime 创建业务 Manager。 */
-  constructor() : this(NpmDynamicLanguagePackageLoader())
+  constructor() : this(
+    packageLoader = NpmDynamicLanguagePackageLoader(),
+    iconCache = DynamicLanguageIconCache.Default,
+  )
 
   private val catalogMutex = Mutex()
   private var cachedLanguages: List<DynamicLanguageInfo>? = null
@@ -67,9 +73,31 @@ class DynamicLanguageManager internal constructor(
   }
 
   /**
+   * 返回当前 Catalog 对应的持久化语言图标。
+   *
+   * 本方法只读取本地图标缓存，不加载语言 npm 包、不创建 JavaScript Runtime，也不检查远端版本。
+   * 因此项目文件列表可以先显示上次成功加载的图标；后续 [load] 会用实际 npm 版本校验并更新。
+   * 缓存损坏或普通文件系统错误按空结果处理，协程取消仍会传播。
+   *
+   * @return 以当前 Catalog 的完整语言定义为键的图标映射。
+   */
+  @Throws(
+    DynamicLanguageProtocolException::class,
+    NpmException::class,
+    CancellationException::class,
+  )
+  suspend fun cachedIcons(): Map<DynamicLanguageInfo, DynamicLanguageIcon> {
+    return iconCache.restore(supportedLanguages())
+  }
+
+  /**
    * 按稳定语言 ID 或别名加载一个独立的动态语言会话。
    *
    * @param languageId Catalog 中的语言 ID 或别名，匹配时忽略首尾空白和大小写。
+   * 返回的 Service 会透明代理 [DynamicLanguageService.fileIcon]：业务首次读取图标时才比较本地
+   * 缓存与包池最终选择的 npm 根包版本，版本一致时不进入 JavaScript，首次读取或版本变化时
+   * 获取并持久化图标。仅加载语言包不会主动读取或保存图标。
+   *
    * @return 由独立 Runtime 支撑、需要由调用方关闭的语言 Service。
    * @throws DynamicLanguageNotFoundException Catalog 中不存在该语言。
    * @throws DynamicLanguageProtocolException Catalog 数据不合法。
@@ -92,7 +120,13 @@ class DynamicLanguageManager internal constructor(
       candidate.languageId == lookupKey || lookupKey in candidate.aliases
     } ?: throw DynamicLanguageNotFoundException(languageId)
 
-    return packageLoader.loadLanguage(language.npmPackageName)
+    val loaded = packageLoader.loadLanguage(language.npmPackageName)
+    return IconCachingDynamicLanguageService(
+      delegate = loaded.service,
+      language = language,
+      npmPackageVersion = loaded.npmPackageVersion,
+      iconCache = iconCache,
+    )
   }
 
   /** 加载、宽容反序列化并校验静态 Catalog JSON；未知新增字段由 [json] 忽略。 */

@@ -23,11 +23,15 @@ import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
 import com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbench
+import com.cyxbs.functions.code.editor.workbench.DynamicLanguageFileIcon
 import com.cyxbs.functions.code.editor.workbench.rememberCodeEditorWorkbenchState
+import com.cyxbs.functions.code.editor.workbench.rememberDynamicLanguageFileIconCache
+import com.cyxbs.functions.code.editor.workbench.resolveDynamicLanguageIdForFile
 import com.cyxbs.functions.code.js.diagnostic.toJsDiagnostic
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
 import com.cyxbs.functions.code.js.teaching.JsTeachingCodeResult
 import com.cyxbs.functions.code.js.teaching.JsTeachingCodeRunner
+import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.cyxbs.functions.code.language.DynamicLanguageManager
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
@@ -71,6 +75,21 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isAnalyzingSymbol by remember { mutableStateOf(false) }
     var highlightCacheCapacity by remember { mutableStateOf(DEFAULT_HIGHLIGHT_CACHE_CAPACITY) }
     var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageService?>(null) }
+    var supportedLanguages by remember { mutableStateOf<List<DynamicLanguageInfo>>(emptyList()) }
+    val languageIconCache = rememberDynamicLanguageFileIconCache()
+    val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
+      if (supportedLanguages.isEmpty()) {
+        null
+      } else {
+        { filePath, modifier ->
+          DynamicLanguageFileIcon(
+            imageVector = languageIconCache[
+              resolveDynamicLanguageIdForFile(filePath, supportedLanguages)
+            ],
+            modifier = modifier,
+          )
+        }
+      }
     val sourceFiles = remember {
       mutableStateMapOf<String, String>(
         MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
@@ -130,14 +149,20 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         val startMark = TimeSource.Monotonic.markNow()
         val catalogMark = TimeSource.Monotonic.markNow()
         val languages = dynamicLanguageManager.supportedLanguages()
+        supportedLanguages = languages
+        // 项目文件列表先恢复上次成功保存的图标，不等待语言 Runtime 创建或远端 latest 检查。
+        languageIconCache.updateAll(dynamicLanguageManager.cachedIcons())
         val catalogDuration = catalogMark.elapsedNow()
         val javaScript = languages.firstOrNull { it.languageId == JAVASCRIPT_LANGUAGE_ID }
           ?: error("动态语言目录中未声明 JavaScript。")
         val serviceMark = TimeSource.Monotonic.markNow()
-        newService = dynamicLanguageManager.load(javaScript.languageId)
+        val loadedService = dynamicLanguageManager.load(javaScript.languageId)
+        newService = loadedService
+        // Service 代理只在业务读取图标时校验 npm 版本，并透明复用或更新持久缓存。
+        languageIconCache.update(javaScript.languageId, loadedService.fileIcon())
         val serviceDuration = serviceMark.elapsedNow()
         editorState.clearHighlightCache()
-        dynamicLanguageService = newService
+        dynamicLanguageService = loadedService
         newService = null
         languageStatus = buildLanguageLoadedText(
           packageName = javaScript.npmPackageName,
@@ -266,6 +291,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isAnalyzingSymbol = isAnalyzingSymbol,
       highlightCacheCapacity = highlightCacheCapacity,
       includeCourse = true,
+      fileIcon = dynamicDocumentIcon,
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
       onLoadLanguage = {
@@ -368,6 +394,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       ),
       breadcrumbs = listOf("src", "lesson-03") + activeFilePath.split('/'),
       onDocumentSelected = ::openFile,
+      documentIcon = dynamicDocumentIcon,
       sidePanels = sidePanels,
       toolWindows = codeEditorTestToolWindows(
         activeFilePath = activeFilePath,

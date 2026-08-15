@@ -4,6 +4,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
@@ -597,13 +598,24 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(SERVICE_ID, _JavaScriptDynamicLanguageServiceNpmJsDispatcher.serviceId)
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
     assertEquals(
-      setOf("complete", "definition", "highlight", "references", "rename"),
+      setOf("complete", "definition", "fileIcon", "highlight", "references", "rename"),
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     assertEquals(
-      setOf("complete", "definition", "highlight", "references", "rename"),
+      setOf("complete", "definition", "fileIcon", "highlight", "references", "rename"),
       describedMethods.toSet(),
     )
+
+    val fileIcon = Json.decodeFromString<DynamicLanguageIcon>(
+      _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
+        method = "fileIcon",
+        argumentsJson = "[]",
+      ),
+    )
+    assertEquals(24F, fileIcon.viewportWidth)
+    assertEquals(24F, fileIcon.viewportHeight)
+    assertEquals(3, fileIcon.paths.size)
+    assertTrue(fileIcon.paths.all { path -> path.pathData.isNotBlank() })
 
     val highlightResult = Json.decodeFromString<DynamicHighlightResult>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(

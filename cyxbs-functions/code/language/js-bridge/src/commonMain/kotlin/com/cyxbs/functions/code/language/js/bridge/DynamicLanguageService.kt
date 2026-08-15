@@ -101,6 +101,26 @@ data class DynamicCompletionResult(
 interface DynamicLanguageService : NpmJsServiceInstance {
 
   /**
+   * 返回当前语言用于文件标签和目录树的矢量图标。
+   *
+   * 每个语言包必须实现本方法。客户端可按语言包版本缓存解析后的 Compose 矢量图；图标数据损坏
+   * 时可以回退到通用文件标记，但缺少实现不属于正常业务状态。
+   *
+   * @return 与具体平台资源无关的 SVG 填充路径模型。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包缺少本方法。
+   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
+   * @throws SerializationException 返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun fileIcon(): DynamicLanguageIcon
+
+  /**
    * 分析工作区中的指定文件，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
    *
    * 返回的性能指标既用于确认语言包是否复用了增量语法树，也可与端上测得的整体耗时组合，

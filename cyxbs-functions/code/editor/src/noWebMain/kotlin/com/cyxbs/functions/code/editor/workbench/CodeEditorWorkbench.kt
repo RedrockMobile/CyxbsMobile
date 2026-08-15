@@ -126,6 +126,7 @@ import kotlin.math.roundToInt
  * @param openDocumentLabels 已打开文档的稳定标识或路径，用于渲染编辑器标签栏。
  * @param breadcrumbs 当前文档的路径导航；为空时根据 [activeDocumentLabel] 生成。
  * @param onDocumentSelected 点击标签后的切换回调；为空时标签仅用于展示。
+ * @param documentIcon 文档标签图标槽位；调用方可按文件路径提供语言图标，为空时使用通用圆点。
  * @param sidePanels 可用侧边能力，顺序决定活动栏顺序。
  * @param toolWindows 可用底部工具窗口，顺序决定底部按钮顺序。
  * @param onRun 顶部运行按钮回调；传入 null 时隐藏运行按钮。
@@ -150,6 +151,7 @@ fun CodeEditorWorkbench(
   openDocumentLabels: List<String> = listOf(activeDocumentLabel),
   breadcrumbs: List<String> = emptyList(),
   onDocumentSelected: ((String) -> Unit)? = null,
+  documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)? = null,
   layoutPolicy: CodeEditorWorkbenchLayoutPolicy = DefaultCodeEditorWorkbenchLayoutPolicy,
   isRunning: Boolean = false,
   onBack: (() -> Unit)? = null,
@@ -262,6 +264,7 @@ fun CodeEditorWorkbench(
           openDocumentLabels = openDocumentLabels,
           breadcrumbs = breadcrumbs,
           onDocumentSelected = onDocumentSelected,
+          documentIcon = documentIcon,
           toolWindows = toolWindows,
           selectedToolWindow = selectedToolWindow,
           isRunning = isRunning,
@@ -329,6 +332,7 @@ private fun EditorAndToolWindow(
   openDocumentLabels: List<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
+  documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
   toolWindows: List<CodeEditorToolWindow>,
   selectedToolWindow: CodeEditorToolWindow?,
   isRunning: Boolean,
@@ -369,6 +373,7 @@ private fun EditorAndToolWindow(
         openDocumentLabels = openDocumentLabels,
         breadcrumbs = breadcrumbs,
         onDocumentSelected = onDocumentSelected,
+        documentIcon = documentIcon,
       )
       Box(
         modifier = Modifier
@@ -647,6 +652,7 @@ private fun EditorDocumentBar(
   openDocumentLabels: List<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
+  documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
 ) {
   val documents = openDocumentLabels.distinct().ifEmpty { listOf(activeDocumentLabel) }
   val selectedDocumentIndex = documents.indexOf(activeDocumentLabel).coerceAtLeast(0)
@@ -720,17 +726,21 @@ private fun EditorDocumentBar(
             .padding(horizontal = 14.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Box(
-            Modifier
-              .size(8.dp)
-              .background(EditorWorkbenchColors.FileIndicator, CircleShape),
-          )
+          if (documentIcon == null) {
+            Box(
+              Modifier
+                .size(8.dp)
+                .background(EditorWorkbenchColors.FileIndicator, CircleShape),
+            )
+          } else {
+            documentIcon(document, Modifier.size(14.dp))
+          }
           Text(
             text = document.substringAfterLast('/'),
             color = if (selected) EditorWorkbenchColors.PrimaryText else EditorWorkbenchColors.SecondaryText,
             fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier.padding(start = if (documentIcon == null) 8.dp else 6.dp),
           )
         }
       }

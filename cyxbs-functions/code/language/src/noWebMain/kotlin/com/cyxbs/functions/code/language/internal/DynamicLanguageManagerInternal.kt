@@ -14,8 +14,14 @@ internal interface DynamicLanguagePackageLoader {
   suspend fun loadCatalog(): String
 
   /** 加载一个 Catalog 已校验坐标对应的语言 Service。 */
-  suspend fun loadLanguage(packageName: String): DynamicLanguageService
+  suspend fun loadLanguage(packageName: String): LoadedDynamicLanguagePackage
 }
+
+/** 已初始化的语言代理及 npm 包池最终选中的根包版本。 */
+internal data class LoadedDynamicLanguagePackage(
+  val service: DynamicLanguageService,
+  val npmPackageVersion: String,
+)
 
 /**
  * 使用静态 npm 资源加载器读取 Catalog，并用通用 Service Loader 加载语言实现。
@@ -39,10 +45,14 @@ internal class NpmDynamicLanguagePackageLoader(
     )
   }
 
-  override suspend fun loadLanguage(packageName: String): DynamicLanguageService {
-    return serviceLoader.load(
+  override suspend fun loadLanguage(packageName: String): LoadedDynamicLanguagePackage {
+    val result = serviceLoader.loadWithInfo(
       serviceClass = DynamicLanguageService::class,
       packageName = packageName,
+    )
+    return LoadedDynamicLanguagePackage(
+      service = result.service,
+      npmPackageVersion = result.entryPackage.version,
     )
   }
 
