@@ -1,14 +1,40 @@
 package com.cyxbs.functions.code.editor.highlight
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cyxbs.functions.code.editor.theme.CodeEditorConnectedCornerRadius
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicHighlightExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicCompletionExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorPlainTextLanguageExtension
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorSearchExtension
+import com.cyxbs.functions.code.editor.highlight.internal.KodeMirrorSearchPanel
+import com.cyxbs.functions.code.editor.highlight.internal.codeEditorSearchPanelOpen
 import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
+import com.cyxbs.functions.code.editor.highlight.internal.toggleCodeEditorSearchPanelVisibility
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
@@ -23,6 +49,10 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
 import com.monkopedia.kodemirror.basicsetup.basicSetup
+import com.monkopedia.kodemirror.commands.redoDepth
+import com.monkopedia.kodemirror.commands.redo as kodeMirrorRedo
+import com.monkopedia.kodemirror.commands.undoDepth
+import com.monkopedia.kodemirror.commands.undo as kodeMirrorUndo
 import com.monkopedia.kodemirror.state.ChangeSpec
 import com.monkopedia.kodemirror.state.DocPos
 import com.monkopedia.kodemirror.state.SelectionSpec
@@ -30,7 +60,13 @@ import com.monkopedia.kodemirror.state.TransactionSpec
 import com.monkopedia.kodemirror.state.asInsert
 import com.monkopedia.kodemirror.state.extensionListOf
 import com.monkopedia.kodemirror.view.EditorSession
+import com.monkopedia.kodemirror.view.EditorLayout
+import com.monkopedia.kodemirror.view.EditorTheme
+import com.monkopedia.kodemirror.view.GutterType
 import com.monkopedia.kodemirror.view.KodeMirror
+import com.monkopedia.kodemirror.view.editorContentStyle
+import com.monkopedia.kodemirror.view.editorTheme
+import com.monkopedia.kodemirror.view.gutters
 import com.monkopedia.kodemirror.view.rememberEditorSession
 import kotlinx.serialization.SerializationException
 import kotlin.coroutines.cancellation.CancellationException
@@ -60,6 +96,36 @@ class JavaScriptCodeEditorState internal constructor(
   /** 当前编辑文档在工作区中的相对路径。 */
   val filePath: String
     get() = activeFilePath()
+
+  /** 当前是否存在可撤销的源码编辑；读取时会随 KodeMirror 会话事务自动触发 Compose 重组。 */
+  val canUndo: Boolean
+    get() = undoDepth(session.state) > 0
+
+  /** 当前是否存在可重做的源码编辑；新的普通编辑会清空该状态。 */
+  val canRedo: Boolean
+    get() = redoDepth(session.state) > 0
+
+  /**
+   * 撤销最近一次可撤销的编辑事务。
+   *
+   * @return 成功撤销时为 true；历史栈为空时为 false，源码保持不变。
+   */
+  fun undo(): Boolean = kodeMirrorUndo(session)
+
+  /**
+   * 重做最近一次被撤销的编辑事务。
+   *
+   * @return 成功重做时为 true；重做栈为空时为 false，源码保持不变。
+   */
+  fun redo(): Boolean = kodeMirrorRedo(session)
+
+  /**
+   * 切换当前文档搜索面板。
+   *
+   * 搜索状态与匹配算法仍由 KodeMirror 提供，面板使用编辑器模块自有的跨平台 Compose UI；
+   * 面板关闭时调用会打开，面板已经打开时调用会关闭，不会触发动态语言服务请求。
+   */
+  fun openSearch(): Boolean = toggleCodeEditorSearchPanelVisibility(session)
 
   /**
    * 将动态语言服务针对当前源码返回的高亮区间应用到编辑器。
@@ -320,6 +386,10 @@ fun rememberJavaScriptCodeEditorState(
     // basicSetup 强制要求存在 Language；纯文本占位仅维持编辑能力，不承担实际语法解析。
     extensions = extensionListOf(
       basicSetup,
+      // 预先安装公开搜索状态，避免 openSearchPanel 注入无法定制的 KodeMirror 默认面板。
+      kodeMirrorSearchExtension,
+      editorTheme.of(codeEditorTheme),
+      editorContentStyle.of(codeEditorTextStyle),
       kodeMirrorPlainTextLanguageExtension,
       kodeMirrorDynamicHighlightExtension,
       completionExtension,
@@ -338,6 +408,129 @@ fun rememberJavaScriptCodeEditorState(
 /** 未显式创建工作区时使用的单文件路径。 */
 private const val DEFAULT_EDITOR_FILE_PATH = "main.js"
 
+/** 编辑器代码区使用的深黑底色，与工作台代码背景保持一致。 */
+private val CodeEditorBackground = Color(0xFF0F131B)
+
+/** 行号栏使用的淡黑底色，与工作台目录面板保持一致。 */
+private val CodeEditorGutterBackground = Color(0xFF1C2330)
+
+/**
+ * 与代码工作台设计稿一致的 KodeMirror 内部主题。
+ *
+ * 主题作为 State Extension 注入，避免业务模块接触第三方类型；后续接入正式编辑器设置时可将其
+ * 替换为模块内部的通用主题模型，再在此处完成一次转换。
+ */
+private val codeEditorTheme = EditorTheme(
+  // 根层负责绘制全高背景，透明色可避免 KodeMirror 用代码底色覆盖行号栏的空白延伸区域。
+  background = Color.Transparent,
+  foreground = Color(0xFFD8DFEC),
+  cursor = Color(0xFF8E7CFF),
+  selection = Color(0x4D6F5CFF),
+  activeLineBackground = Color(0xFF181E2A),
+  gutterBackground = CodeEditorGutterBackground,
+  gutterForeground = Color(0xFF59647A),
+  gutterActiveForeground = Color(0xFFD8DFEC),
+  // 根层使用统一圆角轮廓绘制边界，因此关闭 KodeMirror 自身只支持直线的 gutter border。
+  gutterBorderColor = Color.Transparent,
+  panelBackground = Color(0xFF181E28),
+  panelBorderColor = Color(0xFF30394B),
+  buttonBackground = Color(0xFF232A39),
+  buttonBorderColor = Color(0xFF3A465C),
+  inputBackground = Color(0xFF121720),
+  inputBorderColor = Color(0xFF30394B),
+  tooltipBackground = Color(0xFF222938),
+  activeLineGutterBackground = CodeEditorGutterBackground,
+  // 保持行号与代码区紧凑衔接，同时留出最小间距避免文字直接贴边。
+  // basicSetup 会注册折叠 gutter，但当前动态语言尚未向 KodeMirror 提供折叠区间，因此取消空列占位。
+  layout = EditorLayout(
+    gutterEndPadding = 3.dp,
+    customGutterWidth = 0.dp,
+  ),
+  dark = true,
+)
+
+/** 设计稿默认代码排版；字体仍使用跨平台系统等宽字体，不额外增加字体包体积。 */
+private val codeEditorTextStyle = TextStyle(
+  fontFamily = FontFamily.Monospace,
+  fontSize = 13.sp,
+  lineHeight = 19.sp,
+)
+
+/**
+ * 计算当前 KodeMirror gutter 的真实宽度，供外层工作台对齐工具窗口。
+ *
+ * 宽度会随文档行数位数、字体缩放和已注册 gutter 动态变化；调用方不应再复制固定 dp 值。
+ */
+@Composable
+internal fun JavaScriptCodeEditorState.editorGutterWidth(): Dp {
+  val editorState = session.state
+  val gutterConfigurations = editorState.facet(gutters)
+  if (gutterConfigurations.isEmpty()) return 0.dp
+
+  val density = LocalDensity.current
+  return with(density) {
+    val maxDigits = editorState.doc.lines.toString().length
+    val digitWidth = (codeEditorTextStyle.fontSize.toPx() * 0.65F).toDp()
+    val lineNumberWidth = digitWidth * maxDigits +
+      codeEditorTheme.layout.gutterStartPadding +
+      codeEditorTheme.layout.gutterEndPadding
+    val extraGutterCount = gutterConfigurations.count { config ->
+      config.type != GutterType.LineNumbers && config.lineMarker != null
+    }
+    lineNumberWidth + codeEditorTheme.layout.customGutterWidth * extraGutterCount
+  }
+}
+
+/**
+ * 绘制全高编辑器背景，并统一代码内容区左侧的两个圆角。
+ *
+ * KodeMirror 0.3.5 只会把 gutter 背景绘制到真实代码内容高度。这里在组件根层绘制全高代码
+ * 与 gutter 背景，让行号区域自然延伸并包住代码区。深黑代码内容仅在左侧与行号栏衔接处
+ * 保留圆角，右侧直接延伸到组件边界，不再绘制圆角或竖向描边。真实行号仍由 KodeMirror
+ * 按文档行数绘制，空白延伸区不会产生伪行号。gutter 宽度严格复用其位数、字体、padding
+ * 与自定义 gutter 算法。
+ */
+@Composable
+private fun Modifier.roundedCodeAreaBackground(state: JavaScriptCodeEditorState): Modifier {
+  val density = LocalDensity.current
+  val gutterWidth = state.editorGutterWidth()
+  val gutterWidthPx = with(density) { gutterWidth.toPx() }
+  val radiusPx = with(density) { CodeEditorConnectedCornerRadius.toPx() }
+
+  return drawWithContent {
+    val codeStartX = gutterWidthPx.coerceIn(0F, size.width)
+    val cornerRadius = radiusPx
+      .coerceAtMost((size.width - codeStartX) / 2F)
+      .coerceAtMost(size.height / 2F)
+      .coerceAtLeast(0F)
+    val codeBounds = Rect(
+      Offset(codeStartX, 0F),
+      Size(size.width - codeStartX, size.height),
+    )
+    val codeArea = RoundRect(
+      rect = codeBounds,
+      topLeft = CornerRadius(cornerRadius),
+      bottomLeft = CornerRadius(cornerRadius),
+    )
+    val codeAreaPath = Path().apply {
+      addRoundRect(codeArea)
+    }
+    val codeCornerMask = Path().apply {
+      fillType = PathFillType.EvenOdd
+      addRect(codeBounds)
+      addRoundRect(codeArea)
+    }
+
+    // 先绘制完整淡黑行号栏，再使用仅左侧带圆角的轮廓填充深黑代码内容。
+    drawRect(codeEditorTheme.gutterBackground)
+    drawPath(codeAreaPath, color = CodeEditorBackground)
+    drawContent()
+
+    // KodeMirror 的行背景可能覆盖左侧角落；偶奇遮罩只恢复轮廓以外的淡黑区域。
+    drawPath(codeCornerMask, color = codeEditorTheme.gutterBackground)
+  }
+}
+
 /**
  * 使用纯 Compose KodeMirror 渲染可编辑的 JavaScript 代码视图。
  *
@@ -355,8 +548,36 @@ fun JavaScriptCodeEditor(
   state: JavaScriptCodeEditorState,
   modifier: Modifier = Modifier,
 ) {
-  KodeMirror(
-    session = state.session,
-    modifier = modifier,
-  )
+  BoxWithConstraints(modifier = modifier) {
+    KodeMirror(
+      session = state.session,
+      modifier = Modifier
+        .fillMaxSize()
+        .roundedCodeAreaBackground(state),
+    )
+    if (codeEditorSearchPanelOpen(state.session)) {
+      val useBottomSearchPanel = maxWidth < PhoneSearchPanelBreakpoint
+      // 手机宽度下使用铺满编辑器的底部搜索栏；更宽窗口继续使用右上角紧凑浮层。
+      val searchPanelWidth = (maxWidth - 12.dp)
+        .coerceAtLeast(0.dp)
+        .coerceAtMost(330.dp)
+      val searchPanelModifier = if (useBottomSearchPanel) {
+        Modifier
+          .align(Alignment.BottomCenter)
+          .fillMaxWidth()
+      } else {
+        Modifier
+          .align(Alignment.TopEnd)
+          .padding(top = 6.dp, end = 6.dp)
+          .width(searchPanelWidth)
+      }
+      KodeMirrorSearchPanel(
+        session = state.session,
+        modifier = searchPanelModifier,
+      )
+    }
+  }
 }
+
+/** 手机紧凑宽度分界；以当前编辑器容器宽度判断，支持分屏和窗口动态缩放。 */
+private val PhoneSearchPanelBreakpoint = 600.dp

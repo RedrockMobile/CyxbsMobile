@@ -36,6 +36,42 @@ internal class DefaultJsTeachingCodeRunner(
     CancellationException::class,
   )
   override suspend fun execute(code: String): JsTeachingCodeResult {
+    return execute(
+      files = mapOf(ENTRY_FILE_NAME to code),
+      entryFile = ENTRY_FILE_NAME,
+      mode = JsProgramMode.SCRIPT,
+    )
+  }
+
+  /**
+   * 将编辑器工作区按 Module 语义安装并执行，依赖解析交给 Runtime 的 Module Loader 完成。
+   */
+  @Throws(
+    IllegalArgumentException::class,
+    JsPolicyViolationException::class,
+    JsSourceVerificationException::class,
+    JsRuntimeException::class,
+    CancellationException::class,
+  )
+  override suspend fun executeModule(
+    files: Map<String, String>,
+    entryFile: String,
+  ): JsTeachingCodeResult {
+    return execute(
+      files = files,
+      entryFile = entryFile,
+      mode = JsProgramMode.MODULE,
+    )
+  }
+
+  /**
+   * 串行组装教学 Bundle 和源码包；[mode] 决定入口使用 Script 还是 Module 语义。
+   */
+  private suspend fun execute(
+    files: Map<String, String>,
+    entryFile: String,
+    mode: JsProgramMode,
+  ): JsTeachingCodeResult {
     return executionMutex.withLock {
       val consoleMessages = mutableListOf<JsConsoleMessage>()
       val consoleCapability = JsTeachingConsoleCapability(consoleMessages::add)
@@ -54,9 +90,9 @@ internal class DefaultJsTeachingCodeRunner(
       val sourcePackage = JsSourcePackage.create(
         packageId = TEACHING_PACKAGE_ID,
         version = TEACHING_PACKAGE_VERSION,
-        entry = ENTRY_FILE_NAME,
-        mode = JsProgramMode.SCRIPT,
-        files = mapOf(ENTRY_FILE_NAME to code),
+        entry = entryFile,
+        mode = mode,
+        files = files,
         requiredHostApiVersion = HOST_API_VERSION,
         requiredCapabilities = setOf(JsTeachingConsoleCapability.ID),
       )

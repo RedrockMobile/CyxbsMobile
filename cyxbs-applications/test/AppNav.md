@@ -76,7 +76,7 @@ object fields:
 
 解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
 
-## :cyxbs-functions:code
+## :cyxbs-functions:code:editor
 
 ### code/editor-test
 

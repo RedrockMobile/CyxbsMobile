@@ -45,6 +45,33 @@ interface JsTeachingCodeRunner {
   )
   suspend fun execute(code: String): JsTeachingCodeResult
 
+  /**
+   * 编译并执行一个本地多文件 ES Module 工作区。
+   *
+   * [entryFile] 及其静态、动态导入都从 [files] 中解析，不允许 Runtime 访问工作区外的文件。
+   * 该入口适合编辑器工程运行；Module 的求值结果通常为空，教学输出应优先通过 `console.*` 收集。
+   *
+   * @param files 相对模块名到 JavaScript 源码的映射。
+   * @param entryFile 作为本次运行入口的模块名，必须存在于 [files]。
+   * @return Module 求值结果与控制台输出。
+   * @throws IllegalArgumentException 文件集合为空、入口不存在或模块名非法。
+   * @throws JsPolicyViolationException 源码体积或教学能力不满足教学策略。
+   * @throws JsSourceVerificationException 本地源码校验器拒绝当前源码。
+   * @throws JsRuntimeException JavaScript Runtime 初始化、编译、依赖解析、执行或中断失败。
+   * @throws CancellationException 执行所在协程被取消。
+   */
+  @Throws(
+    IllegalArgumentException::class,
+    JsPolicyViolationException::class,
+    JsSourceVerificationException::class,
+    JsRuntimeException::class,
+    CancellationException::class,
+  )
+  suspend fun executeModule(
+    files: Map<String, String>,
+    entryFile: String,
+  ): JsTeachingCodeResult
+
   companion object {
 
     /**
