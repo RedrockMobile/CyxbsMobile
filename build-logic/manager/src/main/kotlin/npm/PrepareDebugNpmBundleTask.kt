@@ -8,6 +8,7 @@ import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
@@ -22,13 +23,16 @@ import org.gradle.work.DisableCachingByDefault
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
- * 生成入口包及其本地项目依赖的 debug npm bundle，并通过 ADB 注入 App 私有 debug 目录。
+ * 生成入口包及其本地项目依赖的 debug npm bundle，并汇总到根项目的 Desktop 调试源目录。
  *
  * ```text
  * prepare 入口包 + 本地依赖池 + 可选 Runtime
@@ -41,27 +45,25 @@ import javax.inject.Inject
  *                    │
  *          与 registry 稳定版逐包比较 SRI
  *                    │
- *                    ├── 不同：生成 debug tgz
- *                    └── 一致：继续使用稳定坐标
+ *                    ├── 不同：生成 debug 坐标 tgz
+ *                    └── 一致：生成稳定坐标 tgz
  *                              │
- *                 至少一个包变化后才 force-stop App
+ *        按 npm 包名原子汇总到 root/build/npm/debug-source
  *                              │
- *                              ▼
- *        adb 临时文件 ──run-as 原子替换──> cache/cyxbs-code/npm/debug
- *                              │
- *                              ▼
- *                           重启 App
+ *              ├── Desktop：直接读取，不复制
+ *              └── Android 安装任务：按入口清单注入同一批包并重启 App
  * ```
  *
  * debug 版本格式为 `<下一稳定补丁版本>-debug.<yyyyMMddHHmmss>`，时间固定使用上海时区。同次任务
  * 的入口包、依赖包与可选 Runtime 共用一个时间戳。变化检测始终使用稳定版本号和已经解析的下级
  * 精确坐标计算候选 tgz 的 SRI，时间戳只在已确认内容或依赖坐标变化后写入。这样依赖代码变化会先
  * 生成新依赖版本，再自然推动上层包生成引用该版本的新产物。静态 npm 包不配置 Runtime 输入，仍
- * 复用相同的版本比较与 ADB 注入链路。设备旧源不参与检测，有变化时直接原子覆盖固定路径；进入
- * 正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
+ * 复用相同的版本比较链路。根项目调试源会包含入口可达的全部本地包；其中内容与 Registry 一致的
+ * 包保留稳定坐标，发生变化的包才使用 debug 坐标。Android 设备旧源不参与检测，有变化时直接
+ * 原子覆盖固定路径；进入正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
  */
-@DisableCachingByDefault(because = "任务需要读取并修改已连接 Android 设备的 App 私有目录")
-abstract class InstallDebugNpmBundleTask : DefaultTask() {
+@DisableCachingByDefault(because = "任务需要查询 Registry，并修改多个入口共享的本地调试源")
+abstract class PrepareDebugNpmBundleTask : DefaultTask() {
 
   @get:InputDirectory
   @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -96,11 +98,21 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   @get:Input
   abstract val registryUrl: Property<String>
 
-  @get:Input
-  abstract val applicationId: Property<String>
-
   @get:Internal
   abstract val workingDirectory: DirectoryProperty
+
+  /**
+   * 根项目共享的 Desktop npm 调试源。多个入口按包名更新自身可达图，不清理其他入口的包。
+   *
+   * 该目录由多个入口任务共同维护，因此不声明为独占 OutputDirectory；任务始终执行远端比较，
+   * 并使用临时文件加原子移动避免 Desktop 读到半写入的 tgz。
+   */
+  @get:Internal
+  abstract val debugSourceDirectory: DirectoryProperty
+
+  /** 当前入口可达的本地包清单，Android 安装任务据此消费统一调试源。 */
+  @get:Internal
+  abstract val manifestFile: RegularFileProperty
 
   @get:Inject
   abstract val fileSystemOperations: FileSystemOperations
@@ -109,13 +121,12 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
   abstract val execOperations: ExecOperations
 
   /**
-   * 构建、比较并注入本地 bundle。
+   * 构建并汇总本地 bundle，同时生成当前入口清单。
    *
-   * @throws GradleException 当 npm 产物、ADB、设备身份、run-as 写入或 App 重启失败时抛出；构建
-   * 阶段失败不会停止 App，注入阶段失败会保留已经成功构建的本地 tgz 供排查。
+   * @throws GradleException 当 npm 产物、Registry 响应或本地调试源写入失败时抛出。
    */
   @TaskAction
-  fun install() {
+  fun prepare() {
     val outputRoot = workingDirectory.get().asFile
     val packageSource = packageDirectory.get().asFile
     fileSystemOperations.delete { delete(outputRoot) }
@@ -144,47 +155,15 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
           outputIndex = index,
         )
       }
-    val changedPackages = packageResolutions.values.filter { it.archive != null }
-
-    if (runtimeResolution?.archive == null && changedPackages.isEmpty()) {
-      logger.lifecycle("Local npm package graph matches registry stable versions; skip ADB.")
-      return
-    }
-
-    // App 只在所有 npm pack 成功后停止，避免构建错误打断当前调试会话。
-    val appId = applicationId.get().also(::validateApplicationId)
-    val adb = findAdbExecutable()
-    val deviceArguments = selectedDeviceArguments()
-    runAdb(adb, deviceArguments, "shell", "am", "force-stop", appId)
-    runtimeResolution?.archive?.let { archive ->
-      installArchive(adb, deviceArguments, appId, runtimePackageName.get(), archive)
-    }
-    changedPackages.forEach { packageInfo ->
-      installArchive(
-        adb,
-        deviceArguments,
-        appId,
-        packageInfo.name,
-        checkNotNull(packageInfo.archive),
-      )
-    }
-    runAdb(
-      adb,
-      deviceArguments,
-      "shell",
-      "monkey",
-      "-c",
-      "android.intent.category.LAUNCHER",
-      "-p",
-      appId,
-      "1",
-    )
+    val manifest = synchronizeDebugSource(runtimeResolution, packageResolutions.values)
+    writeManifest(manifest)
     val runtimeSummary = runtimeResolution?.let { resolution ->
       "${runtimePackageName.get()}@${resolution.version}"
     } ?: "not required"
     logger.lifecycle(
-      "Installed changed local debug npm graph; packages={}, Runtime {}.",
-      changedPackages.joinToString { "${it.name}@${it.version}" }.ifEmpty { "unchanged" },
+      "Prepared local debug npm graph in {}; packages={}, Runtime {}.",
+      debugSourceDirectory.get().asFile,
+      packageResolutions.values.joinToString { "${it.name}@${it.version}" },
       runtimeSummary,
     )
   }
@@ -231,14 +210,18 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     val remoteIntegrity = readRemoteIntegrity(stableDirectory, runtimeName, stableVersion)
     if (remoteIntegrity == stableIntegrity) {
       logger.lifecycle("Reuse registry npm Runtime {}@{}.", runtimeName, stableVersion)
-      return RuntimeResolution(stableVersion, null)
+      return RuntimeResolution(
+        version = stableVersion,
+        archive = pack(stableDirectory, outputRoot.resolve("runtime-tarball")),
+        changed = false,
+      )
     }
 
     val debugVersion = debugVersionAfter(stableVersion, buildTimestamp)
     val debugDirectory = copyPackage(runtimeSource, outputRoot.resolve("runtime-debug"))
     updatePackageVersion(debugDirectory, debugVersion)
     val archive = pack(debugDirectory, outputRoot.resolve("runtime-tarball"))
-    return RuntimeResolution(debugVersion, archive)
+    return RuntimeResolution(debugVersion, archive, changed = true)
   }
 
   /**
@@ -281,7 +264,12 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
         source.name,
         source.stableVersion,
       )
-      return BusinessPackageResolution(source.name, source.stableVersion, null)
+      return BusinessPackageResolution(
+        name = source.name,
+        version = source.stableVersion,
+        archive = pack(directory, outputRoot.resolve("business-$outputIndex-tarball")),
+        changed = false,
+      )
     }
 
     val debugVersion = debugVersionAfter(source.stableVersion, buildTimestamp)
@@ -291,6 +279,7 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       name = source.name,
       version = debugVersion,
       archive = pack(directory, outputRoot.resolve("business-$outputIndex-tarball")),
+      changed = true,
     )
   }
 
@@ -422,41 +411,111 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
       ?: throw GradleException("npm pack did not produce exactly one tgz.")
   }
 
-  /** 先推到设备公共临时目录，再在 run-as 权限内原子替换 App 私有文件。 */
-  private fun installArchive(
-    adb: File,
-    deviceArguments: List<String>,
-    applicationId: String,
-    packageName: String,
-    archive: File,
-  ) {
-    val safeName = packageName.replace('@', '_').replace('/', '_')
-    val temporary = "/data/local/tmp/cyxbs-npm-$safeName-${archive.lastModified()}.tgz"
-    val destination = deviceArchivePath(packageName)
-    val destinationParent = destination.substringBeforeLast('/')
-    runAdb(adb, deviceArguments, "push", archive.absolutePath, temporary)
-    try {
-      // adb shell 不会保留宿主进程的参数边界，因此不使用 sh -c 拼接脚本，避免路径被拆成多个参数。
-      runAdb(adb, deviceArguments, "shell", "run-as", applicationId, "mkdir", "-p", destinationParent)
-      runAdb(adb, deviceArguments, "shell", "run-as", applicationId, "cp", temporary, "$destination.tmp")
-      runAdb(adb, deviceArguments, "shell", "run-as", applicationId, "mv", "$destination.tmp", destination)
-    } finally {
-      runAdbIgnoringFailure(adb, deviceArguments, "shell", "rm", "-f", temporary)
+  /**
+   * 将当前入口可达的全部本地包原子写入共享调试源，并返回 Android 安装所需的精确清单。
+   *
+   * 稳定包也会写入固定包名路径。这样某个包从 debug 内容恢复为 Registry 稳定内容时，Desktop
+   * 与 Android 都会用稳定 tgz 覆盖旧 debug tgz，而不会继续命中上一次的本地修改。
+   */
+  private fun synchronizeDebugSource(
+    runtimeResolution: RuntimeResolution?,
+    packageResolutions: Collection<BusinessPackageResolution>,
+  ): DebugNpmBundleManifest {
+    val artifacts = buildList {
+      if (runtimeResolution != null) {
+        add(
+          PackageArtifact(
+            name = runtimePackageName.get(),
+            version = runtimeResolution.version,
+            archive = runtimeResolution.archive,
+            changed = runtimeResolution.changed,
+          ),
+        )
+      }
+      packageResolutions.forEach { resolution ->
+        add(
+          PackageArtifact(
+            name = resolution.name,
+            version = resolution.version,
+            archive = resolution.archive,
+            changed = resolution.changed,
+          ),
+        )
+      }
     }
+    val sourceRoot = debugSourceDirectory.get().asFile.canonicalFile
+    sourceRoot.mkdirs()
+    val packages = artifacts.map { artifact ->
+      val relativePath = archiveRelativePath(artifact.name)
+      val destination = sourceRoot.resolve(relativePath).canonicalFile
+      requireInsideRoot(sourceRoot, destination, artifact.name)
+      copyAtomically(artifact.archive, destination)
+      DebugNpmBundlePackage(
+        name = artifact.name,
+        version = artifact.version,
+        relativeArchivePath = relativePath.replace(File.separatorChar, '/'),
+        changed = artifact.changed,
+      )
+    }
+    return DebugNpmBundleManifest(
+      entryPackage = readPackageName(packageDirectory.get().asFile),
+      packages = packages,
+    )
   }
 
-  /** App 私有缓存内的固定包路径；同名包每次 ADB 注入只保留一个源 tgz。 */
-  private fun deviceArchivePath(packageName: String): String {
+  /** 把入口清单写入模块自身 build 目录；清单不与其他入口共享，避免并发覆盖。 */
+  private fun writeManifest(manifest: DebugNpmBundleManifest) {
+    val target = manifestFile.get().asFile
+    target.parentFile.mkdirs()
+    val temporary = target.resolveSibling("${target.name}.tmp")
+    temporary.writeText(GsonBuilder().setPrettyPrinting().create().toJson(manifest) + "\n")
+    moveAtomically(temporary, target)
+  }
+
+  /** npm 包名映射到共享源中的固定 tgz 路径；固定路径便于直接覆盖旧调试内容。 */
+  private fun archiveRelativePath(packageName: String): String {
     val segments = packageName.split('/')
     if (segments.size !in 1..2 || segments.any { !PACKAGE_SEGMENT.matches(it) }) {
       throw GradleException("Invalid npm package name '$packageName'.")
     }
-    val relative = if (segments.size == 1) {
+    return if (segments.size == 1) {
       "${segments[0]}.tgz"
     } else {
       "${segments[0]}/${segments[1]}.tgz"
     }
-    return "$DEVICE_DEBUG_DIRECTORY/$relative"
+  }
+
+  /** 先复制到同目录临时文件再替换，防止 Desktop 在任务执行中读取到半个 tgz。 */
+  private fun copyAtomically(source: File, destination: File) {
+    destination.parentFile.mkdirs()
+    val temporary = destination.resolveSibling("${destination.name}.tmp")
+    try {
+      Files.copy(source.toPath(), temporary.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      moveAtomically(temporary, destination)
+    } finally {
+      Files.deleteIfExists(temporary.toPath())
+    }
+  }
+
+  /** 在文件系统支持时执行原子移动；跨平台不支持时退化为同目录覆盖。 */
+  private fun moveAtomically(source: File, destination: File) {
+    try {
+      Files.move(
+        source.toPath(),
+        destination.toPath(),
+        StandardCopyOption.ATOMIC_MOVE,
+        StandardCopyOption.REPLACE_EXISTING,
+      )
+    } catch (_: AtomicMoveNotSupportedException) {
+      Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+  }
+
+  /** 防止异常包名或清单路径逃逸到共享调试源之外。 */
+  private fun requireInsideRoot(root: File, destination: File, packageName: String) {
+    if (destination.toPath() != root.toPath() && !destination.toPath().startsWith(root.toPath())) {
+      throw GradleException("npm package '$packageName' escapes the shared debug source.")
+    }
   }
 
   private fun copyPackage(source: File, destination: File): File {
@@ -513,54 +572,12 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     )
   }
 
-  private fun runAdb(adb: File, deviceArguments: List<String>, vararg arguments: String) {
-    execOperations.exec {
-      commandLine(listOf(adb.absolutePath) + deviceArguments + arguments)
-    }.assertNormalExitValue()
-  }
-
-  private fun runAdbIgnoringFailure(
-    adb: File,
-    deviceArguments: List<String>,
-    vararg arguments: String,
-  ) {
-    execOperations.exec {
-      commandLine(listOf(adb.absolutePath) + deviceArguments + arguments)
-      isIgnoreExitValue = true
-    }
-  }
-
-  /** `-PandroidDeviceSerial` 优先于 ANDROID_SERIAL，未指定时交由 adb 选择唯一设备。 */
-  private fun selectedDeviceArguments(): List<String> {
-    val serial = project.providers.gradleProperty("androidDeviceSerial").orNull
-      ?: System.getenv("ANDROID_SERIAL")
-    return serial?.takeIf(String::isNotBlank)?.let { listOf("-s", it) }.orEmpty()
-  }
-
-  /** 按 Android SDK 环境变量或 local.properties 定位 adb。 */
-  private fun findAdbExecutable(): File {
-    val sdkRoot = sequenceOf(System.getenv("ANDROID_SDK_ROOT"), System.getenv("ANDROID_HOME"))
-      .filterNotNull()
-      .map(::File)
-      .firstOrNull(File::isDirectory)
-      ?: project.rootProject.file("local.properties").takeIf(File::isFile)?.useLines { lines ->
-        lines.firstOrNull { it.startsWith("sdk.dir=") }
-          ?.substringAfter('=')
-          ?.replace("\\\\", "\\")
-          ?.let(::File)
-      }
-      ?: throw GradleException("Android SDK was not found; configure ANDROID_SDK_ROOT or sdk.dir.")
-    return sdkRoot.resolve("platform-tools/adb").takeIf(File::isFile)
-      ?: throw GradleException("adb was not found under '${sdkRoot.absolutePath}'.")
-  }
-
-  private fun validateApplicationId(value: String) {
-    if (!APPLICATION_ID.matches(value)) {
-      throw GradleException("Invalid Android application id '$value'.")
-    }
-  }
-
-  private data class RuntimeResolution(val version: String, val archive: File?)
+  /** Runtime 的最终精确版本与本地归档；[changed] 表示是否偏离 Registry 稳定内容。 */
+  private data class RuntimeResolution(
+    val version: String,
+    val archive: File,
+    val changed: Boolean,
+  )
 
   /** 一个可独立发布的本地业务包及其稳定依赖声明。 */
   private data class LocalPackageSource(
@@ -570,11 +587,20 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
     val dependencies: Set<String>,
   )
 
-  /** 本次调试解析后的精确版本；[archive] 为空表示继续复用 Registry 稳定包。 */
+  /** 本次调试解析后的精确版本与归档；[changed] 表示是否需要 debug 预发布坐标。 */
   private data class BusinessPackageResolution(
     val name: String,
     val version: String,
-    val archive: File?,
+    val archive: File,
+    val changed: Boolean,
+  )
+
+  /** 写入共享调试源前的内部产物描述。 */
+  private data class PackageArtifact(
+    val name: String,
+    val version: String,
+    val archive: File,
+    val changed: Boolean,
   )
 
   private data class CommandResult(
@@ -587,13 +613,11 @@ abstract class InstallDebugNpmBundleTask : DefaultTask() {
 
   private companion object {
     const val PACKAGE_JSON = "package.json"
-    const val DEVICE_DEBUG_DIRECTORY = "cache/cyxbs-code/npm/debug"
     const val MAX_ERROR_OUTPUT_LENGTH = 4_000
     val DEBUG_ZONE_ID: ZoneId = ZoneId.of("Asia/Shanghai")
     val DEBUG_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
     val STABLE_VERSION = Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""")
     val PACKAGE_SEGMENT = Regex("""@?[a-z0-9][a-z0-9._~-]*""")
-    val APPLICATION_ID = Regex("""[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+""")
   }
 }
 

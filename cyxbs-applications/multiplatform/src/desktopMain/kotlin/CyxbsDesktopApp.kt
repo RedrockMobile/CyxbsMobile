@@ -3,10 +3,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.launchApplication
 import androidx.compose.ui.window.rememberWindowState
+import com.cyxbs.applications.multiplatform.DesktopMainBuildConfig
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.init.DesktopProjectEnvironment
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
@@ -23,9 +25,13 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 fun main() = runApp {
+  DesktopProjectEnvironment.initialize(
+    appId = DesktopMainBuildConfig.APP_ID,
+    projectDirectory = DesktopMainBuildConfig.PROJECT_DIRECTORY
+  )
+  FileKit.init(appId = DesktopMainBuildConfig.APP_ID)
   MultiplatformKtProviderInitializer.tryInitKtProvider()
   InitialManager.init(isMainProcess = true)
-  FileKit.init(appId = "com.mredrock.cyxbs")
   launchApplication {
     val width = 900
     val height = 600

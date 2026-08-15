@@ -13,7 +13,7 @@ import okio.Path
 import okio.SYSTEM
 
 /**
- * 从 App 私有 debug 目录按需读取本地 npm tgz，并将其投影为 registry metadata。
+ * 从平台 debug 目录按需读取本地 npm tgz，并将其投影为 registry metadata。
  *
  * ```text
  * metadata 请求 ──> 查找 debug/<scope>/<name>.tgz ──> 读取 package.json 与计算 SRI
@@ -26,12 +26,12 @@ import okio.SYSTEM
  * 虚拟 tarball 请求 https://cyxbs.local.debug/... ──> 直接返回同一 tgz
  * ```
  *
- * 本类不扫描目录、不持有包索引，也不删除文件。ADB 每次覆盖同包名文件，HTTP 请求到达时再读取，
- * 因而安装新的 debug bundle 后重启 App 即可进入正常 npm 解析链路。
+ * 本类不扫描目录、不持有包索引，也不删除文件。Android 由 ADB 覆盖 App 私有目录；Desktop
+ * 直接读取根项目的构建目录。HTTP 请求到达时才读取文件，因此两端仍复用相同的 npm 解析链路。
  */
 internal class DebugNpmPackageSource(
   private val fileSystem: FileSystem = FileSystem.SYSTEM,
-  private val rootDirectory: Path = DEFAULT_ROOT_DIRECTORY,
+  private val rootDirectory: Path? = defaultDebugNpmPackageRootDirectory(),
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
 
@@ -70,7 +70,7 @@ internal class DebugNpmPackageSource(
       val packageJson = json.parseToJsonElement(packageJsonBytes.decodeToString()).jsonObject
       val actualName = packageJson["name"]?.jsonPrimitive?.content
       val version = packageJson["version"]?.jsonPrimitive?.content
-      if (actualName != packageName || version == null || !DEBUG_VERSION.matches(version) ||
+      if (actualName != packageName || version == null || !LOCAL_VERSION.matches(version) ||
         NpmSemver.parseOrNull(version) == null
       ) {
         throw NpmDownloadException(
@@ -140,10 +140,11 @@ internal class DebugNpmPackageSource(
   /** 包名只允许 npm 作用域结构，拒绝利用路径片段越出固定 debug 目录。 */
   private fun archivePath(packageName: String): Path? {
     if (!PACKAGE_NAME.matches(packageName)) return null
+    val root = rootDirectory ?: return null
     val segments = packageName.split('/')
     return when (segments.size) {
-      1 -> rootDirectory / "${segments[0]}$TARBALL_SUFFIX"
-      2 -> rootDirectory / segments[0] / "${segments[1]}$TARBALL_SUFFIX"
+      1 -> root / "${segments[0]}$TARBALL_SUFFIX"
+      2 -> root / segments[0] / "${segments[1]}$TARBALL_SUFFIX"
       else -> null
     }
   }
@@ -153,14 +154,14 @@ internal class DebugNpmPackageSource(
   }
 
   private companion object {
-    val DEFAULT_ROOT_DIRECTORY: Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
-      "cyxbs-code" / "npm" / "debug"
     const val LOCAL_TARBALL_BASE_URL = "https://cyxbs.local.debug/"
     const val PACKAGE_JSON = "package.json"
     const val TARBALL_SUFFIX = ".tgz"
     const val METADATA_ACCEPT = "application/vnd.npm.install-v1+json"
     val MINIMUM_SEMVER = NpmSemver(0, 0, 0, listOf("0"))
-    val DEBUG_VERSION = Regex("""(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-debug\.\d{14}""")
+    val LOCAL_VERSION = Regex(
+      """(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-debug\.\d{14})?""",
+    )
     val PACKAGE_NAME = Regex("""(?:@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*""")
   }
 }

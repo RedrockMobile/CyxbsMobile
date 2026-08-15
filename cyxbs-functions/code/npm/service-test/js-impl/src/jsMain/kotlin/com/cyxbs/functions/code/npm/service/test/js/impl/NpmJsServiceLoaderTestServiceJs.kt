@@ -7,7 +7,7 @@ import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTes
 /**
  * npm 测试包中的 Kotlin/JS Service 实现。
  *
- * 手动验证热更新时可修改 [BUNDLE_MARKER]，再执行本模块的 installDebugNpmBundle 任务；测试页面
+ * 手动验证热更新时可修改 [BUNDLE_MARKER]，再执行本模块的 installAndroidDebugNpmBundle 任务；测试页面
  * 应在 App 重启后展示新的标识。
  */
 object NpmJsServiceLoaderTestServiceJs : NpmJsServiceLoaderTestService {

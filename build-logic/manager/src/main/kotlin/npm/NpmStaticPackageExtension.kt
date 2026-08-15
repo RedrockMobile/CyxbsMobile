@@ -89,23 +89,32 @@ fun Project.configureNpmStaticPackaging() {
     destinationDirectory.set(layout.buildDirectory.dir("npm/tarball"))
     npmExecutable.set(extension.npmExecutable)
   }
-  tasks.register<InstallDebugNpmBundleTask>("installDebugNpmBundle") {
+  val prepareDebugBundle = tasks.register<PrepareDebugNpmBundleTask>("prepareDebugNpmBundle") {
     group = "npm"
-    description = "比较 Registry 稳定包；存在变化时生成静态 debug bundle、ADB 覆盖并重启。"
-    // 注入阶段读取当前 Gradle 属性与本机 Android SDK，不复用 configuration cache。
-    notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+    description = "比较 Registry，并把静态 npm 包汇总到根项目共享调试源。"
     dependsOn(preparePackage)
     packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
     localPackageDirectories.from(preparePackage.flatMap { it.outputDirectory })
     npmExecutable.set(extension.npmExecutable)
     registryUrl.set(extension.registryUrl)
+    workingDirectory.set(layout.buildDirectory.dir("npm/debug-bundle"))
+    debugSourceDirectory.set(rootProject.layout.buildDirectory.dir("npm/debug-source"))
+    manifestFile.set(layout.buildDirectory.file("npm/debug-bundle/manifest.json"))
+    // 每次执行都重新比较 Registry，确保撤销本地改动时稳定 tgz 也能覆盖旧 debug tgz。
+    outputs.upToDateWhen { false }
+  }
+  tasks.register<InstallAndroidDebugNpmBundleTask>("installAndroidDebugNpmBundle") {
+    group = "npm"
+    description = "准备统一 npm 调试源，将当前静态包安装到 Android 并重启应用。"
+    // 安装阶段读取当前 Gradle 属性与本机 Android SDK，不复用 configuration cache。
+    notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+    dependsOn(prepareDebugBundle)
+    manifestFile.set(prepareDebugBundle.flatMap { it.manifestFile })
+    debugSourceDirectory.set(rootProject.layout.buildDirectory.dir("npm/debug-source"))
     applicationId.set(
       providers.gradleProperty("npmDebugApplicationId")
         .orElse("com.mredrock.cyxbs.test"),
     )
-    workingDirectory.set(layout.buildDirectory.dir("npm/debug-bundle"))
-    // 每次执行都重新比较 Registry；内容一致时任务内部会跳过 ADB 与 App 重启。
-    outputs.upToDateWhen { false }
   }
   tasks.register<PublishNpmJsPackageTask>("publishNpmPackage") {
     group = "npm"

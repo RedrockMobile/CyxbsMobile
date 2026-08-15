@@ -36,7 +36,8 @@ val npmJsPackage = createNpmJsPackageExtension()
  * 应用插件后会把当前模块自动加入 `:cyxbs-functions:code:npm:distribution` 的聚合编译，并提供：
  * - `prepareNpmJsPackage`：仅生成最终发布目录，用于检查分包结果；不调用 npm、不联网。
  * - `packNpmJsPackage`：按依赖拓扑生成 Runtime、项目依赖与当前包的独立 tgz；不访问 Registry。
- * - `installDebugNpmBundle`：按依赖拓扑生成带时间版本的测试 tgz，ADB 替换私有 debug 源并重启。
+ * - `prepareDebugNpmBundle`：按依赖拓扑生成本地 tgz，并汇总到根项目统一调试源供 Desktop 读取。
+ * - `installAndroidDebugNpmBundle`：先执行 prepare，再把同一入口清单安装到 Android 私有源并重启。
  * - `publishNpmJsPackage`：按依赖拓扑校验 Runtime、项目依赖与当前包；相同内容复用，缺失才发布。
  *
  * 正常发布只需执行最后一个任务；真机验证执行 install，prepare/pack 用于检查产物与 CI 制品留存。

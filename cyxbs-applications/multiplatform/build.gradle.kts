@@ -1,5 +1,8 @@
+import rule.ModuleNamespaceCheckRule
+
 plugins {
   id("manager.app-multiplatform")
+  alias(libs.plugins.buildconfig)
 }
 
 useKtProvider()
@@ -48,4 +51,32 @@ tasks.all {
     // 抑制 channelRelease 不能缓存的报错
     notCompatibleWithConfigurationCache("suppres configuration cache")
   }
+}
+
+val isDesktopDebugRun = project.gradle.startParameter.taskNames.any { taskName ->
+  taskName.substringAfterLast(':') == "run" || taskName.substringAfterLast(':') == "hotRunDesktop"
+}
+
+buildConfig {
+  packageName(ModuleNamespaceCheckRule.getCorrectNamespace(project))
+  useKotlinOutput()
+  sourceSets.named("desktopMain") {
+    // ⚠️这里的配置如果其他模块需要统一写进 cyxbs-functions/init 模块的 DesktopProjectEnvironment 中
+    buildConfigField(
+      "APP_ID",
+      "com.mredrock.cyxbs"
+    )
+    buildConfigField(
+      "PROJECT_DIRECTORY",
+      if (isDesktopDebugRun) {
+        // 仅在 AS 中运行桌面端时才输出项目路径
+        rootProject.layout.projectDirectory.asFile.absolutePath
+      } else "",
+    )
+  }
+}
+
+// Desktop KSP 会扫描 BuildConfig 生成源码；显式声明顺序，避免 clean 构建时并发读取未生成目录。
+tasks.matching { task -> task.name == "kspKotlinDesktop" }.configureEach {
+  dependsOn("generateDesktopMainBuildConfigClasses")
 }

@@ -96,6 +96,24 @@ class DebugNpmPackageSourceTest {
     }
   }
 
+  /** 稳定 tgz 也属于统一调试源，用来覆盖同包名路径中已经撤销的旧 debug 内容。 */
+  @Test
+  fun stablePackageCanReplacePreviousDebugArchive() {
+    withSource { source, root, fileSystem ->
+      val packageName = "@cyxbs-mobile/kotlin-js-runtime"
+      val archivePath = root / "@cyxbs-mobile" / "kotlin-js-runtime.tgz"
+      fileSystem.createDirectories(requireNotNull(archivePath.parent))
+      writeArchive(
+        fileSystem,
+        archivePath,
+        """{"name":"$packageName","version":"0.2.0"}""",
+      )
+
+      val localPackage = assertNotNull(source.read(packageName))
+      assertEquals("0.2.0", localPackage.version)
+    }
+  }
+
   /** 为每个用例创建独立的固定 debug 根目录并在结束后清理。 */
   private fun withSource(block: (DebugNpmPackageSource, Path, FileSystem) -> Unit) {
     val fileSystem = FileSystem.SYSTEM

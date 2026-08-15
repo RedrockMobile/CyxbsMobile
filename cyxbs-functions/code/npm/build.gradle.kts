@@ -8,6 +8,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.cyxbsFunctions.code.npm.jsBridge)
+      implementation(projects.cyxbsComponents.init)
       implementation(projects.cyxbsComponents.utils)
     }
 

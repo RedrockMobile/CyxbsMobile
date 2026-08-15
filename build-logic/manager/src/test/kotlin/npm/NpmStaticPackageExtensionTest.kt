@@ -35,23 +35,35 @@ class NpmStaticPackageExtensionTest {
     }
   }
 
-  /** 静态包应复用 debug 注入任务，但不得被迫配置 Kotlin/JS Runtime。 */
+  /** 静态包应先生成统一调试源，再由独立 Android 任务消费，且不得配置 Kotlin/JS Runtime。 */
   @Test
-  fun registersDebugBundleInstallWithoutRuntime() {
+  fun registersAndroidDebugBundleInstallWithoutRuntime() {
     withProject { project ->
       project.version = "1.2.3"
       project.createNpmStaticPackageExtension()
 
       project.configureNpmStaticPackaging()
 
-      val task = project.tasks.named<InstallDebugNpmBundleTask>("installDebugNpmBundle").get()
-      assertFalse(task.runtimePackageDirectory.isPresent)
-      assertFalse(task.runtimePackageName.isPresent)
-      assertFalse(task.runtimeStableVersion.isPresent)
-      assertEquals("com.mredrock.cyxbs.test", task.applicationId.get())
+      val prepareTask = project.tasks.named<PrepareDebugNpmBundleTask>("prepareDebugNpmBundle").get()
+      assertFalse(prepareTask.runtimePackageDirectory.isPresent)
+      assertFalse(prepareTask.runtimePackageName.isPresent)
+      assertFalse(prepareTask.runtimeStableVersion.isPresent)
       assertEquals(
         project.layout.buildDirectory.dir("npm/debug-bundle").get().asFile,
-        task.workingDirectory.get().asFile,
+        prepareTask.workingDirectory.get().asFile,
+      )
+      assertEquals(
+        project.rootProject.layout.buildDirectory.dir("npm/debug-source").get().asFile,
+        prepareTask.debugSourceDirectory.get().asFile,
+      )
+
+      val installTask = project.tasks.named<InstallAndroidDebugNpmBundleTask>(
+        "installAndroidDebugNpmBundle",
+      ).get()
+      assertEquals("com.mredrock.cyxbs.test", installTask.applicationId.get())
+      assertEquals(prepareTask.manifestFile.get(), installTask.manifestFile.get())
+      assertTrue(
+        installTask.taskDependencies.getDependencies(installTask).contains(prepareTask),
       )
     }
   }

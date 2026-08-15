@@ -192,7 +192,8 @@ fun Project.createNpmJsPackageExtension(): NpmJsPackageExtension {
  *          ▼
  * packNpmJsPackage     生成 Runtime、项目依赖与当前业务包的独立 tgz；不访问 Registry
  *
- * installDebugNpmBundle 生成 debug tgz，ADB 原子替换 App 私有源并重启；不发布到 Registry
+ * prepareDebugNpmBundle 比较 Registry，并把完整本地依赖图汇总到根项目共享调试源
+ * installAndroidDebugNpmBundle 消费同一份入口清单，ADB 原子替换 App 私有源并重启
  *
  * publishNpmJsPackage  按依赖拓扑检查 Runtime、项目依赖与当前包；仅发布远端缺失版本
  * ```
@@ -290,13 +291,11 @@ fun Project.configureNpmJsPackaging() {
         // ensure 会直接失败，当前业务包不会被上传，避免发布引用错误 ABI 的版本。
         dependsOn(ensureRuntime)
       }
-      val installDebugBundle = packageProject.tasks.register<InstallDebugNpmBundleTask>(
-        "installDebugNpmBundle",
+      val prepareDebugBundle = packageProject.tasks.register<PrepareDebugNpmBundleTask>(
+        "prepareDebugNpmBundle",
       ) {
         group = "npm"
-        description = "比较 Registry 稳定包；存在变化时生成 debug bundle、ADB 覆盖并重启。"
-        // 注入阶段需要读取当前 Gradle 属性与本机 Android SDK，不复用该任务的 configuration cache。
-        notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+        description = "比较 Registry，并把入口可达的本地 npm 包汇总到共享调试源。"
         dependsOn(preparePackage, prepareRuntime)
         packageDirectory.set(preparePackage.flatMap { it.outputDirectory })
         localPackageDirectories.from(packageRegistry.preparedPackageDirectories)
@@ -305,13 +304,30 @@ fun Project.configureNpmJsPackaging() {
         runtimeStableVersion.set(extension.runtimePackageVersion)
         npmExecutable.set(extension.npmExecutable)
         registryUrl.set(extension.registryUrl)
+        workingDirectory.set(packageProject.layout.buildDirectory.dir("npm/debug-bundle"))
+        debugSourceDirectory.set(
+          packageProject.rootProject.layout.buildDirectory.dir("npm/debug-source"),
+        )
+        manifestFile.set(packageProject.layout.buildDirectory.file("npm/debug-bundle/manifest.json"))
+        // 每次执行都重新查询 Registry，确定共享源应写入稳定包还是新的 debug 包。
+        outputs.upToDateWhen { false }
+      }
+      packageProject.tasks.register<InstallAndroidDebugNpmBundleTask>(
+        "installAndroidDebugNpmBundle",
+      ) {
+        group = "npm"
+        description = "准备统一 npm 调试源，将当前入口清单安装到 Android 并重启应用。"
+        // 安装阶段读取当前 Gradle 属性与本机 Android SDK，不复用该任务的 configuration cache。
+        notCompatibleWithConfigurationCache("npm debug bundle installation depends on the local Android environment")
+        dependsOn(prepareDebugBundle)
+        manifestFile.set(prepareDebugBundle.flatMap { it.manifestFile })
+        debugSourceDirectory.set(
+          packageProject.rootProject.layout.buildDirectory.dir("npm/debug-source"),
+        )
         applicationId.set(
           packageProject.providers.gradleProperty("npmDebugApplicationId")
             .orElse("com.mredrock.cyxbs.test"),
         )
-        workingDirectory.set(packageProject.layout.buildDirectory.dir("npm/debug-bundle"))
-        // 每次执行都需要重新查询 Registry；任务内部会在所有候选包均未变化时跳过 ADB 与重启。
-        outputs.upToDateWhen { false }
       }
       packageProject.gradle.projectsEvaluated {
         // 当前包改为独立 npm 依赖后，pack/publish 必须先完成直接项目依赖；依赖任务自身会继续
@@ -330,7 +346,7 @@ fun Project.configureNpmJsPackaging() {
           }
           // 注册表包含所有模块目录，但任务执行时只遍历入口可达包；显式依赖保证直接依赖的
           // prepare 已进入当前任务图，其他目录的 builtBy 负责补齐更深层依赖。
-          installDebugBundle.configure {
+          prepareDebugBundle.configure {
             dependsOn(dependencyPrepare)
           }
         }
