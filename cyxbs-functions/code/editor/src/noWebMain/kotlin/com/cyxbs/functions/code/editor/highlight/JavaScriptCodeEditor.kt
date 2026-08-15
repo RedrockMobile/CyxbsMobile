@@ -1,10 +1,7 @@
 package com.cyxbs.functions.code.editor.highlight
 
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -13,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -24,9 +20,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -637,36 +635,78 @@ fun JavaScriptCodeEditor(
   state: JavaScriptCodeEditorState,
   modifier: Modifier = Modifier,
 ) {
-  BoxWithConstraints(modifier = modifier) {
+  Box(modifier = modifier) {
     KodeMirror(
       session = state.session,
       modifier = Modifier
         .fillMaxSize()
         .roundedCodeAreaBackground(state),
     )
-    if (codeEditorSearchPanelOpen(state.session)) {
-      val useBottomSearchPanel = maxWidth < PhoneSearchPanelBreakpoint
-      // 手机宽度下使用铺满编辑器的底部搜索栏；更宽窗口继续使用右上角紧凑浮层。
-      val searchPanelWidth = (maxWidth - 12.dp)
-        .coerceAtLeast(0.dp)
-        .coerceAtMost(330.dp)
-      val searchPanelModifier = if (useBottomSearchPanel) {
-        Modifier
-          .align(Alignment.BottomCenter)
-          .fillMaxWidth()
-      } else {
-        Modifier
-          .align(Alignment.TopEnd)
-          .padding(top = 6.dp, end = 6.dp)
-          .width(searchPanelWidth)
-      }
-      KodeMirrorSearchPanel(
-        session = state.session,
-        modifier = searchPanelModifier,
-      )
-    }
+    CodeEditorSearchPanelSlot(session = state.session)
+  }
+}
+
+/**
+ * 独立观察搜索状态并按需提供搜索面板布局节点。
+ *
+ * 搜索开关只会使本槽位重新组合；外层 [Box] 随节点增减重新测量，但不会因为读取容器约束
+ * 而扩大 KodeMirror 的重组范围。
+ */
+@Composable
+private fun CodeEditorSearchPanelSlot(session: EditorSession) {
+  if (codeEditorSearchPanelOpen(session)) {
+    KodeMirrorSearchPanel(
+      session = session,
+      modifier = Modifier.searchPanelLayout(),
+    )
+  }
+}
+
+/**
+ * 仅在测量阶段根据编辑器约束摆放搜索面板。
+ *
+ * 修饰符自身占满父级 [Box]，搜索面板在其内部按实际宽度测量：手机宽度下贴底铺满，宽屏下
+ * 限宽并放置在右上角。容器尺寸变化只会重新测量本节点，不会使 KodeMirror 读取布局约束。
+ */
+private fun Modifier.searchPanelLayout(): Modifier = layout { measurable, constraints ->
+  val layoutWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else constraints.minWidth
+  val layoutHeight = if (constraints.hasBoundedHeight) constraints.maxHeight else constraints.minHeight
+  val edgeSpacing = SearchPanelEdgeSpacing.roundToPx()
+  val useBottomSearchPanel = layoutWidth < PhoneSearchPanelBreakpoint.roundToPx()
+  val searchWidth = if (useBottomSearchPanel) {
+    layoutWidth
+  } else {
+    minOf(
+      SearchPanelMaximumWidth.roundToPx(),
+      (layoutWidth - edgeSpacing * 2).coerceAtLeast(0),
+    )
+  }
+  val searchMaximumHeight = if (useBottomSearchPanel) {
+    layoutHeight
+  } else {
+    (layoutHeight - edgeSpacing).coerceAtLeast(0)
+  }
+  val placeable = measurable.measure(
+    Constraints(
+      minWidth = searchWidth,
+      maxWidth = searchWidth,
+      minHeight = 0,
+      maxHeight = searchMaximumHeight,
+    ),
+  )
+
+  layout(width = layoutWidth, height = layoutHeight) {
+    val x = if (useBottomSearchPanel) 0 else layoutWidth - placeable.width - edgeSpacing
+    val y = if (useBottomSearchPanel) layoutHeight - placeable.height else edgeSpacing
+    placeable.placeRelative(x = x.coerceAtLeast(0), y = y.coerceAtLeast(0))
   }
 }
 
 /** 手机紧凑宽度分界；以当前编辑器容器宽度判断，支持分屏和窗口动态缩放。 */
 private val PhoneSearchPanelBreakpoint = 600.dp
+
+/** 宽屏搜索浮层的最大宽度，防止输入框遮挡过多代码。 */
+private val SearchPanelMaximumWidth = 330.dp
+
+/** 宽屏搜索浮层与编辑器顶部、末端的间距。 */
+private val SearchPanelEdgeSpacing = 6.dp
