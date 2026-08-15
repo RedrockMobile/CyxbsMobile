@@ -78,13 +78,13 @@ import kotlinx.serialization.SerializationException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * JavaScript 编辑器状态。
+ * 代码编辑器状态。
  *
  * 状态内部持有 KodeMirror 会话，对外只暴露当前源码，避免业务代码依赖第三方编辑器类型。
  * [code] 会读取编辑器的最新文档，可直接在“运行”操作触发时获取用户输入。
  */
 @Stable
-class JavaScriptCodeEditorState internal constructor(
+class CodeEditorState internal constructor(
   session: EditorSession,
   initialFilePath: String,
   initialSource: String,
@@ -104,7 +104,7 @@ class JavaScriptCodeEditorState internal constructor(
   )
 
   /**
-   * 编辑器最多保留的文件会话数量；默认由 [rememberJavaScriptCodeEditorState] 设置为 20。
+   * 编辑器最多保留的文件会话数量；默认由 [rememberCodeEditorState] 设置为 20。
    *
    * 调整为更小的值会立即淘汰最久未访问的文件；设为 0 时只保留当前文件，不跨文件缓存。
    */
@@ -114,7 +114,7 @@ class JavaScriptCodeEditorState internal constructor(
       sessionCache.capacity = value
     }
 
-  /** 当前编辑器中的完整 JavaScript 源码。 */
+  /** 当前编辑器中的完整源码。 */
   val code: String
     get() = session.state.doc.toString()
 
@@ -418,24 +418,27 @@ class JavaScriptCodeEditorState internal constructor(
 }
 
 /**
- * 创建并记住一个 JavaScript 编辑器状态。
+ * 创建并记住一个代码编辑器状态。
  *
  * @param initialCode 首次创建状态时使用的源码；后续重组不会覆盖用户已经编辑的内容。
+ * @param activeFilePath 当前编辑文档在工作区中的相对路径；必须由调用方显式提供，避免编辑器
+ * 隐式假定源码语言或文件扩展名。
+ * @param workspace 当前完整工作区；默认使用 [activeFilePath] 和 [initialCode] 构造单文件工作区。
  * @param languageService 当前已经加载的动态语言服务；可先传 null，加载完成后的重组会让补全源
  * 立即使用新服务，而不会重建或覆盖编辑器文档。
  * @param highlightCacheCapacity 最多保留的文件会话数量，默认 20；运行时变化不会重建当前状态。
  * @return 可读取当前源码并在多个组合节点间共享的编辑器状态。
  */
 @Composable
-fun rememberJavaScriptCodeEditorState(
+fun rememberCodeEditorState(
   initialCode: String = "",
-  activeFilePath: String = DEFAULT_EDITOR_FILE_PATH,
+  activeFilePath: String,
   workspace: DynamicLanguageWorkspace = DynamicLanguageWorkspace(
     files = listOf(DynamicSourceFile(activeFilePath, initialCode)),
   ),
   languageService: DynamicLanguageService? = null,
   highlightCacheCapacity: Int = DEFAULT_HIGHLIGHT_CACHE_CAPACITY,
-): JavaScriptCodeEditorState {
+): CodeEditorState {
   val currentLanguageService = rememberUpdatedState(languageService)
   val currentWorkspace = rememberUpdatedState(workspace)
   val currentFilePath = rememberUpdatedState(activeFilePath)
@@ -464,7 +467,7 @@ fun rememberJavaScriptCodeEditorState(
     extensions = editorExtensions,
   )
   val state = remember(session) {
-    JavaScriptCodeEditorState(
+    CodeEditorState(
       session = session,
       initialFilePath = activeFilePath,
       initialSource = initialCode,
@@ -488,9 +491,6 @@ fun rememberJavaScriptCodeEditorState(
   }
   return state
 }
-
-/** 未显式创建工作区时使用的单文件路径。 */
-private const val DEFAULT_EDITOR_FILE_PATH = "main.js"
 
 /** 默认保留最近 20 个文件的编辑会话，业务可通过编辑器设置覆盖。 */
 const val DEFAULT_HIGHLIGHT_CACHE_CAPACITY = 20
@@ -549,7 +549,7 @@ private val codeEditorTextStyle = TextStyle(
  * 宽度会随文档行数位数、字体缩放和已注册 gutter 动态变化；调用方不应再复制固定 dp 值。
  */
 @Composable
-internal fun JavaScriptCodeEditorState.editorGutterWidth(): Dp {
+internal fun CodeEditorState.editorGutterWidth(): Dp {
   val editorState = session.state
   val gutterConfigurations = editorState.facet(gutters)
   if (gutterConfigurations.isEmpty()) return 0.dp
@@ -578,7 +578,7 @@ internal fun JavaScriptCodeEditorState.editorGutterWidth(): Dp {
  * 与自定义 gutter 算法。
  */
 @Composable
-private fun Modifier.roundedCodeAreaBackground(state: JavaScriptCodeEditorState): Modifier {
+private fun Modifier.roundedCodeAreaBackground(state: CodeEditorState): Modifier {
   val density = LocalDensity.current
   val gutterWidth = state.editorGutterWidth()
   val gutterWidthPx = with(density) { gutterWidth.toPx() }
@@ -619,20 +619,20 @@ private fun Modifier.roundedCodeAreaBackground(state: JavaScriptCodeEditorState)
 }
 
 /**
- * 使用纯 Compose KodeMirror 渲染可编辑的 JavaScript 代码视图。
+ * 使用纯 Compose KodeMirror 渲染可编辑的代码视图。
  *
- * 组件自身不再绑定 JavaScript 解析器，仅提供行号、折叠、搜索等通用编辑能力；语法解析与
+ * 组件自身不绑定具体语言解析器，仅提供行号、折叠、搜索等通用编辑能力；语法解析与
  * 高亮、补全由动态语言包加载后接入，避免每种语言的解析实现都进入安装包。
  *
  * 当前组件仅进入 Android、iOS 与 Desktop 的 `noWebMain`。调用方应为组件提供有界高度，
  * KodeMirror 才能在编辑区域内部正确滚动并保持光标可见。
  *
- * @param state 由 [rememberJavaScriptCodeEditorState] 创建的编辑器状态。
+ * @param state 由 [rememberCodeEditorState] 创建的编辑器状态。
  * @param modifier 应用到编辑器根节点的布局修饰符。
  */
 @Composable
-fun JavaScriptCodeEditor(
-  state: JavaScriptCodeEditorState,
+fun CodeEditor(
+  state: CodeEditorState,
   modifier: Modifier = Modifier,
 ) {
   Box(modifier = modifier) {

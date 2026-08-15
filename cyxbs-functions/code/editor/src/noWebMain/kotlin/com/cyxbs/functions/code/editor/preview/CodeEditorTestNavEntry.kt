@@ -14,10 +14,10 @@ import androidx.compose.ui.Modifier
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
-import com.cyxbs.functions.code.editor.highlight.JavaScriptCodeEditor
+import com.cyxbs.functions.code.editor.highlight.CodeEditor
 import com.cyxbs.functions.code.editor.highlight.DEFAULT_HIGHLIGHT_CACHE_CAPACITY
 import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
-import com.cyxbs.functions.code.editor.highlight.rememberJavaScriptCodeEditorState
+import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
@@ -83,7 +83,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         .sortedBy(Map.Entry<String, String>::key)
         .map { (path, source) -> DynamicSourceFile(path, source) },
     )
-    val editorState = rememberJavaScriptCodeEditorState(
+    val editorState = rememberCodeEditorState(
       initialCode = DEFAULT_MAIN_CODE,
       activeFilePath = activeFilePath,
       workspace = workspace,
@@ -385,7 +385,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       onSearch = { editorState.openSearch() },
       editorGutterWidth = editorState.editorGutterWidth(),
       editor = {
-        JavaScriptCodeEditor(
+        CodeEditor(
           state = editorState,
           modifier = Modifier.fillMaxSize(),
         )

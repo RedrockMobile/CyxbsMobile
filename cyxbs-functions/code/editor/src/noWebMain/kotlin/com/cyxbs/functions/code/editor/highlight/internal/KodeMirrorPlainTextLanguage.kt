@@ -15,7 +15,7 @@ import com.monkopedia.kodemirror.state.Extension
  *
  * KodeMirror 的基础编辑扩展要求会话中存在一个 [Language]，否则会在创建编辑器时直接失败。
  * 这里仅生成覆盖完整文档的空语法树，用于保留输入、光标和搜索等通用编辑能力；真正的高亮、
- * 补全和语义分析仍由按需下载的动态语言服务完成，不会把静态 JavaScript 解析器带回安装包。
+ * 补全和语义分析仍由按需下载的动态语言服务完成，不会把具体语言的静态解析器带回安装包。
  */
 internal val kodeMirrorPlainTextLanguageExtension: Extension =
   Language(parser = PlainTextParser, name = "Plain text").extension

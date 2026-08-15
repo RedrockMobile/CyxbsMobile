@@ -723,7 +723,7 @@ private fun EditorDocumentBar(
           Box(
             Modifier
               .size(8.dp)
-              .background(EditorWorkbenchColors.JavaScriptFile, CircleShape),
+              .background(EditorWorkbenchColors.FileIndicator, CircleShape),
           )
           Text(
             text = document.substringAfterLast('/'),
@@ -1555,7 +1555,7 @@ internal object EditorWorkbenchColors {
   val ActionBackground = LightBackground
   val DocumentBarBackground = DeepBackground
   val ActiveDocumentBackground = LightBackground
-  val JavaScriptFile = Color(0xFFF3C969)
+  val FileIndicator = Color(0xFFF3C969)
   // 抽屉活动栏使用深黑、右侧目录面板使用淡黑，选中项复用面板色以维持连续的连接造型。
   val ActivityBarBackground = DeepBackground
   val PanelBackground = LightBackground
