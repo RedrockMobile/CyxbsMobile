@@ -17,10 +17,12 @@ import kotlinx.serialization.json.JsonElement
  *
  * [compilation] 对 Java 可通过光标选择 static 方法，对 JavaScript/Python 等脚本语言则选择入口
  * 文件。[arguments] 使用 JSON 值保证各平台和语言之间拥有稳定、可检查的基础值边界。
+ * [standardInput] 是运行前一次性准备的完整输入快照，不会在程序执行期间阻塞等待交互输入。
  */
 data class DynamicProgramRunRequest(
   val compilation: DynamicCompilationRequest,
   val arguments: List<JsonElement> = emptyList(),
+  val standardInput: String = "",
 )
 
 /**
@@ -33,20 +35,81 @@ data class DynamicProgramRunOptions(
   val memoryLimitBytes: Long = 32L * 1024L * 1024L,
   val maxStackSizeBytes: Long = 256L * 1024L,
   val evaluationTimeoutMillis: Long = 5_000L,
+  /**
+   * 运行期间接收已接受输出的同步通知；为 null 时仅在运行结束后读取结果中的标准流文本。
+   *
+   * 回调位于 Runtime binding 边界，调用方必须快速投递，不能阻塞或同步重入当前 Runtime。
+   */
+  val outputSink: DynamicProgramOutputSink? = null,
+  /**
+   * 标准输出和标准错误合计允许保留的最大 UTF-8 字节数。
+   *
+   * 超量文本不会再占用运行结果内存，也不会向 [outputSink] 发送；运行仍会继续，并通过结果中的
+   * 截断字段通知调用方。设为 0 可禁用输出保留。
+   */
+  val maxOutputBytes: Long = DEFAULT_MAX_OUTPUT_BYTES,
+  /**
+   * 本次运行允许传入的标准输入最大 UTF-8 字节数。
+   *
+   * 输入在创建用户代码 Runtime 前校验，超限会明确终止运行而不会静默截断。该限制只约束
+   * [DynamicProgramRunRequest.standardInput]，不改变入口 [DynamicProgramRunRequest.arguments]。
+   */
+  val maxInputBytes: Long = DEFAULT_MAX_INPUT_BYTES,
 ) {
   init {
     require(maxStackSizeBytes > 0) { "maxStackSizeBytes must be greater than 0." }
     require(evaluationTimeoutMillis >= 0) {
       "evaluationTimeoutMillis must not be negative."
     }
+    require(maxOutputBytes >= 0) { "maxOutputBytes must not be negative." }
+    require(maxInputBytes >= 0) { "maxInputBytes must not be negative." }
   }
+
+  companion object {
+    /** 默认限制运行输出为 64 KiB，避免教学死循环持续追加文本导致页面和内存失控。 */
+    const val DEFAULT_MAX_OUTPUT_BYTES: Long = 64L * 1024L
+
+    /** 默认允许预加载 64 KiB 标准输入，覆盖教学用例并限制复制到 JS Runtime 的文本大小。 */
+    const val DEFAULT_MAX_INPUT_BYTES: Long = 64L * 1024L
+  }
+}
+
+/** 动态程序输出所属的标准流。 */
+enum class DynamicProgramOutputChannel {
+  STANDARD_OUTPUT,
+  STANDARD_ERROR,
+}
+
+/**
+ * 一段已脱离具体 JavaScript Runtime 生命周期的用户程序输出。
+ *
+ * [text] 保留原始换行，不会为了 UI 展示额外补换行；因此 Java `print`、`println` 和未来 Python、
+ * JavaScript 的直接输出可以准确区分。
+ */
+data class DynamicProgramOutputEvent(
+  val channel: DynamicProgramOutputChannel,
+  val text: String,
+)
+
+/**
+ * 接收用户程序的增量输出。
+ *
+ * 回调发生在底层 Runtime 的同步宿主 binding 边界，必须快速返回，不得进行网络、磁盘或其他阻塞操作，
+ * 也不得同步重新进入同一个 Runtime。需要切换协程或更新 UI 时，应只把 [DynamicProgramOutputEvent] 投递给
+ * 调用方自己的队列；回调异常会中断当前运行，并由执行器统一包装为 [DynamicLanguageExecutionException]，
+ * 原始异常会保留在 cause 链中。
+ */
+fun interface DynamicProgramOutputSink {
+
+  /** 接收本次运行允许保留的一段输出事件。 */
+  fun write(event: DynamicProgramOutputEvent)
 }
 
 /**
  * 动态程序运行结果。
  *
  * [executed] 为 false 表示编译失败，此时不会创建用户代码 Runtime；[diagnostics] 同时保留成功
- * 编译的警告。标准输出和错误输出由独立 Runtime 中的 console bridge 收集。
+ * 编译的警告。标准输出和错误输出由独立 Runtime 中的 console 与宿主输出 bridge 收集。
  */
 data class DynamicProgramRunResult(
   val executed: Boolean,
@@ -54,6 +117,10 @@ data class DynamicProgramRunResult(
   val standardOutput: String = "",
   val standardError: String = "",
   val diagnostics: List<DynamicCompilationDiagnostic> = emptyList(),
+  /** 输出是否因 [DynamicProgramRunOptions.maxOutputBytes] 被截断。 */
+  val outputTruncated: Boolean = false,
+  /** 因输出上限未被保留或通知给 sink 的 UTF-8 字节数。 */
+  val droppedOutputBytes: Long = 0,
 )
 
 /**
@@ -75,8 +142,8 @@ class DynamicLanguageSession internal constructor(
    * 编译错误作为 [DynamicProgramRunResult] 返回；Runtime 创建、Module 加载或执行失败则抛出
    * [DynamicLanguageExecutionException]。协程取消会原样传播并关闭当前用户代码 Runtime。
    *
-   * @param request 工作区、入口和 JSON 参数。
-   * @param options 当前执行专属的内存、栈和超时限制。
+   * @param request 工作区、入口、JSON 参数和运行前预加载的标准输入。
+   * @param options 当前执行专属的内存、栈、超时及输入输出大小限制。
    * @throws DynamicLanguageExecutionException Runtime 不可用、Module 图无效或执行失败。
    * @throws SerializationException npm 语言 Service 的编译协议不匹配。
    * @throws CancellationException 调用协程被取消。
@@ -111,12 +178,18 @@ class DynamicLanguageSession internal constructor(
         maxStackSizeBytes = options.maxStackSizeBytes,
         evaluationTimeoutMillis = options.evaluationTimeoutMillis,
       ),
+      outputSink = options.outputSink,
+      maxOutputBytes = options.maxOutputBytes,
+      standardInput = request.standardInput,
+      maxInputBytes = options.maxInputBytes,
     )
     return DynamicProgramRunResult(
       executed = true,
       returnValue = execution.returnValue,
       standardOutput = execution.standardOutput,
       standardError = execution.standardError,
+      outputTruncated = execution.outputTruncated,
+      droppedOutputBytes = execution.droppedOutputBytes,
       diagnostics = compilation.diagnostics,
     )
   }

@@ -1,6 +1,9 @@
 package com.cyxbs.functions.code.language.java.compiler.semantic.impl
 
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinCompatibility
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinMemberDescriptor
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.JavaCompilerPhaseResult
 import com.cyxbs.functions.code.language.java.compiler.frontend.JavaLezerAstFrontend
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaDispatchKind
@@ -514,6 +517,568 @@ class JavaStage1SemanticAnalysisTest {
     assertDiagnostic(
       analyze("Main.java" to "class Main { static String bad(double value) { return \"v\" + value; } }"),
       "java.semantic.string_concat_operand_unsupported",
+    )
+  }
+
+  /** System、PrintStream 与 Math 应复用现有可见性、widening 和调用绑定基础设施。 */
+  @Test
+  fun bindsBuiltinFieldsPrintOverloadsAndMathCalls() {
+    val result = analyze(
+      "Main.java" to """
+        import java.io.PrintStream;
+
+        class Main {
+          static int run(byte small, short medium, boolean flag) {
+            PrintStream output = System.out;
+            output.print(small);
+            System.err.println(medium);
+            System.out.print(flag);
+            System.out.println('A');
+            String nullable = null;
+            System.out.print(nullable);
+            return Math.max(Math.abs(-1), Math.min(2, 3));
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val builtinTypes = model.typeDeclarations.values
+      .filter { it.kind.name == "BUILTIN" }
+      .mapTo(mutableSetOf()) { it.qualifiedName }
+    assertEquals(
+      setOf(
+        "java.lang.Object",
+        "java.lang.String",
+        "java.lang.System",
+        "java.lang.Math",
+        "java.io.PrintStream",
+        "java.lang.Number",
+        "java.lang.Boolean",
+        "java.lang.Byte",
+        "java.lang.Short",
+        "java.lang.Character",
+        "java.lang.Integer",
+        "java.lang.StringBuilder",
+        "java.util.List",
+        "java.util.ArrayList",
+        "java.util.Set",
+        "java.util.HashSet",
+        "java.util.Map",
+        "java.util.HashMap",
+        "java.util.Iterator",
+        "java.io.InputStream",
+        "java.util.Scanner",
+      ),
+      builtinTypes,
+    )
+    assertFalse(
+      model.typeDeclarations.values.single { it.qualifiedName == "java.io.PrintStream" }.isFinal,
+    )
+    val operations = model.builtinMembers.values.mapTo(mutableSetOf()) { it.operation }
+    assertTrue(JavaBuiltinOperation.SYSTEM_OUT in operations)
+    assertTrue(JavaBuiltinOperation.SYSTEM_ERR in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINT_INT in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR in operations)
+    assertTrue(JavaBuiltinOperation.MATH_ABS_INT in operations)
+    assertTrue(JavaBuiltinOperation.MATH_MIN_INT in operations)
+    assertTrue(JavaBuiltinOperation.MATH_MAX_INT in operations)
+
+    val builtinCalls = model.selectedCallables.values.filter { binding ->
+      binding.symbol in model.builtinMembers
+    }
+    assertEquals(8, builtinCalls.size)
+    assertTrue(builtinCalls.any { it.dispatch == JavaDispatchKind.STATIC })
+    assertTrue(builtinCalls.filter { binding ->
+      val descriptor = model.builtinMembers.getValue(binding.symbol)
+      descriptor.ownerQualifiedName == "java.io.PrintStream"
+    }.all { it.dispatch == JavaDispatchKind.SPECIAL && it.virtualSlot == null })
+    assertTrue(model.conversions.values.any { conversion ->
+      conversion == JavaSemanticConversion.PrimitiveWidening(
+        JavaAstPrimitiveType.BYTE,
+        JavaAstPrimitiveType.INT,
+      )
+    })
+    assertTrue(model.conversions.values.any { conversion ->
+      conversion == JavaSemanticConversion.PrimitiveWidening(
+        JavaAstPrimitiveType.SHORT,
+        JavaAstPrimitiveType.INT,
+      )
+    })
+  }
+
+  /** 静态 String 类型的 null 必须选择 String 输出重载，不能借用 Object 输出。 */
+  @Test
+  fun selectsStringPrintOverloadForStringTypedNull() {
+    val result = analyze(
+      "Main.java" to "class Main { static void run() { String value = null; System.out.println(value); } }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val call = model.selectedCallables.values.single()
+    val member = model.builtinMembers.getValue(call.symbol)
+    assertEquals(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING, member.operation)
+    assertEquals("(Ljava/lang/String;)V", call.erasedDescriptor)
+  }
+
+  /** wrapper loose invocation、运算拆箱与 StringBuilder 构造均由 builtin 绑定驱动。 */
+  @Test
+  fun bindsWrapperConversionsAndStringBuilderConstruction() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static int pick(int value) { return 1; }
+          static int pick(Byte value) { return 2; }
+          static int run(byte small) {
+            Integer boxed = 1;
+            int value = boxed + 2;
+            boxed++;
+            boxed += 3;
+            StringBuilder builder = new StringBuilder("x");
+            String nullable = null;
+            builder.append(true).append('A').append(value).append(nullable);
+            return pick(small) + builder.length() + boxed.intValue();
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    assertTrue(model.conversions.values.any { it is JavaSemanticConversion.Boxing })
+    assertTrue(model.conversions.values.any { it is JavaSemanticConversion.Unboxing })
+    assertTrue(model.updateWriteConversions.values.any { conversion ->
+      conversion is JavaSemanticConversion.Boxing || conversion is JavaSemanticConversion.Sequence
+    })
+    val selectedOperations = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]?.operation
+    }
+    assertTrue(JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING in selectedOperations)
+    assertTrue(JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN in selectedOperations)
+    assertTrue(JavaBuiltinOperation.INTEGER_INT_VALUE in selectedOperations)
+    val pick = model.selectedCallables.values.first { binding ->
+      model.symbols.getValue(binding.symbol).name == "pick"
+    }
+    assertEquals("(I)I", pick.erasedDescriptor)
+  }
+
+  /** deprecated wrapper 构造器不在 allowlist 中，必须在源码 new 位置稳定拒绝。 */
+  @Test
+  fun rejectsWrapperConstructorsOutsideAllowlist() {
+    val result = analyze(
+      "Main.java" to "class Main { static Integer run() { return new Integer(1); } }",
+    )
+
+    assertDiagnostic(result, "java.semantic.no_applicable_overload")
+  }
+
+  /** 显式单类型 import 必须覆盖隐式 java.lang，避免用户 System 被错误绑定到 builtin。 */
+  @Test
+  fun prefersExplicitImportOverImplicitJavaLangType() {
+    val result = analyze(
+      "lesson/System.java" to
+        "package lesson; public class System { public static int value = 7; }",
+      "app/Main.java" to
+        "package app; import lesson.System; class Main { static int run() { return System.value; } }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val accessedField = model.valueAccesses.values.single().symbol
+    val fieldOwner = model.fieldDeclarations.getValue(accessedField).owner
+    assertEquals("lesson.System", model.typeDeclarations.getValue(fieldOwner).qualifiedName)
+    assertTrue(accessedField !in model.builtinMembers)
+  }
+
+  /** 显式 single-type import 必须优先于同包其他文件中的同名类型。 */
+  @Test
+  fun prefersExplicitImportOverSamePackageType() {
+    val result = analyze(
+      "p/Math.java" to "package p; class Math { }",
+      "p/Main.java" to
+        "package p; import java.lang.Math; class Main { static int run() { return Math.max(1, 2); } }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val selected = model.selectedCallables.values.single()
+    assertEquals(JavaBuiltinOperation.MATH_MAX_INT, model.builtinMembers.getValue(selected.symbol).operation)
+  }
+
+  /** 当前 CU 顶层类型与异符号 single-type import 同名时，即使未引用也必须稳定诊断。 */
+  @Test
+  fun rejectsExplicitImportConflictingWithCurrentUnitType() {
+    assertDiagnostic(
+      analyze(
+        "p/Math.java" to "package p; import java.lang.Math; class Math { }",
+      ),
+      "java.semantic.import_conflicts_with_top_level_type",
+    )
+  }
+
+  /** builtin 复用首个 CU 仅用于 span；java.lang CU 的显式 import 仍必须覆盖同名 builtin。 */
+  @Test
+  fun doesNotTreatBuiltinHostUnitAsCurrentUnitDeclaration() {
+    val result = analyze(
+      "java/lang/Main.java" to
+        "package java.lang; import lesson.Math; class Main { static int run() { return Math.value; } }",
+      "lesson/Math.java" to
+        "package lesson; public class Math { public static int value = 7; }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val accessedField = model.valueAccesses.values.single().symbol
+    val owner = model.fieldDeclarations.getValue(accessedField).owner
+    assertEquals("lesson.Math", model.typeDeclarations.getValue(owner).qualifiedName)
+    assertTrue(accessedField !in model.builtinMembers)
+  }
+
+  /** String 常用成员和 int 范围 Math 方法应按精确参数数量与类型绑定。 */
+  @Test
+  fun bindsAllowlistedStringAndMathMembers() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static int run(String value) {
+            boolean empty = value.isEmpty();
+            boolean equal = value.equals(null);
+            boolean contains = value.contains("a");
+            boolean starts = value.startsWith("a");
+            boolean ends = value.endsWith("z");
+            String tail = value.substring(1);
+            String middle = value.substring(1, 2);
+            return value.length() + value.charAt(0) + value.indexOf('a') +
+              value.indexOf("a") + Math.abs(-1) + Math.min(1, 2) + Math.max(1, 2);
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val selectedOperations = model.selectedCallables.values.map { binding ->
+      model.builtinMembers.getValue(binding.symbol).operation
+    }.toSet()
+    assertEquals(
+      setOf(
+        JavaBuiltinOperation.STRING_IS_EMPTY,
+        JavaBuiltinOperation.STRING_EQUALS,
+        JavaBuiltinOperation.STRING_CONTAINS,
+        JavaBuiltinOperation.STRING_STARTS_WITH,
+        JavaBuiltinOperation.STRING_ENDS_WITH,
+        JavaBuiltinOperation.STRING_SUBSTRING_FROM,
+        JavaBuiltinOperation.STRING_SUBSTRING_RANGE,
+        JavaBuiltinOperation.STRING_LENGTH,
+        JavaBuiltinOperation.STRING_CHAR_AT,
+        JavaBuiltinOperation.STRING_INDEX_OF_CHAR,
+        JavaBuiltinOperation.STRING_INDEX_OF_STRING,
+        JavaBuiltinOperation.MATH_ABS_INT,
+        JavaBuiltinOperation.MATH_MIN_INT,
+        JavaBuiltinOperation.MATH_MAX_INT,
+      ),
+      selectedOperations,
+    )
+    val contains = model.builtinMembers.values.single { member ->
+      member.operation == JavaBuiltinOperation.STRING_CONTAINS
+    }
+    assertEquals(JavaBuiltinCompatibility.RESTRICTED_COMPATIBLE, contains.compatibility)
+    assertTrue(contains is JavaBuiltinMemberDescriptor.Callable)
+  }
+
+  /** builtin 调用结果作为下一次调用 receiver 时必须继续携带 String 返回类型和独立 binding。 */
+  @Test
+  fun bindsNestedBuiltinInvocationReceiver() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static int run(String value) {
+            if (value.substring(0, 1).equals("a")) {
+              return value.substring(0, 1).length();
+            }
+            return 0;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val operations = model.selectedCallables.values.map {
+      model.builtinMembers.getValue(it.symbol).operation
+    }
+    assertEquals(2, operations.count { it == JavaBuiltinOperation.STRING_SUBSTRING_RANGE })
+    assertTrue(JavaBuiltinOperation.STRING_EQUALS in operations)
+    assertTrue(JavaBuiltinOperation.STRING_LENGTH in operations)
+  }
+
+  /** 未进入 allowlist 的字段、方法和构造器必须停在语义阶段。 */
+  @Test
+  fun rejectsMembersOutsideBuiltinAllowlist() {
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static Object bad() { return System.console; } }"),
+      "java.semantic.unknown_field",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void bad() { System.out.printf(\"x\"); } }"),
+      "java.semantic.no_applicable_overload",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void bad() { System.out.print(); } }"),
+      "java.semantic.no_applicable_overload",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static int bad() { return Math.sqrt(1); } }"),
+      "java.semantic.no_applicable_overload",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static Math bad() { return new Math(); } }"),
+      "java.semantic.no_applicable_overload",
+    )
+  }
+
+  /** 集合 facade、继承成员代换和目标类型 diamond 必须在同一语义模型中闭合。 */
+  @Test
+  fun bindsBuiltinGenericCollectionsAndTargetTypedDiamond() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.ArrayList;
+        import java.util.HashMap;
+        import java.util.HashSet;
+        import java.util.Iterator;
+        import java.util.List;
+        import java.util.Map;
+        import java.util.Set;
+
+        class Main {
+          static int run() {
+            List<Integer> values = new ArrayList<>();
+            values.add(1);
+            Integer first = values.get(0);
+            values.remove(0);
+            values.remove(Integer.valueOf(1));
+            Set<String> names = new HashSet<>();
+            names.add("a");
+            Iterator<String> iterator = names.iterator();
+            Map<String, Integer> scores = new HashMap<>();
+            scores.put("a", first);
+            Set<String> keys = scores.keySet();
+            if (iterator.hasNext() && keys.contains("a")) return scores.get("a");
+            return 0;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val operations = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]?.operation
+    }
+    assertTrue(JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT in operations)
+    assertTrue(JavaBuiltinOperation.HASH_SET_CONSTRUCT in operations)
+    assertTrue(JavaBuiltinOperation.HASH_MAP_CONSTRUCT in operations)
+    assertTrue(JavaBuiltinOperation.LIST_GET in operations)
+    assertTrue(JavaBuiltinOperation.LIST_REMOVE_INDEX in operations)
+    assertTrue(JavaBuiltinOperation.LIST_REMOVE_OBJECT in operations)
+    assertTrue(JavaBuiltinOperation.MAP_KEY_SET in operations)
+  }
+
+  /** Scanner 只能通过 System.in 构造，全部精选方法都必须绑定到受限 builtin operation。 */
+  @Test
+  fun bindsBuiltinScannerAndRejectsNonInputStreamConstruction() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.Scanner;
+        class Main {
+          static int run() {
+            Scanner scanner = new Scanner(System.in);
+            scanner.hasNext();
+            scanner.next();
+            scanner.hasNextInt();
+            scanner.nextInt();
+            scanner.hasNextLine();
+            scanner.nextLine();
+            return 0;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val operations = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]?.operation
+    }.toSet()
+    assertTrue(model.valueAccesses.values.any { access ->
+      model.builtinMembers[access.symbol]?.operation == JavaBuiltinOperation.SYSTEM_IN
+    })
+    assertTrue(JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT_INT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT_INT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT_LINE in operations)
+    val scannerMembers = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]
+    }.filter { member -> member.ownerQualifiedName == "java.util.Scanner" }
+    assertTrue(scannerMembers.all { it.compatibility == JavaBuiltinCompatibility.RESTRICTED_COMPATIBLE })
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.Scanner;
+          class Main { static void run() { new Scanner(System.out); } }
+        """.trimIndent(),
+      ),
+      "java.semantic.no_applicable_overload",
+    )
+  }
+
+  /** 调用与构造参数位置先用非 poly 实参筛选 overload，再把唯一 target type 提交给 diamond。 */
+  @Test
+  fun infersTargetTypedDiamondInCallableArguments() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.ArrayList;
+        import java.util.List;
+        class Holder { Holder(List<Integer> values) {} }
+        class Main {
+          static void take(List<Integer> values) {}
+          static <T> void generic(List<T> values, T element) {}
+          static int pick(List<String> values, int marker) { return 1; }
+          static int pick(List<Integer> values, String marker) { return 2; }
+          static int phase(List<String> values, int marker) { return 3; }
+          static int phase(List<Integer> values, Integer marker) { return 4; }
+          static <T extends Number> int bounded(List<String> values, T marker) { return 5; }
+          static int bounded(List<Integer> values, String marker) { return 6; }
+          static int run() {
+            take(new ArrayList<>());
+            new Holder(new ArrayList<>());
+            generic(new ArrayList<>(), "x");
+            return pick(new ArrayList<>(), "x") + phase(new ArrayList<>(), 1) +
+              bounded(new ArrayList<>(), "x");
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val picked = model.selectedCallables.values.filter { binding ->
+      model.symbols.getValue(binding.symbol).name in setOf("pick", "phase", "bounded")
+    }.associateBy { binding -> model.symbols.getValue(binding.symbol).name }
+    assertEquals("(Ljava/util/List;Ljava/lang/String;)I", picked.getValue("pick").erasedDescriptor)
+    assertEquals("(Ljava/util/List;I)I", picked.getValue("phase").erasedDescriptor)
+    assertEquals("(Ljava/util/List;Ljava/lang/String;)I", picked.getValue("bounded").erasedDescriptor)
+  }
+
+  /** 已有非 poly 约束违反类型变量上界时，冲突候选不得为 diamond 提供伪 target。 */
+  @Test
+  fun rejectsConflictingPartialGenericInferenceForDiamond() {
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.ArrayList;
+          import java.util.List;
+          class Main {
+            static <T extends Number> void bounded(List<String> values, T marker) {}
+            static void run() { bounded(new ArrayList<>(), "x"); }
+          }
+        """.trimIndent(),
+      ),
+      "java.semantic.diamond_target_required",
+    )
+  }
+
+  /** Object 输出只承接已冻结 builtin 类型；用户类在源码参数位置稳定拒绝。 */
+  @Test
+  fun bindsObjectOutputForWrapperAndRejectsKnownUserClass() {
+    val supported = analyze(
+      "Main.java" to """
+        class Main {
+          static void run() {
+            Integer value = null;
+            System.out.println(value);
+            new StringBuilder().append(value);
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(supported.isSuccess, supported.diagnostics.toString())
+    val model = assertNotNull(supported.value)
+    val operations = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]?.operation
+    }
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT in operations)
+    assertTrue(JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT in operations)
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to "class User {} class Main { static void run() { System.out.println(new User()); } }",
+      ),
+      "java.semantic.object_string_conversion_unsupported",
+    )
+  }
+
+  /** char[] 精确重载输出字符内容；裸 null 在 String 与 char[] 之间必须保持 Java 歧义。 */
+  @Test
+  fun bindsCharArrayOutputAndPreservesNullAmbiguity() {
+    val supported = analyze(
+      "Main.java" to """
+        class Main {
+          static void run() {
+            char[] text = {'o', 'k'};
+            System.out.print(text);
+            System.out.println(text);
+            new StringBuilder().append(text);
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(supported.isSuccess, supported.diagnostics.toString())
+    val model = assertNotNull(supported.value)
+    val operations = model.selectedCallables.values.mapNotNull { binding ->
+      model.builtinMembers[binding.symbol]?.operation
+    }
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY in operations)
+    assertTrue(JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY in operations)
+
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void run() { System.out.println(null); } }"),
+      "java.semantic.ambiguous_overload",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void run() { new StringBuilder().append(null); } }"),
+      "java.semantic.ambiguous_overload",
+    )
+  }
+
+  /** 泛型错配与缺失目标的零参 diamond 必须在语义阶段稳定拒绝。 */
+  @Test
+  fun rejectsInvalidBuiltinCollectionGenericUse() {
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.ArrayList;
+          import java.util.List;
+          class Main { static void run() { List<String> values = new ArrayList<Integer>(); } }
+        """.trimIndent(),
+      ),
+      "java.semantic.type_mismatch",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.ArrayList;
+          class Main { static void run() { new ArrayList<>(); } }
+        """.trimIndent(),
+      ),
+      "java.semantic.diamond_target_required",
     )
   }
 

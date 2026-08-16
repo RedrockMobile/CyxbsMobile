@@ -2,6 +2,7 @@ package com.cyxbs.functions.code.language.java.compiler.lowering
 
 import com.cyxbs.functions.code.language.java.compiler.JavaIrLowerer
 import com.cyxbs.functions.code.language.java.compiler.ast.*
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinMemberDescriptor
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.*
 import com.cyxbs.functions.code.language.java.compiler.ir.*
 import com.cyxbs.functions.code.language.java.compiler.semantic.*
@@ -37,7 +38,12 @@ private class JavaLowering(val model: JavaSemanticModel) {
     it.kind == JavaSemanticTypeDeclarationKind.BUILTIN && it.qualifiedName == "java.lang.Object"
   }?.symbol
   private val relations = objectSymbol?.let {
-    JavaTypeRelations(model.typeDeclarations, model.typeParameterDeclarations, it)
+    JavaTypeRelations(
+      model.typeDeclarations,
+      model.typeParameterDeclarations,
+      it,
+      model.wrapperPrimitiveTypes,
+    )
   }
   private var nextSyntheticLocalId = model.symbols.keys.maxOfOrNull { it.value } ?: 0
 
@@ -48,7 +54,10 @@ private class JavaLowering(val model: JavaSemanticModel) {
   fun lower(): JavaIrProgram? {
     indexSources()
     val classes = model.ast.units.flatMap { it.types.mapNotNull(::lowerClass) }
-    return if (failed) null else JavaIrProgram(classes)
+    return if (failed) null else JavaIrProgram(
+      classes,
+      model.builtinTypeRoles.mapKeys { (symbol, _) -> JavaIrClassId(symbol.value) },
+    )
   }
 
   /** 反向索引完全依赖 declarations，后续禁止按成员名称查找。 */
@@ -460,7 +469,10 @@ private class BodyLowering(
       val prepared = prepareTarget(initializer.operand) ?: return@flatMap emptyList()
       prepared.prefix + listOf(
         JavaIrStatement.DeclareLocal(local.id, read(prepared.target, initializer.span), span),
-        JavaIrStatement.Expression(increment(prepared.target, initializer.operator, initializer.span), initializer.span),
+        JavaIrStatement.Expression(
+          increment(prepared.target, initializer, initializer.operator, initializer.span),
+          initializer.span,
+        ),
       )
     } else listOf(JavaIrStatement.DeclareLocal(local.id, initializer?.let(::expression), span))
   }
@@ -497,7 +509,7 @@ private class BodyLowering(
       )
       return prepared.prefix + listOf(
         JavaIrStatement.DeclareLocal(old.id, read(prepared.target, value.span), value.span),
-        JavaIrStatement.Expression(increment(prepared.target, value.operator, value.span), value.span),
+        JavaIrStatement.Expression(increment(prepared.target, value, value.operator, value.span), value.span),
         JavaIrStatement.Return(JavaIrExpression.GetLocal(old.id, old.type, value.span), statement.span),
       )
     }
@@ -512,7 +524,7 @@ private class BodyLowering(
     if (source is JavaAstExpression.Unary && source.operator.isUpdate()) {
       val prepared = prepareTarget(source.operand) ?: return emptyList()
       return prepared.prefix + JavaIrStatement.Expression(
-        increment(prepared.target, source.operator, source.span), span,
+        increment(prepared.target, source, source.operator, source.span), span,
       )
     }
     if (source is JavaAstExpression.Assignment &&
@@ -520,12 +532,15 @@ private class BodyLowering(
     ) {
       val prepared = prepareTarget(source.target) ?: return emptyList()
       val right = expression(source.value) ?: return emptyList()
+      val left = boundConversion(source.target, read(prepared.target, source.target.span))
+        ?: return emptyList()
       val value = compoundValue(
-        source.nodeId, read(prepared.target, source.target.span), source.operator.toIr(), right,
-        prepared.target.type, source.span,
+        source.nodeId, left, source.operator.toIr(), right,
+        updateComputationType(source.nodeId, left.type), source.span,
       )
+      val writeValue = updateWriteConversion(source.nodeId, value, source.span) ?: return emptyList()
       return prepared.prefix + JavaIrStatement.Expression(
-        write(prepared.target, value, prepared.target.type, source.span), span,
+        write(prepared.target, writeValue, prepared.target.type, source.span), span,
       )
     }
     return expression(source)?.let { listOf(JavaIrStatement.Expression(it, span)) } ?: emptyList()
@@ -551,7 +566,7 @@ private class BodyLowering(
       is JavaAstExpression.ArrayAccess -> arrayAccess(source, type)
       is JavaAstExpression.Parenthesized -> expression(source.expression)
   } ?: return null
-    return conversion(source, raw, type)
+    return conversion(source, raw)
   }
 
   /** String + 只消费 semantic binding；普通二元运算仍保留既有 typed IR 形式。 */
@@ -696,6 +711,23 @@ private class BodyLowering(
       }
       JavaValueAccessKind.STATIC_FIELD -> {
         val field = field(binding, true, source.span) ?: return null
+        val owner = lowering.model.typeDeclarations[field.owner]
+          ?: return invalid("Field owner declaration is missing.", source.span)
+        if (owner.kind == JavaSemanticTypeDeclarationKind.BUILTIN) {
+          val builtin = lowering.model.builtinMembers[binding.symbol]
+            ?: return invalid("Builtin field is missing its operation binding.", source.span)
+          if (builtin !is JavaBuiltinMemberDescriptor.Field ||
+            !builtin.isStatic ||
+            builtin.ownerQualifiedName != owner.qualifiedName ||
+            binding.receiverKind !in setOf(JavaReceiverKind.NONE, JavaReceiverKind.TYPE_QUALIFIED)
+          ) {
+            return invalid("Builtin field binding is inconsistent.", source.span)
+          }
+          return JavaIrExpression.BuiltinValue(builtin.operation, type, source.span)
+        }
+        if (binding.symbol in lowering.model.builtinMembers) {
+          return invalid("Source field unexpectedly carries a builtin operation.", source.span)
+        }
         if (binding.receiverKind == JavaReceiverKind.EXPLICIT) {
           return unsupported("Expression-qualified static fields are deferred.", source.span)
         }
@@ -760,7 +792,7 @@ private class BodyLowering(
       if (!target.isStable()) {
         return unsupported("Nested update with an effectful target is deferred.", source.span)
       }
-      increment(target, source.operator, source.span)
+      increment(target, source, source.operator, source.span)
     }
     JavaAstUnaryOperator.POST_INCREMENT, JavaAstUnaryOperator.POST_DECREMENT ->
       unsupported("Nested postfix update is deferred.", source.span)
@@ -777,11 +809,14 @@ private class BodyLowering(
     }
     val right = expression(source.value) ?: return null
     val value = if (source.operator == JavaAstAssignmentOperator.ASSIGN) right else {
+      val left = boundConversion(source.target, read(target, source.target.span)) ?: return null
       compoundValue(
-        source.nodeId, read(target, source.target.span), source.operator.toIr(), right, target.type, source.span,
+        source.nodeId, left, source.operator.toIr(), right,
+        updateComputationType(source.nodeId, left.type), source.span,
       )
     }
-    return write(target, value, type, source.span)
+    val writeValue = updateWriteConversion(source.nodeId, value, source.span) ?: return null
+    return write(target, writeValue, type, source.span)
   }
 
   /** selectedCallables 与 receiverKind 决定 static/special/virtual；接口分派稳定延期。 */
@@ -797,6 +832,22 @@ private class BodyLowering(
       binding.erasedDescriptor == null ||
       binding.erasedDescriptor != declaration.erasedDescriptor
     ) return invalid("Selected method binding is inconsistent.", source.span)
+    val owner = lowering.model.typeDeclarations[declaration.owner]
+      ?: return invalid("Selected method owner declaration is missing.", source.span)
+    if (owner.kind == JavaSemanticTypeDeclarationKind.BUILTIN) {
+      val builtin = lowering.model.builtinMembers[binding.symbol]
+        ?: return invalid("Builtin callable is missing its operation binding.", source.span)
+      if (builtin !is JavaBuiltinMemberDescriptor.Callable ||
+        builtin.isStatic != declaration.isStatic ||
+        builtin.ownerQualifiedName != owner.qualifiedName
+      ) {
+        return invalid("Builtin callable binding is inconsistent.", source.span)
+      }
+      return builtinInvocation(source, type, binding, builtin)
+    }
+    if (binding.symbol in lowering.model.builtinMembers) {
+      return invalid("Source callable unexpectedly carries a builtin operation.", source.span)
+    }
     val arguments = source.arguments.mapNotNull(::expression)
     if (arguments.size != source.arguments.size ||
       arguments.size != binding.parameterTypes.size
@@ -826,6 +877,45 @@ private class BodyLowering(
     }
   }
 
+  /**
+   * 内建调用先 lower receiver、再按源码顺序 lower 参数，确保后端可保持 Java 的单次求值顺序。
+   * 参数仍统一经过 [expression]，因此 widening 等语义 conversion 不会在 builtin 路径丢失。
+   */
+  private fun builtinInvocation(
+    source: JavaAstExpression.MethodInvocation,
+    type: JavaIrType,
+    binding: JavaCallableBinding,
+    builtin: JavaBuiltinMemberDescriptor.Callable,
+  ): JavaIrExpression? {
+    val runtimeReceiver = if (builtin.isStatic) {
+      if (binding.dispatch != JavaDispatchKind.STATIC ||
+        binding.receiverKind !in setOf(JavaReceiverKind.NONE, JavaReceiverKind.TYPE_QUALIFIED)
+      ) {
+        return invalid("Static builtin call has an invalid receiver or dispatch.", source.span)
+      }
+      null
+    } else {
+      if (binding.dispatch != JavaDispatchKind.SPECIAL) {
+        return invalid("Instance builtin call must use special dispatch.", source.span)
+      }
+      receiver(binding.receiverKind, source.receiver, source.span) ?: return null
+    }
+    val arguments = source.arguments.mapNotNull(::expression)
+    if (arguments.size != source.arguments.size ||
+      arguments.size != binding.parameterTypes.size ||
+      arguments.size != builtin.parameterTypes.size
+    ) {
+      return invalid("Builtin call argument count is inconsistent.", source.span)
+    }
+    return JavaIrExpression.InvokeBuiltin(
+      builtin.operation,
+      runtimeReceiver,
+      arguments,
+      type,
+      source.span,
+    )
+  }
+
   /** new 的 owner 和 constructor id 都来自 semantic binding/result type。 */
   private fun newObject(
     source: JavaAstExpression.NewObject,
@@ -848,6 +938,13 @@ private class BodyLowering(
     if (arguments.size != source.arguments.size ||
       arguments.size != binding.parameterTypes.size
     ) return invalid("Selected constructor argument count is inconsistent.", source.span)
+    val builtin = lowering.model.builtinMembers[binding.symbol]
+    if (builtin != null) {
+      if (builtin !is JavaBuiltinMemberDescriptor.Callable || !builtin.isConstructor ||
+        builtin.ownerQualifiedName != lowering.model.typeDeclarations[declaration.owner]?.qualifiedName
+      ) return invalid("Builtin constructor binding is inconsistent.", source.span)
+      return JavaIrExpression.ConstructBuiltin(builtin.operation, arguments, reference, source.span)
+    }
     return JavaIrExpression.NewObject(
       reference.classId, JavaIrMethodId(binding.symbol.value), arguments, type, source.span,
     )
@@ -857,23 +954,71 @@ private class BodyLowering(
   private fun conversion(
     source: JavaAstExpression,
     expression: JavaIrExpression,
-    type: JavaIrType,
   ): JavaIrExpression? {
     val semantic = lowering.model.conversions[source.nodeId] ?: return expression
-    val ir = when (semantic) {
-      JavaSemanticConversion.Identity -> JavaIrConversion.Identity
-      is JavaSemanticConversion.PrimitiveWidening ->
-        JavaIrConversion.PrimitiveWidening(semantic.from, semantic.to)
-      is JavaSemanticConversion.ReferenceWidening -> JavaIrConversion.ReferenceWidening(
-        lowering.typeOf(semantic.from, source.span) ?: return null,
-        lowering.typeOf(semantic.to, source.span) ?: return null,
-      )
-      is JavaSemanticConversion.Boxing ->
-        JavaIrConversion.Boxing(semantic.primitive, JavaIrClassId(semantic.boxedType.value))
-      is JavaSemanticConversion.Unboxing ->
-        JavaIrConversion.Unboxing(JavaIrClassId(semantic.boxedType.value), semantic.primitive)
+    return applyConversion(semantic, expression, source.span)
+  }
+
+  /** 把 semantic Sequence 展开为逐步 typed Convert，确保每一层 result type 都是该步目标类型。 */
+  private fun applyConversion(
+    semantic: JavaSemanticConversion,
+    expression: JavaIrExpression,
+    span: JavaSourceSpan,
+  ): JavaIrExpression? = when (semantic) {
+    JavaSemanticConversion.Identity -> expression
+    is JavaSemanticConversion.Sequence -> semantic.steps.fold(expression as JavaIrExpression?) { current, step ->
+      current?.let { applyConversion(step, it, span) }
     }
-    return JavaIrExpression.Convert(ir, expression, type, source.span)
+    is JavaSemanticConversion.PrimitiveWidening -> JavaIrExpression.Convert(
+      JavaIrConversion.PrimitiveWidening(semantic.from, semantic.to), expression,
+      JavaIrType.Primitive(semantic.to), span,
+    )
+    is JavaSemanticConversion.PrimitiveNarrowing -> JavaIrExpression.Convert(
+      JavaIrConversion.PrimitiveNarrowing(semantic.from, semantic.to), expression,
+      JavaIrType.Primitive(semantic.to), span,
+    )
+    is JavaSemanticConversion.ReferenceWidening -> JavaIrExpression.Convert(
+      JavaIrConversion.ReferenceWidening(
+        lowering.typeOf(semantic.from, span) ?: return null,
+        lowering.typeOf(semantic.to, span) ?: return null,
+      ),
+      expression,
+      lowering.typeOf(semantic.to, span) ?: return null,
+      span,
+    )
+    is JavaSemanticConversion.Boxing -> JavaIrExpression.Convert(
+      JavaIrConversion.Boxing(semantic.primitive, JavaIrClassId(semantic.boxedType.value)),
+      expression, JavaIrType.Reference(JavaIrClassId(semantic.boxedType.value)), span,
+    )
+    is JavaSemanticConversion.Unboxing -> JavaIrExpression.Convert(
+      JavaIrConversion.Unboxing(JavaIrClassId(semantic.boxedType.value), semantic.primitive),
+      expression, JavaIrType.Primitive(semantic.primitive), span,
+    )
+  }
+
+  private fun boundConversion(
+    source: JavaAstExpression,
+    expression: JavaIrExpression,
+  ): JavaIrExpression? = lowering.model.conversions[source.nodeId]
+    ?.let { applyConversion(it, expression, source.span) } ?: expression
+
+  private fun updateWriteConversion(
+    nodeId: JavaNodeId,
+    expression: JavaIrExpression,
+    span: JavaSourceSpan,
+  ): JavaIrExpression? = lowering.model.updateWriteConversions[nodeId]
+    ?.let { applyConversion(it, expression, span) } ?: expression
+
+  /** 从回写序列首步恢复 compound 的真实 primitive 计算类型，禁止把 byte wrapper 结果伪装成 byte 算术。 */
+  private fun updateComputationType(nodeId: JavaNodeId, fallback: JavaIrType): JavaIrType {
+    val conversion = lowering.model.updateWriteConversions[nodeId] ?: return fallback
+    val first = if (conversion is JavaSemanticConversion.Sequence) conversion.steps.first() else conversion
+    val primitive = when (first) {
+      is JavaSemanticConversion.PrimitiveNarrowing -> first.from
+      is JavaSemanticConversion.Boxing -> first.primitive
+      else -> return fallback
+    }
+    return JavaIrType.Primitive(primitive)
   }
 
   /** assignment/update target 同样严格读取 valueAccesses。 */
@@ -966,16 +1111,29 @@ private class BodyLowering(
 
   private fun increment(
     target: Target,
+    source: JavaAstExpression.Unary,
     operator: JavaAstUnaryOperator,
     span: JavaSourceSpan,
   ): JavaIrExpression {
     val binary = if (operator == JavaAstUnaryOperator.PRE_DECREMENT ||
       operator == JavaAstUnaryOperator.POST_DECREMENT
     ) JavaIrBinaryOperator.SUBTRACT else JavaIrBinaryOperator.ADD
-    val one = JavaIrExpression.Constant(JavaIrConstant.IntValue(1), target.type, span)
+    val read = checkNotNull(boundConversion(source.operand, read(target, span)))
+    val one = JavaIrExpression.Constant(
+      JavaIrConstant.IntValue(1),
+      JavaIrType.Primitive(JavaAstPrimitiveType.INT),
+      span,
+    )
+    val computedType = if (read.type == JavaIrType.Primitive(JavaAstPrimitiveType.LONG)) {
+      read.type
+    } else {
+      JavaIrType.Primitive(JavaAstPrimitiveType.INT)
+    }
+    val computed = JavaIrExpression.Binary(read, binary, one, computedType, span)
+    val writeValue = checkNotNull(updateWriteConversion(source.nodeId, computed, span))
     return write(
       target,
-      JavaIrExpression.Binary(read(target, span), binary, one, target.type, span),
+      writeValue,
       target.type, span,
     )
   }

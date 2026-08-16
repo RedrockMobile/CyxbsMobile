@@ -2,6 +2,8 @@ package com.cyxbs.functions.code.language.java.compiler.semantic
 
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstWorkspace
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinMemberDescriptor
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinTypeRole
 import com.cyxbs.functions.code.language.java.compiler.source.JavaNodeId
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
 
@@ -310,6 +312,12 @@ internal sealed interface JavaSemanticConversion {
     val to: JavaAstPrimitiveType,
   ) : JavaSemanticConversion
 
+  /** 仅用于 ++/-- 与复合赋值隐式回写；普通赋值和方法调用绝不开放 primitive narrowing。 */
+  data class PrimitiveNarrowing(
+    val from: JavaAstPrimitiveType,
+    val to: JavaAstPrimitiveType,
+  ) : JavaSemanticConversion
+
   data class ReferenceWidening(
     val from: JavaSemanticType,
     val to: JavaSemanticType,
@@ -324,6 +332,16 @@ internal sealed interface JavaSemanticConversion {
     val boxedType: JavaSymbolId,
     val primitive: JavaAstPrimitiveType,
   ) : JavaSemanticConversion
+
+  /** 多步合法转换按执行顺序冻结，禁止 lowering/backend 再从端点类型猜测中间步骤。 */
+  data class Sequence(val steps: List<JavaSemanticConversion>) : JavaSemanticConversion {
+    init {
+      require(steps.isNotEmpty()) { "A semantic conversion sequence must not be empty." }
+      require(steps.none { it is Sequence || it == Identity }) {
+        "A semantic conversion sequence must be flat and must not contain identity steps."
+      }
+    }
+  }
 }
 
 /**
@@ -338,6 +356,8 @@ internal enum class JavaStringConversionKind {
   BOOLEAN,
   CHAR,
   INT_LIKE,
+  /** 首批 wrapper 引用按 Java String.valueOf(Object) 处理，null 不触发拆箱。 */
+  BOXED,
 }
 
 /**
@@ -386,6 +406,18 @@ internal data class JavaSemanticModel(
   val stringConcatenations:
     Map<JavaNodeId, JavaStringConcatenationBinding> = emptyMap(),
   val arrayLengthExpressions: Set<JavaNodeId> = emptySet(),
+  /** ++/-- 与 wrapper 复合赋值在算术完成后写回变量所需的装箱转换。 */
+  val updateWriteConversions: Map<JavaNodeId, JavaSemanticConversion> = emptyMap(),
+  /**
+   * 精选类库 symbol 到稳定 builtin 描述的映射。
+   *
+   * 普通源码声明不会进入此表；lowering 必须通过该表识别内建行为，不能根据限定名猜测。
+   */
+  val builtinMembers: Map<JavaSymbolId, JavaBuiltinMemberDescriptor> = emptyMap(),
+  /** builtin 类型 symbol 的稳定角色，供 lowering/validator 在不读取名称时核对运行时身份。 */
+  val builtinTypeRoles: Map<JavaSymbolId, JavaBuiltinTypeRole> = emptyMap(),
+  /** 精选 wrapper symbol 到 primitive 的唯一 catalog 映射。 */
+  val wrapperPrimitiveTypes: Map<JavaSymbolId, JavaAstPrimitiveType> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

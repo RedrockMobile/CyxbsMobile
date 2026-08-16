@@ -10,13 +10,15 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
  * 调用方应在自身阶段把失败转换为对应诊断。
  *
  * [objectSymbol] 必须指向声明表中的内建 java.lang.Object；该符号用于无界通配符擦除和数组
- * 到 Object 的引用拓宽，禁止通过名称猜测根类型。
+ * 到 Object 的引用拓宽。[wrapperPrimitiveTypes] 由 builtin catalog 生成，装拆箱只消费精确
+ * symbol，用户声明的同名类型不会被误判。
  */
 internal class JavaTypeRelations(
   private val typeDeclarations: Map<JavaSymbolId, JavaSemanticTypeDeclaration>,
   private val typeParameterDeclarations:
     Map<JavaSymbolId, JavaSemanticTypeParameterDeclaration>,
   private val objectSymbol: JavaSymbolId,
+  private val wrapperPrimitiveTypes: Map<JavaSymbolId, JavaAstPrimitiveType> = emptyMap(),
 ) {
   /**
    * 递归代换声明类型、类型变量、数组与通配符中的类型变量。
@@ -86,12 +88,19 @@ internal class JavaTypeRelations(
   /**
    * 返回赋值上下文允许的最小转换。
    *
-   * 当前只支持 identity、primitive widening、null 到引用类型以及引用拓宽；
-   * boxing、unboxing、常量窄化与 vararg 联合留给后续阶段。
+   * 支持 Java 8 赋值上下文的 identity、primitive/reference widening、首批 wrapper boxing/unboxing
+   * 以及 unboxing 后 primitive widening；常量窄化与 vararg 联合仍稳定拒绝。
    */
   fun assignmentConversion(
     source: JavaSemanticType,
     target: JavaSemanticType,
+  ): JavaSemanticConversion? = invocationConversion(source, target, allowBoxing = true)
+
+  /** overload strict phase 禁止 boxing；loose phase 才开放首批 wrapper 装箱/拆箱。 */
+  fun invocationConversion(
+    source: JavaSemanticType,
+    target: JavaSemanticType,
+    allowBoxing: Boolean,
   ): JavaSemanticConversion? {
     if (!isAssignmentSourceType(source) || !isAssignmentTargetType(target)) return null
     if (source == target) return JavaSemanticConversion.Identity
@@ -108,12 +117,57 @@ internal class JavaTypeRelations(
       return JavaSemanticConversion.ReferenceWidening(source, target)
     }
 
-    return if (isReferenceType(source) && isReferenceType(target) && isSubtype(source, target)) {
-      JavaSemanticConversion.ReferenceWidening(source, target)
-    } else {
-      null
+    if (isReferenceType(source) && isReferenceType(target) && isSubtype(source, target)) {
+      return JavaSemanticConversion.ReferenceWidening(source, target)
+    } else if (allowBoxing) {
+      return boxingConversion(source, target) ?: unboxingConversion(source, target)
     }
+    return null
   }
+
+  /** primitive 只能装到自身 wrapper，再按需要引用拓宽到 Number/Object。 */
+  private fun boxingConversion(
+    source: JavaSemanticType,
+    target: JavaSemanticType,
+  ): JavaSemanticConversion? {
+    val primitive = source as? JavaSemanticType.Primitive ?: return null
+    val targetDeclared = target as? JavaSemanticType.Declared ?: return null
+    val boxed = wrapperSymbol(primitive.kind) ?: return null
+    val boxing = JavaSemanticConversion.Boxing(primitive.kind, boxed)
+    if (targetDeclared.symbol == boxed) return boxing
+    val boxedType = JavaSemanticType.Declared(boxed, emptyList())
+    if (!isSubtype(boxedType, targetDeclared)) return null
+    return JavaSemanticConversion.Sequence(
+      listOf(boxing, JavaSemanticConversion.ReferenceWidening(boxedType, targetDeclared)),
+    )
+  }
+
+  /** wrapper 可拆到自身 primitive，并允许随后执行 Java primitive widening。 */
+  private fun unboxingConversion(
+    source: JavaSemanticType,
+    target: JavaSemanticType,
+  ): JavaSemanticConversion? {
+    val sourceDeclared = source as? JavaSemanticType.Declared ?: return null
+    val targetPrimitive = target as? JavaSemanticType.Primitive ?: return null
+    val primitive = primitiveForWrapper(sourceDeclared.symbol) ?: return null
+    val unboxing = JavaSemanticConversion.Unboxing(sourceDeclared.symbol, primitive)
+    if (primitive == targetPrimitive.kind) return unboxing
+    if (!canWidenPrimitive(primitive, targetPrimitive.kind)) return null
+    return JavaSemanticConversion.Sequence(
+      listOf(unboxing, JavaSemanticConversion.PrimitiveWidening(primitive, targetPrimitive.kind)),
+    )
+  }
+
+  private fun wrapperSymbol(primitive: JavaAstPrimitiveType): JavaSymbolId? {
+    return wrapperPrimitiveTypes.entries.singleOrNull { it.value == primitive }?.key
+  }
+
+  private fun primitiveForWrapper(symbol: JavaSymbolId): JavaAstPrimitiveType? =
+    wrapperPrimitiveTypes[symbol]
+
+  /** 返回首批 wrapper 的精确 primitive；Number/Object 等父类型不会被伪装成可拆箱类型。 */
+  fun unboxedPrimitive(type: JavaSemanticType): JavaAstPrimitiveType? =
+    (type as? JavaSemanticType.Declared)?.symbol?.let(::primitiveForWrapper)
 
   /** 判断赋值上下文是否存在当前阶段支持的转换。 */
   fun isAssignmentCompatible(

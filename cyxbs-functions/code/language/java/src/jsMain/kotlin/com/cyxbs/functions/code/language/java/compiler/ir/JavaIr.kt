@@ -1,6 +1,8 @@
 package com.cyxbs.functions.code.language.java.compiler.ir
 
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinTypeRole
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
 
 /** typed IR 中的类编号。 */
@@ -31,6 +33,8 @@ internal sealed interface JavaIrType {
 /** 完整工作区 lowering 后的 typed IR。 */
 internal data class JavaIrProgram(
   val classes: List<JavaIrClass>,
+  /** builtin classId 到稳定角色的映射；不把内建类型伪造成可发射的用户 class。 */
+  val builtinTypeRoles: Map<JavaIrClassId, JavaBuiltinTypeRole> = emptyMap(),
 )
 
 /** 一个已经解析继承关系的 Java 类型。 */
@@ -246,6 +250,17 @@ internal sealed interface JavaIrExpression {
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 
+  /**
+   * 由精选类库提供、且不对应用户字段存储的稳定值。
+   *
+   * 例如 `System.out` 与 `System.err` 必须保留为显式 operation，后端不得按字段名猜测宿主桥。
+   */
+  data class BuiltinValue(
+    val operation: JavaBuiltinOperation,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
   data class SetStaticField(
     val field: JavaIrFieldId,
     val value: JavaIrExpression,
@@ -279,6 +294,28 @@ internal sealed interface JavaIrExpression {
     val method: JavaIrMethodId,
     val arguments: List<JavaIrExpression>,
     override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /**
+   * 调用精选类库的确定 operation，不暴露不存在的 JDK 方法体或虚方法槽。
+   *
+   * [receiver] 为 null 表示 static 操作；实例操作必须保存 receiver。字段顺序明确要求后端先求值
+   * receiver，再从左到右求值 [arguments]，并且每个表达式只求值一次。
+   */
+  data class InvokeBuiltin(
+    val operation: JavaBuiltinOperation,
+    val receiver: JavaIrExpression?,
+    val arguments: List<JavaIrExpression>,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /** builtin 构造不进入用户 class 分配/构造器调用链，operation 完整决定运行时对象形态。 */
+  data class ConstructBuiltin(
+    val operation: JavaBuiltinOperation,
+    val arguments: List<JavaIrExpression>,
+    override val type: JavaIrType.Reference,
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 
@@ -379,6 +416,7 @@ internal enum class JavaIrStringConversionKind {
   BOOLEAN,
   CHAR,
   INT_LIKE,
+  BOXED,
 }
 
 /** 精确且不依赖 JavaScript Number 表示范围的 IR 常量。 */
@@ -432,6 +470,12 @@ internal sealed interface JavaIrConversion {
   data object Identity : JavaIrConversion
 
   data class PrimitiveWidening(
+    val from: JavaAstPrimitiveType,
+    val to: JavaAstPrimitiveType,
+  ) : JavaIrConversion
+
+  /** Java update/compound assignment 独有的隐式 primitive 回写窄化。 */
+  data class PrimitiveNarrowing(
     val from: JavaAstPrimitiveType,
     val to: JavaAstPrimitiveType,
   ) : JavaIrConversion

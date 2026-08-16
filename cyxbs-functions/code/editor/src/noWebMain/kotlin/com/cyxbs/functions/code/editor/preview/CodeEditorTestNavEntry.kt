@@ -592,6 +592,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       if (isNotEmpty() && last() != '\n') appendLine()
       append(standardError)
     }
+    if (outputTruncated) {
+      if (isNotEmpty() && last() != '\n') appendLine()
+      append("⚠ 输出已截断，丢弃 ").append(droppedOutputBytes).appendLine(" 个 UTF-8 字节。")
+    }
     diagnostics.forEach { diagnostic ->
       if (isNotEmpty() && last() != '\n') appendLine()
       append('[').append(diagnostic.severity).append("] ")

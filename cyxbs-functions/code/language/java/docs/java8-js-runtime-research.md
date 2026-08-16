@@ -441,13 +441,37 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 ### 阶段 2B：精选类库与宿主桥
 
 - 先建立类与公开方法级别的 allowlist 描述，供类型检查、补全和运行实现共同读取；
-- 按 `java.lang` 基础类型 -> 集合接口与实现 -> 函数式接口 -> `Scanner` 教学子集的顺序加入；
+- 按 `java.lang` 基础类型 -> 集合接口与实现 -> `Scanner` 教学子集的顺序加入；函数式接口依赖
+  lambda、方法引用和接口分派，推迟到对应语言能力完成后统一接入；
 - 每个公开 API 同时声明“结果兼容、受限兼容、编译期不支持”之一，并补可观察行为测试；
 - 接入 `System.out/err`、受控行输入和 Runtime 配额，不开放文件、网络或任意宿主对象；
 - `java.time` 不进入本阶段，正则仅在真实课程用例需要时加入常用交集。
 
 阶段闸门：课程与数据结构样例只使用 allowlist API 即可运行；缺失 API 一律在编译期以 Java
 源码位置报告，不能落到 `undefined is not a function` 等 JavaScript 错误。
+
+#### 当前阶段 2B 实现进度（2026-08-17）
+
+- 已建立唯一 builtin allowlist，类型、字段、构造器和方法通过稳定 operation 贯穿语义模型、
+  typed IR、validator 与 JS runtime；未登记 API 在编译期报告，不通过成员名称猜测运行逻辑；
+- 已支持 `System.out/err`、`PrintStream.print/println`、常用 `String` 与 int `Math` 方法，输出按
+  stdout/stderr 分流；宿主桥使用受限 UTF-8 Base64 分块，并限制输入、输出字节数；
+- 已支持 boolean、byte、short、char、int 的装箱/拆箱，Boolean、Byte、Short、Character、Integer、
+  Number 常用方法与 Java 8 缓存身份，并按 strict、loose 两阶段执行重载决议；
+- 已支持 `StringBuilder` 常用构造、append、查询、修改、reverse、substring 和 toString；运行时保持
+  可变对象与别名语义，越界与 null 通过 Java 命名异常报告；
+- 已支持 List/ArrayList、Set/HashSet、Map/HashMap、Iterator 教学子集、目标类型 diamond、
+  `remove(int)`/`remove(Object)` 重载、backed `keySet` 以及集合别名修改；
+- 集合键对 null、String 和包装类型采用值语义，普通用户对象采用身份语义。用户自定义
+  `equals/hashCode` 与 fail-fast iterator 尚未实现，因此集合 API 标记为受限兼容；
+- 已支持预加载输入下的 `new Scanner(System.in)`，包含 hasNext、next、hasNextInt、nextInt、
+  hasNextLine、nextLine；多个 Scanner 共享输入游标，非法 nextInt 不消费 token；整数仅接受常用
+  ASCII 十进制形式，不支持运行中等待输入；
+- `PrintStream` 与 `StringBuilder` 已覆盖 String、char[]、包装值和受控 builtin 对象的常用输出；
+  用户类覆写 `toString` 尚未接入 Object 虚分派，相关调用返回稳定的不支持诊断，不伪造 Java 结果；
+- Java 与通用语言模块的完整测试已覆盖真实源码到 JS、真实 JS runtime、Unicode I/O、配额、
+  泛型集合、包装缓存和 Scanner 混合读取。函数式接口仍受 lambda、方法引用和接口分派缺失阻塞，
+  不在类库层伪实现。
 
 ### 阶段 3：产品化与发布验证
 

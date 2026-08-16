@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.language.java.compiler.semantic.impl
 
 import com.cyxbs.functions.code.language.java.compiler.ast.*
+import com.cyxbs.functions.code.language.java.compiler.builtin.*
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.*
 import com.cyxbs.functions.code.language.java.compiler.semantic.*
 import com.cyxbs.functions.code.language.java.compiler.source.JavaNodeId
@@ -22,12 +23,22 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val resolved = linkedMapOf<JavaNodeId, JavaSymbolId>()
   private val expressionTypes = linkedMapOf<JavaNodeId, JavaSemanticType>()
   private val conversions = linkedMapOf<JavaNodeId, JavaSemanticConversion>()
+  private val updateWriteConversions = linkedMapOf<JavaNodeId, JavaSemanticConversion>()
   private val calls = linkedMapOf<JavaNodeId, JavaCallableBinding>()
   private val constants = linkedMapOf<JavaNodeId, JavaConstantValue>()
   private val valueAccesses = linkedMapOf<JavaNodeId, JavaValueAccessBinding>()
   private val stringConcatenations =
     linkedMapOf<JavaNodeId, JavaStringConcatenationBinding>()
   private val arrayLengthExpressions = linkedSetOf<JavaNodeId>()
+  private val builtinMembers = linkedMapOf<JavaSymbolId, JavaBuiltinMemberDescriptor>()
+  private val builtinTypeRoles = linkedMapOf<JavaSymbolId, JavaBuiltinTypeRole>()
+  private val wrapperPrimitiveTypes = linkedMapOf<JavaSymbolId, JavaAstPrimitiveType>()
+  private val expectedExpressionTypes = linkedMapOf<JavaNodeId, JavaSemanticType>()
+  private val objectStringConversionOperations = setOf(
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
+  )
 
   private val typeDeclarations = linkedMapOf<JavaSymbolId, JavaSemanticTypeDeclaration>()
   private val typeParameterDeclarations =
@@ -72,10 +83,13 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     hostNode = host
     declareBuiltinTypes()
     declareSourceTypeSkeletons()
+    declareAdditionalBuiltinTypes()
+    validateExplicitImports()
     declareTypeParameters()
     resolveHierarchy()
     validateHierarchy()
     declareMembers()
+    declareBuiltinMembers()
     validateOverridesAndAssignSlots()
     analyzeFieldInitializers()
     analyzeCallableBodies()
@@ -83,50 +97,248 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return result()
   }
 
-  /** 登记 Object 与 String；String 的直接父类固定为 Object。 */
+  /**
+   * 两遍登记 allowlist 类型及继承边。
+   *
+   * 第一遍先冻结全部类型 symbol，第二遍才能按限定名建立父类关系，结果不依赖 catalog 顺序。
+   */
   private fun declareBuiltinTypes() {
-    val objectSymbol = symbol(
-      JavaSymbolKind.TYPE,
-      "Object",
-      null,
-      hostNode.nodeId,
-      hostNode.span,
-      null,
-      registerDeclaration = false,
-    )
-    objectType = S1TypeInfo(
-      unit = hostNode,
-      declaration = null,
-      qualifiedName = "java.lang.Object",
-      symbol = objectSymbol,
-      kind = JavaSemanticTypeDeclarationKind.BUILTIN,
-      visibility = JavaVisibility.PUBLIC,
-      isFinal = false,
-    )
-    typesByQualifiedName[objectType.qualifiedName] = objectType
-    typeDeclarations[objectSymbol] = objectType.semanticDeclaration()
+    val descriptors = JavaBuiltinLibrary.types.filter { descriptor ->
+      descriptor.qualifiedName == "java.lang.Object" ||
+        descriptor.qualifiedName == "java.lang.String"
+    }
+    declareBuiltinTypeDescriptors(descriptors)
+    objectType = checkNotNull(typesByQualifiedName["java.lang.Object"])
+    stringType = checkNotNull(typesByQualifiedName["java.lang.String"])
+  }
 
-    val stringSymbol = symbol(
-      JavaSymbolKind.TYPE,
-      "String",
-      null,
+  /**
+   * 在用户类型 symbol 已冻结后登记额外 builtin，避免改变既有 typed IR 编号和生成代码快照。
+   *
+   * 此步骤仍早于类型参数、继承和成员签名解析，因此 System/Math/PrintStream 对源码完全可见。
+   */
+  private fun declareAdditionalBuiltinTypes() {
+    declareBuiltinTypeDescriptors(JavaBuiltinLibrary.types.filter { descriptor ->
+      descriptor.qualifiedName != "java.lang.Object" &&
+        descriptor.qualifiedName != "java.lang.String"
+    })
+  }
+
+  /** 为一组已经过顺序选择的 catalog 类型建立 symbol 与父类边。 */
+  private fun declareBuiltinTypeDescriptors(descriptors: List<JavaBuiltinTypeDescriptor>) {
+    descriptors.forEach { descriptor ->
+      check(descriptor.qualifiedName !in typesByQualifiedName) {
+        "Duplicate Java builtin type ${descriptor.qualifiedName}."
+      }
+      val typeSymbol = symbol(
+        JavaSymbolKind.TYPE,
+        descriptor.qualifiedName.substringAfterLast('.'),
+        null,
+        hostNode.nodeId,
+        hostNode.span,
+        null,
+        registerDeclaration = false,
+      )
+      typesByQualifiedName[descriptor.qualifiedName] = S1TypeInfo(
+        unit = hostNode,
+        declaration = null,
+        qualifiedName = descriptor.qualifiedName,
+        symbol = typeSymbol,
+        kind = JavaSemanticTypeDeclarationKind.BUILTIN,
+        visibility = JavaVisibility.PUBLIC,
+        isFinal = descriptor.isFinal,
+      )
+      builtinTypeRoles[typeSymbol] = descriptor.role
+      descriptor.role.boxedPrimitive?.let { wrapperPrimitiveTypes[typeSymbol] = it }
+    }
+    descriptors.forEach { descriptor ->
+      val type = checkNotNull(typesByQualifiedName[descriptor.qualifiedName])
+      descriptor.typeParameters.forEach { name ->
+        check(name !in type.typeParameterNames) { "Duplicate Java builtin type parameter $name." }
+        val parameter = symbol(
+          JavaSymbolKind.TYPE_PARAMETER,
+          name,
+          type.symbol,
+          hostNode.nodeId,
+          hostNode.span,
+          null,
+          registerDeclaration = false,
+        )
+        type.typeParameters += parameter
+        type.typeParameterNames[name] = parameter
+        typeParameterDeclarations[parameter] = JavaSemanticTypeParameterDeclaration(
+          parameter,
+          type.symbol,
+          listOf(JavaSemanticType.Declared(objectType.symbol, emptyList())),
+        )
+      }
+      type.directSuperClass = descriptor.directSuperQualifiedName?.let { parentName ->
+        val parent = checkNotNull(typesByQualifiedName[parentName]) {
+          "Java builtin parent $parentName is not declared."
+        }
+        JavaSemanticType.Declared(
+          parent.symbol,
+          descriptor.directSuperArguments.map { argument -> argument.toSemanticType(type) },
+        )
+      }
+      typeDeclarations[type.symbol] = type.semanticDeclaration()
+    }
+  }
+
+  /**
+   * 把 catalog 成员转成普通字段/callable 候选，同时保存 symbol 到 builtin 描述的确定映射。
+   *
+   * 这些记录没有 AST 声明节点，不进入源码声明顺序，也不会被字段初始化或方法体分析消费。
+   */
+  private fun declareBuiltinMembers() {
+    JavaBuiltinLibrary.members.forEachIndexed { order, descriptor ->
+      val owner = checkNotNull(typesByQualifiedName[descriptor.ownerQualifiedName]) {
+        "Java builtin owner ${descriptor.ownerQualifiedName} is not declared."
+      }
+      when (descriptor) {
+        is JavaBuiltinMemberDescriptor.Field ->
+          declareBuiltinField(owner, descriptor, order)
+        is JavaBuiltinMemberDescriptor.Callable ->
+          declareBuiltinCallable(owner, descriptor)
+      }
+    }
+  }
+
+  /** 登记一个没有源码 initializer 的内建字段。 */
+  private fun declareBuiltinField(
+    owner: S1TypeInfo,
+    descriptor: JavaBuiltinMemberDescriptor.Field,
+    order: Int,
+  ) {
+    val type = descriptor.type.toSemanticType(owner)
+    val id = symbol(
+      JavaSymbolKind.FIELD,
+      descriptor.name,
+      owner.symbol,
       hostNode.nodeId,
       hostNode.span,
-      null,
+      type,
       registerDeclaration = false,
     )
-    stringType = S1TypeInfo(
-      unit = hostNode,
+    val field = S1FieldInfo(
+      owner = owner,
       declaration = null,
-      qualifiedName = "java.lang.String",
-      symbol = stringSymbol,
-      kind = JavaSemanticTypeDeclarationKind.BUILTIN,
+      declarator = null,
+      symbol = id,
+      name = descriptor.name,
+      type = type,
       visibility = JavaVisibility.PUBLIC,
-      isFinal = true,
-      directSuperClass = JavaSemanticType.Declared(objectSymbol, emptyList()),
+      isStatic = descriptor.isStatic,
+      isFinal = descriptor.isFinal,
+      order = order,
+      span = hostNode.span,
+      isSynthetic = true,
     )
-    typesByQualifiedName[stringType.qualifiedName] = stringType
-    typeDeclarations[stringSymbol] = stringType.semanticDeclaration()
+    check(fieldsByOwnerAndName.put(owner.symbol to descriptor.name, field) == null) {
+      "Duplicate Java builtin field ${descriptor.ownerQualifiedName}.${descriptor.name}."
+    }
+    fields += field
+    fieldDeclarations[id] = JavaSemanticFieldDeclaration(
+      symbol = id,
+      owner = owner.symbol,
+      type = type,
+      visibility = JavaVisibility.PUBLIC,
+      isStatic = descriptor.isStatic,
+      isFinal = descriptor.isFinal,
+      declarationOrder = order,
+    )
+    if (descriptor.isFinal) finalSymbols += id
+    builtinMembers[id] = descriptor
+  }
+
+  /** 登记一个无需方法体、但完整参与重载选择的内建 callable。 */
+  private fun declareBuiltinCallable(
+    owner: S1TypeInfo,
+    descriptor: JavaBuiltinMemberDescriptor.Callable,
+  ) {
+    val parameterTypes = descriptor.parameterTypes.map { it.toSemanticType(owner) }
+    val returnType = descriptor.returnType.toSemanticType(owner)
+    val kind = if (descriptor.isConstructor) {
+      JavaSemanticCallableKind.CONSTRUCTOR
+    } else {
+      JavaSemanticCallableKind.METHOD
+    }
+    val id = symbol(
+      if (descriptor.isConstructor) JavaSymbolKind.CONSTRUCTOR else JavaSymbolKind.METHOD,
+      descriptor.name,
+      owner.symbol,
+      hostNode.nodeId,
+      hostNode.span,
+      returnType,
+      registerDeclaration = false,
+    )
+    val parameterSymbols = parameterTypes.mapIndexed { index, type ->
+      symbol(
+        JavaSymbolKind.PARAMETER,
+        "argument$index",
+        id,
+        hostNode.nodeId,
+        hostNode.span,
+        type,
+        registerDeclaration = false,
+      )
+    }
+    val info = S1CallableInfo(
+      unit = hostNode,
+      owner = owner,
+      declaration = null,
+      symbol = id,
+      kind = kind,
+      name = descriptor.name,
+      typeParameters = emptyList(),
+      typeParameterNames = emptyMap(),
+      parameterNodes = emptyList(),
+      parameterSymbols = parameterSymbols,
+      parameterTypes = parameterTypes,
+      returnType = returnType,
+      visibility = JavaVisibility.PUBLIC,
+      isStatic = if (descriptor.isConstructor) false else descriptor.isStatic,
+      isFinal = if (descriptor.isConstructor) false else descriptor.isFinal,
+      isAbstract = false,
+      erasedSignatureKey = erasedSignatureKey(descriptor.name, parameterTypes),
+      erasedDescriptor = erasedMethodDescriptor(
+        kind,
+        parameterTypes,
+        returnType,
+      ),
+      isSynthetic = true,
+      isBuiltin = true,
+    )
+    val siblings = if (descriptor.isConstructor) {
+      constructorsByOwner.getOrPut(owner.symbol) { mutableListOf() }
+    } else {
+      methodsByOwnerAndName.getOrPut(owner.symbol to descriptor.name) { mutableListOf() }
+    }
+    check(siblings.none { it.erasedSignatureKey == info.erasedSignatureKey }) {
+      "Duplicate Java builtin callable ${descriptor.ownerQualifiedName}.${info.erasedSignatureKey}."
+    }
+    siblings += info
+    callables += info
+    callableDeclarations[id] = info.semanticDeclaration()
+    builtinMembers[id] = descriptor
+  }
+
+  /** 将 catalog 类型引用解析为本次编译内的稳定 semantic type。 */
+  private fun JavaBuiltinTypeReference.toSemanticType(owner: S1TypeInfo): JavaSemanticType = when (this) {
+    is JavaBuiltinTypeReference.Primitive -> JavaSemanticType.Primitive(kind)
+    is JavaBuiltinTypeReference.Array -> JavaSemanticType.Array(componentType.toSemanticType(owner))
+    is JavaBuiltinTypeReference.Declared -> JavaSemanticType.Declared(
+      checkNotNull(typesByQualifiedName[qualifiedName]) {
+        "Java builtin member references unknown type $qualifiedName."
+      }.symbol,
+      arguments.map { argument -> argument.toSemanticType(owner) },
+    )
+    is JavaBuiltinTypeReference.TypeParameter -> JavaSemanticType.TypeVariable(
+      checkNotNull(owner.typeParameterNames[name]) {
+        "Java builtin member references unknown owner type parameter $name."
+      },
+    )
+    JavaBuiltinTypeReference.Void -> JavaSemanticType.Void
   }
 
   /** 第一遍只登记 package-qualified 类型，防止继承与签名解析受源码顺序影响。 */
@@ -165,12 +377,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         }
         val qualifiedName = qualifyStage1(unit.packageName, declaration.name)
         val previous = typesByQualifiedName[qualifiedName]
-        if (previous != null) {
+        val conflictsWithBuiltin = JavaBuiltinLibrary.types.any { descriptor ->
+          descriptor.qualifiedName == qualifiedName
+        }
+        if (previous != null || conflictsWithBuiltin) {
           error(
             declaration.span,
             "java.semantic.duplicate_type",
             "限定类型名 $qualifiedName 已在工作区声明。",
-            listOf(JavaDiagnosticNote("首次声明位于此处。", previous.span)),
+            previous?.let { existing ->
+              listOf(JavaDiagnosticNote("首次声明位于此处。", existing.span))
+            }.orEmpty(),
           )
           return@forEach
         }
@@ -196,7 +413,6 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         typeDeclarations[id] = info.semanticDeclaration()
       }
     }
-    validateExplicitImports()
   }
 
   /** 显式 import 即使未被引用也必须指向可见类型。 */
@@ -222,6 +438,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
             "显式 import 的类型 ${declaration.qualifiedName} 不在当前编译工作区中。",
           )
         } else {
+          val simpleName = declaration.qualifiedName.substringAfterLast('.')
+          val currentUnitType = unit.types.firstOrNull { it.name == simpleName }
+            ?.let { typesByNode[it.nodeId] }
+          if (currentUnitType != null && currentUnitType.symbol != type.symbol) {
+            error(
+              declaration.span,
+              "java.semantic.import_conflicts_with_top_level_type",
+              "显式 import 的类型 ${declaration.qualifiedName} 与当前 compilation unit 的顶层类型 $simpleName 冲突。",
+              listOf(JavaDiagnosticNote("冲突的顶层类型声明。", currentUnitType.span)),
+            )
+          }
           ensureTypeAccessible(type, unit, declaration.span)
         }
       }
@@ -285,6 +512,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         resolveType(it, type.unit, type.typeParameterNames, allowVoid = false)
       } ?: objectSemanticType()
       type.directSuperClass = superType as? JavaSemanticType.Declared
+      val selectedParent = type.directSuperClass?.symbol?.let(::typeInfo)
+      if (selectedParent != null && JavaBuiltinLibrary.types.any { descriptor ->
+          descriptor.qualifiedName == selectedParent.qualifiedName && descriptor.isInterfaceFacade
+        }
+      ) {
+        error(
+          declaration.superClass?.span ?: declaration.span,
+          "java.semantic.builtin_facade_inheritance_unsupported",
+          "精选集合接口仅供变量声明与内建实现使用，用户 class 暂不能继承或实现它。",
+        )
+      }
       if (type.directSuperClass == null && superType != JavaSemanticType.Error) {
         error(declaration.span, "java.semantic.invalid_superclass", "class 的直接父类必须是声明类型。")
       }
@@ -364,7 +602,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         declarator.span,
         "java.semantic.duplicate_field",
         "类型 ${owner.qualifiedName} 重复声明字段 ${declarator.name}。",
-        listOf(JavaDiagnosticNote("首次声明位于此处。", previous.declarator.span)),
+        listOf(JavaDiagnosticNote("首次声明位于此处。", previous.span)),
       )
     }
     val id = symbol(
@@ -380,11 +618,13 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       declaration,
       declarator,
       id,
+      declarator.name,
       type,
       visibility(declaration.modifiers),
       JavaAstModifier.STATIC in declaration.modifiers,
       JavaAstModifier.FINAL in declaration.modifiers,
       order,
+      declarator.span,
     )
     fields += field
     if (key !in fieldsByOwnerAndName) fieldsByOwnerAndName[key] = field
@@ -399,12 +639,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       order,
     )
     if (field.isFinal) finalSymbols += id
-    if (field.isFinal && field.isStatic && field.declarator.initializer == null) {
+    if (field.isFinal && field.isStatic && field.declarator?.initializer == null) {
       // 当前 AST 没有 static initializer block，声明初始化式是 static blank final 的唯一写入路径。
       error(
-        field.declarator.span,
+        field.span,
         "java.semantic.blank_final_field_not_initialized",
-        "static final 字段 ${field.declarator.name} 必须提供声明初始化式。",
+        "static final 字段 ${field.name} 必须提供声明初始化式。",
       )
     }
   }
@@ -600,9 +840,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     callableDeclarations[id] = info.semanticDeclaration()
   }
 
-  /** Object 与 String 也提供可被 implicit super/new 绑定的内建零参数构造器。 */
+  /** 仅为 catalog 明确允许构造的内建类型合成零参数构造器。 */
   private fun synthesizeBuiltinConstructors() {
-    listOf(objectType, stringType).forEach { type ->
+    JavaBuiltinLibrary.types.filter { it.hasDefaultConstructor }.forEach { descriptor ->
+      val type = checkNotNull(typesByQualifiedName[descriptor.qualifiedName])
       if (constructorsByOwner[type.symbol].isNullOrEmpty()) synthesizeDefaultConstructor(type)
     }
   }
@@ -617,6 +858,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         it.owner.symbol == type.symbol && it.kind == JavaSemanticCallableKind.METHOD
       }
       methods.forEach { method ->
+        // builtin 实例方法由显式 IR operation 分派，不占用用户类虚槽。
+        if (method.isBuiltin) return@forEach
         val inherited = inheritedMethods(type)
           .filter { it.name == method.name && isOverrideSubsignature(type, method, it) }
         val visibleInherited = inherited.filter { isMemberAccessible(it.visibility, it.owner, type) }
@@ -775,9 +1018,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   /** 字段初始化式在声明所属 static/instance 上下文中按源码顺序分析。 */
   private fun analyzeFieldInitializers() {
     fields.sortedWith(compareBy<S1FieldInfo>({ it.owner.symbol.value }, { it.order })).forEach { field ->
-      val initializer = field.declarator.initializer ?: return@forEach
+      val initializer = field.declarator?.initializer ?: return@forEach
       withBodyContext(S1BodyContext(field.unit, field.owner, null, field.isStatic)) {
-        val actual = analyzeExpression(initializer)
+        val actual = analyzeExpressionExpected(initializer, field.type)
         assign(initializer.nodeId, actual, field.type, initializer.span)
       }
     }
@@ -1048,7 +1291,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     )
     declarators.forEach { declarator ->
       declarator.initializer?.let { initializer ->
-        val actual = analyzeExpression(initializer)
+        val actual = analyzeExpressionExpected(initializer, declaredType)
         assign(initializer.nodeId, actual, declaredType, initializer.span)
       }
       val id = declareLocal(
@@ -1092,7 +1335,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       }
       return
     }
-    val actual = analyzeExpression(value)
+    val actual = analyzeExpressionExpected(value, callable.returnType)
     if (callable.returnType == JavaSemanticType.Void) {
       error(value.span, "java.semantic.return_type_mismatch", "void 方法不能返回值。")
     } else {
@@ -1113,7 +1356,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstExpression.Name -> name(expression)
       is JavaAstExpression.This -> thisExpression(expression)
       is JavaAstExpression.Super -> superExpression(expression)
-      is JavaAstExpression.Parenthesized -> analyzeExpression(expression.expression)
+      is JavaAstExpression.Parenthesized -> expectedExpressionTypes[expression.nodeId]?.let { expected ->
+        analyzeExpressionExpected(expression.expression, expected)
+      } ?: analyzeExpression(expression.expression)
       is JavaAstExpression.Binary -> binary(expression)
       is JavaAstExpression.Unary -> unary(expression)
       is JavaAstExpression.Assignment -> assignment(expression)
@@ -1125,6 +1370,15 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     expressionTypes[expression.nodeId] = type
     return type
+  }
+
+  /** 仅把赋值上下文目标绑定到当前表达式；普通子表达式不会意外继承 target type。 */
+  private fun analyzeExpressionExpected(
+    expression: JavaAstExpression,
+    expected: JavaSemanticType,
+  ): JavaSemanticType {
+    expectedExpressionTypes[expression.nodeId] = expected
+    return analyzeExpression(expression)
   }
 
   /** 值名称按 local/parameter、字段、类型名顺序解析，允许局部变量遮蔽字段。 */
@@ -1207,25 +1461,37 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
 
   /** 二元数值运算使用 Java binary numeric promotion，不借用 JavaScript 强制转换。 */
   private fun binary(expression: JavaAstExpression.Binary): JavaSemanticType {
-    val left = analyzeExpression(expression.left)
-    val right = analyzeExpression(expression.right)
-    if (left == JavaSemanticType.Error || right == JavaSemanticType.Error) return JavaSemanticType.Error
+    val rawLeft = analyzeExpression(expression.left)
+    val rawRight = analyzeExpression(expression.right)
+    if (rawLeft == JavaSemanticType.Error || rawRight == JavaSemanticType.Error) return JavaSemanticType.Error
     return when (expression.operator) {
       JavaAstBinaryOperator.ADD -> {
-        if (isString(left) || isString(right)) {
-          stringConcatenation(expression.nodeId, left, right, expression.span)
+        if (isString(rawLeft) || isString(rawRight)) {
+          stringConcatenation(expression.nodeId, rawLeft, rawRight, expression.span)
         }
-        else numericBinary(expression.span, left, right, relational = false)
+        else numericBinary(
+          expression.span,
+          primitiveOperand(expression.left, rawLeft),
+          primitiveOperand(expression.right, rawRight),
+          relational = false,
+        )
       }
       JavaAstBinaryOperator.MULTIPLY,
       JavaAstBinaryOperator.DIVIDE,
       JavaAstBinaryOperator.REMAINDER,
       JavaAstBinaryOperator.SUBTRACT,
-      -> numericBinary(expression.span, left, right, relational = false)
+      -> numericBinary(
+        expression.span,
+        primitiveOperand(expression.left, rawLeft),
+        primitiveOperand(expression.right, rawRight),
+        relational = false,
+      )
       JavaAstBinaryOperator.SHIFT_LEFT,
       JavaAstBinaryOperator.SHIFT_RIGHT,
       JavaAstBinaryOperator.UNSIGNED_SHIFT_RIGHT,
       -> {
+        val left = primitiveOperand(expression.left, rawLeft)
+        val right = primitiveOperand(expression.right, rawRight)
         if (!isIntegral(left) || !isIntegral(right)) {
           error(expression.span, "java.semantic.invalid_binary_operands", "位移操作数必须是 integral primitive。")
           JavaSemanticType.Error
@@ -1239,29 +1505,50 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaAstBinaryOperator.LESS_THAN_OR_EQUAL,
       JavaAstBinaryOperator.GREATER_THAN,
       JavaAstBinaryOperator.GREATER_THAN_OR_EQUAL,
-      -> numericBinary(expression.span, left, right, relational = true)
+      -> numericBinary(
+        expression.span,
+        primitiveOperand(expression.left, rawLeft),
+        primitiveOperand(expression.right, rawRight),
+        relational = true,
+      )
       JavaAstBinaryOperator.EQUAL,
       JavaAstBinaryOperator.NOT_EQUAL,
-      -> if (equalityCompatible(left, right)) {
+      -> {
+        // 两个引用（包括 wrapper）保持 Java 身份比较；仅 primitive 与 wrapper 混合时拆箱。
+        val left = if (rawLeft is JavaSemanticType.Primitive || rawRight is JavaSemanticType.Primitive) {
+          primitiveOperand(expression.left, rawLeft)
+        } else rawLeft
+        val right = if (rawLeft is JavaSemanticType.Primitive || rawRight is JavaSemanticType.Primitive) {
+          primitiveOperand(expression.right, rawRight)
+        } else rawRight
+        if (equalityCompatible(left, right)) {
         booleanType()
-      } else {
-        error(expression.span, "java.semantic.invalid_binary_operands", "等值比较的操作数类型不兼容。")
-        JavaSemanticType.Error
+        } else {
+          error(expression.span, "java.semantic.invalid_binary_operands", "等值比较的操作数类型不兼容。")
+          JavaSemanticType.Error
+        }
       }
       JavaAstBinaryOperator.BITWISE_AND,
       JavaAstBinaryOperator.BITWISE_XOR,
       JavaAstBinaryOperator.BITWISE_OR,
-      -> when {
+      -> {
+        val left = primitiveOperand(expression.left, rawLeft)
+        val right = primitiveOperand(expression.right, rawRight)
+        when {
         left == booleanType() && right == booleanType() -> booleanType()
         isIntegral(left) && isIntegral(right) -> checkNotNull(numericPromotion(left, right))
         else -> {
           error(expression.span, "java.semantic.invalid_binary_operands", "位运算要求两个 integral 或两个 boolean 操作数。")
           JavaSemanticType.Error
         }
+        }
       }
       JavaAstBinaryOperator.LOGICAL_AND,
       JavaAstBinaryOperator.LOGICAL_OR,
-      -> if (left == booleanType() && right == booleanType()) {
+      -> if (
+        primitiveOperand(expression.left, rawLeft) == booleanType() &&
+        primitiveOperand(expression.right, rawRight) == booleanType()
+      ) {
         booleanType()
       } else {
         error(expression.span, "java.semantic.invalid_binary_operands", "逻辑操作数必须是 boolean。")
@@ -1287,8 +1574,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
 
   /** 一元数值操作先做 unary numeric promotion；递增递减保留左值声明类型。 */
   private fun unary(expression: JavaAstExpression.Unary): JavaSemanticType {
-    val operand = analyzeExpression(expression.operand)
-    if (operand == JavaSemanticType.Error) return JavaSemanticType.Error
+    val declaredOperand = analyzeExpression(expression.operand)
+    if (declaredOperand == JavaSemanticType.Error) return JavaSemanticType.Error
+    val operand = primitiveOperand(expression.operand, declaredOperand)
     return when (expression.operator) {
       JavaAstUnaryOperator.POSITIVE,
       JavaAstUnaryOperator.NEGATIVE,
@@ -1309,8 +1597,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           error(expression.span, "java.semantic.final_assignment", "final 值不能递增或递减。")
           JavaSemanticType.Error
         }
-        !isNumeric(operand) -> invalidUnary(expression.span, "递增递减目标必须是 numeric primitive。")
-        else -> operand
+        !isNumeric(operand) -> invalidUnary(expression.span, "递增递减目标必须是 numeric primitive 或首批 wrapper。")
+        else -> {
+          if (declaredOperand != operand) {
+            updateWriteConversion(
+              expression.nodeId,
+              checkNotNull(unaryNumericPromotion(operand)),
+              declaredOperand,
+            )
+          }
+          declaredOperand
+        }
       }
     }
   }
@@ -1324,7 +1621,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       ).also { expressionTypes[target.nodeId] = it }
       else -> analyzeExpression(target)
     }
-    val valueType = analyzeExpression(expression.value)
+    val valueType = analyzeExpressionExpected(expression.value, targetType)
     if (!writable(expression.target)) {
       error(expression.target.span, "java.semantic.invalid_assignment_target", "赋值目标必须是局部、参数或字段。")
       return JavaSemanticType.Error
@@ -1350,7 +1647,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     } else if (expression.operator == JavaAstAssignmentOperator.ADD_ASSIGN && isString(targetType)) {
       stringConcatenation(expression.nodeId, targetType, valueType, expression.span)
     } else {
-      compoundAssignmentType(expression.operator, targetType, valueType, expression.span)
+      val readTarget = primitiveOperand(expression.target, targetType)
+      val readValue = primitiveOperand(expression.value, valueType)
+      compoundAssignmentType(expression.operator, readTarget, readValue, expression.span).let { computedType ->
+        if (computedType == JavaSemanticType.Error) {
+          JavaSemanticType.Error
+        } else {
+          if (readTarget != targetType) {
+            updateWriteConversion(expression.nodeId, computedType, targetType)
+          }
+          // Java 复合赋值表达式最终仍具有左值声明类型；计算中间类型只进入回写 side table。
+          targetType
+        }
+      }
     }
     if (result != JavaSemanticType.Error) {
       blankFinalTarget?.let { symbol ->
@@ -1364,36 +1673,40 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return result
   }
 
-  /** 复合赋值按 Java 隐式回转到左值类型处理，boxing 与字符串外的引用组合稳定拒绝。 */
+  /** 复合赋值先在拆箱后的 primitive 上计算；wrapper 回写转换由独立 side table 冻结。 */
   private fun compoundAssignmentType(
     operator: JavaAstAssignmentOperator,
     target: JavaSemanticType,
     value: JavaSemanticType,
     span: JavaSourceSpan,
   ): JavaSemanticType {
-    val valid = when (operator) {
+    val computed = when (operator) {
       JavaAstAssignmentOperator.ADD_ASSIGN ->
-        numericPromotion(target, value) != null
+        numericPromotion(target, value)
       JavaAstAssignmentOperator.AND_ASSIGN,
       JavaAstAssignmentOperator.XOR_ASSIGN,
       JavaAstAssignmentOperator.OR_ASSIGN,
-      -> target == booleanType() && value == booleanType() || isIntegral(target) && isIntegral(value)
+      -> when {
+        target == booleanType() && value == booleanType() -> booleanType()
+        isIntegral(target) && isIntegral(value) -> numericPromotion(target, value)
+        else -> null
+      }
       JavaAstAssignmentOperator.SHIFT_LEFT_ASSIGN,
       JavaAstAssignmentOperator.SHIFT_RIGHT_ASSIGN,
       JavaAstAssignmentOperator.UNSIGNED_SHIFT_RIGHT_ASSIGN,
-      -> isIntegral(target) && isIntegral(value)
+      -> if (isIntegral(target) && isIntegral(value)) unaryNumericPromotion(target) else null
       JavaAstAssignmentOperator.MULTIPLY_ASSIGN,
       JavaAstAssignmentOperator.DIVIDE_ASSIGN,
       JavaAstAssignmentOperator.REMAINDER_ASSIGN,
       JavaAstAssignmentOperator.SUBTRACT_ASSIGN,
-      -> numericPromotion(target, value) != null
-      JavaAstAssignmentOperator.ASSIGN -> true
+      -> numericPromotion(target, value)
+      JavaAstAssignmentOperator.ASSIGN -> target
     }
-    if (!valid) {
+    if (computed == null) {
       error(span, "java.semantic.invalid_compound_assignment", "复合赋值两侧类型不兼容。")
       return JavaSemanticType.Error
     }
-    return target
+    return computed
   }
 
   /**
@@ -1602,14 +1915,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       if (context().isStatic) JavaReceiverKind.NONE else JavaReceiverKind.IMPLICIT_THIS,
       isImplicit = true,
     )
-    val argumentTypes = expression.arguments.map(::analyzeExpression)
-    if (receiver.type == JavaSemanticType.Error ||
-      argumentTypes.any { it == JavaSemanticType.Error }
-    ) {
-      return JavaSemanticType.Error
-    }
     val declaredReceiver = receiver.type as? JavaSemanticType.Declared
     if (declaredReceiver == null) {
+      expression.arguments.forEach(::analyzeExpression)
+      if (receiver.type == JavaSemanticType.Error) return JavaSemanticType.Error
       error(expression.span, "java.semantic.method_receiver_not_declared", "方法 receiver 必须是 class 类型。")
       return JavaSemanticType.Error
     }
@@ -1634,18 +1943,30 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       return JavaSemanticType.Error
     }
     val accessible = modeCandidates.filter { isCallableAccessible(it.info) }
+    val argumentTypes = analyzeInvocationArguments(
+      expression.arguments,
+      accessible,
+      explicitTypeArguments,
+    )
+    if (argumentTypes.any { it == JavaSemanticType.Error }) return JavaSemanticType.Error
     if (modeCandidates.isNotEmpty() && accessible.isEmpty()) {
       error(expression.span, "java.semantic.inaccessible_method", "方法 ${expression.methodName} 在当前上下文不可访问。")
       return JavaSemanticType.Error
     }
-    val instantiated = accessible.mapNotNull { candidate ->
-      instantiateCallable(candidate, argumentTypes, explicitTypeArguments)
-    }
+    val instantiated = instantiateApplicablePhase(
+      accessible,
+      argumentTypes,
+      explicitTypeArguments,
+    )
     val selected = selectMostSpecific(instantiated, expression.span, expression.methodName)
       ?: return JavaSemanticType.Error
+    if (rejectUnsupportedObjectStringConversion(expression.arguments, argumentTypes, selected)) {
+      return JavaSemanticType.Error
+    }
     recordArgumentConversions(expression.arguments, argumentTypes, selected.parameterTypes)
     val dispatch = when {
       selected.info.isStatic -> JavaDispatchKind.STATIC
+      selected.info.isBuiltin -> JavaDispatchKind.SPECIAL
       receiver.kind == JavaReceiverKind.SUPER -> JavaDispatchKind.SPECIAL
       else -> JavaDispatchKind.VIRTUAL
     }
@@ -1664,19 +1985,37 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
 
   /** new 表达式支持显式参数化类型与从构造器实参推断的 diamond。 */
   private fun newObject(expression: JavaAstExpression.NewObject): JavaSemanticType {
-    val argumentTypes = expression.arguments.map(::analyzeExpression)
-    if (argumentTypes.any { it == JavaSemanticType.Error }) return JavaSemanticType.Error
     val named = expression.type as? JavaAstTypeReference.Named
     if (named == null) {
+      expression.arguments.forEach(::analyzeExpression)
       resolveType(expression.type, context().unit, currentTypeParameterScope(), allowVoid = false)
       error(expression.span, "java.semantic.invalid_new_type", "new 只能创建 class 声明类型。")
       return JavaSemanticType.Error
     }
-    val createdType = if (named.usesDiamond) {
-      inferDiamondType(named, argumentTypes, expression.span)
+    val explicitCreatedType = if (named.usesDiamond) {
+      null
     } else {
       resolveType(named, context().unit, currentTypeParameterScope(), allowVoid = false)
         as? JavaSemanticType.Declared
+    }
+    val argumentTypes = if (explicitCreatedType != null) {
+      analyzeInvocationArguments(
+        expression.arguments,
+        constructorCandidates(explicitCreatedType),
+      )
+    } else {
+      expression.arguments.map(::analyzeExpression)
+    }
+    if (argumentTypes.any { it == JavaSemanticType.Error }) return JavaSemanticType.Error
+    val createdType = if (named.usesDiamond) {
+      inferDiamondType(
+        named,
+        argumentTypes,
+        expression.span,
+        expectedExpressionTypes[expression.nodeId],
+      )
+    } else {
+      explicitCreatedType
     }
     if (createdType == null) return JavaSemanticType.Error
     val owner = typeInfo(createdType.symbol)
@@ -1703,11 +2042,18 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return createdType
   }
 
-  /** diamond 仅从构造器实参约束推断 class 类型参数，不执行 target-only inference。 */
+  /**
+   * 为 diamond 推断 class 类型参数。
+   *
+   * Java 8 允许 `List<Integer> values = new ArrayList<>()` 由目标类型提供约束；集合
+   * facade 没有伪造 JDK 源码，因此这里直接使用 catalog 声明的 generic direct-super
+   * 关系反推实现类参数。若目标类型无法给出完整约束，再退回已有的构造器实参推断。
+   */
   private fun inferDiamondType(
     reference: JavaAstTypeReference.Named,
     argumentTypes: List<JavaSemanticType>,
     span: JavaSourceSpan,
+    expectedType: JavaSemanticType?,
   ): JavaSemanticType.Declared? {
     if (reference.arguments.isNotEmpty()) {
       error(reference.span, "java.semantic.invalid_diamond", "diamond 不能同时携带显式类型实参。")
@@ -1716,6 +2062,27 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     val owner = visibleType(reference.qualifiedName, context().unit, reference.span) ?: return null
     if (owner.typeParameters.isEmpty()) return JavaSemanticType.Declared(owner.symbol, emptyList())
     val inference = JavaGenericInference(relations(), typeParameterDeclarations)
+    val expectedDeclared = expectedType as? JavaSemanticType.Declared
+    val targetSubstitutions = expectedDeclared?.let { expected ->
+      when {
+        expected.symbol == owner.symbol && expected.arguments.size == owner.typeParameters.size ->
+          owner.typeParameters.zip(expected.arguments).toMap()
+
+        owner.directSuperClass != null -> inference.infer(
+          owner.typeParameters,
+          listOfNotNull(owner.directSuperClass),
+          listOf(expected),
+        )
+
+        else -> null
+      }
+    }
+    if (targetSubstitutions != null && owner.typeParameters.all(targetSubstitutions::containsKey)) {
+      return JavaSemanticType.Declared(
+        owner.symbol,
+        owner.typeParameters.map(targetSubstitutions::getValue),
+      )
+    }
     val inferredTypes = constructorsByOwner[owner.symbol].orEmpty().mapNotNull { constructor ->
       val substitutions = inference.infer(
         owner.typeParameters,
@@ -1727,8 +2094,16 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     if (inferredTypes.size != 1) {
       error(
         span,
-        if (inferredTypes.isEmpty()) "java.semantic.diamond_inference_failed" else "java.semantic.ambiguous_overload",
-        "无法从构造器实参唯一推断 diamond 类型实参。",
+        when {
+          inferredTypes.size > 1 -> "java.semantic.ambiguous_overload"
+          argumentTypes.isEmpty() -> "java.semantic.diamond_target_required"
+          else -> "java.semantic.diamond_inference_failed"
+        },
+        if (argumentTypes.isEmpty()) {
+          "零参 diamond 需要可代换到实现类泛型参数的目标类型。"
+        } else {
+          "无法从目标类型或构造器实参唯一推断 diamond 类型实参。"
+        },
       )
       return null
     }
@@ -1743,17 +2118,167 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     invocationNode: JavaNodeId?,
   ): S1InstantiatedCallable? {
     val owner = typeInfo(ownerType.symbol) ?: return null
-    val classSubstitutions = owner.typeParameters.zip(ownerType.arguments).toMap()
-    val candidates = constructorsByOwner[owner.symbol].orEmpty()
-      .filter(::isCallableAccessible)
-      .map { S1CallableCandidate(it, classSubstitutions) }
-      .mapNotNull { instantiateCallable(it, argumentTypes, emptyList()) }
-    val selected = selectMostSpecific(candidates, span, owner.simpleName)
-    if (selected == null && invocationNode == null && candidates.isEmpty()) {
+    val candidates = constructorCandidates(ownerType)
+    val applicable = instantiateApplicablePhase(candidates, argumentTypes, emptyList())
+    val selected = selectMostSpecific(applicable, span, owner.simpleName)
+    if (selected == null && invocationNode == null && applicable.isEmpty()) {
       // selectMostSpecific 已产生稳定诊断；该分支只强调 implicit super 的来源。
       return null
     }
     return selected
+  }
+
+  /** 返回已完成 class 类型实参代换的可见构造器候选。 */
+  private fun constructorCandidates(ownerType: JavaSemanticType.Declared): List<S1CallableCandidate> {
+    val owner = typeInfo(ownerType.symbol) ?: return emptyList()
+    val classSubstitutions = owner.typeParameters.zip(ownerType.arguments).toMap()
+    return constructorsByOwner[owner.symbol].orEmpty()
+      .filter(::isCallableAccessible)
+      .map { S1CallableCandidate(it, classSubstitutions) }
+  }
+
+  /**
+   * 以候选签名为参数位置的 target type 分析实参。
+   *
+   * 先正常分析所有非 poly 实参，并用这些已冻结类型排除明显不适用的候选；只有剩余候选在
+   * diamond 位置给出一致或唯一最具体的具体引用类型时，才提交 expected side table。这样不会
+   * 以某个候选试探性分析表达式，也不会让失败候选的诊断、转换或绑定污染最终模型。
+   */
+  private fun analyzeInvocationArguments(
+    arguments: List<JavaAstExpression>,
+    candidates: List<S1CallableCandidate>,
+    explicitTypeArguments: List<JavaSemanticType> = emptyList(),
+  ): List<JavaSemanticType> {
+    val types = MutableList<JavaSemanticType?>(arguments.size) { null }
+    arguments.forEachIndexed { index, argument ->
+      if (!argument.isTargetTypedDiamond()) types[index] = analyzeExpression(argument)
+    }
+    val prepared = candidates.mapNotNull { candidate ->
+      if (candidate.info.parameterTypes.size != arguments.size) return@mapNotNull null
+      val ownerParameters = candidate.info.parameterTypes.map { parameter ->
+        relations().substitute(parameter, candidate.ownerSubstitutions) ?: return@mapNotNull null
+      }
+      val fixed = if (candidate.info.typeParameters.isEmpty()) {
+        if (explicitTypeArguments.isNotEmpty()) return@mapNotNull null
+        emptyMap()
+      } else {
+        val knownIndices = types.indices.filter { types[it] != null }
+        when (val partial = JavaGenericInference(relations(), typeParameterDeclarations).inferPartial(
+          candidate.info.typeParameters,
+          knownIndices.map(ownerParameters::get),
+          knownIndices.map { checkNotNull(types[it]) },
+          explicitTypeArguments,
+          fixedSubstitutions = candidate.ownerSubstitutions,
+        )) {
+          JavaPartialGenericInferenceResult.Conflict -> return@mapNotNull null
+          is JavaPartialGenericInferenceResult.Success -> partial.substitutions
+        }
+      }
+      val parameters = ownerParameters.map { parameter ->
+        relations().substitute(parameter, fixed) ?: return@mapNotNull null
+      }
+      S1PolyCandidate(parameters)
+    }
+    fun applicable(candidate: S1PolyCandidate, allowBoxing: Boolean): Boolean =
+      types.indices.all { index ->
+        val actual = types[index] ?: return@all true
+        val parameter = candidate.parameterTypes[index]
+        parameter.containsUnresolvedTypeVariable() ||
+          relations().invocationConversion(actual, parameter, allowBoxing) != null
+      }
+    val strict = prepared.filter { applicable(it, allowBoxing = false) }
+    // Java overload phase 不能把 loose 候选与已有 strict 候选混在一起。
+    val remaining = strict.ifEmpty { prepared.filter { applicable(it, allowBoxing = true) } }
+    arguments.forEachIndexed { index, argument ->
+      if (types[index] != null) return@forEachIndexed
+      val targets = remaining.mapNotNull { candidate ->
+        candidate.parameterTypes[index] as? JavaSemanticType.Declared
+      }.filter(::isConcreteInvocationTarget).distinct()
+      val target = uniqueMostSpecificInvocationTarget(targets)
+      types[index] = if (target != null) {
+        analyzeExpressionExpected(argument, target)
+      } else {
+        analyzeExpression(argument)
+      }
+    }
+    return types.map { checkNotNull(it) }
+  }
+
+  /** Java 8 本批唯一需要 target type 的 poly expression 是可被括号包裹的 diamond new。 */
+  private fun JavaAstExpression.isTargetTypedDiamond(): Boolean = when (this) {
+    is JavaAstExpression.NewObject -> (type as? JavaAstTypeReference.Named)?.usesDiamond == true
+    is JavaAstExpression.Parenthesized -> expression.isTargetTypedDiamond()
+    else -> false
+  }
+
+  /** 方法自身类型变量尚未实例化时不能据此排除候选，也不能作为 diamond 的最终目标。 */
+  private fun JavaSemanticType.containsUnresolvedTypeVariable(): Boolean = when (this) {
+    is JavaSemanticType.TypeVariable, is JavaSemanticType.Wildcard -> true
+    is JavaSemanticType.Declared -> arguments.any { it.containsUnresolvedTypeVariable() }
+    is JavaSemanticType.Array -> componentType.containsUnresolvedTypeVariable()
+    else -> false
+  }
+
+  /** 参数 target 仍含 type variable/wildcard 时不能安全驱动 poly expression。 */
+  private fun isConcreteInvocationTarget(type: JavaSemanticType.Declared): Boolean =
+    type.arguments.all { argument ->
+      when (argument) {
+        is JavaSemanticType.Declared -> isConcreteInvocationTarget(argument)
+        is JavaSemanticType.Array -> isConcreteInvocationTargetComponent(argument.componentType)
+        is JavaSemanticType.Primitive -> true
+        JavaSemanticType.Null -> true
+        else -> false
+      }
+    }
+
+  /** 递归检查数组 component，拒绝仍待推断的类型变量与 wildcard。 */
+  private fun isConcreteInvocationTargetComponent(type: JavaSemanticType): Boolean = when (type) {
+    is JavaSemanticType.Declared -> isConcreteInvocationTarget(type)
+    is JavaSemanticType.Array -> isConcreteInvocationTargetComponent(type.componentType)
+    is JavaSemanticType.Primitive -> true
+    else -> false
+  }
+
+  /** 从候选参数目标中选择能 strict widening 到其余目标的唯一最具体者。 */
+  private fun uniqueMostSpecificInvocationTarget(
+    targets: List<JavaSemanticType.Declared>,
+  ): JavaSemanticType.Declared? {
+    if (targets.size == 1) return targets.single()
+    val maximal = targets.filter { candidate ->
+      targets.all { other ->
+        candidate == other ||
+          relations().invocationConversion(candidate, other, allowBoxing = false) != null
+      }
+    }
+    return maximal.singleOrNull()
+  }
+
+  /**
+   * 本批不伪造 Object.toString 虚分派。
+   *
+   * 静态类型已经明确是用户源码 class 时，在源码参数位置拒绝 Object 输出；静态 Object、
+   * 类型变量等无法提前确认的值由运行时 helper 以 Java 命名 UnsupportedOperationException 拒绝。
+   */
+  private fun rejectUnsupportedObjectStringConversion(
+    arguments: List<JavaAstExpression>,
+    argumentTypes: List<JavaSemanticType>,
+    selected: S1InstantiatedCallable,
+  ): Boolean {
+    val operation = builtinMembers[selected.info.symbol]?.operation
+    if (operation !in objectStringConversionOperations) return false
+    var rejected = false
+    arguments.zip(argumentTypes).forEach { (argument, type) ->
+      val declared = type as? JavaSemanticType.Declared ?: return@forEach
+      if (typeInfo(declared.symbol)?.declaration != null) {
+        error(
+          argument.span,
+          "java.semantic.object_string_conversion_unsupported",
+          "当前阶段不支持对用户源码类型执行 Object.toString 输出转换。",
+        )
+        rejected = true
+      }
+    }
+    return rejected
   }
 
   /** 把 owner 代换与方法类型推断合并，得到可参与 overload 的实际签名。 */
@@ -1761,6 +2286,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     candidate: S1CallableCandidate,
     argumentTypes: List<JavaSemanticType>,
     explicitTypeArguments: List<JavaSemanticType>,
+    allowBoxing: Boolean,
   ): S1InstantiatedCallable? {
     if (candidate.info.parameterTypes.size != argumentTypes.size) return null
     val ownerParameters = candidate.info.parameterTypes.map {
@@ -1783,7 +2309,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     val parameterTypes = ownerParameters.map {
       relations().substitute(it, callableSubstitutions) ?: return null
     }
-    if (!argumentTypes.zip(parameterTypes).all { (actual, expected) -> compatibility(actual, expected) != null }) {
+    if (!argumentTypes.zip(parameterTypes).all { (actual, expected) ->
+        relations().invocationConversion(actual, expected, allowBoxing) != null
+      }
+    ) {
       return null
     }
     val returnType = relations().substitute(ownerReturn, callableSubstitutions) ?: return null
@@ -1793,6 +2322,24 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       returnType,
       candidate.ownerSubstitutions + callableSubstitutions,
     )
+  }
+
+  /**
+   * Java overload 先运行 strict invocation；仅在该阶段没有候选时进入 boxing/unboxing loose phase。
+   * 这保证 `byte -> int` 的 primitive widening 总是优先于 `byte -> Byte`。
+   */
+  private fun instantiateApplicablePhase(
+    candidates: List<S1CallableCandidate>,
+    argumentTypes: List<JavaSemanticType>,
+    explicitTypeArguments: List<JavaSemanticType>,
+  ): List<S1InstantiatedCallable> {
+    val strict = candidates.mapNotNull { candidate ->
+      instantiateCallable(candidate, argumentTypes, explicitTypeArguments, allowBoxing = false)
+    }
+    if (strict.isNotEmpty()) return strict
+    return candidates.mapNotNull { candidate ->
+      instantiateCallable(candidate, argumentTypes, explicitTypeArguments, allowBoxing = true)
+    }
   }
 
   /**
@@ -1829,7 +2376,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     candidate: S1InstantiatedCallable,
     other: S1InstantiatedCallable,
   ): Boolean = candidate.parameterTypes.zip(other.parameterTypes).all { (left, right) ->
-    left == right || compatibility(left, right) != null
+    left == right || relations().invocationConversion(left, right, allowBoxing = false) != null
   }
 
   /** 对最终选中的参数逐一写入转换 side table。 */
@@ -2157,15 +2704,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return result
   }
 
-  /** 按限定名、同 package、java.lang、显式 import、通配 import 顺序解析。 */
+  /** 按限定名、当前 CU 顶层声明、显式单类型 import、同 package、java.lang、通配 import 顺序解析。 */
   private fun visibleTypeOrNull(
     name: String,
     unit: JavaAstCompilationUnit,
     span: JavaSourceSpan,
   ): S1TypeInfo? {
     if ('.' in name) return typesByQualifiedName[name]?.let { ensureTypeAccessible(it, unit, span) }
-    typesByQualifiedName[qualifyStage1(unit.packageName, name)]?.let { return it }
-    typesByQualifiedName["java.lang.$name"]?.let { return it }
+    val samePackage = typesByQualifiedName[qualifyStage1(unit.packageName, name)]
+    // builtin 只为 span 复用首个 unit，必须同时存在源码 declaration 才能认定为当前 CU 顶层声明。
+    // 真实当前 CU 声明即使与 import 冲突仍保持最高绑定优先级；冲突由 import 校验稳定报告。
+    samePackage?.takeIf { it.declaration != null && it.unit === unit }?.let { return it }
     val explicit = unit.imports
       .filter { !it.isStatic && !it.isWildcard && it.qualifiedName.substringAfterLast('.') == name }
       .mapNotNull { typesByQualifiedName[it.qualifiedName] }
@@ -2175,6 +2724,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(span, "java.semantic.ambiguous_type", "类型名 $name 被多个显式 import 引入。")
       return null
     }
+    samePackage?.let { return it }
+    typesByQualifiedName["java.lang.$name"]?.let { return it }
     val wildcard = unit.imports.filter { !it.isStatic && it.isWildcard }
       .mapNotNull { typesByQualifiedName[qualifyStage1(it.qualifiedName, name)] }
       .distinctBy { it.symbol }
@@ -2286,14 +2837,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     val callable = context().callable ?: return false
     return callable.kind == JavaSemanticCallableKind.CONSTRUCTOR &&
       callable.owner.symbol == field.owner.symbol && !field.isStatic &&
-      field.declarator.initializer == null
+      field.declarator?.initializer == null && !field.isSynthetic
   }
 
   /** 返回 owner 自身需要由构造器初始化的 instance blank final 字段。 */
   private fun blankFinalFields(owner: S1TypeInfo): Set<JavaSymbolId> = fields.asSequence()
     .filter {
       it.owner.symbol == owner.symbol && it.isFinal && !it.isStatic &&
-        it.declarator.initializer == null
+        it.declarator?.initializer == null && !it.isSynthetic
     }
     .map { it.symbol }
     .toSet()
@@ -2444,6 +2995,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     typeDeclarations,
     typeParameterDeclarations,
     objectType.symbol,
+    wrapperPrimitiveTypes,
   )
 
   /**
@@ -2511,6 +3063,47 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return JavaSemanticType.Primitive(result)
   }
 
+  /**
+   * 运算上下文只对 catalog 中明确支持的 wrapper 执行拆箱，并把转换绑定在原操作数节点上。
+   * 普通引用保持不变，随后由既有 numeric/boolean 检查给出源码位置诊断。
+   */
+  private fun primitiveOperand(
+    expression: JavaAstExpression,
+    type: JavaSemanticType,
+  ): JavaSemanticType {
+    val primitive = relations().unboxedPrimitive(type) ?: return type
+    val target = JavaSemanticType.Primitive(primitive)
+    val conversion = checkNotNull(
+      relations().invocationConversion(type, target, allowBoxing = true),
+    ) { "A declared wrapper must have a deterministic unboxing conversion." }
+    conversions[expression.nodeId] = conversion
+    return target
+  }
+
+  /**
+   * 冻结 wrapper 更新后的隐式回写步骤：byte/short/char 的算术结果先窄化，再按精确 wrapper 装箱。
+   * 该窄化只属于 Java 的 ++/-- 与复合赋值规则，绝不会被普通赋值或 overload 复用。
+   */
+  private fun updateWriteConversion(
+    nodeId: JavaNodeId,
+    computedType: JavaSemanticType,
+    declaredTargetType: JavaSemanticType,
+  ) {
+    val primitive = relations().unboxedPrimitive(declaredTargetType)
+      ?: error("An update write conversion requires a supported wrapper target.")
+    val computedPrimitive = (computedType as? JavaSemanticType.Primitive)?.kind
+      ?: error("An update write conversion requires a primitive computed value.")
+    val boxed = (declaredTargetType as JavaSemanticType.Declared).symbol
+    val steps = buildList {
+      if (computedPrimitive != primitive) {
+        add(JavaSemanticConversion.PrimitiveNarrowing(computedPrimitive, primitive))
+      }
+      add(JavaSemanticConversion.Boxing(primitive, boxed))
+    }
+    updateWriteConversions[nodeId] = if (steps.size == 1) steps.single()
+    else JavaSemanticConversion.Sequence(steps)
+  }
+
   /** unary numeric promotion 把 byte/short/char 提升到 int。 */
   private fun unaryNumericPromotion(type: JavaSemanticType): JavaSemanticType.Primitive? {
     if (!isNumeric(type)) return null
@@ -2550,7 +3143,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   /**
    * 校验并登记本阶段支持的 String 拼接转换。
    *
-   * 任意对象、数组、long 与浮点数需要尚未冻结的运行时字符串化规则，因此在这里稳定拒绝。
+   * 首批 wrapper 使用冻结的 tagged 字符串化；任意对象、数组、long 与浮点仍稳定拒绝。
    */
   private fun stringConcatenation(
     nodeId: JavaNodeId,
@@ -2564,7 +3157,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(
         span,
         "java.semantic.string_concat_operand_unsupported",
-        "String 拼接暂只支持 String、null、boolean、byte、short、char 与 int。",
+        "String 拼接暂只支持 String、null、首批 wrapper、boolean、byte、short、char 与 int。",
       )
       return JavaSemanticType.Error
     }
@@ -2584,6 +3177,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaAstPrimitiveType.SHORT,
       JavaAstPrimitiveType.INT,
     ) -> JavaStringConversionKind.INT_LIKE
+    relations().unboxedPrimitive(type) != null -> JavaStringConversionKind.BOXED
     else -> null
   }
 
@@ -2662,6 +3256,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         constructorDelegations.toMap(),
         stringConcatenations.toMap(),
         arrayLengthExpressions.toSet(),
+        updateWriteConversions.toMap(),
+        builtinMembers.toMap(),
+        builtinTypeRoles.toMap(),
+        wrapperPrimitiveTypes.toMap(),
       ),
       diagnostics,
     )
@@ -2722,17 +3320,25 @@ private class S1TypeInfo(
   )
 }
 
-/** 分析期字段签名。 */
+/**
+ * 分析期字段签名。
+ *
+ * builtin 字段没有 AST [declaration]/[declarator]，但仍提供稳定 [name]/[span]；源码专属的
+ * 初始化与 blank-final 逻辑必须先排除 [isSynthetic]。
+ */
 private data class S1FieldInfo(
   val owner: S1TypeInfo,
-  val declaration: JavaAstMemberDeclaration.Field,
-  val declarator: JavaAstVariableDeclarator,
+  val declaration: JavaAstMemberDeclaration.Field?,
+  val declarator: JavaAstVariableDeclarator?,
   val symbol: JavaSymbolId,
+  val name: String,
   val type: JavaSemanticType,
   val visibility: JavaVisibility,
   val isStatic: Boolean,
   val isFinal: Boolean,
   val order: Int,
+  val span: JavaSourceSpan,
+  val isSynthetic: Boolean = false,
 ) {
   val unit: JavaAstCompilationUnit get() = owner.unit
 }
@@ -2764,6 +3370,8 @@ private data class S1CallableInfo(
   val erasedSignatureKey: String,
   val erasedDescriptor: String,
   val isSynthetic: Boolean = false,
+  /** builtin callable 由稳定 operation 执行，不参与用户类虚槽分配。 */
+  val isBuiltin: Boolean = false,
 ) {
   val span: JavaSourceSpan get() = declaration?.span ?: owner.span
 
@@ -2789,6 +3397,9 @@ private data class S1CallableCandidate(
   val info: S1CallableInfo,
   val ownerSubstitutions: Map<JavaSymbolId, JavaSemanticType>,
 )
+
+/** 仅用于 poly 实参目标推断的临时候选；不会写入 semantic side table。 */
+private data class S1PolyCandidate(val parameterTypes: List<JavaSemanticType>)
 
 /** 完成 owner 与 callable 类型代换后可参与 overload 的签名。 */
 private data class S1InstantiatedCallable(

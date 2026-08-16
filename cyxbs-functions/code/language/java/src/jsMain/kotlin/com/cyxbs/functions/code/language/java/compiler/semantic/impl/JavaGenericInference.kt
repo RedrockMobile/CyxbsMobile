@@ -6,6 +6,21 @@ import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSymbolId
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaTypeRelations
 
 /**
+ * 非 poly 实参对 callable 类型参数的部分推断结果。
+ *
+ * [Success.mayRemainUnresolved] 只表示当前参数尚未提供约束；已经收集到但互相冲突、或违反
+ * 上界的约束必须返回 [Conflict]，调用方不能把它误当成“稍后可由 diamond 补齐”。
+ */
+internal sealed interface JavaPartialGenericInferenceResult {
+  data class Success(
+    val substitutions: Map<JavaSymbolId, JavaSemanticType>,
+    val mayRemainUnresolved: Boolean,
+  ) : JavaPartialGenericInferenceResult
+
+  data object Conflict : JavaPartialGenericInferenceResult
+}
+
+/**
  * 阶段 1 方法与 diamond 构造器共用的保守泛型实参推断器。
  *
  * 仅从实参约束推断，不读取 target type；同一类型变量出现多个候选时只选择已有候选中的
@@ -31,19 +46,60 @@ internal class JavaGenericInference(
     explicitTypeArguments: List<JavaSemanticType> = emptyList(),
     fixedSubstitutions: Map<JavaSymbolId, JavaSemanticType> = emptyMap(),
   ): Map<JavaSymbolId, JavaSemanticType>? {
-    if (formalParameterTypes.size != actualArgumentTypes.size) return null
+    return when (val result = inferPartial(
+      typeParameters,
+      formalParameterTypes,
+      actualArgumentTypes,
+      explicitTypeArguments,
+      fixedSubstitutions,
+    )) {
+      JavaPartialGenericInferenceResult.Conflict -> null
+      is JavaPartialGenericInferenceResult.Success ->
+        result.substitutions.takeUnless { result.mayRemainUnresolved }
+    }
+  }
+
+  /**
+   * 从已经完成普通分析的实参收集部分约束。
+   *
+   * 没有触及的类型变量允许保持未决，供调用参数中的 poly expression 后续使用；一旦现有
+   * 实参已经产生矛盾约束或违反可判定上界，则立即返回 [JavaPartialGenericInferenceResult.Conflict]。
+   */
+  fun inferPartial(
+    typeParameters: List<JavaSymbolId>,
+    formalParameterTypes: List<JavaSemanticType>,
+    actualArgumentTypes: List<JavaSemanticType>,
+    explicitTypeArguments: List<JavaSemanticType> = emptyList(),
+    fixedSubstitutions: Map<JavaSymbolId, JavaSemanticType> = emptyMap(),
+  ): JavaPartialGenericInferenceResult {
+    if (formalParameterTypes.size != actualArgumentTypes.size) {
+      return JavaPartialGenericInferenceResult.Conflict
+    }
     if (explicitTypeArguments.isNotEmpty()) {
-      if (explicitTypeArguments.size != typeParameters.size) return null
-      return typeParameters.zip(explicitTypeArguments).toMap()
-        .takeIf { satisfiesBounds(it, fixedSubstitutions) }
+      if (explicitTypeArguments.size != typeParameters.size) {
+        return JavaPartialGenericInferenceResult.Conflict
+      }
+      val substitutions = typeParameters.zip(explicitTypeArguments).toMap()
+      return if (satisfiesBounds(substitutions, fixedSubstitutions)) {
+        JavaPartialGenericInferenceResult.Success(substitutions, mayRemainUnresolved = false)
+      } else {
+        JavaPartialGenericInferenceResult.Conflict
+      }
     }
 
     val candidates = linkedMapOf<JavaSymbolId, JavaSemanticType>()
     formalParameterTypes.zip(actualArgumentTypes).forEach { (formal, actual) ->
-      if (!collect(formal, actual, typeParameters.toSet(), candidates)) return null
+      if (!collect(formal, actual, typeParameters.toSet(), candidates)) {
+        return JavaPartialGenericInferenceResult.Conflict
+      }
     }
-    if (typeParameters.any { it !in candidates }) return null
-    return candidates.takeIf { satisfiesBounds(it, fixedSubstitutions) }
+    if (!satisfiesKnownBounds(candidates, fixedSubstitutions, typeParameters.toSet())) {
+      return JavaPartialGenericInferenceResult.Conflict
+    }
+    return JavaPartialGenericInferenceResult.Success(
+      candidates,
+      mayRemainUnresolved = typeParameters.any { it !in candidates },
+    )
   }
 
   /** 递归收集 invariant 参数位置约束；通配符只使用明确的 extends/super 边界。 */
@@ -105,5 +161,38 @@ internal class JavaGenericInference(
         relations.isAssignmentCompatible(actual, substitutedBound)
       }
     }
+  }
+
+  /**
+   * 部分推断只校验已经能完全代换的上界。
+   *
+   * 例如 `T extends Number` 且 T 已推为 String 时立即判冲突；`T extends U` 但 U 尚无约束时
+   * 保留候选，避免把“尚不可判定”误报成失败。
+   */
+  private fun satisfiesKnownBounds(
+    substitutions: Map<JavaSymbolId, JavaSemanticType>,
+    fixedSubstitutions: Map<JavaSymbolId, JavaSemanticType>,
+    inferable: Set<JavaSymbolId>,
+  ): Boolean {
+    val allSubstitutions = fixedSubstitutions + substitutions
+    return substitutions.all { (symbol, actual) ->
+      val declaration = typeParameterDeclarations[symbol] ?: return false
+      declaration.upperBounds.all { bound ->
+        val substitutedBound = relations.substitute(bound, allSubstitutions) ?: return false
+        substitutedBound.containsAnyTypeVariable(inferable - substitutions.keys) ||
+          relations.isAssignmentCompatible(actual, substitutedBound)
+      }
+    }
+  }
+
+  /** 判断类型中是否仍含本轮尚未推断的 callable 类型变量。 */
+  private fun JavaSemanticType.containsAnyTypeVariable(symbols: Set<JavaSymbolId>): Boolean = when (this) {
+    is JavaSemanticType.TypeVariable -> symbol in symbols
+    is JavaSemanticType.Declared -> arguments.any { it.containsAnyTypeVariable(symbols) }
+    is JavaSemanticType.Array -> componentType.containsAnyTypeVariable(symbols)
+    is JavaSemanticType.Wildcard ->
+      upperBound?.containsAnyTypeVariable(symbols) == true ||
+        lowerBound?.containsAnyTypeVariable(symbols) == true
+    else -> false
   }
 }

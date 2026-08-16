@@ -1,8 +1,11 @@
 package com.cyxbs.functions.code.language.java.compiler.lowering
 
 import com.cyxbs.functions.code.language.java.compiler.ast.*
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
+import com.cyxbs.functions.code.language.java.compiler.frontend.JavaLezerAstFrontend
 import com.cyxbs.functions.code.language.java.compiler.ir.*
 import com.cyxbs.functions.code.language.java.compiler.semantic.*
+import com.cyxbs.functions.code.language.java.compiler.semantic.impl.JavaSemanticAnalyzerImpl
 import com.cyxbs.functions.code.language.java.compiler.source.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -465,6 +468,210 @@ class JavaAstToIrLowererTest {
     assertTrue(result.diagnostics.any { it.code == "JAVA_LOWERING_INVALID_SEMANTIC_MODEL" })
   }
 
+  /** System、PrintStream、String 与 Math 必须降低为明确 operation，不能伪装成用户成员调用。 */
+  @Test
+  fun lowersSelectedBuiltinOperations() {
+    val model = analyze(
+      "Main.java" to """
+        class Main {
+          static int probe(String value) {
+            char[] chars = {'o', 'k'};
+            System.out.print(value);
+            System.out.print(chars);
+            System.out.println(chars);
+            new StringBuilder().append(chars);
+            System.err.println(value.length());
+            value.isEmpty();
+            value.charAt(0);
+            value.equals(null);
+            value.substring(1);
+            value.substring(1, 2);
+            value.indexOf('x');
+            value.indexOf("x");
+            value.contains("x");
+            value.startsWith("x");
+            value.endsWith("x");
+            return Math.max(Math.min(1, 2), Math.abs(-1));
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val operations = method.body!!.statements.flatMap(::builtinOperations).toSet()
+    assertTrue(JavaBuiltinOperation.SYSTEM_OUT in operations)
+    assertTrue(JavaBuiltinOperation.SYSTEM_ERR in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY in operations)
+    assertTrue(JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY in operations)
+    assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT in operations)
+    assertTrue(JavaBuiltinOperation.STRING_LENGTH in operations)
+    assertTrue(JavaBuiltinOperation.STRING_SUBSTRING_RANGE in operations)
+    assertTrue(JavaBuiltinOperation.STRING_INDEX_OF_CHAR in operations)
+    assertTrue(JavaBuiltinOperation.STRING_INDEX_OF_STRING in operations)
+    assertTrue(JavaBuiltinOperation.STRING_CONTAINS in operations)
+    assertTrue(JavaBuiltinOperation.STRING_STARTS_WITH in operations)
+    assertTrue(JavaBuiltinOperation.STRING_ENDS_WITH in operations)
+    assertTrue(JavaBuiltinOperation.MATH_ABS_INT in operations)
+    assertTrue(JavaBuiltinOperation.MATH_MIN_INT in operations)
+    assertTrue(JavaBuiltinOperation.MATH_MAX_INT in operations)
+  }
+
+  /** byte 参数选择 int 重载后必须保留语义 widening，不能直接交给 JS 动态类型。 */
+  @Test
+  fun preservesBuiltinArgumentConversion() {
+    val model = analyze(
+      "Main.java" to "class Main { static void run(byte value) { System.out.print(value); } }",
+    )
+
+    val statement = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+      .body!!.statements.single() as JavaIrStatement.Expression
+    val invocation = statement.expression as JavaIrExpression.InvokeBuiltin
+    assertEquals(JavaBuiltinOperation.PRINTSTREAM_PRINT_INT, invocation.operation)
+    assertTrue(invocation.receiver is JavaIrExpression.BuiltinValue)
+    assertTrue(invocation.arguments.single() is JavaIrExpression.Convert)
+    assertEquals(
+      JavaIrType.Primitive(JavaAstPrimitiveType.INT),
+      invocation.arguments.single().type,
+    )
+  }
+
+  /** StringBuilder new 必须成为独立 ConstructBuiltin，wrapper Sequence 则逐步形成 typed Convert。 */
+  @Test
+  fun lowersBuiltinConstructionAndBoxingSequence() {
+    val model = analyze(
+      "Main.java" to """
+        class Main {
+          static Object run(int value) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(value);
+            Number boxed = value;
+            return boxed;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val declarations = method.body!!.statements.filterIsInstance<JavaIrStatement.DeclareLocal>()
+    assertTrue(declarations.first().initializer is JavaIrExpression.ConstructBuiltin)
+    val boxed = assertNotNull(declarations.last().initializer) as JavaIrExpression.Convert
+    assertTrue(boxed.conversion is JavaIrConversion.ReferenceWidening)
+    val inner = boxed.expression as JavaIrExpression.Convert
+    assertTrue(inner.conversion is JavaIrConversion.Boxing)
+    assertEquals(inner.type, boxed.expression.type)
+  }
+
+  /** 集合构造与成员调用必须仅依据 semantic side table 降为稳定 builtin operation。 */
+  @Test
+  fun lowersBuiltinCollectionConstructionAndCalls() {
+    val model = analyze(
+      "Main.java" to """
+        import java.util.ArrayList;
+        import java.util.HashMap;
+        import java.util.List;
+        import java.util.Map;
+        class Main {
+          static int run() {
+            List<Integer> values = new ArrayList<>();
+            values.add(1);
+            Map<String, Integer> map = new HashMap<>();
+            map.put("a", values.get(0));
+            return map.get("a");
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val operations = method.body!!.statements.flatMap(::builtinOperations)
+    assertTrue(JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT in operations)
+    assertTrue(JavaBuiltinOperation.HASH_MAP_CONSTRUCT in operations)
+    assertTrue(JavaBuiltinOperation.LIST_ADD in operations)
+    assertTrue(JavaBuiltinOperation.LIST_GET in operations)
+    assertTrue(JavaBuiltinOperation.MAP_PUT in operations)
+    assertTrue(JavaBuiltinOperation.MAP_GET in operations)
+    // facade 赋值会在 ConstructBuiltin 外再包一层 ReferenceWidening，必须按真实 IR 树递归断言。
+    assertEquals(
+      2,
+      operations.count {
+        it == JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT ||
+          it == JavaBuiltinOperation.HASH_MAP_CONSTRUCT
+      },
+    )
+  }
+
+  /** System.in、Scanner 构造和读取方法必须全部保留明确 operation，不伪造普通对象调用。 */
+  @Test
+  fun lowersBuiltinScannerOperations() {
+    val model = analyze(
+      "Main.java" to """
+        import java.util.Scanner;
+        class Main {
+          static int run() {
+            Scanner scanner = new Scanner(System.in);
+            scanner.hasNext();
+            scanner.next();
+            scanner.hasNextInt();
+            scanner.hasNextLine();
+            scanner.nextLine();
+            return scanner.nextInt();
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val operations = method.body!!.statements.flatMap(::builtinOperations).toSet()
+    assertTrue(JavaBuiltinOperation.SYSTEM_IN in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT_INT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT_INT in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE in operations)
+    assertTrue(JavaBuiltinOperation.SCANNER_NEXT_LINE in operations)
+  }
+
+  /** builtin owner 缺少 symbol→operation side table 时必须失败，不能退回普通成员 lowering。 */
+  @Test
+  fun failsStructurallyForMissingBuiltinBinding() {
+    val model = analyze(
+      "Main.java" to "class Main { static void run() { System.out.println(1); } }",
+    )
+    val systemOut = model.builtinMembers.entries.single {
+      it.value.operation == JavaBuiltinOperation.SYSTEM_OUT
+    }.key
+    val result = JavaAstToIrLowerer.lower(
+      model.copy(builtinMembers = model.builtinMembers - systemOut),
+    )
+
+    assertNull(result.value)
+    assertTrue(result.diagnostics.any { it.code == "JAVA_LOWERING_INVALID_SEMANTIC_MODEL" })
+  }
+
+  /** instance builtin 被篡改为无 receiver 时必须结构化失败，不能生成缺 receiver 的调用。 */
+  @Test
+  fun failsStructurallyForInvalidBuiltinReceiver() {
+    val model = analyze(
+      "Main.java" to "class Main { static void run() { System.out.println(1); } }",
+    )
+    val call = model.selectedCallables.entries.single {
+      model.builtinMembers[it.value.symbol]?.operation ==
+        JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT
+    }
+    val result = JavaAstToIrLowerer.lower(
+      model.copy(
+        selectedCallables = model.selectedCallables +
+          (call.key to call.value.copy(receiverKind = JavaReceiverKind.NONE)),
+      ),
+    )
+
+    assertNull(result.value)
+    assertTrue(result.diagnostics.any { it.code == "JAVA_LOWERING_INVALID_SEMANTIC_MODEL" })
+  }
+
   /** 用手工 AST 和 semantic side table 构建最小 static int sum 工作区。 */
   private fun fixture(
     withField: Boolean = false,
@@ -657,6 +864,70 @@ class JavaAstToIrLowererTest {
   }
 
   private fun primitive(ids: Ids) = JavaAstTypeReference.Primitive(ids.next(), span(), JavaAstPrimitiveType.INT)
+
+  /** 使用真实前端与 Stage1 语义结果构造 builtin lowering 测试，避免手工复制 catalog。 */
+  private fun analyze(vararg sources: Pair<String, String>): JavaSemanticModel {
+    val workspace = JavaSourceWorkspace(
+      sources.mapIndexed { index, (path, source) ->
+        JavaSourceFile(JavaSourceFileId(index), path, source)
+      },
+    )
+    val frontend = JavaLezerAstFrontend.parse(workspace)
+    assertTrue(frontend.isSuccess, frontend.diagnostics.toString())
+    val semantic = JavaSemanticAnalyzerImpl.analyze(assertNotNull(frontend.value))
+    assertTrue(semantic.isSuccess, semantic.diagnostics.toString())
+    return assertNotNull(semantic.value)
+  }
+
+  /** 深度收集 typed IR 中的 builtin operation，覆盖嵌套 receiver 与参数。 */
+  private fun builtinOperations(statement: JavaIrStatement): List<JavaBuiltinOperation> = when (statement) {
+    is JavaIrStatement.Block -> statement.statements.flatMap(::builtinOperations)
+    is JavaIrStatement.DeclareLocal -> statement.initializer?.let(::builtinOperations).orEmpty()
+    is JavaIrStatement.Expression -> builtinOperations(statement.expression)
+    is JavaIrStatement.If -> builtinOperations(statement.condition) +
+      builtinOperations(statement.thenBranch) +
+      statement.elseBranch?.let(::builtinOperations).orEmpty()
+    is JavaIrStatement.While -> builtinOperations(statement.condition) + builtinOperations(statement.body)
+    is JavaIrStatement.Return -> statement.expression?.let(::builtinOperations).orEmpty()
+    is JavaIrStatement.Throw -> builtinOperations(statement.expression)
+    is JavaIrStatement.ConstructorInvocation -> statement.arguments.flatMap(::builtinOperations)
+  }
+
+  /** 按 IR 求值结构递归读取 operation；测试只关心 builtin 节点，普通叶子返回空集合。 */
+  private fun builtinOperations(expression: JavaIrExpression): List<JavaBuiltinOperation> = when (expression) {
+    is JavaIrExpression.BuiltinValue -> listOf(expression.operation)
+    is JavaIrExpression.InvokeBuiltin -> listOf(expression.operation) +
+      expression.receiver?.let(::builtinOperations).orEmpty() +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.ConstructBuiltin -> listOf(expression.operation) +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.Binary -> builtinOperations(expression.left) + builtinOperations(expression.right)
+    is JavaIrExpression.Unary -> builtinOperations(expression.operand)
+    is JavaIrExpression.Convert -> builtinOperations(expression.expression)
+    is JavaIrExpression.InvokeStatic -> expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.InvokeSpecial -> builtinOperations(expression.receiver) +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.InvokeVirtual -> builtinOperations(expression.receiver) +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.NewObject -> expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.NewArray -> builtinOperations(expression.length)
+    is JavaIrExpression.ArrayInitializer -> expression.elements.flatMap(::builtinOperations)
+    is JavaIrExpression.GetArrayElement -> builtinOperations(expression.array) + builtinOperations(expression.index)
+    is JavaIrExpression.SetArrayElement -> builtinOperations(expression.array) +
+      builtinOperations(expression.index) + builtinOperations(expression.value)
+    is JavaIrExpression.ArrayLength -> builtinOperations(expression.array)
+    is JavaIrExpression.StringConcat -> expression.parts.flatMap { builtinOperations(it.expression) }
+    is JavaIrExpression.SetLocal -> builtinOperations(expression.value)
+    is JavaIrExpression.GetField -> builtinOperations(expression.receiver)
+    is JavaIrExpression.SetField -> builtinOperations(expression.receiver) + builtinOperations(expression.value)
+    is JavaIrExpression.SetStaticField -> builtinOperations(expression.value)
+    is JavaIrExpression.Constant,
+    is JavaIrExpression.GetLocal,
+    is JavaIrExpression.This,
+    is JavaIrExpression.GetStaticField,
+    -> emptyList()
+  }
+
   private fun symbol(id: Int, kind: JavaSymbolKind, node: JavaNodeId, type: JavaSemanticType?) =
     JavaSemanticSymbol(JavaSymbolId(id), kind, "s$id", null, node, span(), type)
   private fun span() = JavaSourceSpan(JavaSourceFileId(0), 0, 1)

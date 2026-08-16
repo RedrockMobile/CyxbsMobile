@@ -283,6 +283,27 @@ class JavaLezerAstFrontendTest {
     assertTrue(assertIs<JavaAstMemberDeclaration.Method>(marker.members.single()).body == null)
   }
 
+  /** 链式调用必须把内层调用保留为外层 receiver，名称和 ArgumentList 不得跨层混用。 */
+  @Test
+  fun parsesChainedInvocationFromCurrentCstNode() {
+    val result = parse(
+      "class Main { boolean run(String value) { return value.substring(1, 2).equals(\"x\"); } }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val outer = assertIs<JavaAstExpression.MethodInvocation>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(method.body).statements.single()).expression,
+    )
+    assertEquals("equals", outer.methodName)
+    assertEquals(1, outer.arguments.size)
+    val inner = assertIs<JavaAstExpression.MethodInvocation>(assertNotNull(outer.receiver))
+    assertEquals("substring", inner.methodName)
+    assertEquals(2, inner.arguments.size)
+  }
+
   /** 真实 CST 中的未开放 Java 8 或阶段 2A 结构必须被稳定拒绝，不能在 adapter 中消失。 */
   @Test
   fun rejectsStageOneExcludedSyntaxWithoutErasure() {

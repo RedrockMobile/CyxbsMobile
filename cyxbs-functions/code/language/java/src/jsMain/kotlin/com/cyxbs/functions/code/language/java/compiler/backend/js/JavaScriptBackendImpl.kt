@@ -4,6 +4,10 @@ import com.cyxbs.functions.code.language.java.compiler.JavaCompilerEntryPoint
 import com.cyxbs.functions.code.language.java.compiler.JavaScriptBackend
 import com.cyxbs.functions.code.language.java.compiler.JavaScriptModuleArtifact
 import com.cyxbs.functions.code.language.java.compiler.JavaScriptProgramArtifact
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinLibrary
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinTypeRole
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.JavaCompilerDiagnostic
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.JavaCompilerPhaseResult
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.JavaDiagnosticSeverity
@@ -28,6 +32,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrArrayReferenceComponentKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrUnaryOperator
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
 
 /**
  * Stage1 typed IR 到 ES Module 的 JavaScript 后端。
@@ -289,6 +294,7 @@ private class JavaScriptBackendValidator(
       is JavaIrExpression.GetField -> { requireInstanceField(expression.field, expression.span); validateExpression(expression.receiver) }
       is JavaIrExpression.SetField -> { requireInstanceField(expression.field, expression.span); validateExpression(expression.receiver); validateExpression(expression.value) }
       is JavaIrExpression.GetStaticField -> requireStaticField(expression.field, expression.span)
+      is JavaIrExpression.BuiltinValue -> validateBuiltinValue(expression)
       is JavaIrExpression.SetStaticField -> { requireStaticField(expression.field, expression.span); validateExpression(expression.value) }
       is JavaIrExpression.Binary -> {
         validateExpression(expression.left)
@@ -297,12 +303,14 @@ private class JavaScriptBackendValidator(
       is JavaIrExpression.Unary -> validateExpression(expression.operand)
       is JavaIrExpression.Convert -> {
         validateExpression(expression.expression)
-        validateConversion(expression.conversion, expression.span)
+        validateConversion(expression)
       }
       is JavaIrExpression.InvokeStatic -> {
         requireStaticMethod(expression.method, expression.span)
         expression.arguments.forEach(::validateExpression)
       }
+      is JavaIrExpression.InvokeBuiltin -> validateBuiltinInvocation(expression)
+      is JavaIrExpression.ConstructBuiltin -> validateBuiltinConstruction(expression)
       is JavaIrExpression.InvokeSpecial -> { requireInstanceMethod(expression.method, expression.span); validateExpression(expression.receiver); expression.arguments.forEach(::validateExpression) }
       is JavaIrExpression.InvokeVirtual -> {
         val target = index.methods[expression.method]
@@ -345,24 +353,493 @@ private class JavaScriptBackendValidator(
     }
   }
 
+  /** System 标准流值只允许使用 catalog operation，并且必须保持引用类型。 */
+  private fun validateBuiltinValue(expression: JavaIrExpression.BuiltinValue) {
+    val role = when (expression.operation) {
+      JavaBuiltinOperation.SYSTEM_OUT, JavaBuiltinOperation.SYSTEM_ERR -> JavaBuiltinTypeRole.PRINT_STREAM
+      JavaBuiltinOperation.SYSTEM_IN -> JavaBuiltinTypeRole.INPUT_STREAM
+      else -> null
+    }
+    if (role == null || !matchesBuiltinRole(expression.type, setOf(role))) {
+      invalid("Java IR builtin value has an invalid operation or type.", expression.span)
+    }
+  }
+
+  /** 校验 builtin operation 的 static/receiver、参数和结果形态，防止篡改 IR 进入 emitter。 */
+  private fun validateBuiltinInvocation(expression: JavaIrExpression.InvokeBuiltin) {
+    expression.receiver?.let(::validateExpression)
+    expression.arguments.forEach(::validateExpression)
+    val signature = builtinSignature(expression.operation)
+    if (signature == null) {
+      invalid("Java IR operation is not a callable builtin.", expression.span)
+      return
+    }
+    if ((expression.receiver != null) != signature.hasReceiver ||
+      (signature.hasReceiver && expression.receiver?.type !is JavaIrType.Reference) ||
+      !matchesBuiltinRole(expression.receiver?.type, builtinReceiverRoles(expression.operation)) ||
+      expression.arguments.size != signature.parameters.size ||
+      !matchesBuiltinType(expression.type, signature.result) ||
+      !matchesBuiltinRole(expression.type, builtinResultRoles(expression.operation)) ||
+      expression.arguments.zip(signature.parameters).any { (argument, expected) ->
+        !matchesBuiltinArgument(argument, expected)
+      } || expression.arguments.indices.any { index ->
+        !matchesBuiltinRole(
+          expression.arguments[index].type,
+          builtinParameterRoles(expression.operation, index),
+        )
+      }
+    ) {
+      invalid("Java IR builtin invocation has an invalid receiver or signature.", expression.span)
+    }
+  }
+
+  /** builtin 构造与普通 NewObject 分离，只接受 catalog 明确声明的构造形态。 */
+  private fun validateBuiltinConstruction(expression: JavaIrExpression.ConstructBuiltin) {
+    expression.arguments.forEach(::validateExpression)
+    val parameters = when (expression.operation) {
+      JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY -> emptyList()
+      JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING -> listOf(BuiltinType.REFERENCE_OR_NULL)
+      JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+      JavaBuiltinOperation.HASH_SET_CONSTRUCT,
+      JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> emptyList()
+      JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> listOf(BuiltinType.REFERENCE_OR_NULL)
+      else -> {
+        invalid("Java IR operation is not a constructible builtin.", expression.span)
+        return
+      }
+    }
+    if (expression.arguments.size != parameters.size ||
+      !matchesBuiltinRole(expression.type, setOfNotNull(builtinConstructRole(expression.operation))) ||
+      expression.arguments.zip(parameters).any { (argument, expected) ->
+        !matchesBuiltinType(argument.type, expected)
+      } || expression.arguments.indices.any { index ->
+        !matchesBuiltinRole(
+          expression.arguments[index].type,
+          builtinParameterRoles(expression.operation, index),
+        )
+      }
+    ) invalid("Java IR builtin construction has an invalid signature.", expression.span)
+  }
+
+  /** operation 到 Java IR 形态的唯一映射；不得从成员名称或 JavaScript 值反推。 */
+  private fun builtinSignature(operation: JavaBuiltinOperation): BuiltinSignature? = when (operation) {
+    JavaBuiltinOperation.SYSTEM_OUT,
+    JavaBuiltinOperation.SYSTEM_ERR,
+    JavaBuiltinOperation.SYSTEM_IN -> null
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN -> BuiltinSignature(true, emptyList(), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
+    JavaBuiltinOperation.STRING_LENGTH -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.STRING_IS_EMPTY -> BuiltinSignature(true, emptyList(), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.STRING_CHAR_AT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.CHAR)
+    JavaBuiltinOperation.STRING_EQUALS -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.STRING_SUBSTRING_FROM -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_SUBSTRING_RANGE -> BuiltinSignature(true, listOf(BuiltinType.INT, BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_INDEX_OF_CHAR -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.INT)
+    JavaBuiltinOperation.STRING_INDEX_OF_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.INT)
+    JavaBuiltinOperation.STRING_CONTAINS,
+    JavaBuiltinOperation.STRING_STARTS_WITH,
+    JavaBuiltinOperation.STRING_ENDS_WITH -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.MATH_ABS_INT -> BuiltinSignature(false, listOf(BuiltinType.INT), BuiltinType.INT)
+    JavaBuiltinOperation.MATH_MIN_INT,
+    JavaBuiltinOperation.MATH_MAX_INT -> BuiltinSignature(false, listOf(BuiltinType.INT, BuiltinType.INT), BuiltinType.INT)
+    JavaBuiltinOperation.BOOLEAN_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.BOOLEAN), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.BYTE_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.BYTE), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.SHORT_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.SHORT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.CHARACTER_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.CHAR), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.INTEGER_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.BOOLEAN_BOOLEAN_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.BYTE_BYTE_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.BYTE)
+    JavaBuiltinOperation.SHORT_SHORT_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.SHORT)
+    JavaBuiltinOperation.CHARACTER_CHAR_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.CHAR)
+    JavaBuiltinOperation.INTEGER_INT_VALUE,
+    JavaBuiltinOperation.NUMBER_INT_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.BOOLEAN_EQUALS,
+    JavaBuiltinOperation.BYTE_EQUALS,
+    JavaBuiltinOperation.SHORT_EQUALS,
+    JavaBuiltinOperation.CHARACTER_EQUALS,
+    JavaBuiltinOperation.INTEGER_EQUALS -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.BOOLEAN_HASH_CODE,
+    JavaBuiltinOperation.BYTE_HASH_CODE,
+    JavaBuiltinOperation.SHORT_HASH_CODE,
+    JavaBuiltinOperation.CHARACTER_HASH_CODE,
+    JavaBuiltinOperation.INTEGER_HASH_CODE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.BOOLEAN_TO_STRING,
+    JavaBuiltinOperation.BYTE_TO_STRING,
+    JavaBuiltinOperation.SHORT_TO_STRING,
+    JavaBuiltinOperation.CHARACTER_TO_STRING,
+    JavaBuiltinOperation.INTEGER_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_LENGTH -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.STRING_BUILDER_CHAR_AT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.CHAR)
+    JavaBuiltinOperation.STRING_BUILDER_SET_CHAR_AT -> BuiltinSignature(true, listOf(BuiltinType.INT, BuiltinType.CHAR), BuiltinType.VOID)
+    JavaBuiltinOperation.STRING_BUILDER_REVERSE -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_FROM -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_RANGE -> BuiltinSignature(true, listOf(BuiltinType.INT, BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY,
+    JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING,
+    JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+    JavaBuiltinOperation.HASH_SET_CONSTRUCT,
+    JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> null
+    JavaBuiltinOperation.LIST_SIZE,
+    JavaBuiltinOperation.SET_SIZE,
+    JavaBuiltinOperation.MAP_SIZE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.LIST_IS_EMPTY,
+    JavaBuiltinOperation.SET_IS_EMPTY,
+    JavaBuiltinOperation.MAP_IS_EMPTY,
+    JavaBuiltinOperation.ITERATOR_HAS_NEXT -> BuiltinSignature(true, emptyList(), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.LIST_ADD,
+    JavaBuiltinOperation.LIST_REMOVE_OBJECT,
+    JavaBuiltinOperation.LIST_CONTAINS,
+    JavaBuiltinOperation.SET_ADD,
+    JavaBuiltinOperation.SET_CONTAINS,
+    JavaBuiltinOperation.SET_REMOVE,
+    JavaBuiltinOperation.MAP_CONTAINS_KEY ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.LIST_GET,
+    JavaBuiltinOperation.LIST_REMOVE_INDEX ->
+      BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.LIST_SET ->
+      BuiltinSignature(true, listOf(BuiltinType.INT, BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.LIST_INDEX_OF ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.INT)
+    JavaBuiltinOperation.LIST_CLEAR,
+    JavaBuiltinOperation.SET_CLEAR,
+    JavaBuiltinOperation.MAP_CLEAR -> BuiltinSignature(true, emptyList(), BuiltinType.VOID)
+    JavaBuiltinOperation.LIST_ITERATOR,
+    JavaBuiltinOperation.SET_ITERATOR,
+    JavaBuiltinOperation.ITERATOR_NEXT,
+    JavaBuiltinOperation.MAP_KEY_SET -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.MAP_PUT -> BuiltinSignature(
+      true,
+      listOf(BuiltinType.REFERENCE_OR_NULL, BuiltinType.REFERENCE_OR_NULL),
+      BuiltinType.REFERENCE,
+    )
+    JavaBuiltinOperation.MAP_GET,
+    JavaBuiltinOperation.MAP_REMOVE ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.MAP_GET_OR_DEFAULT -> BuiltinSignature(
+      true,
+      listOf(BuiltinType.REFERENCE_OR_NULL, BuiltinType.REFERENCE_OR_NULL),
+      BuiltinType.REFERENCE,
+    )
+    JavaBuiltinOperation.SCANNER_HAS_NEXT,
+    JavaBuiltinOperation.SCANNER_HAS_NEXT_INT,
+    JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE -> BuiltinSignature(true, emptyList(), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.SCANNER_NEXT,
+    JavaBuiltinOperation.SCANNER_NEXT_LINE -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.SCANNER_NEXT_INT -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> null
+  }
+
+  /** builtin receiver 的精确运行时角色；null 表示 static/field/constructor 或无需引用约束。 */
+  private fun builtinReceiverRoles(operation: JavaBuiltinOperation): Set<JavaBuiltinTypeRole>? = when (operation) {
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_INT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_BOOLEAN,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> setOf(JavaBuiltinTypeRole.PRINT_STREAM)
+
+    JavaBuiltinOperation.STRING_LENGTH,
+    JavaBuiltinOperation.STRING_IS_EMPTY,
+    JavaBuiltinOperation.STRING_CHAR_AT,
+    JavaBuiltinOperation.STRING_EQUALS,
+    JavaBuiltinOperation.STRING_SUBSTRING_FROM,
+    JavaBuiltinOperation.STRING_SUBSTRING_RANGE,
+    JavaBuiltinOperation.STRING_INDEX_OF_CHAR,
+    JavaBuiltinOperation.STRING_INDEX_OF_STRING,
+    JavaBuiltinOperation.STRING_CONTAINS,
+    JavaBuiltinOperation.STRING_STARTS_WITH,
+    JavaBuiltinOperation.STRING_ENDS_WITH -> setOf(JavaBuiltinTypeRole.STRING)
+
+    JavaBuiltinOperation.BOOLEAN_BOOLEAN_VALUE, JavaBuiltinOperation.BOOLEAN_EQUALS,
+    JavaBuiltinOperation.BOOLEAN_HASH_CODE, JavaBuiltinOperation.BOOLEAN_TO_STRING -> setOf(JavaBuiltinTypeRole.BOOLEAN)
+    JavaBuiltinOperation.BYTE_BYTE_VALUE, JavaBuiltinOperation.BYTE_EQUALS,
+    JavaBuiltinOperation.BYTE_HASH_CODE, JavaBuiltinOperation.BYTE_TO_STRING -> setOf(JavaBuiltinTypeRole.BYTE)
+    JavaBuiltinOperation.SHORT_SHORT_VALUE, JavaBuiltinOperation.SHORT_EQUALS,
+    JavaBuiltinOperation.SHORT_HASH_CODE, JavaBuiltinOperation.SHORT_TO_STRING -> setOf(JavaBuiltinTypeRole.SHORT)
+    JavaBuiltinOperation.CHARACTER_CHAR_VALUE, JavaBuiltinOperation.CHARACTER_EQUALS,
+    JavaBuiltinOperation.CHARACTER_HASH_CODE, JavaBuiltinOperation.CHARACTER_TO_STRING -> setOf(JavaBuiltinTypeRole.CHARACTER)
+    JavaBuiltinOperation.INTEGER_INT_VALUE, JavaBuiltinOperation.INTEGER_EQUALS,
+    JavaBuiltinOperation.INTEGER_HASH_CODE, JavaBuiltinOperation.INTEGER_TO_STRING -> setOf(JavaBuiltinTypeRole.INTEGER)
+    JavaBuiltinOperation.NUMBER_INT_VALUE -> setOf(
+      JavaBuiltinTypeRole.NUMBER, JavaBuiltinTypeRole.BYTE,
+      JavaBuiltinTypeRole.SHORT, JavaBuiltinTypeRole.INTEGER,
+    )
+
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_INT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
+    JavaBuiltinOperation.STRING_BUILDER_LENGTH,
+    JavaBuiltinOperation.STRING_BUILDER_CHAR_AT,
+    JavaBuiltinOperation.STRING_BUILDER_SET_CHAR_AT,
+    JavaBuiltinOperation.STRING_BUILDER_REVERSE,
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_FROM,
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_RANGE,
+    JavaBuiltinOperation.STRING_BUILDER_TO_STRING -> setOf(JavaBuiltinTypeRole.STRING_BUILDER)
+
+    JavaBuiltinOperation.LIST_SIZE, JavaBuiltinOperation.LIST_IS_EMPTY,
+    JavaBuiltinOperation.LIST_ADD, JavaBuiltinOperation.LIST_GET, JavaBuiltinOperation.LIST_SET,
+    JavaBuiltinOperation.LIST_REMOVE_INDEX, JavaBuiltinOperation.LIST_REMOVE_OBJECT,
+    JavaBuiltinOperation.LIST_CONTAINS, JavaBuiltinOperation.LIST_INDEX_OF,
+    JavaBuiltinOperation.LIST_CLEAR, JavaBuiltinOperation.LIST_ITERATOR ->
+      setOf(JavaBuiltinTypeRole.LIST, JavaBuiltinTypeRole.ARRAY_LIST)
+    JavaBuiltinOperation.SET_ADD, JavaBuiltinOperation.SET_CONTAINS, JavaBuiltinOperation.SET_REMOVE,
+    JavaBuiltinOperation.SET_SIZE, JavaBuiltinOperation.SET_IS_EMPTY,
+    JavaBuiltinOperation.SET_CLEAR, JavaBuiltinOperation.SET_ITERATOR ->
+      setOf(JavaBuiltinTypeRole.SET, JavaBuiltinTypeRole.HASH_SET)
+    JavaBuiltinOperation.MAP_PUT, JavaBuiltinOperation.MAP_GET,
+    JavaBuiltinOperation.MAP_GET_OR_DEFAULT, JavaBuiltinOperation.MAP_CONTAINS_KEY,
+    JavaBuiltinOperation.MAP_REMOVE, JavaBuiltinOperation.MAP_SIZE,
+    JavaBuiltinOperation.MAP_IS_EMPTY, JavaBuiltinOperation.MAP_CLEAR,
+    JavaBuiltinOperation.MAP_KEY_SET -> setOf(JavaBuiltinTypeRole.MAP, JavaBuiltinTypeRole.HASH_MAP)
+    JavaBuiltinOperation.ITERATOR_HAS_NEXT, JavaBuiltinOperation.ITERATOR_NEXT -> setOf(JavaBuiltinTypeRole.ITERATOR)
+    JavaBuiltinOperation.SCANNER_HAS_NEXT, JavaBuiltinOperation.SCANNER_NEXT,
+    JavaBuiltinOperation.SCANNER_HAS_NEXT_INT, JavaBuiltinOperation.SCANNER_NEXT_INT,
+    JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE, JavaBuiltinOperation.SCANNER_NEXT_LINE -> setOf(JavaBuiltinTypeRole.SCANNER)
+
+    else -> null
+  }
+
+  /** 引用参数中需要精确 builtin class 身份的位置。 */
+  private fun builtinParameterRoles(
+    operation: JavaBuiltinOperation,
+    index: Int,
+  ): Set<JavaBuiltinTypeRole>? = when (operation) {
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING,
+    JavaBuiltinOperation.STRING_INDEX_OF_STRING,
+    JavaBuiltinOperation.STRING_CONTAINS,
+    JavaBuiltinOperation.STRING_STARTS_WITH,
+    JavaBuiltinOperation.STRING_ENDS_WITH,
+    JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING -> if (index == 0) setOf(JavaBuiltinTypeRole.STRING) else null
+    JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> if (index == 0) setOf(JavaBuiltinTypeRole.INPUT_STREAM) else null
+    else -> null
+  }
+
+  /** 仅对返回 builtin 引用的 operation 约束精确 class role。 */
+  private fun builtinResultRoles(operation: JavaBuiltinOperation): Set<JavaBuiltinTypeRole>? = when (operation) {
+    JavaBuiltinOperation.STRING_SUBSTRING_FROM,
+    JavaBuiltinOperation.STRING_SUBSTRING_RANGE,
+    JavaBuiltinOperation.BOOLEAN_TO_STRING,
+    JavaBuiltinOperation.BYTE_TO_STRING,
+    JavaBuiltinOperation.SHORT_TO_STRING,
+    JavaBuiltinOperation.CHARACTER_TO_STRING,
+    JavaBuiltinOperation.INTEGER_TO_STRING,
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_FROM,
+    JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_RANGE,
+    JavaBuiltinOperation.STRING_BUILDER_TO_STRING,
+    JavaBuiltinOperation.SCANNER_NEXT,
+    JavaBuiltinOperation.SCANNER_NEXT_LINE -> setOf(JavaBuiltinTypeRole.STRING)
+    JavaBuiltinOperation.BOOLEAN_VALUE_OF -> setOf(JavaBuiltinTypeRole.BOOLEAN)
+    JavaBuiltinOperation.BYTE_VALUE_OF -> setOf(JavaBuiltinTypeRole.BYTE)
+    JavaBuiltinOperation.SHORT_VALUE_OF -> setOf(JavaBuiltinTypeRole.SHORT)
+    JavaBuiltinOperation.CHARACTER_VALUE_OF -> setOf(JavaBuiltinTypeRole.CHARACTER)
+    JavaBuiltinOperation.INTEGER_VALUE_OF -> setOf(JavaBuiltinTypeRole.INTEGER)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_INT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
+    JavaBuiltinOperation.STRING_BUILDER_REVERSE -> setOf(JavaBuiltinTypeRole.STRING_BUILDER)
+    JavaBuiltinOperation.LIST_ITERATOR,
+    JavaBuiltinOperation.SET_ITERATOR -> setOf(JavaBuiltinTypeRole.ITERATOR)
+    JavaBuiltinOperation.MAP_KEY_SET -> setOf(JavaBuiltinTypeRole.SET)
+    else -> null
+  }
+
+  /** ConstructBuiltin 的结果类必须与 operation 唯一对应。 */
+  private fun builtinConstructRole(operation: JavaBuiltinOperation): JavaBuiltinTypeRole? = when (operation) {
+    JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY,
+    JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING -> JavaBuiltinTypeRole.STRING_BUILDER
+    JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT -> JavaBuiltinTypeRole.ARRAY_LIST
+    JavaBuiltinOperation.HASH_SET_CONSTRUCT -> JavaBuiltinTypeRole.HASH_SET
+    JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> JavaBuiltinTypeRole.HASH_MAP
+    JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> JavaBuiltinTypeRole.SCANNER
+    else -> null
+  }
+
+  /** 空 role 约束表示该位置可使用任意合法 Java 引用；非空时必须精确命中 catalog role。 */
+  private fun matchesBuiltinRole(
+    type: JavaIrType?,
+    roles: Set<JavaBuiltinTypeRole>?,
+  ): Boolean {
+    if (roles.isNullOrEmpty()) return true
+    if (type == JavaIrType.Null) return true
+    val reference = type as? JavaIrType.Reference ?: return false
+    return index.program.builtinTypeRoles[reference.classId] in roles
+  }
+
+  /** builtin 类型只按 typed IR 类别检查；内建类没有伪造为输出 JavaIrClass。 */
+  private fun matchesBuiltinType(type: JavaIrType, expected: BuiltinType): Boolean = when (expected) {
+    BuiltinType.BOOLEAN -> type is JavaIrType.Primitive && type.kind.name == "BOOLEAN"
+    BuiltinType.BYTE -> type is JavaIrType.Primitive && type.kind.name == "BYTE"
+    BuiltinType.SHORT -> type is JavaIrType.Primitive && type.kind.name == "SHORT"
+    BuiltinType.CHAR -> type is JavaIrType.Primitive && type.kind.name == "CHAR"
+    BuiltinType.CHAR_ARRAY -> type is JavaIrType.Array &&
+      type.componentType is JavaIrType.Primitive && type.componentType.kind.name == "CHAR"
+    BuiltinType.INT -> type is JavaIrType.Primitive && type.kind.name == "INT"
+    BuiltinType.REFERENCE -> type is JavaIrType.Reference
+    BuiltinType.REFERENCE_OR_NULL -> type is JavaIrType.Reference || type is JavaIrType.Array || type == JavaIrType.Null
+    BuiltinType.VOID -> type == JavaIrType.Void
+  }
+
+  /** lowering 保证 Convert.type 是目标类型，因此 builtin 参数无需窥探 conversion 内部特判。 */
+  private fun matchesBuiltinArgument(
+    expression: JavaIrExpression,
+    expected: BuiltinType,
+  ): Boolean = matchesBuiltinType(expression.type, expected)
+
+  private data class BuiltinSignature(
+    val hasReceiver: Boolean,
+    val parameters: List<BuiltinType>,
+    val result: BuiltinType,
+  )
+
+  private enum class BuiltinType {
+    BOOLEAN, BYTE, SHORT, CHAR, CHAR_ARRAY, INT, REFERENCE, REFERENCE_OR_NULL, VOID,
+  }
+
   /** 当前运行子集支持 identity、引用拓宽与不涉及 long/浮点的整数 widening。 */
-  private fun validateConversion(conversion: JavaIrConversion, span: JavaSourceSpan) {
+  private fun validateConversion(expression: JavaIrExpression.Convert) {
+    val conversion = expression.conversion
+    val sourceType = expression.expression.type
+    val resultType = expression.type
     when (conversion) {
-      JavaIrConversion.Identity,
-      is JavaIrConversion.ReferenceWidening -> Unit
+      JavaIrConversion.Identity -> if (sourceType != resultType) {
+        invalid("Identity conversion must preserve its operand type.", expression.span)
+      }
+      is JavaIrConversion.ReferenceWidening -> if (
+        conversion.from != sourceType || conversion.to != resultType ||
+        !isValidReferenceWidening(sourceType, resultType)
+      ) invalid("Reference conversion endpoints do not match typed IR.", expression.span)
       is JavaIrConversion.PrimitiveWidening -> {
         if (!conversion.from.name.isStage0IntegralPrimitiveName() ||
           !conversion.to.name.isStage0IntegralPrimitiveName()
         ) {
-          unsupported("Only integral primitive widening is available in the current JavaScript backend.", span)
+          unsupported("Only integral primitive widening is available in the current JavaScript backend.", expression.span)
+        }
+        if (sourceType != JavaIrType.Primitive(conversion.from) ||
+          resultType != JavaIrType.Primitive(conversion.to)
+        ) invalid("Primitive widening endpoints do not match typed IR.", expression.span)
+      }
+      is JavaIrConversion.PrimitiveNarrowing -> {
+        if (!conversion.from.name.isStage0IntegralPrimitiveName() ||
+          !conversion.to.name.isStage0IntegralPrimitiveName() ||
+          sourceType != JavaIrType.Primitive(conversion.from) ||
+          resultType != JavaIrType.Primitive(conversion.to)
+        ) {
+          invalid("Primitive narrowing endpoints do not match supported typed IR.", expression.span)
         }
       }
-      is JavaIrConversion.Boxing,
-      is JavaIrConversion.Unboxing -> unsupported(
-        "Boxing and unboxing are not available in the current JavaScript backend.",
-        span,
-      )
+      is JavaIrConversion.Boxing -> if (
+        sourceType != JavaIrType.Primitive(conversion.primitive) ||
+        resultType != JavaIrType.Reference(conversion.boxedClass) ||
+        index.program.builtinTypeRoles[conversion.boxedClass]?.boxedPrimitive != conversion.primitive
+      ) invalid("Boxing endpoints do not match typed IR.", expression.span)
+      is JavaIrConversion.Unboxing -> if (
+        sourceType != JavaIrType.Reference(conversion.boxedClass) ||
+        resultType != JavaIrType.Primitive(conversion.primitive) ||
+        index.program.builtinTypeRoles[conversion.boxedClass]?.boxedPrimitive != conversion.primitive
+      ) invalid("Unboxing endpoints do not match typed IR.", expression.span)
     }
+  }
+
+  /**
+   * 以 typed IR 用户类层级和 catalog builtin role 层级验证引用拓宽。
+   *
+   * null 可拓宽到任意引用/数组；数组只实现当前 Java 子集可证明的协变与 Object 根类型拓宽。
+   * 任一 classId 无法在用户类或 builtin role 中证明时返回 false，禁止伪造端点绕过 builtin 校验。
+   */
+  private fun isValidReferenceWidening(source: JavaIrType, target: JavaIrType): Boolean = when {
+    source == JavaIrType.Null -> target is JavaIrType.Reference || target is JavaIrType.Array
+    source is JavaIrType.Reference && target is JavaIrType.Reference ->
+      isReferenceAssignableByHierarchy(source.classId, target.classId)
+    source is JavaIrType.Array && target is JavaIrType.Array ->
+      isValidArrayComponentWidening(source.componentType, target.componentType)
+    source is JavaIrType.Array && target is JavaIrType.Reference ->
+      index.program.builtinTypeRoles[target.classId] == JavaBuiltinTypeRole.OBJECT
+    else -> false
+  }
+
+  /** 数组协变只接受引用组件的可证明拓宽；primitive 数组不会伪装成另一 primitive 数组。 */
+  private fun isValidArrayComponentWidening(source: JavaIrType, target: JavaIrType): Boolean = when {
+    source is JavaIrType.Reference && target is JavaIrType.Reference ->
+      isReferenceAssignableByHierarchy(source.classId, target.classId)
+    source is JavaIrType.Array && target is JavaIrType.Array ->
+      isValidArrayComponentWidening(source.componentType, target.componentType)
+    source is JavaIrType.Array && target is JavaIrType.Reference ->
+      index.program.builtinTypeRoles[target.classId] == JavaBuiltinTypeRole.OBJECT
+    else -> false
+  }
+
+  /**
+   * 沿用户 IR 父类/接口及 catalog role 父链验证可赋值关系。
+   *
+   * 擦除后相同 classId 也合法：泛型参数层级已由 semantic 冻结，运行时无需再次转换。
+  */
+  private fun isReferenceAssignableByHierarchy(source: JavaIrClassId, target: JavaIrClassId): Boolean {
+    if (source == target) return source in index.classes || source in index.program.builtinTypeRoles
+    val pending = ArrayDeque<JavaIrClassId>()
+    pending.addAll(directSuperClasses(source))
+    val visited = mutableSetOf<JavaIrClassId>()
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current)) continue
+      if (current == target) return true
+      pending.addAll(directSuperClasses(current))
+    }
+    return false
+  }
+
+  /** builtin 父类由 catalog role 映射定位，用户类沿 JavaIrClass 已冻结层级。 */
+  private fun directSuperClasses(classId: JavaIrClassId): List<JavaIrClassId> {
+    index.classes[classId]?.let { clazz ->
+      val rootObject = if (clazz.superClass == null) {
+        index.program.builtinTypeRoles.entries
+          .singleOrNull { (_, role) -> role == JavaBuiltinTypeRole.OBJECT }
+          ?.key
+      } else {
+        null
+      }
+      // lowering 用 null 表示未发射的 Object 根，因此这里恢复该条可证明的直接父边。
+      return listOfNotNull(clazz.superClass ?: rootObject) + clazz.interfaces
+    }
+    val role = index.program.builtinTypeRoles[classId] ?: return emptyList()
+    val superRole = JavaBuiltinLibrary.directSuperRoles[role] ?: return emptyList()
+    return index.program.builtinTypeRoles.entries
+      .singleOrNull { (_, candidateRole) -> candidateRole == superRole }
+      ?.let { (superClassId, _) -> listOf(superClassId) }
+      .orEmpty()
   }
 
   /** 引用类型以运行时对象身份参与 null、相等性、字段和调用；内建类库仍未注入。 */
@@ -485,6 +962,11 @@ private class JavaScriptEmitter(
   private val entryPoint: JavaCompilerEntryPoint,
 ) {
   private val writer = JsWriter()
+  private val charArrayBuiltinOperations = setOf(
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY,
+  )
   private var currentMethod: JavaIrMethod? = null
   private var currentThisName: String = "this"
   private val classesInParentFirstOrder: List<JavaIrClass> by lazy {
@@ -509,6 +991,21 @@ private class JavaScriptEmitter(
     if (usesArrayOrStringRuntime()) {
       writer.line()
       JavaRuntimePrelude.arrayAndStringSource.lines().forEach(writer::line)
+    }
+    if (usesBuiltinRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.builtinSource.lines().forEach(writer::line)
+    }
+    if (usesCollectionRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.collectionSource.lines().forEach(writer::line)
+    }
+    if (usesScannerRuntime()) {
+      writer.line()
+      // Scanner 依赖模块内的 UTF-8/Base64 解码 reader；必须先声明 reader，再声明 cursor helper。
+      DynamicProgramHostAbi.STANDARD_INPUT_READER_SOURCE.lines().forEach(writer::line)
+      writer.line()
+      JavaRuntimePrelude.scannerSource.lines().forEach(writer::line)
     }
     writer.line()
     val methods = index.program.classes
@@ -545,7 +1042,160 @@ private class JavaScriptEmitter(
   }
 
   /** object helper 既服务字段调用，也服务数组的 null 检查。 */
-  private fun usesRuntimeHelpers(): Boolean = usesObjectRuntime() || usesArrayOrStringRuntime()
+  private fun usesRuntimeHelpers(): Boolean =
+    usesObjectRuntime() || usesArrayOrStringRuntime() || usesBuiltinRuntime()
+
+  /** builtin helper 仅在 typed IR 显式包含 builtin 节点时注入，普通快照保持不变。 */
+  private fun usesBuiltinRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { field -> field.initializer?.requiresBuiltinRuntime() == true } ||
+      clazz.staticInitializer?.containsBuiltinRuntime() == true ||
+      clazz.instanceInitializer?.containsBuiltinRuntime() == true ||
+      clazz.methods.any { method -> method.body?.containsBuiltinRuntime() == true }
+  }
+
+  private fun JavaIrStatement.Block.containsBuiltinRuntime(): Boolean =
+    statements.any { statement -> statement.requiresBuiltinRuntime() }
+
+  /** 递归扫描控制流中的 builtin 节点，避免只看入口方法造成 helper 漏注入。 */
+  private fun JavaIrStatement.requiresBuiltinRuntime(): Boolean = when (this) {
+    is JavaIrStatement.Block -> containsBuiltinRuntime()
+    is JavaIrStatement.DeclareLocal -> initializer?.requiresBuiltinRuntime() == true
+    is JavaIrStatement.Expression -> expression.requiresBuiltinRuntime()
+    is JavaIrStatement.If -> condition.requiresBuiltinRuntime() ||
+      thenBranch.requiresBuiltinRuntime() || elseBranch?.requiresBuiltinRuntime() == true
+    is JavaIrStatement.While -> condition.requiresBuiltinRuntime() || body.requiresBuiltinRuntime()
+    is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrStatement.Return -> expression?.requiresBuiltinRuntime() == true
+    is JavaIrStatement.Throw -> expression.requiresBuiltinRuntime()
+  }
+
+  /** builtin 可嵌套在 receiver、参数、转换与数组表达式中，扫描必须覆盖完整表达式树。 */
+  private fun JavaIrExpression.requiresBuiltinRuntime(): Boolean = when (this) {
+    is JavaIrExpression.BuiltinValue,
+    is JavaIrExpression.InvokeBuiltin,
+    is JavaIrExpression.ConstructBuiltin -> true
+    is JavaIrExpression.SetLocal -> value.requiresBuiltinRuntime()
+    is JavaIrExpression.GetField -> receiver.requiresBuiltinRuntime()
+    is JavaIrExpression.SetField -> receiver.requiresBuiltinRuntime() || value.requiresBuiltinRuntime()
+    is JavaIrExpression.SetStaticField -> value.requiresBuiltinRuntime()
+    is JavaIrExpression.Binary -> left.requiresBuiltinRuntime() || right.requiresBuiltinRuntime()
+    is JavaIrExpression.Unary -> operand.requiresBuiltinRuntime()
+    is JavaIrExpression.Convert -> conversion is JavaIrConversion.Boxing ||
+      conversion is JavaIrConversion.Unboxing || expression.requiresBuiltinRuntime()
+    is JavaIrExpression.InvokeStatic -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrExpression.InvokeSpecial -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrExpression.InvokeVirtual -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrExpression.NewArray -> length.requiresBuiltinRuntime()
+    is JavaIrExpression.ArrayInitializer -> elements.any { element -> element.requiresBuiltinRuntime() }
+    is JavaIrExpression.GetArrayElement -> array.requiresBuiltinRuntime() || index.requiresBuiltinRuntime()
+    is JavaIrExpression.SetArrayElement -> array.requiresBuiltinRuntime() || index.requiresBuiltinRuntime() || value.requiresBuiltinRuntime()
+    is JavaIrExpression.ArrayLength -> array.requiresBuiltinRuntime()
+    is JavaIrExpression.StringConcat -> parts.any { it.expression.requiresBuiltinRuntime() }
+    else -> false
+  }
+
+  /** collection helper 单独按 operation 扫描，未使用集合的旧程序不会携带集合运行时。 */
+  private fun usesCollectionRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { field -> field.initializer?.requiresCollectionRuntime() == true } ||
+      clazz.staticInitializer?.containsCollectionRuntime() == true ||
+      clazz.instanceInitializer?.containsCollectionRuntime() == true ||
+      clazz.methods.any { method -> method.body?.containsCollectionRuntime() == true }
+  }
+
+  private fun JavaIrStatement.Block.containsCollectionRuntime(): Boolean =
+    statements.any { statement -> statement.requiresCollectionRuntime() }
+
+  /** 遍历结构化语句，确保仅藏在分支或构造参数里的集合节点也能触发注入。 */
+  private fun JavaIrStatement.requiresCollectionRuntime(): Boolean = when (this) {
+    is JavaIrStatement.Block -> containsCollectionRuntime()
+    is JavaIrStatement.DeclareLocal -> initializer?.requiresCollectionRuntime() == true
+    is JavaIrStatement.Expression -> expression.requiresCollectionRuntime()
+    is JavaIrStatement.If -> condition.requiresCollectionRuntime() ||
+      thenBranch.requiresCollectionRuntime() || elseBranch?.requiresCollectionRuntime() == true
+    is JavaIrStatement.While -> condition.requiresCollectionRuntime() || body.requiresCollectionRuntime()
+    is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrStatement.Return -> expression?.requiresCollectionRuntime() == true
+    is JavaIrStatement.Throw -> expression.requiresCollectionRuntime()
+  }
+
+  /** operation 是唯一判据；receiver/参数仍递归扫描，禁止按 Java 类型名或成员名猜测。 */
+  private fun JavaIrExpression.requiresCollectionRuntime(): Boolean = when (this) {
+    is JavaIrExpression.InvokeBuiltin -> operation.isCollectionOperation() ||
+      receiver?.requiresCollectionRuntime() == true || arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.ConstructBuiltin -> operation.isCollectionOperation() ||
+      arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.SetLocal -> value.requiresCollectionRuntime()
+    is JavaIrExpression.GetField -> receiver.requiresCollectionRuntime()
+    is JavaIrExpression.SetField -> receiver.requiresCollectionRuntime() || value.requiresCollectionRuntime()
+    is JavaIrExpression.SetStaticField -> value.requiresCollectionRuntime()
+    is JavaIrExpression.Binary -> left.requiresCollectionRuntime() || right.requiresCollectionRuntime()
+    is JavaIrExpression.Unary -> operand.requiresCollectionRuntime()
+    is JavaIrExpression.Convert -> expression.requiresCollectionRuntime()
+    is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.InvokeSpecial -> receiver.requiresCollectionRuntime() || arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.InvokeVirtual -> receiver.requiresCollectionRuntime() || arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.NewObject -> arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.NewArray -> length.requiresCollectionRuntime()
+    is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.GetArrayElement -> array.requiresCollectionRuntime() || index.requiresCollectionRuntime()
+    is JavaIrExpression.SetArrayElement -> array.requiresCollectionRuntime() ||
+      index.requiresCollectionRuntime() || value.requiresCollectionRuntime()
+    is JavaIrExpression.ArrayLength -> array.requiresCollectionRuntime()
+    is JavaIrExpression.StringConcat -> parts.any { it.expression.requiresCollectionRuntime() }
+    else -> false
+  }
+
+  /** Scanner runtime 与其他 builtin 分离，普通输出、字符串和集合程序不会携带输入解析代码。 */
+  private fun usesScannerRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { field -> field.initializer?.requiresScannerRuntime() == true } ||
+      clazz.staticInitializer?.containsScannerRuntime() == true ||
+      clazz.instanceInitializer?.containsScannerRuntime() == true ||
+      clazz.methods.any { method -> method.body?.containsScannerRuntime() == true }
+  }
+
+  private fun JavaIrStatement.Block.containsScannerRuntime(): Boolean =
+    statements.any { statement -> statement.requiresScannerRuntime() }
+
+  /** 遍历全部结构化语句，避免只在异常分支使用 Scanner 时漏注入 helper。 */
+  private fun JavaIrStatement.requiresScannerRuntime(): Boolean = when (this) {
+    is JavaIrStatement.Block -> containsScannerRuntime()
+    is JavaIrStatement.DeclareLocal -> initializer?.requiresScannerRuntime() == true
+    is JavaIrStatement.Expression -> expression.requiresScannerRuntime()
+    is JavaIrStatement.If -> condition.requiresScannerRuntime() ||
+      thenBranch.requiresScannerRuntime() || elseBranch?.requiresScannerRuntime() == true
+    is JavaIrStatement.While -> condition.requiresScannerRuntime() || body.requiresScannerRuntime()
+    is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresScannerRuntime() }
+    is JavaIrStatement.Return -> expression?.requiresScannerRuntime() == true
+    is JavaIrStatement.Throw -> expression.requiresScannerRuntime()
+  }
+
+  /** 只认稳定 operation；嵌套 receiver、参数与转换继续递归检查。 */
+  private fun JavaIrExpression.requiresScannerRuntime(): Boolean = when (this) {
+    is JavaIrExpression.InvokeBuiltin -> operation.isScannerOperation() ||
+      receiver?.requiresScannerRuntime() == true || arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.ConstructBuiltin -> operation.isScannerOperation() ||
+      arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.SetLocal -> value.requiresScannerRuntime()
+    is JavaIrExpression.GetField -> receiver.requiresScannerRuntime()
+    is JavaIrExpression.SetField -> receiver.requiresScannerRuntime() || value.requiresScannerRuntime()
+    is JavaIrExpression.SetStaticField -> value.requiresScannerRuntime()
+    is JavaIrExpression.Binary -> left.requiresScannerRuntime() || right.requiresScannerRuntime()
+    is JavaIrExpression.Unary -> operand.requiresScannerRuntime()
+    is JavaIrExpression.Convert -> expression.requiresScannerRuntime()
+    is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.InvokeSpecial -> receiver.requiresScannerRuntime() || arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.InvokeVirtual -> receiver.requiresScannerRuntime() || arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.NewObject -> arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.NewArray -> length.requiresScannerRuntime()
+    is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.GetArrayElement -> array.requiresScannerRuntime() || index.requiresScannerRuntime()
+    is JavaIrExpression.SetArrayElement -> array.requiresScannerRuntime() ||
+      index.requiresScannerRuntime() || value.requiresScannerRuntime()
+    is JavaIrExpression.ArrayLength -> array.requiresScannerRuntime()
+    is JavaIrExpression.StringConcat -> parts.any { it.expression.requiresScannerRuntime() }
+    else -> false
+  }
 
   /** 扫描表达式树决定是否注入数组/字符串 helper，不影响既有纯 static 快照。 */
   private fun JavaIrStatement.Block.containsArrayOrStringRuntime(): Boolean =
@@ -574,6 +1224,10 @@ private class JavaScriptEmitter(
     is JavaIrExpression.ArrayLength,
     is JavaIrExpression.StringConcat,
     -> true
+    is JavaIrExpression.InvokeBuiltin -> operation in charArrayBuiltinOperations ||
+      receiver?.requiresArrayOrStringRuntime() == true ||
+      arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.ConstructBuiltin -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     is JavaIrExpression.SetLocal -> value.requiresArrayOrStringRuntime()
     is JavaIrExpression.GetField -> receiver.requiresArrayOrStringRuntime()
     is JavaIrExpression.SetField -> receiver.requiresArrayOrStringRuntime() || value.requiresArrayOrStringRuntime()
@@ -588,7 +1242,7 @@ private class JavaScriptEmitter(
     else -> false
   }
 
-  /** 先声明所有 prototype 与 class metadata，允许跨文件父类和前向静态引用。 */
+  /** 先声明所有 prototype，允许跨文件父类和前向静态引用。 */
   private fun emitClassShells() {
     classesInParentFirstOrder.forEach { clazz ->
       val parent = clazz.superClass?.let(JsNameMangler::prototype) ?: "null"
@@ -837,6 +1491,12 @@ private class JavaScriptEmitter(
         val owner = index.fields.getValue(expression.field).owner
         "(${JsNameMangler.classInitializer(owner)}(), ${JsNameMangler.staticStorage(owner)}.values[\"${JsNameMangler.field(expression.field)}\"])"
       }
+      is JavaIrExpression.BuiltinValue -> when (expression.operation) {
+        JavaBuiltinOperation.SYSTEM_OUT -> "0"
+        JavaBuiltinOperation.SYSTEM_ERR -> "1"
+        JavaBuiltinOperation.SYSTEM_IN -> "2"
+        else -> error("Validated Java IR builtin value has a non-stream operation.")
+      }
       is JavaIrExpression.SetStaticField -> {
         val owner = index.fields.getValue(expression.field).owner
         // Java putstatic 的右值先求值，随后才初始化字段所属类并执行写入。
@@ -845,6 +1505,18 @@ private class JavaScriptEmitter(
       is JavaIrExpression.InvokeSpecial -> {
         val args = expression.arguments.joinToString(", ") { renderExpression(it) }
         "((receiver${if (args.isEmpty()) "" else ", values"}) => ${JsNameMangler.method(expression.method)}.call(\$__j_non_null(receiver)${if (args.isEmpty()) "" else ", ...values"}))(${renderExpression(expression.receiver)}${if (args.isEmpty()) "" else ", [$args]"})"
+      }
+      is JavaIrExpression.InvokeBuiltin -> renderBuiltinInvocation(expression)
+      is JavaIrExpression.ConstructBuiltin -> when (expression.operation) {
+        JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY -> "\$__j_sb_new()"
+        JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING ->
+          "\$__j_sb_new_string(${renderExpression(expression.arguments.single())})"
+        JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT -> "\$__j_list_new()"
+        JavaBuiltinOperation.HASH_SET_CONSTRUCT -> "\$__j_set_new()"
+        JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> "\$__j_map_new()"
+        JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM ->
+          "\$__j_scanner_new(${renderExpression(expression.arguments.single())})"
+        else -> error("Validated builtin construction has an unsupported operation.")
       }
       is JavaIrExpression.InvokeVirtual -> {
         val receiver = renderExpression(expression.receiver)
@@ -874,6 +1546,128 @@ private class JavaScriptEmitter(
         val kinds = expression.parts.joinToString(", ") { part -> writer.stringLiteral(part.conversion.name) }
         "\$__j_string_concat([$values], [$kinds])"
       }
+    }
+  }
+
+  /** operation 与 helper 一一对应；JS 参数求值先于 helper 函数体中的 receiver 空检查。 */
+  private fun renderBuiltinInvocation(expression: JavaIrExpression.InvokeBuiltin): String {
+    val receiver = expression.receiver?.let(::renderExpression)
+    val arguments = expression.arguments.map(::renderExpression)
+    fun instance(helper: String): String =
+      "$helper(${listOfNotNull(receiver).plus(arguments).joinToString(", ")})"
+    fun static(helper: String): String = "$helper(${arguments.joinToString(", ")})"
+    return when (expression.operation) {
+      JavaBuiltinOperation.SYSTEM_OUT,
+      JavaBuiltinOperation.SYSTEM_ERR,
+      JavaBuiltinOperation.SYSTEM_IN -> error("Validated callable builtin cannot be a stream value operation.")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> instance("\$__j_print_boolean")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> instance("\$__j_print_char")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> instance("\$__j_print_char_array")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_INT -> instance("\$__j_print_int")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING -> instance("\$__j_print_string")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT -> instance("\$__j_print_object")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN -> instance("\$__j_println")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_BOOLEAN -> instance("\$__j_println_boolean")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR -> instance("\$__j_println_char")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY -> instance("\$__j_println_char_array")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT -> instance("\$__j_println_int")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING -> instance("\$__j_println_string")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> instance("\$__j_println_object")
+      JavaBuiltinOperation.STRING_LENGTH -> instance("\$__j_string_length")
+      JavaBuiltinOperation.STRING_IS_EMPTY -> instance("\$__j_string_is_empty")
+      JavaBuiltinOperation.STRING_CHAR_AT -> instance("\$__j_string_char_at")
+      JavaBuiltinOperation.STRING_EQUALS -> instance("\$__j_string_equals")
+      JavaBuiltinOperation.STRING_SUBSTRING_FROM -> instance("\$__j_string_substring_from")
+      JavaBuiltinOperation.STRING_SUBSTRING_RANGE -> instance("\$__j_string_substring_range")
+      JavaBuiltinOperation.STRING_INDEX_OF_CHAR -> instance("\$__j_string_index_of_code_point")
+      JavaBuiltinOperation.STRING_INDEX_OF_STRING -> instance("\$__j_string_index_of_string")
+      JavaBuiltinOperation.STRING_CONTAINS -> instance("\$__j_string_contains")
+      JavaBuiltinOperation.STRING_STARTS_WITH -> instance("\$__j_string_starts_with")
+      JavaBuiltinOperation.STRING_ENDS_WITH -> instance("\$__j_string_ends_with")
+      JavaBuiltinOperation.MATH_ABS_INT -> static("\$__j_math_abs_int")
+      JavaBuiltinOperation.MATH_MIN_INT -> static("\$__j_math_min_int")
+      JavaBuiltinOperation.MATH_MAX_INT -> static("\$__j_math_max_int")
+      JavaBuiltinOperation.BOOLEAN_VALUE_OF -> "\$__j_box(\"BOOLEAN\", ${arguments.single()})"
+      JavaBuiltinOperation.BYTE_VALUE_OF -> "\$__j_box(\"BYTE\", ${arguments.single()})"
+      JavaBuiltinOperation.SHORT_VALUE_OF -> "\$__j_box(\"SHORT\", ${arguments.single()})"
+      JavaBuiltinOperation.CHARACTER_VALUE_OF -> "\$__j_box(\"CHAR\", ${arguments.single()})"
+      JavaBuiltinOperation.INTEGER_VALUE_OF -> "\$__j_box(\"INT\", ${arguments.single()})"
+      JavaBuiltinOperation.BOOLEAN_BOOLEAN_VALUE -> "\$__j_unbox($receiver, \"BOOLEAN\")"
+      JavaBuiltinOperation.BYTE_BYTE_VALUE -> "\$__j_unbox($receiver, \"BYTE\")"
+      JavaBuiltinOperation.SHORT_SHORT_VALUE -> "\$__j_unbox($receiver, \"SHORT\")"
+      JavaBuiltinOperation.CHARACTER_CHAR_VALUE -> "\$__j_unbox($receiver, \"CHAR\")"
+      JavaBuiltinOperation.INTEGER_INT_VALUE -> "\$__j_unbox($receiver, \"INT\")"
+      JavaBuiltinOperation.NUMBER_INT_VALUE -> instance("\$__j_number_int_value")
+      JavaBuiltinOperation.BOOLEAN_EQUALS,
+      JavaBuiltinOperation.BYTE_EQUALS,
+      JavaBuiltinOperation.SHORT_EQUALS,
+      JavaBuiltinOperation.CHARACTER_EQUALS,
+      JavaBuiltinOperation.INTEGER_EQUALS -> instance("\$__j_box_equals")
+      JavaBuiltinOperation.BOOLEAN_HASH_CODE,
+      JavaBuiltinOperation.BYTE_HASH_CODE,
+      JavaBuiltinOperation.SHORT_HASH_CODE,
+      JavaBuiltinOperation.CHARACTER_HASH_CODE,
+      JavaBuiltinOperation.INTEGER_HASH_CODE -> instance("\$__j_box_hash")
+      JavaBuiltinOperation.BOOLEAN_TO_STRING,
+      JavaBuiltinOperation.BYTE_TO_STRING,
+      JavaBuiltinOperation.SHORT_TO_STRING,
+      JavaBuiltinOperation.CHARACTER_TO_STRING,
+      JavaBuiltinOperation.INTEGER_TO_STRING -> instance("\$__j_box_to_string")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN -> instance("\$__j_sb_append_boolean")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR -> instance("\$__j_sb_append_char")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY -> instance("\$__j_sb_append_char_array")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_INT -> instance("\$__j_sb_append_int")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING -> instance("\$__j_sb_append_string")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT -> instance("\$__j_sb_append_object")
+      JavaBuiltinOperation.STRING_BUILDER_LENGTH -> instance("\$__j_sb_length")
+      JavaBuiltinOperation.STRING_BUILDER_CHAR_AT -> instance("\$__j_sb_char_at")
+      JavaBuiltinOperation.STRING_BUILDER_SET_CHAR_AT -> instance("\$__j_sb_set_char_at")
+      JavaBuiltinOperation.STRING_BUILDER_REVERSE -> instance("\$__j_sb_reverse")
+      JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_FROM -> instance("\$__j_sb_substring_from")
+      JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_RANGE -> instance("\$__j_sb_substring_range")
+      JavaBuiltinOperation.STRING_BUILDER_TO_STRING -> instance("\$__j_sb_to_string")
+      JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY,
+      JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING,
+      JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+      JavaBuiltinOperation.HASH_SET_CONSTRUCT,
+      JavaBuiltinOperation.HASH_MAP_CONSTRUCT,
+      JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM ->
+        error("Validated callable builtin cannot be a construction operation.")
+      JavaBuiltinOperation.LIST_SIZE -> instance("\$__j_list_size")
+      JavaBuiltinOperation.LIST_IS_EMPTY -> instance("\$__j_list_is_empty")
+      JavaBuiltinOperation.LIST_ADD -> instance("\$__j_list_add")
+      JavaBuiltinOperation.LIST_GET -> instance("\$__j_list_get")
+      JavaBuiltinOperation.LIST_SET -> instance("\$__j_list_set")
+      JavaBuiltinOperation.LIST_REMOVE_INDEX -> instance("\$__j_list_remove_index")
+      JavaBuiltinOperation.LIST_REMOVE_OBJECT -> instance("\$__j_list_remove_object")
+      JavaBuiltinOperation.LIST_CONTAINS -> instance("\$__j_list_contains")
+      JavaBuiltinOperation.LIST_INDEX_OF -> instance("\$__j_list_index_of")
+      JavaBuiltinOperation.LIST_CLEAR -> instance("\$__j_list_clear")
+      JavaBuiltinOperation.LIST_ITERATOR -> instance("\$__j_list_iterator")
+      JavaBuiltinOperation.ITERATOR_HAS_NEXT -> instance("\$__j_iterator_has_next")
+      JavaBuiltinOperation.ITERATOR_NEXT -> instance("\$__j_iterator_next")
+      JavaBuiltinOperation.SET_ADD -> instance("\$__j_set_add")
+      JavaBuiltinOperation.SET_CONTAINS -> instance("\$__j_set_contains")
+      JavaBuiltinOperation.SET_REMOVE -> instance("\$__j_set_remove")
+      JavaBuiltinOperation.SET_SIZE -> instance("\$__j_set_size")
+      JavaBuiltinOperation.SET_IS_EMPTY -> instance("\$__j_set_is_empty")
+      JavaBuiltinOperation.SET_CLEAR -> instance("\$__j_set_clear")
+      JavaBuiltinOperation.SET_ITERATOR -> instance("\$__j_set_iterator")
+      JavaBuiltinOperation.MAP_PUT -> instance("\$__j_map_put")
+      JavaBuiltinOperation.MAP_GET -> instance("\$__j_map_get")
+      JavaBuiltinOperation.MAP_GET_OR_DEFAULT -> instance("\$__j_map_get_or_default")
+      JavaBuiltinOperation.MAP_CONTAINS_KEY -> instance("\$__j_map_contains_key")
+      JavaBuiltinOperation.MAP_REMOVE -> instance("\$__j_map_remove")
+      JavaBuiltinOperation.MAP_SIZE -> instance("\$__j_map_size")
+      JavaBuiltinOperation.MAP_IS_EMPTY -> instance("\$__j_map_is_empty")
+      JavaBuiltinOperation.MAP_CLEAR -> instance("\$__j_map_clear")
+      JavaBuiltinOperation.MAP_KEY_SET -> instance("\$__j_map_key_set")
+      JavaBuiltinOperation.SCANNER_HAS_NEXT -> instance("\$__j_scanner_has_next")
+      JavaBuiltinOperation.SCANNER_NEXT -> instance("\$__j_scanner_next")
+      JavaBuiltinOperation.SCANNER_HAS_NEXT_INT -> instance("\$__j_scanner_has_next_int")
+      JavaBuiltinOperation.SCANNER_NEXT_INT -> instance("\$__j_scanner_next_int")
+      JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE -> instance("\$__j_scanner_has_next_line")
+      JavaBuiltinOperation.SCANNER_NEXT_LINE -> instance("\$__j_scanner_next_line")
     }
   }
 
@@ -941,9 +1735,28 @@ private class JavaScriptEmitter(
       } else {
         code
       }
-      is JavaIrConversion.Boxing,
-      is JavaIrConversion.Unboxing -> error("Validated Java IR cannot contain boxing conversions.")
+      is JavaIrConversion.PrimitiveNarrowing -> when (expression.conversion.to.name) {
+        "BYTE" -> "(($code << 24) >> 24)"
+        "SHORT" -> "(($code << 16) >> 16)"
+        "CHAR" -> "($code & 65535)"
+        "INT" -> "($code | 0)"
+        else -> error("Validated primitive narrowing has an unsupported target.")
+      }
+      is JavaIrConversion.Boxing ->
+        "\$__j_box(\"${expression.conversion.primitive.boxTag()}\", $code)"
+      is JavaIrConversion.Unboxing ->
+        "\$__j_unbox($code, \"${expression.conversion.primitive.boxTag()}\")"
     }
+  }
+
+  /** 首批 primitive 与 tagged wrapper 的稳定运行时标签。 */
+  private fun JavaAstPrimitiveType.boxTag(): String = when (this) {
+    JavaAstPrimitiveType.BOOLEAN -> "BOOLEAN"
+    JavaAstPrimitiveType.BYTE -> "BYTE"
+    JavaAstPrimitiveType.SHORT -> "SHORT"
+    JavaAstPrimitiveType.CHAR -> "CHAR"
+    JavaAstPrimitiveType.INT -> "INT"
+    else -> error("Validated boxing conversion contains an unsupported primitive.")
   }
 
   /** 常量使用 JSON 兼容转义，整数文本保持不经过 JavaScript Number 重新格式化。 */
@@ -1012,4 +1825,53 @@ private fun JavaIrType.isStage0Integral(): Boolean {
 /** long、float、double 需要不同 runtime representation，不得静默按 Number 降级。 */
 private fun String.isStage0IntegralPrimitiveName(): Boolean {
   return this == "BYTE" || this == "SHORT" || this == "CHAR" || this == "INT"
+}
+
+/** 集合 operation 的集中判定同时服务 helper 注入，不依赖 Java 类型名。 */
+private fun JavaBuiltinOperation.isCollectionOperation(): Boolean = when (this) {
+  JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+  JavaBuiltinOperation.HASH_SET_CONSTRUCT,
+  JavaBuiltinOperation.HASH_MAP_CONSTRUCT,
+  JavaBuiltinOperation.LIST_SIZE,
+  JavaBuiltinOperation.LIST_IS_EMPTY,
+  JavaBuiltinOperation.LIST_ADD,
+  JavaBuiltinOperation.LIST_GET,
+  JavaBuiltinOperation.LIST_SET,
+  JavaBuiltinOperation.LIST_REMOVE_INDEX,
+  JavaBuiltinOperation.LIST_REMOVE_OBJECT,
+  JavaBuiltinOperation.LIST_CONTAINS,
+  JavaBuiltinOperation.LIST_INDEX_OF,
+  JavaBuiltinOperation.LIST_CLEAR,
+  JavaBuiltinOperation.LIST_ITERATOR,
+  JavaBuiltinOperation.ITERATOR_HAS_NEXT,
+  JavaBuiltinOperation.ITERATOR_NEXT,
+  JavaBuiltinOperation.SET_ADD,
+  JavaBuiltinOperation.SET_CONTAINS,
+  JavaBuiltinOperation.SET_REMOVE,
+  JavaBuiltinOperation.SET_SIZE,
+  JavaBuiltinOperation.SET_IS_EMPTY,
+  JavaBuiltinOperation.SET_CLEAR,
+  JavaBuiltinOperation.SET_ITERATOR,
+  JavaBuiltinOperation.MAP_PUT,
+  JavaBuiltinOperation.MAP_GET,
+  JavaBuiltinOperation.MAP_GET_OR_DEFAULT,
+  JavaBuiltinOperation.MAP_CONTAINS_KEY,
+  JavaBuiltinOperation.MAP_REMOVE,
+  JavaBuiltinOperation.MAP_SIZE,
+  JavaBuiltinOperation.MAP_IS_EMPTY,
+  JavaBuiltinOperation.MAP_CLEAR,
+  JavaBuiltinOperation.MAP_KEY_SET -> true
+  else -> false
+}
+
+/** Scanner 构造与调用的集中判定，保证 runtime 注入不依赖类型名。 */
+private fun JavaBuiltinOperation.isScannerOperation(): Boolean = when (this) {
+  JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM,
+  JavaBuiltinOperation.SCANNER_HAS_NEXT,
+  JavaBuiltinOperation.SCANNER_NEXT,
+  JavaBuiltinOperation.SCANNER_HAS_NEXT_INT,
+  JavaBuiltinOperation.SCANNER_NEXT_INT,
+  JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE,
+  JavaBuiltinOperation.SCANNER_NEXT_LINE -> true
+  else -> false
 }

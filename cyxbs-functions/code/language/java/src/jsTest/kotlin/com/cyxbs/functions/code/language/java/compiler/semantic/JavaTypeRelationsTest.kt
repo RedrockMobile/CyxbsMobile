@@ -183,6 +183,58 @@ class JavaTypeRelationsTest {
     assertNull(fixture.relations.assignmentConversion(booleanType, intType))
   }
 
+  /** loose invocation 才开放 wrapper 转换，并保留多步转换的精确顺序。 */
+  @Test
+  fun appliesBoxingAndUnboxingAfterStrictInvocation() {
+    val fixture = standardFixture()
+    val intType = JavaSemanticType.Primitive(JavaAstPrimitiveType.INT)
+    val longType = JavaSemanticType.Primitive(JavaAstPrimitiveType.LONG)
+
+    assertNull(fixture.relations.invocationConversion(intType, fixture.integerType, allowBoxing = false))
+    assertEquals(
+      JavaSemanticConversion.Boxing(JavaAstPrimitiveType.INT, INTEGER),
+      fixture.relations.invocationConversion(intType, fixture.integerType, allowBoxing = true),
+    )
+    assertEquals(
+      JavaSemanticConversion.Sequence(
+        listOf(
+          JavaSemanticConversion.Boxing(JavaAstPrimitiveType.INT, INTEGER),
+          JavaSemanticConversion.ReferenceWidening(fixture.integerType, fixture.numberType),
+        ),
+      ),
+      fixture.relations.assignmentConversion(intType, fixture.numberType),
+    )
+    assertEquals(
+      JavaSemanticConversion.Sequence(
+        listOf(
+          JavaSemanticConversion.Unboxing(INTEGER, JavaAstPrimitiveType.INT),
+          JavaSemanticConversion.PrimitiveWidening(JavaAstPrimitiveType.INT, JavaAstPrimitiveType.LONG),
+        ),
+      ),
+      fixture.relations.assignmentConversion(fixture.integerType, longType),
+    )
+  }
+
+  /** wrapper 身份只来自 catalog symbol 映射；限定名相同或映射缺失都不能触发装拆箱。 */
+  @Test
+  fun doesNotGuessWrapperRoleFromQualifiedName() {
+    val fakeInteger = JavaSymbolId(120)
+    val declarations = mapOf(
+      OBJECT to typeDeclaration(OBJECT, "java.lang.Object"),
+      fakeInteger to typeDeclaration(
+        fakeInteger,
+        "java.lang.Integer",
+        directSuperClass = JavaSemanticType.Declared(OBJECT, emptyList()),
+      ),
+    )
+    val relations = JavaTypeRelations(declarations, emptyMap(), OBJECT)
+    val intType = JavaSemanticType.Primitive(JavaAstPrimitiveType.INT)
+    val fakeType = JavaSemanticType.Declared(fakeInteger, emptyList())
+
+    assertNull(relations.assignmentConversion(intType, fakeType))
+    assertNull(relations.assignmentConversion(fakeType, intType))
+  }
+
   /** 引用数组保持 Java 协变，primitive 数组只接受完全相同的 component 类型。 */
   @Test
   fun appliesArraySubtypeAndAssignmentRules() {
@@ -354,7 +406,12 @@ class JavaTypeRelationsTest {
       ),
     )
     return Fixture(
-      relations = JavaTypeRelations(declarations, typeParameters, OBJECT),
+      relations = JavaTypeRelations(
+        declarations,
+        typeParameters,
+        OBJECT,
+        mapOf(INTEGER to JavaAstPrimitiveType.INT),
+      ),
     )
   }
 

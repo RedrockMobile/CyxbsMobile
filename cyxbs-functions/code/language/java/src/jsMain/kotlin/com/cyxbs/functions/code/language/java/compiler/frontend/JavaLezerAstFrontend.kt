@@ -444,14 +444,17 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
 
   /** 构建方法调用和其 CST ArgumentList。 */
   private fun invocation(node: LezerSyntaxNode): JavaAstExpression.MethodInvocation {
-    // 限定调用的 receiver 也可能包含 Identifier，必须优先取专用 MethodName，
-    // 否则 Helper.twice() 会被错误解析为调用 Helper()。
-    val name = node.descendants().firstOrNull { it.name == "MethodName" }
-      ?: node.descendants().firstOrNull { it.name == "Identifier" }
+    val children = node.children()
+    // 链式调用的 receiver 本身也是 MethodInvocation；只读取当前节点直接成员，不能误取内层名称和参数。
+    val name = children.firstOrNull { it.name == "MethodName" }
+      ?: children.lastOrNull { it.name == "Identifier" }
       ?: unsupported(node, "调用缺少方法名。")
-    val arguments = node.descendants().firstOrNull { it.name == "ArgumentList" }?.expressions()?.map(::expression).orEmpty()
+    val arguments = children.firstOrNull { it.name == "ArgumentList" }
+      ?.expressions()
+      ?.map(::expression)
+      .orEmpty()
     val receiver = node.expressions().firstOrNull { it.to <= name.from }?.let(::expression)
-    val typeArguments = node.children().firstOrNull { it.name == "TypeArguments" }?.typeArguments().orEmpty()
+    val typeArguments = children.firstOrNull { it.name == "TypeArguments" }?.typeArguments().orEmpty()
     return JavaAstExpression.MethodInvocation(ids.next(), span(node), receiver, text(name), typeArguments, arguments)
   }
 

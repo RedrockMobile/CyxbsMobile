@@ -2,6 +2,8 @@ package com.cyxbs.functions.code.language.java.compiler.backend.js
 
 import com.cyxbs.functions.code.language.java.compiler.JavaCompilerEntryPoint
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinTypeRole
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrClass
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrClassId
@@ -24,6 +26,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStringConversion
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -316,6 +319,295 @@ class JavaScriptBackendImplTest {
     assertTrue("[\"STRING\", \"CHAR\"]" in source)
   }
 
+  /** builtin IR 必须在真实 JS 中按 ABI 分流输出，并保留 Math.abs(MIN_VALUE) 的 Java 结果。 */
+  @Test
+  fun executesBuiltinStreamsAndMathRuntime() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(builtinProgram(), entryPoint("entry", "()I")).value,
+    ).modules.single()
+    var stdout = ""
+    var stderr = ""
+    val executable = """
+      globalThis["${DynamicProgramHostAbi.WRITE_STANDARD_OUTPUT}"] = stdout;
+      globalThis["${DynamicProgramHostAbi.WRITE_STANDARD_ERROR}"] = stderr;
+    """.trimIndent() + "\n" + artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor("stdout", "stderr", executable)(
+      { text: String -> stdout += text },
+      { text: String -> stderr += text },
+    )
+
+    assertEquals(Int.MIN_VALUE, (entry() as Number).toInt())
+    assertEquals("-7\n", stdout)
+    assertEquals("bad", stderr)
+    assertTrue("function ${'$'}__j_println_int" in artifact.source)
+  }
+
+  /** wrapper conversion 与 StringBuilder 构造必须仅凭 typed IR 注入并执行对应 helper。 */
+  @Test
+  fun executesBoxingAndStringBuilderRuntime() {
+    val boxed = JavaIrExpression.Convert(
+      JavaIrConversion.Boxing(JavaAstPrimitiveType.INT, integerReferenceType.classId),
+      intConstant(7),
+      integerReferenceType,
+      span(),
+    )
+    val unboxed = JavaIrExpression.Convert(
+      JavaIrConversion.Unboxing(integerReferenceType.classId, JavaAstPrimitiveType.INT),
+      boxed,
+      intType,
+      span(),
+    )
+    val builder = JavaIrExpression.ConstructBuiltin(
+      JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY,
+      emptyList(),
+      stringBuilderReferenceType,
+      span(),
+    )
+    val appended = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING,
+      builder,
+      listOf(JavaIrExpression.Constant(JavaIrConstant.StringValue("ab"), stringReferenceType, span())),
+      stringBuilderReferenceType,
+      span(),
+    )
+    val length = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.STRING_BUILDER_LENGTH,
+      appended,
+      emptyList(),
+      intType,
+      span(),
+    )
+    val result = JavaIrExpression.Binary(unboxed, JavaIrBinaryOperator.ADD, length, intType, span())
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(
+        builtinReturnProgram(result),
+        entryPoint("entry", "()I"),
+      ).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(9, (entry() as Number).toInt())
+    assertTrue("function ${'$'}__j_box" in artifact.source)
+    assertTrue("function ${'$'}__j_sb_new" in artifact.source)
+  }
+
+  /** 集合 helper 只由显式 operation 注入，并在真实 JS 中保持同一引用上的可变状态。 */
+  @Test
+  fun executesBuiltinCollectionRuntimeAndInjectsItLazily() {
+    val list = local(90, "values", type = arrayListReferenceType)
+    val construct = JavaIrExpression.ConstructBuiltin(
+      JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+      emptyList(),
+      arrayListReferenceType,
+      span(),
+    )
+    val add = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.LIST_ADD,
+      get(list),
+      listOf(JavaIrExpression.Constant(JavaIrConstant.StringValue("x"), stringReferenceType, span())),
+      booleanType,
+      span(),
+    )
+    val size = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.LIST_SIZE,
+      get(list),
+      emptyList(),
+      intType,
+      span(),
+    )
+    val entry = method(
+      id = 10,
+      name = "entry",
+      descriptor = "()I",
+      locals = listOf(list),
+      body = JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.DeclareLocal(list.id, construct, span()),
+          JavaIrStatement.Expression(add, span()),
+          JavaIrStatement.Return(size, span()),
+        ),
+        span(),
+      ),
+    )
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(
+        JavaIrProgram(listOf(clazz(listOf(entry))), builtinTypeRoles),
+        entryPoint("entry", "()I"),
+      ).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val callable: dynamic = constructor(executable)()
+
+    assertEquals(1, (callable() as Number).toInt())
+    assertTrue("function ${'$'}__j_list_new" in artifact.source)
+    val ordinarySource = assertNotNull(
+      JavaScriptBackendImpl.generate(sumProgram(), sumEntryPoint()).value,
+    ).modules.single().source
+    assertTrue("function ${'$'}__j_list_new" !in ordinarySource)
+  }
+
+  /** Scanner builtin 必须读取 host 预加载文本，并且只在对应 operation 出现时注入运行时。 */
+  @Test
+  fun executesBuiltinScannerRuntimeAndInjectsItLazily() {
+    val scanner = local(91, "scanner", type = scannerReferenceType)
+    val input = JavaIrExpression.BuiltinValue(
+      JavaBuiltinOperation.SYSTEM_IN,
+      inputStreamReferenceType,
+      span(),
+    )
+    val construct = JavaIrExpression.ConstructBuiltin(
+      JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM,
+      listOf(input),
+      scannerReferenceType,
+      span(),
+    )
+    val nextInt = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.SCANNER_NEXT_INT,
+      get(scanner),
+      emptyList(),
+      intType,
+      span(),
+    )
+    val entry = method(
+      id = 10,
+      name = "entry",
+      descriptor = "()I",
+      locals = listOf(scanner),
+      body = JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.DeclareLocal(scanner.id, construct, span()),
+          JavaIrStatement.Return(nextInt, span()),
+        ),
+        span(),
+      ),
+    )
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(
+        JavaIrProgram(listOf(clazz(listOf(entry))), builtinTypeRoles),
+        entryPoint("entry", "()I"),
+      ).value,
+    ).modules.single()
+    val executable = """
+      globalThis["${DynamicProgramHostAbi.READ_STANDARD_INPUT_UTF8_BASE64}"] = readInputBase64;
+    """.trimIndent() + "\n" + artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val callable: dynamic = constructor("readInputBase64", executable)({ "LTEy" })
+
+    assertEquals(-12, (callable() as Number).toInt())
+    assertTrue(DynamicProgramHostAbi.DECODE_UTF8_BASE64 in artifact.source)
+    assertTrue("function ${'$'}__j_scanner_next_int" in artifact.source)
+    val ordinarySource = assertNotNull(
+      JavaScriptBackendImpl.generate(sumProgram(), sumEntryPoint()).value,
+    ).modules.single().source
+    assertTrue("function ${'$'}__j_scanner_next_int" !in ordinarySource)
+  }
+
+  /** validator 必须拒绝把值 operation 当 callable，以及为 static Math 伪造 receiver。 */
+  @Test
+  fun rejectsTamperedBuiltinIr() {
+    val streamAsCall = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.SYSTEM_OUT,
+      null,
+      emptyList(),
+      intType,
+      span(),
+    )
+    val mathWithReceiver = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.MATH_ABS_INT,
+      intConstant(1),
+      listOf(intConstant(-1)),
+      intType,
+      span(),
+    )
+
+    val intAsBoolean = JavaIrExpression.Convert(
+      JavaIrConversion.Boxing(JavaAstPrimitiveType.INT, booleanReferenceType.classId),
+      intConstant(1),
+      booleanReferenceType,
+      span(),
+    )
+    val wrongBoxingRole = JavaIrExpression.Convert(
+      JavaIrConversion.Unboxing(booleanReferenceType.classId, JavaAstPrimitiveType.INT),
+      intAsBoolean,
+      intType,
+      span(),
+    )
+    val stringAsList = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.LIST_SIZE,
+      JavaIrExpression.Constant(JavaIrConstant.StringValue("x"), stringReferenceType, span()),
+      emptyList(),
+      intType,
+      span(),
+    )
+    val wrongConstructRole = JavaIrExpression.InvokeBuiltin(
+      JavaBuiltinOperation.LIST_SIZE,
+      JavaIrExpression.ConstructBuiltin(
+        JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
+        emptyList(),
+        hashMapReferenceType,
+        span(),
+      ),
+      emptyList(),
+      intType,
+      span(),
+    )
+    val inputAsPrintStream = JavaIrExpression.Convert(
+      JavaIrConversion.ReferenceWidening(inputStreamReferenceType, printStreamReferenceType),
+      JavaIrExpression.BuiltinValue(
+        JavaBuiltinOperation.SYSTEM_IN,
+        inputStreamReferenceType,
+        span(),
+      ),
+      printStreamReferenceType,
+      span(),
+    )
+
+    listOf(
+      streamAsCall,
+      mathWithReceiver,
+      wrongBoxingRole,
+      stringAsList,
+      wrongConstructRole,
+      inputAsPrintStream,
+    ).forEach { expression ->
+      val result = JavaScriptBackendImpl.generate(
+        builtinReturnProgram(expression),
+        entryPoint("entry", "()I"),
+      )
+      assertNull(result.value)
+      assertTrue(result.diagnostics.any { it.code == "JAVA_BACKEND_INVALID_IR" })
+    }
+
+    val wrongTypedBoxing = JavaIrExpression.Convert(
+      JavaIrConversion.Boxing(JavaAstPrimitiveType.INT, integerReferenceType.classId),
+      intConstant(1),
+      intType,
+      span(),
+    )
+    val result = JavaScriptBackendImpl.generate(
+      builtinReturnProgram(wrongTypedBoxing),
+      entryPoint("entry", "()I"),
+    )
+    assertNull(result.value)
+    assertTrue(result.diagnostics.any { it.code == "JAVA_BACKEND_INVALID_IR" })
+  }
+
   /** 构造包含阶段 0 完整控制流的 sum typed IR。 */
   private fun sumProgram(
     parameterName: String = "limit",
@@ -395,7 +687,7 @@ class JavaScriptBackendImplTest {
 
   /** 构造一次 static invoke 与 primitive widening 的最小 typed IR。 */
   private fun staticCallProgram(): JavaIrProgram {
-    val entryParameter = local(1, "input", isParameter = true)
+    val entryParameter = local(1, "input", isParameter = true, type = byteType)
     val helperParameter = local(3, "value", isParameter = true)
     return JavaIrProgram(
       classes = listOf(
@@ -404,7 +696,7 @@ class JavaScriptBackendImplTest {
             method(
               id = 10,
               name = "entry",
-              descriptor = "(I)I",
+              descriptor = "(B)I",
               parameters = listOf(entryParameter),
               body = JavaIrStatement.Block(
                 statements = listOf(
@@ -900,6 +1192,81 @@ class JavaScriptBackendImplTest {
     return JavaIrProgram(listOf(clazz(listOf(entry))))
   }
 
+  /** 构造同时覆盖 stdout、stderr 与 static Math 的最小 builtin typed IR。 */
+  private fun builtinProgram(): JavaIrProgram {
+    val stdout = JavaIrExpression.BuiltinValue(
+      JavaBuiltinOperation.SYSTEM_OUT,
+      printStreamReferenceType,
+      span(),
+    )
+    val stderr = JavaIrExpression.BuiltinValue(
+      JavaBuiltinOperation.SYSTEM_ERR,
+      printStreamReferenceType,
+      span(),
+    )
+    val entry = method(
+      id = 10,
+      name = "entry",
+      descriptor = "()I",
+      body = JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.Expression(
+            JavaIrExpression.InvokeBuiltin(
+              JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT,
+              stdout,
+              listOf(intConstant(-7)),
+              JavaIrType.Void,
+              span(),
+            ),
+            span(),
+          ),
+          JavaIrStatement.Expression(
+            JavaIrExpression.InvokeBuiltin(
+              JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING,
+              stderr,
+              listOf(
+                JavaIrExpression.Constant(
+                  JavaIrConstant.StringValue("bad"),
+                  stringReferenceType,
+                  span(),
+                ),
+              ),
+              JavaIrType.Void,
+              span(),
+            ),
+            span(),
+          ),
+          JavaIrStatement.Return(
+            JavaIrExpression.InvokeBuiltin(
+              JavaBuiltinOperation.MATH_ABS_INT,
+              null,
+              listOf(intConstant(Int.MIN_VALUE)),
+              intType,
+              span(),
+            ),
+            span(),
+          ),
+        ),
+        span(),
+      ),
+    )
+    return JavaIrProgram(listOf(clazz(listOf(entry))), builtinTypeRoles)
+  }
+
+  /** 用指定返回表达式构造 validator 负例，不让其他 IR 噪音掩盖 builtin 诊断。 */
+  private fun builtinReturnProgram(expression: JavaIrExpression): JavaIrProgram {
+    val entry = method(
+      id = 10,
+      name = "entry",
+      descriptor = "()I",
+      body = JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(expression, span())),
+        span(),
+      ),
+    )
+    return JavaIrProgram(listOf(clazz(listOf(entry))), builtinTypeRoles)
+  }
+
   /** 创建阶段 0 的单个静态方法，未指定 locals 时保持空集合。 */
   private fun method(
     id: Int,
@@ -936,10 +1303,15 @@ class JavaScriptBackendImplTest {
   )
 
   /** 创建 typed IR 局部变量；ID 而不是 nameHint 决定后端名称。 */
-  private fun local(id: Int, nameHint: String, isParameter: Boolean = false): JavaIrLocal = JavaIrLocal(
+  private fun local(
+    id: Int,
+    nameHint: String,
+    isParameter: Boolean = false,
+    type: JavaIrType = intType,
+  ): JavaIrLocal = JavaIrLocal(
     id = JavaIrLocalId(id),
     nameHint = nameHint,
-    type = intType,
+    type = type,
     isParameter = isParameter,
     span = span(id),
   )
@@ -948,7 +1320,8 @@ class JavaScriptBackendImplTest {
   private fun intConstant(value: Int): JavaIrExpression.Constant = JavaIrExpression.Constant(
     value = JavaIrConstant.IntValue(value),
     type = intType,
-    span = span(value + 100),
+    // 测试 span 只需稳定且非负；掩码避免 MIN_VALUE 加偏移时溢出。
+    span = span(value and 0x3fffffff),
   )
 
   /** 创建局部变量读取表达式。 */
@@ -971,7 +1344,7 @@ class JavaScriptBackendImplTest {
   private fun sumEntryPoint(): JavaCompilerEntryPoint = entryPoint("sum", "(I)I")
 
   /** 生成 static invoke 测试的入口定位。 */
-  private fun staticCallEntryPoint(): JavaCompilerEntryPoint = entryPoint("entry", "(I)I")
+  private fun staticCallEntryPoint(): JavaCompilerEntryPoint = entryPoint("entry", "(B)I")
 
   /** 生成 long 拒绝测试的入口定位。 */
   private fun longEntryPoint(): JavaCompilerEntryPoint = entryPoint("longValue", "()J")
@@ -996,8 +1369,29 @@ class JavaScriptBackendImplTest {
 
   private companion object {
     val classId = JavaIrClassId(1)
+    val byteType = JavaIrType.Primitive(JavaAstPrimitiveType.BYTE)
     val intType = JavaIrType.Primitive(JavaAstPrimitiveType.INT)
     val booleanType = JavaIrType.Primitive(JavaAstPrimitiveType.BOOLEAN)
     val longType = JavaIrType.Primitive(JavaAstPrimitiveType.LONG)
+    val printStreamReferenceType = JavaIrType.Reference(JavaIrClassId(90))
+    val stringReferenceType = JavaIrType.Reference(JavaIrClassId(91))
+    val integerReferenceType = JavaIrType.Reference(JavaIrClassId(92))
+    val stringBuilderReferenceType = JavaIrType.Reference(JavaIrClassId(93))
+    val arrayListReferenceType = JavaIrType.Reference(JavaIrClassId(94))
+    val scannerReferenceType = JavaIrType.Reference(JavaIrClassId(95))
+    val inputStreamReferenceType = JavaIrType.Reference(JavaIrClassId(96))
+    val booleanReferenceType = JavaIrType.Reference(JavaIrClassId(97))
+    val hashMapReferenceType = JavaIrType.Reference(JavaIrClassId(98))
+    val builtinTypeRoles = mapOf(
+      printStreamReferenceType.classId to JavaBuiltinTypeRole.PRINT_STREAM,
+      stringReferenceType.classId to JavaBuiltinTypeRole.STRING,
+      integerReferenceType.classId to JavaBuiltinTypeRole.INTEGER,
+      stringBuilderReferenceType.classId to JavaBuiltinTypeRole.STRING_BUILDER,
+      arrayListReferenceType.classId to JavaBuiltinTypeRole.ARRAY_LIST,
+      scannerReferenceType.classId to JavaBuiltinTypeRole.SCANNER,
+      inputStreamReferenceType.classId to JavaBuiltinTypeRole.INPUT_STREAM,
+      booleanReferenceType.classId to JavaBuiltinTypeRole.BOOLEAN,
+      hashMapReferenceType.classId to JavaBuiltinTypeRole.HASH_MAP,
+    )
   }
 }
