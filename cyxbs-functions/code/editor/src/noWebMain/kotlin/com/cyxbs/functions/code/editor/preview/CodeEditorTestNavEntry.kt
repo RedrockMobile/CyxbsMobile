@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,7 +56,7 @@ import kotlin.time.TimeSource
 data object CodeEditorTestNavArgument : AppNavArgument
 
 /**
- * 多文件 JavaScript 编辑、动态语言分析和本地 QuickJS 运行的手动测试页面。
+ * 多语言、多文件编辑、动态语言分析和本地 QuickJS 运行的手动测试页面。
  *
  * 路由只维护文件、Service 与运行状态，具体布局交给可复用工作台组件；该页面只编译进
  * `noWebMain`，用于 Android、iOS 与 Desktop 的功能体验，不作为最终教学业务页面。
@@ -75,6 +76,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isAnalyzingSymbol by remember { mutableStateOf(false) }
     var highlightCacheCapacity by remember { mutableStateOf(DEFAULT_HIGHLIGHT_CACHE_CAPACITY) }
     var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageService?>(null) }
+    var loadedLanguageId by remember { mutableStateOf<String?>(null) }
     var supportedLanguages by remember { mutableStateOf<List<DynamicLanguageInfo>>(emptyList()) }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
     val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
@@ -91,14 +93,20 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         }
       }
     val sourceFiles = remember {
-      mutableStateMapOf<String, String>(
-        MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
-        STUDENT_FILE_PATH to DEFAULT_STUDENT_CODE,
-      ).apply { putAll(DEFAULT_ADDITIONAL_SOURCE_FILES) }
+      mutableStateMapOf<String, String>().apply { putAll(DEFAULT_SOURCE_FILES) }
     }
-    var activeFilePath by remember { mutableStateOf(MAIN_FILE_PATH) }
+    val openFilePaths = remember { mutableStateListOf(JAVA_MAIN_FILE_PATH) }
+    var activeFilePath by remember { mutableStateOf(JAVA_MAIN_FILE_PATH) }
+    val activeLanguageId = resolveDynamicLanguageIdForFile(activeFilePath, supportedLanguages)
+    val activeLanguageService = dynamicLanguageService.takeIf {
+      loadedLanguageId == activeLanguageId
+    }
     val workspace = DynamicLanguageWorkspace(
       files = sourceFiles.entries
+        .filter { (path, _) ->
+          activeLanguageId == null ||
+            resolveDynamicLanguageIdForFile(path, supportedLanguages) == activeLanguageId
+        }
         .sortedBy(Map.Entry<String, String>::key)
         .map { (path, source) -> DynamicSourceFile(path, source) },
     )
@@ -106,12 +114,12 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       initialCode = DEFAULT_MAIN_CODE,
       activeFilePath = activeFilePath,
       workspace = workspace,
-      languageService = dynamicLanguageService,
+      languageService = activeLanguageService,
       highlightCacheCapacity = highlightCacheCapacity,
     )
     val workbenchState = rememberCodeEditorWorkbenchState(initialSidePanelId = FILES_PANEL_ID)
     var output by remember { mutableStateOf("点击右上角运行按钮或底部 Run 查看输出") }
-    var languageStatus by remember { mutableStateOf("正在准备 JavaScript 动态语言服务…") }
+    var languageStatus by remember { mutableStateOf("正在准备动态语言目录…") }
     var autoHighlightReport by remember { mutableStateOf("动态服务加载后显示实时高亮耗时") }
 
     /** 用当前编辑器的未保存文本覆盖文件池，供动态服务分析与运行。 */
@@ -119,8 +127,13 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       filePath: String = activeFilePath,
       currentSource: String = editorState.code,
     ): DynamicLanguageWorkspace {
+      val languageId = resolveDynamicLanguageIdForFile(filePath, supportedLanguages)
       return DynamicLanguageWorkspace(
         files = sourceFiles.entries
+          .filter { (path, _) ->
+            languageId == null ||
+              resolveDynamicLanguageIdForFile(path, supportedLanguages) == languageId
+          }
           .map { (path, source) ->
             DynamicSourceFile(path, if (path == filePath) currentSource else source)
           }
@@ -132,18 +145,19 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     fun openFile(filePath: String, selection: DynamicTextRange? = null) {
       sourceFiles[activeFilePath] = editorState.code
       val targetSource = sourceFiles[filePath] ?: error("文件不存在：$filePath")
+      if (filePath !in openFilePaths) openFilePaths += filePath
       editorState.replaceDocument(filePath, targetSource, selection?.from)
       activeFilePath = filePath
       selection?.let(editorState::selectRange)
     }
 
     /**
-     * 下载目录并创建 JavaScript Service；先构造新实例，成功后再替换旧实例，避免刷新失败使编辑器失能。
+     * 按语言 ID 创建对应 Service；先构造新实例，成功后再替换，失败时不污染当前语言会话。
      */
-    suspend fun loadLanguageService() {
-      if (isLoadingLanguage) return
+    suspend fun loadLanguageService(languageId: String) {
+      if (loadedLanguageId == languageId && dynamicLanguageService != null) return
       isLoadingLanguage = true
-      languageStatus = "正在加载动态语言目录与 JavaScript 服务…"
+      languageStatus = "正在加载 $languageId 动态语言服务…"
       var newService: DynamicLanguageService? = null
       try {
         val startMark = TimeSource.Monotonic.markNow()
@@ -153,19 +167,20 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         // 项目文件列表先恢复上次成功保存的图标，不等待语言 Runtime 创建或远端 latest 检查。
         languageIconCache.updateAll(dynamicLanguageManager.cachedIcons())
         val catalogDuration = catalogMark.elapsedNow()
-        val javaScript = languages.firstOrNull { it.languageId == JAVASCRIPT_LANGUAGE_ID }
-          ?: error("动态语言目录中未声明 JavaScript。")
+        val language = languages.firstOrNull { it.languageId == languageId }
+          ?: error("动态语言目录中未声明 $languageId。")
         val serviceMark = TimeSource.Monotonic.markNow()
-        val loadedService = dynamicLanguageManager.load(javaScript.languageId)
+        val loadedService = dynamicLanguageManager.load(language.languageId)
         newService = loadedService
         // Service 代理只在业务读取图标时校验 npm 版本，并透明复用或更新持久缓存。
-        languageIconCache.update(javaScript.languageId, loadedService.fileIcon())
+        languageIconCache.update(language.languageId, loadedService.fileIcon())
         val serviceDuration = serviceMark.elapsedNow()
         editorState.clearHighlightCache()
         dynamicLanguageService = loadedService
+        loadedLanguageId = language.languageId
         newService = null
         languageStatus = buildLanguageLoadedText(
-          packageName = javaScript.npmPackageName,
+          packageName = language.npmPackageName,
           totalDuration = startMark.elapsedNow(),
           catalogDuration = catalogDuration,
           serviceDuration = serviceDuration,
@@ -193,14 +208,30 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     }
 
-    // 正规编辑器进入后应直接具备语言能力；失败状态保留在设置栏，用户仍可编辑和手动重试。
+    // 先发现 Catalog 和持久图标；具体语言 Runtime 由活动文件触发，未打开的语言不会下载。
     LaunchedEffect(Unit) {
-      loadLanguageService()
+      try {
+        supportedLanguages = dynamicLanguageManager.supportedLanguages()
+        languageIconCache.updateAll(dynamicLanguageManager.cachedIcons())
+      } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+        languageStatus = throwable.toFailureText("动态语言目录加载失败")
+      }
+    }
+
+    // 文件语言变化时先停止使用旧 Service，再在任何分析请求发生前加载新语言包。
+    LaunchedEffect(activeLanguageId) {
+      val languageId = activeLanguageId ?: return@LaunchedEffect
+      if (loadedLanguageId != languageId) {
+        dynamicLanguageService = null
+        loadedLanguageId = null
+      }
+      loadLanguageService(languageId)
     }
 
     // 输入停止后刷新高亮；源码校验防止迟到结果覆盖已切换或继续编辑的文档。
-    LaunchedEffect(dynamicLanguageService, editorState, activeFilePath) {
-      val service = dynamicLanguageService ?: return@LaunchedEffect
+    LaunchedEffect(activeLanguageService, editorState, activeFilePath) {
+      val service = activeLanguageService ?: return@LaunchedEffect
       val requestedFilePath = activeFilePath
       snapshotFlow { editorState.code }.collectLatest { source ->
         if (editorState.hasCachedHighlights(requestedFilePath, source)) {
@@ -237,12 +268,17 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
       coroutineScope.launch {
         isRunning = true
-        output = "正在编译并运行 $MAIN_FILE_PATH…"
+        if (activeLanguageId != JAVASCRIPT_LANGUAGE_ID) {
+          output = "当前只接入 JavaScript 运行；Java 本次用于验证高亮与轻量语义能力。"
+          isRunning = false
+          return@launch
+        }
+        output = "正在编译并运行 $JAVASCRIPT_MAIN_FILE_PATH…"
         try {
           val files = currentWorkspace().files.associate { file -> file.path to file.source }
           output = runner.executeModule(
             files = files,
-            entryFile = MAIN_FILE_PATH,
+            entryFile = JAVASCRIPT_MAIN_FILE_PATH,
           ).toDisplayText()
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
@@ -282,6 +318,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val displayedSourceFiles = sourceFiles.toMutableMap().apply {
       this[activeFilePath] = editorState.code
     }
+    val activeLanguageDisplayName = supportedLanguages
+      .firstOrNull { it.languageId == activeLanguageId }
+      ?.displayName
+      ?: "代码"
     val sidePanels = rememberCodeEditorTestSidePanels(
       activeFilePath = activeFilePath,
       sourceFiles = displayedSourceFiles,
@@ -295,7 +335,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
       onLoadLanguage = {
-        coroutineScope.launch { loadLanguageService() }
+        activeLanguageId?.let { languageId ->
+          coroutineScope.launch { loadLanguageService(languageId) }
+        }
       },
       onHighlightCacheCapacityChange = { capacity ->
         highlightCacheCapacity = capacity
@@ -371,8 +413,21 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
                   sourceFiles[filePath] = source.applyTextEdits(edits)
                   if (filePath == activeFilePath) editorState.applyTextEdits(edits)
                 }
+                rename.fileRenames.forEach { fileRename ->
+                  val renamedSource = sourceFiles.remove(fileRename.oldPath)
+                    ?: error("待重命名文件不存在：${fileRename.oldPath}")
+                  sourceFiles[fileRename.newPath] = renamedSource
+                  openFilePaths.indexOf(fileRename.oldPath).takeIf { it >= 0 }?.let { index ->
+                    openFilePaths[index] = fileRename.newPath
+                  }
+                  if (activeFilePath == fileRename.oldPath) {
+                    activeFilePath = fileRename.newPath
+                    editorState.replaceDocument(fileRename.newPath, renamedSource)
+                  }
+                }
                 "已将 ${rename.symbol.name} 重命名为 $renameTarget，" +
-                  "修改 ${editsByFile.size} 个文件、${rename.edits.size} 处位置。\n" +
+                  "修改 ${editsByFile.size} 个文件、${rename.edits.size} 处位置，" +
+                  "重命名 ${rename.fileRenames.size} 个文件。\n" +
                   "Service 往返与事务应用：${mark.elapsedNow().toDisplayMilliseconds()}"
               }
             }
@@ -386,12 +441,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       },
     )
     CodeEditorWorkbench(
-      title = "JavaScript 课程",
+      title = "$activeLanguageDisplayName 课程",
       activeDocumentLabel = activeFilePath,
       subtitle = "多文件语义分析 · 实验课",
-      openDocumentLabels = sourceFiles.keys.sortedWith(
-        compareBy<String> { it != MAIN_FILE_PATH }.thenBy { it.lowercase() },
-      ),
+      openDocumentLabels = openFilePaths.toList(),
       breadcrumbs = listOf("src", "lesson-03") + activeFilePath.split('/'),
       onDocumentSelected = ::openFile,
       documentIcon = dynamicDocumentIcon,
@@ -502,57 +555,140 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     const val DISPLAY_RESULT_LIMIT = 12
     const val MICROSECONDS_PER_MILLISECOND = 1_000
     const val AUTO_HIGHLIGHT_DELAY_MILLIS = 200L
-    const val MAIN_FILE_PATH = "main.js"
-    const val STUDENT_FILE_PATH = "models/student.js"
+    const val JAVA_MAIN_FILE_PATH = "java/Main.java"
+    const val JAVASCRIPT_MAIN_FILE_PATH = "javascript/main.js"
 
     val DEFAULT_MAIN_CODE = """
-      import { Student } from "./models/student.js";
+      package course;
 
-      const student = new Student("小邮", [88, 92, 95]);
-      console.log(student.name, "平均分", student.average());
-      student.average();
-    """.trimIndent()
+      import course.model.Student;
+      import course.repository.Repository;
+      import java.util.Arrays;
+      import java.util.List;
 
-    val DEFAULT_STUDENT_CODE = """
-      export class Student {
-        constructor(name, scores) {
-          this.name = name;
-          this.scores = scores;
-        }
+      public class Main {
+        public static void main(String[] args) {
+          Repository<Student> repository = new Repository<>();
+          repository.add(new Student("小邮", Arrays.asList(88, 92, 95)));
+          repository.add(new Student("小红", Arrays.asList(90, 86, 97)));
 
-        average() {
-          return this.scores.reduce((sum, score) => sum + score, 0) / this.scores.length;
+          Student student = repository.findByName("小邮");
+          System.out.println(student.describe() + "，平均分 " + student.average());
         }
       }
     """.trimIndent()
+
+    val DEFAULT_SOURCE_FILES = mapOf(
+      JAVA_MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
+      "java/model/Person.java" to """
+        package course.model;
+
+        public abstract class Person {
+          private final String name;
+
+          protected Person(String name) {
+            this.name = name;
+          }
+
+          public String getName() {
+            return name;
+          }
+
+          public abstract String describe();
+        }
+      """.trimIndent(),
+      "java/model/Student.java" to """
+        package course.model;
+
+        import java.util.ArrayList;
+        import java.util.List;
+
+        public class Student extends Person implements Comparable<Student> {
+          private final List<Integer> scores;
+
+          public Student(String name) {
+            this(name, new ArrayList<>());
+          }
+
+          public Student(String name, List<Integer> scores) {
+            super(name);
+            this.scores = scores;
+          }
+
+          public double average() {
+            int total = 0;
+            for (Integer score : scores) total += score;
+            return scores.isEmpty() ? 0.0 : (double) total / scores.size();
+          }
+
+          @Override
+          public String describe() {
+            return "学生 " + getName();
+          }
+
+          @Override
+          public int compareTo(Student other) {
+            return Double.compare(average(), other.average());
+          }
+        }
+      """.trimIndent(),
+      "java/repository/Repository.java" to """
+        package course.repository;
+
+        import course.model.Person;
+        import java.util.ArrayList;
+        import java.util.List;
+
+        public class Repository<T extends Person> {
+          private final List<T> values = new ArrayList<>();
+
+          public void add(T value) {
+            values.add(value);
+          }
+
+          public T findByName(String name) {
+            for (T value : values) {
+              if (value.getName().equals(name)) return value;
+            }
+            return null;
+          }
+
+          public <R> List<R> map(Mapper<? super T, ? extends R> mapper) {
+            List<R> result = new ArrayList<>();
+            for (T value : values) result.add(mapper.apply(value));
+            return result;
+          }
+
+          public interface Mapper<I, O> {
+            O apply(I input);
+          }
+        }
+      """.trimIndent(),
+      JAVASCRIPT_MAIN_FILE_PATH to """
+        import { Student } from "./models/student.js";
+
+        const student = new Student("小邮", [88, 92, 95]);
+        console.log(student.name, "平均分", student.average());
+        student.average();
+      """.trimIndent(),
+      "javascript/models/student.js" to """
+        export class Student {
+          constructor(name, scores) {
+            this.name = name;
+            this.scores = scores;
+          }
+
+          average() {
+            return this.scores.reduce((sum, score) => sum + score, 0) / this.scores.length;
+          }
+        }
+      """.trimIndent(),
+    )
 
     val DEFAULT_NEW_FILE_CODE = """
       // 在这里编写新模块
       export const value = 1;
     """.trimIndent()
 
-    /** 扩充手动测试工作区，验证大量长短标签的横向滑动与选中项自动滚入视口。 */
-    val DEFAULT_ADDITIONAL_SOURCE_FILES = mapOf(
-      "config/course-settings.js" to """
-        export const courseSettings = { passScore: 60, maxScore: 100 };
-      """.trimIndent(),
-      "data/sample-students.js" to """
-        export const sampleStudents = ["小邮", "小红", "小蓝"];
-      """.trimIndent(),
-      "services/grade-calculation-service.js" to """
-        export const calculateAverage = scores =>
-          scores.reduce((sum, score) => sum + score, 0) / scores.length;
-      """.trimIndent(),
-      "services/student-repository.js" to """
-        export const findStudent = (students, name) =>
-          students.find(student => student.name === name);
-      """.trimIndent(),
-      "utils/format-score.js" to """
-        export const formatScore = score => `${'$'}{score.toFixed(1)} 分`;
-      """.trimIndent(),
-      "utils/math.js" to """
-        export const sum = values => values.reduce((total, value) => total + value, 0);
-      """.trimIndent(),
-    )
   }
 }

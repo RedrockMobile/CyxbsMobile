@@ -84,17 +84,30 @@ data class DynamicSourceEdit(
 )
 
 /**
+ * 一次工作区文件重命名。
+ *
+ * 两个路径均为工作区内使用 `/` 分隔的相对路径；调用方应与 [DynamicRenameResult.edits] 原子应用，
+ * 避免源码名称与文件路径短暂不一致。
+ */
+@Serializable
+data class DynamicFileRename(
+  val oldPath: String,
+  val newPath: String,
+)
+
+/**
  * 动态语言包生成的工作区重命名结果。
  *
  * [rejectionCode] 为 null 时表示重命名可安全执行；同一文件的 [edits] 按请求快照中的原始
- * 源码位置升序排列且互不重叠。调用方必须一次性更新所有涉及文件，不能只提交当前文件；
- * 非 null 时客户端不得应用 [edits]，并可直接展示 [rejectionMessage]。拒绝码使用字符串而非枚举，
- * 便于后续语言包增加细分原因时保持旧客户端可解码。
+ * 源码位置升序排列且互不重叠。[fileRenames] 与文本修改属于同一事务，调用方必须一次性更新
+ * 所有涉及文件，不能只提交当前文件；非 null 时客户端不得应用任何修改，并可直接展示
+ * [rejectionMessage]。拒绝码使用字符串而非枚举，便于语言包增加细分原因时保持旧客户端可解码。
  */
 @Serializable
 data class DynamicRenameResult(
   val symbol: DynamicSymbolDefinition,
   val edits: List<DynamicSourceEdit> = emptyList(),
+  val fileRenames: List<DynamicFileRename> = emptyList(),
   val rejectionCode: String? = null,
   val rejectionMessage: String? = null,
 ) {

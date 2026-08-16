@@ -38,6 +38,7 @@ import com.cyxbs.functions.code.editor.highlight.internal.codeEditorSearchPanelO
 import com.cyxbs.functions.code.editor.highlight.internal.EditorSessionCache
 import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
 import com.cyxbs.functions.code.editor.highlight.internal.toggleCodeEditorSearchPanelVisibility
+import com.cyxbs.functions.code.language.js.bridge.DynamicFileRename
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
@@ -262,8 +263,8 @@ class CodeEditorState internal constructor(
   /**
    * 为主光标所在词法符号计算工作区安全重命名修改。
    *
-   * 本方法不直接修改任何文件。调用方应按文件分组 [DynamicRenameResult.edits]，当前文档可用
-   * [applyTextEdits] 原子应用，其他文件则更新自身的文档存储。
+   * 本方法不直接修改任何文件。调用方应将 [DynamicRenameResult.edits] 与文件路径修改原子应用；
+   * 当前文档的文本部分可用 [applyTextEdits] 更新，其他文件与路径则更新自身的工作区存储。
    *
    * @throws NpmJsServiceMethodNotImplementedException 旧语言包不支持重命名。
    * @throws NpmJsServiceInvocationException JavaScript 服务执行失败。
@@ -293,7 +294,10 @@ class CodeEditorState internal constructor(
     ) ?: return null
     checkContextUnchanged(requestedFilePath, source)
     result.symbol.definition.requireValidFor(requestedWorkspace)
-    if (result.isSuccess) result.edits.requireValidFor(requestedWorkspace)
+    if (result.isSuccess) {
+      result.edits.requireValidFor(requestedWorkspace)
+      result.fileRenames.requireValidFileRenamesFor(requestedWorkspace)
+    }
     return result
   }
 
@@ -415,6 +419,32 @@ class CodeEditorState internal constructor(
       sourceEdits.map { sourceEdit -> sourceEdit.edit }.requireValidFor(source)
     }
   }
+
+  /** 校验文件重命名的源路径、目标路径和同一事务中的唯一性。 */
+  private fun List<DynamicFileRename>.requireValidFileRenamesFor(workspace: DynamicLanguageWorkspace) {
+    val workspacePaths = workspace.files.mapTo(mutableSetOf(), DynamicSourceFile::path)
+    val oldPaths = map(DynamicFileRename::oldPath)
+    val newPaths = map(DynamicFileRename::newPath)
+    require(oldPaths.distinct().size == size) { "Dynamic language file rename sources must be unique." }
+    require(newPaths.distinct().size == size) { "Dynamic language file rename targets must be unique." }
+    forEach { rename ->
+      require(rename.oldPath in workspacePaths) {
+        "Dynamic language file rename points to missing '${rename.oldPath}'."
+      }
+      require(rename.newPath.isValidWorkspacePath()) {
+        "Dynamic language file rename target '${rename.newPath}' is not a normalized relative path."
+      }
+      require(rename.newPath !in workspacePaths || rename.newPath in oldPaths) {
+        "Dynamic language file rename target '${rename.newPath}' already exists."
+      }
+    }
+  }
+}
+
+/** 工作区路径必须是使用 `/` 分隔且不包含空段、`.` 或 `..` 的相对路径。 */
+private fun String.isValidWorkspacePath(): Boolean {
+  if (isEmpty() || startsWith('/') || contains('\\')) return false
+  return split('/').all { segment -> segment.isNotEmpty() && segment != "." && segment != ".." }
 }
 
 /**
