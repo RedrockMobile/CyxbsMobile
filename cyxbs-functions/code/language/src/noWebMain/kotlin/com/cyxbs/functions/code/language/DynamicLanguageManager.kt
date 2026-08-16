@@ -5,7 +5,7 @@ import com.cyxbs.functions.code.language.internal.IconCachingDynamicLanguageServ
 import com.cyxbs.functions.code.language.internal.NpmDynamicLanguagePackageLoader
 import com.cyxbs.functions.code.language.internal.validatedLanguages
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
-import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceProtocolException
 import com.cyxbs.functions.code.npm.model.NpmException
@@ -30,7 +30,7 @@ import kotlinx.serialization.json.Json
  *
  * - Catalog 是不包含 Kotlin/JS Runtime 的静态 npm 包，读取目录不会创建 JavaScript Runtime；
  * - Manager 只缓存体积很小的 Catalog 快照，不共享正在执行的语言 Runtime；
- * - 每次 [load] 都返回独立 [DynamicLanguageService]，调用方必须在编辑会话结束时关闭它；
+ * - 每次 [load] 都返回独立 [DynamicLanguageSession]，调用方必须在编辑会话结束时关闭它；
  * - npm tgz、依赖图与字节码仍由底层全局包池复用，因此独立 Runtime 不会导致重复下载。
  *
  * Catalog 和语言包都使用 npm `latest`：每个包池实例首次使用对应入口时，会在 Runtime 创建前
@@ -40,6 +40,7 @@ class DynamicLanguageManager internal constructor(
   private val packageLoader: DynamicLanguagePackageLoader,
   private val json: Json = Json { ignoreUnknownKeys = true },
   private val iconCache: DynamicLanguageIconCache = DynamicLanguageIconCache.inMemory(),
+  private val runtimeFactoryProvider: () -> JsRuntimeFactory? = { JsRuntimeFactory.implOrNull() },
 ) {
 
   /** 使用默认 npm 包池和 JavaScript Runtime 创建业务 Manager。 */
@@ -98,7 +99,7 @@ class DynamicLanguageManager internal constructor(
    * 缓存与包池最终选择的 npm 根包版本，版本一致时不进入 JavaScript，首次读取或版本变化时
    * 获取并持久化图标。仅加载语言包不会主动读取或保存图标。
    *
-   * @return 由独立 Runtime 支撑、需要由调用方关闭的语言 Service。
+   * @return 由独立分析 Runtime 支撑、可按次创建用户程序 Runtime 且需要由调用方关闭的会话。
    * @throws DynamicLanguageNotFoundException Catalog 中不存在该语言。
    * @throws DynamicLanguageProtocolException Catalog 数据不合法。
    * @throws NpmJsServiceProtocolException Service 代理、入口或方法清单协议不合法。
@@ -114,18 +115,21 @@ class DynamicLanguageManager internal constructor(
     NpmException::class,
     CancellationException::class,
   )
-  suspend fun load(languageId: String): DynamicLanguageService {
+  suspend fun load(languageId: String): DynamicLanguageSession {
     val lookupKey = languageId.trim().lowercase()
     val language = supportedLanguages().firstOrNull { candidate ->
       candidate.languageId == lookupKey || lookupKey in candidate.aliases
     } ?: throw DynamicLanguageNotFoundException(languageId)
 
     val loaded = packageLoader.loadLanguage(language.npmPackageName)
-    return IconCachingDynamicLanguageService(
-      delegate = loaded.service,
-      language = language,
-      npmPackageVersion = loaded.npmPackageVersion,
-      iconCache = iconCache,
+    return DynamicLanguageSession(
+      delegate = IconCachingDynamicLanguageService(
+        delegate = loaded.service,
+        language = language,
+        npmPackageVersion = loaded.npmPackageVersion,
+        iconCache = iconCache,
+      ),
+      runtimeFactoryProvider = runtimeFactoryProvider,
     )
   }
 

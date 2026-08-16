@@ -687,6 +687,35 @@ class JavaDynamicLanguageServiceDispatcherTest {
     assertNull(complete(source, source.lastIndexOf("ret") + 3, explicit = true))
   }
 
+  /** 入口发现应同时识别标准 main 和阶段 0 可执行的无参数 main，并忽略普通 static 方法。 */
+  @Test
+  fun runTargetsFindJavaMainMethodsAcrossWorkspace() = runTest {
+    val standardSource = """
+      package lesson;
+      public class Main {
+        public static void main(String[] args) {}
+        public static void helper() {}
+      }
+    """.trimIndent()
+    val stageZeroSource = """
+      package lesson;
+      public class Counter {
+        public static int main() { return 15; }
+      }
+    """.trimIndent()
+    val workspace = DynamicLanguageWorkspace(
+      listOf(
+        DynamicSourceFile("Main.java", standardSource),
+        DynamicSourceFile("Counter.java", stageZeroSource),
+      ),
+    )
+
+    val targets = JavaDynamicLanguageService.runTargets(workspace, "Main.java")
+
+    assertEquals(listOf("lesson.Counter.main", "lesson.Main.main"), targets.map { it.displayName }.sorted())
+    assertTrue(targets.all { target -> target.location != null && target.entry.position != null })
+  }
+
   /** 生成分发器应完整暴露 DynamicLanguageService 协议并支持重复初始化。 */
   @Test
   fun generatedDispatcherInvokesService() = runTest {
@@ -697,7 +726,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
     assertTrue(bridge != undefined)
     assertEquals(SERVICE_ID, _JavaDynamicLanguageServiceNpmJsDispatcher.serviceId)
     assertEquals(
-      setOf("complete", "definition", "fileIcon", "highlight", "references", "rename"),
+      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
       _JavaDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)

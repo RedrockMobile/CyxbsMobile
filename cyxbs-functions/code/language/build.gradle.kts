@@ -11,6 +11,7 @@ kotlin {
     }
 
     noWebMain.dependencies {
+      implementation(projects.cyxbsFunctions.code.js)
       implementation(projects.cyxbsFunctions.code.npm)
       implementation(libs.kotlinx.coroutines)
       implementation(libs.okio)
@@ -25,6 +26,9 @@ kotlin {
     }
     desktopTest {
       dependsOn(noWebTest)
+      dependencies {
+        implementation(projects.cyxbsFunctions.code.js.quickjs)
+      }
     }
     iosArm64Test {
       dependsOn(noWebTest)

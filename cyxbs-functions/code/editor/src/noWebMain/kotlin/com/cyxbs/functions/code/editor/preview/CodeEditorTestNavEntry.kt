@@ -10,8 +10,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
@@ -21,22 +29,25 @@ import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
 import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
+import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
+import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
 import com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbench
 import com.cyxbs.functions.code.editor.workbench.DynamicLanguageFileIcon
+import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
 import com.cyxbs.functions.code.editor.workbench.rememberCodeEditorWorkbenchState
 import com.cyxbs.functions.code.editor.workbench.rememberDynamicLanguageFileIconCache
 import com.cyxbs.functions.code.editor.workbench.resolveDynamicLanguageIdForFile
-import com.cyxbs.functions.code.js.diagnostic.toJsDiagnostic
-import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
-import com.cyxbs.functions.code.js.teaching.JsTeachingCodeResult
-import com.cyxbs.functions.code.js.teaching.JsTeachingCodeRunner
 import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.cyxbs.functions.code.language.DynamicLanguageManager
+import com.cyxbs.functions.code.language.DynamicLanguageSession
+import com.cyxbs.functions.code.language.DynamicProgramRunRequest
+import com.cyxbs.functions.code.language.DynamicProgramRunResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
-import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
@@ -68,14 +79,13 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
   @Composable
   override fun Content(argument: CodeEditorTestNavArgument) {
-    val runner = remember { JsTeachingCodeRunner.create(QuickJsRuntimeFactory) }
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
     val coroutineScope = rememberCoroutineScope()
     var isRunning by remember { mutableStateOf(false) }
     var isLoadingLanguage by remember { mutableStateOf(false) }
     var isAnalyzingSymbol by remember { mutableStateOf(false) }
     var highlightCacheCapacity by remember { mutableStateOf(DEFAULT_HIGHLIGHT_CACHE_CAPACITY) }
-    var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageService?>(null) }
+    var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageSession?>(null) }
     var loadedLanguageId by remember { mutableStateOf<String?>(null) }
     var supportedLanguages by remember { mutableStateOf<List<DynamicLanguageInfo>>(emptyList()) }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
@@ -97,6 +107,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
     val openFilePaths = remember { mutableStateListOf(JAVA_MAIN_FILE_PATH) }
     var activeFilePath by remember { mutableStateOf(JAVA_MAIN_FILE_PATH) }
+    var runTargets by remember { mutableStateOf<List<DynamicRunTarget>>(emptyList()) }
+    var pendingLineRunTarget by remember { mutableStateOf<DynamicRunTarget?>(null) }
+    var showRunTargetPicker by remember { mutableStateOf(false) }
     val activeLanguageId = resolveDynamicLanguageIdForFile(activeFilePath, supportedLanguages)
     val activeLanguageService = dynamicLanguageService.takeIf {
       loadedLanguageId == activeLanguageId
@@ -110,14 +123,20 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         .sortedBy(Map.Entry<String, String>::key)
         .map { (path, source) -> DynamicSourceFile(path, source) },
     )
+    val workbenchState = rememberCodeEditorWorkbenchState(initialSidePanelId = FILES_PANEL_ID)
     val editorState = rememberCodeEditorState(
       initialCode = DEFAULT_MAIN_CODE,
       activeFilePath = activeFilePath,
       workspace = workspace,
       languageService = activeLanguageService,
       highlightCacheCapacity = highlightCacheCapacity,
+      runTargets = runTargets,
+      onRunTarget = { target ->
+        // gutter 点击应立即给出界面反馈，入口复核与编译继续由页面协程异步完成。
+        workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
+        pendingLineRunTarget = target
+      },
     )
-    val workbenchState = rememberCodeEditorWorkbenchState(initialSidePanelId = FILES_PANEL_ID)
     var output by remember { mutableStateOf("点击右上角运行按钮或底部 Run 查看输出") }
     var languageStatus by remember { mutableStateOf("正在准备动态语言目录…") }
     var autoHighlightReport by remember { mutableStateOf("动态服务加载后显示实时高亮耗时") }
@@ -158,7 +177,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       if (loadedLanguageId == languageId && dynamicLanguageService != null) return
       isLoadingLanguage = true
       languageStatus = "正在加载 $languageId 动态语言服务…"
-      var newService: DynamicLanguageService? = null
+      var newService: DynamicLanguageSession? = null
       try {
         val startMark = TimeSource.Monotonic.markNow()
         val catalogMark = TimeSource.Monotonic.markNow()
@@ -263,35 +282,96 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     }
 
-    /** 运行当前内存工作区，并在执行前展开固定底栏上方的 Run Tool Window。 */
-    fun runWorkspace() {
+    // 入口发现与高亮一样跟随未保存文本，并复用语言包内部增量语法树；迟到结果不能覆盖文件切换。
+    LaunchedEffect(activeLanguageService, editorState, activeFilePath) {
+      val service = activeLanguageService ?: run {
+        runTargets = emptyList()
+        return@LaunchedEffect
+      }
+      val requestedFilePath = activeFilePath
+      snapshotFlow { editorState.code }.collectLatest { source ->
+        delay(RUN_TARGET_REFRESH_DELAY_MILLIS)
+        try {
+          val targets = service.runTargets(
+            workspace = currentWorkspace(requestedFilePath, source),
+            activeFilePath = requestedFilePath,
+          )
+          if (activeFilePath == requestedFilePath && editorState.code == source) {
+            runTargets = targets
+          }
+        } catch (throwable: Throwable) {
+          if (throwable is CancellationException) throw throwable
+          if (activeFilePath == requestedFilePath && editorState.code == source) {
+            runTargets = emptyList()
+            output = throwable.toFailureText("运行入口发现失败")
+          }
+        }
+      }
+    }
+
+    /**
+     * 重新确认入口位置后编译并运行，避免用户编辑源码后点击到异步刷新前的旧位置。
+     */
+    fun runTarget(requestedTarget: DynamicRunTarget) {
       workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
       coroutineScope.launch {
         isRunning = true
-        if (activeLanguageId != JAVASCRIPT_LANGUAGE_ID) {
-          output = "当前只接入 JavaScript 运行；Java 本次用于验证高亮与轻量语义能力。"
-          isRunning = false
-          return@launch
-        }
-        output = "正在编译并运行 $JAVASCRIPT_MAIN_FILE_PATH…"
         try {
-          val files = currentWorkspace().files.associate { file -> file.path to file.source }
-          output = runner.executeModule(
-            files = files,
-            entryFile = JAVASCRIPT_MAIN_FILE_PATH,
-          ).toDisplayText()
+          val service = activeLanguageService ?: error("当前语言服务尚未加载完成。")
+          val requestedWorkspace = currentWorkspace()
+          val refreshedTargets = service.runTargets(requestedWorkspace, activeFilePath)
+          runTargets = refreshedTargets
+          val target = refreshedTargets.firstOrNull { candidate ->
+            candidate.displayName == requestedTarget.displayName &&
+              candidate.entry.filePath == requestedTarget.entry.filePath
+          } ?: error("运行入口已经随源码变化失效，请重新选择。")
+          output = "正在编译并运行 ${target.displayName}…"
+          val result = service.run(
+            DynamicProgramRunRequest(
+              compilation = DynamicCompilationRequest(
+                workspace = requestedWorkspace,
+                entry = target.entry,
+              ),
+            ),
+          )
+          output = result.toDisplayText(target)
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
-          val diagnostic = throwable.toJsDiagnostic()
-          output = buildString {
-            append(diagnostic.kind).append(": ").append(diagnostic.message)
-            diagnostic.lineNumber?.let { line -> append("\n位置：第 ").append(line).append(" 行") }
-            diagnostic.columnNumber?.let { column -> append("，第 ").append(column).append(" 列") }
-          }
+          output = throwable.toFailureText("程序运行失败")
         } finally {
           isRunning = false
         }
       }
+    }
+
+    /** 顶部运行按钮按目标数量直接运行、提示无入口或打开入口选择器。 */
+    fun runWorkspace() {
+      coroutineScope.launch {
+        try {
+          val service = activeLanguageService ?: error("当前语言服务尚未加载完成。")
+          val targets = service.runTargets(currentWorkspace(), activeFilePath)
+          runTargets = targets
+          when (targets.size) {
+            0 -> {
+              workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
+              output = "当前工作区没有可运行入口。"
+            }
+            1 -> runTarget(targets.single())
+            else -> showRunTargetPicker = true
+          }
+        } catch (throwable: Throwable) {
+          if (throwable is CancellationException) throw throwable
+          workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
+          output = throwable.toFailureText("运行入口发现失败")
+        }
+      }
+    }
+
+    // gutter 点击只写入 Compose 状态，实际协程从页面作用域启动并使用刷新后的入口。
+    LaunchedEffect(pendingLineRunTarget) {
+      val target = pendingLineRunTarget ?: return@LaunchedEffect
+      pendingLineRunTarget = null
+      runTarget(target)
     }
 
     /** 校验并创建工作区相对路径文件。 */
@@ -458,6 +538,38 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isRunning = isRunning,
       onBack = argument::popBackStack,
       onRun = ::runWorkspace,
+      runPopupContent = {
+        MaterialTheme(
+          colors = MaterialTheme.colors.copy(
+            surface = EditorWorkbenchColors.PanelBackground,
+            onSurface = EditorWorkbenchColors.PrimaryText,
+          ),
+        ) {
+          DropdownMenu(
+            expanded = showRunTargetPicker,
+            onDismissRequest = { showRunTargetPicker = false },
+            modifier = Modifier.removeDefaultDropdownMenuVerticalPadding(),
+          ) {
+            runTargets.forEach { target ->
+              DropdownMenuItem(
+                modifier = Modifier.height(CompactDropdownMenuItemHeight),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                onClick = {
+                  showRunTargetPicker = false
+                  runTarget(target)
+                },
+              ) {
+                Text(
+                  text = target.displayName,
+                  color = EditorWorkbenchColors.PrimaryText,
+                  fontSize = 12.sp,
+                  maxLines = 1,
+                )
+              }
+            }
+          }
+        }
+      },
       onUndo = { editorState.undo() },
       canUndo = editorState.canUndo,
       onRedo = { editorState.redo() },
@@ -473,13 +585,25 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     )
   }
 
-  /** 将一次教学执行结果整理成输出面板可直接阅读的文本。 */
-  private fun JsTeachingCodeResult.toDisplayText(): String = buildString {
-    consoleMessages.forEach { message ->
-      append('[').append(message.level).append("] ").appendLine(message.text)
+  /** 将统一动态语言运行结果整理成输出面板可直接阅读的文本。 */
+  private fun DynamicProgramRunResult.toDisplayText(target: DynamicRunTarget): String = buildString {
+    if (standardOutput.isNotEmpty()) append(standardOutput)
+    if (standardError.isNotEmpty()) {
+      if (isNotEmpty() && last() != '\n') appendLine()
+      append(standardError)
     }
-    if (value != null) append("返回值：").append(value)
-    else append("运行完成")
+    diagnostics.forEach { diagnostic ->
+      if (isNotEmpty() && last() != '\n') appendLine()
+      append('[').append(diagnostic.severity).append("] ")
+        .append(diagnostic.code).append(": ").appendLine(diagnostic.message)
+    }
+    if (isNotEmpty() && last() != '\n') appendLine()
+    if (executed) {
+      append("运行完成：").append(target.displayName)
+      returnValue?.let { value -> append("\n返回值：").append(value) }
+    } else if (diagnostics.isEmpty()) {
+      append("编译未生成可执行程序。")
+    }
   }
 
   /** 将目录发现和 Service 加载结果整理为设置栏中的紧凑状态。 */
@@ -551,116 +675,50 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   }
 
   private companion object {
-    const val JAVASCRIPT_LANGUAGE_ID = "javascript"
     const val DISPLAY_RESULT_LIMIT = 12
     const val MICROSECONDS_PER_MILLISECOND = 1_000
     const val AUTO_HIGHLIGHT_DELAY_MILLIS = 200L
+    const val RUN_TARGET_REFRESH_DELAY_MILLIS = 150L
     const val JAVA_MAIN_FILE_PATH = "java/Main.java"
     const val JAVASCRIPT_MAIN_FILE_PATH = "javascript/main.js"
 
     val DEFAULT_MAIN_CODE = """
       package course;
 
-      import course.model.Student;
-      import course.repository.Repository;
-      import java.util.Arrays;
-      import java.util.List;
-
       public class Main {
-        public static void main(String[] args) {
-          Repository<Student> repository = new Repository<>();
-          repository.add(new Student("小邮", Arrays.asList(88, 92, 95)));
-          repository.add(new Student("小红", Arrays.asList(90, 86, 97)));
-
-          Student student = repository.findByName("小邮");
-          System.out.println(student.describe() + "，平均分 " + student.average());
+        public static int main() {
+          return ScoreMath.sumTo(10);
         }
       }
     """.trimIndent()
 
     val DEFAULT_SOURCE_FILES = mapOf(
       JAVA_MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
-      "java/model/Person.java" to """
-        package course.model;
+      "java/ScoreMath.java" to """
+        package course;
 
-        public abstract class Person {
-          private final String name;
-
-          protected Person(String name) {
-            this.name = name;
-          }
-
-          public String getName() {
-            return name;
-          }
-
-          public abstract String describe();
-        }
-      """.trimIndent(),
-      "java/model/Student.java" to """
-        package course.model;
-
-        import java.util.ArrayList;
-        import java.util.List;
-
-        public class Student extends Person implements Comparable<Student> {
-          private final List<Integer> scores;
-
-          public Student(String name) {
-            this(name, new ArrayList<>());
-          }
-
-          public Student(String name, List<Integer> scores) {
-            super(name);
-            this.scores = scores;
-          }
-
-          public double average() {
+        public class ScoreMath {
+          public static int sumTo(int limit) {
             int total = 0;
-            for (Integer score : scores) total += score;
-            return scores.isEmpty() ? 0.0 : (double) total / scores.size();
-          }
-
-          @Override
-          public String describe() {
-            return "学生 " + getName();
-          }
-
-          @Override
-          public int compareTo(Student other) {
-            return Double.compare(average(), other.average());
+            for (int value = 1; value <= limit; value++) {
+              total += value;
+            }
+            return total;
           }
         }
       """.trimIndent(),
-      "java/repository/Repository.java" to """
-        package course.repository;
+      "java/CounterMain.java" to """
+        package course;
 
-        import course.model.Person;
-        import java.util.ArrayList;
-        import java.util.List;
-
-        public class Repository<T extends Person> {
-          private final List<T> values = new ArrayList<>();
-
-          public void add(T value) {
-            values.add(value);
-          }
-
-          public T findByName(String name) {
-            for (T value : values) {
-              if (value.getName().equals(name)) return value;
+        public class CounterMain {
+          public static int main() {
+            int counter = 0;
+            int remaining = 5;
+            while (remaining > 0) {
+              counter++;
+              remaining--;
             }
-            return null;
-          }
-
-          public <R> List<R> map(Mapper<? super T, ? extends R> mapper) {
-            List<R> result = new ArrayList<>();
-            for (T value : values) result.add(mapper.apply(value));
-            return result;
-          }
-
-          public interface Mapper<I, O> {
-            O apply(I input);
+            return counter;
           }
         }
       """.trimIndent(),

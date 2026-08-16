@@ -21,6 +21,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.AlertDialog
@@ -423,7 +424,7 @@ private fun FilePanelToolbar(
  * Compose 1.11.1 没有暴露该边距参数，因此这里只收缩并平移菜单内容布局；Popup 定位、圆角 Surface、
  * 动画及外部点击关闭仍由原组件提供。升级 Compose 后应重新核对默认边距值。
  */
-private fun Modifier.removeDefaultDropdownMenuVerticalPadding(): Modifier = layout {
+internal fun Modifier.removeDefaultDropdownMenuVerticalPadding(): Modifier = layout {
     measurable,
     constraints,
   ->
@@ -1048,17 +1049,19 @@ private fun SettingsSectionTitle(text: String) {
   )
 }
 
-/** Tool Window 中的可滚动等宽文本。 */
+/** Tool Window 中可滚动、可选中复制的等宽文本。 */
 @Composable
 private fun ToolWindowText(text: String) {
-  Text(
-    text = text,
-    color = EditorWorkbenchColors.PrimaryText,
-    fontFamily = FontFamily.Monospace,
-    fontSize = 11.sp,
-    lineHeight = 16.sp,
-    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
-  )
+  SelectionContainer {
+    Text(
+      text = text,
+      color = EditorWorkbenchColors.PrimaryText,
+      fontFamily = FontFamily.Monospace,
+      fontSize = 11.sp,
+      lineHeight = 16.sp,
+      modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+    )
+  }
 }
 
 /** 暗色编辑器面板输入框颜色。 */
@@ -1103,7 +1106,7 @@ private val FileTreeNodeIconSize = 16.dp
 private val FilePanelToolbarHeight = 34.dp
 
 /** 新建菜单单项的紧凑高度。 */
-private val CompactDropdownMenuItemHeight = 34.dp
+internal val CompactDropdownMenuItemHeight = 34.dp
 
 /** Compose Material 2 当前固定在菜单内容上下的默认留白。 */
 private val DefaultDropdownMenuVerticalPadding = 8.dp

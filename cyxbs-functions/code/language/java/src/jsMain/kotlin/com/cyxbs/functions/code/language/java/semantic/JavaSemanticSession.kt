@@ -7,7 +7,9 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicFileRename
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
@@ -94,6 +96,41 @@ internal class JavaSemanticSession(
     newName: String,
   ): DynamicRenameResult? {
     return workspaceIndex(workspace).rename(filePath, position, newName)
+  }
+
+  /**
+   * 返回工作区中的 Java `main` 入口，并复用高亮、补全已经建立的单文件增量索引。
+   *
+   * 正式 Java 入口识别 `public static void main(String[]/String... args)`；阶段 0 另外允许无参数
+   * `public static main()`，用于在数组和标准库桥接完成前运行当前编译器已经支持的教学子集。
+   */
+  fun runTargets(workspace: DynamicLanguageWorkspace): List<DynamicRunTarget> {
+    require(workspace.files.map { file -> file.path }.distinct().size == workspace.files.size) {
+      "Workspace file paths must be unique."
+    }
+    return workspace.files.flatMap { file ->
+      val index = indexFor(file.path, file.source)
+      index.symbols.mapNotNull { symbol ->
+        if (!symbol.isJavaMainTarget()) return@mapNotNull null
+        val ownerName = symbol.ownerTypeName ?: return@mapNotNull null
+        val qualifiedOwnerName = listOfNotNull(
+          index.packageName.takeIf(String::isNotEmpty),
+          ownerName,
+        ).joinToString(".")
+        val location = DynamicSourceLocation(file.path, symbol.definition)
+        DynamicRunTarget(
+          displayName = "$qualifiedOwnerName.main",
+          entry = DynamicProgramEntry(
+            filePath = file.path,
+            position = symbol.definition.from,
+          ),
+          location = location,
+        )
+      }
+    }.sortedWith(
+      compareBy<DynamicRunTarget> { target -> target.entry.filePath }
+        .thenBy { target -> target.entry.position },
+    )
   }
 
   /** 删除工作区中已不存在的文件缓存。 */
@@ -811,6 +848,7 @@ private class JavaSemanticIndex(
           parameterTypes = definition.parameterTypes,
           superTypes = definition.superTypes,
           isStatic = definition.isStatic,
+          isPublic = definition.isPublic,
           isVararg = definition.isVararg,
           isPublicTopLevelType = definition.isPublicTopLevelType,
         )
@@ -842,6 +880,7 @@ private class JavaSemanticIndex(
           typeParameters = owner.declaredTypeParameters(),
           superTypes = owner.declaredSuperTypes(),
           isStatic = owner.headerBefore(node).containsWord("static"),
+          isPublic = owner.headerBefore(node).containsWord("public"),
           isPublicTopLevelType = target.kind == JavaScopeKind.FILE &&
             owner.headerBefore(node).containsWord("public"),
         )
@@ -857,6 +896,7 @@ private class JavaSemanticIndex(
           typeParameters = owner.declaredTypeParameters(),
           parameterTypes = owner.declaredParameterTypes(),
           isStatic = owner.headerBefore(node).containsWord("static"),
+          isPublic = owner.headerBefore(node).containsWord("public"),
           isVararg = owner.hasVarargParameter(),
         )
       }
@@ -1267,6 +1307,7 @@ private data class JavaSymbol(
   val parameterTypes: List<JavaType> = emptyList(),
   val superTypes: List<JavaType> = emptyList(),
   val isStatic: Boolean = false,
+  val isPublic: Boolean = false,
   val isVararg: Boolean = false,
   val isPublicTopLevelType: Boolean = false,
   val boost: Int = 100,
@@ -1292,6 +1333,17 @@ private data class JavaSymbol(
   }
 }
 
+/** 判断词法方法符号是否是编辑器应展示的 Java 程序入口。 */
+private fun JavaSymbol.isJavaMainTarget(): Boolean {
+  if (kind != JavaSymbolKind.METHOD || name != "main" || !isPublic || !isStatic) return false
+  if (parameterTypes.isEmpty()) return true
+  // Lezer 的 void 是关键字节点，不会进入类型节点集合，因此轻量索引用 null 表示 void 返回值。
+  val returnsVoid = receiverType == null || (receiverType as? JavaType.Named)?.name == "void"
+  val arguments = parameterTypes.singleOrNull() as? JavaType.Array
+  val componentName = (arguments?.component as? JavaType.Named)?.name
+  return returnsVoid && componentName?.substringAfterLast('.') == "String"
+}
+
 /** 分类 Definition 时使用的中间结果。 */
 private data class JavaDefinition(
   val kind: JavaSymbolKind,
@@ -1303,6 +1355,7 @@ private data class JavaDefinition(
   val parameterTypes: List<JavaType> = emptyList(),
   val superTypes: List<JavaType> = emptyList(),
   val isStatic: Boolean = false,
+  val isPublic: Boolean = false,
   val isVararg: Boolean = false,
   val isPublicTopLevelType: Boolean = false,
 )

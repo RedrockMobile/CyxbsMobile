@@ -130,6 +130,7 @@ import kotlin.math.roundToInt
  * @param sidePanels 可用侧边能力，顺序决定活动栏顺序。
  * @param toolWindows 可用底部工具窗口，顺序决定底部按钮顺序。
  * @param onRun 顶部运行按钮回调；传入 null 时隐藏运行按钮。
+ * @param runPopupContent 锚定在顶部运行按钮上的弹出内容；为空时只展示普通运行按钮。
  * @param onUndo 撤销当前编辑器操作；传入 null 时隐藏撤销按钮。
  * @param canUndo 当前是否存在可撤销操作；为 false 时保留灰色按钮但禁止点击。
  * @param onRedo 重做当前编辑器操作；传入 null 时隐藏重做按钮。
@@ -156,6 +157,7 @@ fun CodeEditorWorkbench(
   isRunning: Boolean = false,
   onBack: (() -> Unit)? = null,
   onRun: (() -> Unit)? = null,
+  runPopupContent: (@Composable () -> Unit)? = null,
   onUndo: (() -> Unit)? = null,
   canUndo: Boolean = onUndo != null,
   onRedo: (() -> Unit)? = null,
@@ -295,6 +297,7 @@ fun CodeEditorWorkbench(
         onOpenSidePanel = { panel -> state.selectSidePanel(panel.id) },
         onCloseSidePanel = state::closeSidePanel,
         onRun = onRun,
+        runPopupContent = runPopupContent,
         onUndo = onUndo,
         canUndo = canUndo,
         onRedo = onRedo,
@@ -442,6 +445,7 @@ private fun EditorWorkbenchTopBar(
   onOpenSidePanel: (CodeEditorSidePanel) -> Unit,
   onCloseSidePanel: () -> Unit,
   onRun: (() -> Unit)?,
+  runPopupContent: (@Composable () -> Unit)?,
   onUndo: (() -> Unit)?,
   canUndo: Boolean,
   onRedo: (() -> Unit)?,
@@ -492,13 +496,17 @@ private fun EditorWorkbenchTopBar(
       }
 
       if (onRun != null && layout.runPlacement == CodeEditorCommandPlacement.TopBar) {
-        EditorTopBarAction(
-          icon = Icons.Default.PlayArrow,
-          contentDescription = if (isRunning) "运行中" else "运行",
-          enabled = !isRunning,
-          contentColor = if (isRunning) EditorWorkbenchColors.SecondaryText else Color.White,
-          onClick = onRun,
-        )
+        // Box 同时作为 DropdownMenu 的定位锚点，使多入口选择紧贴运行按钮而不是居中遮挡编辑器。
+        Box {
+          EditorTopBarAction(
+            icon = Icons.Default.PlayArrow,
+            contentDescription = if (isRunning) "运行中" else "运行",
+            enabled = !isRunning,
+            contentColor = if (isRunning) EditorWorkbenchColors.SecondaryText else Color.White,
+            onClick = onRun,
+          )
+          runPopupContent?.invoke()
+        }
       }
       if (onUndo != null) {
         EditorTopBarAction(

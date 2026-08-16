@@ -29,11 +29,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.functions.code.editor.theme.CodeEditorConnectedCornerRadius
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorCodeEditorSetup
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicHighlightExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorDynamicCompletionExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorPlainTextLanguageExtension
+import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorRunOrFoldGutterExtension
 import com.cyxbs.functions.code.editor.highlight.internal.kodeMirrorSearchExtension
 import com.cyxbs.functions.code.editor.highlight.internal.KodeMirrorSearchPanel
+import com.cyxbs.functions.code.editor.highlight.internal.RunTargetGutterWidth
 import com.cyxbs.functions.code.editor.highlight.internal.codeEditorSearchPanelOpen
 import com.cyxbs.functions.code.editor.highlight.internal.EditorSessionCache
 import com.cyxbs.functions.code.editor.highlight.internal.replaceDynamicHighlights
@@ -43,6 +46,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
@@ -52,7 +56,6 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
-import com.monkopedia.kodemirror.basicsetup.basicSetup
 import com.monkopedia.kodemirror.commands.redoDepth
 import com.monkopedia.kodemirror.commands.redo as kodeMirrorRedo
 import com.monkopedia.kodemirror.commands.undoDepth
@@ -457,6 +460,8 @@ private fun String.isValidWorkspacePath(): Boolean {
  * @param languageService 当前已经加载的动态语言服务；可先传 null，加载完成后的重组会让补全源
  * 立即使用新服务，而不会重建或覆盖编辑器文档。
  * @param highlightCacheCapacity 最多保留的文件会话数量，默认 20；运行时变化不会重建当前状态。
+ * @param runTargets 当前语言在工作区发现的可运行入口；带源码位置的入口会显示在 gutter。
+ * @param onRunTarget 点击 gutter 入口后的回调；为空时不处理运行标记点击。
  * @return 可读取当前源码并在多个组合节点间共享的编辑器状态。
  */
 @Composable
@@ -468,10 +473,14 @@ fun rememberCodeEditorState(
   ),
   languageService: DynamicLanguageService? = null,
   highlightCacheCapacity: Int = DEFAULT_HIGHLIGHT_CACHE_CAPACITY,
+  runTargets: List<DynamicRunTarget> = emptyList(),
+  onRunTarget: ((DynamicRunTarget) -> Unit)? = null,
 ): CodeEditorState {
   val currentLanguageService = rememberUpdatedState(languageService)
   val currentWorkspace = rememberUpdatedState(workspace)
   val currentFilePath = rememberUpdatedState(activeFilePath)
+  val currentRunTargets = rememberUpdatedState(runTargets)
+  val currentOnRunTarget = rememberUpdatedState(onRunTarget)
   val completionExtension = remember {
     kodeMirrorDynamicCompletionExtension(
       service = { currentLanguageService.value },
@@ -479,9 +488,18 @@ fun rememberCodeEditorState(
       filePath = { currentFilePath.value },
     )
   }
-  val editorExtensions = remember(completionExtension) {
+  val runGutterExtension = remember {
+    kodeMirrorRunOrFoldGutterExtension(
+      targets = { currentRunTargets.value },
+      activeFilePath = { currentFilePath.value },
+      onRunTarget = { currentOnRunTarget.value },
+    )
+  }
+  val editorExtensions = remember(completionExtension, runGutterExtension) {
     extensionListOf(
-      basicSetup,
+      kodeMirrorCodeEditorSetup,
+      // 合并列放在行号之后，与上游 basicSetup 的折叠列位置保持一致。
+      runGutterExtension,
       // 预先安装公开搜索状态，避免 openSearchPanel 注入无法定制的 KodeMirror 默认面板。
       kodeMirrorSearchExtension,
       editorTheme.of(codeEditorTheme),
@@ -557,11 +575,10 @@ private val codeEditorTheme = EditorTheme(
   inputBorderColor = Color(0xFF30394B),
   tooltipBackground = Color(0xFF222938),
   activeLineGutterBackground = CodeEditorGutterBackground,
-  // 保持行号与代码区紧凑衔接，同时留出最小间距避免文字直接贴边。
-  // basicSetup 会注册折叠 gutter，但当前动态语言尚未向 KodeMirror 提供折叠区间，因此取消空列占位。
+  // 运行入口和代码折叠复用同一列，不再为运行按钮增加额外横向间距。
   layout = EditorLayout(
     gutterEndPadding = 3.dp,
-    customGutterWidth = 0.dp,
+    customGutterWidth = RunTargetGutterWidth,
   ),
   dark = true,
 )

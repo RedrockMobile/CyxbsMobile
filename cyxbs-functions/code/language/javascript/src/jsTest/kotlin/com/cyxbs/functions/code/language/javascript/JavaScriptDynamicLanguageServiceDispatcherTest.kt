@@ -1,11 +1,13 @@
 package com.cyxbs.functions.code.language.javascript
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
@@ -564,6 +566,35 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(source.indexOf("Student"), location.range.from)
   }
 
+  /** JavaScript 编译应保留多文件 Module，并生成统一的可调用入口适配器。 */
+  @Test
+  fun compileCreatesExecutableModuleGraph() = runTest {
+    val workspace = workspaceOf(
+      MAIN_FILE_PATH to """
+        import { answer } from "./answer.js"
+        export default function main() { return answer }
+      """.trimIndent(),
+      "answer.js" to "export const answer = 42",
+    )
+
+    val result = JavaScriptDynamicLanguageService.compile(
+      DynamicCompilationRequest(
+        workspace = workspace,
+        entry = DynamicProgramEntry(MAIN_FILE_PATH),
+      ),
+    )
+
+    val program = assertNotNull(result.program)
+    assertEquals(3, program.modules.size)
+    assertTrue(program.modules.any { module -> module.name == MAIN_FILE_PATH })
+    assertTrue(program.modules.any { module -> module.name == "answer.js" })
+    assertTrue(
+      program.modules.first { module -> module.name == program.entryModuleName }
+        .source
+        .contains("export function ${program.entryExportName}"),
+    )
+  }
+
   /** 越出工作区根目录的相对 import 不得被折叠成根目录同名文件。 */
   @Test
   fun importOutsideWorkspaceDoesNotMatchRootFile() = runTest {
@@ -588,6 +619,24 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(mainSource.indexOf("Student"), location.range.from)
   }
 
+  /** JavaScript 只把当前文件作为运行目标，依赖模块不会同时出现在顶部运行选择器。 */
+  @Test
+  fun runTargetsUseOnlyTheActiveModule() = runTest {
+    val workspace = DynamicLanguageWorkspace(
+      listOf(
+        DynamicSourceFile("main.js", "export default () => 42"),
+        DynamicSourceFile("dependency.js", "export const value = 42"),
+      ),
+    )
+
+    val targets = JavaScriptDynamicLanguageService.runTargets(workspace, "main.js")
+
+    assertEquals(1, targets.size)
+    assertEquals("main.js", targets.single().entry.filePath)
+    assertNull(targets.single().entry.position)
+    assertNull(targets.single().location)
+  }
+
   /** 显式初始化应可重复调用，并按 commonMain 协议完成参数及返回值的 JSON 转换。 */
   @Test
   fun generatedDispatcherInvokesService() = runTest {
@@ -598,11 +647,11 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(SERVICE_ID, _JavaScriptDynamicLanguageServiceNpmJsDispatcher.serviceId)
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
     assertEquals(
-      setOf("complete", "definition", "fileIcon", "highlight", "references", "rename"),
+      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     assertEquals(
-      setOf("complete", "definition", "fileIcon", "highlight", "references", "rename"),
+      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
       describedMethods.toSet(),
     )
 

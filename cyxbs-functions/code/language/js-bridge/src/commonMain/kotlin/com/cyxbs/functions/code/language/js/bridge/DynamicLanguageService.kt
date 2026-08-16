@@ -121,6 +121,57 @@ interface DynamicLanguageService : NpmJsServiceInstance {
   suspend fun fileIcon(): DynamicLanguageIcon
 
   /**
+   * 发现当前工作区可由编辑器直接启动的入口。
+   *
+   * Java 等语言可以返回工作区中的多个 `main`，客户端会在顶部运行按钮中提供选择，并在
+   * [DynamicRunTarget.location] 对应行显示运行标记。JavaScript、Python 等按文件执行的语言应
+   * 根据 [activeFilePath] 返回当前文件目标，不需要枚举整个工作区的每个文件。
+   *
+   * 本方法只分析入口，不编译或执行程序。源码变化后客户端可以重新调用；语言包应尽量复用
+   * 已有增量语法树，避免为了刷新行号标记重复完成整套编译。
+   *
+   * @param workspace 包含未保存文本的完整同语言工作区。
+   * @param activeFilePath 当前编辑器文件，用于按文件执行的语言选择默认目标。
+   * @return 按语言定义排序的可运行入口；为空表示当前工作区没有可运行目标。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包尚未提供入口发现能力。
+   * @throws NpmJsServiceInvocationException JavaScript 分析 Service 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun runTargets(
+    workspace: DynamicLanguageWorkspace,
+    activeFilePath: String,
+  ): List<DynamicRunTarget>
+
+  /**
+   * 把当前语言工作区编译为端上统一执行器可加载的 ES Module 图。
+   *
+   * 语言包只负责语法、语义和代码生成，不得在自身的分析 Runtime 中执行用户程序。Java、
+   * Python 等语言可以转译为 JavaScript，JavaScript 语言则可以只规范化并包装原始模块；端上会
+   * 为返回的程序创建另一个独立 Runtime。
+   *
+   * @param request 完整工作区快照及语言无关入口位置。
+   * @return 成功时包含可执行 Module 图；源码错误通过结构化诊断返回，不以异常表示。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包尚未提供编译能力。
+   * @throws NpmJsServiceInvocationException JavaScript 编译 Service 执行失败。
+   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(
+    NpmJsServiceMethodNotImplementedException::class,
+    NpmJsServiceInvocationException::class,
+    SerializationException::class,
+    CancellationException::class,
+  )
+  suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult
+
+  /**
    * 分析工作区中的指定文件，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
    *
    * 返回的性能指标既用于确认语言包是否复用了增量语法树，也可与端上测得的整体耗时组合，

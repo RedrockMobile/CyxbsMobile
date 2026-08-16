@@ -33,8 +33,24 @@ external interface LezerTree {
   fun resolveInner(position: Int, side: Int = definedExternally): LezerSyntaxNode
 }
 
+/**
+ * Lezer 语法节点的稳定类型元数据。
+ *
+ * [isError] 用于识别错误恢复树中的节点。编译器必须据此拒绝恢复 AST，不能仅依赖节点显示名称，
+ * 因为该名称不是错误判定契约。
+ */
+external interface LezerNodeType {
+  /** 节点的 grammar 名称，供 CST adapter 分派。 */
+  val name: String
+
+  /** 此节点是否代表 parser 错误恢复位置。 */
+  val isError: Boolean
+}
+
 /** 动态语言语义分析所需的最小 Lezer 节点视图。 */
 external interface LezerSyntaxNode {
+  /** 节点类型及错误恢复标记。 */
+  val type: LezerNodeType
   val name: String
   val from: Int
   val to: Int

@@ -4,6 +4,10 @@ import com.cyxbs.functions.code.language.internal.DynamicLanguagePackageLoader
 import com.cyxbs.functions.code.language.internal.LoadedDynamicLanguagePackage
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionItem
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnosticSeverity
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
@@ -12,6 +16,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIconPath
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
@@ -89,6 +94,16 @@ class DynamicLanguageManagerTest {
         false,
       )?.options?.single()?.label,
     )
+    val runResult = service.run(
+      DynamicProgramRunRequest(
+        compilation = DynamicCompilationRequest(
+          workspace = workspace,
+          entry = DynamicProgramEntry("main.js"),
+        ),
+      ),
+    )
+    assertEquals(false, runResult.executed)
+    assertEquals("TEST_COMPILER_UNAVAILABLE", runResult.diagnostics.single().code)
 
     service.close()
     assertEquals(1, languageService.closeCount)
@@ -245,6 +260,25 @@ class DynamicLanguageManagerTest {
     override suspend fun fileIcon(): DynamicLanguageIcon {
       fileIconCallCount += 1
       return icon
+    }
+
+    /** 测试替身不暴露运行入口。 */
+    override suspend fun runTargets(
+      workspace: DynamicLanguageWorkspace,
+      activeFilePath: String,
+    ) = emptyList<com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget>()
+
+    /** 测试替身未提供可执行程序，使用结构化编译诊断验证协议透传。 */
+    override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
+      return DynamicCompilationResult(
+        diagnostics = listOf(
+          DynamicCompilationDiagnostic(
+            code = "TEST_COMPILER_UNAVAILABLE",
+            message = "The test language does not provide a compiler.",
+            severity = DynamicCompilationDiagnosticSeverity.ERROR,
+          ),
+        ),
+      )
     }
 
     /** 测试替身不维护语法树，仅返回可预测的完整解析指标。 */
