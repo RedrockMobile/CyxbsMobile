@@ -690,15 +690,23 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       package course;
 
       public class Main {
-        public static int main() {
-          return ScoreMath.sumTo(10);
+        public static void main(String[] args) {
+          int total = ScoreMath.sumTo(10);
+          System.out.println("1 到 10 的和：" + total);
+
+          System.out.print("偶数：");
+          for (int value = 2; value <= 10; value += 2) {
+            System.out.print(value);
+            System.out.print(" ");
+          }
+          System.out.println();
         }
       }
     """.trimIndent()
 
     val DEFAULT_SOURCE_FILES = mapOf(
       JAVA_MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
-      "java/ScoreMath.java" to """
+      "java/basics/ScoreMath.java" to """
         package course;
 
         public class ScoreMath {
@@ -711,18 +719,109 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           }
         }
       """.trimIndent(),
-      "java/CounterMain.java" to """
-        package course;
+      "java/basics/CounterMain.java" to """
+        package course.basics;
 
         public class CounterMain {
-          public static int main() {
+          public static void main(String[] args) {
             int counter = 0;
             int remaining = 5;
             while (remaining > 0) {
               counter++;
               remaining--;
+              System.out.println("第 " + counter + " 次计数");
             }
-            return counter;
+            System.out.println("最终结果：" + counter);
+          }
+        }
+      """.trimIndent(),
+      "java/generics/GenericBoxMain.java" to """
+        package course.generics;
+
+        public class GenericBoxMain {
+          public static void main(String[] args) {
+            Box<String> message = new Box<String>("泛型可以复用类型安全的容器");
+            Box<Integer> score = new Box<Integer>(95);
+
+            System.out.println(message.get());
+            System.out.println("课程分数：" + score.get());
+          }
+        }
+
+        class Box<T> {
+          private T value;
+
+          Box(T value) {
+            this.value = value;
+          }
+
+          T get() {
+            return value;
+          }
+        }
+      """.trimIndent(),
+      "java/generics/GenericMethodMain.java" to """
+        package course.generics;
+
+        public class GenericMethodMain {
+          public static <T> T chooseFirst(T first, T second) {
+            return first;
+          }
+
+          public static void main(String[] args) {
+            String course = chooseFirst("Java", "Kotlin");
+            Integer score = chooseFirst(92, 88);
+
+            System.out.println("选择的课程：" + course);
+            System.out.println("选择的分数：" + score);
+          }
+        }
+      """.trimIndent(),
+      "java/collections/ListMain.java" to """
+        package course.collections;
+
+        import java.util.ArrayList;
+        import java.util.Iterator;
+        import java.util.List;
+
+        public class ListMain {
+          public static void main(String[] args) {
+            List<String> courses = new ArrayList<>();
+            courses.add("Java 基础");
+            courses.add("泛型");
+            courses.add("集合");
+
+            System.out.println("课程数量：" + courses.size());
+            Iterator<String> iterator = courses.iterator();
+            while (iterator.hasNext()) {
+              System.out.println("- " + iterator.next());
+            }
+          }
+        }
+      """.trimIndent(),
+      "java/collections/SetMapMain.java" to """
+        package course.collections;
+
+        import java.util.HashMap;
+        import java.util.HashSet;
+        import java.util.Map;
+        import java.util.Set;
+
+        public class SetMapMain {
+          public static void main(String[] args) {
+            Set<String> tags = new HashSet<>();
+            tags.add("Java");
+            tags.add("集合");
+            boolean duplicated = tags.add("Java");
+
+            Map<String, Integer> scores = new HashMap<>();
+            scores.put("小邮", 96);
+            scores.put("小掌", 91);
+
+            System.out.println("标签数量：" + tags.size());
+            System.out.println("重复添加成功：" + duplicated);
+            System.out.println("小邮的分数：" + scores.get("小邮"));
+            System.out.println("是否包含小掌：" + scores.containsKey("小掌"));
           }
         }
       """.trimIndent(),
