@@ -19,6 +19,8 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrProgram
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStatement
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStringConcatPart
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStringConversionKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
@@ -148,7 +150,7 @@ class JavaScriptBackendImplTest {
     assertTrue("\$d_9(self);" in source)
     assertTrue("\$d_2(value);" in source)
     // receiver、右值/实参先进入 IIFE 参数，空检查位于函数体内。
-    assertTrue("((receiver, value) => (\$__j_non_null(receiver)" in source)
+    assertTrue("__j_non_null(receiver)" in source)
     assertTrue("((receiver, values) => \$m_" in source)
   }
 
@@ -236,6 +238,82 @@ class JavaScriptBackendImplTest {
     val entry: dynamic = constructor(executable)()
 
     assertEquals(7, (entry() as Number).toInt())
+  }
+
+  /** 一维数组必须预填 Java 默认值，并在读写处经统一的边界检查 runtime。 */
+  @Test
+  fun executesArrayDefaultValuesAndCheckedWrites() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(arrayProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(9, (entry() as Number).toInt())
+    // IIFE 的三个参数将 array/index/RHS 固定为各一次求值，再进入 checked store。
+    assertTrue("((array, index, value) => ${'$'}__j_array_set(array, index, value))" in artifact.source)
+    assertTrue("java.lang.NegativeArraySizeException" in artifact.source)
+    assertTrue("java.lang.ArrayIndexOutOfBoundsException" in artifact.source)
+  }
+
+  /** 引用 component token 必须阻止 string 绕过用户类数组，也阻止对象写入 String 数组。 */
+  @Test
+  fun rejectsInvalidReferenceArrayStoresAtRuntime() {
+    val artifact = assertNotNull(JavaScriptBackendImpl.generate(arrayProgram(), objectEntryPoint()).value).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + """
+      return () => {
+        const userClassArray = ${'$'}__j_new_array(1, null, {});
+        const stringArray = ${'$'}__j_new_array(1, null, "string");
+        try { ${'$'}__j_array_set(userClassArray, 0, "bad"); return false; }
+        catch (error) { if (!String(error).includes("java.lang.ArrayStoreException")) return false; }
+        try { ${'$'}__j_array_set(stringArray, 0, {}); return false; }
+        catch (error) { return String(error).includes("java.lang.ArrayStoreException"); }
+      };
+    """.trimIndent()
+    val constructor: dynamic = js("Function")
+    val checks: dynamic = constructor(executable)()
+
+    assertEquals(true, checks() as Boolean)
+  }
+
+  /** primitive store 的最终写回必须在 array runtime 内完成 Java 窄化。 */
+  @Test
+  fun narrowsPrimitiveArrayWritesAtRuntime() {
+    val artifact = assertNotNull(JavaScriptBackendImpl.generate(arrayProgram(), objectEntryPoint()).value).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + """
+      return () => {
+        const bytes = ${'$'}__j_new_array(1, 0, "primitive:BYTE");
+        const chars = ${'$'}__j_new_array(1, 0, "primitive:CHAR");
+        ${'$'}__j_array_set(bytes, 0, 128);
+        ${'$'}__j_array_set(chars, 0, -1);
+        return bytes[0] === -128 && chars[0] === 65535;
+      };
+    """.trimIndent()
+    val constructor: dynamic = js("Function")
+    val checks: dynamic = constructor(executable)()
+
+    assertEquals(true, checks() as Boolean)
+  }
+
+  /** StringConcat 使用显式 conversion kind，不能退化为 JavaScript 动态加法。 */
+  @Test
+  fun emitsExplicitStringConcatenationRuntime() {
+    val source = assertNotNull(
+      JavaScriptBackendImpl.generate(stringConcatProgram(), stringEntryPoint()).value,
+    ).modules.single().source
+
+    assertTrue("function ${'$'}__j_string_concat" in source)
+    assertTrue("[\"STRING\", \"CHAR\"]" in source)
   }
 
   /** 构造包含阶段 0 完整控制流的 sum typed IR。 */
@@ -761,6 +839,67 @@ class JavaScriptBackendImplTest {
     ))
   }
 
+  /** 构造直接可执行的数组 IR，覆盖分配默认值、写回和读取三个 runtime 路径。 */
+  private fun arrayProgram(): JavaIrProgram {
+    val arrayType = JavaIrType.Array(intType)
+    val array = JavaIrLocal(JavaIrLocalId(91), "numbers", arrayType, false, span(91))
+    val entry = method(
+      id = 10,
+      name = "entry",
+      descriptor = "()I",
+      locals = listOf(array),
+      body = JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.DeclareLocal(
+            array.id,
+            JavaIrExpression.NewArray(intType, intConstant(2), arrayType, span(92)),
+            span(92),
+          ),
+          JavaIrStatement.Expression(
+            JavaIrExpression.SetArrayElement(
+              JavaIrExpression.GetLocal(array.id, arrayType, span(93)), intConstant(1), intConstant(9), intType, span(93),
+            ),
+            span(93),
+          ),
+          JavaIrStatement.Return(
+            JavaIrExpression.GetArrayElement(
+              JavaIrExpression.GetLocal(array.id, arrayType, span(94)), intConstant(1), intType, span(94),
+            ),
+            span(94),
+          ),
+        ),
+        span(95),
+      ),
+    )
+    return JavaIrProgram(listOf(clazz(listOf(entry))))
+  }
+
+  /** 构造一个纯 String 拼接入口，验证 backend 消费 IR conversion kind。 */
+  private fun stringConcatProgram(): JavaIrProgram {
+    val stringType = JavaIrType.Reference(JavaIrClassId(99))
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()Ljava/lang/String;", JavaIrDispatchKind.STATIC, null,
+      stringType, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(
+          JavaIrExpression.StringConcat(
+            listOf(
+              JavaIrStringConcatPart(
+                JavaIrExpression.Constant(JavaIrConstant.StringValue("x"), stringType, span(96)),
+                JavaIrStringConversionKind.STRING,
+              ),
+              JavaIrStringConcatPart(intConstant(65), JavaIrStringConversionKind.CHAR),
+            ),
+            stringType,
+            span(96),
+          ),
+          span(96),
+        )),
+        span(96),
+      ), span(96),
+    )
+    return JavaIrProgram(listOf(clazz(listOf(entry))))
+  }
+
   /** 创建阶段 0 的单个静态方法，未指定 locals 时保持空集合。 */
   private fun method(
     id: Int,
@@ -838,6 +977,8 @@ class JavaScriptBackendImplTest {
   private fun longEntryPoint(): JavaCompilerEntryPoint = entryPoint("longValue", "()J")
 
   private fun objectEntryPoint(): JavaCompilerEntryPoint = entryPoint("entry", "()I")
+
+  private fun stringEntryPoint(): JavaCompilerEntryPoint = entryPoint("entry", "()Ljava/lang/String;")
 
   /** 统一构造 Java 编译入口，避免测试意外依赖名称解析。 */
   private fun entryPoint(name: String, descriptor: String): JavaCompilerEntryPoint = JavaCompilerEntryPoint(

@@ -4,6 +4,9 @@ import com.cyxbs.functions.code.language.java.parser
 import com.cyxbs.functions.code.language.java.compiler.JavaAstFrontend
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAssignmentOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAnnotation
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayDimension
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializer
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializerElement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCompilationUnit
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
@@ -155,8 +158,9 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   private fun field(node: LezerSyntaxNode): JavaAstMemberDeclaration.Field {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "字段缺少名称。")
     rejectAnnotationsBefore(node, definition, "字段")
+    val type = node.typeBefore(definition)
     return JavaAstMemberDeclaration.Field(ids.next(), span(node), node.modifiersBefore(definition, FIELD_MODIFIERS, "字段"),
-      node.typeBefore(definition), node.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
+      type, node.descendants().filter { it.name == "VariableDeclarator" }.map { declarator(it, type) }.toList())
   }
 
   /** 构建 instance/static 方法和其受限泛型声明。 */
@@ -169,6 +173,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       ?: unsupported(node, "方法缺少名称。")
     val modifiers = node.modifiersBefore(definition, METHOD_MODIFIERS, "方法")
     val annotations = methodAnnotations(node, definition)
+    rejectReturnDimensions(node)
     node.descendants().firstOrNull { it.name in THROWS_CLAUSES }?.let {
       unsupported(it, "阶段 1 尚不支持 throws 或受检异常。")
     }
@@ -230,6 +235,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   private fun parameter(node: LezerSyntaxNode): JavaAstParameter {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "参数缺少名称。")
     rejectAnnotationsBefore(node, definition, "参数")
+    rejectPostNameDimensions(definition, "参数")
     return JavaAstParameter(ids.next(), span(node), node.modifiersBefore(definition, PARAMETER_MODIFIERS, "参数"), node.typeBefore(definition),
       text(definition), false)
   }
@@ -266,7 +272,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "Block" -> block(node)
     "LocalVariableDeclaration" -> local(node)
     "ExpressionStatement" -> JavaAstStatement.Expression(ids.next(), span(node), expression(node.onlyExpression()))
-    "ReturnStatement" -> JavaAstStatement.Return(ids.next(), span(node), node.expressions().singleOrNull()?.let(::expression))
+    "ReturnStatement" -> JavaAstStatement.Return(ids.next(), span(node), node.returnExpression())
     "IfStatement" -> ifStatement(node)
     "WhileStatement" -> whileStatement(node)
     "ForStatement" -> forStatement(node)
@@ -339,8 +345,9 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       declaration.descendants().firstOrNull { text(it) == "var" }?.let {
         unsupported(it, "阶段 1 仅支持 Java 8，不能使用 var。")
       }
+      val type = declaration.typeBefore(definition)
       return JavaAstForInitializer.VariableDeclaration(ids.next(), span(declaration), declaration.modifiersBefore(definition, LOCAL_MODIFIERS, "for 局部变量"),
-        declaration.typeBefore(definition), declaration.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
+        type, declaration.descendants().filter { it.name == "VariableDeclarator" }.map { declarator(it, type) }.toList())
     }
     val expressions = nodes.expressionNodes().map(::expression)
     if (expressions.isEmpty()) unsupported(nodes.first(), "for 初始化不包含表达式。")
@@ -354,16 +361,29 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     node.descendants().firstOrNull { text(it) == "var" }?.let {
       unsupported(it, "阶段 1 仅支持 Java 8，不能使用 var。")
     }
-    return JavaAstStatement.VariableDeclaration(ids.next(), span(node), node.modifiersBefore(definition, LOCAL_MODIFIERS, "局部变量"), node.typeBefore(definition),
-      node.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
+    val type = node.typeBefore(definition)
+    return JavaAstStatement.VariableDeclaration(ids.next(), span(node), node.modifiersBefore(definition, LOCAL_MODIFIERS, "局部变量"), type,
+      node.descendants().filter { it.name == "VariableDeclarator" }.map { declarator(it, type) }.toList())
   }
 
-  /** declarator 的初始化值由 VariableInitializer 的唯一 expression child 提供。 */
-  private fun declarator(node: LezerSyntaxNode): JavaAstVariableDeclarator {
+  /**
+   * 单个 declarator 的初始化值由 VariableInitializer 或直接 ArrayInitializer 提供。
+   *
+   * 同一 field/local/for 声明可含多个 declarator，因此后置维度必须在这里按各自 Definition
+   * 校验，不能只检查声明中的第一个名称后漏掉 `int first, second[];`。
+   */
+  private fun declarator(
+    node: LezerSyntaxNode,
+    declaredType: JavaAstTypeReference,
+  ): JavaAstVariableDeclarator {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "变量缺少名称。")
-    val initializerNode = node.children().firstOrNull { it.name == "VariableInitializer" }?.onlyExpression()
+    rejectPostNameDimensions(definition, "变量")
+    val initializerNode = node.children().firstOrNull {
+      it.name == "VariableInitializer" || it.name == "ArrayInitializer"
+    }
+    val initializer = initializerNode?.let { variableInitializer(it, declaredType) }
       ?: node.expressions().singleOrNull()
-    val initializer = initializerNode?.let(::expression)
+        ?.let(::expression)
     return JavaAstVariableDeclarator(ids.next(), span(node), text(definition), initializer)
   }
 
@@ -386,6 +406,8 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "UnaryExpression", "PostfixExpression", "UpdateExpression" -> unary(node)
       "MethodInvocation" -> invocation(node)
       "ObjectCreationExpression" -> newObject(node)
+      "ArrayCreationExpression" -> newArray(node)
+      "ArrayAccess" -> arrayAccess(node)
       "FieldAccess" -> fieldAccess(node)
       else -> unsupported(node, "Stage1 不支持该表达式。")
     }
@@ -444,6 +466,80 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     return JavaAstExpression.NewObject(ids.next(), span(node), typeReference(type), arguments)
   }
 
+  /**
+   * 将真实 CST 的数组创建节点映射为组件类型、逐维大小和可选花括号初始化器。
+   *
+   * `Dimension` 的大小是否为空必须保留，不能将 `new int[2][]` 误写成两个同类已定长维度；
+   * 一维执行限制由后续语义阶段统一校验。
+   */
+  private fun newArray(node: LezerSyntaxNode): JavaAstExpression.NewArray {
+    val component = node.children().firstOrNull {
+      it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS - setOf("ArrayType")
+    } ?: unsupported(node, "数组创建缺少组件类型。")
+    val dimensions = node.children().filter { it.name == "Dimension" }.map(::arrayDimension)
+    if (dimensions.isEmpty()) unsupported(node, "数组创建缺少维度。")
+    val initializer = node.children().firstOrNull { it.name == "ArrayInitializer" }?.let(::arrayInitializer)
+    return JavaAstExpression.NewArray(ids.next(), span(node), typeReference(component), dimensions, initializer)
+  }
+
+  /** 将数组访问节点的两个直接 expression child（数组和下标）完整保留。 */
+  private fun arrayAccess(node: LezerSyntaxNode): JavaAstExpression.ArrayAccess {
+    val operands = node.expressions()
+    if (operands.size != 2) unsupported(node, "数组访问必须包含数组与下标两个表达式。")
+    return JavaAstExpression.ArrayAccess(ids.next(), span(node), expression(operands[0]), expression(operands[1]))
+  }
+
+  /** 映射数组创建中的单个 `Dimension`，空方括号用 null size 表示。 */
+  private fun arrayDimension(node: LezerSyntaxNode): JavaAstArrayDimension {
+    val sizes = node.expressions()
+    if (sizes.size > 1) unsupported(node, "数组维度包含多个大小表达式。")
+    return JavaAstArrayDimension(ids.next(), span(node), sizes.singleOrNull()?.let(::expression))
+  }
+
+  /**
+   * 递归保留花括号初始化器，元素只允许普通 expression 或嵌套 ArrayInitializer。
+   *
+   * 该节点不会进入通用 [expression]，从而维持 Java 中花括号仅能作为数组初始化器的边界。
+   */
+  private fun arrayInitializer(node: LezerSyntaxNode): JavaAstArrayInitializer {
+    val elements = node.children().mapNotNull { child ->
+      when {
+        child.name == "ArrayInitializer" -> JavaAstArrayInitializerElement.Nested(arrayInitializer(child))
+        child.name in EXPRESSION_NODES -> JavaAstArrayInitializerElement.Expression(expression(child))
+        child.trivia() || text(child) in ARRAY_INITIALIZER_TOKENS -> null
+        else -> unsupported(child, "数组初始化器包含不支持的元素。")
+      }
+    }
+    return JavaAstArrayInitializer(ids.next(), span(node), elements)
+  }
+
+  /**
+   * 读取变量初始化器；`int[] values = { ... }` 没有 CST 的 ArrayCreationExpression，故以
+   * 声明数组类型规范化为虚拟 NewArray，后续阶段可与显式 `new int[] { ... }` 走同一规则。
+   */
+  private fun variableInitializer(
+    node: LezerSyntaxNode,
+    declaredType: JavaAstTypeReference,
+  ): JavaAstExpression {
+    // @lezer/java 1.1.3 会将 `{...}` 直接挂在 VariableDeclarator 下，不能假定存在 wrapper。
+    val arrayInitializer = if (node.name == "ArrayInitializer") node else {
+      node.children().firstOrNull { it.name == "ArrayInitializer" }
+    }
+    if (arrayInitializer == null) return expression(node.onlyExpression())
+    val type = declaredType as? JavaAstTypeReference.Array
+      ?: unsupported(arrayInitializer, "花括号初始化器只能用于数组声明。")
+    val dimensions = List(type.dimensions) {
+      JavaAstArrayDimension(ids.next(), span(arrayInitializer), null)
+    }
+    return JavaAstExpression.NewArray(
+      ids.next(),
+      span(arrayInitializer),
+      type.componentType,
+      dimensions,
+      arrayInitializer(arrayInitializer),
+    )
+  }
+
   /** 字段访问保留 receiver 与字段名称的 CST 关系。 */
   private fun fieldAccess(node: LezerSyntaxNode): JavaAstExpression.FieldAccess {
     val receiver = node.expressions().firstOrNull() ?: unsupported(node, "字段访问缺少 receiver。")
@@ -457,7 +553,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /**
    * 映射阶段 1 的 Java 8 类型引用。
    *
-   * 参数化类型、通配符和菱形都必须保留在 AST，不能退化为裸类型；数组仍明确留给阶段 2A。
+   * 参数化类型、通配符、菱形和数组都必须保留在 AST，不能退化为裸类型。
    */
   private fun typeReference(node: LezerSyntaxNode): JavaAstTypeReference = when (node.name) {
     "PrimitiveType" -> JavaAstTypeReference.Primitive(ids.next(), span(node), primitive(text(node)))
@@ -476,9 +572,19 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       )
     }
     "Wildcard" -> wildcard(node)
-    "ArrayType" -> unsupported(node, "阶段 1 尚不支持数组类型。")
+    "ArrayType" -> arrayType(node)
     "void" -> JavaAstTypeReference.Void(ids.next(), span(node))
     else -> unsupported(node, "阶段 1 不支持该类型。")
+  }
+
+  /** 将前置方括号的 ArrayType 映射为已有的组件类型加固定维度数。 */
+  private fun arrayType(node: LezerSyntaxNode): JavaAstTypeReference.Array {
+    val component = node.children().firstOrNull {
+      it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS && it.name != "ArrayType"
+    } ?: unsupported(node, "数组类型缺少组件类型。")
+    val dimensions = node.children().count { it.name == "Dimension" }
+    if (dimensions == 0) unsupported(node, "数组类型缺少维度。")
+    return JavaAstTypeReference.Array(ids.next(), span(node), typeReference(component), dimensions)
   }
 
   /** 从 declaration 的类型 CST 子节点构建类型，并排除泛型参数与注解内部类型。 */
@@ -490,6 +596,37 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       .minWithOrNull(compareBy<LezerSyntaxNode> { it.from }.thenByDescending { it.to })
       ?: unsupported(this, "声明缺少支持的类型。")
     return typeReference(type)
+  }
+
+  /**
+   * 拒绝变量名后的 `[]`，避免 `int value[]` 被现有共享声明类型静默降成 int。
+   *
+   * 只检查 Definition 所在声明节点的直接后继，且不深入 initializer：数组创建、索引表达式中的
+   * Dimension 也在名称之后，若递归扫描会把合法的数组创建初始化器误判为后置维度。
+   * LezerSyntaxNode 是 cursor wrapper，不能依赖 wrapper 引用相同；这里以节点名称和源码区间
+   * 在直接 child 中定位 Definition。
+   * 前置 `int[] value` 的 Dimension 位于 ArrayType 内，仍由 [arrayType] 正常保留。
+   */
+  private fun rejectPostNameDimensions(definition: LezerSyntaxNode, declarationName: String) {
+    val declaration = definition.parent ?: unsupported(definition, "${declarationName}缺少声明容器。")
+    val suffixDimension = declaration.children()
+      .dropWhile { it.name != definition.name || it.from != definition.from || it.to != definition.to }
+      .drop(1)
+      .takeWhile { child ->
+        text(child) != "=" && child.name != "AssignOp" && child.name != "VariableInitializer" &&
+          child.name !in EXPRESSION_NODES
+      }
+      .firstOrNull { it.name == "Dimension" }
+    suffixDimension?.let {
+      unsupported(it, "阶段 2A 仅支持前置数组维度，${declarationName}不能在名称后声明 []。")
+    }
+  }
+
+  /** 拒绝方法 FormalParameters 后的返回类型后置维度 `int value()[]`。 */
+  private fun rejectReturnDimensions(node: LezerSyntaxNode) {
+    node.children().firstOrNull { it.name == "Dimension" }?.let {
+      unsupported(it, "阶段 2A 仅支持前置数组维度，方法返回类型不能在参数列表后声明 []。")
+    }
   }
 
   /** 读取 GenericType 的 TypeArguments，直接 child 只保留一个类型实参层级。 */
@@ -664,6 +801,20 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /** 取得唯一 expression child，否则明确报 unsupported。 */
   private fun LezerSyntaxNode.onlyExpression() = expressions().singleOrNull() ?: unsupported(this, "无法唯一确定表达式。")
 
+  /**
+   * 返回语句只有没有非 token child 时才表示 `return;`。
+   *
+   * 这样未映射的新 expression 不会因 expressions() 过滤而被静默擦除成无返回值语句。
+   */
+  private fun LezerSyntaxNode.returnExpression(): JavaAstExpression? {
+    val valueNodes = children().filterNot { child ->
+      child.trivia() || text(child) == "return" || text(child) == ";"
+    }
+    if (valueNodes.isEmpty()) return null
+    if (valueNodes.size != 1) unsupported(this, "return 包含多个表达式。")
+    return expression(valueNodes.single())
+  }
+
   /** 仅解开不承载语义的单 child expression wrapper。 */
   private fun LezerSyntaxNode.unwrap(): LezerSyntaxNode {
     var current = this
@@ -725,7 +876,8 @@ private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation"
 private val THROWS_CLAUSES = setOf("Throws")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")
 private val MODIFIERS = mapOf("public" to JavaAstModifier.PUBLIC, "protected" to JavaAstModifier.PROTECTED, "private" to JavaAstModifier.PRIVATE, "abstract" to JavaAstModifier.ABSTRACT, "static" to JavaAstModifier.STATIC, "final" to JavaAstModifier.FINAL)

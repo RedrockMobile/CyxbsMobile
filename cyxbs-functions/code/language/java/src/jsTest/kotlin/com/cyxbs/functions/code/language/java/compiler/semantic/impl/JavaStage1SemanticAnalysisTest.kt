@@ -1,12 +1,16 @@
 package com.cyxbs.functions.code.language.java.compiler.semantic.impl
 
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.JavaCompilerPhaseResult
 import com.cyxbs.functions.code.language.java.compiler.frontend.JavaLezerAstFrontend
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaDispatchKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaConstructorDelegationKind
+import com.cyxbs.functions.code.language.java.compiler.semantic.JavaConstantValue
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticCallableKind
+import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticConversion
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticModel
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticType
+import com.cyxbs.functions.code.language.java.compiler.semantic.JavaStringConversionKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSymbolKind
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
@@ -369,6 +373,147 @@ class JavaStage1SemanticAnalysisTest {
         "Main.java" to "class Base{} class Box<T extends Base>{} class Main { Box<String> invalid; }",
       ),
       "java.semantic.type_argument_bound",
+    )
+  }
+
+  /** 一维数组创建、初始化、索引、length 与元素更新必须产出完整类型和转换绑定。 */
+  @Test
+  fun supportsOneDimensionalArrayOperations() {
+    val result = analyze(
+      "Main.java" to """
+        class Box<T> { }
+        class Main {
+          static Box<?>[] wildcardArray() { return new Box<?>[1]; }
+          static int run(byte index) {
+            final int[] initialized = new int[]{1, 2};
+            int[] sized = new int[2];
+            initialized[index] += 2;
+            sized[index]++;
+            return initialized.length + initialized[index] + sized[index];
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    assertTrue(model.expressionTypes.values.any { it is JavaSemanticType.Array })
+    assertEquals(1, model.arrayLengthExpressions.size)
+    assertTrue(
+      model.conversions.values.any {
+        it == JavaSemanticConversion.PrimitiveWidening(
+          JavaAstPrimitiveType.BYTE,
+          JavaAstPrimitiveType.INT,
+        )
+      },
+    )
+    assertTrue(model.expressionTypes.values.none { it == JavaSemanticType.Error })
+  }
+
+  /** 数组形态、索引、元素和 length 的越界语义都应产生稳定诊断。 */
+  @Test
+  fun rejectsUnsupportedOrInvalidArrayOperations() {
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static int[] bad() { return new int[1L]; } }"),
+      "java.semantic.array_index_type",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to
+          "class Main { static int bad(boolean index) { int[] a = new int[1]; return a[index]; } }",
+      ),
+      "java.semantic.array_index_type",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static int[] bad() { return new int[]{1L}; } }"),
+      "java.semantic.array_initializer_type_mismatch",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to
+          "class Main { static void bad() { int[] a = new int[1]; a[0] = \"bad\"; } }",
+      ),
+      "java.semantic.type_mismatch",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to
+          "class Main { static void bad() { int[] a = new int[1]; a.length = 2; } }",
+      ),
+      "java.semantic.invalid_assignment_target",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static int[][] bad() { return new int[1][2]; } }"),
+      "java.semantic.multidimensional_array_creation_unsupported",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static int[][] bad() { return new int[][]{{1}}; } }"),
+      "java.semantic.nested_array_initializer_unsupported",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main<T> { T[] bad() { return new T[1]; } }"),
+      "java.semantic.generic_array_creation_unsupported",
+    )
+  }
+
+  /** String `+` 和 `+=` 记录逐操作数转换，保证 char/null 等不依赖 JavaScript 动态加法。 */
+  @Test
+  fun recordsRestrictedStringConcatenationBindings() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static String numbers() { return 1 + 2 + "n"; }
+          static String run(boolean flag) {
+            String value = "v";
+            value += 'A';
+            return value + null + flag + 1;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val bindings = model.stringConcatenations.values
+    assertEquals(5, bindings.size)
+    assertTrue(model.constants.values.any { it == JavaConstantValue.IntValue('A'.code) })
+    assertTrue(bindings.any {
+      it.leftKind == JavaStringConversionKind.INT_LIKE &&
+        it.rightKind == JavaStringConversionKind.STRING
+    })
+    assertTrue(bindings.any {
+      it.leftKind == JavaStringConversionKind.STRING &&
+        it.rightKind == JavaStringConversionKind.CHAR
+    })
+    assertTrue(bindings.any { it.rightKind == JavaStringConversionKind.NULL })
+    assertTrue(bindings.any { it.rightKind == JavaStringConversionKind.BOOLEAN })
+    assertTrue(bindings.any { it.rightKind == JavaStringConversionKind.INT_LIKE })
+  }
+
+  /** 首批不借用 boxing、Object.toString 或后端长整型/浮点格式化完成 String 拼接。 */
+  @Test
+  fun rejectsStringConcatenationWithoutFrozenRuntimeConversion() {
+    assertDiagnostic(
+      analyze(
+        "Main.java" to
+          "class Main { static String bad(Object value) { return \"v\" + value; } }",
+      ),
+      "java.semantic.string_concat_operand_unsupported",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to
+          "class Main { static String bad() { int[] value = new int[1]; return \"v\" + value; } }",
+      ),
+      "java.semantic.string_concat_operand_unsupported",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static String bad(long value) { return \"v\" + value; } }"),
+      "java.semantic.string_concat_operand_unsupported",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static String bad(double value) { return \"v\" + value; } }"),
+      "java.semantic.string_concat_operand_unsupported",
     )
   }
 

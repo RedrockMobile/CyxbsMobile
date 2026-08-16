@@ -183,6 +183,46 @@ class JavaTypeRelationsTest {
     assertNull(fixture.relations.assignmentConversion(booleanType, intType))
   }
 
+  /** 引用数组保持 Java 协变，primitive 数组只接受完全相同的 component 类型。 */
+  @Test
+  fun appliesArraySubtypeAndAssignmentRules() {
+    val fixture = standardFixture()
+    val stringArray = JavaSemanticType.Array(fixture.stringType)
+    val objectArray = JavaSemanticType.Array(fixture.objectType)
+    val intArray = JavaSemanticType.Array(
+      JavaSemanticType.Primitive(JavaAstPrimitiveType.INT),
+    )
+    val longArray = JavaSemanticType.Array(
+      JavaSemanticType.Primitive(JavaAstPrimitiveType.LONG),
+    )
+
+    assertTrue(fixture.relations.isSubtype(stringArray, objectArray))
+    assertEquals(
+      JavaSemanticConversion.ReferenceWidening(stringArray, objectArray),
+      fixture.relations.assignmentConversion(stringArray, objectArray),
+    )
+    assertFalse(fixture.relations.isSubtype(intArray, longArray))
+    assertNull(fixture.relations.assignmentConversion(intArray, longArray))
+  }
+
+  /** 数组是引用值：可拓宽到 Object，也可接收 null，而无需 boxing。 */
+  @Test
+  fun convertsArraysAsReferenceValues() {
+    val fixture = standardFixture()
+    val intArray = JavaSemanticType.Array(
+      JavaSemanticType.Primitive(JavaAstPrimitiveType.INT),
+    )
+
+    assertEquals(
+      JavaSemanticConversion.ReferenceWidening(intArray, fixture.objectType),
+      fixture.relations.assignmentConversion(intArray, fixture.objectType),
+    )
+    assertEquals(
+      JavaSemanticConversion.ReferenceWidening(JavaSemanticType.Null, intArray),
+      fixture.relations.assignmentConversion(JavaSemanticType.Null, intArray),
+    )
+  }
+
   /** 类型变量擦除使用首上界，并去除声明类型的泛型实参。 */
   @Test
   fun erasesTypeVariableToItsFirstUpperBound() {

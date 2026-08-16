@@ -326,6 +326,30 @@ internal sealed interface JavaSemanticConversion {
   ) : JavaSemanticConversion
 }
 
+/**
+ * String 拼接单个操作数的 Java 源语言转换类别。
+ *
+ * 该分类刻意不包含任意引用、数组、long 与浮点类型：它们需要尚未进入本阶段的
+ * String.valueOf/toString 或后端数值格式化契约，语义阶段必须稳定拒绝而不能借用 JS 动态 `+`。
+ */
+internal enum class JavaStringConversionKind {
+  STRING,
+  NULL,
+  BOOLEAN,
+  CHAR,
+  INT_LIKE,
+}
+
+/**
+ * 一个 String `+` 或 `+=` 节点两侧已经确定的转换策略。
+ *
+ * lowering 必须消费该绑定生成显式字符串转换，不能仅根据结果类型重新猜测操作数语义。
+ */
+internal data class JavaStringConcatenationBinding(
+  val leftKind: JavaStringConversionKind,
+  val rightKind: JavaStringConversionKind,
+)
+
 /** 编译期常量；阶段 0 仅登记保证能无损进入 IR 的类型。 */
 internal sealed interface JavaConstantValue {
   data class BooleanValue(val value: Boolean) : JavaConstantValue
@@ -359,6 +383,9 @@ internal data class JavaSemanticModel(
   val overriddenMethods: Map<JavaSymbolId, List<JavaSymbolId>> = emptyMap(),
   val constructorDelegations:
     Map<JavaSymbolId, JavaConstructorDelegation> = emptyMap(),
+  val stringConcatenations:
+    Map<JavaNodeId, JavaStringConcatenationBinding> = emptyMap(),
+  val arrayLengthExpressions: Set<JavaNodeId> = emptySet(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

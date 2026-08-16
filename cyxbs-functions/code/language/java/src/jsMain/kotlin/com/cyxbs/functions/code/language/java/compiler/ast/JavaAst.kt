@@ -384,6 +384,29 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     val arguments: List<JavaAstExpression>,
   ) : JavaAstExpression
 
+  /**
+   * 数组创建表达式。
+   *
+   * [componentType] 不包含维度；每个 [dimensions] 依源码顺序保留，未填写大小的维度以
+   * [JavaAstArrayDimension.size] 为 `null` 表示。直接花括号初始化器也统一规范化为该节点，
+   * 以便后续语义阶段在同一入口校验维度与元素类型。
+   */
+  data class NewArray(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val componentType: JavaAstTypeReference,
+    val dimensions: List<JavaAstArrayDimension>,
+    val initializer: JavaAstArrayInitializer?,
+  ) : JavaAstExpression
+
+  /** 数组下标访问；赋值目标合法性和元素类型由语义阶段决定。 */
+  data class ArrayAccess(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val array: JavaAstExpression,
+    val index: JavaAstExpression,
+  ) : JavaAstExpression
+
   /** 实例或静态字段访问；具体分派由语义阶段确定。 */
   data class FieldAccess(
     override val nodeId: JavaNodeId,
@@ -398,6 +421,34 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     override val span: JavaSourceSpan,
     val expression: JavaAstExpression,
   ) : JavaAstExpression
+}
+
+/** 数组创建中单个 `[...]` 维度；[size] 为 null 表示由初始化器或后续维度决定长度。 */
+internal data class JavaAstArrayDimension(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val size: JavaAstExpression?,
+) : JavaAstNode
+
+/**
+ * 数组花括号初始化器。
+ *
+ * 花括号不是可独立出现的 Java expression，故使用专用节点保留递归结构，避免错误地允许
+ * `return { ... };` 一类语法。
+ */
+internal data class JavaAstArrayInitializer(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val elements: List<JavaAstArrayInitializerElement>,
+) : JavaAstNode
+
+/** 数组初始化器元素：普通表达式或嵌套花括号初始化器。 */
+internal sealed interface JavaAstArrayInitializerElement {
+  /** 普通数组元素表达式。 */
+  data class Expression(val expression: JavaAstExpression) : JavaAstArrayInitializerElement
+
+  /** 多维数组的嵌套花括号初始化器。 */
+  data class Nested(val initializer: JavaAstArrayInitializer) : JavaAstArrayInitializerElement
 }
 
 /** Java 字面量分类。 */

@@ -1,6 +1,9 @@
 package com.cyxbs.functions.code.language.java.compiler.frontend
 
+import com.cyxbs.functions.code.language.java.parser
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAssignmentOperator
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializerElement
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
@@ -12,6 +15,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeReference
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspace
+import com.cyxbs.functions.code.language.lezer.LezerSyntaxNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -85,12 +89,105 @@ class JavaLezerAstFrontendTest {
     assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
-  /** 阶段 1 继续拒绝数组和 vararg，不能把它们静默降成普通类型或参数。 */
+  /** vararg 仍未开放，不能被静默降成普通数组参数。 */
   @Test
-  fun rejectsUnsupportedTypeWrappers() {
+  fun rejectsUnsupportedVarargWithoutErasure() {
+    val result = parse("class Main { static int value(int... items) { return 0; } }")
+
+    assertFalse(result.isSuccess)
+    assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
+  }
+
+  /**
+   * 真实 @lezer/java CST 的数组节点必须完整映射为 AST，且 String `+` 仍只是普通 ADD。
+   *
+   * 同时断言关键节点的直接 child 名称，防止 adapter 仅因宽松的 descendants 查找而偶然通过。
+   */
+  @Test
+  fun mapsArraysFromRealLezerCstWithoutSpecialCasingStringConcatenation() {
+    val source =
+      """
+      class Main {
+        int[] field;
+        String[][] matrix = new String[2][3];
+        int[] shorthand = {1, 2};
+        int[][] nested = new int[][]{{1}, {2}};
+        int read(int[] values, int index) { return values[index]; }
+        int length(int[] values) { return values.length; }
+        int[] generated() { return new int[3]; }
+        String text() { return "x" + 1 + 2; }
+      }
+      """.trimIndent()
+    val tree = parser.parse(source)
+    val nodes = tree.topNode.descendants().toList()
+
+    assertEquals(listOf("PrimitiveType", "Dimension"), nodes.first { it.name == "ArrayType" }.childNames())
+    assertEquals(listOf("new", "TypeName", "Dimension", "Dimension"), nodes.first {
+      it.name == "ArrayCreationExpression" && source.substring(it.from, it.to) == "new String[2][3]"
+    }.childNames())
+    assertEquals(listOf("new", "PrimitiveType", "Dimension", "Dimension", "ArrayInitializer"), nodes.first {
+      it.name == "ArrayCreationExpression" && source.substring(it.from, it.to) == "new int[][]{{1}, {2}}"
+    }.childNames())
+    // 简写 initializer 没有 VariableInitializer wrapper，而是直接位于 VariableDeclarator。
+    assertEquals(listOf("Definition", "AssignOp", "ArrayInitializer"), nodes.first {
+      it.name == "VariableDeclarator" && source.substring(it.from, it.to) == "shorthand = {1, 2}"
+    }.childNames())
+    // @lezer/java 的外层 ArrayAccess 直接保存 receiver；只有二维访问的 receiver 才会是内层 ArrayAccess。
+    assertEquals(listOf("Identifier", "[", "Identifier", "]"), nodes.first {
+      it.name == "ArrayAccess" && source.substring(it.from, it.to) == "values[index]"
+    }.childNames())
+    assertEquals(listOf("Identifier", ".", "Identifier"), nodes.first {
+      it.name == "FieldAccess" && source.substring(it.from, it.to) == "values.length"
+    }.childNames())
+    assertEquals(listOf("BinaryExpression", "ArithOp", "IntegerLiteral"), nodes.first {
+      it.name == "BinaryExpression" && source.substring(it.from, it.to) == "\"x\" + 1 + 2"
+    }.childNames())
+
+    val result = parse(source)
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val members = assertNotNull(result.value).units.single().types.single().members
+    val field = assertIs<JavaAstMemberDeclaration.Field>(members[0])
+    assertEquals(1, assertIs<JavaAstTypeReference.Array>(field.type).dimensions)
+    val matrix = assertIs<JavaAstMemberDeclaration.Field>(members[1])
+    val matrixCreation = assertIs<JavaAstExpression.NewArray>(matrix.declarators.single().initializer)
+    assertEquals(2, matrixCreation.dimensions.size)
+    assertTrue(matrixCreation.dimensions.all { it.size != null })
+    val shorthand = assertIs<JavaAstMemberDeclaration.Field>(members[2])
+    val shorthandCreation = assertIs<JavaAstExpression.NewArray>(shorthand.declarators.single().initializer)
+    val shorthandInitializer = assertNotNull(shorthandCreation.initializer)
+    assertEquals(2, shorthandInitializer.elements.size)
+    assertTrue(shorthandInitializer.elements.all { it is JavaAstArrayInitializerElement.Expression })
+    val nested = assertIs<JavaAstMemberDeclaration.Field>(members[3])
+    val nestedCreation = assertIs<JavaAstExpression.NewArray>(nested.declarators.single().initializer)
+    assertTrue(assertNotNull(nestedCreation.initializer).elements.all { it is JavaAstArrayInitializerElement.Nested })
+    val read = assertIs<JavaAstMemberDeclaration.Method>(members.first { it is JavaAstMemberDeclaration.Method && it.name == "read" })
+    assertIs<JavaAstExpression.ArrayAccess>(assertIs<JavaAstStatement.Return>(assertNotNull(read.body).statements.single()).expression)
+    val length = assertIs<JavaAstMemberDeclaration.Method>(members.first { it is JavaAstMemberDeclaration.Method && it.name == "length" })
+    val lengthAccess = assertIs<JavaAstExpression.FieldAccess>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(length.body).statements.single()).expression,
+    )
+    assertEquals("length", lengthAccess.fieldName)
+    val generated = assertIs<JavaAstMemberDeclaration.Method>(members.first { it is JavaAstMemberDeclaration.Method && it.name == "generated" })
+    assertIs<JavaAstExpression.NewArray>(assertIs<JavaAstStatement.Return>(assertNotNull(generated.body).statements.single()).expression)
+    val text = assertIs<JavaAstMemberDeclaration.Method>(members.first { it is JavaAstMemberDeclaration.Method && it.name == "text" })
+    val concatenation = assertIs<JavaAstExpression.Binary>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(text.body).statements.single()).expression,
+    )
+    assertEquals(JavaAstBinaryOperator.ADD, concatenation.operator)
+    assertEquals(JavaAstBinaryOperator.ADD, assertIs<JavaAstExpression.Binary>(concatenation.left).operator)
+  }
+
+  /** 后置或混合维度必须稳定拒绝，避免共享声明类型悄悄丢失数组语义。 */
+  @Test
+  fun rejectsPostNameArrayDimensionsWithoutErasure() {
     listOf(
-      "class Main { static int[] value() { return null; } }",
-      "class Main { static int value(int... items) { return 0; } }",
+      "class Main { int field[]; }",
+      "class Main { void value(int item[]) { } }",
+      "class Main { int value()[] { return null; } }",
+      "class Main { void value() { int local[]; } }",
+      "class Main { int[] mixed[]; }",
+      "class Main { int first, second[]; }",
     ).forEach { source ->
       val result = parse(source)
       assertFalse(result.isSuccess, source)
@@ -207,4 +304,26 @@ class JavaLezerAstFrontendTest {
   private fun parse(source: String) = JavaLezerAstFrontend.parse(
     JavaSourceWorkspace(listOf(JavaSourceFile(JavaSourceFileId(0), "Main.java", source))),
   )
+
+  /** 读取真实 Lezer CST 的直接子节点名称，锁定 adapter 依赖的 parser 契约。 */
+  private fun LezerSyntaxNode.childNames(): List<String> = children().map { it.name }
+
+  /** 深度优先枚举真实 Lezer CST 节点，测试只用于定位目标结构而不重建源码。 */
+  private fun LezerSyntaxNode.descendants(): Sequence<LezerSyntaxNode> = sequence {
+    children().forEach { child ->
+      yield(child)
+      yieldAll(child.descendants())
+    }
+  }
+
+  /** 枚举 CST 直接子节点，保持与 frontend adapter 相同的 cursor 读取方式。 */
+  private fun LezerSyntaxNode.children(): List<LezerSyntaxNode> {
+    val result = mutableListOf<LezerSyntaxNode>()
+    var child = firstChild
+    while (child != null) {
+      result += child
+      child = child.nextSibling
+    }
+    return result
+  }
 }

@@ -25,6 +25,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val calls = linkedMapOf<JavaNodeId, JavaCallableBinding>()
   private val constants = linkedMapOf<JavaNodeId, JavaConstantValue>()
   private val valueAccesses = linkedMapOf<JavaNodeId, JavaValueAccessBinding>()
+  private val stringConcatenations =
+    linkedMapOf<JavaNodeId, JavaStringConcatenationBinding>()
+  private val arrayLengthExpressions = linkedSetOf<JavaNodeId>()
 
   private val typeDeclarations = linkedMapOf<JavaSymbolId, JavaSemanticTypeDeclaration>()
   private val typeParameterDeclarations =
@@ -1116,6 +1119,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstExpression.Assignment -> assignment(expression)
       is JavaAstExpression.MethodInvocation -> invocation(expression)
       is JavaAstExpression.NewObject -> newObject(expression)
+      is JavaAstExpression.NewArray -> newArray(expression)
+      is JavaAstExpression.ArrayAccess -> arrayAccess(expression)
       is JavaAstExpression.FieldAccess -> fieldAccess(expression)
     }
     expressionTypes[expression.nodeId] = type
@@ -1207,7 +1212,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     if (left == JavaSemanticType.Error || right == JavaSemanticType.Error) return JavaSemanticType.Error
     return when (expression.operator) {
       JavaAstBinaryOperator.ADD -> {
-        if (isString(left) || isString(right)) stringType.selfType()
+        if (isString(left) || isString(right)) {
+          stringConcatenation(expression.nodeId, left, right, expression.span)
+        }
         else numericBinary(expression.span, left, right, relational = false)
       }
       JavaAstBinaryOperator.MULTIPLY,
@@ -1340,6 +1347,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       } else {
         JavaSemanticType.Error
       }
+    } else if (expression.operator == JavaAstAssignmentOperator.ADD_ASSIGN && isString(targetType)) {
+      stringConcatenation(expression.nodeId, targetType, valueType, expression.span)
     } else {
       compoundAssignmentType(expression.operator, targetType, valueType, expression.span)
     }
@@ -1364,7 +1373,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   ): JavaSemanticType {
     val valid = when (operator) {
       JavaAstAssignmentOperator.ADD_ASSIGN ->
-        isString(target) || numericPromotion(target, value) != null
+        numericPromotion(target, value) != null
       JavaAstAssignmentOperator.AND_ASSIGN,
       JavaAstAssignmentOperator.XOR_ASSIGN,
       JavaAstAssignmentOperator.OR_ASSIGN,
@@ -1387,10 +1396,169 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return target
   }
 
-  /** 显式字段访问区分 type-qualified、super 与普通实例 receiver。 */
+  /**
+   * 分析一维数组创建，并把大小或初始化元素的赋值转换写入通用转换表。
+   *
+   * 首批只接受一个有大小且无初始化器的维度，或一个无大小且携带一维初始化器的维度；
+   * 多维、嵌套初始化器与不可具体化泛型 component 均稳定拒绝。
+   */
+  private fun newArray(expression: JavaAstExpression.NewArray): JavaSemanticType {
+    val component = resolveType(
+      expression.componentType,
+      context().unit,
+      currentTypeParameterScope(),
+      allowVoid = false,
+    )
+    if (component == JavaSemanticType.Error) return JavaSemanticType.Error
+    if (!isReifiableArrayComponent(component)) {
+      error(
+        expression.componentType.span,
+        "java.semantic.generic_array_creation_unsupported",
+        "数组创建的 component 必须是 primitive 或可具体化的非泛型声明类型。",
+      )
+      return JavaSemanticType.Error
+    }
+    if (expression.dimensions.size != 1) {
+      expression.dimensions.forEach { dimension -> dimension.size?.let(::analyzeExpression) }
+      analyzeArrayInitializerElements(expression.initializer, component)
+      error(
+        expression.span,
+        "java.semantic.multidimensional_array_creation_unsupported",
+        "Stage2A 首批只支持一维数组创建。",
+      )
+      return JavaSemanticType.Error
+    }
+
+    val dimension = expression.dimensions.single()
+    val initializer = expression.initializer
+    return when {
+      dimension.size != null && initializer == null -> {
+        val sizeType = analyzeExpression(dimension.size)
+        if (assignArrayIndex(dimension.size, sizeType, "数组长度")) {
+          JavaSemanticType.Array(component)
+        } else {
+          JavaSemanticType.Error
+        }
+      }
+      dimension.size == null && initializer != null -> {
+        if (analyzeArrayInitializerElements(initializer, component)) {
+          JavaSemanticType.Array(component)
+        } else {
+          JavaSemanticType.Error
+        }
+      }
+      else -> {
+        dimension.size?.let(::analyzeExpression)
+        analyzeArrayInitializerElements(initializer, component)
+        error(
+          expression.span,
+          "java.semantic.invalid_array_creation_shape",
+          "数组创建必须提供一个长度，或使用一个无长度维度配合初始化器。",
+        )
+        JavaSemanticType.Error
+      }
+    }
+  }
+
+  /** 分析一维数组初始化器；嵌套花括号属于尚未开放的多维能力。 */
+  private fun analyzeArrayInitializerElements(
+    initializer: JavaAstArrayInitializer?,
+    component: JavaSemanticType,
+  ): Boolean {
+    if (initializer == null) return true
+    var valid = true
+    initializer.elements.forEach { element ->
+      when (element) {
+        is JavaAstArrayInitializerElement.Expression -> {
+          val actual = analyzeExpression(element.expression)
+          if (!assign(
+              element.expression.nodeId,
+              actual,
+              component,
+              element.expression.span,
+              code = "java.semantic.array_initializer_type_mismatch",
+              message = "数组初始化元素类型与 component 类型不兼容。",
+            )
+          ) {
+            valid = false
+          }
+        }
+        is JavaAstArrayInitializerElement.Nested -> {
+          error(
+            element.initializer.span,
+            "java.semantic.nested_array_initializer_unsupported",
+            "Stage2A 首批不支持嵌套数组初始化器。",
+          )
+          valid = false
+        }
+      }
+    }
+    return valid
+  }
+
+  /** 数组索引读取返回 component 类型；索引按赋值 widening 转成 int 并登记转换。 */
+  private fun arrayAccess(expression: JavaAstExpression.ArrayAccess): JavaSemanticType {
+    val arrayType = analyzeExpression(expression.array)
+    val indexType = analyzeExpression(expression.index)
+    val array = arrayType as? JavaSemanticType.Array
+    if (array == null) {
+      if (arrayType != JavaSemanticType.Error) {
+        error(
+          expression.array.span,
+          "java.semantic.array_receiver_required",
+          "下标访问的 receiver 必须是数组。",
+        )
+      }
+      return JavaSemanticType.Error
+    }
+    return if (assignArrayIndex(expression.index, indexType, "数组下标")) {
+      array.componentType
+    } else {
+      JavaSemanticType.Error
+    }
+  }
+
+  /** 只接受 byte/short/char/int 数组长度或索引，并把 widening 明确记录到 int。 */
+  private fun assignArrayIndex(
+    expression: JavaAstExpression,
+    actual: JavaSemanticType,
+    displayName: String,
+  ): Boolean = assign(
+    expression.nodeId,
+    actual,
+    intType(),
+    expression.span,
+    code = "java.semantic.array_index_type",
+    message = "$displayName 必须是 byte、short、char 或 int。",
+  )
+
+  /**
+   * 判断数组运行时 component 是否可具体化。
+   *
+   * 非泛型声明和仅含无界 wildcard 的声明可按擦除保留运行时身份；具体类型实参与类型变量
+   * 会丢失必要信息，必须拒绝创建。
+   */
+  private fun isReifiableArrayComponent(type: JavaSemanticType): Boolean = when (type) {
+    is JavaSemanticType.Primitive -> true
+    is JavaSemanticType.Declared -> type.arguments.all { argument ->
+      argument is JavaSemanticType.Wildcard &&
+        argument.upperBound == null && argument.lowerBound == null
+    }
+    else -> false
+  }
+
+  /** 显式字段访问区分数组 length、type-qualified、super 与普通实例 receiver。 */
   private fun fieldAccess(expression: JavaAstExpression.FieldAccess): JavaSemanticType {
     val receiver = resolveReceiver(expression.receiver)
     if (receiver == null || receiver.type == JavaSemanticType.Error) return JavaSemanticType.Error
+    if (receiver.type is JavaSemanticType.Array) {
+      if (expression.fieldName == "length" && receiver.kind == JavaReceiverKind.EXPLICIT) {
+        arrayLengthExpressions += expression.nodeId
+        return intType()
+      }
+      error(expression.span, "java.semantic.unknown_array_member", "数组只提供只读 length 成员。")
+      return JavaSemanticType.Error
+    }
     val declared = receiver.type as? JavaSemanticType.Declared
     if (declared == null) {
       error(expression.span, "java.semantic.field_receiver_not_declared", "字段 receiver 必须是 class 类型。")
@@ -1898,7 +2066,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** 登记常用 Java 字面量；浮点和 char 当前只需要类型，不写不可表达的常量值。 */
+  /** 登记常用 Java 字面量；浮点当前只需要类型，char 以无损 UTF-16 code unit 保存。 */
   private fun literal(expression: JavaAstExpression.Literal): JavaSemanticType =
     when (expression.kind) {
       JavaAstLiteralKind.BOOLEAN -> booleanType().also {
@@ -1948,13 +2116,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     )
   }
 
-  /** char literal 必须解码为一个 UTF-16 code unit。 */
+  /**
+   * char literal 必须解码为一个 UTF-16 code unit。
+   *
+   * 冻结常量契约没有独立 char 值，因此使用 [JavaConstantValue.IntValue] 无损保存 0..65535；
+   * lowering 必须读取该 side table，不能重新解析源码 token。
+   */
   private fun characterLiteral(expression: JavaAstExpression.Literal): JavaSemanticType {
     val value = decodeStage1Character(expression.tokenText)
     if (value == null) {
       error(expression.span, "java.semantic.invalid_character_literal", "char literal 必须包含一个合法字符。")
       return JavaSemanticType.Error
     }
+    constants[expression.nodeId] = JavaConstantValue.IntValue(value.code)
     return JavaSemanticType.Primitive(JavaAstPrimitiveType.CHAR)
   }
 
@@ -2081,8 +2255,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     else -> false
   }
 
-  /** Name/FieldAccess 是 Stage1 可写左值。 */
+  /** Name、FieldAccess 与 ArrayAccess 是 Stage2A 可写左值；数组 length 仍保持只读。 */
   private fun writable(expression: JavaAstExpression): Boolean {
+    if (expression is JavaAstExpression.ArrayAccess) return true
     if (expression !is JavaAstExpression.Name && expression !is JavaAstExpression.FieldAccess) return false
     val kind = resolved[expression.nodeId]?.let(symbols::get)?.kind
     return kind == JavaSymbolKind.PARAMETER || kind == JavaSymbolKind.LOCAL_VARIABLE ||
@@ -2372,6 +2547,46 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private fun isString(type: JavaSemanticType): Boolean =
     type is JavaSemanticType.Declared && type.symbol == stringType.symbol
 
+  /**
+   * 校验并登记本阶段支持的 String 拼接转换。
+   *
+   * 任意对象、数组、long 与浮点数需要尚未冻结的运行时字符串化规则，因此在这里稳定拒绝。
+   */
+  private fun stringConcatenation(
+    nodeId: JavaNodeId,
+    left: JavaSemanticType,
+    right: JavaSemanticType,
+    span: JavaSourceSpan,
+  ): JavaSemanticType {
+    val leftKind = stringConversionKind(left)
+    val rightKind = stringConversionKind(right)
+    if (leftKind == null || rightKind == null) {
+      error(
+        span,
+        "java.semantic.string_concat_operand_unsupported",
+        "String 拼接暂只支持 String、null、boolean、byte、short、char 与 int。",
+      )
+      return JavaSemanticType.Error
+    }
+    stringConcatenations[nodeId] = JavaStringConcatenationBinding(leftKind, rightKind)
+    return stringType.selfType()
+  }
+
+  /** 将操作数类型映射为 lowering 可直接消费的 String 转换类别。 */
+  private fun stringConversionKind(type: JavaSemanticType): JavaStringConversionKind? = when {
+    isString(type) -> JavaStringConversionKind.STRING
+    type == JavaSemanticType.Null -> JavaStringConversionKind.NULL
+    type == booleanType() -> JavaStringConversionKind.BOOLEAN
+    type == JavaSemanticType.Primitive(JavaAstPrimitiveType.CHAR) ->
+      JavaStringConversionKind.CHAR
+    type is JavaSemanticType.Primitive && type.kind in setOf(
+      JavaAstPrimitiveType.BYTE,
+      JavaAstPrimitiveType.SHORT,
+      JavaAstPrimitiveType.INT,
+    ) -> JavaStringConversionKind.INT_LIKE
+    else -> null
+  }
+
   private fun objectSemanticType() = JavaSemanticType.Declared(objectType.symbol, emptyList())
   private fun intType() = JavaSemanticType.Primitive(JavaAstPrimitiveType.INT)
   private fun longType() = JavaSemanticType.Primitive(JavaAstPrimitiveType.LONG)
@@ -2445,6 +2660,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         virtualSlots.toMap(),
         overriddenMethods.toMap(),
         constructorDelegations.toMap(),
+        stringConcatenations.toMap(),
+        arrayLengthExpressions.toSet(),
       ),
       diagnostics,
     )

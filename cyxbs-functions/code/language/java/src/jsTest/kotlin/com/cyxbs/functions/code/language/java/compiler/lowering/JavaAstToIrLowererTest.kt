@@ -43,6 +43,25 @@ class JavaAstToIrLowererTest {
     assertEquals(assignment.span, write.span)
   }
 
+  /** String `+=` 必须直接消费 semantic 转换类别，不能由 lowering 回推 JavaScript `+`。 */
+  @Test
+  fun lowersStringCompoundAssignmentFromSemanticBinding() {
+    val fixture = fixture()
+    val model = fixture.model.copy(
+      stringConcatenations = mapOf(
+        fixture.assignment.nodeId to JavaStringConcatenationBinding(
+          JavaStringConversionKind.INT_LIKE,
+          JavaStringConversionKind.INT_LIKE,
+        ),
+      ),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val expression = (method.body!!.statements[1] as JavaIrStatement.While).body
+      .let { it as JavaIrStatement.Block }.statements.single() as JavaIrStatement.Expression
+    assertTrue((expression.expression as JavaIrExpression.SetLocal).value is JavaIrExpression.StringConcat)
+  }
+
   /** return 中的 postfix 必须先保存旧值、再写回，最后返回合成 local。 */
   @Test
   fun preservesReturnPostfixValueBeforeWriteBack() {

@@ -504,12 +504,12 @@ private class BodyLowering(
     return expression(value)?.let { listOf(JavaIrStatement.Return(it, statement.span)) } ?: emptyList()
   }
 
-  /** 独立 postfix/compound 允许把 effectful field receiver 拆到临时 local。 */
+  /** 独立更新/compound 先稳定数组或字段 target，避免 read 与 write 重复求值。 */
   private fun expressionStatement(
     source: JavaAstExpression,
     span: JavaSourceSpan,
   ): List<JavaIrStatement> {
-    if (source is JavaAstExpression.Unary && source.operator.isPostfix()) {
+    if (source is JavaAstExpression.Unary && source.operator.isUpdate()) {
       val prepared = prepareTarget(source.operand) ?: return emptyList()
       return prepared.prefix + JavaIrStatement.Expression(
         increment(prepared.target, source.operator, source.span), span,
@@ -520,8 +520,8 @@ private class BodyLowering(
     ) {
       val prepared = prepareTarget(source.target) ?: return emptyList()
       val right = expression(source.value) ?: return emptyList()
-      val value = JavaIrExpression.Binary(
-        read(prepared.target, source.target.span), source.operator.toIr(), right,
+      val value = compoundValue(
+        source.nodeId, read(prepared.target, source.target.span), source.operator.toIr(), right,
         prepared.target.type, source.span,
       )
       return prepared.prefix + JavaIrStatement.Expression(
@@ -537,20 +537,130 @@ private class BodyLowering(
     val raw = when (source) {
       is JavaAstExpression.Literal -> literal(source, type)
       is JavaAstExpression.Name -> access(source, null, type)
-      is JavaAstExpression.FieldAccess -> access(source, source.receiver, type)
+      is JavaAstExpression.FieldAccess -> if (source.nodeId in lowering.model.arrayLengthExpressions) {
+        JavaIrExpression.ArrayLength(expression(source.receiver) ?: return null, type, source.span)
+      } else access(source, source.receiver, type)
       is JavaAstExpression.This -> thisExpression(source.span)
       is JavaAstExpression.Super -> invalid("Standalone super cannot enter IR.", source.span)
-      is JavaAstExpression.Binary -> JavaIrExpression.Binary(
-        expression(source.left) ?: return null, source.operator.toIr(),
-        expression(source.right) ?: return null, type, source.span,
-      )
+      is JavaAstExpression.Binary -> binary(source, type)
       is JavaAstExpression.Unary -> unary(source, type)
       is JavaAstExpression.Assignment -> assignment(source, type)
       is JavaAstExpression.MethodInvocation -> invocation(source, type)
       is JavaAstExpression.NewObject -> newObject(source, type)
+      is JavaAstExpression.NewArray -> newArray(source, type)
+      is JavaAstExpression.ArrayAccess -> arrayAccess(source, type)
       is JavaAstExpression.Parenthesized -> expression(source.expression)
-    } ?: return null
+  } ?: return null
     return conversion(source, raw, type)
+  }
+
+  /** String + 只消费 semantic binding；普通二元运算仍保留既有 typed IR 形式。 */
+  private fun binary(source: JavaAstExpression.Binary, type: JavaIrType): JavaIrExpression? {
+    val left = expression(source.left) ?: return null
+    val right = expression(source.right) ?: return null
+    val stringBinding = lowering.model.stringConcatenations[source.nodeId]
+    return if (stringBinding == null) {
+      JavaIrExpression.Binary(left, source.operator.toIr(), right, type, source.span)
+    } else {
+      stringConcat(left, stringBinding.leftKind, right, stringBinding.rightKind, type, source.span)
+    }
+  }
+
+  /** 首批只 lowering 一维创建和扁平 initializer；多维由 semantic 先稳定拒绝。 */
+  private fun newArray(source: JavaAstExpression.NewArray, type: JavaIrType): JavaIrExpression? {
+    val arrayType = type as? JavaIrType.Array ?: return invalid("Array creation result is not an array.", source.span)
+    if (arrayType.componentType is JavaIrType.Array || source.dimensions.size != 1) {
+      return unsupported("Multidimensional arrays are deferred.", source.span)
+    }
+    val initializer = source.initializer
+    if (initializer != null) {
+      if (source.dimensions.any { it.size != null }) return invalid("Array initializer cannot include a dimension size.", source.span)
+      val elements = initializer.elements.map { element ->
+        val expression = (element as? JavaAstArrayInitializerElement.Expression)?.expression
+          ?: return unsupported("Nested array initializers are deferred.", initializer.span)
+        expression(expression) ?: return null
+      }
+      return JavaIrExpression.ArrayInitializer(
+        arrayType.componentType,
+        elements,
+        arrayType,
+        source.span,
+        arrayReferenceComponentKind(source.componentType, arrayType.componentType, source.span),
+      )
+    }
+    val length = source.dimensions.single().size ?: return invalid("Array creation is missing its length.", source.span)
+    return JavaIrExpression.NewArray(
+      arrayType.componentType,
+      expression(length) ?: return null,
+      arrayType,
+      source.span,
+      arrayReferenceComponentKind(source.componentType, arrayType.componentType, source.span),
+    )
+  }
+
+  /** 将 semantic 已解析的引用组件分类传给 runtime，避免后端按 JavaScript 值猜测 String/Object。 */
+  private fun arrayReferenceComponentKind(
+    source: JavaAstTypeReference,
+    componentType: JavaIrType,
+    span: JavaSourceSpan,
+  ): JavaIrArrayReferenceComponentKind? {
+    if (componentType !is JavaIrType.Reference) return null
+    val symbol = lowering.model.resolvedSymbols[source.nodeId]
+      ?: return invalid("Array component type is missing its semantic symbol.", span)
+    val declaration = lowering.model.typeDeclarations[symbol]
+      ?: return invalid("Array component type is missing its semantic declaration.", span)
+    return when (declaration.qualifiedName) {
+      "java.lang.Object" -> JavaIrArrayReferenceComponentKind.OBJECT
+      "java.lang.String" -> JavaIrArrayReferenceComponentKind.STRING
+      else -> JavaIrArrayReferenceComponentKind.USER_CLASS
+    }
+  }
+
+  /** 数组下标读取保留 receiver/index 两个独立表达式，后端负责一次求值和检查时序。 */
+  private fun arrayAccess(source: JavaAstExpression.ArrayAccess, type: JavaIrType): JavaIrExpression? =
+    JavaIrExpression.GetArrayElement(
+      expression(source.array) ?: return null,
+      expression(source.index) ?: return null,
+      type,
+      source.span,
+    )
+
+  /** 统一构造显式 StringConcat part，禁止 backend 按 JavaScript 类型猜测转换。 */
+  private fun stringConcat(
+    left: JavaIrExpression,
+    leftKind: JavaStringConversionKind,
+    right: JavaIrExpression,
+    rightKind: JavaStringConversionKind,
+    type: JavaIrType,
+    span: JavaSourceSpan,
+  ): JavaIrExpression.StringConcat = JavaIrExpression.StringConcat(
+    listOf(
+      JavaIrStringConcatPart(left, JavaIrStringConversionKind.valueOf(leftKind.name)),
+      JavaIrStringConcatPart(right, JavaIrStringConversionKind.valueOf(rightKind.name)),
+    ),
+    type,
+    span,
+  )
+
+  /**
+   * 复合赋值同样必须读取语义提供的 String 转换绑定。
+   *
+   * [left] 已由调用者按 target 的 Java 求值顺序读取，故此处不能重新 lower target。
+   */
+  private fun compoundValue(
+    nodeId: JavaNodeId,
+    left: JavaIrExpression,
+    operator: JavaIrBinaryOperator,
+    right: JavaIrExpression,
+    type: JavaIrType,
+    span: JavaSourceSpan,
+  ): JavaIrExpression {
+    val binding = lowering.model.stringConcatenations[nodeId]
+    return if (binding == null) {
+      JavaIrExpression.Binary(left, operator, right, type, span)
+    } else {
+      stringConcat(left, binding.leftKind, right, binding.rightKind, type, span)
+    }
   }
 
   private fun literal(source: JavaAstExpression.Literal, type: JavaIrType): JavaIrExpression? {
@@ -647,8 +757,8 @@ private class BodyLowering(
     )
     JavaAstUnaryOperator.PRE_INCREMENT, JavaAstUnaryOperator.PRE_DECREMENT -> {
       val target = target(source.operand) ?: return null
-      if (!target.receiverIsStable()) {
-        return unsupported("Nested update with an effectful field receiver is deferred.", source.span)
+      if (!target.isStable()) {
+        return unsupported("Nested update with an effectful target is deferred.", source.span)
       }
       increment(target, source.operator, source.span)
     }
@@ -656,19 +766,19 @@ private class BodyLowering(
       unsupported("Nested postfix update is deferred.", source.span)
   }
 
-  /** SetField 自身保持 receiver-before-value；compound 额外要求 receiver 可稳定重复读取。 */
+  /** SetField/SetArrayElement 自身保持 target-before-value；嵌套 compound 要求 target 可稳定重读。 */
   private fun assignment(
     source: JavaAstExpression.Assignment,
     type: JavaIrType,
   ): JavaIrExpression? {
     val target = target(source.target) ?: return null
-    if (source.operator != JavaAstAssignmentOperator.ASSIGN && !target.receiverIsStable()) {
+    if (source.operator != JavaAstAssignmentOperator.ASSIGN && !target.isStable()) {
       return unsupported("Nested compound assignment with an effectful receiver is deferred.", source.span)
     }
     val right = expression(source.value) ?: return null
     val value = if (source.operator == JavaAstAssignmentOperator.ASSIGN) right else {
-      JavaIrExpression.Binary(
-        read(target, source.target.span), source.operator.toIr(), right, target.type, source.span,
+      compoundValue(
+        source.nodeId, read(target, source.target.span), source.operator.toIr(), right, target.type, source.span,
       )
     }
     return write(target, value, type, source.span)
@@ -768,6 +878,14 @@ private class BodyLowering(
 
   /** assignment/update target 同样严格读取 valueAccesses。 */
   private fun target(source: JavaAstExpression): Target? {
+    if (source is JavaAstExpression.ArrayAccess) {
+      val type = lowering.expressionType(source.nodeId, source.span) ?: return null
+      return Target.Array(
+        expression(source.array) ?: return null,
+        expression(source.index) ?: return null,
+        type,
+      )
+    }
     val binding = lowering.model.valueAccesses[source.nodeId]
       ?: return invalid("Missing writable value access binding.", source.span)
     val type = lowering.expressionType(source.nodeId, source.span) ?: return null
@@ -795,26 +913,43 @@ private class BodyLowering(
     }
   }
 
-  /** effectful receiver 先保存为 temp，使 postfix/compound 的 read 与 write 共享同一值。 */
+  /** effectful field/array target 先保存为 temp，使 postfix/compound 的 read 与 write 共享同一值。 */
   private fun prepareTarget(source: JavaAstExpression): PreparedTarget? {
     val target = target(source) ?: return null
-    if (target !is Target.Instance || target.receiverIsStable()) {
-      return PreparedTarget(emptyList(), target)
+    if (target.isStable()) return PreparedTarget(emptyList(), target)
+    return when (target) {
+      is Target.Instance -> {
+        val receiver = temporary(target.receiver.type, "fieldReceiver", source.span)
+        PreparedTarget(
+          listOf(JavaIrStatement.DeclareLocal(receiver.id, target.receiver, source.span)),
+          Target.Instance(JavaIrExpression.GetLocal(receiver.id, receiver.type, source.span), target.field, target.type),
+        )
+      }
+      is Target.Array -> {
+        // Java 先求 array 再求 index；两个临时 local 也必须沿这个顺序声明。
+        val array = temporary(target.array.type, "arrayReceiver", source.span)
+        val index = temporary(target.index.type, "arrayIndex", source.span)
+        PreparedTarget(
+          listOf(
+            JavaIrStatement.DeclareLocal(array.id, target.array, source.span),
+            JavaIrStatement.DeclareLocal(index.id, target.index, source.span),
+          ),
+          Target.Array(
+            JavaIrExpression.GetLocal(array.id, array.type, source.span),
+            JavaIrExpression.GetLocal(index.id, index.type, source.span),
+            target.type,
+          ),
+        )
+      }
+      is Target.Local, is Target.Static -> PreparedTarget(emptyList(), target)
     }
-    val receiver = temporary(target.receiver.type, "fieldReceiver", source.span)
-    return PreparedTarget(
-      listOf(JavaIrStatement.DeclareLocal(receiver.id, target.receiver, source.span)),
-      Target.Instance(
-        JavaIrExpression.GetLocal(receiver.id, receiver.type, source.span),
-        target.field, target.type,
-      ),
-    )
   }
 
   private fun read(target: Target, span: JavaSourceSpan): JavaIrExpression = when (target) {
     is Target.Local -> JavaIrExpression.GetLocal(target.local, target.type, span)
     is Target.Instance -> JavaIrExpression.GetField(target.receiver, target.field, target.type, span)
     is Target.Static -> JavaIrExpression.GetStaticField(target.field, target.type, span)
+    is Target.Array -> JavaIrExpression.GetArrayElement(target.array, target.index, target.type, span)
   }
 
   private fun write(
@@ -826,6 +961,7 @@ private class BodyLowering(
     is Target.Local -> JavaIrExpression.SetLocal(target.local, value, type, span)
     is Target.Instance -> JavaIrExpression.SetField(target.receiver, target.field, value, type, span)
     is Target.Static -> JavaIrExpression.SetStaticField(target.field, value, type, span)
+    is Target.Array -> JavaIrExpression.SetArrayElement(target.array, target.index, value, type, span)
   }
 
   private fun increment(
@@ -861,6 +997,11 @@ private class BodyLowering(
       override val type: JavaIrType,
     ) : Target
     data class Static(val field: JavaIrFieldId, override val type: JavaIrType) : Target
+    data class Array(
+      val array: JavaIrExpression,
+      val index: JavaIrExpression,
+      override val type: JavaIrType,
+    ) : Target
   }
 
   private data class PreparedTarget(
@@ -868,11 +1009,18 @@ private class BodyLowering(
     val target: Target,
   )
 
-  /** This/GetLocal receiver 可重复引用；其余 receiver 必须先保存到 temp。 */
-  private fun Target.receiverIsStable(): Boolean =
-    this !is Target.Instance ||
-      receiver is JavaIrExpression.This ||
-      receiver is JavaIrExpression.GetLocal
+  /** This/GetLocal 可重复引用；数组 target 还要求 index 已是稳定 local。 */
+  private fun Target.isStable(): Boolean = when (this) {
+    is Target.Instance -> receiver is JavaIrExpression.This || receiver is JavaIrExpression.GetLocal
+    is Target.Array -> (array is JavaIrExpression.This || array is JavaIrExpression.GetLocal) &&
+      index is JavaIrExpression.GetLocal
+    is Target.Local, is Target.Static -> true
+  }
+
+  /** 自增和自减无论前后缀，表达式语句均可安全拆成稳定 target 后的一次写回。 */
+  private fun JavaAstUnaryOperator.isUpdate(): Boolean =
+    this == JavaAstUnaryOperator.PRE_INCREMENT || this == JavaAstUnaryOperator.PRE_DECREMENT ||
+      isPostfix()
 
   private fun JavaAstUnaryOperator.isPostfix(): Boolean =
     this == JavaAstUnaryOperator.POST_INCREMENT ||

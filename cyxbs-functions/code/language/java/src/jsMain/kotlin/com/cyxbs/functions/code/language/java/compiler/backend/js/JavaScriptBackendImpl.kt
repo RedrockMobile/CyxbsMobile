@@ -25,6 +25,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStatement
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrArrayReferenceComponentKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrUnaryOperator
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
 
@@ -313,6 +314,34 @@ private class JavaScriptBackendValidator(
         if (target == null || target.kind != JavaIrMethodKind.CONSTRUCTOR || target.owner != expression.classId) invalid("Java IR object creation must target an owner constructor.", expression.span)
         expression.arguments.forEach(::validateExpression)
       }
+      is JavaIrExpression.NewArray -> {
+        validateArrayComponent(expression.componentType, expression.span)
+        validateExpression(expression.length)
+        if (!expression.length.type.isStage0Integral()) invalid("Java IR array length must be integral.", expression.length.span)
+      }
+      is JavaIrExpression.ArrayInitializer -> {
+        validateArrayComponent(expression.componentType, expression.span)
+        expression.elements.forEach(::validateExpression)
+      }
+      is JavaIrExpression.GetArrayElement -> {
+        validateExpression(expression.array)
+        validateExpression(expression.index)
+        requireArray(expression.array.type, expression.array.span)
+        if (!expression.index.type.isStage0Integral()) invalid("Java IR array index must be integral.", expression.index.span)
+      }
+      is JavaIrExpression.SetArrayElement -> {
+        validateExpression(expression.array)
+        validateExpression(expression.index)
+        validateExpression(expression.value)
+        requireArray(expression.array.type, expression.array.span)
+        if (!expression.index.type.isStage0Integral()) invalid("Java IR array index must be integral.", expression.index.span)
+      }
+      is JavaIrExpression.ArrayLength -> {
+        validateExpression(expression.array)
+        requireArray(expression.array.type, expression.array.span)
+        if (!expression.type.isStage0Integral()) invalid("Java IR array length result must be integral.", expression.span)
+      }
+      is JavaIrExpression.StringConcat -> expression.parts.forEach { part -> validateExpression(part.expression) }
     }
   }
 
@@ -348,10 +377,7 @@ private class JavaScriptBackendValidator(
         )
         else -> Unit
       }
-      is JavaIrType.Array -> unsupported(
-        "Java arrays are not available in the stage 0 JavaScript backend.",
-        span,
-      )
+      is JavaIrType.Array -> validateArrayComponent(type.componentType, span)
       is JavaIrType.Reference,
       JavaIrType.Null,
       JavaIrType.Void -> Unit
@@ -418,6 +444,20 @@ private class JavaScriptBackendValidator(
     else if (method.dispatch == JavaIrDispatchKind.STATIC || method.kind != JavaIrMethodKind.METHOD || method.body == null) invalid("Java IR instance call targets a non-executable static method.", span)
   }
 
+  /** 首批仅支持一维、当前运行时可表示的数组组件。 */
+  private fun validateArrayComponent(type: JavaIrType, span: JavaSourceSpan) {
+    if (type is JavaIrType.Array) {
+      unsupported("Multidimensional Java arrays are not available in the current JavaScript backend.", span)
+    } else {
+      validateType(type, span)
+    }
+  }
+
+  /** 数组读写与 length 都必须由明确 Array 类型驱动，不能把普通引用伪装为数组。 */
+  private fun requireArray(type: JavaIrType, span: JavaSourceSpan) {
+    if (type !is JavaIrType.Array) invalid("Java IR array operation requires an array receiver.", span)
+  }
+
   /** 记录 typed IR 已知但当前后端尚未实现的稳定诊断。 */
   private fun unsupported(message: String, span: JavaSourceSpan?) {
     diagnostics += JavaCompilerDiagnostic(
@@ -462,9 +502,13 @@ private class JavaScriptEmitter(
   /** 输出 runtime prelude、全部静态方法和稳定入口导出。 */
   fun emit(): JavaScriptProgramArtifact {
     JavaRuntimePrelude.source.lines().forEach(writer::line)
-    if (usesObjectRuntime()) {
+    if (usesRuntimeHelpers()) {
       writer.line()
       JavaRuntimePrelude.objectSource.lines().forEach(writer::line)
+    }
+    if (usesArrayOrStringRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.arrayAndStringSource.lines().forEach(writer::line)
     }
     writer.line()
     val methods = index.program.classes
@@ -492,6 +536,56 @@ private class JavaScriptEmitter(
   private fun usesObjectRuntime(): Boolean = index.program.classes.any { clazz ->
     clazz.superClass != null || clazz.fields.isNotEmpty() || clazz.staticInitializer != null ||
       clazz.instanceInitializer != null || clazz.methods.any { it.dispatch != JavaIrDispatchKind.STATIC }
+  }
+
+  /** 数组和显式 StringConcat 可存在于纯 static 程序，仍需额外 runtime helper。 */
+  private fun usesArrayOrStringRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { field -> field.initializer?.requiresArrayOrStringRuntime() == true } ||
+      clazz.methods.any { method -> method.body?.containsArrayOrStringRuntime() == true }
+  }
+
+  /** object helper 既服务字段调用，也服务数组的 null 检查。 */
+  private fun usesRuntimeHelpers(): Boolean = usesObjectRuntime() || usesArrayOrStringRuntime()
+
+  /** 扫描表达式树决定是否注入数组/字符串 helper，不影响既有纯 static 快照。 */
+  private fun JavaIrStatement.Block.containsArrayOrStringRuntime(): Boolean =
+    statements.any { statement -> statement.requiresArrayOrStringRuntime() }
+
+  /** 结构化语句的分支也必须参与扫描，否则条件路径可能缺失所需 runtime。 */
+  private fun JavaIrStatement.requiresArrayOrStringRuntime(): Boolean = when (this) {
+    is JavaIrStatement.Block -> containsArrayOrStringRuntime()
+    is JavaIrStatement.DeclareLocal -> initializer?.requiresArrayOrStringRuntime() == true
+    is JavaIrStatement.Expression -> expression.requiresArrayOrStringRuntime()
+    is JavaIrStatement.If -> condition.requiresArrayOrStringRuntime() ||
+      thenBranch.requiresArrayOrStringRuntime() ||
+      (elseBranch?.requiresArrayOrStringRuntime() == true)
+    is JavaIrStatement.While -> condition.requiresArrayOrStringRuntime() || body.requiresArrayOrStringRuntime()
+    is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrStatement.Return -> expression?.requiresArrayOrStringRuntime() == true
+    is JavaIrStatement.Throw -> expression.requiresArrayOrStringRuntime()
+  }
+
+  /** 递归扫描嵌套表达式，避免例如数组索引藏在 static 调用参数中而漏注入 helper。 */
+  private fun JavaIrExpression.requiresArrayOrStringRuntime(): Boolean = when (this) {
+    is JavaIrExpression.NewArray,
+    is JavaIrExpression.ArrayInitializer,
+    is JavaIrExpression.GetArrayElement,
+    is JavaIrExpression.SetArrayElement,
+    is JavaIrExpression.ArrayLength,
+    is JavaIrExpression.StringConcat,
+    -> true
+    is JavaIrExpression.SetLocal -> value.requiresArrayOrStringRuntime()
+    is JavaIrExpression.GetField -> receiver.requiresArrayOrStringRuntime()
+    is JavaIrExpression.SetField -> receiver.requiresArrayOrStringRuntime() || value.requiresArrayOrStringRuntime()
+    is JavaIrExpression.SetStaticField -> value.requiresArrayOrStringRuntime()
+    is JavaIrExpression.Binary -> left.requiresArrayOrStringRuntime() || right.requiresArrayOrStringRuntime()
+    is JavaIrExpression.Unary -> operand.requiresArrayOrStringRuntime()
+    is JavaIrExpression.Convert -> expression.requiresArrayOrStringRuntime()
+    is JavaIrExpression.InvokeStatic -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.InvokeSpecial -> receiver.requiresArrayOrStringRuntime() || arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.InvokeVirtual -> receiver.requiresArrayOrStringRuntime() || arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    else -> false
   }
 
   /** 先声明所有 prototype 与 class metadata，允许跨文件父类和前向静态引用。 */
@@ -761,6 +855,25 @@ private class JavaScriptEmitter(
         val args = expression.arguments.joinToString(", ") { renderExpression(it) }
         "(${JsNameMangler.classInitializer(expression.classId)}(), (() => { const value = Object.create(${JsNameMangler.prototype(expression.classId)}); ${JsNameMangler.instanceDefaultInitializer(expression.classId)}(value); ${JsNameMangler.method(expression.constructor)}.call(value${if (args.isEmpty()) "" else ", $args"}); return value; })())"
       }
+      is JavaIrExpression.NewArray ->
+        "\$__j_new_array(${renderExpression(expression.length)}, ${defaultValue(expression.componentType)}, ${renderArrayComponent(expression.componentType, expression.referenceComponentKind)})"
+      is JavaIrExpression.ArrayInitializer -> {
+        val writes = expression.elements.mapIndexed { index, element ->
+          "\$__j_array_set(value, $index, ${renderExpression(element)})"
+        }.joinToString("; ")
+        "(() => { const value = \$__j_new_array(${expression.elements.size}, ${defaultValue(expression.componentType)}, ${renderArrayComponent(expression.componentType, expression.referenceComponentKind)}); $writes${if (writes.isEmpty()) "" else ";"} return value; })()"
+      }
+      is JavaIrExpression.GetArrayElement ->
+        "((array, index) => \$__j_array(array)[\$__j_array_index(array, index)])(${renderExpression(expression.array)}, ${renderExpression(expression.index)})"
+      is JavaIrExpression.SetArrayElement ->
+        "((array, index, value) => \$__j_array_set(array, index, value))(${renderExpression(expression.array)}, ${renderExpression(expression.index)}, ${renderExpression(expression.value)})"
+      is JavaIrExpression.ArrayLength ->
+        "\$__j_array(${renderExpression(expression.array)}).length"
+      is JavaIrExpression.StringConcat -> {
+        val values = expression.parts.joinToString(", ") { part -> renderExpression(part.expression) }
+        val kinds = expression.parts.joinToString(", ") { part -> writer.stringLiteral(part.conversion.name) }
+        "\$__j_string_concat([$values], [$kinds])"
+      }
     }
   }
 
@@ -855,6 +968,27 @@ private class JavaScriptEmitter(
     }
     is JavaIrType.Reference, is JavaIrType.Array, JavaIrType.Null -> "null"
     JavaIrType.Void -> error("Void fields are invalid Java IR.")
+  }
+
+  /**
+   * 数组 component token 同时承载 primitive 窄化和引用存储检查。
+   *
+   * Object/primitive 是无条件写入，String 只接受 JS string，用户类使用 prototype 链；
+   * 因此不会把任意 JS string 错误地放入某个用户类数组。
+   */
+  private fun renderArrayComponent(
+    type: JavaIrType,
+    referenceKind: JavaIrArrayReferenceComponentKind?,
+  ): String = when (type) {
+    is JavaIrType.Primitive -> writer.stringLiteral("primitive:${type.kind.name}")
+    is JavaIrType.Reference -> when (referenceKind) {
+      JavaIrArrayReferenceComponentKind.OBJECT -> writer.stringLiteral("object")
+      JavaIrArrayReferenceComponentKind.STRING -> writer.stringLiteral("string")
+      JavaIrArrayReferenceComponentKind.USER_CLASS ->
+        index.classes[type.classId]?.let { JsNameMangler.prototype(it.id) } ?: "null"
+      null -> index.classes[type.classId]?.let { JsNameMangler.prototype(it.id) } ?: "null"
+    }
+    else -> "null"
   }
 
   /** 入口绑定已由 validator 验证唯一性，这里只执行确定性索引读取。 */

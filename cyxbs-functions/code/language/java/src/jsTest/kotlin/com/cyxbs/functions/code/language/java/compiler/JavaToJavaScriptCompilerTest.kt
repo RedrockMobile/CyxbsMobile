@@ -296,6 +296,115 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(12, (executeEntryValue(artifact, null) as Number).toInt())
   }
 
+  /** 一维数组的初始化器、默认值、索引读写、复合赋值与 length 应贯穿完整编译链。 */
+  @Test
+  fun compilesOneDimensionalArrayCoreOperations() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static int run() {
+            int[] values = new int[]{2, 3, 4};
+            boolean[] flags = new boolean[1];
+            String[] labels = new String[1];
+            values[1] += values[0];
+            values[2]++;
+            if (!flags[0] && labels[0] == null) {
+              return values.length * 100 + values[0] * 10 + values[1] + values[2];
+            }
+            return -1;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(330, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
+  /** 数组写入必须按 receiver、index、右值顺序各求值一次。 */
+  @Test
+  fun preservesArrayWriteEvaluationOrder() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static int state = 0;
+          static int[] values = new int[1];
+          static int[] array() { state = state * 10 + 1; return values; }
+          static int index() { state = state * 10 + 2; return 0; }
+          static int value() { state = state * 10 + 3; return 7; }
+
+          static int run() {
+            array()[index()] = value();
+            return state * 10 + values[0];
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(1237, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
+  /** String 拼接应保持 Java 左结合以及 null、boolean、char 和 int 的转换规则。 */
+  @Test
+  fun compilesJavaStringConcatenation() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()Ljava/lang/String;",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static String run() {
+            String value = "" + 1 + true + null;
+            value += 'A';
+            return value + ":" + (1 + 2);
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals("1truenullA:3", executeEntryValue(artifact, null) as String)
+  }
+
+  /** 数组复合赋值先按 int 运算，再在 store 边界窄化为 byte/char。 */
+  @Test
+  fun compilesPrimitiveArrayNarrowing() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static int run() {
+            byte[] bytes = new byte[1];
+            char[] chars = new char[1];
+            bytes[0] += 128;
+            chars[0]--;
+            return bytes[0] + chars[0];
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(65407, executeEntry(artifact, 0))
+  }
+
   /** 编辑器入口位置应选择所在 static 方法，并在 Java 包内部推导 descriptor。 */
   @Test
   fun compilesEntrySelectedBySourcePosition() {

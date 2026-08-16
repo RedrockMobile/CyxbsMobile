@@ -424,6 +424,20 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 阶段闸门：不依赖大规模类库的 Java 8 语言样例能够稳定编译执行，生成 JS 中不存在未解析的
 Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义。
 
+#### 当前阶段 2A 首批实现进度（2026-08-16）
+
+- 已贯通一维 primitive/引用数组的前置类型声明、`new T[n]`、一维花括号初始化器、元素读写、
+  `length`、复合赋值和 `++/--`；数组 receiver、index 与右值保持 Java 从左到右且只求值一次；
+- JS runtime 已补齐默认元素值、负长度、空数组引用、越界和引用数组协变写入检查；引用组件在
+  typed IR 中明确区分 Object、String 与用户类，非法协变写入会抛出 `ArrayStoreException`；
+- byte、short、char 与 int 数组在写回边界执行 Java 窄化，避免把 JavaScript Number 的结果直接
+  泄漏为 Java 数组元素；boolean 数组同样在统一写回入口收敛为布尔值；
+- String `+` 与 `+=` 已支持 String、null、boolean、byte、short、char 和 int，并显式保存每个
+  操作数的转换类别；任意对象、数组、long 与浮点字符串化继续返回稳定的不支持诊断；
+- 完整 `jsNodeTest` 共 164 项通过，新增真实源码到 JS 执行用例覆盖数组求值顺序、byte/char
+  写回窄化与字符串左结合，后端运行测试覆盖两类引用数组 `ArrayStoreException`；
+- 多维数组运行、嵌套初始化器、boxing/unboxing、任意对象 `toString`、接口与异常仍留给后续批次。
+
 ### 阶段 2B：精选类库与宿主桥
 
 - 先建立类与公开方法级别的 allowlist 描述，供类型检查、补全和运行实现共同读取；

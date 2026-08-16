@@ -306,6 +306,79 @@ internal sealed interface JavaIrExpression {
     override val type: JavaIrType,
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
+
+  /** 一维数组分配；length 在进入节点前已按 Java 从左到右规则求值一次。 */
+  data class NewArray(
+    val componentType: JavaIrType,
+    val length: JavaIrExpression,
+    override val type: JavaIrType.Array,
+    override val span: JavaSourceSpan,
+    /** 引用数组的运行时存储边界；primitive 数组由 [componentType] 决定窄化。 */
+    val referenceComponentKind: JavaIrArrayReferenceComponentKind? = null,
+  ) : JavaIrExpression
+
+  /** 一维数组 initializer；elements 保持源码顺序，后端不得重排或合并副作用。 */
+  data class ArrayInitializer(
+    val componentType: JavaIrType,
+    val elements: List<JavaIrExpression>,
+    override val type: JavaIrType.Array,
+    override val span: JavaSourceSpan,
+    /** 与 [NewArray.referenceComponentKind] 保持一致，供 initializer 写回使用。 */
+    val referenceComponentKind: JavaIrArrayReferenceComponentKind? = null,
+  ) : JavaIrExpression
+
+  /** Java 数组元素读取，数组与 index 均由运行时统一检查。 */
+  data class GetArrayElement(
+    val array: JavaIrExpression,
+    val index: JavaIrExpression,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /** Java 数组元素写入；赋值表达式的结果为写入后的 value。 */
+  data class SetArrayElement(
+    val array: JavaIrExpression,
+    val index: JavaIrExpression,
+    val value: JavaIrExpression,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /** Java array.length 专用节点，避免把 length 当作普通字段或 JavaScript 属性。 */
+  data class ArrayLength(
+    val array: JavaIrExpression,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /** 显式字符串拼接，part 的转换种类由语义阶段决定，后端不再猜测 Java `+`。 */
+  data class StringConcat(
+    val parts: List<JavaIrStringConcatPart>,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+}
+
+/** 引用数组写入检查不依赖 JavaScript 动态类型，明确区分 Object、String 与用户类。 */
+internal enum class JavaIrArrayReferenceComponentKind {
+  OBJECT,
+  STRING,
+  USER_CLASS,
+}
+
+/** String 拼接的单个 part；保留 Java 转换种类以隔离 JavaScript 的隐式 String 规则。 */
+internal data class JavaIrStringConcatPart(
+  val expression: JavaIrExpression,
+  val conversion: JavaIrStringConversionKind,
+)
+
+/** 已由语义分析决议的 Java String 转换；首批不包含 boxing 或任意对象 toString。 */
+internal enum class JavaIrStringConversionKind {
+  STRING,
+  NULL,
+  BOOLEAN,
+  CHAR,
+  INT_LIKE,
 }
 
 /** 精确且不依赖 JavaScript Number 表示范围的 IR 常量。 */
