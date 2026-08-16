@@ -43,6 +43,12 @@ internal data class JavaIrClass(
   val methods: List<JavaIrMethod>,
   val staticInitializer: JavaIrStatement.Block?,
   val span: JavaSourceSpan,
+  /**
+   * 非 static 字段初始化器组成的已排序语句块。
+   *
+   * 后端必须在成功完成 super 构造器调用后、当前构造器普通语句前执行一次，不能根据字段声明重新猜测。
+   */
+  val instanceInitializer: JavaIrStatement.Block? = null,
 )
 
 /** 已完成静态/实例分类的字段。 */
@@ -73,12 +79,19 @@ internal data class JavaIrMethod(
   val locals: List<JavaIrLocal>,
   val body: JavaIrStatement.Block?,
   val span: JavaSourceSpan,
+  /** 默认保留普通方法身份，兼容阶段 0 的既有位置构造调用。 */
+  val kind: JavaIrMethodKind = JavaIrMethodKind.METHOD,
 ) {
   init {
     val requiresVirtualSlot = dispatch == JavaIrDispatchKind.VIRTUAL ||
       dispatch == JavaIrDispatchKind.INTERFACE
     require(requiresVirtualSlot == (virtualSlot != null)) {
       "Only virtual and interface Java IR methods may declare a virtual slot."
+    }
+    if (kind == JavaIrMethodKind.CONSTRUCTOR) {
+      require(descriptor.endsWith(")V")) {
+        "Java IR constructors must use a descriptor with a void return type."
+      }
     }
   }
 }
@@ -98,6 +111,22 @@ internal enum class JavaIrDispatchKind {
   SPECIAL,
   VIRTUAL,
   INTERFACE,
+}
+
+/**
+ * 方法声明的语义身份。
+ *
+ * [CONSTRUCTOR] 与普通 SPECIAL 方法分离，避免后端把私有方法或 super 普通调用误当成对象初始化。
+ */
+internal enum class JavaIrMethodKind {
+  METHOD,
+  CONSTRUCTOR,
+}
+
+/** 构造器首语句的已决议委托目标。 */
+internal enum class JavaIrConstructorInvocationKind {
+  THIS,
+  SUPER,
 }
 
 /**
@@ -137,6 +166,19 @@ internal sealed interface JavaIrStatement {
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
 
+  /**
+   * 构造器的首条委托语句。
+   *
+   * [constructor] 已由语义阶段精确选定；lowering 必须确保它只出现在 CONSTRUCTOR 方法体的第一条语句，
+   * 以便后端准确插入实例字段初始化。
+   */
+  data class ConstructorInvocation(
+    val kind: JavaIrConstructorInvocationKind,
+    val constructor: JavaIrMethodId,
+    val arguments: List<JavaIrExpression>,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
   data class Return(
     val expression: JavaIrExpression?,
     override val span: JavaSourceSpan,
@@ -162,6 +204,16 @@ internal sealed interface JavaIrExpression {
   data class GetLocal(
     val local: JavaIrLocalId,
     override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /**
+   * 当前实例 receiver。
+   *
+   * 仅实例方法和构造器可产生该节点；使用 [JavaIrType.Reference] 避免把 primitive 或 null 伪装为 this。
+   */
+  data class This(
+    override val type: JavaIrType.Reference,
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 

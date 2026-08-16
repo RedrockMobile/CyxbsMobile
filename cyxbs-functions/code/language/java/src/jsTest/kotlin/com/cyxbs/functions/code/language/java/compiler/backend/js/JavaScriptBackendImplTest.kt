@@ -6,13 +6,17 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrClass
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrClassId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstant
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConversion
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrDispatchKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrExpression
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrField
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrFieldId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocal
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocalId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethod
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodId
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrProgram
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStatement
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
@@ -111,6 +115,127 @@ class JavaScriptBackendImplTest {
       diagnostic.code == "JAVA_BACKEND_UNSUPPORTED" &&
         diagnostic.message.contains("long")
     })
+  }
+
+  /** 对象创建、实例字段默认初始化和 this-free getter 必须在真实 JavaScript 中返回 Java int。 */
+  @Test
+  fun executesInstanceFieldInitialization() {
+    val artifact = assertNotNull(JavaScriptBackendImpl.generate(objectProgram(), objectEntryPoint()).value).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(7, (entry() as Number).toInt())
+  }
+
+  /** 静态前向读取、父类优先壳和分配默认值必须在生成源码中彼此独立。 */
+  @Test
+  fun emitsJavaInitializationOrderingGuards() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(initializationOrderingProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val source = artifact.source
+
+    // child id 小于 parent id 时，prototype 和默认值函数仍先依赖已声明的 parent。
+    assertTrue(source.indexOf("const \$c_9") < source.indexOf("const \$c_2"))
+    assertTrue(source.indexOf("Object.create(\$p_9)") > source.indexOf("const \$p_9"))
+    // static 字段的默认值在 state=1 前写入，显式 initializer 才保留在 clinit 内。
+    assertTrue(source.indexOf("\$c_1.values[\"\$f_11\"] = 0;") < source.indexOf("function \$i_1()"))
+    assertTrue("function \$d_2(self)" in source)
+    assertTrue("\$d_9(self);" in source)
+    assertTrue("\$d_2(value);" in source)
+    // receiver、右值/实参先进入 IIFE 参数，空检查位于函数体内。
+    assertTrue("((receiver, value) => (\$__j_non_null(receiver)" in source)
+    assertTrue("((receiver, values) => \$m_" in source)
+  }
+
+  /** 构造器委托和 virtual slot 的错误 IR 必须稳定地在 emitter 前拒绝。 */
+  @Test
+  fun rejectsIllegalConstructorDelegationAndVirtualSlots() {
+    val result = JavaScriptBackendImpl.generate(invalidConstructorAndSlotProgram(), objectEntryPoint())
+
+    assertNull(result.value)
+    assertTrue(result.diagnostics.any { it.message.contains("constructor invocation must be the constructor body's direct first statement") })
+    assertTrue(result.diagnostics.any { it.message.contains("duplicate virtual slot 7") })
+    assertTrue(result.diagnostics.any { it.message.contains("override parameters do not match") })
+  }
+
+  /** root this() 链只能在终点构造器执行一次本类初始化，不能在调用方重复执行。 */
+  @Test
+  fun initializesRootThisDelegationOnlyAtTerminalConstructor() {
+    val source = assertNotNull(
+      JavaScriptBackendImpl.generate(rootThisDelegationProgram(), objectEntryPoint()).value,
+    ).modules.single().source
+
+    assertEquals(1, source.split("\$n_1(this);").size - 1)
+  }
+
+  /** 同类 static 字段的前向读取必须得到 Java 默认值而不是 JavaScript undefined。 */
+  @Test
+  fun executesSameClassStaticForwardInitialization() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(staticForwardInitializationProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(0, (entry() as Number).toInt())
+  }
+
+  /** 父构造器虚调子类 override 时，子类字段已在调用任意构造器前按默认值可见。 */
+  @Test
+  fun exposesChildDefaultFieldDuringParentConstructorVirtualDispatch() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(parentVirtualDispatchProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(0, (entry() as Number).toInt())
+  }
+
+  /** invokestatic 与 putstatic 都必须在参数或右值副作用完成后才初始化目标类。 */
+  @Test
+  fun evaluatesStaticArgumentsAndRightHandSidesBeforeClassInitialization() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(staticInitializationOrderingProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    // read() 依次将 counter 设为 1/2；A、B 的 clinit 必须分别观察到这两个值。
+    assertEquals(12, (entry() as Number).toInt())
+  }
+
+  /** 协变返回的 override 必须共用祖先虚槽，并仍通过父类型 selected method 派发到子类实现。 */
+  @Test
+  fun dispatchesCovariantReturnOverrideThroughParentVirtualSlot() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(covariantVirtualDispatchProgram(), objectEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
+
+    assertEquals(7, (entry() as Number).toInt())
   }
 
   /** 构造包含阶段 0 完整控制流的 sum typed IR。 */
@@ -275,6 +400,367 @@ class JavaScriptBackendImplTest {
     )
   }
 
+  /** 构造一个根类字段与 static 入口交叉的最小对象 IR，锁定 root constructor 初始化规则。 */
+  private fun objectProgram(): JavaIrProgram {
+    val objectClass = JavaIrClassId(2)
+    val objectField = JavaIrField(
+      id = JavaIrFieldId(20), owner = objectClass, name = "value", type = intType,
+      isStatic = false, initializer = intConstant(7), span = span(90),
+    )
+    val constructor = JavaIrMethod(
+      id = JavaIrMethodId(12), owner = objectClass, name = "Box", descriptor = "()V",
+      dispatch = JavaIrDispatchKind.SPECIAL, virtualSlot = null, returnType = JavaIrType.Void,
+      parameters = emptyList(), locals = emptyList(),
+      body = JavaIrStatement.Block(emptyList(), span(91)), span = span(91),
+      kind = JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val created = JavaIrExpression.NewObject(
+      classId = objectClass, constructor = constructor.id, arguments = emptyList(),
+      type = JavaIrType.Reference(objectClass), span = span(92),
+    )
+    val entry = JavaIrMethod(
+      id = JavaIrMethodId(10), owner = classId, name = "entry", descriptor = "()I",
+      dispatch = JavaIrDispatchKind.STATIC, virtualSlot = null, returnType = intType,
+      parameters = emptyList(), locals = emptyList(),
+      body = JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(
+          JavaIrExpression.GetField(created, objectField.id, intType, span(93)), span(93),
+        )),
+        span(94),
+      ),
+      span = span(94),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(classId, "sample.Main", null, emptyList(), emptyList(), listOf(entry), null, span()),
+      JavaIrClass(objectClass, "sample.Box", null, emptyList(), listOf(objectField), listOf(constructor), null, span()),
+    ))
+  }
+
+  /** 覆盖静态默认值、继承 ID 逆序、构造时字段预填充和 IIFE 求值顺序的最小 IR。 */
+  private fun initializationOrderingProgram(): JavaIrProgram {
+    val parent = JavaIrClassId(9)
+    val child = JavaIrClassId(2)
+    val staticForward = JavaIrField(JavaIrFieldId(11), classId, "forward", intType, true, null, span(111))
+    val parentField = JavaIrField(JavaIrFieldId(12), parent, "parent", intType, false, null, span(112))
+    val childField = JavaIrField(JavaIrFieldId(13), child, "child", intType, false, null, span(113))
+    val parentConstructor = JavaIrMethod(
+      JavaIrMethodId(21), parent, "Parent", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(emptyList(), span(114)), span(114),
+      JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val childConstructor = JavaIrMethod(
+      JavaIrMethodId(22), child, "Child", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.ConstructorInvocation(JavaIrConstructorInvocationKind.SUPER, parentConstructor.id, emptyList(), span(115))),
+        span(115),
+      ), span(115), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val helper = JavaIrMethod(
+      JavaIrMethodId(23), classId, "helper", "(I)I", JavaIrDispatchKind.SPECIAL, null,
+      intType, listOf(local(24, "value", true)), emptyList(),
+      JavaIrStatement.Block(listOf(JavaIrStatement.Return(get(local(24, "value", true)), span(116))), span(116)), span(116),
+    )
+    val created = JavaIrExpression.NewObject(child, childConstructor.id, emptyList(), JavaIrType.Reference(child), span(117))
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.Expression(
+            JavaIrExpression.SetField(created, childField.id, intConstant(1), intType, span(118)), span(118),
+          ),
+          JavaIrStatement.Return(
+            JavaIrExpression.InvokeSpecial(created, helper.id, listOf(intConstant(2)), intType, span(119)), span(119),
+          ),
+        ), span(117),
+      ), span(117),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(child, "sample.Child", parent, emptyList(), listOf(childField), listOf(childConstructor), null, span(120)),
+      JavaIrClass(classId, "sample.Main", null, emptyList(), listOf(staticForward), listOf(entry, helper), null, span(121)),
+      JavaIrClass(parent, "sample.Parent", null, emptyList(), listOf(parentField), listOf(parentConstructor), null, span(122)),
+    ))
+  }
+
+  /** 构造非首句委托与同 owner slot 重复，用于锁定 validator 的稳定错误边界。 */
+  private fun invalidConstructorAndSlotProgram(): JavaIrProgram {
+    val parent = JavaIrClassId(8)
+    val child = JavaIrClassId(7)
+    val constructor = JavaIrMethod(
+      JavaIrMethodId(31), classId, "Main", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.Return(null, span(131)),
+          JavaIrStatement.ConstructorInvocation(JavaIrConstructorInvocationKind.THIS, JavaIrMethodId(31), emptyList(), span(132)),
+        ), span(130),
+      ), span(130), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    fun virtual(id: Int): JavaIrMethod = JavaIrMethod(
+      JavaIrMethodId(id), classId, "virtual$id", "()I", JavaIrDispatchKind.VIRTUAL, 7,
+      intType, emptyList(), emptyList(), JavaIrStatement.Block(listOf(JavaIrStatement.Return(intConstant(id), span(id))), span(id)), span(id),
+    )
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(listOf(JavaIrStatement.Return(intConstant(0), span(133))), span(133)), span(133),
+    )
+    val parentVirtual = JavaIrMethod(
+      JavaIrMethodId(34), parent, "slot", "(I)I", JavaIrDispatchKind.VIRTUAL, 8,
+      intType, listOf(local(37, "value", true)), emptyList(), JavaIrStatement.Block(listOf(JavaIrStatement.Return(intConstant(0), span(135))), span(135)), span(135),
+    )
+    val childVirtual = JavaIrMethod(
+      JavaIrMethodId(35), child, "slot", "(Z)I", JavaIrDispatchKind.VIRTUAL, 8,
+      intType, listOf(local(36, "value", true)), emptyList(), JavaIrStatement.Block(listOf(JavaIrStatement.Return(intConstant(0), span(136))), span(136)), span(136),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(classId, "sample.Main", null, emptyList(), emptyList(), listOf(entry, constructor, virtual(32), virtual(33)), null, span(134)),
+      JavaIrClass(child, "sample.Child", parent, emptyList(), emptyList(), listOf(childVirtual), null, span(137)),
+      JavaIrClass(parent, "sample.Parent", null, emptyList(), emptyList(), listOf(parentVirtual), null, span(138)),
+    ))
+  }
+
+  /** 构造根类的 this() 委托链，终点构造器没有显式 constructor invocation。 */
+  private fun rootThisDelegationProgram(): JavaIrProgram {
+    val field = JavaIrField(JavaIrFieldId(41), classId, "value", intType, false, intConstant(1), span(141))
+    val terminal = JavaIrMethod(
+      JavaIrMethodId(42), classId, "Main", "(I)V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, listOf(local(43, "unused", true)), emptyList(),
+      JavaIrStatement.Block(emptyList(), span(142)), span(142), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val delegating = JavaIrMethod(
+      JavaIrMethodId(44), classId, "Main", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.ConstructorInvocation(JavaIrConstructorInvocationKind.THIS, terminal.id, listOf(intConstant(0)), span(143))),
+        span(143),
+      ), span(143), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(listOf(JavaIrStatement.Return(intConstant(0), span(144))), span(144)), span(144),
+    )
+    return JavaIrProgram(listOf(JavaIrClass(
+      classId, "sample.Main", null, emptyList(), listOf(field), listOf(entry, terminal, delegating), null, span(145),
+    )))
+  }
+
+  /** 构造 a 读取后声明 b 的同类 static 初始化，锁定默认值在 clinit 前可见。 */
+  private fun staticForwardInitializationProgram(): JavaIrProgram {
+    val later = JavaIrField(JavaIrFieldId(51), classId, "later", intType, true, intConstant(7), span(151))
+    val earlier = JavaIrField(
+      JavaIrFieldId(52), classId, "earlier", intType, true,
+      JavaIrExpression.GetStaticField(later.id, intType, span(152)), span(152),
+    )
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(JavaIrExpression.GetStaticField(earlier.id, intType, span(153)), span(153))),
+        span(153),
+      ), span(153),
+    )
+    return JavaIrProgram(listOf(JavaIrClass(
+      classId, "sample.Main", null, emptyList(), listOf(earlier, later), listOf(entry), null, span(154),
+    )))
+  }
+
+  /** 构造父构造器中的 virtual dispatch，用主类 static 字段观测 child 默认字段。 */
+  private fun parentVirtualDispatchProgram(): JavaIrProgram {
+    val parent = JavaIrClassId(9)
+    val child = JavaIrClassId(2)
+    val observed = JavaIrField(JavaIrFieldId(61), classId, "observed", intType, true, null, span(161))
+    val childField = JavaIrField(JavaIrFieldId(62), child, "value", intType, false, null, span(162))
+    val parentThis = JavaIrExpression.This(JavaIrType.Reference(parent), span(163))
+    val virtualBody = JavaIrStatement.Block(
+      listOf(JavaIrStatement.Return(
+        JavaIrExpression.SetStaticField(
+          observed.id,
+          JavaIrExpression.GetField(parentThis, childField.id, intType, span(164)),
+          intType,
+          span(164),
+        ),
+        span(164),
+      )), span(164),
+    )
+    val parentVirtual = JavaIrMethod(
+      JavaIrMethodId(63), parent, "readChild", "()I", JavaIrDispatchKind.VIRTUAL, 4,
+      intType, emptyList(), emptyList(), virtualBody, span(163),
+    )
+    val childVirtual = JavaIrMethod(
+      JavaIrMethodId(64), child, "readChild", "()I", JavaIrDispatchKind.VIRTUAL, 4,
+      intType, emptyList(), emptyList(), virtualBody, span(165),
+    )
+    val parentConstructor = JavaIrMethod(
+      JavaIrMethodId(65), parent, "Parent", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Expression(
+          JavaIrExpression.InvokeVirtual(parentThis, parentVirtual.id, 4, emptyList(), intType, span(166)), span(166),
+        )), span(166),
+      ), span(166), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val childConstructor = JavaIrMethod(
+      JavaIrMethodId(67), child, "Child", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.ConstructorInvocation(JavaIrConstructorInvocationKind.SUPER, parentConstructor.id, emptyList(), span(167))),
+        span(167),
+      ), span(167), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val created = JavaIrExpression.NewObject(child, childConstructor.id, emptyList(), JavaIrType.Reference(child), span(168))
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.Expression(created, span(168)),
+          JavaIrStatement.Return(JavaIrExpression.GetStaticField(observed.id, intType, span(169)), span(169)),
+        ), span(168),
+      ), span(168),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(classId, "sample.Main", null, emptyList(), listOf(observed), listOf(entry), null, span(170)),
+      JavaIrClass(child, "sample.Child", parent, emptyList(), listOf(childField), listOf(childVirtual, childConstructor), null, span(171)),
+      JavaIrClass(parent, "sample.Parent", null, emptyList(), emptyList(), listOf(parentVirtual, parentConstructor), null, span(172)),
+    ))
+  }
+
+  /** 构造 A.f(read()) 与 B.x = read()，以 A/B 的 clinit 记录右值求值时序。 */
+  private fun staticInitializationOrderingProgram(): JavaIrProgram {
+    val callOwner = JavaIrClassId(2)
+    val writeOwner = JavaIrClassId(3)
+    val counter = JavaIrField(JavaIrFieldId(71), classId, "counter", intType, true, null, span(181))
+    val callObserved = JavaIrField(JavaIrFieldId(72), classId, "callObserved", intType, true, null, span(182))
+    val writeObserved = JavaIrField(JavaIrFieldId(73), classId, "writeObserved", intType, true, null, span(183))
+    val target = JavaIrField(JavaIrFieldId(74), writeOwner, "x", intType, true, null, span(184))
+    val read = JavaIrMethod(
+      JavaIrMethodId(75), classId, "read", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(
+          JavaIrExpression.SetStaticField(
+            counter.id,
+            JavaIrExpression.Binary(
+              JavaIrExpression.GetStaticField(counter.id, intType, span(185)),
+              JavaIrBinaryOperator.ADD,
+              intConstant(1),
+              intType,
+              span(185),
+            ),
+            intType,
+            span(185),
+          ),
+          span(185),
+        )), span(185),
+      ), span(185),
+    )
+    val callParameter = local(76, "value", true)
+    val call = JavaIrMethod(
+      JavaIrMethodId(77), callOwner, "f", "(I)I", JavaIrDispatchKind.STATIC, null, intType,
+      listOf(callParameter), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(get(callParameter), span(186))), span(186),
+      ), span(186),
+    )
+    val callInitializer = JavaIrStatement.Block(
+      listOf(JavaIrStatement.Expression(
+        JavaIrExpression.SetStaticField(
+          callObserved.id,
+          JavaIrExpression.GetStaticField(counter.id, intType, span(187)),
+          intType,
+          span(187),
+        ), span(187),
+      )), span(187),
+    )
+    val writeInitializer = JavaIrStatement.Block(
+      listOf(JavaIrStatement.Expression(
+        JavaIrExpression.SetStaticField(
+          writeObserved.id,
+          JavaIrExpression.GetStaticField(counter.id, intType, span(188)),
+          intType,
+          span(188),
+        ), span(188),
+      )), span(188),
+    )
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(
+          JavaIrStatement.Expression(
+            JavaIrExpression.InvokeStatic(call.id, listOf(JavaIrExpression.InvokeStatic(read.id, emptyList(), intType, span(189))), intType, span(189)),
+            span(189),
+          ),
+          JavaIrStatement.Expression(
+            JavaIrExpression.SetStaticField(target.id, JavaIrExpression.InvokeStatic(read.id, emptyList(), intType, span(190)), intType, span(190)),
+            span(190),
+          ),
+          JavaIrStatement.Return(
+            JavaIrExpression.Binary(
+              JavaIrExpression.Binary(
+                JavaIrExpression.GetStaticField(callObserved.id, intType, span(191)),
+                JavaIrBinaryOperator.MULTIPLY,
+                intConstant(10),
+                intType,
+                span(191),
+              ),
+              JavaIrBinaryOperator.ADD,
+              JavaIrExpression.GetStaticField(writeObserved.id, intType, span(191)),
+              intType,
+              span(191),
+            ),
+            span(191),
+          ),
+        ), span(189),
+      ), span(189),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(classId, "sample.Main", null, emptyList(), listOf(counter, callObserved, writeObserved), listOf(entry, read), null, span(192)),
+      JavaIrClass(callOwner, "sample.A", null, emptyList(), emptyList(), listOf(call), callInitializer, span(193)),
+      JavaIrClass(writeOwner, "sample.B", null, emptyList(), listOf(target), emptyList(), writeInitializer, span(194)),
+    ))
+  }
+
+  /** 构造 A.self(): A 与 B.self(): B，通过 A 的 selected method 调用 B override。 */
+  private fun covariantVirtualDispatchProgram(): JavaIrProgram {
+    val parent = JavaIrClassId(8)
+    val child = JavaIrClassId(7)
+    val marker = JavaIrField(JavaIrFieldId(81), child, "marker", intType, false, intConstant(7), span(201))
+    val parentSelf = JavaIrMethod(
+      JavaIrMethodId(82), parent, "self", "()Lsample/A;", JavaIrDispatchKind.VIRTUAL, 9,
+      JavaIrType.Reference(parent), emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(JavaIrExpression.This(JavaIrType.Reference(parent), span(202)), span(202))), span(202),
+      ), span(202),
+    )
+    val childSelf = JavaIrMethod(
+      JavaIrMethodId(83), child, "self", "()Lsample/B;", JavaIrDispatchKind.VIRTUAL, 9,
+      JavaIrType.Reference(child), emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(JavaIrExpression.This(JavaIrType.Reference(child), span(203)), span(203))), span(203),
+      ), span(203),
+    )
+    val parentConstructor = JavaIrMethod(
+      JavaIrMethodId(84), parent, "A", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(emptyList(), span(204)), span(204), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val childConstructor = JavaIrMethod(
+      JavaIrMethodId(85), child, "B", "()V", JavaIrDispatchKind.SPECIAL, null,
+      JavaIrType.Void, emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.ConstructorInvocation(JavaIrConstructorInvocationKind.SUPER, parentConstructor.id, emptyList(), span(205))),
+        span(205),
+      ), span(205), JavaIrMethodKind.CONSTRUCTOR,
+    )
+    val created = JavaIrExpression.NewObject(child, childConstructor.id, emptyList(), JavaIrType.Reference(child), span(206))
+    val entry = JavaIrMethod(
+      JavaIrMethodId(10), classId, "entry", "()I", JavaIrDispatchKind.STATIC, null, intType,
+      emptyList(), emptyList(), JavaIrStatement.Block(
+        listOf(JavaIrStatement.Return(
+          JavaIrExpression.GetField(
+            JavaIrExpression.InvokeVirtual(created, parentSelf.id, 9, emptyList(), JavaIrType.Reference(parent), span(207)),
+            marker.id,
+            intType,
+            span(207),
+          ),
+          span(207),
+        )), span(207),
+      ), span(207),
+    )
+    return JavaIrProgram(listOf(
+      JavaIrClass(classId, "sample.Main", null, emptyList(), emptyList(), listOf(entry), null, span(208)),
+      JavaIrClass(child, "sample.B", parent, emptyList(), listOf(marker), listOf(childSelf, childConstructor), null, span(209)),
+      JavaIrClass(parent, "sample.A", null, emptyList(), emptyList(), listOf(parentSelf, parentConstructor), null, span(210)),
+    ))
+  }
+
   /** 创建阶段 0 的单个静态方法，未指定 locals 时保持空集合。 */
   private fun method(
     id: Int,
@@ -350,6 +836,8 @@ class JavaScriptBackendImplTest {
 
   /** 生成 long 拒绝测试的入口定位。 */
   private fun longEntryPoint(): JavaCompilerEntryPoint = entryPoint("longValue", "()J")
+
+  private fun objectEntryPoint(): JavaCompilerEntryPoint = entryPoint("entry", "()I")
 
   /** 统一构造 Java 编译入口，避免测试意外依赖名称解析。 */
   private fun entryPoint(name: String, descriptor: String): JavaCompilerEntryPoint = JavaCompilerEntryPoint(

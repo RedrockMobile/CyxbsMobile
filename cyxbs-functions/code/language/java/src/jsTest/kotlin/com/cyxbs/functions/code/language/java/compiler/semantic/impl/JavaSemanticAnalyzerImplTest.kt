@@ -194,6 +194,7 @@ class JavaSemanticAnalyzerImplTest {
     assertEquals(listOf(JavaSemanticType.Primitive(
       com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType.INT,
     )), selected.parameterTypes)
+    assertEquals("(I)I", selected.erasedDescriptor)
   }
 
   /** null 同时兼容多个引用重载时必须报告歧义而不是任选一个。 */
@@ -282,14 +283,23 @@ class JavaSemanticAnalyzerImplTest {
     assertDiagnostic(missing, "java.semantic.unknown_import")
   }
 
-  /** 顶层 class 不能使用仅适用于成员类型的 private、protected 或 static。 */
+  /** 顶层 class 的非法 modifier 应在严格 Java 方言前端直接拒绝。 */
   @Test
   fun rejectsInvalidTopLevelModifiers() {
     listOf("private", "protected", "static").forEach { modifier ->
-      val result = analyze(
-        "Main.java" to "$modifier class Main { static int value() { return 1; } }",
+      val result = JavaLezerAstFrontend.parse(
+        JavaSourceWorkspace(
+          listOf(
+            JavaSourceFile(
+              JavaSourceFileId(0),
+              "Main.java",
+              "$modifier class Main { static int value() { return 1; } }",
+            ),
+          ),
+        ),
       )
-      assertDiagnostic(result, "java.semantic.invalid_top_level_modifier")
+      assertFalse(result.isSuccess)
+      assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
     }
   }
 

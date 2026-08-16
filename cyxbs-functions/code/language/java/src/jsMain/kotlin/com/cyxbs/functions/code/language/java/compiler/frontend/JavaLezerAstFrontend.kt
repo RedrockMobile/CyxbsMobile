@@ -3,8 +3,10 @@ package com.cyxbs.functions.code.language.java.compiler.frontend
 import com.cyxbs.functions.code.language.java.parser
 import com.cyxbs.functions.code.language.java.compiler.JavaAstFrontend
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAssignmentOperator
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAnnotation
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCompilationUnit
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstImport
@@ -16,6 +18,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstStatement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclarationKind
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeParameter
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeReference
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstUnaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstVariableDeclarator
@@ -30,7 +33,7 @@ import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspac
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxNode
 
 /**
- * 从 @lezer/java 的 CST 严格构建阶段 0 AST。
+ * 从 @lezer/java 的 CST 严格构建 Stage1 AST。
  *
  * Lezer 可为编辑器恢复不完整源码；编译器先拒绝 error 节点，再只接受明确映射的 Java 8 子集，
  * 因而不会把恢复树或半成品 AST 交给后续语义阶段。
@@ -75,9 +78,9 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   fun build(root: LezerSyntaxNode): JavaAstCompilationUnit {
     val packageNode = root.children().firstOrNull { it.name == "PackageDeclaration" }
     val types = root.children().filter { it.name in TYPE_NODES }
-    if (types.isEmpty()) unsupported(root, "阶段 0 至少需要一个顶层 class。")
+    if (types.isEmpty()) unsupported(root, "Stage1 至少需要一个顶层 class 或 interface。")
     if (root.children().any { it.name !in TYPE_NODES + setOf("PackageDeclaration", "ImportDeclaration", ";") && !it.trivia() }) {
-      unsupported(root, "阶段 0 不支持该顶层语法。")
+      unsupported(root, "Stage1 不支持该顶层语法。")
     }
     return JavaAstCompilationUnit(
       ids.next(), span(root), file, packageNode?.qualifiedName(),
@@ -96,80 +99,169 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       node.children().any { text(it) == "static" }, node.descendants().any { text(it) == "*" })
   }
 
-  /** 阶段 0 只开放 class 和其中的 static 方法、字段。 */
+  /**
+   * 构建阶段 1 的 class 或 interface。
+   *
+   * 继承和泛型必须从 CST 的专用 clause 读取，不能仅保留 class 名称后把这些结构静默降级；
+   * interface 虽可构建 AST，但其执行语义仍由后续阶段决定是否开放。
+   */
   private fun type(node: LezerSyntaxNode): JavaAstTypeDeclaration {
-    if (node.name != "ClassDeclaration") unsupported(node, "阶段 0 仅支持 class。")
-    val definition = node.children().firstOrNull { it.name == "Definition" } ?: unsupported(node, "class 缺少名称。")
-    val body = node.children().firstOrNull { it.name == "ClassBody" } ?: unsupported(node, "class 缺少主体。")
-    node.children().firstOrNull { it.name in UNSUPPORTED_CLASS_CLAUSES }?.let {
-      unsupported(it, "阶段 0 尚不支持泛型 class、继承或接口实现。")
+    val kind = when (node.name) {
+      "ClassDeclaration" -> JavaAstTypeDeclarationKind.CLASS
+      "InterfaceDeclaration" -> JavaAstTypeDeclarationKind.INTERFACE
+      else -> unsupported(node, "阶段 1 仅支持 class 和 interface。")
     }
+    val definition = node.children().firstOrNull { it.name == "Definition" } ?: unsupported(node, "class 缺少名称。")
+    val body = node.children().firstOrNull {
+      it.name == "ClassBody" || it.name == "InterfaceBody"
+    } ?: unsupported(node, "类型缺少主体。")
+    val modifiers = node.modifiersBefore(definition, TYPE_MODIFIERS, "类型")
+    rejectAnnotationsBefore(node, definition, "类型")
     node.descendants().firstOrNull { it.name in UNSUPPORTED_NODES }?.let {
-      unsupported(it, "阶段 0 不支持 Java 8 之外的语法。")
+      unsupported(it, "阶段 1 不支持 Java 8 之外的语法。")
     }
     val members = body.children().mapNotNull { child ->
       when {
-        child.name in MEMBER_NODES -> member(child)
+        child.name in MEMBER_NODES -> member(child, kind)
         child.name == "{" || child.name == "}" || child.name == ";" || child.trivia() -> null
-        else -> unsupported(child, "阶段 0 不支持嵌套类型、初始化块或该 class 成员。")
+        else -> unsupported(child, "阶段 1 不支持嵌套类型、初始化块或该 class 成员。")
       }
     }
-    return JavaAstTypeDeclaration(ids.next(), span(node), JavaAstTypeDeclarationKind.CLASS,
-      node.modifiersBefore(definition), text(definition), emptyList(), null, emptyList(),
-      members)
+    return JavaAstTypeDeclaration(
+      ids.next(),
+      span(node),
+      kind,
+      modifiers,
+      text(definition),
+      node.children().firstOrNull { it.name == "TypeParameters" }?.let(::typeParameters).orEmpty(),
+      node.children().firstOrNull { it.name == "Superclass" }?.onlyTypeReference(),
+      node.children().firstOrNull { it.name in INTERFACE_CLAUSES }?.typeReferences().orEmpty(),
+      members,
+    )
   }
 
-  /** 构建字段或静态方法。 */
-  private fun member(node: LezerSyntaxNode): JavaAstMemberDeclaration = when (node.name) {
+  /** 构建字段、构造器或实例/static 方法；成员类别由 class body 的直接 child 决定。 */
+  private fun member(
+    node: LezerSyntaxNode,
+    ownerKind: JavaAstTypeDeclarationKind,
+  ): JavaAstMemberDeclaration = when (node.name) {
     "FieldDeclaration" -> field(node)
-    "MethodDeclaration" -> method(node)
-    else -> unsupported(node, "阶段 0 不支持构造器或嵌套类型。")
+    "MethodDeclaration" -> method(node, ownerKind)
+    "ConstructorDeclaration" -> constructor(node)
+    else -> unsupported(node, "阶段 1 不支持嵌套类型或该 class 成员。")
   }
 
   /** 字段按单个 declarator 保留其初始化表达式。 */
   private fun field(node: LezerSyntaxNode): JavaAstMemberDeclaration.Field {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "字段缺少名称。")
-    return JavaAstMemberDeclaration.Field(ids.next(), span(node), node.modifiersBefore(definition),
+    rejectAnnotationsBefore(node, definition, "字段")
+    return JavaAstMemberDeclaration.Field(ids.next(), span(node), node.modifiersBefore(definition, FIELD_MODIFIERS, "字段"),
       node.typeBefore(definition), node.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
   }
 
-  /** 阶段 0 方法必须是带 block body 的 static 非泛型方法。 */
-  private fun method(node: LezerSyntaxNode): JavaAstMemberDeclaration.Method {
-    val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "方法缺少名称。")
-    val modifiers = node.modifiersBefore(definition)
-    if (JavaAstModifier.STATIC !in modifiers) unsupported(node, "阶段 0 仅支持 static 方法。")
-    if (node.descendants().any { it.name == "TypeParameters" }) unsupported(node, "阶段 0 不支持泛型方法。")
-    node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
-      unsupported(it, "阶段 0 尚不支持可变参数。")
+  /** 构建 instance/static 方法和其受限泛型声明。 */
+  private fun method(
+    node: LezerSyntaxNode,
+    ownerKind: JavaAstTypeDeclarationKind,
+  ): JavaAstMemberDeclaration.Method {
+    // 泛型方法的 TypeParameters 内也包含 Definition，方法名必须只从声明的直接子节点读取。
+    val definition = node.children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(node, "方法缺少名称。")
+    val modifiers = node.modifiersBefore(definition, METHOD_MODIFIERS, "方法")
+    val annotations = methodAnnotations(node, definition)
+    node.descendants().firstOrNull { it.name in THROWS_CLAUSES }?.let {
+      unsupported(it, "阶段 1 尚不支持 throws 或受检异常。")
     }
-    val body = node.children().firstOrNull { it.name == "Block" } ?: node.descendants().firstOrNull { it.name == "Block" }
-      ?: unsupported(node, "阶段 0 方法必须有 block 方法体。")
+    node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
+      unsupported(it, "阶段 1 尚不支持可变参数。")
+    }
+    val bodyNode = node.children().firstOrNull { it.name == "Block" }
+    if (bodyNode == null && ownerKind == JavaAstTypeDeclarationKind.CLASS &&
+      JavaAstModifier.ABSTRACT !in modifiers
+    ) {
+      unsupported(node, "class 中的非 abstract 方法必须有 block 方法体。")
+    }
+    if (bodyNode != null && JavaAstModifier.ABSTRACT in modifiers) {
+      unsupported(bodyNode, "abstract 方法不能提供 block 方法体。")
+    }
     val parameters = node.descendants().filter { it.name == "FormalParameter" }
       .filter { it.nearest("MethodDeclaration") === node }.map(::parameter)
-    return JavaAstMemberDeclaration.Method(ids.next(), span(node), modifiers, emptyList(), node.typeBefore(definition),
-      text(definition), parameters.toList(), block(body))
+    return JavaAstMemberDeclaration.Method(
+      ids.next(),
+      span(node),
+      modifiers,
+      node.children().firstOrNull { it.name == "TypeParameters" }?.let(::typeParameters).orEmpty(),
+      node.typeBefore(definition),
+      text(definition),
+      parameters.toList(),
+      bodyNode?.let { block(it) },
+      annotations,
+    )
+  }
+
+  /** 构建构造器，并让其显式 this/super 调用保留为首条专用语句。 */
+  private fun constructor(node: LezerSyntaxNode): JavaAstMemberDeclaration.Constructor {
+    // 构造器类型参数同样可能包含 Definition，不能让它覆盖构造器自身名称。
+    val definition = node.children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(node, "构造器缺少名称。")
+    rejectAnnotationsBefore(node, definition, "构造器")
+    node.descendants().firstOrNull { it.name in THROWS_CLAUSES }?.let {
+      unsupported(it, "阶段 1 尚不支持 throws 或受检异常。")
+    }
+    node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
+      unsupported(it, "阶段 1 尚不支持可变参数。")
+    }
+    val body = node.children().firstOrNull { it.name == "ConstructorBody" }
+      ?: unsupported(node, "构造器必须有 block 方法体。")
+    val parameters = node.descendants().filter { it.name == "FormalParameter" }
+      .filter { it.nearest("ConstructorDeclaration") === node }.map(::parameter).toList()
+    return JavaAstMemberDeclaration.Constructor(
+      ids.next(),
+      span(node),
+      node.modifiersBefore(definition, CONSTRUCTOR_MODIFIERS, "构造器"),
+      node.children().firstOrNull { it.name == "TypeParameters" }?.let(::typeParameters).orEmpty(),
+      text(definition),
+      parameters,
+      block(body, allowConstructorInvocation = true),
+    )
   }
 
   /** 构建普通参数，vararg 由后续阶段开放。 */
   private fun parameter(node: LezerSyntaxNode): JavaAstParameter {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "参数缺少名称。")
-    return JavaAstParameter(ids.next(), span(node), node.modifiersBefore(definition), node.typeBefore(definition),
+    rejectAnnotationsBefore(node, definition, "参数")
+    return JavaAstParameter(ids.next(), span(node), node.modifiersBefore(definition, PARAMETER_MODIFIERS, "参数"), node.typeBefore(definition),
       text(definition), false)
   }
 
-  /** 构建 block 内的语句，命中语句后不继续穿透。 */
-  private fun block(node: LezerSyntaxNode): JavaAstStatement.Block {
-    val statements = node.children().mapNotNull { child ->
+  /**
+   * 构建 block 内的直接语句。
+   *
+   * [allowConstructorInvocation] 只在构造器 body 开启，且显式 this/super 调用必须成为首条非 trivia
+   * 语句，避免错误地降成普通方法调用后破坏初始化顺序。
+   */
+  private fun block(
+    node: LezerSyntaxNode,
+    allowConstructorInvocation: Boolean = false,
+  ): JavaAstStatement.Block {
+    val statements = mutableListOf<JavaAstStatement>()
+    node.children().forEach { child ->
       when {
-        child.name in STATEMENT_NODES -> statement(child)
-        child.name == "{" || child.name == "}" || child.trivia() -> null
-        else -> unsupported(child, "阶段 0 不支持该语句，不能忽略其外层控制流语义。")
+        child.name in STATEMENT_NODES -> statements += statement(child)
+        child.name in CONSTRUCTOR_INVOCATION_NODES -> {
+          if (!allowConstructorInvocation || statements.isNotEmpty()) {
+            unsupported(child, "显式 this/super 调用只能作为构造器的第一条语句。")
+          }
+          statements += constructorInvocation(child)
+        }
+        child.name == "{" || child.name == "}" || child.trivia() -> Unit
+        else -> unsupported(child, "阶段 1 不支持该语句，不能忽略其外层控制流语义。")
       }
     }
     return JavaAstStatement.Block(ids.next(), span(node), statements)
   }
 
-  /** 构建阶段 0 语句。 */
+  /** 构建阶段 1 基础语句。 */
   private fun statement(node: LezerSyntaxNode): JavaAstStatement = when (node.name) {
     "Block" -> block(node)
     "LocalVariableDeclaration" -> local(node)
@@ -179,7 +271,26 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "WhileStatement" -> whileStatement(node)
     "ForStatement" -> forStatement(node)
     "EmptyStatement" -> JavaAstStatement.Empty(ids.next(), span(node))
-    else -> unsupported(node, "阶段 0 不支持该语句。")
+    else -> unsupported(node, "阶段 1 不支持该语句。")
+  }
+
+  /** 将真实 CST 的 ExplicitConstructorInvocation 映射为初始化顺序专用节点。 */
+  private fun constructorInvocation(node: LezerSyntaxNode): JavaAstStatement.ConstructorInvocation {
+    node.children().firstOrNull { it.name == "TypeArguments" }?.let {
+      unsupported(it, "阶段 1 尚不支持构造器调用的显式类型实参。")
+    }
+    val target = node.children().firstOrNull { text(it) == "this" || text(it) == "super" }
+      ?: unsupported(node, "显式构造器调用缺少 this 或 super。")
+    val kind = when (text(target)) {
+      "this" -> JavaAstConstructorInvocationKind.THIS
+      "super" -> JavaAstConstructorInvocationKind.SUPER
+      else -> unsupported(target, "不支持的构造器调用目标。")
+    }
+    val arguments = node.children().firstOrNull { it.name == "ArgumentList" }
+      ?.expressions()
+      ?.map(::expression)
+      .orEmpty()
+    return JavaAstStatement.ConstructorInvocation(ids.next(), span(node), kind, arguments)
   }
 
   /** 构建 if/else，并仅把直接语句子节点视为两个分支。 */
@@ -209,7 +320,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /** 经典 for 使用 ForSpec 的直接分号 token 分段，绝不通过源码切分。 */
   private fun forStatement(node: LezerSyntaxNode): JavaAstStatement.For {
     val spec = node.children().firstOrNull { it.name == "ForSpec" } ?: node.descendants().firstOrNull { it.name == "ForSpec" }
-      ?: unsupported(node, "阶段 0 只支持经典 for。")
+      ?: unsupported(node, "阶段 1 只支持经典 for。")
     val parts = spec.split(";")
     if (parts.size != 3) unsupported(spec, "经典 for 必须包含三个分段。")
     val body = node.children().lastOrNull { it.name in STATEMENT_NODES } ?: unsupported(node, "for 缺少循环体。")
@@ -224,7 +335,11 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val declaration = nodes.firstOrNull { it.name == "LocalVariableDeclaration" }
     if (declaration != null) {
       val definition = declaration.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(declaration, "for 变量缺少名称。")
-      return JavaAstForInitializer.VariableDeclaration(ids.next(), span(declaration), declaration.modifiersBefore(definition),
+      rejectAnnotationsBefore(declaration, definition, "for 局部变量")
+      declaration.descendants().firstOrNull { text(it) == "var" }?.let {
+        unsupported(it, "阶段 1 仅支持 Java 8，不能使用 var。")
+      }
+      return JavaAstForInitializer.VariableDeclaration(ids.next(), span(declaration), declaration.modifiersBefore(definition, LOCAL_MODIFIERS, "for 局部变量"),
         declaration.typeBefore(definition), declaration.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
     }
     val expressions = nodes.expressionNodes().map(::expression)
@@ -235,7 +350,11 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /** 构建局部变量。 */
   private fun local(node: LezerSyntaxNode): JavaAstStatement.VariableDeclaration {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "局部变量缺少名称。")
-    return JavaAstStatement.VariableDeclaration(ids.next(), span(node), node.modifiersBefore(definition), node.typeBefore(definition),
+    rejectAnnotationsBefore(node, definition, "局部变量")
+    node.descendants().firstOrNull { text(it) == "var" }?.let {
+      unsupported(it, "阶段 1 仅支持 Java 8，不能使用 var。")
+    }
+    return JavaAstStatement.VariableDeclaration(ids.next(), span(node), node.modifiersBefore(definition, LOCAL_MODIFIERS, "局部变量"), node.typeBefore(definition),
       node.descendants().filter { it.name == "VariableDeclarator" }.map(::declarator).toList())
   }
 
@@ -253,7 +372,8 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val node = original.unwrap()
     return when (node.name) {
       "Identifier", "ScopedIdentifier" -> JavaAstExpression.Name(ids.next(), span(node), text(node))
-      "This" -> JavaAstExpression.This(ids.next(), span(node))
+      "this" -> JavaAstExpression.This(ids.next(), span(node))
+      "super" -> JavaAstExpression.Super(ids.next(), span(node))
       "IntegerLiteral" -> literal(node, JavaAstLiteralKind.INTEGER)
       "FloatingPointLiteral" -> literal(node, JavaAstLiteralKind.FLOATING_POINT)
       "StringLiteral" -> literal(node, JavaAstLiteralKind.STRING)
@@ -267,7 +387,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "MethodInvocation" -> invocation(node)
       "ObjectCreationExpression" -> newObject(node)
       "FieldAccess" -> fieldAccess(node)
-      else -> unsupported(node, "阶段 0 不支持该表达式。")
+      else -> unsupported(node, "Stage1 不支持该表达式。")
     }
   }
 
@@ -309,12 +429,17 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       ?: unsupported(node, "调用缺少方法名。")
     val arguments = node.descendants().firstOrNull { it.name == "ArgumentList" }?.expressions()?.map(::expression).orEmpty()
     val receiver = node.expressions().firstOrNull { it.to <= name.from }?.let(::expression)
-    return JavaAstExpression.MethodInvocation(ids.next(), span(node), receiver, text(name), emptyList(), arguments)
+    val typeArguments = node.children().firstOrNull { it.name == "TypeArguments" }?.typeArguments().orEmpty()
+    return JavaAstExpression.MethodInvocation(ids.next(), span(node), receiver, text(name), typeArguments, arguments)
   }
 
   /** 阶段 0 仅支持普通对象创建，不支持数组创建与匿名类型。 */
   private fun newObject(node: LezerSyntaxNode): JavaAstExpression.NewObject {
-    val type = node.descendants().firstOrNull { it.name in TYPE_REFERENCE_NODES } ?: unsupported(node, "对象创建缺少类型。")
+    node.children().firstOrNull { it.name == "ClassBody" }?.let {
+      unsupported(it, "阶段 1 尚不支持匿名类。")
+    }
+    val type = node.children().firstOrNull { it.name in TYPE_REFERENCE_NODES + setOf("GenericType") }
+      ?: unsupported(node, "对象创建缺少类型。")
     val arguments = node.descendants().firstOrNull { it.name == "ArgumentList" }?.expressions()?.map(::expression).orEmpty()
     return JavaAstExpression.NewObject(ids.next(), span(node), typeReference(type), arguments)
   }
@@ -329,23 +454,175 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /** 保留 literal token 原文，数值范围与转义交由语义阶段。 */
   private fun literal(node: LezerSyntaxNode, kind: JavaAstLiteralKind) = JavaAstExpression.Literal(ids.next(), span(node), kind, text(node))
 
-  /** 阶段 0 类型限于 primitive、void、简单命名类型。 */
+  /**
+   * 映射阶段 1 的 Java 8 类型引用。
+   *
+   * 参数化类型、通配符和菱形都必须保留在 AST，不能退化为裸类型；数组仍明确留给阶段 2A。
+   */
   private fun typeReference(node: LezerSyntaxNode): JavaAstTypeReference = when (node.name) {
     "PrimitiveType" -> JavaAstTypeReference.Primitive(ids.next(), span(node), primitive(text(node)))
     "TypeName", "ScopedTypeName" -> JavaAstTypeReference.Named(ids.next(), span(node), text(node), emptyList())
+    "GenericType" -> {
+      val name = node.children().firstOrNull { it.name == "TypeName" || it.name == "ScopedTypeName" }
+        ?: unsupported(node, "参数化类型缺少原始类型名。")
+      val arguments = node.children().firstOrNull { it.name == "TypeArguments" }
+        ?: unsupported(node, "参数化类型缺少类型实参。")
+      JavaAstTypeReference.Named(
+        ids.next(),
+        span(node),
+        text(name),
+        arguments.typeArguments(),
+        arguments.isDiamond(),
+      )
+    }
+    "Wildcard" -> wildcard(node)
+    "ArrayType" -> unsupported(node, "阶段 1 尚不支持数组类型。")
     "void" -> JavaAstTypeReference.Void(ids.next(), span(node))
-    else -> unsupported(node, "阶段 0 不支持该类型。")
+    else -> unsupported(node, "阶段 1 不支持该类型。")
   }
 
-  /** 从 declaration 的类型 CST 子节点构建类型。 */
+  /** 从 declaration 的类型 CST 子节点构建类型，并排除泛型参数与注解内部类型。 */
   private fun LezerSyntaxNode.typeBefore(definition: LezerSyntaxNode): JavaAstTypeReference {
-    descendants().firstOrNull {
-      it.name in UNSUPPORTED_TYPE_NODES || it.name == "Dimension"
-    }?.let { unsupported(it, "阶段 0 尚不支持数组、参数化类型或通配符类型。") }
-    val type = descendants().filter { it.to <= definition.from && it.name in TYPE_REFERENCE_NODES }
-      .filterNot { it.hasAncestor("Annotation") }.minWithOrNull(compareBy<LezerSyntaxNode> { it.from }.thenByDescending { it.to })
+    val type = descendants()
+      .filter { it.to <= definition.from && it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS }
+      .filterNot { it.hasAncestor("Annotation") || it.hasAncestor("MarkerAnnotation") || it.hasAncestor("TypeParameters") }
+      .filterNot(::isNestedTypeReference)
+      .minWithOrNull(compareBy<LezerSyntaxNode> { it.from }.thenByDescending { it.to })
       ?: unsupported(this, "声明缺少支持的类型。")
     return typeReference(type)
+  }
+
+  /** 读取 GenericType 的 TypeArguments，直接 child 只保留一个类型实参层级。 */
+  private fun LezerSyntaxNode.typeArguments(): List<JavaAstTypeReference> = children()
+    .filter { it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS + setOf("Wildcard") }
+    .map(::typeReference)
+
+  /** `<>` 没有任何类型 child；它与未参数化类型都使用空列表，故必须额外保留标记。 */
+  private fun LezerSyntaxNode.isDiamond(): Boolean =
+    children().none { it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS + setOf("Wildcard") }
+
+  /** 映射 `?`、`? extends T` 与 `? super T`，并保持边界方向。 */
+  private fun wildcard(node: LezerSyntaxNode): JavaAstTypeReference.Wildcard {
+    // @lezer/java 1.1.3 将 super/extends 与边界类型直接放在 Wildcard 下，不存在额外 wrapper。
+    val children = node.children()
+    val type = children.firstOrNull { it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS }
+      ?: return JavaAstTypeReference.Wildcard(ids.next(), span(node))
+    return when {
+      children.any { text(it) == "extends" } ->
+        JavaAstTypeReference.Wildcard(ids.next(), span(node), upperBound = typeReference(type))
+      children.any { text(it) == "super" } ->
+        JavaAstTypeReference.Wildcard(ids.next(), span(node), lowerBound = typeReference(type))
+      else -> unsupported(node, "通配符边界缺少 extends 或 super。")
+    }
+  }
+
+  /** 读取一个 clause 的唯一类型，避免把 extends/implements 意外映射成空继承关系。 */
+  private fun LezerSyntaxNode.onlyTypeReference(): JavaAstTypeReference {
+    val types = typeReferences()
+    if (types.size != 1) unsupported(this, "继承 clause 必须包含唯一父类型。")
+    return types.single()
+  }
+
+  /** 从 Superclass、SuperInterfaces 或 ExtendsInterfaces 的 InterfaceTypeList 中读取直接类型。 */
+  private fun LezerSyntaxNode.typeReferences(): List<JavaAstTypeReference> {
+    val list = children().firstOrNull { it.name == "InterfaceTypeList" } ?: this
+    return list.children()
+      .filter { it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS }
+      .map(::typeReference)
+  }
+
+  /** 泛型外壳内的 TypeName/TypeArguments 不应与外层 GenericType 重复建模。 */
+  private fun isNestedTypeReference(node: LezerSyntaxNode): Boolean {
+    var current = node.parent
+    while (current != null) {
+      if (current.name in TYPE_REFERENCE_WRAPPERS) return true
+      current = current.parent
+    }
+    return false
+  }
+
+  /** 构建 `<T extends A & B>` 形式的类型参数；type bound 只能包含阶段 1 已开放类型。 */
+  private fun typeParameters(node: LezerSyntaxNode): List<JavaAstTypeParameter> {
+    return node.children().filter { it.name == "TypeParameter" }.map { parameter ->
+      rejectAnnotationsBefore(parameter, parameter.definition(), "类型参数")
+      val definition = parameter.definition()
+      val bounds = parameter.children().firstOrNull { it.name == "TypeBound" }
+        ?.children()
+        ?.filter { it.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS }
+        ?.map(::typeReference)
+        .orEmpty()
+      JavaAstTypeParameter(
+        ids.next(),
+        span(parameter),
+        text(definition),
+        bounds,
+      )
+    }
+  }
+
+  /** TypeParameter 与其他声明共享 Definition 节点，集中处理缺失诊断。 */
+  private fun LezerSyntaxNode.definition(): LezerSyntaxNode =
+    children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(this, "声明缺少名称。")
+
+  /**
+   * 收集并校验声明修饰符。
+   *
+   * 不能用 Set 静默抹掉重复 token，也不能让未映射的 Java 8 modifier 在语义阶段之前消失；
+   * 允许集合由声明位置传入，组合合法性随后统一检查。
+   */
+  private fun LezerSyntaxNode.modifiersBefore(
+    definition: LezerSyntaxNode,
+    allowed: Set<JavaAstModifier>,
+    declarationName: String,
+  ): Set<JavaAstModifier> {
+    // Lezer 的 Modifiers 容器文本与内部单个 modifier token 相同；只读取叶子 token，避免同一
+    // 个 static/public/final 被容器和 child 重复计数。
+    val tokens = descendants()
+      .filter { it.firstChild == null && it.to <= definition.from && text(it) in JAVA_MODIFIER_TOKENS }
+      .map(::text)
+      .toList()
+    val unsupported = tokens.firstOrNull { it !in MODIFIERS }
+    if (unsupported != null) unsupported(definition, declarationName + " 不支持修饰符 " + unsupported + "。")
+    val mapped = tokens.map(MODIFIERS::getValue)
+    val duplicate = mapped.groupingBy { it }.eachCount().entries.firstOrNull { it.value > 1 }
+    if (duplicate != null) unsupported(definition, declarationName + " 不能重复修饰符 " + duplicate.key.name.lowercase() + "。")
+    val disallowed = mapped.firstOrNull { it !in allowed }
+    if (disallowed != null) unsupported(definition, declarationName + " 不允许修饰符 " + disallowed.name.lowercase() + "。")
+    if (JavaAstModifier.PUBLIC in mapped && JavaAstModifier.PRIVATE in mapped ||
+      JavaAstModifier.PUBLIC in mapped && JavaAstModifier.PROTECTED in mapped ||
+      JavaAstModifier.PRIVATE in mapped && JavaAstModifier.PROTECTED in mapped ||
+      JavaAstModifier.ABSTRACT in mapped && JavaAstModifier.FINAL in mapped
+    ) {
+      unsupported(definition, declarationName + " 包含互斥修饰符。")
+    }
+    return mapped.toSet()
+  }
+
+  /** 非方法声明目前不接受注解，防止未知 metadata 被静默忽略。 */
+  private fun rejectAnnotationsBefore(
+    node: LezerSyntaxNode,
+    definition: LezerSyntaxNode,
+    declarationName: String,
+  ) {
+    node.descendants().firstOrNull {
+      it.to <= definition.from && it.name in ANNOTATION_NODES
+    }?.let { unsupported(it, "阶段 1 的 " + declarationName + " 不支持注解。") }
+  }
+
+  /** 仅接受无参数的精确 `@Override`，其他 Java annotation 仍属于后续阶段。 */
+  private fun methodAnnotations(
+    node: LezerSyntaxNode,
+    definition: LezerSyntaxNode,
+  ): List<JavaAstAnnotation> {
+    return node.descendants().filter {
+      it.to <= definition.from && it.name in ANNOTATION_NODES
+    }.map { annotation ->
+      if (annotation.name != "MarkerAnnotation" || text(annotation) != "@Override") {
+        unsupported(annotation, "阶段 1 的方法只支持无参数的 @Override。")
+      }
+      JavaAstAnnotation(ids.next(), span(annotation), "Override")
+    }.toList()
   }
 
   /** primitive token 到公共 AST enum 的映射。 */
@@ -427,10 +704,6 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     return text(name)
   }
 
-  /** definition 前的 modifier token。 */
-  private fun LezerSyntaxNode.modifiersBefore(definition: LezerSyntaxNode): Set<JavaAstModifier> =
-    descendants().filter { it.to <= definition.from }.map(::text).mapNotNull(MODIFIERS::get).toSet()
-
   /** 忽略 root 的注释节点。 */
   private fun LezerSyntaxNode.trivia() = name == "LineComment" || name == "BlockComment"
   private fun span(node: LezerSyntaxNode) = JavaSourceSpan(file.id, node.from, node.to)
@@ -445,14 +718,24 @@ private class JavaFrontendIssue(val node: LezerSyntaxNode, val code: String, ove
 private val TYPE_NODES = setOf("ClassDeclaration", "InterfaceDeclaration", "EnumDeclaration")
 private val MEMBER_NODES = setOf("FieldDeclaration", "MethodDeclaration", "ConstructorDeclaration")
 private val STATEMENT_NODES = setOf("Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement", "WhileStatement", "ForStatement", "EmptyStatement")
-private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void")
-private val UNSUPPORTED_TYPE_NODES = setOf("ArrayType", "GenericType", "Wildcard", "WildcardType")
-private val UNSUPPORTED_CLASS_CLAUSES = setOf("TypeParameters", "Superclass", "Interfaces", "SuperInterfaces")
+private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void", "ArrayType")
+private val TYPE_REFERENCE_WRAPPERS = setOf("GenericType")
+private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
+private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
+private val THROWS_CLAUSES = setOf("Throws")
+private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "This", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")
 private val MODIFIERS = mapOf("public" to JavaAstModifier.PUBLIC, "protected" to JavaAstModifier.PROTECTED, "private" to JavaAstModifier.PRIVATE, "abstract" to JavaAstModifier.ABSTRACT, "static" to JavaAstModifier.STATIC, "final" to JavaAstModifier.FINAL)
+private val JAVA_MODIFIER_TOKENS = MODIFIERS.keys + setOf("strictfp", "default", "synchronized", "native", "transient", "volatile")
+private val TYPE_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.ABSTRACT, JavaAstModifier.FINAL)
+private val FIELD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE, JavaAstModifier.STATIC, JavaAstModifier.FINAL)
+private val METHOD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE, JavaAstModifier.STATIC, JavaAstModifier.FINAL, JavaAstModifier.ABSTRACT)
+private val CONSTRUCTOR_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE)
+private val PARAMETER_MODIFIERS = setOf(JavaAstModifier.FINAL)
+private val LOCAL_MODIFIERS = setOf(JavaAstModifier.FINAL)
 private val BINARY = mapOf("*" to JavaAstBinaryOperator.MULTIPLY, "/" to JavaAstBinaryOperator.DIVIDE, "%" to JavaAstBinaryOperator.REMAINDER, "+" to JavaAstBinaryOperator.ADD, "-" to JavaAstBinaryOperator.SUBTRACT, "<" to JavaAstBinaryOperator.LESS_THAN, "<=" to JavaAstBinaryOperator.LESS_THAN_OR_EQUAL, ">" to JavaAstBinaryOperator.GREATER_THAN, ">=" to JavaAstBinaryOperator.GREATER_THAN_OR_EQUAL, "==" to JavaAstBinaryOperator.EQUAL, "!=" to JavaAstBinaryOperator.NOT_EQUAL, "&&" to JavaAstBinaryOperator.LOGICAL_AND, "||" to JavaAstBinaryOperator.LOGICAL_OR)
 private val ASSIGNMENT = mapOf("=" to JavaAstAssignmentOperator.ASSIGN, "+=" to JavaAstAssignmentOperator.ADD_ASSIGN, "-=" to JavaAstAssignmentOperator.SUBTRACT_ASSIGN, "*=" to JavaAstAssignmentOperator.MULTIPLY_ASSIGN, "/=" to JavaAstAssignmentOperator.DIVIDE_ASSIGN, "%=" to JavaAstAssignmentOperator.REMAINDER_ASSIGN)
 private val UNARY = mapOf("+" to JavaAstUnaryOperator.POSITIVE, "-" to JavaAstUnaryOperator.NEGATIVE, "!" to JavaAstUnaryOperator.LOGICAL_NOT, "~" to JavaAstUnaryOperator.BITWISE_NOT, "++" to JavaAstUnaryOperator.POST_INCREMENT, "--" to JavaAstUnaryOperator.POST_DECREMENT)

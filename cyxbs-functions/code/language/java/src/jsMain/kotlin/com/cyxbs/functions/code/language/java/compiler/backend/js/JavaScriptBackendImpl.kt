@@ -19,15 +19,17 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocal
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocalId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethod
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodId
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrMethodKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrProgram
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStatement
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrUnaryOperator
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
 
 /**
- * 阶段 0 的 typed IR 到 ES Module 后端。
+ * Stage1 typed IR 到 ES Module 的 JavaScript 后端。
  *
  * 本实现只观察 [JavaIrProgram]；所有名称解析、类型推断和 CST/源码读取必须在 lowering 前结束。
  * 生成前会完整校验支持范围，因此失败时绝不返回可能执行错误的半成品 JavaScript。
@@ -64,6 +66,9 @@ private class JavaIrIndex(
     .flatMap(JavaIrClass::methods)
     .flatMap { method -> method.parameters + method.locals }
     .associateBy(JavaIrLocal::id)
+
+  /** 返回方法所属类；所有实例/静态操作均以此消除源码名称依赖。 */
+  fun ownerOf(method: JavaIrMethodId): JavaIrClass? = methods[method]?.let { classes[it.owner] }
 }
 
 /** 预检 IR，拒绝尚未具备 Java 语义实现的节点、类型或不一致引用。 */
@@ -72,6 +77,7 @@ private class JavaScriptBackendValidator(
   private val entryPoint: JavaCompilerEntryPoint,
 ) {
   private val diagnostics = mutableListOf<JavaCompilerDiagnostic>()
+  private val virtualSlotRoots = mutableMapOf<Int, JavaIrMethod>()
 
   /** 返回全部错误；调用方在诊断存在时不会创建 emitter。 */
   fun validate(): List<JavaCompilerDiagnostic> {
@@ -85,31 +91,41 @@ private class JavaScriptBackendValidator(
       invalid("Java IR contains duplicate field ids.", null)
     }
     index.program.classes.sortedBy { it.id.value }.forEach(::validateClass)
+    index.program.classes.forEach { clazz ->
+      val seen = mutableSetOf<JavaIrClassId>()
+      var current: JavaIrClass? = clazz
+      while (current != null && seen.add(current.id)) current = current.superClass?.let(index.classes::get)
+      if (current != null) invalid("Java IR inheritance graph contains a cycle.", clazz.span)
+    }
     validateEntryPoint()
     return diagnostics.toList()
   }
 
-  /** 阶段 0 只保留无字段、无初始化器的静态方法容器。 */
+  /** 校验阶段 1 类关系、字段归属和初始化块。接口默认方法仍未实现。 */
   private fun validateClass(clazz: JavaIrClass) {
-    if (clazz.superClass != null || clazz.interfaces.isNotEmpty()) {
-      unsupported("Class inheritance and interfaces are not available in the stage 0 JavaScript backend.", clazz.span)
+    if (clazz.interfaces.isNotEmpty()) unsupported("Java interfaces are not available in the stage 1 JavaScript backend.", clazz.span)
+    clazz.superClass?.let { parent -> if (index.classes[parent] == null) invalid("Java IR references an unknown superclass id ${parent.value}.", clazz.span) }
+    clazz.fields.forEach { field ->
+      if (field.owner != clazz.id) invalid("Java IR field owner does not match its class.", field.span)
+      validateType(field.type, field.span)
+      field.initializer?.let(::validateExpression)
     }
-    if (clazz.fields.isNotEmpty()) {
-      unsupported("Java fields are not available in the stage 0 JavaScript backend.", clazz.span)
+    clazz.staticInitializer?.let(::validateStatement)
+    clazz.instanceInitializer?.let(::validateStatement)
+    clazz.methods.forEach { method ->
+      if (method.owner != clazz.id) invalid("Java IR method owner does not match its class.", method.span)
+      validateMethod(method)
     }
-    if (clazz.staticInitializer != null) {
-      unsupported("Java class initializers are not available in the stage 0 JavaScript backend.", clazz.span)
-    }
-    clazz.methods.forEach(::validateMethod)
+    validateVirtualSlots(clazz)
   }
 
-  /** 校验方法签名、局部变量引用和结构化语句。 */
+  /** 校验方法签名、构造器首句和局部变量引用。 */
   private fun validateMethod(method: JavaIrMethod) {
-    if (method.dispatch != JavaIrDispatchKind.STATIC) {
-      unsupported("Only static Java methods are available in the stage 0 JavaScript backend.", method.span)
-    }
     if (method.body == null) {
       unsupported("Abstract or native Java methods cannot be emitted as JavaScript.", method.span)
+    }
+    if (method.kind == JavaIrMethodKind.CONSTRUCTOR && method.dispatch != JavaIrDispatchKind.SPECIAL) {
+      invalid("Java IR constructors must use SPECIAL dispatch.", method.span)
     }
     validateType(method.returnType, method.span)
     val locals = method.parameters + method.locals
@@ -122,7 +138,103 @@ private class JavaScriptBackendValidator(
       invalid("Java IR method parameters and locals have inconsistent flags.", method.span)
     }
     locals.forEach { local -> validateType(local.type, local.span) }
-    method.body?.let(::validateStatement)
+    method.body?.let { body ->
+      validateConstructorInvocations(method, body)
+      validateStatement(body)
+    }
+  }
+
+  /** 构造器委托只能作为直接首句，并且 target 必须与 this/super 语义严格一致。 */
+  private fun validateConstructorInvocations(method: JavaIrMethod, body: JavaIrStatement.Block) {
+    val invocations = mutableListOf<JavaIrStatement.ConstructorInvocation>()
+    fun collect(statement: JavaIrStatement) {
+      when (statement) {
+        is JavaIrStatement.Block -> statement.statements.forEach(::collect)
+        is JavaIrStatement.If -> {
+          collect(statement.thenBranch)
+          statement.elseBranch?.let(::collect)
+        }
+        is JavaIrStatement.While -> collect(statement.body)
+        is JavaIrStatement.ConstructorInvocation -> invocations += statement
+        else -> Unit
+      }
+    }
+    collect(body)
+    if (method.kind != JavaIrMethodKind.CONSTRUCTOR) {
+      invocations.forEach { invalid("Java IR constructor invocation may only appear in a constructor.", it.span) }
+      return
+    }
+
+    val first = body.statements.firstOrNull() as? JavaIrStatement.ConstructorInvocation
+    if (invocations.any { it !== first }) {
+      invocations.filter { it !== first }.forEach {
+        invalid("Java IR constructor invocation must be the constructor body's direct first statement.", it.span)
+      }
+    }
+    val owner = index.classes[method.owner]
+    if (owner?.superClass != null && first == null) {
+      invalid("Java IR constructor must start with a constructor invocation.", method.span)
+    }
+    first?.let { invocation ->
+      val target = index.methods[invocation.constructor]
+      when (invocation.kind) {
+        JavaIrConstructorInvocationKind.THIS -> if (target?.owner != method.owner) {
+          invalid("Java IR this constructor invocation must target a constructor of the same class.", invocation.span)
+        }
+        JavaIrConstructorInvocationKind.SUPER -> if (target?.owner != owner?.superClass) {
+          invalid("Java IR super constructor invocation must target a constructor of the direct superclass.", invocation.span)
+        }
+      }
+    }
+  }
+
+  /** 同类 slot 不能重用；覆盖关系必须保持虚分派身份和兼容的参数形态。 */
+  private fun validateVirtualSlots(clazz: JavaIrClass) {
+    val declared = mutableMapOf<Int, JavaIrMethod>()
+    clazz.methods.filter { it.virtualSlot != null }.forEach { method ->
+      val slot = checkNotNull(method.virtualSlot)
+      if (method.dispatch != JavaIrDispatchKind.VIRTUAL || method.kind != JavaIrMethodKind.METHOD) {
+        invalid("Java IR virtual slot $slot must belong to an instance virtual method.", method.span)
+      }
+      val previous = declared.put(slot, method)
+      if (previous != null) {
+        invalid("Java IR class contains duplicate virtual slot $slot.", method.span)
+      }
+      var ancestor = clazz.superClass?.let(index.classes::get)
+      var inherited: JavaIrMethod? = null
+      val visited = mutableSetOf<JavaIrClassId>()
+      while (ancestor != null && inherited == null && visited.add(ancestor.id)) {
+        inherited = ancestor.methods.singleOrNull { it.virtualSlot == slot }
+        ancestor = ancestor.superClass?.let(index.classes::get)
+      }
+      if (inherited != null) {
+        if (!hasCompatibleVirtualParameters(inherited, method)) {
+          invalid("Java IR virtual slot $slot override parameters do not match its inherited method.", method.span)
+        }
+      } else {
+        val root = virtualSlotRoots[slot]
+        if (root == null) {
+          virtualSlotRoots[slot] = method
+        } else if (root.owner != method.owner) {
+          invalid("Java IR virtual slot $slot is reused by unrelated override owners.", method.span)
+        }
+      }
+    }
+  }
+
+  /**
+   * 协变返回不会改变 Java override 的虚槽身份；泛型父类代换也可能让 lowered descriptor
+   * 的引用参数文本不同。因此优先要求参数 descriptor 一致；仅引用参数允许按相同 arity
+   * 退化匹配，既兼容泛型代换，也不放过 int/boolean 等原始参数的错误重用。
+   */
+  private fun hasCompatibleVirtualParameters(parent: JavaIrMethod, child: JavaIrMethod): Boolean {
+    val parentParameters = parent.descriptor.substringBefore(')') + ")"
+    val childParameters = child.descriptor.substringBefore(')') + ")"
+    return parentParameters == childParameters ||
+      (parent.parameters.size == child.parameters.size &&
+        parent.parameters.zip(child.parameters).all { (parentParameter, childParameter) ->
+          parentParameter.type is JavaIrType.Reference && childParameter.type is JavaIrType.Reference
+        })
   }
 
   /** 递归校验在阶段 0 可直接翻译的控制流。 */
@@ -143,9 +255,16 @@ private class JavaScriptBackendValidator(
         validateExpression(statement.condition)
         validateStatement(statement.body)
       }
+      is JavaIrStatement.ConstructorInvocation -> {
+        val target = index.methods[statement.constructor]
+        if (target == null || target.kind != JavaIrMethodKind.CONSTRUCTOR) {
+          invalid("Java IR constructor invocation must target a constructor.", statement.span)
+        }
+        statement.arguments.forEach(::validateExpression)
+      }
       is JavaIrStatement.Return -> statement.expression?.let(::validateExpression)
       is JavaIrStatement.Throw -> unsupported(
-        "Java throw statements are not available in the stage 0 JavaScript backend.",
+        "Java throw statements are not available in the current JavaScript backend.",
         statement.span,
       )
     }
@@ -159,17 +278,17 @@ private class JavaScriptBackendValidator(
         unsupported("Java long constants require the later BigInt backend.", expression.span)
       }
       is JavaIrExpression.GetLocal -> requireLocal(expression.local, expression.span)
+      is JavaIrExpression.This -> if (index.classes[expression.type.classId] == null) {
+        invalid("Java IR this expression references an unknown class.", expression.span)
+      }
       is JavaIrExpression.SetLocal -> {
         requireLocal(expression.local, expression.span)
         validateExpression(expression.value)
       }
-      is JavaIrExpression.GetField,
-      is JavaIrExpression.SetField,
-      is JavaIrExpression.GetStaticField,
-      is JavaIrExpression.SetStaticField -> unsupported(
-        "Java field access is not available in the stage 0 JavaScript backend.",
-        expression.span,
-      )
+      is JavaIrExpression.GetField -> { requireInstanceField(expression.field, expression.span); validateExpression(expression.receiver) }
+      is JavaIrExpression.SetField -> { requireInstanceField(expression.field, expression.span); validateExpression(expression.receiver); validateExpression(expression.value) }
+      is JavaIrExpression.GetStaticField -> requireStaticField(expression.field, expression.span)
+      is JavaIrExpression.SetStaticField -> { requireStaticField(expression.field, expression.span); validateExpression(expression.value) }
       is JavaIrExpression.Binary -> {
         validateExpression(expression.left)
         validateExpression(expression.right)
@@ -183,16 +302,21 @@ private class JavaScriptBackendValidator(
         requireStaticMethod(expression.method, expression.span)
         expression.arguments.forEach(::validateExpression)
       }
-      is JavaIrExpression.InvokeSpecial,
-      is JavaIrExpression.InvokeVirtual,
-      is JavaIrExpression.NewObject -> unsupported(
-        "Instance construction and dispatch are not available in the stage 0 JavaScript backend.",
-        expression.span,
-      )
+      is JavaIrExpression.InvokeSpecial -> { requireInstanceMethod(expression.method, expression.span); validateExpression(expression.receiver); expression.arguments.forEach(::validateExpression) }
+      is JavaIrExpression.InvokeVirtual -> {
+        val target = index.methods[expression.method]
+        if (target == null || target.dispatch != JavaIrDispatchKind.VIRTUAL || target.virtualSlot != expression.virtualSlot) invalid("Java IR virtual call slot does not match its selected method.", expression.span)
+        validateExpression(expression.receiver); expression.arguments.forEach(::validateExpression)
+      }
+      is JavaIrExpression.NewObject -> {
+        val target = index.methods[expression.constructor]
+        if (target == null || target.kind != JavaIrMethodKind.CONSTRUCTOR || target.owner != expression.classId) invalid("Java IR object creation must target an owner constructor.", expression.span)
+        expression.arguments.forEach(::validateExpression)
+      }
     }
   }
 
-  /** 阶段 0 支持 identity、引用拓宽与不涉及 long/浮点的整数 widening。 */
+  /** 当前运行子集支持 identity、引用拓宽与不涉及 long/浮点的整数 widening。 */
   private fun validateConversion(conversion: JavaIrConversion, span: JavaSourceSpan) {
     when (conversion) {
       JavaIrConversion.Identity,
@@ -201,25 +325,25 @@ private class JavaScriptBackendValidator(
         if (!conversion.from.name.isStage0IntegralPrimitiveName() ||
           !conversion.to.name.isStage0IntegralPrimitiveName()
         ) {
-          unsupported("Only integral primitive widening is available in the stage 0 JavaScript backend.", span)
+          unsupported("Only integral primitive widening is available in the current JavaScript backend.", span)
         }
       }
       is JavaIrConversion.Boxing,
       is JavaIrConversion.Unboxing -> unsupported(
-        "Boxing and unboxing are not available in the stage 0 JavaScript backend.",
+        "Boxing and unboxing are not available in the current JavaScript backend.",
         span,
       )
     }
   }
 
-  /** 引用类型仅以不透明值参与阶段 0 的 null、相等性和字符串字面量场景。 */
+  /** 引用类型以运行时对象身份参与 null、相等性、字段和调用；内建类库仍未注入。 */
   private fun validateType(type: JavaIrType, span: JavaSourceSpan) {
     when (type) {
       is JavaIrType.Primitive -> when (type.kind.name) {
         "LONG" -> unsupported("Java long requires the later BigInt backend.", span)
         "FLOAT",
         "DOUBLE" -> unsupported(
-          "Java floating-point values are not available in the stage 0 JavaScript backend.",
+          "Java floating-point values are not available in the current JavaScript backend.",
           span,
         )
         else -> Unit
@@ -270,9 +394,28 @@ private class JavaScriptBackendValidator(
     val method = index.methods[methodId]
     if (method == null) {
       invalid("Java IR references an unknown method id ${methodId.value}.", span)
-    } else if (method.dispatch != JavaIrDispatchKind.STATIC || method.body == null) {
+    } else if (method.dispatch != JavaIrDispatchKind.STATIC || method.kind != JavaIrMethodKind.METHOD || method.body == null) {
       unsupported("Java static calls may only target executable static methods.", span)
     }
+  }
+
+  /** 字段操作必须服从 lowering 已完成的 static/instance 分类。 */
+  private fun requireStaticField(fieldId: JavaIrFieldId, span: JavaSourceSpan) {
+    val field = index.fields[fieldId]
+    if (field == null) invalid("Java IR references an unknown field id ${fieldId.value}.", span)
+    else if (!field.isStatic) invalid("Java IR static access targets an instance field.", span)
+  }
+
+  private fun requireInstanceField(fieldId: JavaIrFieldId, span: JavaSourceSpan) {
+    val field = index.fields[fieldId]
+    if (field == null) invalid("Java IR references an unknown field id ${fieldId.value}.", span)
+    else if (field.isStatic) invalid("Java IR instance access targets a static field.", span)
+  }
+
+  private fun requireInstanceMethod(methodId: JavaIrMethodId, span: JavaSourceSpan) {
+    val method = index.methods[methodId]
+    if (method == null) invalid("Java IR references an unknown method id ${methodId.value}.", span)
+    else if (method.dispatch == JavaIrDispatchKind.STATIC || method.kind != JavaIrMethodKind.METHOD || method.body == null) invalid("Java IR instance call targets a non-executable static method.", span)
   }
 
   /** 记录 typed IR 已知但当前后端尚未实现的稳定诊断。 */
@@ -302,15 +445,34 @@ private class JavaScriptEmitter(
   private val entryPoint: JavaCompilerEntryPoint,
 ) {
   private val writer = JsWriter()
+  private var currentMethod: JavaIrMethod? = null
+  private var currentThisName: String = "this"
+  private val classesInParentFirstOrder: List<JavaIrClass> by lazy {
+    val visited = mutableSetOf<JavaIrClassId>()
+    buildList {
+      fun visit(clazz: JavaIrClass) {
+        if (!visited.add(clazz.id)) return
+        clazz.superClass?.let(index.classes::get)?.let(::visit)
+        add(clazz)
+      }
+      index.program.classes.sortedBy { it.id.value }.forEach(::visit)
+    }
+  }
 
   /** 输出 runtime prelude、全部静态方法和稳定入口导出。 */
   fun emit(): JavaScriptProgramArtifact {
     JavaRuntimePrelude.source.lines().forEach(writer::line)
+    if (usesObjectRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.objectSource.lines().forEach(writer::line)
+    }
     writer.line()
-    index.program.classes
+    val methods = index.program.classes
       .flatMap(JavaIrClass::methods)
       .sortedBy { method -> method.id.value }
-      .forEach(::emitMethod)
+    if (usesObjectRuntime()) emitClassShells()
+    methods.forEach(::emitMethod)
+    if (usesObjectRuntime()) emitClassInitializers()
     emitEntryExport(resolveEntryMethod())
 
     return JavaScriptProgramArtifact(
@@ -326,6 +488,92 @@ private class JavaScriptEmitter(
     )
   }
 
+  /** 阶段 0 的纯 static 程序不发射对象壳，保持其既有稳定快照。 */
+  private fun usesObjectRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.superClass != null || clazz.fields.isNotEmpty() || clazz.staticInitializer != null ||
+      clazz.instanceInitializer != null || clazz.methods.any { it.dispatch != JavaIrDispatchKind.STATIC }
+  }
+
+  /** 先声明所有 prototype 与 class metadata，允许跨文件父类和前向静态引用。 */
+  private fun emitClassShells() {
+    classesInParentFirstOrder.forEach { clazz ->
+      val parent = clazz.superClass?.let(JsNameMangler::prototype) ?: "null"
+      writer.line("const ${JsNameMangler.staticStorage(clazz.id)} = { state: 0, error: null, values: Object.create(null) };")
+      // 类初始化尚未开始时，字段已按 Java 默认值可见；这也覆盖递归 clinit 的 in-progress 读取。
+      clazz.fields.filter { it.isStatic }.forEach { field ->
+        writer.line("${JsNameMangler.staticStorage(clazz.id)}.values[\"${JsNameMangler.field(field.id)}\"] = ${defaultValue(field.type)};")
+      }
+      writer.line("const ${JsNameMangler.prototype(clazz.id)} = Object.create($parent);")
+    }
+    index.program.classes.flatMap { it.methods }.filter { it.virtualSlot != null }.sortedBy { it.id.value }.forEach { method ->
+      writer.line("${JsNameMangler.prototype(method.owner)}[\"${JsNameMangler.virtualSlot(checkNotNull(method.virtualSlot))}\"] = ${JsNameMangler.method(method.id)};")
+    }
+    writer.line()
+  }
+
+  /** 每个类的 clinit 与实例初始化器均以函数声明输出，调用顺序由 constructor IR 保证。 */
+  private fun emitClassInitializers() {
+    classesInParentFirstOrder.forEach { clazz ->
+      emitClassInitializer(clazz)
+      emitInstanceDefaultInitializer(clazz)
+      emitInstanceInitializer(clazz)
+    }
+  }
+
+  /** 父类优先、至多一次、失败缓存的 lazy class initialization。 */
+  private fun emitClassInitializer(clazz: JavaIrClass) {
+    val storage = JsNameMangler.staticStorage(clazz.id)
+    writer.line("function ${JsNameMangler.classInitializer(clazz.id)}() {")
+    writer.indented {
+      writer.line("const meta = $storage;")
+      writer.line("if (meta.state === 2) return;")
+      writer.line("if (meta.state === 3) throw meta.error;")
+      writer.line("if (meta.state === 1) return;")
+      writer.line("meta.state = 1;")
+      writer.line("try {")
+      writer.indented {
+        clazz.superClass?.let { writer.line("${JsNameMangler.classInitializer(it)}();") }
+        clazz.fields.filter { it.isStatic && it.initializer != null }.forEach { field ->
+          writer.line("meta.values[\"${JsNameMangler.field(field.id)}\"] = ${renderExpression(checkNotNull(field.initializer))};")
+        }
+        clazz.staticInitializer?.let(::emitBlockContents)
+        writer.line("meta.state = 2;")
+      }
+      writer.line("} catch (error) { meta.state = 3; meta.error = error; throw error; }")
+    }
+    writer.line("}")
+  }
+
+  /** 对象分配时按 parent 到 child 一次性填充整个实例字段集合的 Java 默认值。 */
+  private fun emitInstanceDefaultInitializer(clazz: JavaIrClass) {
+    writer.line("function ${JsNameMangler.instanceDefaultInitializer(clazz.id)}(self) {")
+    writer.indented {
+      clazz.superClass?.let { writer.line("${JsNameMangler.instanceDefaultInitializer(it)}(self);") }
+      clazz.fields.filter { !it.isStatic }.forEach { field ->
+        writer.line("self[\"${JsNameMangler.field(field.id)}\"] = ${defaultValue(field.type)};")
+      }
+    }
+    writer.line("}")
+  }
+
+  /** 仅执行本类显式字段初始化与初始化块，默认值已在分配阶段完成。 */
+  private fun emitInstanceInitializer(clazz: JavaIrClass) {
+    writer.line("function ${JsNameMangler.instanceInitializer(clazz.id)}(self) {")
+    writer.indented {
+      currentThisName = "self"
+      try {
+        clazz.fields.filter { !it.isStatic && it.initializer != null }.forEach { field ->
+          writer.line("self[\"${JsNameMangler.field(field.id)}\"] = ${renderExpression(checkNotNull(field.initializer))};")
+        }
+        clazz.instanceInitializer?.let(::emitBlockContents)
+      } finally {
+        currentThisName = "this"
+      }
+    }
+    writer.line("}")
+    writer.line()
+  }
+
   /** 生成一个实现 Java static 方法、参数按 stable id 命名的普通 JS function。 */
   private fun emitMethod(method: JavaIrMethod) {
     val parameters = method.parameters.joinToString(", ") { parameter ->
@@ -339,16 +587,31 @@ private class JavaScriptEmitter(
           val name = JsNameMangler.local(parameter.id)
           writer.line("$name = $name | 0;")
         }
-      emitBlockContents(checkNotNull(method.body))
+      currentMethod = method
+      try {
+        // 根类的 this() 链仅由终点构造器初始化一次，避免委托前后重复执行字段初始化。
+        if (method.kind == JavaIrMethodKind.CONSTRUCTOR &&
+          index.classes[method.owner]?.superClass == null &&
+          constructorInvocationKind(method) != JavaIrConstructorInvocationKind.THIS
+        ) {
+          writer.line("${JsNameMangler.instanceInitializer(method.owner)}(this);")
+        }
+        emitBlockContents(checkNotNull(method.body))
+      } finally { currentMethod = null }
     }
     writer.line("}")
     writer.line()
   }
 
+  /** 读取 validator 已保证位于构造器直接首句的委托种类。 */
+  private fun constructorInvocationKind(method: JavaIrMethod): JavaIrConstructorInvocationKind? =
+    (method.body?.statements?.firstOrNull() as? JavaIrStatement.ConstructorInvocation)?.kind
+
   /** 输出稳定入口；剩余调用参数会由目标 static 方法的 JS 形参自然忽略。 */
   private fun emitEntryExport(entry: JavaIrMethod) {
     writer.line("export function ${JavaModuleLayout.ENTRY_EXPORT_NAME}(...args) {")
     writer.indented {
+      if (usesObjectRuntime()) writer.line("${JsNameMangler.classInitializer(entry.owner)}();")
       writer.line("return ${JsNameMangler.method(entry.id)}(...args);")
     }
     writer.line("}")
@@ -403,6 +666,19 @@ private class JavaScriptEmitter(
         writer.write(") ")
         emitBranch(statement.body)
       }
+      is JavaIrStatement.ConstructorInvocation -> {
+        val arguments = statement.arguments.joinToString(", ") { renderExpression(it) }
+        writer.writeIndentation()
+        writer.writeMapped(
+          "${JsNameMangler.method(statement.constructor)}.call(this${if (arguments.isEmpty()) "" else ", $arguments"});",
+          statement.span,
+        )
+        writer.write("\n")
+        if (statement.kind == JavaIrConstructorInvocationKind.SUPER) {
+          val owner = checkNotNull(currentMethod).owner
+          writer.line("${JsNameMangler.instanceInitializer(owner)}(this);")
+        }
+      }
       is JavaIrStatement.Return -> {
         val expression = statement.expression
         if (expression == null) {
@@ -436,6 +712,7 @@ private class JavaScriptEmitter(
     return when (expression) {
       is JavaIrExpression.Constant -> renderConstant(expression.value)
       is JavaIrExpression.GetLocal -> JsNameMangler.local(expression.local)
+      is JavaIrExpression.This -> currentThisName
       is JavaIrExpression.SetLocal -> {
         val local = index.locals.getValue(expression.local)
         "(${JsNameMangler.local(expression.local)} = " +
@@ -446,15 +723,44 @@ private class JavaScriptEmitter(
       is JavaIrExpression.Convert -> renderConversion(expression)
       is JavaIrExpression.InvokeStatic -> {
         val arguments = expression.arguments.joinToString(", ") { argument -> renderExpression(argument) }
-        "${JsNameMangler.method(expression.method)}(${arguments})"
+        index.ownerOf(expression.method)?.let { owner ->
+          if (usesObjectRuntime()) {
+            // Java 先完成全部实参求值，再在真正 invokestatic 前触发目标类初始化。
+            "((values) => (${JsNameMangler.classInitializer(owner.id)}(), ${JsNameMangler.method(expression.method)}(...values)))([$arguments])"
+          } else {
+            "${JsNameMangler.method(expression.method)}($arguments)"
+          }
+        } ?: error("Validated Java IR references an unknown static method.")
       }
-      is JavaIrExpression.GetField,
-      is JavaIrExpression.SetField,
-      is JavaIrExpression.GetStaticField,
-      is JavaIrExpression.SetStaticField,
-      is JavaIrExpression.InvokeSpecial,
-      is JavaIrExpression.InvokeVirtual,
-      is JavaIrExpression.NewObject -> error("Validated Java IR cannot contain unsupported expressions.")
+      is JavaIrExpression.GetField ->
+        "\$__j_non_null(${renderExpression(expression.receiver)})[\"${JsNameMangler.field(expression.field)}\"]"
+      is JavaIrExpression.SetField -> {
+        val receiver = renderExpression(expression.receiver)
+        val value = renderExpression(expression.value)
+        "((receiver, value) => (\$__j_non_null(receiver)[\"${JsNameMangler.field(expression.field)}\"] = value))($receiver, $value)"
+      }
+      is JavaIrExpression.GetStaticField -> {
+        val owner = index.fields.getValue(expression.field).owner
+        "(${JsNameMangler.classInitializer(owner)}(), ${JsNameMangler.staticStorage(owner)}.values[\"${JsNameMangler.field(expression.field)}\"])"
+      }
+      is JavaIrExpression.SetStaticField -> {
+        val owner = index.fields.getValue(expression.field).owner
+        // Java putstatic 的右值先求值，随后才初始化字段所属类并执行写入。
+        "((value) => (${JsNameMangler.classInitializer(owner)}(), ${JsNameMangler.staticStorage(owner)}.values[\"${JsNameMangler.field(expression.field)}\"] = value))(${renderExpression(expression.value)})"
+      }
+      is JavaIrExpression.InvokeSpecial -> {
+        val args = expression.arguments.joinToString(", ") { renderExpression(it) }
+        "((receiver${if (args.isEmpty()) "" else ", values"}) => ${JsNameMangler.method(expression.method)}.call(\$__j_non_null(receiver)${if (args.isEmpty()) "" else ", ...values"}))(${renderExpression(expression.receiver)}${if (args.isEmpty()) "" else ", [$args]"})"
+      }
+      is JavaIrExpression.InvokeVirtual -> {
+        val receiver = renderExpression(expression.receiver)
+        val args = expression.arguments.joinToString(", ") { renderExpression(it) }
+        "((receiver${if (args.isEmpty()) "" else ", values"}) => \$__j_non_null(receiver)[\"${JsNameMangler.virtualSlot(expression.virtualSlot)}\"](${if (args.isEmpty()) "" else "...values"}))($receiver${if (args.isEmpty()) "" else ", [$args]"})"
+      }
+      is JavaIrExpression.NewObject -> {
+        val args = expression.arguments.joinToString(", ") { renderExpression(it) }
+        "(${JsNameMangler.classInitializer(expression.classId)}(), (() => { const value = Object.create(${JsNameMangler.prototype(expression.classId)}); ${JsNameMangler.instanceDefaultInitializer(expression.classId)}(value); ${JsNameMangler.method(expression.constructor)}.call(value${if (args.isEmpty()) "" else ", $args"}); return value; })())"
+      }
     }
   }
 
@@ -539,6 +845,16 @@ private class JavaScriptEmitter(
   /** 对 int-like 本地变量或参数写入统一加上 Java 32 位截断。 */
   private fun coerceToType(code: String, type: JavaIrType): String {
     return if (type.isStage0Integral()) "($code | 0)" else code
+  }
+
+  /** Java 默认字段值必须独立于 JavaScript 的 undefined。 */
+  private fun defaultValue(type: JavaIrType): String = when (type) {
+    is JavaIrType.Primitive -> when (type.kind.name) {
+      "BOOLEAN" -> "false"
+      else -> "0"
+    }
+    is JavaIrType.Reference, is JavaIrType.Array, JavaIrType.Null -> "null"
+    JavaIrType.Void -> error("Void fields are invalid Java IR.")
   }
 
   /** 入口绑定已由 validator 验证唯一性，这里只执行确定性索引读取。 */

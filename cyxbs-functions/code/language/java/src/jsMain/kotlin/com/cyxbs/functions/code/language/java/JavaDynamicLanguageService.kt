@@ -35,7 +35,7 @@ import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
  * Java 动态语言 npm 包的 Kotlin/JS 入口。
  *
  * @lezer/java 负责错误恢复语法树和增量高亮；轻量语义索引负责工作区声明、补全、跳转、引用与
- * 安全重命名。实现不会执行用户源码，也不会加载 JDK、Gradle 或 Maven classpath。
+ * 安全重命名。编译后的程序交给独立 Runtime 执行，本服务不会加载 JDK、Gradle 或 Maven classpath。
  */
 object JavaDynamicLanguageService : DynamicLanguageService {
   private val highlighterSessions = mutableMapOf<String, LezerSyntaxHighlighterSession>()
@@ -66,8 +66,8 @@ object JavaDynamicLanguageService : DynamicLanguageService {
   /**
    * 将 Java 工作区编译为统一 ES Module 图，入口由文件和可选光标位置选择。
    *
-   * 编译只生成代码，不在当前语言分析 Runtime 中执行用户程序。缺少入口、源码错误和阶段 0
-   * 尚未支持的 Java 特性都会通过结构化诊断返回。
+   * 编译只生成代码，不在当前语言分析 Runtime 中执行用户程序。缺少入口、源码错误和当前
+   * Stage1 子集尚未支持的 Java 特性都会通过结构化诊断返回。
    */
   override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
     val sourceWorkspace = request.workspace.toJavaSourceWorkspace()

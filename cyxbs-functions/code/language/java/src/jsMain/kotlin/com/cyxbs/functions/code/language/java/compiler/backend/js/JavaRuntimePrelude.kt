@@ -27,4 +27,15 @@ internal object JavaRuntimePrelude {
       return (left - @__j_int_div(left, right) * right) | 0;
     }
   """.trimIndent().replace('@', '$')
+
+  /** 仅对象运行时需要的空 receiver 检查，避免改变阶段 0 纯 static 快照。 */
+  val objectSource: String = """
+    // 所有实例 receiver 在属性访问和调用前通过这里统一转为 Java 风格空指针错误。
+    function @__j_non_null(value) {
+      if (value === null) {
+        throw new Error("java.lang.NullPointerException");
+      }
+      return value;
+    }
+  """.trimIndent().replace('@', '$')
 }

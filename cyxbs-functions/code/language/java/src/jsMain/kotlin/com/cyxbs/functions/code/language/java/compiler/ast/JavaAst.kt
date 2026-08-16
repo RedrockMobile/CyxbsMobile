@@ -48,6 +48,18 @@ internal enum class JavaAstModifier {
   FINAL,
 }
 
+/**
+ * 阶段 1 保留的声明注解。
+ *
+ * 当前只由前端接受精确的 [qualifiedName] `Override`，保留该节点可避免把注解静默擦除，
+ * 也为后续语义阶段校验 override 关系提供稳定的源码区间。
+ */
+internal data class JavaAstAnnotation(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val qualifiedName: String,
+) : JavaAstNode
+
 /** 类型声明种类；阶段 0 只执行 CLASS，其余种类由后续阶段逐步开放。 */
 internal enum class JavaAstTypeDeclarationKind {
   CLASS,
@@ -91,6 +103,8 @@ internal sealed interface JavaAstTypeReference : JavaAstNode {
     override val span: JavaSourceSpan,
     val qualifiedName: String,
     val arguments: List<JavaAstTypeReference>,
+    /** `new Box<>()` 等菱形写法；空 [arguments] 本身表示未参数化类型。 */
+    val usesDiamond: Boolean = false,
   ) : JavaAstTypeReference
 
   /** 固定维度的数组类型。 */
@@ -159,6 +173,8 @@ internal sealed interface JavaAstMemberDeclaration : JavaAstNode {
     val name: String,
     val parameters: List<JavaAstParameter>,
     val body: JavaAstStatement.Block?,
+    /** 仅保留阶段 1 明确允许的 `@Override`，默认值保持既有构造调用兼容。 */
+    val annotations: List<JavaAstAnnotation> = emptyList(),
   ) : JavaAstMemberDeclaration
 
   /** 构造器声明；显式 this/super 调用保留为方法体首条表达式。 */
@@ -209,6 +225,19 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val declarators: List<JavaAstVariableDeclarator>,
   ) : JavaAstStatement
 
+  /**
+   * 构造器的显式 `this(...)` 或 `super(...)` 调用。
+   *
+   * 它不是普通方法调用：Java 要求其只能位于构造器 body 的第一条语句，前端保留专用节点让
+   * 后续语义与 lowering 可以据此执行该约束和初始化顺序。
+   */
+  data class ConstructorInvocation(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val kind: JavaAstConstructorInvocationKind,
+    val arguments: List<JavaAstExpression>,
+  ) : JavaAstStatement
+
   /** 仅为副作用求值的表达式语句。 */
   data class Expression(
     override val nodeId: JavaNodeId,
@@ -257,6 +286,12 @@ internal sealed interface JavaAstStatement : JavaAstNode {
   ) : JavaAstStatement
 }
 
+/** 显式构造器调用的目标。 */
+internal enum class JavaAstConstructorInvocationKind {
+  THIS,
+  SUPER,
+}
+
 /** 经典 for 初始化部分的两种合法形态。 */
 internal sealed interface JavaAstForInitializer : JavaAstNode {
   /** for 初始化中的局部变量声明。 */
@@ -295,6 +330,12 @@ internal sealed interface JavaAstExpression : JavaAstNode {
 
   /** this 表达式。 */
   data class This(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+  ) : JavaAstExpression
+
+  /** `super` 表达式，阶段 1 用于父类实例成员访问和调用。 */
+  data class Super(
     override val nodeId: JavaNodeId,
     override val span: JavaSourceSpan,
   ) : JavaAstExpression

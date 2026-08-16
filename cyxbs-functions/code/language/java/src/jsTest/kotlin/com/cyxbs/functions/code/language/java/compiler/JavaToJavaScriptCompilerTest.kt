@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** 使用真实 Lezer CST 验证源码到可执行 JavaScript 的完整阶段 0 链路。 */
+/** 使用真实 Lezer CST 验证源码到可执行 JavaScript 的完整 Stage1 链路。 */
 class JavaToJavaScriptCompilerTest {
   /** classic for、局部变量和 int 运算应贯穿所有阶段并产生正确运行结果。 */
   @Test
@@ -107,6 +107,195 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(true, executeEntryValue(artifact, null) as Boolean)
   }
 
+  /** 构造器、父类字段和 override 必须从源码贯穿到 JavaScript 虚分派结果。 */
+  @Test
+  fun compilesConstructorsInheritanceAndVirtualDispatch() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Base {
+          int value;
+          Base(int value) { this.value = value; }
+          int score() { return value; }
+        }
+
+        class Child extends Base {
+          Child(int value) { super(value); }
+          @Override int score() { return value + 2; }
+        }
+
+        class Main {
+          static int run(int value) {
+            Base item = new Child(value);
+            return item.score();
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(7, executeEntry(artifact, 5))
+  }
+
+  /** 参数化字段、继承代换和泛型返回值必须在擦除后保持正确运行结果。 */
+  @Test
+  fun compilesGenericClassAndInheritedSubstitution() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()Z",
+      "demo/Main.java" to """
+        package demo;
+
+        class Box<T> {
+          T value;
+          Box(T value) { this.value = value; }
+          T get() { return value; }
+        }
+
+        class StringBox extends Box<String> {
+          StringBox(String value) { super(value); }
+        }
+
+        class Main {
+          static boolean run() {
+            Box<String> box = new StringBox("ok");
+            return box.get() != null;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(true, executeEntryValue(artifact, null) as Boolean)
+  }
+
+  /** 泛型父类的方法代换后仍应被子类协变返回的 override 复用同一虚槽。 */
+  @Test
+  fun compilesGenericOverrideWithCovariantReturn() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()Z",
+      "demo/Main.java" to """
+        package demo;
+
+        class Base<T> {
+          T value(T input) { return null; }
+        }
+
+        class Child extends Base<String> {
+          @Override String value(String input) { return input; }
+        }
+
+        class Main {
+          static boolean run() {
+            Base<String> item = new Child();
+            return item.value("child") != null;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(true, executeEntryValue(artifact, null) as Boolean)
+  }
+
+  /** 方法类型参数的上界必须先应用所属类的类型实参，再执行调用点推断。 */
+  @Test
+  fun compilesMethodTypeBoundUsingOwnerSubstitution() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()Z",
+      "demo/Main.java" to """
+        package demo;
+
+        class Converter<T> {
+          <U extends T> U identity(U value) { return value; }
+        }
+
+        class Main {
+          static boolean run() {
+            Converter<Object> converter = new Converter<Object>();
+            return converter.identity("ok") != null;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(true, executeEntryValue(artifact, null) as Boolean)
+  }
+
+  /** static 调用必须先求值实参，再于实际调用点触发目标类初始化。 */
+  @Test
+  fun evaluatesStaticArgumentsBeforeTargetClassInitialization() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Target {
+          static int trigger = Main.markInitialized();
+          static int accept(int value) { return value; }
+        }
+
+        class Main {
+          static int state = 1;
+          static int readState() { return state; }
+          static int markInitialized() { state = 2; return 0; }
+
+          static int run() {
+            int argument = Target.accept(readState());
+            return argument * 10 + state;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(12, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
+  /** static 字段写入必须先求值右侧表达式，再于实际写入点初始化字段所属类。 */
+  @Test
+  fun evaluatesStaticFieldValueBeforeTargetClassInitialization() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Target {
+          static int trigger = Main.markInitialized();
+          static int value;
+        }
+
+        class Main {
+          static int state = 1;
+          static int readState() { return state; }
+          static int markInitialized() { state = 2; return 0; }
+
+          static int run() {
+            Target.value = readState();
+            return Target.value * 10 + state;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(12, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
   /** 编辑器入口位置应选择所在 static 方法，并在 Java 包内部推导 descriptor。 */
   @Test
   fun compilesEntrySelectedBySourcePosition() {
@@ -181,7 +370,7 @@ class JavaToJavaScriptCompilerTest {
     return (value as Number).toInt()
   }
 
-  /** 执行任意阶段 0 入口，供引用与 boolean descriptor 用例复用。 */
+  /** 执行任意 Stage1 入口，供引用、对象与 boolean descriptor 用例复用。 */
   private fun executeEntryValue(
     artifact: JavaScriptProgramArtifact,
     argument: dynamic,

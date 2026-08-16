@@ -8,9 +8,9 @@ import com.cyxbs.functions.code.language.java.compiler.semantic.impl.JavaSemanti
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspace
 
 /**
- * 阶段 0 Java 源码到纯 ES Module 的默认编译入口。
+ * Stage1 Java 源码到纯 ES Module 的默认编译入口。
  *
- * 该入口固定串联严格 CST adapter、三遍语义分析、typed IR lowering 和 JavaScript 后端。
+ * 该入口固定串联严格 CST adapter、多遍语义分析、typed IR lowering 和 JavaScript 后端。
  * 任一阶段失败都会立即返回结构化诊断，不会向后续阶段传递恢复树或半成品。
  */
 internal object JavaToJavaScriptCompiler {

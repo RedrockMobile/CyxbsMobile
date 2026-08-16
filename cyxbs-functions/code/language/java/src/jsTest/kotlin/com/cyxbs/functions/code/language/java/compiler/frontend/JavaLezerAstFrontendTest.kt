@@ -1,10 +1,13 @@
 package com.cyxbs.functions.code.language.java.compiler.frontend
 
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAssignmentOperator
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstStatement
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclarationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeReference
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
@@ -73,21 +76,20 @@ class JavaLezerAstFrontendTest {
     assertTrue(unit.types.single().span.from == source.indexOf("class"))
   }
 
-  /** 未映射到阶段 0 的 Java 结构必须给出 stable unsupported diagnostic。 */
+  /** 未映射到阶段 1 的 Java 结构必须给出 stable unsupported diagnostic。 */
   @Test
   fun rejectsUnsupportedSyntax() {
-    val result = parse("interface Main {}")
+    val result = parse("enum Main { VALUE }")
 
     assertFalse(result.isSuccess)
     assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
-  /** 包裹基础类型的数组、泛型和 vararg 不能被静默擦除成阶段 0 类型。 */
+  /** 阶段 1 继续拒绝数组和 vararg，不能把它们静默降成普通类型或参数。 */
   @Test
   fun rejectsUnsupportedTypeWrappers() {
     listOf(
       "class Main { static int[] value() { return null; } }",
-      "class Main { static List<String> value() { return null; } }",
       "class Main { static int value(int... items) { return 0; } }",
     ).forEach { source ->
       val result = parse(source)
@@ -120,13 +122,80 @@ class JavaLezerAstFrontendTest {
     assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
-  /** 泛型、extends 与 implements 必须保留为显式 unsupported，不能被降成普通 class。 */
+  /**
+   * 真实 @lezer/java CST 必须完整映射阶段 1 的类型参数、继承、字段、构造器、interface 与泛型调用。
+   *
+   * 该用例不构造手写 CST，而是经动态 npm 中的 parser.parse 进入 adapter，用于锁定 CST 节点契约。
+   */
   @Test
-  fun rejectsUnsupportedClassClauses() {
+  fun mapsStageOneDeclarationsFromRealLezerCst() {
+    val result = parse(
+      """
+      class Child<T extends Base & Marker> extends Base implements Marker {
+        Box<String> field = new Box<>();
+        Box<? super Base> lower;
+        Child(int value) { super(value); }
+        @Override public <R extends Base> R convert(R value) { return value; }
+        int inherited() { return super.value(); }
+        static <T> T pick(T value) { return value; }
+        static String run() { return Child.<String>pick("ok"); }
+      }
+      interface Marker<T> extends Parent<T> { T map(T value); }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val unit = assertNotNull(result.value).units.single()
+    val child = unit.types.first()
+    assertEquals(JavaAstTypeDeclarationKind.CLASS, child.kind)
+    assertEquals("T", child.typeParameters.single().name)
+    assertEquals(2, child.typeParameters.single().upperBounds.size)
+    assertEquals("Base", assertIs<JavaAstTypeReference.Named>(assertNotNull(child.superClass)).qualifiedName)
+    assertEquals("Marker", assertIs<JavaAstTypeReference.Named>(child.interfaces.single()).qualifiedName)
+    val field = assertIs<JavaAstMemberDeclaration.Field>(child.members[0])
+    val fieldType = assertIs<JavaAstTypeReference.Named>(field.type)
+    assertEquals("Box", fieldType.qualifiedName)
+    assertEquals("String", assertIs<JavaAstTypeReference.Named>(fieldType.arguments.single()).qualifiedName)
+    assertTrue(assertIs<JavaAstExpression.NewObject>(assertNotNull(field.declarators.single().initializer)).type.let {
+      assertIs<JavaAstTypeReference.Named>(it).usesDiamond
+    })
+    val lower = assertIs<JavaAstMemberDeclaration.Field>(child.members[1])
+    val wildcard = assertIs<JavaAstTypeReference.Wildcard>(
+      assertIs<JavaAstTypeReference.Named>(lower.type).arguments.single(),
+    )
+    assertEquals("Base", assertIs<JavaAstTypeReference.Named>(assertNotNull(wildcard.lowerBound)).qualifiedName)
+    val constructor = child.members.filterIsInstance<JavaAstMemberDeclaration.Constructor>().single()
+    assertEquals(JavaAstConstructorInvocationKind.SUPER, assertIs<JavaAstStatement.ConstructorInvocation>(constructor.body.statements.single()).kind)
+    val methods = child.members.filterIsInstance<JavaAstMemberDeclaration.Method>()
+    val override = methods.first { it.name == "convert" }
+    assertEquals(listOf("Override"), override.annotations.map { it.qualifiedName })
+    assertEquals("R", override.typeParameters.single().name)
+    val inherited = methods.first { it.name == "inherited" }
+    val inheritedCall = assertIs<JavaAstExpression.MethodInvocation>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(inherited.body).statements.single()).expression,
+    )
+    assertIs<JavaAstExpression.Super>(assertNotNull(inheritedCall.receiver))
+    val run = methods.first { it.name == "run" }
+    val invocation = assertIs<JavaAstExpression.MethodInvocation>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(run.body).statements.single()).expression,
+    )
+    assertEquals("String", assertIs<JavaAstTypeReference.Named>(invocation.typeArguments.single()).qualifiedName)
+    val marker = unit.types.last()
+    assertEquals(JavaAstTypeDeclarationKind.INTERFACE, marker.kind)
+    assertEquals("Parent", assertIs<JavaAstTypeReference.Named>(marker.interfaces.single()).qualifiedName)
+    assertTrue(assertIs<JavaAstMemberDeclaration.Method>(marker.members.single()).body == null)
+  }
+
+  /** 真实 CST 中的未开放 Java 8 或阶段 2A 结构必须被稳定拒绝，不能在 adapter 中消失。 */
+  @Test
+  fun rejectsStageOneExcludedSyntaxWithoutErasure() {
     listOf(
-      "class Main<T> {}",
-      "class Main extends Base {} class Base {}",
-      "class Main implements Runnable {}",
+      "class Main { int value() throws Exception { return 1; } }",
+      "class Main { @Deprecated int value() { return 1; } }",
+      "class Main { strictfp int value() { return 1; } }",
+      "public public class Main { }",
+      "class Main { Object value = new Object() { }; }",
+      "class Main { static { } }",
     ).forEach { source ->
       val result = parse(source)
       assertFalse(result.isSuccess, source)

@@ -15,6 +15,18 @@ internal object JsNameMangler {
   /** 返回类静态存储对象的确定性名称。 */
   fun staticStorage(classId: JavaIrClassId): String = "\$c_${classId.value}"
 
+  /** 返回实例原型的确定性名称；属性仅由 IR 编号寻址。 */
+  fun prototype(classId: JavaIrClassId): String = "\$p_${classId.value}"
+
+  /** 返回类懒初始化函数的确定性名称。 */
+  fun classInitializer(classId: JavaIrClassId): String = "\$i_${classId.value}"
+
+  /** 返回本类实例字段初始化函数的确定性名称。 */
+  fun instanceInitializer(classId: JavaIrClassId): String = "\$n_${classId.value}"
+
+  /** 返回对象分配时填充整条继承链字段默认值的确定性名称。 */
+  fun instanceDefaultInitializer(classId: JavaIrClassId): String = "\$d_${classId.value}"
+
   /** 返回静态方法的确定性名称。 */
   fun method(methodId: JavaIrMethodId): String = "\$m_${methodId.value}"
 
@@ -23,4 +35,7 @@ internal object JsNameMangler {
 
   /** 返回字段属性名；使用方必须通过方括号访问，避免属性名不是 JS 标识符。 */
   fun field(fieldId: JavaIrFieldId): String = "\$f_${fieldId.value}"
+
+  /** 返回虚分派槽位属性名，override 必须复用同一编号。 */
+  fun virtualSlot(slot: Int): String = "\$v_$slot"
 }

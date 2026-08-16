@@ -1,6 +1,7 @@
 # Java 8 在 QuickJS/JavaScript 中运行的可行性调研
 
-> 状态：调研完成；已落地阶段 0 的静态方法纵向闭环，尚未作为产品运行接口发布。
+> 状态：调研完成；阶段 0 纵向链路与阶段 1 的对象、继承、重载和常用泛型核心已落地，
+> 尚未作为完整 Java 8 产品能力发布。
 >
 > 调研与体量测量日期：2026-08-16（Asia/Shanghai）。
 
@@ -367,7 +368,7 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 - JS 后端必须重新读取 CST 或源码才能生成正确代码，说明 AST/IR 边界设计失败；
 - 生成 JS 无法稳定隔离用户异常与宿主终止信号。
 
-#### 当前阶段 0 实现进度（2026-08-16）
+#### 阶段 0 实现结果（2026-08-16）
 
 - 已建立 `JavaSourceWorkspace -> AST -> JavaSemanticModel -> JavaIrProgram -> ES Module` 的固定边界，
   每层只读取上一层稳定契约；
@@ -379,9 +380,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
   重载歧义，以及 public 顶层类型与 Java 文件名一致性检查；
 - typed IR 已消除名称猜测，JS 后端已实现 32 位 `int` 的溢出、乘除余数、局部读写、控制流、
   静态调用和单一稳定入口导出；
-- 已用真实多文件 Java 源码贯穿完整流水线，并在 Node 中执行生成代码；Java 模块完整 91 项
-  JS 测试已通过。尚未接入 QuickJS 宿主
-  bridge，也尚未完成 `long`、递归/异常、性能与内存闸门，因此阶段 0 仍未结束。
+- 已用真实多文件 Java 源码贯穿完整流水线，并在 Node 中执行生成代码；该静态子集继续作为
+  Stage1 的回归基线。端上执行复用既有独立 QuickJS Runtime 和 ES Module 加载链路。
 
 ### 阶段 1：编译器核心纵向闭环
 
@@ -392,6 +392,21 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 - 以“小批语法 -> typed IR -> JS 快照 -> QuickJS 输出 -> javac 对照”的顺序持续交付；
 - 阶段末应能运行只依赖极小内建 runtime 的控制流、方法和简单类教学程序。
 
+#### 当前阶段 1 实现进度（2026-08-16）
+
+- AST 和 Java 8 方言层已支持 class 泛型、单继承、字段、构造器、实例/static 方法、`this`、
+  `super`、`new`、通配符、显式方法类型实参与 diamond；未开放语法会在前端整体拒绝；
+- 语义层采用类型、继承、成员和方法体多遍分析，已支持构造委托与循环检查、字段访问、
+  override/虚槽和 static hiding，以及 exact、primitive/reference widening、`null` 最具体重载；
+- 常用 class/method 泛型已支持边界校验、不变类型参数、继承代换、`? extends/? super`、
+  实参驱动的方法与 diamond 推断；raw、capture member 操作和 target-only inference 保持关闭；
+- typed IR 与 JS 后端已接入对象分配、父类优先初始化、字段默认值、lazy class initialization、
+  constructor special call 和 virtual dispatch，并校验 receiver、构造委托与虚槽完整性；
+- 完整 `jsNodeTest` 共 147 项通过，其中真实源码端到端用例会执行生成的 JavaScript，覆盖
+  多文件 static 回归、构造器/继承/override 和泛型继承代换；
+- 当前运行子集仍以 `int/boolean/String/null` 为主。`long`、浮点完整运行语义、boxing、数组、
+  接口分派、异常与 lambda 继续留在后续阶段，遇到时返回稳定的不支持诊断。
+
 停止条件：
 
 - 为常见重载/泛型程序对齐 javac 需要大量逐例补丁，而不能归纳为规则；
@@ -400,7 +415,7 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 
 ### 阶段 2A：补齐 Java 语言 MVP
 
-- 完成构造器链、类/接口初始化、虚分派与接口分派；
+- 在已有 class 构造器链、初始化和虚分派基础上补齐接口初始化、接口分派与 default method；
 - 完成数组、boxing/unboxing、字符串拼接、异常/`finally`、enum；
 - 完成常见泛型擦除与桥接、lambda、方法引用和函数式接口；
 - 对复杂 wildcard capture、低频语法和不支持 API 给出稳定的编译期诊断，不动态降级；
