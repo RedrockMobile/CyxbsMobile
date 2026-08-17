@@ -7,6 +7,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaBody
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
@@ -453,6 +454,42 @@ class JavaLezerAstFrontendTest {
       assertFalse(result.isSuccess, source)
       assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" }, source)
     }
+  }
+
+  /** 真实 Lezer CST 的 lambda 参数推断、显式类型与两种 body 必须完整保留。 */
+  @Test
+  fun mapsJavaEightLambdaParametersAndBodies() {
+    val result = parse(
+      """
+      interface Mapper { int apply(int value); }
+      class Main {
+        static Mapper expression() { return value -> value + 1; }
+        static Mapper block() { return (int value) -> { return value + 2; }; }
+        static void local() { Runnable task = () -> { int nested = 1; }; }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val methods = assertNotNull(result.value).units.single().types[1].members
+      .map { assertIs<JavaAstMemberDeclaration.Method>(it) }
+    val expressionLambda = assertIs<JavaAstExpression.Lambda>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(methods[0].body).statements.single()).expression,
+    )
+    assertEquals(null, expressionLambda.parameters.single().type)
+    assertIs<JavaAstLambdaBody.Expression>(expressionLambda.body)
+    val blockLambda = assertIs<JavaAstExpression.Lambda>(
+      assertIs<JavaAstStatement.Return>(assertNotNull(methods[1].body).statements.single()).expression,
+    )
+    assertIs<JavaAstTypeReference.Primitive>(assertNotNull(blockLambda.parameters.single().type))
+    assertIs<JavaAstLambdaBody.Block>(blockLambda.body)
+    val outerDeclaration = assertIs<JavaAstStatement.VariableDeclaration>(
+      assertNotNull(methods[2].body).statements.single(),
+    )
+    assertEquals(1, outerDeclaration.declarators.size)
+    val localLambda = assertIs<JavaAstExpression.Lambda>(outerDeclaration.declarators.single().initializer)
+    val localBody = assertIs<JavaAstLambdaBody.Block>(localLambda.body)
+    assertEquals(1, localBody.block.statements.size)
   }
 
   /** 构造唯一文件编号和规范化工作区路径。 */

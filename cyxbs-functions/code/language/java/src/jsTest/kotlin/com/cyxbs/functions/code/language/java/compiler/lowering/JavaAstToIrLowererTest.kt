@@ -962,6 +962,7 @@ class JavaAstToIrLowererTest {
       expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.InvokeVirtualSlot -> builtinOperations(expression.receiver) +
       expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.Lambda -> builtinOperations(expression.body)
     is JavaIrExpression.NewObject -> expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.NewArray -> builtinOperations(expression.length)
     is JavaIrExpression.ArrayInitializer -> expression.elements.flatMap(::builtinOperations)

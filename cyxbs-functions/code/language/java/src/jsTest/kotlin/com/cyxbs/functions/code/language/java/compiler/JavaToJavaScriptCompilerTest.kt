@@ -1482,6 +1482,51 @@ class JavaToJavaScriptCompilerTest {
     assertTrue(missingReturn.diagnostics.any { it.code == "java.semantic.missing_return" })
   }
 
+  /** 用户 SAM 与常用 java.util.function 接口共享虚槽闭包实现，并保持词法捕获。 */
+  @Test
+  fun compilesAndExecutesJavaEightLambdas() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        import java.util.function.Consumer;
+        import java.util.function.Function;
+        import java.util.function.Predicate;
+        import java.util.function.Supplier;
+
+        interface IntMapper { int apply(int value); }
+
+        class Main {
+          static <T> T call(Function<T, T> function, T value) {
+            return function.apply(value);
+          }
+
+          static int run() {
+            int offset = 3;
+            IntMapper mapper = value -> value + offset;
+            Function<Integer, Integer> twice = value -> value + value;
+            Supplier<Integer> supplier = () -> 4;
+            Predicate<Integer> positive = value -> value > 0;
+            Runnable task = () -> { int local = 1; };
+            Consumer<Integer> sink = value -> { int ignored = value; };
+            task.run();
+            sink.accept(1);
+            int result = mapper.apply(2);
+            result += twice.apply(3);
+            result += supplier.get();
+            if (positive.test(result)) result += 1;
+            return result;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(16, executeEntryValue(artifact, null) as Int)
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

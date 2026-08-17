@@ -126,11 +126,10 @@ private class JavaScriptBackendValidator(
     clazz.superClass?.let { parent -> if (index.classes[parent] == null) invalid("Java IR references an unknown superclass id ${parent.value}.", clazz.span) }
     clazz.interfaces.forEach { interfaceId ->
       val inherited = index.classes[interfaceId]
-      // AutoCloseable 是不发射 JS class shell 的 builtin facade，但允许用户类实现；其余接口仍必须
-      // 是本次程序中可验证的源码 interface，避免任意 builtin class id 混入接口表。
-      val isBuiltinAutoCloseable =
-        index.program.builtinTypeRoles[interfaceId] == JavaBuiltinTypeRole.AUTO_CLOSEABLE
-      if ((inherited == null && !isBuiltinAutoCloseable) ||
+      // 只有 catalog 明确允许用户实现的 builtin interface facade 可以不发射源码 class shell。
+      val isImplementableBuiltinInterface = index.program.builtinTypeRoles[interfaceId]
+        ?.let(::isUserImplementableBuiltinInterface) == true
+      if ((inherited == null && !isImplementableBuiltinInterface) ||
         (inherited != null && inherited.kind != JavaIrTypeDeclarationKind.INTERFACE)
       ) {
         invalid("Java IR direct interface must reference an emitted interface.", clazz.span)
@@ -524,6 +523,7 @@ private class JavaScriptBackendValidator(
           } || !matchesBuiltinType(expression.type, signature.result)
         ) invalid("Java IR builtin virtual slot call has an invalid signature.", expression.span)
       }
+      is JavaIrExpression.Lambda -> validateLambda(expression)
       is JavaIrExpression.NewObject -> {
         val target = index.methods[expression.constructor]
         if (target == null || target.kind != JavaIrMethodKind.CONSTRUCTOR || target.owner != expression.classId) invalid("Java IR object creation must target an owner constructor.", expression.span)
@@ -558,6 +558,36 @@ private class JavaScriptBackendValidator(
       }
       is JavaIrExpression.StringConcat -> expression.parts.forEach { part -> validateExpression(part.expression) }
     }
+  }
+
+  /** 校验 lambda 的 SAM 槽、词法参数/捕获以及结构化 body。 */
+  private fun validateLambda(expression: JavaIrExpression.Lambda) {
+    val sourceInterface = index.classes[expression.interfaceClass]
+    val builtinRole = index.program.builtinTypeRoles[expression.interfaceClass]
+    val validInterface = sourceInterface?.kind == JavaIrTypeDeclarationKind.INTERFACE ||
+      builtinRole?.let(::isUserImplementableBuiltinInterface) == true
+    val sourceSlot = sourceInterface?.methods?.any { method ->
+      method.virtualSlot == expression.virtualSlot && method.dispatch == JavaIrDispatchKind.INTERFACE
+    } == true
+    val builtinSlot = builtinRole != null &&
+      index.program.builtinVirtualSlots.values.any { it == expression.virtualSlot }
+    if (!validInterface || (!sourceSlot && !builtinSlot) || expression.virtualSlot < 0) {
+      invalid("Java IR lambda target or virtual slot is invalid.", expression.span)
+    }
+    if (expression.parameters.distinct().size != expression.parameters.size ||
+      expression.captures.distinct().size != expression.captures.size ||
+      expression.parameters.any { it in expression.captures }
+    ) {
+      invalid("Java IR lambda has duplicate or overlapping local bindings.", expression.span)
+    }
+    expression.parameters.forEach { local ->
+      val declaration = index.locals[local]
+      if (declaration == null || declaration.isParameter) {
+        invalid("Java IR lambda parameter is not a lambda-local declaration.", expression.span)
+      }
+    }
+    expression.captures.forEach { requireLocal(it, expression.span) }
+    validateStatement(expression.body, loopDepth = 0, breakDepth = 0)
   }
 
   /** System 标准流值只允许使用 catalog operation，并且必须保持引用类型。 */
@@ -656,6 +686,14 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.THROWABLE_GET_CAUSE,
     JavaBuiltinOperation.THROWABLE_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
     JavaBuiltinOperation.AUTO_CLOSEABLE_CLOSE -> BuiltinSignature(true, emptyList(), BuiltinType.VOID)
+    JavaBuiltinOperation.RUNNABLE_RUN -> BuiltinSignature(true, emptyList(), BuiltinType.VOID)
+    JavaBuiltinOperation.CONSUMER_ACCEPT ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE), BuiltinType.VOID)
+    JavaBuiltinOperation.FUNCTION_APPLY ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.SUPPLIER_GET -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.PREDICATE_TEST ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE), BuiltinType.BOOLEAN)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
@@ -1257,7 +1295,7 @@ private class JavaScriptEmitter(
   private val index: JavaIrIndex,
   private val entryPoint: JavaCompilerEntryPoint,
 ) {
-  private val writer = JsWriter()
+  private var writer = JsWriter()
   private val charArrayBuiltinOperations = setOf(
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY,
@@ -1415,6 +1453,7 @@ private class JavaScriptEmitter(
           JavaBuiltinOperation.THROWABLE_GET_CAUSE,
           JavaBuiltinOperation.THROWABLE_TO_STRING,
         ) || receiver.requiresExceptionRuntime() || arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.Lambda -> body.containsExceptionRuntime()
     is JavaIrExpression.NewObject -> arguments.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresExceptionRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresExceptionRuntime() }
@@ -1485,6 +1524,7 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeSpecial -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.InvokeVirtual -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> true
+    is JavaIrExpression.Lambda -> body.containsBuiltinRuntime()
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.NewArray -> length.requiresBuiltinRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { element -> element.requiresBuiltinRuntime() }
@@ -1554,6 +1594,7 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresCollectionRuntime() || arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresCollectionRuntime() ||
       arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.Lambda -> body.containsCollectionRuntime()
     is JavaIrExpression.NewObject -> arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresCollectionRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresCollectionRuntime() }
@@ -1623,6 +1664,7 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresScannerRuntime() || arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresScannerRuntime() ||
       arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.Lambda -> body.containsScannerRuntime()
     is JavaIrExpression.NewObject -> arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.NewArray -> length.requiresScannerRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresScannerRuntime() }
@@ -1698,6 +1740,7 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresArrayOrStringRuntime() || arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresArrayOrStringRuntime() ||
       arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.Lambda -> body.containsArrayOrStringRuntime()
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     else -> false
   }
@@ -2212,6 +2255,7 @@ private class JavaScriptEmitter(
         "((receiver${if (args.isEmpty()) "" else ", values"}) => \$__j_non_null(receiver)[\"${JsNameMangler.virtualSlot(expression.virtualSlot)}\"](${if (args.isEmpty()) "" else "...values"}))($receiver${if (args.isEmpty()) "" else ", [$args]"})"
       }
       is JavaIrExpression.InvokeVirtualSlot -> renderVirtualSlotInvocation(expression)
+      is JavaIrExpression.Lambda -> renderLambda(expression)
       is JavaIrExpression.NewObject -> {
         val args = expression.arguments.joinToString(", ") { renderExpression(it) }
         "(${JsNameMangler.classInitializer(expression.classId)}(), (() => { const value = Object.create(${JsNameMangler.prototype(expression.classId)}); ${JsNameMangler.instanceDefaultInitializer(expression.classId)}(value); ${JsNameMangler.method(expression.constructor)}.call(value${if (args.isEmpty()) "" else ", $args"}); return value; })())"
@@ -2239,6 +2283,30 @@ private class JavaScriptEmitter(
   }
 
   /**
+   * 把 Lambda body 写入隔离 writer 后嵌入表达式；箭头函数确保 `this` 指向外围 Java 实例。
+   *
+   * Lambda 局部仍使用工作区唯一 local id，因此嵌套闭包可直接引用外围参数/局部而无需复制值。
+   */
+  private fun renderLambda(expression: JavaIrExpression.Lambda): String {
+    val previousWriter = writer
+    val bodyWriter = JsWriter()
+    writer = bodyWriter
+    try {
+      emitBlockContents(expression.body)
+    } finally {
+      writer = previousWriter
+    }
+    val parameters = expression.parameters.joinToString(", ") { JsNameMangler.local(it) }
+    val prototype = index.classes[expression.interfaceClass]
+      ?.let { JsNameMangler.prototype(it.id) }
+      ?: "null"
+    val slot = JsNameMangler.virtualSlot(expression.virtualSlot)
+    val body = bodyWriter.source.lineSequence().joinToString("\n") { line -> "  $line" }
+    return "(() => { const value = Object.create($prototype); " +
+      "value[\"$slot\"] = ($parameters) => {\n$body}; return value; })()"
+  }
+
+  /**
    * builtin 虚方法根优先调用用户 prototype 上的槽位；没有 override 时才进入确定的运行时默认实现。
    * receiver 和全部参数先作为 IIFE 实参求值，保持 Java 的 NPE 与参数副作用顺序。
    */
@@ -2256,6 +2324,11 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.THROWABLE_TO_STRING -> "\$__j_exception_to_string(receiver)"
       JavaBuiltinOperation.AUTO_CLOSEABLE_CLOSE ->
         "(() => { throw new Error(\"java.lang.AbstractMethodError: close\"); })()"
+      JavaBuiltinOperation.RUNNABLE_RUN -> abstractMethodFallback("run")
+      JavaBuiltinOperation.CONSUMER_ACCEPT -> abstractMethodFallback("accept")
+      JavaBuiltinOperation.FUNCTION_APPLY -> abstractMethodFallback("apply")
+      JavaBuiltinOperation.SUPPLIER_GET -> abstractMethodFallback("get")
+      JavaBuiltinOperation.PREDICATE_TEST -> abstractMethodFallback("test")
       else -> error("Validated builtin virtual slot has an unsupported operation.")
     }
     val slot = JsNameMangler.virtualSlot(expression.virtualSlot)
@@ -2264,6 +2337,10 @@ private class JavaScriptEmitter(
       "return typeof method === \"function\" ? method.call(receiver, ...values) : $fallback; " +
       "})($receiver, $valuesArgument)"
   }
+
+  /** builtin 函数式接口没有默认实现，缺失 lambda/用户实现槽时抛出稳定 AbstractMethodError。 */
+  private fun abstractMethodFallback(name: String): String =
+    "(() => { throw new Error(\"java.lang.AbstractMethodError: $name\"); })()"
 
   /** operation 与 helper 一一对应；JS 参数求值先于 helper 函数体中的 receiver 空检查。 */
   private fun renderBuiltinInvocation(expression: JavaIrExpression.InvokeBuiltin): String {
@@ -2284,6 +2361,12 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.THROWABLE_TO_STRING -> instance("\$__j_exception_to_string")
       JavaBuiltinOperation.AUTO_CLOSEABLE_CLOSE ->
         error("AutoCloseable.close must use its virtual slot.")
+      JavaBuiltinOperation.RUNNABLE_RUN,
+      JavaBuiltinOperation.CONSUMER_ACCEPT,
+      JavaBuiltinOperation.FUNCTION_APPLY,
+      JavaBuiltinOperation.SUPPLIER_GET,
+      JavaBuiltinOperation.PREDICATE_TEST,
+      -> error("Functional interface calls must use their virtual slots.")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> instance("\$__j_print_boolean")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> instance("\$__j_print_char")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> instance("\$__j_print_char_array")
@@ -2678,5 +2761,16 @@ private fun JavaBuiltinOperation.isBuiltinVirtualOperation(): Boolean = when (th
   JavaBuiltinOperation.THROWABLE_GET_CAUSE,
   JavaBuiltinOperation.THROWABLE_TO_STRING,
   JavaBuiltinOperation.AUTO_CLOSEABLE_CLOSE -> true
+  JavaBuiltinOperation.RUNNABLE_RUN,
+  JavaBuiltinOperation.CONSUMER_ACCEPT,
+  JavaBuiltinOperation.FUNCTION_APPLY,
+  JavaBuiltinOperation.SUPPLIER_GET,
+  JavaBuiltinOperation.PREDICATE_TEST -> true
   else -> false
 }
+
+/** catalog 明确允许用户源码或 lambda 实现的 builtin interface facade。 */
+private fun isUserImplementableBuiltinInterface(role: JavaBuiltinTypeRole): Boolean =
+  JavaBuiltinLibrary.types.any { descriptor ->
+    descriptor.role == role && descriptor.isInterfaceFacade && descriptor.allowsUserImplementation
+  }

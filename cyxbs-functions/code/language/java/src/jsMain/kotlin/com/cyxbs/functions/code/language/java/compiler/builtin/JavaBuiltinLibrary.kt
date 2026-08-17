@@ -39,6 +39,11 @@ internal enum class JavaBuiltinTypeRole(val boxedPrimitive: JavaAstPrimitiveType
   ITERATOR,
   SCANNER,
   AUTO_CLOSEABLE,
+  RUNNABLE,
+  CONSUMER,
+  FUNCTION,
+  SUPPLIER,
+  PREDICATE,
   THROWABLE,
   ERROR,
   EXCEPTION,
@@ -149,6 +154,11 @@ internal enum class JavaBuiltinOperation {
   THROWABLE_GET_CAUSE,
   THROWABLE_TO_STRING,
   AUTO_CLOSEABLE_CLOSE,
+  RUNNABLE_RUN,
+  CONSUMER_ACCEPT,
+  FUNCTION_APPLY,
+  SUPPLIER_GET,
+  PREDICATE_TEST,
 
   /** 异常构造器共享行为，实际 Java 类型由 ConstructBuiltin 的 result role 决定。 */
   EXCEPTION_CONSTRUCT_EMPTY,
@@ -258,6 +268,8 @@ internal object JavaBuiltinLibrary {
   private val eType = JavaBuiltinTypeReference.TypeParameter("E")
   private val kType = JavaBuiltinTypeReference.TypeParameter("K")
   private val vType = JavaBuiltinTypeReference.TypeParameter("V")
+  private val tType = JavaBuiltinTypeReference.TypeParameter("T")
+  private val rType = JavaBuiltinTypeReference.TypeParameter("R")
   private val iteratorOfE = JavaBuiltinTypeReference.Declared("java.util.Iterator", listOf(eType))
   private val setOfK = JavaBuiltinTypeReference.Declared("java.util.Set", listOf(kType))
 
@@ -344,6 +356,26 @@ internal object JavaBuiltinLibrary {
       role = JavaBuiltinTypeRole.AUTO_CLOSEABLE,
       isInterfaceFacade = true,
       allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor(
+      "java.lang.Runnable", "java.lang.Object", false, JavaBuiltinTypeRole.RUNNABLE,
+      isInterfaceFacade = true, allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor(
+      "java.util.function.Consumer", "java.lang.Object", false, JavaBuiltinTypeRole.CONSUMER,
+      typeParameters = listOf("T"), isInterfaceFacade = true, allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor(
+      "java.util.function.Function", "java.lang.Object", false, JavaBuiltinTypeRole.FUNCTION,
+      typeParameters = listOf("T", "R"), isInterfaceFacade = true, allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor(
+      "java.util.function.Supplier", "java.lang.Object", false, JavaBuiltinTypeRole.SUPPLIER,
+      typeParameters = listOf("T"), isInterfaceFacade = true, allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor(
+      "java.util.function.Predicate", "java.lang.Object", false, JavaBuiltinTypeRole.PREDICATE,
+      typeParameters = listOf("T"), isInterfaceFacade = true, allowsUserImplementation = true,
     ),
     JavaBuiltinTypeDescriptor("java.util.Scanner", "java.lang.AutoCloseable", true, JavaBuiltinTypeRole.SCANNER),
     JavaBuiltinTypeDescriptor("java.lang.Throwable", "java.lang.Object", false, JavaBuiltinTypeRole.THROWABLE),
@@ -719,6 +751,29 @@ internal object JavaBuiltinLibrary {
       isVirtualRoot = true,
       isAbstract = true,
       thrownTypes = listOf(JavaBuiltinTypeReference.Declared("java.lang.Exception")),
+    )
+    callable(
+      owner = "java.lang.Runnable", name = "run", operation = JavaBuiltinOperation.RUNNABLE_RUN,
+      isFinal = false, isVirtualRoot = true, isAbstract = true,
+    )
+    callable(
+      owner = "java.util.function.Consumer", name = "accept", parameters = listOf(tType),
+      operation = JavaBuiltinOperation.CONSUMER_ACCEPT,
+      isFinal = false, isVirtualRoot = true, isAbstract = true,
+    )
+    callable(
+      owner = "java.util.function.Function", name = "apply", parameters = listOf(tType),
+      operation = JavaBuiltinOperation.FUNCTION_APPLY, returnType = rType,
+      isFinal = false, isVirtualRoot = true, isAbstract = true,
+    )
+    callable(
+      owner = "java.util.function.Supplier", name = "get", operation = JavaBuiltinOperation.SUPPLIER_GET,
+      returnType = tType, isFinal = false, isVirtualRoot = true, isAbstract = true,
+    )
+    callable(
+      owner = "java.util.function.Predicate", name = "test", parameters = listOf(tType),
+      operation = JavaBuiltinOperation.PREDICATE_TEST, returnType = booleanType,
+      isFinal = false, isVirtualRoot = true, isAbstract = true,
     )
     callable(
       "java.lang.Throwable",

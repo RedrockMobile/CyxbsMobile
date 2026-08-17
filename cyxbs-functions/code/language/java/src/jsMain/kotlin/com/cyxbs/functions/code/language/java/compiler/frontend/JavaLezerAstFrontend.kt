@@ -15,6 +15,8 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstImport
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLiteralKind
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaBody
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaParameter
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstParameter
@@ -575,7 +577,12 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     return JavaAstForInitializer.Expressions(ids.next(), span(nodes.first(), nodes.last()), expressions)
   }
 
-  /** 构建局部变量。 */
+  /**
+   * 构建局部变量，并且只读取当前声明直接包含的 declarator。
+   *
+   * Lambda initializer 的 block 也可能包含局部声明；若递归枚举 descendants，会把 lambda 内部
+   * 变量错误提升为外层声明的同类型 declarator，破坏其类型与词法作用域。
+   */
   private fun local(node: LezerSyntaxNode): JavaAstStatement.VariableDeclaration {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "局部变量缺少名称。")
     rejectAnnotationsBefore(node, definition, "局部变量")
@@ -583,8 +590,13 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       unsupported(it, "阶段 1 仅支持 Java 8，不能使用 var。")
     }
     val type = node.typeBefore(definition)
-    return JavaAstStatement.VariableDeclaration(ids.next(), span(node), node.modifiersBefore(definition, LOCAL_MODIFIERS, "局部变量"), type,
-      node.descendants().filter { it.name == "VariableDeclarator" }.map { declarator(it, type) }.toList())
+    return JavaAstStatement.VariableDeclaration(
+      ids.next(),
+      span(node),
+      node.modifiersBefore(definition, LOCAL_MODIFIERS, "局部变量"),
+      type,
+      node.children().filter { it.name == "VariableDeclarator" }.map { declarator(it, type) },
+    )
   }
 
   /**
@@ -630,8 +642,58 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "ArrayCreationExpression" -> newArray(node)
       "ArrayAccess" -> arrayAccess(node)
       "FieldAccess" -> fieldAccess(node)
+      "LambdaExpression" -> lambda(node)
       else -> unsupported(node, "Stage1 不支持该表达式。")
     }
+  }
+
+  /**
+   * 按 @lezer/java 1.1.3 的真实 CST 映射 Java 8 lambda。
+   *
+   * 单参数简写直接携带 Definition；推断参数列表使用 InferredParameters；显式类型参数继续复用
+   * FormalParameter 的 modifier/type 校验。箭头右侧只能是单个 expression 或 block。
+   */
+  private fun lambda(node: LezerSyntaxNode): JavaAstExpression.Lambda {
+    val children = node.children()
+    val parameterContainer = children.firstOrNull {
+      it.name == "InferredParameters" || it.name == "FormalParameters"
+    }
+    val parameters = when (parameterContainer?.name) {
+      "InferredParameters" -> parameterContainer.descendants()
+        .filter { it.name == "Definition" }
+        .map { definition ->
+          JavaAstLambdaParameter(ids.next(), span(definition), text(definition), null)
+        }.toList()
+      "FormalParameters" -> parameterContainer.descendants()
+        .filter { it.name == "FormalParameter" }
+        .map { formal ->
+          val parsed = parameter(formal)
+          JavaAstLambdaParameter(
+            parsed.nodeId,
+            parsed.span,
+            parsed.name,
+            parsed.type,
+            parsed.modifiers,
+          )
+        }.toList()
+      null -> children.firstOrNull { it.name == "Definition" }?.let { definition ->
+        listOf(JavaAstLambdaParameter(ids.next(), span(definition), text(definition), null))
+      }.orEmpty()
+      else -> emptyList()
+    }
+    val body = children.lastOrNull { child ->
+      child.name == "Block" || child.name in EXPRESSION_NODES
+    } ?: unsupported(node, "lambda 缺少表达式或 block 方法体。")
+    return JavaAstExpression.Lambda(
+      ids.next(),
+      span(node),
+      parameters,
+      if (body.name == "Block") {
+        JavaAstLambdaBody.Block(block(body))
+      } else {
+        JavaAstLambdaBody.Expression(expression(body))
+      },
+    )
   }
 
   /** 二元表达式完全由两个 expression child 和直接 token 组成。 */
@@ -1103,7 +1165,7 @@ private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
 private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
 private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")

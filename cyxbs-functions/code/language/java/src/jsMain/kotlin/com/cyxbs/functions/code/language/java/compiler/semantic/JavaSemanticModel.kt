@@ -217,6 +217,28 @@ internal data class JavaResourceCloseBinding(
   val closeCallable: JavaCallableBinding,
 )
 
+/**
+ * lambda 表达式已经完成 target typing 后的唯一执行契约。
+ *
+ * [functionalMethod] 保存完成泛型代换后的 SAM 参数、返回类型和虚槽；[parameterSymbols] 与源码
+ * 参数一一对应；[captures] 只包含外围方法的局部变量和参数，并且语义阶段已验证 effectively-final。
+ */
+internal data class JavaLambdaBinding(
+  val targetType: JavaSemanticType.Declared,
+  val functionalMethod: JavaCallableBinding,
+  val parameterSymbols: List<JavaSymbolId>,
+  val captures: List<JavaSymbolId>,
+) {
+  init {
+    require(parameterSymbols.distinct().size == parameterSymbols.size) {
+      "A Java lambda must not repeat a parameter symbol."
+    }
+    require(captures.distinct().size == captures.size) {
+      "A Java lambda must not repeat a captured symbol."
+    }
+  }
+}
+
 /** 一次编译内稳定的虚方法槽编号；编号不应跨编译请求持久化。 */
 internal data class JavaVirtualSlotId(val value: Int) {
   init {
@@ -463,6 +485,8 @@ internal data class JavaSemanticModel(
   val catchTypes: Map<JavaNodeId, List<JavaSemanticType.Declared>> = emptyMap(),
   /** 资源 AST node 到已验证的 final 局部变量和 close() 分派。 */
   val resourceCloseBindings: Map<JavaNodeId, JavaResourceCloseBinding> = emptyMap(),
+  /** lambda expression node 到已决议 SAM、参数与 effectively-final 捕获的绑定。 */
+  val lambdaBindings: Map<JavaNodeId, JavaLambdaBinding> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

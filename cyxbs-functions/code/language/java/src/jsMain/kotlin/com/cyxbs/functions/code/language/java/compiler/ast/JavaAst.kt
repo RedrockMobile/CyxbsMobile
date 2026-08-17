@@ -523,6 +523,34 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     override val span: JavaSourceSpan,
     val expression: JavaAstExpression,
   ) : JavaAstExpression
+
+  /**
+   * Java 8 lambda；参数类型为空表示由目标函数式接口推断。
+   *
+   * Lambda 本身没有独立类型，必须由赋值、返回值或调用实参上下文提供目标接口。表达式体与
+   * block 体分开保存，避免后续阶段把 void-compatible expression 错写成带值 return。
+   */
+  data class Lambda(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val parameters: List<JavaAstLambdaParameter>,
+    val body: JavaAstLambdaBody,
+  ) : JavaAstExpression
+}
+
+/** Lambda 参数；[type] 为空时使用函数式接口 SAM 参数类型。 */
+internal data class JavaAstLambdaParameter(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val name: String,
+  val type: JavaAstTypeReference?,
+  val modifiers: Set<JavaAstModifier> = emptySet(),
+) : JavaAstNode
+
+/** Lambda 的表达式体或语句块体。 */
+internal sealed interface JavaAstLambdaBody {
+  data class Expression(val expression: JavaAstExpression) : JavaAstLambdaBody
+  data class Block(val block: JavaAstStatement.Block) : JavaAstLambdaBody
 }
 
 /** 数组创建中单个 `[...]` 维度；[size] 为 null 表示由初始化器或后续维度决定长度。 */

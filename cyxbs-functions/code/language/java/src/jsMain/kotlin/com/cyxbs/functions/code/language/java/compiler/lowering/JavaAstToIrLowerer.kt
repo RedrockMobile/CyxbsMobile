@@ -807,8 +807,65 @@ private class BodyLowering(
       is JavaAstExpression.NewArray -> newArray(source, type)
       is JavaAstExpression.ArrayAccess -> arrayAccess(source, type)
       is JavaAstExpression.Parenthesized -> expression(source.expression)
+      is JavaAstExpression.Lambda -> lambda(source, type)
   } ?: return null
     return conversion(source, raw)
+  }
+
+  /** 将 semantic SAM binding 降为保留词法捕获的 typed lambda IR。 */
+  private fun lambda(
+    source: JavaAstExpression.Lambda,
+    type: JavaIrType,
+  ): JavaIrExpression? {
+    val referenceType = type as? JavaIrType.Reference
+      ?: return invalid("Lambda target must lower to a reference type.", source.span)
+    val binding = lowering.model.lambdaBindings[source.nodeId]
+      ?: return invalid("Lambda expression is missing its semantic binding.", source.span)
+    if (referenceType.classId != JavaIrClassId(binding.targetType.symbol.value)) {
+      return invalid("Lambda target type is inconsistent with semantic binding.", source.span)
+    }
+    val slot = binding.functionalMethod.virtualSlot?.value
+      ?: return invalid("Lambda SAM binding is missing its virtual slot.", source.span)
+    if (binding.parameterSymbols.size != source.parameters.size ||
+      binding.functionalMethod.parameterTypes.size != source.parameters.size
+    ) {
+      return invalid("Lambda parameter binding count is inconsistent.", source.span)
+    }
+    val parameterLocals = source.parameters.mapIndexed { index, parameter ->
+      val symbol = lowering.declaration(parameter.nodeId, parameter.span, JavaSymbolKind.PARAMETER)
+        ?: return null
+      if (symbol.id != binding.parameterSymbols[index]) {
+        return invalid("Lambda parameter order is inconsistent.", parameter.span)
+      }
+      // isParameter 只表示顶层 JavaIrMethod 形参；lambda 形参由 Lambda 节点自身绑定。
+      createLocal(symbol.id, symbol.name, binding.functionalMethod.parameterTypes[index], false, parameter.span)
+        ?: return null
+    }
+    val body = when (val lambdaBody = source.body) {
+      is JavaAstLambdaBody.Expression -> {
+        val lowered = expression(lambdaBody.expression) ?: return null
+        val statement = if (binding.functionalMethod.returnType == JavaSemanticType.Void) {
+          JavaIrStatement.Expression(lowered, lambdaBody.expression.span)
+        } else {
+          JavaIrStatement.Return(lowered, lambdaBody.expression.span)
+        }
+        JavaIrStatement.Block(listOf(statement), lambdaBody.expression.span)
+      }
+      is JavaAstLambdaBody.Block -> lowerBlock(lambdaBody.block)
+    }
+    val captures = binding.captures.map { symbol ->
+      localBySymbol[symbol]?.id
+        ?: return invalid("Lambda capture references an unknown enclosing local.", source.span)
+    }
+    return JavaIrExpression.Lambda(
+      referenceType.classId,
+      slot,
+      parameterLocals.map(JavaIrLocal::id),
+      captures,
+      body,
+      referenceType,
+      source.span,
+    )
   }
 
   /** String + 只消费 semantic binding；普通二元运算仍保留既有 typed IR 形式。 */
@@ -1359,7 +1416,8 @@ private class BodyLowering(
       JavaValueAccessKind.LOCAL, JavaValueAccessKind.PARAMETER -> {
         val local = localBySymbol[binding.symbol]
           ?: return invalid("Writable access references an unknown local.", source.span)
-        if (local.isParameter != (binding.kind == JavaValueAccessKind.PARAMETER)) {
+        val isCallableParameter = binding.symbol in callable?.parameters.orEmpty()
+        if (local.isParameter != isCallableParameter) {
           return invalid("Writable access kind does not match local declaration kind.", source.span)
         }
         Target.Local(local.id, local.type)

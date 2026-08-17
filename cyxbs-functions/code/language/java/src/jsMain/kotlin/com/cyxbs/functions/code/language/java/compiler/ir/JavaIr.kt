@@ -463,6 +463,22 @@ internal sealed interface JavaIrExpression {
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 
+  /**
+   * 已完成 SAM 适配的 Java lambda。
+   *
+   * [parameters] 是由 lambda 自身绑定的局部编号，[captures] 只列出外围方法局部/参数；body 内
+   * 的所有 GetLocal 均使用全局稳定 local id。后端必须用箭头函数保存外围 Java `this` 语义。
+   */
+  data class Lambda(
+    val interfaceClass: JavaIrClassId,
+    val virtualSlot: Int,
+    val parameters: List<JavaIrLocalId>,
+    val captures: List<JavaIrLocalId>,
+    val body: JavaIrStatement.Block,
+    override val type: JavaIrType.Reference,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
   data class NewObject(
     val classId: JavaIrClassId,
     val constructor: JavaIrMethodId,

@@ -570,6 +570,11 @@ class JavaStage1SemanticAnalysisTest {
         "java.util.Iterator",
         "java.io.InputStream",
         "java.lang.AutoCloseable",
+        "java.lang.Runnable",
+        "java.util.function.Consumer",
+        "java.util.function.Function",
+        "java.util.function.Supplier",
+        "java.util.function.Predicate",
         "java.util.Scanner",
         "java.lang.Throwable",
         "java.lang.Error",
@@ -1266,6 +1271,67 @@ class JavaStage1SemanticAnalysisTest {
   }
 
   /** 解析源码并确认前端成功，避免语义断言误吞 CST 失败。 */
+  /** 用户 SAM、泛型 builtin 函数式接口及不同参数数量的 overload 都必须完成 target typing。 */
+  @Test
+  fun bindsLambdasToSamTargetsAndTracksCaptures() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.function.Function;
+        import java.util.function.Supplier;
+        interface Zero { int get(); }
+        interface One { int get(int value); }
+        class Main {
+          static int use(Zero value) { return value.get(); }
+          static int use(One value) { return value.get(2); }
+          static <T> T apply(Function<T, T> function, T value) { return function.apply(value); }
+          static int run() {
+            int offset = 3;
+            One mapper = value -> value + offset;
+            Supplier<Integer> supplier = () -> 4;
+            return use(value -> value + 1) + mapper.get(2) +
+              apply(value -> value, supplier.get());
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    assertEquals(4, model.lambdaBindings.size)
+    assertTrue(model.lambdaBindings.values.all { it.functionalMethod.virtualSlot != null })
+    assertTrue(model.lambdaBindings.values.any { it.captures.isNotEmpty() })
+  }
+
+  /** 捕获值只要在外围方法任意位置发生写操作，就不再满足 effectively-final。 */
+  @Test
+  fun rejectsNonEffectivelyFinalLambdaCaptureAndNonSamTarget() {
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.function.Function;
+          class Main {
+            static int run() {
+              int offset = 1;
+              Function<Integer, Integer> mapper = value -> value + offset;
+              offset = 2;
+              return mapper.apply(1);
+            }
+          }
+        """.trimIndent(),
+      ),
+      "java.semantic.lambda_capture_not_effectively_final",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          interface Bad { void first(); void second(); }
+          class Main { static void run() { Bad value = () -> { }; } }
+        """.trimIndent(),
+      ),
+      "java.semantic.lambda_target_not_functional_interface",
+    )
+  }
+
   private fun analyze(vararg sources: Pair<String, String>): JavaCompilerPhaseResult<JavaSemanticModel> {
     val workspace = JavaSourceWorkspace(
       sources.mapIndexed { index, (path, source) ->

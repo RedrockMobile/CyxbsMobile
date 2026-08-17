@@ -48,6 +48,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     linkedMapOf<JavaSymbolId, JavaConstructorDelegation>()
   private val catchTypes = linkedMapOf<JavaNodeId, List<JavaSemanticType.Declared>>()
   private val resourceCloseBindings = linkedMapOf<JavaNodeId, JavaResourceCloseBinding>()
+  private val lambdaBindings = linkedMapOf<JavaNodeId, JavaLambdaBinding>()
 
   private val typesByQualifiedName = linkedMapOf<String, S1TypeInfo>()
   private val typesByNode = linkedMapOf<JavaNodeId, S1TypeInfo>()
@@ -77,6 +78,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val triesCompletingNormally = mutableSetOf<JavaNodeId>()
   /** 仅在分析 try 主体时生效；catch/finally 不会错误继承同一捕获范围。 */
   private val activeCatchScopes = mutableListOf<List<JavaSemanticType.Declared>>()
+  /** 当前 callable 内出现过写操作的局部/参数，用于 lambda effectively-final 校验。 */
+  private val mutatedLocalSymbols = mutableSetOf<JavaSymbolId>()
+  /** 嵌套 lambda 上下文；名称解析时据此登记从外围词法作用域捕获的值。 */
+  private val activeLambdas = mutableListOf<S1LambdaContext>()
+  /** 当前方法体中已完成的 lambda，必须等整个方法扫描完才能判断后续写操作。 */
+  private val bodyLambdas = mutableListOf<Pair<JavaNodeId, JavaSourceSpan>>()
+  /** block lambda 的 return 目标；存在该值时 return 不得落回外围 callable。 */
+  private val lambdaReturnTypes = mutableListOf<JavaSemanticType>()
 
   /** 执行全部语义遍次；错误结果不会泄露含恢复类型的半成品模型。 */
   fun analyze(): JavaCompilerPhaseResult<JavaSemanticModel> {
@@ -1952,6 +1961,28 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
 
   /** 校验 return 的有值/无值形态以及赋值转换。 */
   private fun analyzeReturn(statement: JavaAstStatement.Return) {
+    lambdaReturnTypes.lastOrNull()?.let { returnType ->
+      val value = statement.expression
+      if (value == null) {
+        if (returnType != JavaSemanticType.Void && returnType != JavaSemanticType.Error) {
+          error(statement.span, "java.semantic.lambda_return_type_mismatch", "非 void lambda 必须返回兼容值。")
+        }
+      } else {
+        val actual = analyzeExpressionExpected(value, returnType)
+        if (returnType == JavaSemanticType.Void) {
+          error(value.span, "java.semantic.lambda_return_type_mismatch", "void lambda 不能返回值。")
+        } else {
+          assign(
+            value.nodeId,
+            actual,
+            returnType,
+            value.span,
+            code = "java.semantic.lambda_return_type_mismatch",
+          )
+        }
+      }
+      return
+    }
     val callable = context().callable
     if (callable == null || callable.kind != JavaSemanticCallableKind.METHOD) {
       if (statement.expression != null) {
@@ -2001,6 +2032,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstExpression.NewArray -> newArray(expression)
       is JavaAstExpression.ArrayAccess -> arrayAccess(expression)
       is JavaAstExpression.FieldAccess -> fieldAccess(expression)
+      is JavaAstExpression.Lambda -> lambda(expression)
     }
     expressionTypes[expression.nodeId] = type
     return type
@@ -2014,6 +2046,223 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     expectedExpressionTypes[expression.nodeId] = expected
     return analyzeExpression(expression)
   }
+
+  /**
+   * 使用目标接口的唯一 SAM 分析 lambda，并冻结参数、捕获与虚槽。
+   *
+   * Lambda 不允许脱离赋值/返回/调用上下文独立推断；block 体分析期间会隔离外围循环与
+   * definite-assignment 状态，避免其中的 return/break/局部声明污染外围方法。
+   */
+  private fun lambda(expression: JavaAstExpression.Lambda): JavaSemanticType {
+    val target = expectedExpressionTypes[expression.nodeId] as? JavaSemanticType.Declared
+    if (target == null) {
+      error(expression.span, "java.semantic.lambda_target_required", "lambda 必须具有明确的函数式接口目标类型。")
+      return JavaSemanticType.Error
+    }
+    val sam = functionalMethod(target, expression.span) ?: return JavaSemanticType.Error
+    if (sam.parameterTypes.size != expression.parameters.size) {
+      error(
+        expression.span,
+        "java.semantic.lambda_parameter_count_mismatch",
+        "lambda 参数数量与目标函数式接口方法不一致。",
+      )
+      return JavaSemanticType.Error
+    }
+
+    val previousFlow = currentFlowState()
+    val previousLoopDepth = loopDepth
+    val previousLoopFlows = loopFlows.toList()
+    val previousBreakFlows = breakFlows.toList()
+    val lambdaContext = S1LambdaContext(expression.nodeId)
+    val parameterSymbols = mutableListOf<JavaSymbolId>()
+    withScope {
+      activeLambdas += lambdaContext
+      loopDepth = 0
+      loopFlows.clear()
+      breakFlows.clear()
+      try {
+        expression.parameters.zip(sam.parameterTypes).forEach { (parameter, inferredType) ->
+          if (parameter.modifiers.any { it != JavaAstModifier.FINAL }) {
+            error(parameter.span, "java.semantic.lambda_parameter_modifier_unsupported", "lambda 参数当前只支持 final 修饰符。")
+          }
+          parameter.type?.let { explicitReference ->
+            val explicitType = resolveType(
+              explicitReference,
+              context().unit,
+              currentTypeParameterScope(),
+              allowVoid = false,
+            )
+            if (explicitType != inferredType && explicitType != JavaSemanticType.Error) {
+              error(parameter.span, "java.semantic.lambda_parameter_type_mismatch", "显式 lambda 参数类型与 SAM 参数类型不一致。")
+            }
+          }
+          val symbol = declareLocal(
+            JavaSymbolKind.PARAMETER,
+            parameter.name,
+            context().callable?.symbol ?: context().owner.symbol,
+            parameter.nodeId,
+            parameter.span,
+            inferredType,
+          )
+          parameterSymbols += symbol
+          definitelyAssigned += symbol
+          if (JavaAstModifier.FINAL in parameter.modifiers) finalSymbols += symbol
+        }
+        when (val body = expression.body) {
+          is JavaAstLambdaBody.Expression -> analyzeLambdaExpressionBody(body.expression, sam.returnType)
+          is JavaAstLambdaBody.Block -> {
+            lambdaReturnTypes += sam.returnType
+            try {
+              analyzeStatements(body.block.statements)
+            } finally {
+              lambdaReturnTypes.removeAt(lambdaReturnTypes.lastIndex)
+            }
+            if (sam.returnType != JavaSemanticType.Void && canCompleteNormally(body.block)) {
+              error(body.block.span, "java.semantic.lambda_missing_return", "非 void lambda 的 block 体存在未返回值的路径。")
+            }
+          }
+        }
+      } finally {
+        activeLambdas.removeAt(activeLambdas.lastIndex)
+        loopDepth = previousLoopDepth
+        loopFlows.clear()
+        loopFlows += previousLoopFlows
+        breakFlows.clear()
+        breakFlows += previousBreakFlows
+        replaceFlowState(previousFlow)
+      }
+    }
+    lambdaBindings[expression.nodeId] = JavaLambdaBinding(
+      target,
+      sam,
+      parameterSymbols,
+      lambdaContext.captures.toList(),
+    )
+    bodyLambdas += expression.nodeId to expression.span
+    return target
+  }
+
+  /** 表达式体按 SAM 返回类型决定是产生 return，还是仅执行 void-compatible 语句表达式。 */
+  private fun analyzeLambdaExpressionBody(
+    body: JavaAstExpression,
+    returnType: JavaSemanticType,
+  ) {
+    if (returnType == JavaSemanticType.Void) {
+      analyzeExpression(body)
+      if (!body.isStatementExpression()) {
+        error(body.span, "java.semantic.lambda_void_expression_unsupported", "void lambda 的表达式体必须是语句表达式。")
+      }
+      return
+    }
+    val actual = analyzeExpressionExpected(body, returnType)
+    assign(
+      body.nodeId,
+      actual,
+      returnType,
+      body.span,
+      code = "java.semantic.lambda_return_type_mismatch",
+    )
+  }
+
+  /** Java 允许在 void-compatible lambda 中丢弃这些表达式的结果。 */
+  private fun JavaAstExpression.isStatementExpression(): Boolean = when (this) {
+    is JavaAstExpression.Assignment,
+    is JavaAstExpression.MethodInvocation,
+    is JavaAstExpression.NewObject,
+    -> true
+    is JavaAstExpression.Unary -> operator in setOf(
+      JavaAstUnaryOperator.PRE_INCREMENT,
+      JavaAstUnaryOperator.PRE_DECREMENT,
+      JavaAstUnaryOperator.POST_INCREMENT,
+      JavaAstUnaryOperator.POST_DECREMENT,
+    )
+    is JavaAstExpression.Parenthesized -> expression.isStatementExpression()
+    else -> false
+  }
+
+  /**
+   * 查找目标类型继承图中唯一的抽象实例方法，并完成 owner 泛型代换。
+   *
+   * 最近的 concrete/default 声明会压住同签名父方法；与 Object 公共方法同签名的声明不计入 SAM。
+   */
+  private fun functionalMethod(
+    target: JavaSemanticType.Declared,
+    span: JavaSourceSpan,
+  ): JavaCallableBinding? {
+    val targetInfo = typeInfo(target.symbol)
+    val builtinDescriptor = builtinTypeRoles[target.symbol]?.let { role ->
+      JavaBuiltinLibrary.types.firstOrNull { it.role == role }
+    }
+    val isInterface = targetInfo?.kind == JavaSemanticTypeDeclarationKind.INTERFACE ||
+      builtinDescriptor?.isInterfaceFacade == true
+    if (!isInterface || targetInfo == null) {
+      error(span, "java.semantic.lambda_target_not_functional_interface", "lambda 目标必须是函数式接口。")
+      return null
+    }
+
+    val pending = ArrayDeque<JavaSemanticType.Declared>()
+    pending += target
+    val visited = mutableSetOf<JavaSymbolId>()
+    val seenSignatures = mutableSetOf<String>()
+    val abstractMethods = mutableListOf<S1CallableCandidate>()
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current.symbol)) continue
+      val owner = typeInfo(current.symbol) ?: continue
+      val substitutions = owner.typeParameters.zip(current.arguments).toMap()
+      callables.filter { callable ->
+        callable.owner.symbol == owner.symbol &&
+          callable.kind == JavaSemanticCallableKind.METHOD &&
+          !callable.isStatic
+      }.forEach { method ->
+        val visibleParameters = method.parameterTypes.map { parameter ->
+          relations().substitute(parameter, substitutions) ?: return@forEach
+        }
+        val signature = erasedSignatureKey(method.name, visibleParameters)
+        if (seenSignatures.add(signature) && method.isAbstract && !isObjectMethodSignature(method, signature)) {
+          abstractMethods += S1CallableCandidate(method, substitutions)
+        }
+      }
+      owner.directSuperClass?.let { relations().substitute(it, substitutions) as? JavaSemanticType.Declared }
+        ?.let(pending::addLast)
+      owner.directInterfaces.mapNotNullTo(pending) { inherited ->
+        relations().substitute(inherited, substitutions) as? JavaSemanticType.Declared
+      }
+    }
+    val selected = abstractMethods.singleOrNull()
+    if (selected == null) {
+      error(
+        span,
+        "java.semantic.lambda_target_not_functional_interface",
+        if (abstractMethods.isEmpty()) "目标接口没有可实现的抽象方法。" else "目标接口包含多个独立抽象方法。",
+      )
+      return null
+    }
+    val parameterTypes = selected.info.parameterTypes.map { parameter ->
+      relations().substitute(parameter, selected.ownerSubstitutions) ?: JavaSemanticType.Error
+    }
+    val returnType = relations().substitute(selected.info.returnType, selected.ownerSubstitutions)
+      ?: JavaSemanticType.Error
+    val slot = virtualSlots[selected.info.symbol]
+    if (slot == null) {
+      error(span, "java.semantic.lambda_missing_virtual_slot", "函数式接口方法缺少可执行虚槽。")
+      return null
+    }
+    return JavaCallableBinding(
+      selected.info.symbol,
+      JavaDispatchKind.INTERFACE,
+      parameterTypes,
+      returnType,
+      selected.ownerSubstitutions,
+      JavaReceiverKind.EXPLICIT,
+      selected.info.erasedDescriptor,
+      slot,
+    )
+  }
+
+  /** 与 Object 公共实例方法同签名的接口声明不参与函数式接口抽象方法计数。 */
+  private fun isObjectMethodSignature(method: S1CallableInfo, signature: String): Boolean =
+    methodsByOwnerAndName[objectType.symbol to method.name].orEmpty().any { it.erasedSignatureKey == signature }
 
   /** 值名称按 local/parameter、字段、类型名顺序解析，允许局部变量遮蔽字段。 */
   private fun name(
@@ -2040,6 +2289,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
             "局部变量 ${expression.qualifiedName} 可能尚未初始化。",
           )
           return JavaSemanticType.Error
+        }
+        // 每层 lambda 仅捕获不属于自身词法声明的外围局部值；字段与 this 不进入捕获表。
+        activeLambdas.forEach { lambda ->
+          if (id !in lambda.declaredSymbols) lambda.captures += id
         }
         return symbol.type ?: JavaSemanticType.Error
       }
@@ -2233,6 +2486,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         }
         !isNumeric(operand) -> invalidUnary(expression.span, "递增递减目标必须是 numeric primitive 或首批 wrapper。")
         else -> {
+          markLocalMutation(expression.operand)
           if (declaredOperand != operand) {
             updateWriteConversion(
               expression.nodeId,
@@ -2260,6 +2514,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(expression.target.span, "java.semantic.invalid_assignment_target", "赋值目标必须是局部、参数或字段。")
       return JavaSemanticType.Error
     }
+    markLocalMutation(expression.target)
     var blankFinalTarget: JavaSymbolId? = null
     if (isFinal(expression.target)) {
       val targetSymbol = resolved[expression.target.nodeId]
@@ -2820,10 +3075,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     fun applicable(candidate: S1PolyCandidate, allowBoxing: Boolean): Boolean =
       types.indices.all { index ->
-        val actual = types[index] ?: return@all true
         val parameter = candidate.parameterTypes[index]
-        parameter.containsUnresolvedTypeVariable() ||
-          relations().invocationConversion(actual, parameter, allowBoxing) != null
+        val actual = types[index]
+        if (actual == null) {
+          arguments[index].isPolyCompatibleWith(parameter)
+        } else {
+          parameter.containsUnresolvedTypeVariable() ||
+            relations().invocationConversion(actual, parameter, allowBoxing) != null
+        }
       }
     val strict = prepared.filter { applicable(it, allowBoxing = false) }
     // Java overload phase 不能把 loose 候选与已有 strict 候选混在一起。
@@ -2843,11 +3102,68 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return types.map { checkNotNull(it) }
   }
 
-  /** Java 8 本批唯一需要 target type 的 poly expression 是可被括号包裹的 diamond new。 */
+  /** Java 8 本批 poly expression 包含 diamond new 与 lambda，并允许任意层括号包装。 */
   private fun JavaAstExpression.isTargetTypedDiamond(): Boolean = when (this) {
     is JavaAstExpression.NewObject -> (type as? JavaAstTypeReference.Named)?.usesDiamond == true
+    is JavaAstExpression.Lambda -> true
     is JavaAstExpression.Parenthesized -> expression.isTargetTypedDiamond()
     else -> false
+  }
+
+  /** 不写入 side table 地检查 poly expression 与候选参数的形状兼容性。 */
+  private fun JavaAstExpression.isPolyCompatibleWith(parameter: JavaSemanticType): Boolean = when (this) {
+    is JavaAstExpression.Lambda -> {
+      val target = parameter as? JavaSemanticType.Declared
+      target != null && functionalMethodShape(target)?.parameterCount == parameters.size
+    }
+    is JavaAstExpression.Parenthesized -> expression.isPolyCompatibleWith(parameter)
+    is JavaAstExpression.NewObject -> parameter is JavaSemanticType.Declared
+    else -> true
+  }
+
+  /**
+   * overload 预筛选只读取 SAM 参数数量，不产生诊断、符号或虚槽绑定。
+   *
+   * 真正的函数式接口合法性仍由 [functionalMethod] 在最终 target type 确定后验证。
+   */
+  private fun functionalMethodShape(target: JavaSemanticType.Declared): S1SamShape? {
+    val targetInfo = typeInfo(target.symbol) ?: return null
+    val descriptor = builtinTypeRoles[target.symbol]?.let { role ->
+      JavaBuiltinLibrary.types.firstOrNull { it.role == role }
+    }
+    if (targetInfo.kind != JavaSemanticTypeDeclarationKind.INTERFACE && descriptor?.isInterfaceFacade != true) {
+      return null
+    }
+    val pending = ArrayDeque<JavaSemanticType.Declared>()
+    pending += target
+    val visited = mutableSetOf<JavaSymbolId>()
+    val seen = mutableSetOf<String>()
+    val counts = mutableListOf<Int>()
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current.symbol)) continue
+      val owner = typeInfo(current.symbol) ?: continue
+      val substitutions = owner.typeParameters.zip(current.arguments).toMap()
+      callables.filter { callable ->
+        callable.owner.symbol == owner.symbol &&
+          callable.kind == JavaSemanticCallableKind.METHOD &&
+          !callable.isStatic
+      }.forEach { method ->
+        val visibleParameters = method.parameterTypes.map { parameter ->
+          relations().substitute(parameter, substitutions) ?: return@forEach
+        }
+        val signature = erasedSignatureKey(method.name, visibleParameters)
+        if (seen.add(signature) && method.isAbstract && !isObjectMethodSignature(method, signature)) {
+          counts += visibleParameters.size
+        }
+      }
+      owner.directSuperClass?.let { relations().substitute(it, substitutions) as? JavaSemanticType.Declared }
+        ?.let(pending::addLast)
+      owner.directInterfaces.mapNotNullTo(pending) { inherited ->
+        relations().substitute(inherited, substitutions) as? JavaSemanticType.Declared
+      }
+    }
+    return counts.singleOrNull()?.let(::S1SamShape)
   }
 
   /** 方法自身类型变量尚未实例化时不能据此排除候选，也不能作为 diamond 的最终目标。 */
@@ -3585,7 +3901,20 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     val id = symbol(kind, name, owner, nodeId, span, type)
     if (name !in current.values) current.values[name] = id
+    activeLambdas.lastOrNull()?.declaredSymbols?.add(id)
     return id
+  }
+
+  /** 若写目标是局部或参数，则登记为非 effectively-final；字段写入不影响 lambda 捕获。 */
+  private fun markLocalMutation(expression: JavaAstExpression) {
+    val node = when (expression) {
+      is JavaAstExpression.Parenthesized -> expression.expression
+      else -> expression
+    }
+    val symbol = resolved[node.nodeId] ?: return
+    if (symbols[symbol]?.kind in setOf(JavaSymbolKind.LOCAL_VARIABLE, JavaSymbolKind.PARAMETER)) {
+      mutatedLocalSymbols += symbol
+    }
   }
 
   /** 创建 symbol 并按需登记声明节点。 */
@@ -3611,16 +3940,31 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     val previousAssigned = definitelyAssigned.toSet()
     val previousBlankFinalFields = assignedBlankFinalFields.toSet()
     val previousUnassignedBlankFinalFields = unassignedBlankFinalFields.toSet()
+    val previousMutatedSymbols = mutatedLocalSymbols.toSet()
+    val previousBodyLambdas = bodyLambdas.toList()
     bodyContext = context
     scope = S1Scope(null)
     definitelyAssigned.clear()
     assignedBlankFinalFields.clear()
     unassignedBlankFinalFields.clear()
+    mutatedLocalSymbols.clear()
+    bodyLambdas.clear()
     if (context.callable?.kind == JavaSemanticCallableKind.CONSTRUCTOR) {
       unassignedBlankFinalFields += blankFinalFields(context.owner)
     }
     try {
       block()
+      bodyLambdas.forEach { (nodeId, span) ->
+        val binding = lambdaBindings[nodeId] ?: return@forEach
+        val illegal = binding.captures.firstOrNull { it in mutatedLocalSymbols }
+        if (illegal != null) {
+          error(
+            span,
+            "java.semantic.lambda_capture_not_effectively_final",
+            "lambda 捕获的局部值 ${symbols[illegal]?.name ?: illegal.value} 不是 effectively-final。",
+          )
+        }
+      }
     } finally {
       bodyContext = previousContext
       scope = previousScope
@@ -3629,6 +3973,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       assignedBlankFinalFields += previousBlankFinalFields
       unassignedBlankFinalFields.clear()
       unassignedBlankFinalFields += previousUnassignedBlankFinalFields
+      mutatedLocalSymbols.clear()
+      mutatedLocalSymbols += previousMutatedSymbols
+      bodyLambdas.clear()
+      bodyLambdas += previousBodyLambdas
     }
   }
 
@@ -3944,6 +4292,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         enhancedForBindings.toMap(),
         catchTypes.toMap(),
         resourceCloseBindings.toMap(),
+        lambdaBindings.toMap(),
       ),
       diagnostics,
     )
@@ -4124,6 +4473,16 @@ private data class S1BodyContext(
   val callable: S1CallableInfo?,
   val isStatic: Boolean,
 )
+
+/** 单个 lambda 的词法声明与外围捕获集合。 */
+private data class S1LambdaContext(
+  val nodeId: JavaNodeId,
+  val declaredSymbols: MutableSet<JavaSymbolId> = linkedSetOf(),
+  val captures: MutableSet<JavaSymbolId> = linkedSetOf(),
+)
+
+/** overload 预筛选所需的无副作用 SAM 形状。 */
+private data class S1SamShape(val parameterCount: Int)
 
 /** 循环分析期间收集的 break 正常出口。 */
 private data class S1LoopFlow(
