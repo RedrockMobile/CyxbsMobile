@@ -417,10 +417,27 @@ private class JavaScriptBackendValidator(
         statement.arguments.forEach(::validateExpression)
       }
       is JavaIrStatement.Return -> statement.expression?.let(::validateExpression)
-      is JavaIrStatement.Throw -> unsupported(
-        "Java throw statements are not available in the current JavaScript backend.",
-        statement.span,
-      )
+      is JavaIrStatement.Throw -> {
+        validateExpression(statement.expression)
+        val type = statement.expression.type
+        if (type != JavaIrType.Null && !type.hasThrowableRole()) {
+          invalid("Java IR throw expression must be Throwable or null.", statement.span)
+        }
+      }
+      is JavaIrStatement.Try -> {
+        if (statement.catches.isEmpty() && statement.finallyBlock == null) {
+          invalid("Java IR try must contain catch or finally.", statement.span)
+        }
+        validateStatement(statement.body, loopDepth, breakDepth)
+        statement.catches.forEach { clause ->
+          val local = index.locals[clause.local]
+          if (local == null || local.type != clause.exceptionType || !clause.exceptionType.hasThrowableRole()) {
+            invalid("Java IR catch must bind a Throwable local of the declared type.", clause.span)
+          }
+          validateStatement(clause.body, loopDepth, breakDepth)
+        }
+        statement.finallyBlock?.let { validateStatement(it, loopDepth, breakDepth) }
+      }
     }
   }
 
@@ -561,13 +578,20 @@ private class JavaScriptBackendValidator(
       JavaBuiltinOperation.HASH_SET_CONSTRUCT,
       JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> emptyList()
       JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> listOf(BuiltinType.REFERENCE_OR_NULL)
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY -> emptyList()
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING -> listOf(BuiltinType.REFERENCE_OR_NULL)
       else -> {
         invalid("Java IR operation is not a constructible builtin.", expression.span)
         return
       }
     }
+    val resultRoles = if (expression.operation.isExceptionConstruction()) {
+      JavaBuiltinTypeRole.entries.filterTo(mutableSetOf()) { it.isUncheckedExceptionRole() }
+    } else {
+      setOfNotNull(builtinConstructRole(expression.operation))
+    }
     if (expression.arguments.size != parameters.size ||
-      !matchesBuiltinRole(expression.type, setOfNotNull(builtinConstructRole(expression.operation))) ||
+      !matchesBuiltinRole(expression.type, resultRoles) ||
       expression.arguments.zip(parameters).any { (argument, expected) ->
         !matchesBuiltinType(argument.type, expected)
       } || expression.arguments.indices.any { index ->
@@ -707,7 +731,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.SCANNER_NEXT,
     JavaBuiltinOperation.SCANNER_NEXT_LINE -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
     JavaBuiltinOperation.SCANNER_NEXT_INT -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
-    JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> null
+    JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM,
+    JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
+    JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING -> null
   }
 
   /** builtin receiver 的精确运行时角色；null 表示 static/field/constructor 或无需引用约束。 */
@@ -844,7 +870,7 @@ private class JavaScriptBackendValidator(
     else -> null
   }
 
-  /** ConstructBuiltin 的结果类必须与 operation 唯一对应。 */
+  /** ConstructBuiltin 的普通结果类与 operation 唯一对应；异常 family 由结果 role 进一步区分。 */
   private fun builtinConstructRole(operation: JavaBuiltinOperation): JavaBuiltinTypeRole? = when (operation) {
     JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY,
     JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING -> JavaBuiltinTypeRole.STRING_BUILDER
@@ -852,6 +878,8 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.HASH_SET_CONSTRUCT -> JavaBuiltinTypeRole.HASH_SET
     JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> JavaBuiltinTypeRole.HASH_MAP
     JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM -> JavaBuiltinTypeRole.SCANNER
+    JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
+    JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING -> null
     else -> null
   }
 
@@ -864,6 +892,12 @@ private class JavaScriptBackendValidator(
     if (type == JavaIrType.Null) return true
     val reference = type as? JavaIrType.Reference ?: return false
     return index.program.builtinTypeRoles[reference.classId] in roles
+  }
+
+  /** catch/throw 在阶段 1 只接受 catalog 中可证明继承 Throwable 的 builtin 引用。 */
+  private fun JavaIrType.hasThrowableRole(): Boolean {
+    val reference = this as? JavaIrType.Reference ?: return false
+    return index.program.builtinTypeRoles[reference.classId]?.isThrowableRole() == true
   }
 
   /** builtin 类型只按 typed IR 类别检查；内建类没有伪造为输出 JavaIrClass。 */
@@ -1189,6 +1223,10 @@ private class JavaScriptEmitter(
       writer.line()
       JavaRuntimePrelude.arrayAndStringSource.lines().forEach(writer::line)
     }
+    if (usesExceptionRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.exceptionSource.lines().forEach(writer::line)
+    }
     if (usesBuiltinRuntime()) {
       writer.line()
       emitBuiltinVirtualSlotConstants()
@@ -1252,7 +1290,67 @@ private class JavaScriptEmitter(
 
   /** object helper 既服务字段调用，也服务数组的 null 检查。 */
   private fun usesRuntimeHelpers(): Boolean =
-    usesObjectRuntime() || usesArrayOrStringRuntime() || usesBuiltinRuntime()
+    usesObjectRuntime() || usesArrayOrStringRuntime() || usesBuiltinRuntime() || usesExceptionRuntime()
+
+  /** throw、try/catch 与异常构造任一出现时注入类型匹配运行时。 */
+  private fun usesExceptionRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { it.initializer?.requiresExceptionRuntime() == true } ||
+      clazz.staticInitializer?.containsExceptionRuntime() == true ||
+      clazz.instanceInitializer?.containsExceptionRuntime() == true ||
+      clazz.methods.any { it.body?.containsExceptionRuntime() == true }
+  }
+
+  private fun JavaIrStatement.Block.containsExceptionRuntime(): Boolean =
+    statements.any { it.requiresExceptionRuntime() }
+
+  /** 异常结构自身即需要运行时，嵌套表达式继续递归以覆盖字段初始化中的异常构造。 */
+  private fun JavaIrStatement.requiresExceptionRuntime(): Boolean = when (this) {
+    is JavaIrStatement.Throw,
+    is JavaIrStatement.Try -> true
+    is JavaIrStatement.Block -> containsExceptionRuntime()
+    is JavaIrStatement.DeclareLocal -> initializer?.requiresExceptionRuntime() == true
+    is JavaIrStatement.Expression -> expression.requiresExceptionRuntime()
+    is JavaIrStatement.If -> condition.requiresExceptionRuntime() ||
+      thenBranch.requiresExceptionRuntime() || elseBranch?.requiresExceptionRuntime() == true
+    is JavaIrStatement.While -> condition.requiresExceptionRuntime() || body.requiresExceptionRuntime()
+    is JavaIrStatement.DoWhile -> body.requiresExceptionRuntime() || condition.requiresExceptionRuntime()
+    is JavaIrStatement.For -> condition.requiresExceptionRuntime() ||
+      updates.any { it.requiresExceptionRuntime() } || body.requiresExceptionRuntime()
+    is JavaIrStatement.EnhancedFor -> iterable.requiresExceptionRuntime() || body.requiresExceptionRuntime()
+    is JavaIrStatement.Switch -> selector.requiresExceptionRuntime() || entries.any { entry ->
+      entry.statements.any { it.requiresExceptionRuntime() }
+    }
+    is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrStatement.Return -> expression?.requiresExceptionRuntime() == true
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> false
+  }
+
+  private fun JavaIrExpression.requiresExceptionRuntime(): Boolean = when (this) {
+    is JavaIrExpression.ConstructBuiltin -> operation.isExceptionConstruction() ||
+      arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.InvokeBuiltin -> receiver?.requiresExceptionRuntime() == true ||
+      arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.SetLocal -> value.requiresExceptionRuntime()
+    is JavaIrExpression.GetField -> receiver.requiresExceptionRuntime()
+    is JavaIrExpression.SetField -> receiver.requiresExceptionRuntime() || value.requiresExceptionRuntime()
+    is JavaIrExpression.SetStaticField -> value.requiresExceptionRuntime()
+    is JavaIrExpression.Binary -> left.requiresExceptionRuntime() || right.requiresExceptionRuntime()
+    is JavaIrExpression.Unary -> operand.requiresExceptionRuntime()
+    is JavaIrExpression.Convert -> expression.requiresExceptionRuntime()
+    is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.InvokeSpecial -> receiver.requiresExceptionRuntime() || arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.InvokeVirtual -> receiver.requiresExceptionRuntime() || arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.NewObject -> arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.NewArray -> length.requiresExceptionRuntime()
+    is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.GetArrayElement -> array.requiresExceptionRuntime() || index.requiresExceptionRuntime()
+    is JavaIrExpression.SetArrayElement -> array.requiresExceptionRuntime() ||
+      index.requiresExceptionRuntime() || value.requiresExceptionRuntime()
+    is JavaIrExpression.ArrayLength -> array.requiresExceptionRuntime()
+    is JavaIrExpression.StringConcat -> parts.any { it.expression.requiresExceptionRuntime() }
+    else -> false
+  }
 
   /** builtin helper 仅在 typed IR 显式包含 builtin 节点时注入，普通快照保持不变。 */
   private fun usesBuiltinRuntime(): Boolean = index.program.classes.any { clazz ->
@@ -1287,6 +1385,9 @@ private class JavaScriptEmitter(
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrStatement.Return -> expression?.requiresBuiltinRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresBuiltinRuntime()
+    is JavaIrStatement.Try -> body.containsBuiltinRuntime() ||
+      catches.any { it.body.containsBuiltinRuntime() } ||
+      finallyBlock?.containsBuiltinRuntime() == true
   }
 
   /** builtin 可嵌套在 receiver、参数、转换与数组表达式中，扫描必须覆盖完整表达式树。 */
@@ -1347,6 +1448,9 @@ private class JavaScriptEmitter(
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresCollectionRuntime() }
     is JavaIrStatement.Return -> expression?.requiresCollectionRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresCollectionRuntime()
+    is JavaIrStatement.Try -> body.containsCollectionRuntime() ||
+      catches.any { it.body.containsCollectionRuntime() } ||
+      finallyBlock?.containsCollectionRuntime() == true
   }
 
   /** operation 是唯一判据；receiver/参数仍递归扫描，禁止按 Java 类型名或成员名猜测。 */
@@ -1407,6 +1511,9 @@ private class JavaScriptEmitter(
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresScannerRuntime() }
     is JavaIrStatement.Return -> expression?.requiresScannerRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresScannerRuntime()
+    is JavaIrStatement.Try -> body.containsScannerRuntime() ||
+      catches.any { it.body.containsScannerRuntime() } ||
+      finallyBlock?.containsScannerRuntime() == true
   }
 
   /** 只认稳定 operation；嵌套 receiver、参数与转换继续递归检查。 */
@@ -1465,6 +1572,9 @@ private class JavaScriptEmitter(
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     is JavaIrStatement.Return -> expression?.requiresArrayOrStringRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresArrayOrStringRuntime()
+    is JavaIrStatement.Try -> body.containsArrayOrStringRuntime() ||
+      catches.any { it.body.containsArrayOrStringRuntime() } ||
+      finallyBlock?.containsArrayOrStringRuntime() == true
   }
 
   /** 递归扫描嵌套表达式，避免例如数组索引藏在 static 调用参数中而漏注入 helper。 */
@@ -1744,7 +1854,50 @@ private class JavaScriptEmitter(
           writer.write(";\n")
         }
       }
-      is JavaIrStatement.Throw -> error("Validated Java IR cannot contain throw statements.")
+      is JavaIrStatement.Throw -> {
+        writer.writeIndentation()
+        writer.writeMapped("\$__j_throw(${renderExpression(statement.expression)});", statement.span)
+        writer.write("\n")
+      }
+      is JavaIrStatement.Try -> emitTry(statement)
+    }
+  }
+
+  /**
+   * 发射单个原生 try/catch/finally；原生 finally 会自然覆盖 return/break/continue/throw。
+   * 多个 Java catch 在同一 JavaScript catch 中按源码顺序匹配，未命中值必须原样再次抛出。
+   */
+  private fun emitTry(statement: JavaIrStatement.Try) {
+    writer.writeIndentation()
+    writer.write("try ")
+    emitBranch(statement.body)
+    if (statement.catches.isNotEmpty()) {
+      val errorName = "\$__j_caught_${currentMethod?.id?.value ?: 0}_${statement.span.from}"
+      writer.writeIndentation()
+      writer.write("catch ($errorName) {\n")
+      writer.indented {
+        statement.catches.forEachIndexed { position, clause ->
+          val role = index.program.builtinTypeRoles[clause.exceptionType.classId]
+            ?: error("Validated catch type is missing its builtin role.")
+          val qualifiedName = role.exceptionQualifiedName()
+            ?: error("Validated catch type is not a Java exception role.")
+          writer.writeIndentation()
+          writer.write(if (position == 0) "if" else "else if")
+          writer.write(" (\$__j_exception_is($errorName, ${writer.stringLiteral(qualifiedName)})) {\n")
+          writer.indented {
+            writer.line("let ${JsNameMangler.local(clause.local)} = $errorName;")
+            emitBlockContents(clause.body)
+          }
+          writer.line("}")
+        }
+        writer.line("else { throw $errorName; }")
+      }
+      writer.line("}")
+    }
+    statement.finallyBlock?.let { finallyBlock ->
+      writer.writeIndentation()
+      writer.write("finally ")
+      emitBranch(finallyBlock)
     }
   }
 
@@ -1866,6 +2019,16 @@ private class JavaScriptEmitter(
         JavaBuiltinOperation.HASH_MAP_CONSTRUCT -> "\$__j_map_new()"
         JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM ->
           "\$__j_scanner_new(${renderExpression(expression.arguments.single())})"
+        JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
+        JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING -> {
+          val reference = expression.type
+          val role = index.program.builtinTypeRoles[reference.classId]
+            ?: error("Validated exception construction is missing its builtin role.")
+          val name = role.exceptionQualifiedName()
+            ?: error("Validated exception construction has a non-exception role.")
+          val message = expression.arguments.singleOrNull()?.let(::renderExpression) ?: "null"
+          "\$__j_new_exception(${writer.stringLiteral(name)}, $message)"
+        }
         else -> error("Validated builtin construction has an unsupported operation.")
       }
       is JavaIrExpression.InvokeVirtual -> {
@@ -1984,7 +2147,9 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.ARRAY_LIST_CONSTRUCT,
       JavaBuiltinOperation.HASH_SET_CONSTRUCT,
       JavaBuiltinOperation.HASH_MAP_CONSTRUCT,
-      JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM ->
+      JavaBuiltinOperation.SCANNER_CONSTRUCT_INPUT_STREAM,
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING ->
         error("Validated callable builtin cannot be a construction operation.")
       JavaBuiltinOperation.LIST_SIZE -> instance("\$__j_list_size")
       JavaBuiltinOperation.LIST_IS_EMPTY -> instance("\$__j_list_is_empty")
@@ -2266,6 +2431,34 @@ private fun JavaBuiltinOperation.isScannerOperation(): Boolean = when (this) {
   JavaBuiltinOperation.SCANNER_NEXT_LINE -> true
   else -> false
 }
+
+/** 两个异常构造 operation 共享实现，由 ConstructBuiltin 的精确结果 role 决定具体类型。 */
+private fun JavaBuiltinOperation.isExceptionConstruction(): Boolean =
+  this == JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY ||
+    this == JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING
+
+/** 按 catalog 的唯一继承表判断 builtin role 子类型关系。 */
+private fun JavaBuiltinTypeRole.isSubtypeOf(target: JavaBuiltinTypeRole): Boolean {
+  var current: JavaBuiltinTypeRole? = this
+  val visited = mutableSetOf<JavaBuiltinTypeRole>()
+  while (current != null && visited.add(current)) {
+    if (current == target) return true
+    current = JavaBuiltinLibrary.directSuperRoles[current]
+  }
+  return false
+}
+
+private fun JavaBuiltinTypeRole.isThrowableRole(): Boolean =
+  isSubtypeOf(JavaBuiltinTypeRole.THROWABLE)
+
+private fun JavaBuiltinTypeRole.isUncheckedExceptionRole(): Boolean =
+  isSubtypeOf(JavaBuiltinTypeRole.RUNTIME_EXCEPTION)
+
+/** exception runtime 使用稳定 Java 限定名，不读取源码名称或 JS constructor.name。 */
+private fun JavaBuiltinTypeRole.exceptionQualifiedName(): String? =
+  JavaBuiltinLibrary.types.firstOrNull { it.role == this }
+    ?.qualifiedName
+    ?.takeIf { isThrowableRole() }
 
 /** Object 三个 builtin operation 是用户 override 的虚方法根。 */
 private fun JavaBuiltinOperation.isObjectVirtualOperation(): Boolean = when (this) {

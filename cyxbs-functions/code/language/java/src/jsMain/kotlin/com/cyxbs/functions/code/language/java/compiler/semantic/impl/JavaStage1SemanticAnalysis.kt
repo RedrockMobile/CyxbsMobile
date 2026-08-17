@@ -72,6 +72,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val breakFlows = mutableListOf<S1LoopFlow>()
   private val enhancedForBindings = linkedMapOf<JavaNodeId, JavaEnhancedForBinding>()
   private val switchesCompletingNormally = mutableSetOf<JavaNodeId>()
+  private val triesCompletingNormally = mutableSetOf<JavaNodeId>()
 
   /** 执行全部语义遍次；错误结果不会泄露含恢复类型的半成品模型。 */
   fun analyze(): JavaCompilerPhaseResult<JavaSemanticModel> {
@@ -1496,6 +1497,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       }
       is JavaAstStatement.EnhancedFor -> analyzeEnhancedFor(statement)
       is JavaAstStatement.Switch -> analyzeSwitch(statement)
+      is JavaAstStatement.Throw -> analyzeThrow(statement)
+      is JavaAstStatement.Try -> analyzeTry(statement)
       is JavaAstStatement.Break -> {
         val flow = breakFlows.lastOrNull()
         if (flow == null) {
@@ -1507,6 +1510,93 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       }
       is JavaAstStatement.Return -> analyzeReturn(statement)
       is JavaAstStatement.Empty -> Unit
+    }
+  }
+
+  /** throw 只接受 Throwable 引用或 null；checked exception 的 throws 校验在下一批完成。 */
+  private fun analyzeThrow(statement: JavaAstStatement.Throw) {
+    val type = analyzeExpression(statement.expression)
+    val throwable = checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
+    if (type != JavaSemanticType.Error && type != JavaSemanticType.Null &&
+      !relations().isSubtype(type, throwable)
+    ) {
+      error(
+        statement.expression.span,
+        "java.semantic.throw_not_throwable",
+        "throw 表达式必须是 Throwable 或 null。",
+      )
+    }
+  }
+
+  /**
+   * 分析 try/catch/finally 的作用域、捕获顺序和保守 DA 交集。
+   *
+   * finally 的运行时 abrupt completion 由结构化 IR 保证；这里把所有入口状态纳入交集，宁可拒绝
+   * 极少数复杂 DA 写法，也不会把未初始化变量错误放行。
+   */
+  private fun analyzeTry(statement: JavaAstStatement.Try) {
+    val entry = currentFlowState()
+    analyzeStatement(statement.body)
+    val normalExits = mutableListOf<S1FlowState>()
+    if (canCompleteNormally(statement.body)) normalExits += currentFlowState()
+
+    val throwable = checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
+    val previousCatchTypes = mutableListOf<JavaSemanticType.Declared>()
+    statement.catches.forEach { clause ->
+      replaceFlowState(entry)
+      val catchType = resolveType(
+        clause.type,
+        context().unit,
+        currentTypeParameterScope(),
+        allowVoid = false,
+      )
+      val declared = catchType as? JavaSemanticType.Declared
+      if (declared == null || !relations().isSubtype(declared, throwable)) {
+        if (catchType != JavaSemanticType.Error) {
+          error(clause.type.span, "java.semantic.catch_not_throwable", "catch 参数类型必须继承 Throwable。")
+        }
+      } else {
+        if (previousCatchTypes.any { previous -> relations().isSubtype(declared, previous) }) {
+          error(
+            clause.type.span,
+            "java.semantic.unreachable_catch",
+            "该 catch 已被前面的父类型 catch 覆盖。",
+          )
+        }
+        previousCatchTypes += declared
+      }
+      withScope {
+        val symbol = declareLocal(
+          JavaSymbolKind.PARAMETER,
+          clause.parameterName,
+          context().callable?.symbol ?: context().owner.symbol,
+          clause.nodeId,
+          clause.parameterSpan,
+          catchType,
+        )
+        definitelyAssigned += symbol
+        if (JavaAstModifier.FINAL in clause.modifiers) finalSymbols += symbol
+        analyzeStatement(clause.body)
+      }
+      if (canCompleteNormally(clause.body)) normalExits += currentFlowState()
+    }
+
+    val finallyBlock = statement.finallyBlock
+    if (finallyBlock == null) {
+      if (normalExits.isNotEmpty()) {
+        replaceFlowState(checkNotNull(normalExits.intersectionOrNull()))
+        triesCompletingNormally += statement.nodeId
+      } else {
+        replaceFlowState(entry)
+      }
+      return
+    }
+
+    // finally 也可能由 try/catch 中途抛出的异常进入，因此其入口必须额外包含最保守的语句入口。
+    replaceFlowState(checkNotNull((normalExits + entry).intersectionOrNull()))
+    analyzeStatement(finallyBlock)
+    if (normalExits.isNotEmpty() && canCompleteNormally(finallyBlock)) {
+      triesCompletingNormally += statement.nodeId
     }
   }
 
@@ -3240,9 +3330,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       containsBreakForCurrentLoop(statement.body)
     is JavaAstStatement.EnhancedFor -> true
     is JavaAstStatement.Switch -> statement.nodeId in switchesCompletingNormally
+    is JavaAstStatement.Try -> statement.nodeId in triesCompletingNormally
     is JavaAstStatement.Break,
     is JavaAstStatement.Continue,
-    is JavaAstStatement.Return -> false
+    is JavaAstStatement.Return,
+    is JavaAstStatement.Throw -> false
     else -> true
   }
 
@@ -3257,6 +3349,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     is JavaAstStatement.For -> false
     is JavaAstStatement.EnhancedFor,
     is JavaAstStatement.Switch -> false
+    is JavaAstStatement.Try -> {
+      containsBreakForCurrentLoop(statement.body) ||
+        statement.catches.any { containsBreakForCurrentLoop(it.body) } ||
+        statement.finallyBlock?.let(::containsBreakForCurrentLoop) == true
+    }
     else -> false
   }
 

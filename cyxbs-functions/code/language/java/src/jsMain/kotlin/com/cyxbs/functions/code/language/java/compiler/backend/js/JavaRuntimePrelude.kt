@@ -42,6 +42,69 @@ internal object JavaRuntimePrelude {
 
   """.trimIndent().replace('@', '$')
 
+  /**
+   * Java 异常的最小运行时表示与类型匹配。
+   *
+   * 编译器主动构造的异常保存精确类型属性；既有数组、集合与 Scanner helper 仍抛原生 Error，
+   * 因此匹配器也会读取其稳定的 `java.*Exception` message 前缀，让旧运行时错误可被 catch。
+   */
+  val exceptionSource: String = """
+    const @__j_exception_parent = Object.freeze({
+      "java.lang.Throwable": null,
+      "java.lang.Exception": "java.lang.Throwable",
+      "java.lang.RuntimeException": "java.lang.Exception",
+      "java.lang.IllegalArgumentException": "java.lang.RuntimeException",
+      "java.lang.IllegalStateException": "java.lang.RuntimeException",
+      "java.lang.NullPointerException": "java.lang.RuntimeException",
+      "java.lang.ArithmeticException": "java.lang.RuntimeException",
+      "java.lang.IndexOutOfBoundsException": "java.lang.RuntimeException",
+      "java.lang.ArrayIndexOutOfBoundsException": "java.lang.IndexOutOfBoundsException",
+      "java.lang.StringIndexOutOfBoundsException": "java.lang.IndexOutOfBoundsException",
+      "java.lang.ClassCastException": "java.lang.RuntimeException",
+      "java.lang.UnsupportedOperationException": "java.lang.RuntimeException",
+      "java.lang.NegativeArraySizeException": "java.lang.RuntimeException",
+      "java.lang.ArrayStoreException": "java.lang.RuntimeException",
+      "java.util.NoSuchElementException": "java.lang.RuntimeException",
+      "java.util.InputMismatchException": "java.util.NoSuchElementException"
+    });
+
+    function @__j_exception_name(value) {
+      if (value !== null && typeof value === "object" &&
+        typeof value.@__j_exception_name === "string") {
+        return value.@__j_exception_name;
+      }
+      if (!(value instanceof Error) || typeof value.message !== "string") return null;
+      const separator = value.message.indexOf(":");
+      const name = separator < 0 ? value.message : value.message.slice(0, separator);
+      return Object.prototype.hasOwnProperty.call(@__j_exception_parent, name) ? name : null;
+    }
+
+    function @__j_new_exception(name, message) {
+      const error = new Error(message === null ? name : name + ": " + message);
+      Object.defineProperty(error, "@__j_exception_name", { value: name });
+      Object.defineProperty(error, "@__j_exception_message", { value: message });
+      return error;
+    }
+
+    function @__j_exception_is(value, target) {
+      let current = @__j_exception_name(value);
+      while (current !== null) {
+        if (current === target) return true;
+        current = Object.prototype.hasOwnProperty.call(@__j_exception_parent, current)
+          ? @__j_exception_parent[current]
+          : null;
+      }
+      return false;
+    }
+
+    function @__j_throw(value) {
+      if (value === null) {
+        throw @__j_new_exception("java.lang.NullPointerException", null);
+      }
+      throw value;
+    }
+  """.trimIndent().replace('@', '$')
+
   /** 数组与字符串拼接运行时；所有检查集中在这里避免 JavaScript 默认语义泄漏。 */
   val arrayAndStringSource: String = """
     function @__j_array(value) {

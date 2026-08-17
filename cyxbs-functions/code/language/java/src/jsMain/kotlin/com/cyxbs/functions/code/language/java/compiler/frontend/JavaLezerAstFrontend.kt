@@ -8,6 +8,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayDimension
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializerElement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCatchClause
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCompilationUnit
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
@@ -340,10 +341,66 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "ForStatement" -> forStatement(node)
     "EnhancedForStatement" -> enhancedForStatement(node)
     "SwitchStatement" -> switchStatement(node)
+    "ThrowStatement" -> throwStatement(node)
+    "TryStatement" -> tryStatement(node)
     "BreakStatement" -> loopJump(node, isBreak = true)
     "ContinueStatement" -> loopJump(node, isBreak = false)
     "EmptyStatement" -> JavaAstStatement.Empty(ids.next(), span(node))
     else -> unsupported(node, "阶段 1 不支持该语句。")
+  }
+
+  /** throw 必须包含唯一表达式；无法识别时不能静默退化为空控制流。 */
+  private fun throwStatement(node: LezerSyntaxNode): JavaAstStatement.Throw {
+    val value = node.children().firstOrNull { it.name in EXPRESSION_NODES }
+      ?: unsupported(node, "throw 缺少异常表达式。")
+    return JavaAstStatement.Throw(ids.next(), span(node), expression(value))
+  }
+
+  /**
+   * 保留 try、顺序 catch 与 finally 的原始嵌套。
+   *
+   * 资源声明和 multi-catch 属于下一批异常完整性，当前必须明确拒绝，不能忽略后继续生成代码。
+   */
+  private fun tryStatement(node: LezerSyntaxNode): JavaAstStatement.Try {
+    node.children().firstOrNull { it.name == "ResourceSpecification" }?.let {
+      unsupported(it, "异常阶段 1 尚不支持 try-with-resources。")
+    }
+    val body = node.children().firstOrNull { it.name == "Block" }
+      ?: unsupported(node, "try 缺少方法体。")
+    val catches = node.children().filter { it.name == "CatchClause" }.map(::catchClause)
+    val finallyBlock = node.children().firstOrNull { it.name == "FinallyClause" }
+      ?.children()
+      ?.firstOrNull { it.name == "Block" }
+      ?.let(::block)
+    if (catches.isEmpty() && finallyBlock == null) {
+      unsupported(node, "try 必须至少包含 catch 或 finally。")
+    }
+    return JavaAstStatement.Try(ids.next(), span(node), block(body), catches, finallyBlock)
+  }
+
+  /** 构建单类型 catch 参数；多个异常类型留给下一批 multi-catch。 */
+  private fun catchClause(node: LezerSyntaxNode): JavaAstCatchClause {
+    val parameter = node.children().firstOrNull { it.name == "CatchFormalParameter" }
+      ?: unsupported(node, "catch 缺少参数。")
+    val definition = parameter.descendants().firstOrNull { it.name == "Definition" }
+      ?: unsupported(parameter, "catch 参数缺少名称。")
+    val catchType = parameter.children().firstOrNull { it.name == "CatchType" }
+      ?: unsupported(parameter, "catch 参数缺少异常类型。")
+    val types = catchType.typeReferences()
+    if (types.size != 1) {
+      unsupported(catchType, "异常阶段 1 尚不支持 multi-catch。")
+    }
+    val body = node.children().firstOrNull { it.name == "Block" }
+      ?: unsupported(node, "catch 缺少方法体。")
+    return JavaAstCatchClause(
+      ids.next(),
+      span(node),
+      parameter.modifiersBefore(definition, PARAMETER_MODIFIERS, "catch 参数"),
+      types.single(),
+      text(definition),
+      span(definition),
+      block(body),
+    )
   }
 
   /** 将真实 CST 的 ExplicitConstructorInvocation 映射为初始化顺序专用节点。 */
@@ -1025,7 +1082,7 @@ private val MEMBER_NODES = setOf("FieldDeclaration", "MethodDeclaration", "Const
 private val STATEMENT_NODES = setOf(
   "Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement",
   "WhileStatement", "DoStatement", "ForStatement", "EnhancedForStatement", "SwitchStatement",
-  "BreakStatement", "ContinueStatement", "EmptyStatement",
+  "ThrowStatement", "TryStatement", "BreakStatement", "ContinueStatement", "EmptyStatement",
 )
 private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void", "ArrayType")
 private val TYPE_REFERENCE_WRAPPERS = setOf("GenericType")

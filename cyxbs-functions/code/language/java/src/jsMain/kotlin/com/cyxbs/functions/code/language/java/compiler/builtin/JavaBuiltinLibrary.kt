@@ -38,6 +38,22 @@ internal enum class JavaBuiltinTypeRole(val boxedPrimitive: JavaAstPrimitiveType
   HASH_MAP,
   ITERATOR,
   SCANNER,
+  THROWABLE,
+  EXCEPTION,
+  RUNTIME_EXCEPTION,
+  ILLEGAL_ARGUMENT_EXCEPTION,
+  ILLEGAL_STATE_EXCEPTION,
+  NULL_POINTER_EXCEPTION,
+  ARITHMETIC_EXCEPTION,
+  INDEX_OUT_OF_BOUNDS_EXCEPTION,
+  ARRAY_INDEX_OUT_OF_BOUNDS_EXCEPTION,
+  STRING_INDEX_OUT_OF_BOUNDS_EXCEPTION,
+  CLASS_CAST_EXCEPTION,
+  UNSUPPORTED_OPERATION_EXCEPTION,
+  NEGATIVE_ARRAY_SIZE_EXCEPTION,
+  ARRAY_STORE_EXCEPTION,
+  NO_SUCH_ELEMENT_EXCEPTION,
+  INPUT_MISMATCH_EXCEPTION,
 }
 
 /**
@@ -125,6 +141,10 @@ internal enum class JavaBuiltinOperation {
   SCANNER_NEXT_INT,
   SCANNER_HAS_NEXT_LINE,
   SCANNER_NEXT_LINE,
+
+  /** 异常构造器共享行为，实际 Java 类型由 ConstructBuiltin 的 result role 决定。 */
+  EXCEPTION_CONSTRUCT_EMPTY,
+  EXCEPTION_CONSTRUCT_STRING,
 }
 
 /** catalog 中与一次编译 symbol 编号无关的类型引用。 */
@@ -302,6 +322,22 @@ internal object JavaBuiltinLibrary {
     ),
     JavaBuiltinTypeDescriptor("java.io.InputStream", "java.lang.Object", false, JavaBuiltinTypeRole.INPUT_STREAM),
     JavaBuiltinTypeDescriptor("java.util.Scanner", "java.lang.Object", true, JavaBuiltinTypeRole.SCANNER),
+    JavaBuiltinTypeDescriptor("java.lang.Throwable", "java.lang.Object", false, JavaBuiltinTypeRole.THROWABLE),
+    JavaBuiltinTypeDescriptor("java.lang.Exception", "java.lang.Throwable", false, JavaBuiltinTypeRole.EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.RuntimeException", "java.lang.Exception", false, JavaBuiltinTypeRole.RUNTIME_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.IllegalArgumentException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.ILLEGAL_ARGUMENT_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.IllegalStateException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.ILLEGAL_STATE_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.NullPointerException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.NULL_POINTER_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.ArithmeticException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.ARITHMETIC_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.IndexOutOfBoundsException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.INDEX_OUT_OF_BOUNDS_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.ArrayIndexOutOfBoundsException", "java.lang.IndexOutOfBoundsException", false, JavaBuiltinTypeRole.ARRAY_INDEX_OUT_OF_BOUNDS_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.StringIndexOutOfBoundsException", "java.lang.IndexOutOfBoundsException", false, JavaBuiltinTypeRole.STRING_INDEX_OUT_OF_BOUNDS_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.ClassCastException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.CLASS_CAST_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.UnsupportedOperationException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.UNSUPPORTED_OPERATION_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.NegativeArraySizeException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.NEGATIVE_ARRAY_SIZE_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.lang.ArrayStoreException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.ARRAY_STORE_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.util.NoSuchElementException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.NO_SUCH_ELEMENT_EXCEPTION),
+    JavaBuiltinTypeDescriptor("java.util.InputMismatchException", "java.util.NoSuchElementException", false, JavaBuiltinTypeRole.INPUT_MISMATCH_EXCEPTION),
   )
 
   /**
@@ -648,14 +684,45 @@ internal object JavaBuiltinLibrary {
     callable("java.util.Scanner", "nextInt", operation = JavaBuiltinOperation.SCANNER_NEXT_INT, returnType = intType)
     callable("java.util.Scanner", "hasNextLine", operation = JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE, returnType = booleanType)
     callable("java.util.Scanner", "nextLine", operation = JavaBuiltinOperation.SCANNER_NEXT_LINE, returnType = stringType)
+
+    // 阶段 1 为常用 unchecked exception 开放 Java 8 的空构造器与 message 构造器；
+    // Throwable/Exception 仅作为 catch 根类型，checked exception 的构造和 throws 在下一批开放。
+    listOf(
+      "java.lang.RuntimeException",
+      "java.lang.IllegalArgumentException",
+      "java.lang.IllegalStateException",
+      "java.lang.NullPointerException",
+      "java.lang.ArithmeticException",
+      "java.lang.IndexOutOfBoundsException",
+      "java.lang.ArrayIndexOutOfBoundsException",
+      "java.lang.StringIndexOutOfBoundsException",
+      "java.lang.ClassCastException",
+      "java.lang.UnsupportedOperationException",
+      "java.lang.NegativeArraySizeException",
+      "java.lang.ArrayStoreException",
+      "java.util.NoSuchElementException",
+      "java.util.InputMismatchException",
+    ).forEach { owner ->
+      val exceptionType = JavaBuiltinTypeReference.Declared(owner)
+      constructor(owner, emptyList(), JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY, exceptionType)
+      constructor(owner, listOf(stringType), JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING, exceptionType)
+    }
   }
 
   init {
     require(types.map { it.qualifiedName }.distinct().size == types.size) {
       "Java builtin type qualified names must be unique."
     }
-    require(members.map { it.operation }.distinct().size == members.size) {
-      "Every Java builtin member overload must have a stable unique operation."
+    val sharedConstructorOperations = setOf(
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING,
+    )
+    require(
+      members.filter { it.operation !in sharedConstructorOperations }
+        .map { it.operation }.distinct().size ==
+        members.count { it.operation !in sharedConstructorOperations },
+    ) {
+      "Every non-family Java builtin member overload must have a stable unique operation."
     }
     require(members.map(::signatureKey).distinct().size == members.size) {
       "Java builtin member signatures must be unique."

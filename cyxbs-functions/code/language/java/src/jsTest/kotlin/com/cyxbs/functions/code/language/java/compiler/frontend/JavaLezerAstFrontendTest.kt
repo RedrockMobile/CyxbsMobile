@@ -200,8 +200,55 @@ class JavaLezerAstFrontendTest {
   @Test
   fun rejectsUnsupportedStatementWrappers() {
     listOf(
-      "class Main { static int value() { try { return 1; } finally { return 2; } } }",
       "class Main { static int value() { synchronized (this) { return 1; } } }",
+    ).forEach { source ->
+      val result = parse(source)
+      assertFalse(result.isSuccess, source)
+      assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" }, source)
+    }
+  }
+
+  /** throw、多个 catch 与 finally 必须按真实 CST 顺序映射，不能再被当作未知 wrapper。 */
+  @Test
+  fun parsesThrowTryCatchAndFinally() {
+    val result = parse(
+      """
+      class Main {
+        static int value(int mode) {
+          try {
+            if (mode == 0) throw new IllegalArgumentException("bad");
+            return 1;
+          } catch (IllegalArgumentException error) {
+            return 2;
+          } catch (RuntimeException error) {
+            return 3;
+          } finally {
+            mode++;
+          }
+        }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val statement = assertIs<JavaAstStatement.Try>(assertNotNull(method.body).statements.single())
+    assertEquals(2, statement.catches.size)
+    assertEquals("error", statement.catches.first().parameterName)
+    assertIs<JavaAstStatement.Throw>(
+      assertIs<JavaAstStatement.If>(statement.body.statements.first()).thenBranch,
+    )
+    assertNotNull(statement.finallyBlock)
+  }
+
+  /** 多异常 catch 与带资源 try 留给阶段 2，阶段 1 必须稳定拒绝而不是擦除语义。 */
+  @Test
+  fun rejectsStageTwoExceptionSyntax() {
+    listOf(
+      "class Main { void run() { try { } catch (IllegalArgumentException | IllegalStateException error) { } } }",
+      "class Main { void run() { try (Resource resource = open()) { } } }",
     ).forEach { source ->
       val result = parse(source)
       assertFalse(result.isSuccess, source)

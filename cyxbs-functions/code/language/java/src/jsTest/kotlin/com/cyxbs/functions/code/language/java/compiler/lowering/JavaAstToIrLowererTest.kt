@@ -636,6 +636,37 @@ class JavaAstToIrLowererTest {
     assertTrue(JavaBuiltinOperation.SCANNER_NEXT_LINE in operations)
   }
 
+  /** try/catch/finally 必须保留结构化 IR，catch 参数与异常构造都只能消费 semantic binding。 */
+  @Test
+  fun lowersStructuredExceptionFlow() {
+    val model = analyze(
+      "Main.java" to """
+        class Main {
+          static int run() {
+            try {
+              throw new IllegalArgumentException("bad");
+            } catch (IllegalArgumentException error) {
+              return 1;
+            } finally {
+              System.out.print("done");
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val method = assertNotNull(JavaAstToIrLowerer.lower(model).value).onlyMethod()
+    val statement = assertIs<JavaIrStatement.Try>(assertNotNull(method.body).statements.single())
+    val thrown = assertIs<JavaIrStatement.Throw>(statement.body.statements.single())
+    assertEquals(
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING,
+      assertIs<JavaIrExpression.ConstructBuiltin>(thrown.expression).operation,
+    )
+    assertEquals(1, statement.catches.size)
+    assertTrue(method.locals.any { it.id == statement.catches.single().local })
+    assertNotNull(statement.finallyBlock)
+  }
+
   /** builtin owner 缺少 symbol→operation side table 时必须失败，不能退回普通成员 lowering。 */
   @Test
   fun failsStructurallyForMissingBuiltinBinding() {
@@ -901,6 +932,9 @@ class JavaAstToIrLowererTest {
     is JavaIrStatement.Continue -> emptyList()
     is JavaIrStatement.Return -> statement.expression?.let(::builtinOperations).orEmpty()
     is JavaIrStatement.Throw -> builtinOperations(statement.expression)
+    is JavaIrStatement.Try -> builtinOperations(statement.body) +
+      statement.catches.flatMap { builtinOperations(it.body) } +
+      statement.finallyBlock?.let(::builtinOperations).orEmpty()
     is JavaIrStatement.ConstructorInvocation -> statement.arguments.flatMap(::builtinOperations)
   }
 

@@ -246,11 +246,30 @@ internal sealed interface JavaIrStatement {
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
 
+  /** Java throw；后端必须在抛出前执行 null 检查并把 null 转为 NullPointerException。 */
   data class Throw(
     val expression: JavaIrExpression,
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
+
+  /**
+   * 保留原生 try/catch/finally 结构，确保 finally 对所有 abrupt completion 的覆盖顺序与 Java 一致。
+   */
+  data class Try(
+    val body: Block,
+    val catches: List<JavaIrCatchClause>,
+    val finallyBlock: Block?,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
 }
+
+/** 已完成类型解析与局部绑定的 catch 分支。 */
+internal data class JavaIrCatchClause(
+  val exceptionType: JavaIrType.Reference,
+  val local: JavaIrLocalId,
+  val body: JavaIrStatement.Block,
+  val span: JavaSourceSpan,
+)
 
 /** 增强 for 后端协议；集合种类显式区分以选择稳定 iterator operation。 */
 internal enum class JavaIrEnhancedForKind { ARRAY, LIST, SET }

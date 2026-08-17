@@ -446,6 +446,14 @@ private class BodyLowering(
       is JavaAstStatement.Switch -> statement.entries.forEach { entry ->
         entry.statements.forEach(::collectLocals)
       }
+      is JavaAstStatement.Try -> {
+        collectLocals(statement.body)
+        statement.catches.forEach { clause ->
+          registerCatchLocal(clause)
+          collectLocals(clause.body)
+        }
+        statement.finallyBlock?.let(::collectLocals)
+      }
       else -> Unit
     }
   }
@@ -454,6 +462,15 @@ private class BodyLowering(
     val symbol = lowering.declaration(source.nodeId, source.span, JavaSymbolKind.LOCAL_VARIABLE) ?: return
     if (localBySymbol[symbol.id] == null) {
       createLocal(symbol.id, symbol.name, symbol.type, false, source.span)
+    }
+  }
+
+  /** catch 参数在语义上属于 parameter，但在 IR 中是由 catch 入口赋值的普通 local。 */
+  private fun registerCatchLocal(source: JavaAstCatchClause) {
+    val symbol = lowering.declaration(source.nodeId, source.parameterSpan, JavaSymbolKind.PARAMETER)
+      ?: return
+    if (localBySymbol[symbol.id] == null) {
+      createLocal(symbol.id, symbol.name, symbol.type, false, source.parameterSpan)
     }
   }
 
@@ -499,10 +516,38 @@ private class BodyLowering(
     is JavaAstStatement.For -> lowerFor(statement)
     is JavaAstStatement.EnhancedFor -> lowerEnhancedFor(statement)
     is JavaAstStatement.Switch -> lowerSwitch(statement)
+    is JavaAstStatement.Throw -> expression(statement.expression)?.let { value ->
+      listOf(JavaIrStatement.Throw(value, statement.span))
+    } ?: emptyList()
+    is JavaAstStatement.Try -> lowerTry(statement)
     is JavaAstStatement.Break -> listOf(JavaIrStatement.Break(statement.span))
     is JavaAstStatement.Continue -> listOf(JavaIrStatement.Continue(statement.span))
     is JavaAstStatement.Return -> lowerReturn(statement)
     is JavaAstStatement.Empty -> emptyList()
+  }
+
+  /** try/catch/finally 原样降低，catch 类型与参数局部只消费语义声明。 */
+  private fun lowerTry(statement: JavaAstStatement.Try): List<JavaIrStatement> {
+    val catches = statement.catches.map { clause ->
+      val symbol = lowering.declaration(
+        clause.nodeId,
+        clause.parameterSpan,
+        JavaSymbolKind.PARAMETER,
+      ) ?: return emptyList()
+      val local = localBySymbol[symbol.id]
+        ?: return invalid("Catch parameter is missing its IR local.", clause.parameterSpan).let { emptyList() }
+      val type = lowering.typeOf(symbol.type, clause.type.span) as? JavaIrType.Reference
+        ?: return invalid("Catch parameter must lower to a reference type.", clause.type.span).let { emptyList() }
+      JavaIrCatchClause(type, local.id, lowerBlock(clause.body), clause.span)
+    }
+    return listOf(
+      JavaIrStatement.Try(
+        lowerBlock(statement.body),
+        catches,
+        statement.finallyBlock?.let(::lowerBlock),
+        statement.span,
+      ),
+    )
   }
 
   private fun branch(statement: JavaAstStatement): JavaIrStatement =

@@ -570,6 +570,22 @@ class JavaStage1SemanticAnalysisTest {
         "java.util.Iterator",
         "java.io.InputStream",
         "java.util.Scanner",
+        "java.lang.Throwable",
+        "java.lang.Exception",
+        "java.lang.RuntimeException",
+        "java.lang.IllegalArgumentException",
+        "java.lang.IllegalStateException",
+        "java.lang.NullPointerException",
+        "java.lang.ArithmeticException",
+        "java.lang.IndexOutOfBoundsException",
+        "java.lang.ArrayIndexOutOfBoundsException",
+        "java.lang.StringIndexOutOfBoundsException",
+        "java.lang.ClassCastException",
+        "java.lang.UnsupportedOperationException",
+        "java.lang.NegativeArraySizeException",
+        "java.lang.ArrayStoreException",
+        "java.util.NoSuchElementException",
+        "java.util.InputMismatchException",
       ),
       builtinTypes,
     )
@@ -1088,6 +1104,56 @@ class JavaStage1SemanticAnalysisTest {
         """.trimIndent(),
       ),
       "java.semantic.diamond_target_required",
+    )
+  }
+
+  /** throw/catch 必须建立 Throwable 子类型约束、catch 局部符号与可达性顺序。 */
+  @Test
+  fun analyzesBasicExceptionFlowAndCatchOrdering() {
+    val success = analyze(
+      "Main.java" to """
+        class Main {
+          static int run(int mode) {
+            try {
+              if (mode == 0) throw new IllegalArgumentException("bad");
+              return 1;
+            } catch (IllegalArgumentException error) {
+              return 2;
+            } catch (RuntimeException error) {
+              return 3;
+            } finally {
+              mode++;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(success.isSuccess, success.diagnostics.toString())
+    val model = assertNotNull(success.value)
+    assertEquals(2, model.symbols.values.count { it.kind == JavaSymbolKind.PARAMETER && it.name == "error" })
+
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void run() { throw 1; } }"),
+      "java.semantic.throw_not_throwable",
+    )
+    assertDiagnostic(
+      analyze("Main.java" to "class Main { static void run() { try { } catch (String error) { } } }"),
+      "java.semantic.catch_not_throwable",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          class Main {
+            static void run() {
+              try { throw new IllegalArgumentException(); }
+              catch (RuntimeException error) { }
+              catch (IllegalArgumentException error) { }
+            }
+          }
+        """.trimIndent(),
+      ),
+      "java.semantic.unreachable_catch",
     )
   }
 

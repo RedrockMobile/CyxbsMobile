@@ -425,17 +425,22 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 - 对复杂 wildcard capture、低频语法和不支持 API 给出稳定的编译期诊断，不动态降级；
 - 每项能力继续通过 typed IR 单测、JS 快照、QuickJS 行为和 javac 差分四层验证。
 
-后续批次按依赖顺序推进：
+剩余工作固定为九个可独立提交的批次；每批都必须同步更新本文档、通过完整 `jsNodeTest` 后再进入下一批：
 
-1. （已完成）用户接口、`implements`、接口继承、接口分派与 default method；
-2. （已完成）`Object.toString/equals/hashCode` 虚分派，并让集合受控接入用户对象语义；
-3. （已完成）增强 `for`、`break/continue`、`do-while` 与 `switch` 等常用控制流；
-4. `throw`、`try/catch/finally` 与常用异常；
-5. 函数式接口、lambda、方法引用和捕获变量；
-6. 多维数组、`enum` 以及 `long/float/double` 的完整运行语义。
+1. （已完成，2026-08-18）异常基础：`throw`、`try/catch/finally`、有序多 catch、常用运行时异常，
+   并让数组、集合和 Scanner 已产生的 Java 命名异常可被源码 catch；
+2. 异常完整语义：checked exception 与 `throws`、multi-catch、自定义异常、常用 Throwable API，
+   以及受控资源上的 try-with-resources/AutoCloseable；
+3. 函数式接口与 lambda：无捕获/有捕获 lambda、effectively-final 校验和目标类型推断；
+4. 方法引用：静态、绑定 receiver、未绑定 receiver 与构造器引用，复用函数式接口适配链；
+5. 多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/求值顺序；
+6. `enum`：枚举常量、`values/valueOf`、`name/ordinal`、switch 与受控成员；
+7. 完整数值：`long`、`float`、`double`、数值提升、转换、比较及常用 Math/包装 API；
+8. 泛型与语言收口：剩余常用推断、桥方法、数组/可变参数等教学高频边界，低频项稳定诊断；
+9. 产品化：源码栈映射、缓存与增量编译、npm/端上链路、资源限制、fuzz 和跨平台发布验证。
 
-第一批优先实现接口，是因为接口分派同时是函数式接口、增强 `for`、集合标准抽象以及用户对象基础
-方法正确接入的共同前置能力。低频 wildcard capture、反射、文件、网络和动态类加载仍保持关闭。
+接口分派、Object 虚方法和常用控制流已经作为上述九批的前置基础完成。低频 wildcard capture、
+反射、文件、网络和动态类加载仍保持关闭。
 
 阶段闸门：不依赖大规模类库的 Java 8 语言样例能够稳定编译执行，生成 JS 中不存在未解析的
 Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义。
@@ -462,9 +467,14 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - 已支持数组、`List`、`Set` 的增强 `for`，迭代变量的装箱/拆箱与赋值转换由 semantic side table
   固定；`switch` 已支持 int-like（含对应 wrapper）与 String 教学用法、连续 case、fallthrough、
   default、switch break 及 String null 检查；重复 case/default 和不可迭代对象会在编译期报告稳定诊断；
-- 完整 `jsNodeTest` 共 217 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
-  字符串左结合、泛型接口/default 分派、Object 虚方法、循环跳转、增强 `for` 与 switch；
-- 多维数组运行、嵌套初始化器、异常、lambda、方法引用、enum、long 与浮点完整语义仍留给后续批次。
+- 已支持 `throw`、`try/catch/finally` 和多个有序 catch；常用 RuntimeException 层级进入 builtin catalog，
+  显式抛出以及数组、集合、Scanner 已有运行时错误都按 Java 继承关系匹配首个 catch；
+- JS 后端使用原生结构化 try/finally，因而 `finally` 会正确覆盖 return/throw，并在 break/continue
+  前执行；宿主超时、取消和内存终止信号仍不包装为可被 Java 源码捕获的普通异常；
+- 完整 `jsNodeTest` 共 223 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
+  字符串左结合、泛型接口/default 分派、Object 虚方法、循环跳转、增强 `for`、switch 与异常流；
+- checked exception、multi-catch、try-with-resources、自定义异常完整 API、多维数组运行、lambda、
+  方法引用、enum、long 与浮点完整语义仍按上述第 2～8 批继续实现。
 
 ### 阶段 2B：精选类库与宿主桥
 

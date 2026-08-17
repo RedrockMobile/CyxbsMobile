@@ -319,12 +319,44 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val expression: JavaAstExpression?,
   ) : JavaAstStatement
 
+  /** 抛出一个异常对象；表达式的 Throwable 类型由语义阶段验证。 */
+  data class Throw(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val expression: JavaAstExpression,
+  ) : JavaAstStatement
+
+  /**
+   * Java try/catch/finally 语句。
+   *
+   * catch 顺序必须原样保留，finally 也不能被 lowering 复制到各出口，否则会破坏 return、
+   * break、continue 与再次 throw 的覆盖语义。
+   */
+  data class Try(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val body: Block,
+    val catches: List<JavaAstCatchClause>,
+    val finallyBlock: Block?,
+  ) : JavaAstStatement
+
   /** 空语句。 */
   data class Empty(
     override val nodeId: JavaNodeId,
     override val span: JavaSourceSpan,
   ) : JavaAstStatement
 }
+
+/** 单个 catch 分支；阶段 1 只允许一个异常类型，multi-catch 在下一批单独开放。 */
+internal data class JavaAstCatchClause(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val modifiers: Set<JavaAstModifier>,
+  val type: JavaAstTypeReference,
+  val parameterName: String,
+  val parameterSpan: JavaSourceSpan,
+  val body: JavaAstStatement.Block,
+) : JavaAstNode
 
 /** switch 中单个 case/default 及其后直到下一 label 的语句。 */
 internal data class JavaAstSwitchEntry(

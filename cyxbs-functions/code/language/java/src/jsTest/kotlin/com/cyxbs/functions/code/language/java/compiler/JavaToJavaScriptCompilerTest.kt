@@ -829,6 +829,98 @@ class JavaToJavaScriptCompilerTest {
     }
   }
 
+  /** 显式 throw 与既有数组/集合运行时错误必须按 Java 异常继承关系进入首个匹配 catch。 */
+  @Test
+  fun catchesExplicitAndExistingRuntimeExceptions() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/Main.java" to """
+        package demo;
+
+        import java.util.ArrayList;
+        import java.util.List;
+
+        class Main {
+          static int run(int mode) {
+            try {
+              if (mode == 0) throw new IllegalArgumentException("bad");
+              if (mode == 1) {
+                int[] values = new int[1];
+                return values[2];
+              }
+              List<Integer> values = new ArrayList<>();
+              return values.get(0);
+            } catch (IllegalArgumentException error) {
+              return 10;
+            } catch (ArrayIndexOutOfBoundsException error) {
+              return 20;
+            } catch (IndexOutOfBoundsException error) {
+              return 30;
+            } catch (RuntimeException error) {
+              return 40;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(10, executeEntry(artifact, 0))
+    assertEquals(20, executeEntry(artifact, 1))
+    assertEquals(30, executeEntry(artifact, 2))
+  }
+
+  /** JavaScript 原生 try/finally 必须保留 return 覆盖以及 break/continue 都执行 finally 的语义。 */
+  @Test
+  fun preservesFinallyAbruptCompletionSemantics() {
+    val returnResult = compile(
+      entryClass = "demo.ReturnMain",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/ReturnMain.java" to """
+        package demo;
+        class ReturnMain {
+          static int run() {
+            try {
+              throw new IllegalStateException("failed");
+            } catch (RuntimeException error) {
+              return 1;
+            } finally {
+              return 2;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertEquals(2, executeEntry(assertNotNull(returnResult.value, returnResult.diagnostics.toString()), 0))
+
+    val loopResult = compile(
+      entryClass = "demo.LoopMain",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/LoopMain.java" to """
+        package demo;
+        class LoopMain {
+          static int run() {
+            int value = 0;
+            for (int index = 0; index < 3; index++) {
+              try {
+                if (index == 0) continue;
+                if (index == 1) break;
+              } finally {
+                value += 10;
+              }
+            }
+            return value;
+          }
+        }
+      """.trimIndent(),
+    )
+    assertEquals(20, executeEntry(assertNotNull(loopResult.value, loopResult.diagnostics.toString()), 0))
+  }
+
   /** Object 虚分派覆盖用户 override、默认实现、输出与集合查找，并保留集合 self-reference。 */
   @Test
   fun dispatchesObjectMethodsAcrossOutputAndCollections() {
