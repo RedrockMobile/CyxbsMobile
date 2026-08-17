@@ -41,6 +41,7 @@ import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceSpan
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspace
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxNode
+import com.cyxbs.functions.code.language.lezer.LezerTree
 
 /**
  * 从 @lezer/java 的 CST 严格构建 Stage1 AST。
@@ -50,10 +51,22 @@ import com.cyxbs.functions.code.language.lezer.LezerSyntaxNode
  */
 internal object JavaLezerAstFrontend : JavaAstFrontend {
   /** 解析整个工作区，任何 ERROR 都阻止返回 AST。 */
-  override fun parse(workspace: JavaSourceWorkspace): JavaCompilerPhaseResult<JavaAstWorkspace> {
+  override fun parse(workspace: JavaSourceWorkspace): JavaCompilerPhaseResult<JavaAstWorkspace> =
+    parse(workspace) { file -> parser.parse(file.source.normalizeDefaultModifierForLezer()) }
+
+  /**
+   * 使用调用方提供的语法树解析工作区。
+   *
+   * 动态语言 Service 通过该入口复用高亮会话的 Lezer 增量树；独立编译器和测试仍使用 [parse] 的
+   * 默认全量 parser。树必须与传入文件当前源码对应，adapter 仍会执行相同的恢复节点和方言校验。
+   */
+  fun parse(
+    workspace: JavaSourceWorkspace,
+    syntaxTree: (JavaSourceFile) -> LezerTree,
+  ): JavaCompilerPhaseResult<JavaAstWorkspace> {
     val diagnostics = mutableListOf<JavaCompilerDiagnostic>()
     val units = workspace.files.mapNotNull { file ->
-      val tree = parser.parse(file.source.normalizeDefaultModifierForLezer())
+      val tree = syntaxTree(file)
       val recovered = tree.topNode.firstRecoveryNode()
       if (recovered != null) {
         diagnostics += error(file, recovered, "java.syntax.recovery", "Java 源码包含语法错误恢复节点，不能编译。")
@@ -88,7 +101,7 @@ internal object JavaLezerAstFrontend : JavaAstFrontend {
  * adapter 仍从原始源码读取 token 和字面量，因此不会改变诊断位置、字符串内容或最终 AST。
  * 待上游 grammar 修复并升级后可移除此兼容层。
  */
-private fun String.normalizeDefaultModifierForLezer(): String {
+internal fun String.normalizeDefaultModifierForLezer(): String {
   val keyword = "default"
   // `private` 与 `default` 同为 7 个字符，CST modifier span 才能完整覆盖原关键字。
   val replacement = "private"

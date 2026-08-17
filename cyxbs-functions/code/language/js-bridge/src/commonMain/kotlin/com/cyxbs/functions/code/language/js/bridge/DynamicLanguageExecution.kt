@@ -36,6 +36,33 @@ data class DynamicCompilationRequest(
   val entry: DynamicProgramEntry,
 )
 
+/** 动态编译本次采用的缓存路径。 */
+@Serializable
+enum class DynamicCompilationCacheMode {
+  /** 工作区没有可复用快照，语法与后续编译阶段均从头计算。 */
+  FULL,
+
+  /** 文件集合相同但源码变化，语言包至少复用了未受影响的增量语法树片段。 */
+  INCREMENTAL,
+
+  /** 工作区与入口完全相同，直接复用已完成的编译结果。 */
+  EXACT,
+}
+
+/**
+ * 一次语言包内部编译的轻量指标。
+ *
+ * [totalMicroseconds] 不包含 npm bridge 序列化和端上 Runtime 执行时间；客户端可将它与调用侧耗时
+ * 对照，区分语言编译与跨 Runtime 调用成本。
+ */
+@Serializable
+data class DynamicCompilationMetrics(
+  val cacheMode: DynamicCompilationCacheMode,
+  val workspaceFileCount: Int,
+  val sourceLength: Int,
+  val totalMicroseconds: Long,
+)
+
 /** 动态编译诊断严重程度。 */
 @Serializable
 enum class DynamicCompilationDiagnosticSeverity {
@@ -108,4 +135,5 @@ data class DynamicExecutableProgram(
 data class DynamicCompilationResult(
   val program: DynamicExecutableProgram? = null,
   val diagnostics: List<DynamicCompilationDiagnostic> = emptyList(),
+  val metrics: DynamicCompilationMetrics? = null,
 )

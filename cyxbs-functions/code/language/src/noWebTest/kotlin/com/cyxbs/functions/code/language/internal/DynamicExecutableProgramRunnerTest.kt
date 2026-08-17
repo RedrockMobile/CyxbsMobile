@@ -2,7 +2,10 @@ package com.cyxbs.functions.code.language.internal
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableModule
 import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
+import com.cyxbs.functions.code.language.js.bridge.DynamicGeneratedSourceMapping
 import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
+import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
 import com.cyxbs.functions.code.language.DynamicProgramOutputChannel
 import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
@@ -10,6 +13,8 @@ import com.cyxbs.functions.code.language.DynamicProgramRunResult
 import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
+import com.cyxbs.functions.code.js.runtime.JsRuntimeErrorKind
+import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -269,6 +274,98 @@ class DynamicExecutableProgramRunnerTest {
     assertEquals(0, result.droppedOutputBytes)
   }
 
+  /** Runtime 生成位置应沿稀疏 mapping 恢复到最接近的原始源码区间。 */
+  @Test
+  fun mapsRuntimeFailureBackToDynamicSourceFrames() = runTest {
+    val failure = JsRuntimeException(
+      kind = JsRuntimeErrorKind.RUNTIME_ERROR,
+      message = "boom",
+      fileName = "lesson/main.mjs",
+      lineNumber = 5,
+      columnNumber = 3,
+      jsStack = "at run (lesson/main.mjs:5:3)",
+    )
+    val factory = FakeRuntimeFactory(emitConsole = false, runtimeFailure = failure)
+    val sourceLocation = DynamicSourceLocation("Main.java", DynamicTextRange(24, 40))
+    val program = DynamicExecutableProgram(
+      entryModuleName = "lesson/main.mjs",
+      entryExportName = "runLesson",
+      modules = listOf(
+        DynamicExecutableModule(
+          name = "lesson/main.mjs",
+          source = "export function runLesson(){ throw new Error('boom'); }",
+          sourceMappings = listOf(
+            DynamicGeneratedSourceMapping(2, 0, DynamicSourceLocation("Main.java", DynamicTextRange(0, 10))),
+            DynamicGeneratedSourceMapping(4, 0, sourceLocation),
+          ),
+        ),
+      ),
+    )
+
+    val mapped = assertFailsWith<DynamicLanguageExecutionException> {
+      DynamicExecutableProgramRunner { factory }.run(
+        program = program,
+        arguments = emptyList(),
+        config = JsRuntimeConfig(),
+        maxOutputBytes = 1_024,
+      )
+    }
+
+    assertEquals(sourceLocation, mapped.sourceFrames.single().sourceLocation)
+    assertTrue(mapped.message.orEmpty().contains("Main.java"))
+    assertTrue(mapped.cause === failure)
+  }
+
+  /** 生成源码配额必须在创建 Runtime 前拒绝异常 Module 图。 */
+  @Test
+  fun rejectsOversizedGeneratedProgramBeforeCreatingRuntime() = runTest {
+    val factory = FakeRuntimeFactory(emitConsole = false)
+
+    val failure = assertFailsWith<DynamicLanguageExecutionException> {
+      DynamicExecutableProgramRunner { factory }.run(
+        program = program(),
+        arguments = emptyList(),
+        config = JsRuntimeConfig(),
+        maxOutputBytes = 1_024,
+        maxProgramSourceBytes = 8,
+      )
+    }
+
+    assertTrue(failure.message.orEmpty().contains("oversized"))
+    assertTrue(factory.runtimes.isEmpty())
+  }
+
+  /** 损坏的动态源码区间必须在进入 Runtime 前拒绝，不能把负偏移传给编辑器导航。 */
+  @Test
+  fun rejectsInvalidGeneratedSourceMappingBeforeCreatingRuntime() = runTest {
+    val factory = FakeRuntimeFactory(emitConsole = false)
+    val invalidProgram = program().copy(
+      modules = listOf(
+        program().modules.single().copy(
+          sourceMappings = listOf(
+            DynamicGeneratedSourceMapping(
+              generatedLine = 1,
+              generatedColumn = 0,
+              sourceLocation = DynamicSourceLocation("Main.java", DynamicTextRange(-1, 0)),
+            ),
+          ),
+        ),
+      ),
+    )
+
+    val failure = assertFailsWith<DynamicLanguageExecutionException> {
+      DynamicExecutableProgramRunner { factory }.run(
+        program = invalidProgram,
+        arguments = emptyList(),
+        config = JsRuntimeConfig(),
+        maxOutputBytes = 1_024,
+      )
+    }
+
+    assertTrue(failure.message.orEmpty().contains("source mapping"))
+    assertTrue(factory.runtimes.isEmpty())
+  }
+
   /** 创建各测试共用的最小合法 Module 图。 */
   private fun program(): DynamicExecutableProgram = DynamicExecutableProgram(
     entryModuleName = "lesson/main.mjs",
@@ -287,6 +384,7 @@ class DynamicExecutableProgramRunnerTest {
     private val hostOutput: List<Pair<String, String>> = emptyList(),
     private val hostBase64Output: List<Pair<String, String>> = emptyList(),
     private val readStandardInput: Boolean = false,
+    private val runtimeFailure: JsRuntimeException? = null,
   ) : JsRuntimeFactory {
     lateinit var options: JsRuntimeOptions
     val runtimes = mutableListOf<FakeRuntime>()
@@ -299,6 +397,7 @@ class DynamicExecutableProgramRunnerTest {
         hostOutput = hostOutput,
         hostBase64Output = hostBase64Output,
         readStandardInput = readStandardInput,
+        runtimeFailure = runtimeFailure,
       ).also(runtimes::add)
     }
   }
@@ -309,6 +408,7 @@ class DynamicExecutableProgramRunnerTest {
     private val hostOutput: List<Pair<String, String>>,
     private val hostBase64Output: List<Pair<String, String>>,
     private val readStandardInput: Boolean,
+    private val runtimeFailure: JsRuntimeException?,
   ) : JsRuntime {
     override var isClosed: Boolean = false
       private set
@@ -326,6 +426,7 @@ class DynamicExecutableProgramRunnerTest {
       return if (code == DynamicProgramHostAbi.OUTPUT_BRIDGE_SOURCE) {
         null
       } else if (asModule) {
+        runtimeFailure?.let { throw it }
         if (emitConsole) {
           emitRawText(DynamicProgramHostAbi.WRITE_STANDARD_OUTPUT_UTF8_BASE64_CHUNK, "value 42\n")
         }

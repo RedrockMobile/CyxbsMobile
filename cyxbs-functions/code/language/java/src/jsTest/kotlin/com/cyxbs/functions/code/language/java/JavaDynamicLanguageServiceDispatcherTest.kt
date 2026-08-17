@@ -1,11 +1,14 @@
 package com.cyxbs.functions.code.language.java
 
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompletionResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationCacheMode
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
@@ -714,6 +717,50 @@ class JavaDynamicLanguageServiceDispatcherTest {
 
     assertEquals(listOf("lesson.Counter.main", "lesson.Main.main"), targets.map { it.displayName }.sorted())
     assertTrue(targets.all { target -> target.location != null && target.entry.position != null })
+  }
+
+  /** 完全相同的运行请求应命中结果缓存，改动源码则复用独立编译语法树的增量片段。 */
+  @Test
+  fun cachesCompilationAndReportsIncrementalRebuilds() = runTest {
+    fun request(returnValue: Int) = DynamicCompilationRequest(
+      workspace = DynamicLanguageWorkspace(
+        listOf(
+          DynamicSourceFile(
+            "CacheMetrics.java",
+            "class CacheMetrics { static int run() { return $returnValue; } }",
+          ),
+        ),
+      ),
+      entry = DynamicProgramEntry("CacheMetrics.java", position = 32),
+    )
+
+    val first = JavaDynamicLanguageService.compile(request(1))
+    val exact = JavaDynamicLanguageService.compile(request(1))
+    val changed = JavaDynamicLanguageService.compile(request(2))
+
+    assertNotNull(first.program)
+    assertTrue(first.metrics?.cacheMode != DynamicCompilationCacheMode.EXACT)
+    assertEquals(DynamicCompilationCacheMode.EXACT, exact.metrics?.cacheMode)
+    assertEquals(0, exact.metrics?.totalMicroseconds)
+    assertEquals(DynamicCompilationCacheMode.INCREMENTAL, changed.metrics?.cacheMode)
+    assertNotNull(changed.program)
+  }
+
+  /** 超过语言包上限的工作区必须在 parser 前返回结构化诊断。 */
+  @Test
+  fun rejectsCompilationWorkspaceOverFileLimit() = runTest {
+    val files = List(129) { index ->
+      DynamicSourceFile("Limit$index.java", "class Limit$index {}")
+    }
+    val result = JavaDynamicLanguageService.compile(
+      DynamicCompilationRequest(
+        workspace = DynamicLanguageWorkspace(files),
+        entry = DynamicProgramEntry(files.first().path),
+      ),
+    )
+
+    assertNull(result.program)
+    assertEquals("java.compilation.too_many_files", result.diagnostics.single().code)
   }
 
   /** 生成分发器应完整暴露 DynamicLanguageService 协议并支持重复初始化。 */

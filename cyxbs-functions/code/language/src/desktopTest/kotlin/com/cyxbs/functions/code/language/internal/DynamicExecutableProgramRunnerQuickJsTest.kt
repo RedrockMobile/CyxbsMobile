@@ -1,16 +1,21 @@
 package com.cyxbs.functions.code.language.internal
 
-import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableModule
-import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
-import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
-import com.cyxbs.functions.code.language.DynamicProgramOutputChannel
-import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
+import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
+import com.cyxbs.functions.code.language.DynamicProgramOutputChannel
+import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
+import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableModule
+import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
+import com.cyxbs.functions.code.language.js.bridge.DynamicGeneratedSourceMapping
+import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
+import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /** 使用真实 QuickJS 验证统一 Module 图、宿主入口和 console bridge。 */
 class DynamicExecutableProgramRunnerQuickJsTest {
@@ -71,6 +76,46 @@ class DynamicExecutableProgramRunnerQuickJsTest {
       ),
       events,
     )
+  }
+
+  /** 真实 QuickJS 的模块栈应通过稀疏映射还原为动态语言源码位置。 */
+  @Test
+  fun mapsQuickJsFailureBackToDynamicSource() = runTest {
+    val failure = assertFailsWith<DynamicLanguageExecutionException> {
+      DynamicExecutableProgramRunner { QuickJsRuntimeFactory }.run(
+        program = DynamicExecutableProgram(
+          entryModuleName = "lesson/failure.mjs",
+          entryExportName = "runLesson",
+          modules = listOf(
+            DynamicExecutableModule(
+              name = "lesson/failure.mjs",
+              source = """
+                export function runLesson() {
+                  const value = 1;
+                  throw new Error("mapped failure: " + value);
+                }
+              """.trimIndent(),
+              sourceMappings = listOf(
+                DynamicGeneratedSourceMapping(
+                  generatedLine = 3,
+                  generatedColumn = 2,
+                  sourceLocation = DynamicSourceLocation(
+                    filePath = "src/Main.java",
+                    range = DynamicTextRange(from = 48, to = 62),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        arguments = emptyList(),
+        config = JsRuntimeConfig(evaluationTimeoutMillis = 2_000),
+        maxOutputBytes = 1_024,
+      )
+    }
+
+    assertEquals("src/Main.java", failure.sourceFrames.first().sourceLocation.filePath)
+    assertEquals(48, failure.sourceFrames.first().sourceLocation.range.from)
   }
 
   /**

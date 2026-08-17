@@ -4,7 +4,7 @@ plugins {
   id("manager.npmJs")
 }
 
-version = "0.1.0"
+version = "0.2.0"
 
 npmJsPackage {
   packageName.set("@cyxbs-mobile/language-java")

@@ -5,6 +5,7 @@ import com.cyxbs.functions.code.language.DynamicProgramOutputChannel
 import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
 import com.cyxbs.functions.code.language.DynamicProgramOutputSink
 import com.cyxbs.functions.code.language.DynamicProgramRunOptions
+import com.cyxbs.functions.code.language.DynamicProgramSourceFrame
 import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
 import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
 import com.cyxbs.functions.code.js.runtime.JsModuleLoader
@@ -55,8 +56,9 @@ internal class DynamicExecutableProgramRunner(
     maxOutputBytes: Long,
     standardInput: String = "",
     maxInputBytes: Long = DynamicProgramRunOptions.DEFAULT_MAX_INPUT_BYTES,
+    maxProgramSourceBytes: Long = DynamicProgramRunOptions.DEFAULT_MAX_PROGRAM_SOURCE_BYTES,
   ): DynamicProgramExecution {
-    validateProgram(program)
+    validateProgram(program, maxProgramSourceBytes)
     validateStandardInput(standardInput, maxInputBytes)
     val runtimeFactory = runtimeFactoryProvider()
       ?: throw DynamicLanguageExecutionException(
@@ -97,10 +99,7 @@ internal class DynamicExecutableProgramRunner(
       throw exception
     } catch (exception: JsRuntimeException) {
       primaryFailure = exception
-      throw DynamicLanguageExecutionException(
-        message = "Dynamic program execution failed.",
-        cause = exception,
-      )
+      throw exception.toDynamicExecutionException(program)
     } catch (exception: Throwable) {
       primaryFailure = exception
       throw DynamicLanguageExecutionException(
@@ -181,10 +180,12 @@ internal class DynamicExecutableProgramRunner(
   }
 
   /** 在进入具体引擎前拒绝损坏或带注入风险的语言包产物。 */
-  private fun validateProgram(program: DynamicExecutableProgram) {
+  private fun validateProgram(program: DynamicExecutableProgram, maxProgramSourceBytes: Long) {
+    require(maxProgramSourceBytes >= 0) { "maxProgramSourceBytes must not be negative." }
     val names = program.modules.map { module -> module.name }
     if (
       names.isEmpty() ||
+      names.size > MAX_PROGRAM_MODULES ||
       names.distinct().size != names.size ||
       program.entryModuleName !in names ||
       names.any { name -> !name.isSafeModuleName() } ||
@@ -194,6 +195,86 @@ internal class DynamicExecutableProgramRunner(
         "The language package returned an invalid executable Module graph.",
       )
     }
+    var sourceBytes = 0L
+    program.modules.forEach { module ->
+      if (module.source.validateUtf8WithinLimit(maxProgramSourceBytes) != StandardInputValidation.VALID) {
+        throw DynamicLanguageExecutionException(
+          "The language package returned invalid or oversized generated Module source.",
+        )
+      }
+      sourceBytes += module.source.encodeToByteArray().size
+      if (sourceBytes > maxProgramSourceBytes) {
+        throw DynamicLanguageExecutionException(
+          "The generated Module graph exceeds the configured UTF-8 source limit of " +
+            "$maxProgramSourceBytes bytes.",
+        )
+      }
+      if (module.sourceMappings.any { mapping ->
+          mapping.generatedLine < 1 || mapping.generatedColumn < 0 ||
+            mapping.sourceLocation.filePath.isEmpty() ||
+            mapping.sourceLocation.range.from < 0 ||
+            mapping.sourceLocation.range.to < mapping.sourceLocation.range.from
+        }
+      ) {
+        throw DynamicLanguageExecutionException(
+          "The language package returned an invalid generated source mapping.",
+        )
+      }
+    }
+  }
+
+  /**
+   * 使用语言包随 Module 返回的稀疏映射，把 QuickJS 首帧和调用栈位置恢复为源码区间。
+   *
+   * 映射选择同一生成位置之前最近的一项；找不到模块、位置或映射时保留原始 Runtime 异常，不能
+   * 猜测源码文件。QuickJS 列号按一基处理，公共映射列统一为零基。
+   */
+  private fun JsRuntimeException.toDynamicExecutionException(
+    program: DynamicExecutableProgram,
+  ): DynamicLanguageExecutionException {
+    val generatedFrames = buildList {
+      val directFileName = fileName
+      val directLineNumber = lineNumber
+      if (directFileName != null && directLineNumber != null) {
+        add(GeneratedRuntimeFrame(directFileName, directLineNumber, (columnNumber ?: 1).coerceAtLeast(1) - 1))
+      }
+      jsStack.orEmpty().lineSequence().forEach { line ->
+        val match = STACK_LOCATION.find(line) ?: return@forEach
+        add(
+          GeneratedRuntimeFrame(
+            moduleName = match.groupValues[1],
+            line = match.groupValues[2].toIntOrNull() ?: return@forEach,
+            column = ((match.groupValues[3].toIntOrNull() ?: 1).coerceAtLeast(1) - 1),
+          ),
+        )
+      }
+    }.distinct()
+    val sourceFrames = generatedFrames.mapNotNull { frame ->
+      val module = program.modules.firstOrNull { it.name == frame.moduleName } ?: return@mapNotNull null
+      val mapping = module.sourceMappings
+        .asSequence()
+        .filter { it.generatedLine < frame.line ||
+          (it.generatedLine == frame.line && it.generatedColumn <= frame.column)
+        }
+        .maxWithOrNull(compareBy({ it.generatedLine }, { it.generatedColumn }))
+        ?: return@mapNotNull null
+      DynamicProgramSourceFrame(
+        generatedModuleName = frame.moduleName,
+        generatedLine = frame.line,
+        generatedColumn = frame.column,
+        sourceLocation = mapping.sourceLocation,
+      )
+    }
+    val firstSource = sourceFrames.firstOrNull()?.sourceLocation?.filePath
+    return DynamicLanguageExecutionException(
+      message = if (firstSource == null) {
+        "Dynamic program execution failed."
+      } else {
+        "Dynamic program execution failed in $firstSource."
+      },
+      cause = this,
+      sourceFrames = sourceFrames,
+    )
   }
 
   /**
@@ -254,8 +335,17 @@ internal class DynamicExecutableProgramRunner(
   private companion object {
     val JS_IDENTIFIER = Regex("[A-Za-z_$][A-Za-z0-9_$]*")
     const val INVALID_MODULE_PREFIX = "__cyxbs_invalid_module__/"
+    const val MAX_PROGRAM_MODULES = 256
+    val STACK_LOCATION = Regex("([^\\s()]+):(\\d+):(\\d+)")
   }
 }
+
+/** QuickJS 栈中的生成模块位置；列已经统一成零基。 */
+private data class GeneratedRuntimeFrame(
+  val moduleName: String,
+  val line: Int,
+  val column: Int,
+)
 
 /**
  * 在单次执行内聚合控制台和语言 intrinsic 输出，并限制其占用的 UTF-8 字节数。

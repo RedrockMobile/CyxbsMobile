@@ -6,6 +6,8 @@ import com.cyxbs.functions.code.language.java.compiler.frontend.JavaLezerAstFron
 import com.cyxbs.functions.code.language.java.compiler.lowering.JavaAstToIrLowerer
 import com.cyxbs.functions.code.language.java.compiler.semantic.impl.JavaSemanticAnalyzerImpl
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspace
+import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
+import com.cyxbs.functions.code.language.lezer.LezerTree
 
 /**
  * Stage1 Java 源码到纯 ES Module 的默认编译入口。
@@ -41,4 +43,24 @@ internal object JavaToJavaScriptCompiler {
     workspace: JavaSourceWorkspace,
     entryPoint: JavaCompilerSourceEntryPoint,
   ): JavaCompilerPhaseResult<JavaScriptProgramArtifact> = pipeline.compile(workspace, entryPoint)
+
+  /**
+   * 使用编辑器会话已维护的增量 Lezer 树编译工作区。
+   *
+   * 只有 CST 构建复用 [syntaxTree]；语义分析、typed IR 与代码生成仍针对当前完整工作区重新执行，
+   * 避免跨文件符号变化留下陈旧 binding。
+   */
+  fun compile(
+    workspace: JavaSourceWorkspace,
+    entryPoint: JavaCompilerSourceEntryPoint,
+    syntaxTree: (JavaSourceFile) -> LezerTree,
+  ): JavaCompilerPhaseResult<JavaScriptProgramArtifact> {
+    val incrementalPipeline = JavaCompilerPipeline(
+      frontend = JavaAstFrontend { current -> JavaLezerAstFrontend.parse(current, syntaxTree) },
+      semanticAnalyzer = JavaSemanticAnalyzerImpl,
+      lowerer = JavaAstToIrLowerer,
+      backend = JavaScriptBackendImpl,
+    )
+    return incrementalPipeline.compile(workspace, entryPoint)
+  }
 }

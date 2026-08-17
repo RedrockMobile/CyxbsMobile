@@ -1,15 +1,5 @@
 package com.cyxbs.functions.code.editor.preview
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -17,6 +7,16 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,9 +27,9 @@ import com.cyxbs.functions.code.editor.highlight.CodeEditor
 import com.cyxbs.functions.code.editor.highlight.DEFAULT_HIGHLIGHT_CACHE_CAPACITY
 import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
 import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
+import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
-import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
 import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
@@ -39,6 +39,7 @@ import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
 import com.cyxbs.functions.code.editor.workbench.rememberCodeEditorWorkbenchState
 import com.cyxbs.functions.code.editor.workbench.rememberDynamicLanguageFileIconCache
 import com.cyxbs.functions.code.editor.workbench.resolveDynamicLanguageIdForFile
+import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
 import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.cyxbs.functions.code.language.DynamicLanguageManager
 import com.cyxbs.functions.code.language.DynamicLanguageSession
@@ -587,6 +588,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
   /** 将统一动态语言运行结果整理成输出面板可直接阅读的文本。 */
   private fun DynamicProgramRunResult.toDisplayText(target: DynamicRunTarget): String = buildString {
+    compilationMetrics?.let { metrics ->
+      append("编译：").append(metrics.cacheMode)
+        .append(" ｜ ").append(metrics.totalMicroseconds / 1_000.0).appendLine(" ms")
+    }
     if (standardOutput.isNotEmpty()) append(standardOutput)
     if (standardError.isNotEmpty()) {
       if (isNotEmpty() && last() != '\n') appendLine()
@@ -656,6 +661,13 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   private fun Throwable.toFailureText(title: String): String = buildString {
     append(title).append("：").appendLine(this@toFailureText::class.simpleName)
     append(message ?: "未提供错误信息")
+    (this@toFailureText as? DynamicLanguageExecutionException)?.sourceFrames
+      ?.take(MAX_DISPLAYED_SOURCE_FRAMES)
+      ?.forEach { frame ->
+        append("\n  at ").append(frame.sourceLocation.filePath)
+          .append(" [").append(frame.sourceLocation.range.from)
+          .append("..").append(frame.sourceLocation.range.to).append(']')
+      }
     cause?.takeIf { it !== this@toFailureText }?.let { cause ->
       append("\n根因：").append(cause::class.simpleName).append(": ").append(cause.message)
     }
@@ -680,6 +692,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
   private companion object {
     const val DISPLAY_RESULT_LIMIT = 12
+    const val MAX_DISPLAYED_SOURCE_FRAMES = 8
     const val MICROSECONDS_PER_MILLISECOND = 1_000
     const val AUTO_HIGHLIGHT_DELAY_MILLIS = 200L
     const val RUN_TARGET_REFRESH_DELAY_MILLIS = 150L

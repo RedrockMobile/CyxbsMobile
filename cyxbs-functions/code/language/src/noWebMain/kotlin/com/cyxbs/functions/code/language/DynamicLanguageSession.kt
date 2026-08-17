@@ -3,8 +3,10 @@ package com.cyxbs.functions.code.language
 import com.cyxbs.functions.code.language.internal.DynamicExecutableProgramRunner
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnosticSeverity
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
@@ -55,6 +57,13 @@ data class DynamicProgramRunOptions(
    * [DynamicProgramRunRequest.standardInput]，不改变入口 [DynamicProgramRunRequest.arguments]。
    */
   val maxInputBytes: Long = DEFAULT_MAX_INPUT_BYTES,
+  /**
+   * 语言包生成的完整 ES Module 图允许占用的最大 UTF-8 字节数。
+   *
+   * 该限制在创建用户 Runtime 前执行，防止损坏或不受信任的动态语言包返回超大源码绕过运行时
+   * 内存限制。它不约束编辑器中的原始源码，语言包应在编译阶段单独限制输入规模。
+   */
+  val maxProgramSourceBytes: Long = DEFAULT_MAX_PROGRAM_SOURCE_BYTES,
 ) {
   init {
     require(maxStackSizeBytes > 0) { "maxStackSizeBytes must be greater than 0." }
@@ -63,6 +72,7 @@ data class DynamicProgramRunOptions(
     }
     require(maxOutputBytes >= 0) { "maxOutputBytes must not be negative." }
     require(maxInputBytes >= 0) { "maxInputBytes must not be negative." }
+    require(maxProgramSourceBytes >= 0) { "maxProgramSourceBytes must not be negative." }
   }
 
   companion object {
@@ -71,6 +81,9 @@ data class DynamicProgramRunOptions(
 
     /** 默认允许预加载 64 KiB 标准输入，覆盖教学用例并限制复制到 JS Runtime 的文本大小。 */
     const val DEFAULT_MAX_INPUT_BYTES: Long = 64L * 1024L
+
+    /** 默认允许 4 MiB 生成源码，覆盖教学工作区并阻止异常 Module 图占满宿主内存。 */
+    const val DEFAULT_MAX_PROGRAM_SOURCE_BYTES: Long = 4L * 1024L * 1024L
   }
 }
 
@@ -121,6 +134,8 @@ data class DynamicProgramRunResult(
   val outputTruncated: Boolean = false,
   /** 因输出上限未被保留或通知给 sink 的 UTF-8 字节数。 */
   val droppedOutputBytes: Long = 0,
+  /** 语言包返回的本次编译缓存路径和耗时；旧语言包未提供时为空。 */
+  val compilationMetrics: DynamicCompilationMetrics? = null,
 )
 
 /**
@@ -165,6 +180,7 @@ class DynamicLanguageSession internal constructor(
       return DynamicProgramRunResult(
         executed = false,
         diagnostics = compilation.diagnostics,
+        compilationMetrics = compilation.metrics,
       )
     }
     val program = compilation.program ?: throw DynamicLanguageExecutionException(
@@ -182,6 +198,7 @@ class DynamicLanguageSession internal constructor(
       maxOutputBytes = options.maxOutputBytes,
       standardInput = request.standardInput,
       maxInputBytes = options.maxInputBytes,
+      maxProgramSourceBytes = options.maxProgramSourceBytes,
     )
     return DynamicProgramRunResult(
       executed = true,
@@ -191,16 +208,28 @@ class DynamicLanguageSession internal constructor(
       outputTruncated = execution.outputTruncated,
       droppedOutputBytes = execution.droppedOutputBytes,
       diagnostics = compilation.diagnostics,
+      compilationMetrics = compilation.metrics,
     )
   }
 }
+
+/** 一帧由生成 JavaScript 位置还原到动态语言源码的位置。 */
+data class DynamicProgramSourceFrame(
+  val generatedModuleName: String,
+  val generatedLine: Int,
+  val generatedColumn: Int,
+  val sourceLocation: DynamicSourceLocation,
+)
 
 /**
  * 动态语言用户程序执行失败。
  *
  * 该异常隐藏 QuickJS 等具体引擎类型；底层 [JsRuntimeException] 仅通过 cause 保留用于诊断。
+ * 语言包提供生成源码映射且引擎返回位置时，[sourceFrames] 可直接用于编辑器导航。
  */
 class DynamicLanguageExecutionException(
   message: String,
   cause: Throwable? = null,
+  /** 按 JavaScript 调用栈顺序排列；语言包未提供映射或引擎未返回位置时为空。 */
+  val sourceFrames: List<DynamicProgramSourceFrame> = emptyList(),
 ) : RuntimeException(message, cause)
