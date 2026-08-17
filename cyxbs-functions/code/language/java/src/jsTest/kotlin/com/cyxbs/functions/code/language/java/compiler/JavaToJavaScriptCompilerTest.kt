@@ -1655,6 +1655,96 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(1, executeEntryValue(artifact, null) as Int)
   }
 
+  /** enum 常量初始化、标准方法、switch 与 values 防御性数组必须贯穿完整编译执行链。 */
+  @Test
+  fun compilesAndExecutesEnums() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/Main.java" to """
+        package demo;
+        interface Coded { int code(); }
+        enum Color implements Coded {
+          RED(1), GREEN(2), BLUE(3);
+          private final int code;
+          private final String label;
+          private Color(int code) {
+            this.code = code;
+            this.label = name() + ":" + ordinal();
+          }
+          public int code() { return code; }
+          int labelLength() { return label.length(); }
+        }
+        class Main {
+          static int run(int mode) {
+            if (mode == 1) {
+              Color[] first = Color.values();
+              first[0] = Color.BLUE;
+              if (Color.values()[0] == Color.RED) return 1;
+              return 0;
+            }
+            if (mode == 2) {
+              try {
+                Color.valueOf("MISSING");
+                return 0;
+              } catch (IllegalArgumentException expected) {
+                return 2;
+              }
+            }
+            Color selected = Color.valueOf("GREEN");
+            Coded view = selected;
+            int value = selected.ordinal() * 100 + selected.name().length() * 10 +
+              Color.values().length + selected.labelLength();
+            switch (selected) {
+              case RED: return -1;
+              case GREEN: value += view.code(); break;
+              default: return -2;
+            }
+            return value;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(162, executeEntry(artifact, 0))
+    assertEquals(1, executeEntry(artifact, 1))
+    assertEquals(2, executeEntry(artifact, 2))
+  }
+
+  /** enum 只能由声明常量实例化，且构造器不能公开。 */
+  @Test
+  fun rejectsDirectEnumInstantiationAndPublicConstructor() {
+    val directNew = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        enum Color { RED; }
+        class Main { static int run() { Color value = new Color(); return 0; } }
+      """.trimIndent(),
+    )
+    assertTrue(directNew.value == null)
+    assertTrue(directNew.diagnostics.any { it.code == "java.semantic.enum_instantiation_forbidden" })
+
+    val publicConstructor = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        enum Color { RED; public Color() { } }
+        class Main { static int run() { return 0; } }
+      """.trimIndent(),
+    )
+    assertTrue(publicConstructor.value == null)
+    assertTrue(publicConstructor.diagnostics.any {
+      it.code == "java.semantic.invalid_enum_constructor_visibility"
+    })
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

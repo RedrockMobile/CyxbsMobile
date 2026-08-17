@@ -12,6 +12,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCatchClause
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstCompilationUnit
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstEnumConstant
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstImport
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLiteralKind
@@ -158,18 +159,27 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val kind = when (node.name) {
       "ClassDeclaration" -> JavaAstTypeDeclarationKind.CLASS
       "InterfaceDeclaration" -> JavaAstTypeDeclarationKind.INTERFACE
-      else -> unsupported(node, "阶段 1 仅支持 class 和 interface。")
+      "EnumDeclaration" -> JavaAstTypeDeclarationKind.ENUM
+      else -> unsupported(node, "阶段 2A 仅支持 class、interface 和 enum。")
     }
     val definition = node.children().firstOrNull { it.name == "Definition" } ?: unsupported(node, "class 缺少名称。")
     val body = node.children().firstOrNull {
-      it.name == "ClassBody" || it.name == "InterfaceBody"
+      it.name == "ClassBody" || it.name == "InterfaceBody" || it.name == "EnumBody"
     } ?: unsupported(node, "类型缺少主体。")
     val modifiers = node.modifiersBefore(definition, TYPE_MODIFIERS, "类型")
     rejectAnnotationsBefore(node, definition, "类型")
     node.descendants().firstOrNull { it.name in UNSUPPORTED_NODES }?.let {
       unsupported(it, "阶段 1 不支持 Java 8 之外的语法。")
     }
-    val members = body.children().mapNotNull { child ->
+    val enumConstantPairs = if (kind == JavaAstTypeDeclarationKind.ENUM) {
+      body.children().filter { it.name == "EnumConstant" }.mapIndexed { ordinal, constant ->
+        enumConstant(constant, text(definition), ordinal)
+      }
+    } else emptyList()
+    val memberNodes = if (kind == JavaAstTypeDeclarationKind.ENUM) {
+      body.children().firstOrNull { it.name == "EnumBodyDeclarations" }?.children().orEmpty()
+    } else body.children()
+    val members = enumConstantPairs.map { it.second } + memberNodes.mapNotNull { child ->
       when {
         child.name in MEMBER_NODES -> member(child, kind)
         child.name == "{" || child.name == "}" || child.name == ";" || child.trivia() -> null
@@ -186,7 +196,40 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       node.children().firstOrNull { it.name == "Superclass" }?.onlyTypeReference(),
       node.children().firstOrNull { it.name in INTERFACE_CLAUSES }?.typeReferences().orEmpty(),
       members,
+      enumConstantPairs.map { it.first },
     )
+  }
+
+  /**
+   * 将 enum 常量规范化为同类型的 public static final 字段初始化器。
+   *
+   * 常量参数仍是普通 NewObject 参数，因而构造器 overload 与求值顺序无需另建分支；常量专属
+   * ClassBody 会改变运行时类型和 override 语义，本批明确拒绝而不静默擦除。
+   */
+  private fun enumConstant(
+    node: LezerSyntaxNode,
+    ownerName: String,
+    ordinal: Int,
+  ): Pair<JavaAstEnumConstant, JavaAstMemberDeclaration.Field> {
+    node.children().firstOrNull { it.name == "ClassBody" }?.let {
+      unsupported(it, "阶段 2A 当前不支持带专属 class body 的 enum 常量。")
+    }
+    val definition = node.children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(node, "enum 常量缺少名称。")
+    val constantName = text(definition)
+    val type = JavaAstTypeReference.Named(ids.next(), span(definition), ownerName, emptyList())
+    val arguments = node.children().firstOrNull { it.name == "ArgumentList" }
+      ?.expressions()?.map(::expression).orEmpty()
+    val initializer = JavaAstExpression.NewObject(ids.next(), span(node), type, arguments)
+    val declarator = JavaAstVariableDeclarator(ids.next(), span(node), constantName, initializer)
+    val field = JavaAstMemberDeclaration.Field(
+      ids.next(),
+      span(node),
+      setOf(JavaAstModifier.PUBLIC, JavaAstModifier.STATIC, JavaAstModifier.FINAL),
+      type,
+      listOf(declarator),
+    )
+    return JavaAstEnumConstant(ids.next(), span(node), constantName, ordinal, declarator.nodeId) to field
   }
 
   /** 构建字段、构造器或实例/static 方法；成员类别由 class body 的直接 child 决定。 */
@@ -225,7 +268,8 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     }
     val bodyNode = node.children().firstOrNull { it.name == "Block" }
     when (ownerKind) {
-      JavaAstTypeDeclarationKind.CLASS -> {
+      JavaAstTypeDeclarationKind.CLASS,
+      JavaAstTypeDeclarationKind.ENUM -> {
         if (bodyNode == null && JavaAstModifier.ABSTRACT !in modifiers) {
           unsupported(node, "class 中的非 abstract 方法必须有 block 方法体。")
         }
@@ -249,8 +293,6 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
           unsupported(bodyNode, "abstract interface 方法不能提供方法体。")
         }
       }
-      JavaAstTypeDeclarationKind.ENUM ->
-        unsupported(node, "enum 方法将在阶段 2A 后续批次开放。")
     }
     val parameters = node.descendants().filter { it.name == "FormalParameter" }
       .filter { it.nearest("MethodDeclaration") === node }.map(::parameter)

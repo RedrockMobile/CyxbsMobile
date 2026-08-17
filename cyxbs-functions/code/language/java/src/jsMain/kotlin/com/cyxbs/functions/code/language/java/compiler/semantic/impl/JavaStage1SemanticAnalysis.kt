@@ -50,6 +50,18 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val resourceCloseBindings = linkedMapOf<JavaNodeId, JavaResourceCloseBinding>()
   private val lambdaBindings = linkedMapOf<JavaNodeId, JavaLambdaBinding>()
   private val methodReferenceBindings = linkedMapOf<JavaNodeId, JavaMethodReferenceBinding>()
+  private val enumConstants = linkedMapOf<JavaSymbolId, JavaEnumConstantBinding>()
+  private val enumBuiltinCallables = linkedMapOf<JavaSymbolId, JavaEnumBuiltinOperation>()
+  private val enumSwitchSelectors = linkedSetOf<JavaNodeId>()
+  private val enumSwitchLabels = linkedMapOf<JavaNodeId, Int>()
+  private val enumConstantInitializerNodes: Set<JavaNodeId> by lazy {
+    ast.units.flatMap { it.types }.flatMap { declaration ->
+      val constantDeclarators = declaration.enumConstants.map { it.fieldDeclaratorNodeId }.toSet()
+      declaration.members.filterIsInstance<JavaAstMemberDeclaration.Field>()
+        .flatMap { it.declarators }.filter { it.nodeId in constantDeclarators }
+        .mapNotNull { it.initializer?.nodeId }
+    }.toSet()
+  }
 
   private val typesByQualifiedName = linkedMapOf<String, S1TypeInfo>()
   private val typesByNode = linkedMapOf<JavaNodeId, S1TypeInfo>()
@@ -367,11 +379,13 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         error(it.span, "java.semantic.static_import_unsupported", "Stage1 暂不支持 static import。")
       }
       unit.types.forEach { declaration ->
-        if (declaration.kind == JavaAstTypeDeclarationKind.ENUM) {
+        if (declaration.kind == JavaAstTypeDeclarationKind.ENUM &&
+          declaration.modifiers.any { it == JavaAstModifier.ABSTRACT || it == JavaAstModifier.FINAL }
+        ) {
           error(
             declaration.span,
-            "java.semantic.type_kind_unsupported",
-            "enum 将在阶段 2A 后续批次开放。",
+            "java.semantic.invalid_enum_modifier",
+            "enum 已隐式 final，不能显式声明 abstract 或 final。",
           )
         }
         if (declaration.modifiers.any {
@@ -440,7 +454,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
             JavaAstTypeDeclarationKind.ENUM -> JavaSemanticTypeDeclarationKind.ENUM
           },
           visibility(declaration.modifiers),
-          JavaAstModifier.FINAL in declaration.modifiers,
+          declaration.kind == JavaAstTypeDeclarationKind.ENUM ||
+            JavaAstModifier.FINAL in declaration.modifiers,
           declaration.kind == JavaAstTypeDeclarationKind.INTERFACE ||
             JavaAstModifier.ABSTRACT in declaration.modifiers,
         )
@@ -663,9 +678,25 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           is JavaAstMemberDeclaration.Constructor -> declareCallable(owner, member)
         }
       }
-      if (owner.kind == JavaSemanticTypeDeclarationKind.CLASS &&
+      if (owner.kind in setOf(
+          JavaSemanticTypeDeclarationKind.CLASS,
+          JavaSemanticTypeDeclarationKind.ENUM,
+        ) &&
         constructorsByOwner[owner.symbol].isNullOrEmpty()
       ) synthesizeDefaultConstructor(owner)
+      if (owner.kind == JavaSemanticTypeDeclarationKind.ENUM) {
+        declaration.enumConstants.forEach { constant ->
+          val field = declarations[constant.fieldDeclaratorNodeId]
+          if (field == null) {
+            error(constant.span, "java.semantic.enum_constant_field_missing", "enum 常量缺少规范化字段绑定。")
+          } else {
+            enumConstants[field] = JavaEnumConstantBinding(
+              field, owner.symbol, constant.name, constant.ordinal,
+            )
+          }
+        }
+        synthesizeEnumStandardMembers(owner)
+      }
       typeDeclarations[owner.symbol] = owner.semanticDeclaration()
     }
     synthesizeBuiltinConstructors()
@@ -855,7 +886,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       parameterSymbols = parameterSymbols,
       parameterTypes = parameterTypes,
       returnType = returnType,
-      visibility = if (isInterfaceMethod) JavaVisibility.PUBLIC else visibility(modifiers),
+      visibility = when {
+        isInterfaceMethod -> JavaVisibility.PUBLIC
+        kind == JavaSemanticCallableKind.CONSTRUCTOR &&
+          owner.kind == JavaSemanticTypeDeclarationKind.ENUM -> JavaVisibility.PRIVATE
+        else -> visibility(modifiers)
+      },
       isStatic = JavaAstModifier.STATIC in modifiers,
       isFinal = JavaAstModifier.FINAL in modifiers,
       isAbstract = JavaAstModifier.ABSTRACT in modifiers ||
@@ -891,6 +927,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       val declaration = info.declaration as JavaAstMemberDeclaration.Constructor
       if (info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
         error(declaration.span, "java.semantic.interface_constructor", "interface 不能声明构造器。")
+      }
+      if (info.owner.kind == JavaSemanticTypeDeclarationKind.ENUM &&
+        declaration.modifiers.any { it == JavaAstModifier.PUBLIC || it == JavaAstModifier.PROTECTED }
+      ) {
+        error(declaration.span, "java.semantic.invalid_enum_constructor_visibility", "enum 构造器只能省略可见性或声明为 private。")
       }
       if (JavaAstModifier.STATIC in declaration.modifiers ||
         JavaAstModifier.FINAL in declaration.modifiers ||
@@ -954,7 +995,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       emptyList(),
       emptyList(),
       owner.selfType(),
-      owner.visibility,
+      if (owner.kind == JavaSemanticTypeDeclarationKind.ENUM) JavaVisibility.PRIVATE else owner.visibility,
       isStatic = false,
       isFinal = false,
       isAbstract = false,
@@ -965,6 +1006,55 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     constructorsByOwner.getOrPut(owner.symbol) { mutableListOf() } += info
     callables += info
     callableDeclarations[id] = info.semanticDeclaration()
+  }
+
+  /** 为每个 enum 合成 name/ordinal/values/valueOf，并让它们进入普通 overload 选择。 */
+  private fun synthesizeEnumStandardMembers(owner: S1TypeInfo) {
+    fun add(
+      operation: JavaEnumBuiltinOperation,
+      name: String,
+      isStatic: Boolean,
+      parameterTypes: List<JavaSemanticType>,
+      returnType: JavaSemanticType,
+    ) {
+      val id = symbol(
+        JavaSymbolKind.METHOD, name, owner.symbol, owner.nodeId, owner.span, returnType,
+        registerDeclaration = false,
+      )
+      val parameterSymbols = parameterTypes.mapIndexed { index, type ->
+        symbol(
+          JavaSymbolKind.PARAMETER, "arg$index", id, owner.nodeId, owner.span, type,
+          registerDeclaration = false,
+        )
+      }
+      val info = S1CallableInfo(
+        owner.unit, owner, null, id, JavaSemanticCallableKind.METHOD, name,
+        emptyList(), emptyMap(), emptyList(), parameterSymbols, parameterTypes, returnType,
+        JavaVisibility.PUBLIC, isStatic, isFinal = true, isAbstract = false,
+        erasedSignatureKey(name, parameterTypes),
+        erasedMethodDescriptor(JavaSemanticCallableKind.METHOD, parameterTypes, returnType),
+        isSynthetic = true,
+      )
+      val siblings = methodsByOwnerAndName.getOrPut(owner.symbol to name) { mutableListOf() }
+      siblings.firstOrNull { it.erasedSignatureKey == info.erasedSignatureKey }?.let { conflict ->
+        error(
+          owner.span,
+          "java.semantic.enum_standard_member_conflict",
+          "enum 不能声明与编译器合成成员 ${info.erasedSignatureKey} 冲突的方法。",
+          listOf(JavaDiagnosticNote("冲突声明位于此处。", conflict.span)),
+        )
+      }
+      siblings += info
+      callables += info
+      callableDeclarations[id] = info.semanticDeclaration()
+      enumBuiltinCallables[id] = operation
+    }
+
+    val enumType = owner.selfType()
+    add(JavaEnumBuiltinOperation.NAME, "name", false, emptyList(), stringType.selfType())
+    add(JavaEnumBuiltinOperation.ORDINAL, "ordinal", false, emptyList(), intType())
+    add(JavaEnumBuiltinOperation.VALUES, "values", true, emptyList(), JavaSemanticType.Array(enumType))
+    add(JavaEnumBuiltinOperation.VALUE_OF, "valueOf", true, listOf(stringType.selfType()), enumType)
   }
 
   /** 仅为 catalog 明确允许构造的内建类型合成零参数构造器。 */
@@ -1092,7 +1182,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
    * abstract 方法可以压住父接口 default，两个互不相关的 default 则必须由 class 显式解决。
    */
   private fun resolveInterfaceDefaultMethods() {
-    sourceTypes().filter { it.kind == JavaSemanticTypeDeclarationKind.CLASS }.forEach { type ->
+    sourceTypes().filter {
+      it.kind == JavaSemanticTypeDeclarationKind.CLASS ||
+        it.kind == JavaSemanticTypeDeclarationKind.ENUM
+    }.forEach { type ->
       val classMethods = classHierarchyMethods(type)
       val interfaceMethods = interfaceHierarchyMethods(type)
       val defaults = linkedMapOf<JavaVirtualSlotId, JavaSymbolId>()
@@ -1853,10 +1946,15 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     replaceFlowState((flow.breakExits + entry).intersectionOrNull() ?: entry)
   }
 
-  /** switch 首批接受 int-like 与 String 常量 label，并按 fallthrough 合并 DA 出口。 */
+  /** switch 接受 int-like、String 与 enum；enum label 绑定到同类型常量的 ordinal。 */
   private fun analyzeSwitch(statement: JavaAstStatement.Switch) = withScope {
     val declaredSelectorType = analyzeExpression(statement.selector)
-    val selectorType = if (
+    val enumOwner = (declaredSelectorType as? JavaSemanticType.Declared)?.symbol
+      ?.let(::typeInfo)?.takeIf { it.kind == JavaSemanticTypeDeclarationKind.ENUM }
+    val selectorType = if (enumOwner != null) {
+      enumSwitchSelectors += statement.selector.nodeId
+      declaredSelectorType
+    } else if (
       declaredSelectorType == JavaSemanticType.Declared(stringType.symbol, emptyList())
     ) {
       declaredSelectorType
@@ -1864,7 +1962,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       // Java 允许 Byte/Short/Character/Integer selector；转换直接绑定到 selector 表达式。
       primitiveOperand(statement.selector, declaredSelectorType)
     }
-    val validSelector = selectorType == JavaSemanticType.Declared(stringType.symbol, emptyList()) ||
+    val validSelector = enumOwner != null ||
+      selectorType == JavaSemanticType.Declared(stringType.symbol, emptyList()) ||
       (selectorType as? JavaSemanticType.Primitive)?.kind in setOf(
         JavaAstPrimitiveType.BYTE,
         JavaAstPrimitiveType.SHORT,
@@ -1875,7 +1974,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(
         statement.selector.span,
         "java.semantic.switch_selector_unsupported",
-        "switch selector 当前只支持 byte/short/char/int、对应 wrapper 与 String。",
+        "switch selector 当前只支持 byte/short/char/int、对应 wrapper、String 与 enum。",
       )
     }
     var defaultSeen = false
@@ -1886,15 +1985,36 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         if (defaultSeen) error(entry.span, "java.semantic.duplicate_switch_default", "switch 只能包含一个 default。")
         defaultSeen = true
       } else {
-        val actual = analyzeExpression(label)
-        if (compatibility(actual, selectorType) == null || constants[label.nodeId] == null) {
+        val enumConstant = if (enumOwner != null && label is JavaAstExpression.Name) {
+          fieldsByOwnerAndName[enumOwner.symbol to label.qualifiedName]?.let { field ->
+            enumConstants[field.symbol]
+          }
+        } else null
+        if (enumOwner != null && enumConstant != null) {
+          expressionTypes[label.nodeId] = declaredSelectorType
+          resolved[label.nodeId] = enumConstant.field
+          enumSwitchLabels[label.nodeId] = enumConstant.ordinal
+          if (!labels.add("enum:${enumConstant.ordinal}")) {
+            error(label.span, "java.semantic.duplicate_switch_label", "switch case enum 常量重复。")
+          }
+        } else if (enumOwner != null) {
+          analyzeExpression(label)
           error(
             label.span,
-            "java.semantic.invalid_switch_label",
-            "case 必须是与 selector 兼容的编译期常量。",
+            "java.semantic.invalid_enum_switch_label",
+            "enum switch case 必须使用同一 enum 的未限定常量名。",
           )
-        } else if (!labels.add(constants.getValue(label.nodeId).toString())) {
-          error(label.span, "java.semantic.duplicate_switch_label", "switch case 常量重复。")
+        } else {
+          val actual = analyzeExpression(label)
+          if (compatibility(actual, selectorType) == null || constants[label.nodeId] == null) {
+            error(
+              label.span,
+              "java.semantic.invalid_switch_label",
+              "case 必须是与 selector 兼容的编译期常量。",
+            )
+          } else if (!labels.add(constants.getValue(label.nodeId).toString())) {
+            error(label.span, "java.semantic.duplicate_switch_label", "switch case 常量重复。")
+          }
         }
       }
     }
@@ -3078,10 +3198,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     if (createdType == null) return JavaSemanticType.Error
     val owner = typeInfo(createdType.symbol)
-    if (owner == null || owner.kind != JavaSemanticTypeDeclarationKind.CLASS &&
-      owner.kind != JavaSemanticTypeDeclarationKind.BUILTIN
+    if (owner == null || owner.kind !in setOf(
+        JavaSemanticTypeDeclarationKind.CLASS,
+        JavaSemanticTypeDeclarationKind.BUILTIN,
+        JavaSemanticTypeDeclarationKind.ENUM,
+      )
     ) {
       error(expression.span, "java.semantic.invalid_new_type", "new 的目标必须是可实例化 class。")
+      return JavaSemanticType.Error
+    }
+    if (owner.kind == JavaSemanticTypeDeclarationKind.ENUM &&
+      expression.nodeId !in enumConstantInitializerNodes
+    ) {
+      error(expression.span, "java.semantic.enum_instantiation_forbidden", "enum 只能由其声明中的常量实例化。")
       return JavaSemanticType.Error
     }
     if (owner.declaration?.modifiers?.contains(JavaAstModifier.ABSTRACT) == true) {
@@ -4463,6 +4592,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         resourceCloseBindings.toMap(),
         lambdaBindings.toMap(),
         methodReferenceBindings.toMap(),
+        enumConstants.toMap(),
+        enumBuiltinCallables.toMap(),
+        enumSwitchSelectors.toSet(),
+        enumSwitchLabels.toMap(),
       ),
       diagnostics,
     )

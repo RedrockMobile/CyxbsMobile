@@ -201,7 +201,8 @@ internal object JavaRuntimePrelude {
         return actualNested !== undefined && expectedNested !== undefined &&
           @__j_array_component_subtype(actualNested, expectedNested);
       }
-      return expected === actual || expected.isPrototypeOf(actual);
+      // 源码 class prototype 以 Object.create(null) 创建，本身没有 isPrototypeOf 方法。
+      return expected === actual || Object.prototype.isPrototypeOf.call(expected, actual);
     }
 
     function @__j_array_value_matches(value, component) {
@@ -213,7 +214,7 @@ internal object JavaRuntimePrelude {
         return Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, "@__j_component") &&
           @__j_array_component_subtype(value.@__j_component, expectedNested);
       }
-      return component.isPrototypeOf(value);
+      return Object.prototype.isPrototypeOf.call(component, value);
     }
 
     function @__j_array_default(component) {

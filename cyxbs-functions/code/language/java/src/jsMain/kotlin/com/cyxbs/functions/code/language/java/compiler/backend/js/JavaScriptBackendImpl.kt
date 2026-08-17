@@ -18,6 +18,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConversion
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrDispatchKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrExpression
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrEnhancedForKind
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrEnumOperation
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrField
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrFieldId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocal
@@ -143,6 +144,7 @@ private class JavaScriptBackendValidator(
         invalid("Java IR interface contains class-only runtime members.", clazz.span)
       }
     }
+    validateEnumClass(clazz)
     clazz.fields.forEach { field ->
       if (field.owner != clazz.id) invalid("Java IR field owner does not match its class.", field.span)
       validateType(field.type, field.span)
@@ -165,6 +167,31 @@ private class JavaScriptBackendValidator(
       }
     }
     validateVirtualSlots(clazz)
+  }
+
+  /** enum 元数据必须与按源码顺序生成的 static final-like 常量字段严格一致。 */
+  private fun validateEnumClass(clazz: JavaIrClass) {
+    if (clazz.kind != JavaIrTypeDeclarationKind.ENUM) {
+      if (clazz.enumConstants.isNotEmpty()) {
+        invalid("Only Java IR enum classes may declare enum constants.", clazz.span)
+      }
+      return
+    }
+    if (clazz.enumConstants.map { it.ordinal } != clazz.enumConstants.indices.toList() ||
+      clazz.enumConstants.map { it.name }.distinct().size != clazz.enumConstants.size ||
+      clazz.enumConstants.map { it.field }.distinct().size != clazz.enumConstants.size
+    ) {
+      invalid("Java IR enum constants must have unique names, fields and contiguous ordinals.", clazz.span)
+    }
+    clazz.enumConstants.forEach { constant ->
+      val field = index.fields[constant.field]
+      if (field == null || field.owner != clazz.id || !field.isStatic ||
+        field.type != JavaIrType.Reference(clazz.id) ||
+        field.initializer !is JavaIrExpression.NewEnumConstant
+      ) {
+        invalid("Java IR enum constant must reference its enum static field initializer.", clazz.span)
+      }
+    }
   }
 
   /** 父类和接口共享同一继承图，validator 必须拒绝任意方向的循环。 */
@@ -529,6 +556,8 @@ private class JavaScriptBackendValidator(
         if (target == null || target.kind != JavaIrMethodKind.CONSTRUCTOR || target.owner != expression.classId) invalid("Java IR object creation must target an owner constructor.", expression.span)
         expression.arguments.forEach(::validateExpression)
       }
+      is JavaIrExpression.NewEnumConstant -> validateNewEnumConstant(expression)
+      is JavaIrExpression.InvokeEnum -> validateEnumInvocation(expression)
       is JavaIrExpression.NewArray -> {
         validateArrayComponent(expression.componentType, expression.span)
         validateExpression(expression.length)
@@ -580,6 +609,40 @@ private class JavaScriptBackendValidator(
       }
       is JavaIrExpression.StringConcat -> expression.parts.forEach { part -> validateExpression(part.expression) }
     }
+  }
+
+  /** enum 常量只能调用同一 enum 的构造器，且 name/ordinal 必须与 class 元数据一致。 */
+  private fun validateNewEnumConstant(expression: JavaIrExpression.NewEnumConstant) {
+    val clazz = index.classes[expression.classId]
+    val constructor = index.methods[expression.constructor]
+    expression.arguments.forEach(::validateExpression)
+    if (clazz?.kind != JavaIrTypeDeclarationKind.ENUM ||
+      constructor?.kind != JavaIrMethodKind.CONSTRUCTOR || constructor.owner != expression.classId ||
+      expression.type.classId != expression.classId || expression.ordinal < 0 ||
+      clazz.enumConstants.none { it.name == expression.name && it.ordinal == expression.ordinal }
+    ) {
+      invalid("Java IR enum constant creation is inconsistent with its enum declaration.", expression.span)
+    }
+  }
+
+  /** enum 标准操作拥有固定 receiver、参数与返回类型，避免后端按源码名称猜测。 */
+  private fun validateEnumInvocation(expression: JavaIrExpression.InvokeEnum) {
+    expression.receiver?.let(::validateExpression)
+    expression.arguments.forEach(::validateExpression)
+    val clazz = index.classes[expression.enumClass]
+    val enumType = JavaIrType.Reference(expression.enumClass)
+    val stringType = expression.arguments.firstOrNull()?.type
+    val valid = clazz?.kind == JavaIrTypeDeclarationKind.ENUM && when (expression.operation) {
+      JavaIrEnumOperation.NAME -> expression.receiver?.type == enumType &&
+        expression.arguments.isEmpty() && expression.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING)
+      JavaIrEnumOperation.ORDINAL -> expression.receiver?.type == enumType &&
+        expression.arguments.isEmpty() && expression.type == JavaIrType.Primitive(JavaAstPrimitiveType.INT)
+      JavaIrEnumOperation.VALUES -> expression.receiver == null && expression.arguments.isEmpty() &&
+        expression.type == JavaIrType.Array(enumType)
+      JavaIrEnumOperation.VALUE_OF -> expression.receiver == null && expression.arguments.size == 1 &&
+        stringType?.hasBuiltinRole(JavaBuiltinTypeRole.STRING) == true && expression.type == enumType
+    }
+    if (!valid) invalid("Java IR enum standard invocation has an invalid signature.", expression.span)
   }
 
   /** 校验 lambda 的 SAM 槽、词法参数/捕获以及结构化 body。 */
@@ -1485,6 +1548,9 @@ private class JavaScriptEmitter(
     is JavaIrExpression.Lambda -> body.containsExceptionRuntime() ||
       boundValues.any { it.requireNonNull || it.expression.requiresExceptionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.NewEnumConstant -> arguments.any { it.requiresExceptionRuntime() }
+    is JavaIrExpression.InvokeEnum -> operation == JavaIrEnumOperation.VALUE_OF ||
+      receiver?.requiresExceptionRuntime() == true || arguments.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresExceptionRuntime()
     is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresExceptionRuntime() }
@@ -1558,6 +1624,9 @@ private class JavaScriptEmitter(
     is JavaIrExpression.Lambda -> body.containsBuiltinRuntime() ||
       boundValues.any { it.expression.requiresBuiltinRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
+    is JavaIrExpression.NewEnumConstant -> arguments.any { it.requiresBuiltinRuntime() }
+    is JavaIrExpression.InvokeEnum -> receiver?.requiresBuiltinRuntime() == true ||
+      arguments.any { it.requiresBuiltinRuntime() }
     is JavaIrExpression.NewArray -> length.requiresBuiltinRuntime()
     is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresBuiltinRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { element -> element.requiresBuiltinRuntime() }
@@ -1630,6 +1699,9 @@ private class JavaScriptEmitter(
     is JavaIrExpression.Lambda -> body.containsCollectionRuntime() ||
       boundValues.any { it.expression.requiresCollectionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.NewEnumConstant -> arguments.any { it.requiresCollectionRuntime() }
+    is JavaIrExpression.InvokeEnum -> receiver?.requiresCollectionRuntime() == true ||
+      arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresCollectionRuntime()
     is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresCollectionRuntime() }
@@ -1702,6 +1774,9 @@ private class JavaScriptEmitter(
     is JavaIrExpression.Lambda -> body.containsScannerRuntime() ||
       boundValues.any { it.expression.requiresScannerRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.NewEnumConstant -> arguments.any { it.requiresScannerRuntime() }
+    is JavaIrExpression.InvokeEnum -> receiver?.requiresScannerRuntime() == true ||
+      arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.NewArray -> length.requiresScannerRuntime()
     is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresScannerRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresScannerRuntime() }
@@ -1781,6 +1856,10 @@ private class JavaScriptEmitter(
     is JavaIrExpression.Lambda -> body.containsArrayOrStringRuntime() ||
       boundValues.any { it.expression.requiresArrayOrStringRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.NewEnumConstant -> arguments.any { it.requiresArrayOrStringRuntime() }
+    is JavaIrExpression.InvokeEnum -> operation == JavaIrEnumOperation.VALUES ||
+      receiver?.requiresArrayOrStringRuntime() == true ||
+      arguments.any { it.requiresArrayOrStringRuntime() }
     else -> false
   }
 
@@ -1806,7 +1885,7 @@ private class JavaScriptEmitter(
       .forEach { method ->
       writer.line("${JsNameMangler.prototype(method.owner)}[\"${JsNameMangler.virtualSlot(checkNotNull(method.virtualSlot))}\"] = ${JsNameMangler.method(method.id)};")
     }
-    classesInParentFirstOrder.filter { it.kind == JavaIrTypeDeclarationKind.CLASS }.forEach { clazz ->
+    classesInParentFirstOrder.filter { it.kind != JavaIrTypeDeclarationKind.INTERFACE }.forEach { clazz ->
       clazz.interfaceDefaultMethods.entries.sortedBy { it.key }.forEach { (slot, method) ->
         val key = JsNameMangler.virtualSlot(slot)
         // 语义层已经解决 default 冲突；这里仅安装显式选择结果，class/superclass 自身实现优先。
@@ -2299,6 +2378,8 @@ private class JavaScriptEmitter(
         val args = expression.arguments.joinToString(", ") { renderExpression(it) }
         "(${JsNameMangler.classInitializer(expression.classId)}(), (() => { const value = Object.create(${JsNameMangler.prototype(expression.classId)}); ${JsNameMangler.instanceDefaultInitializer(expression.classId)}(value); ${JsNameMangler.method(expression.constructor)}.call(value${if (args.isEmpty()) "" else ", $args"}); return value; })())"
       }
+      is JavaIrExpression.NewEnumConstant -> renderNewEnumConstant(expression)
+      is JavaIrExpression.InvokeEnum -> renderEnumInvocation(expression)
       is JavaIrExpression.NewArray ->
         "\$__j_new_array(${renderExpression(expression.length)}, ${defaultValue(expression.componentType)}, ${renderArrayComponent(expression.componentType, expression.referenceComponentKind)})"
       is JavaIrExpression.NewMultiArray -> {
@@ -2321,6 +2402,48 @@ private class JavaScriptEmitter(
         val values = expression.parts.joinToString(", ") { part -> renderExpression(part.expression) }
         val kinds = expression.parts.joinToString(", ") { part -> writer.stringLiteral(part.conversion.name) }
         "\$__j_string_concat([$values], [$kinds])"
+      }
+    }
+  }
+
+  /** enum name/ordinal 在构造器执行前安装，匹配 Java 构造器内即可观察标准元数据的规则。 */
+  private fun renderNewEnumConstant(expression: JavaIrExpression.NewEnumConstant): String {
+    val arguments = expression.arguments.joinToString(", ") { renderExpression(it) }
+    val suffix = if (arguments.isEmpty()) "" else ", ...values"
+    return "((values) => { const value = Object.create(${JsNameMangler.prototype(expression.classId)}); " +
+      "${JsNameMangler.instanceDefaultInitializer(expression.classId)}(value); " +
+      "value[\"\$__j_enum_name\"] = ${writer.stringLiteral(expression.name)}; " +
+      "value[\"\$__j_enum_ordinal\"] = ${expression.ordinal}; " +
+      "${JsNameMangler.method(expression.constructor)}.call(value$suffix); return value; })([$arguments])"
+  }
+
+  /** values 返回防御性新数组；valueOf 在参数求值后触发 enum clinit，并返回唯一常量对象。 */
+  private fun renderEnumInvocation(expression: JavaIrExpression.InvokeEnum): String {
+    val clazz = index.classes.getValue(expression.enumClass)
+    val storage = JsNameMangler.staticStorage(clazz.id)
+    return when (expression.operation) {
+      JavaIrEnumOperation.NAME ->
+        "\$__j_non_null(${renderExpression(checkNotNull(expression.receiver))})[\"\$__j_enum_name\"]"
+      JavaIrEnumOperation.ORDINAL ->
+        "\$__j_non_null(${renderExpression(checkNotNull(expression.receiver))})[\"\$__j_enum_ordinal\"]"
+      JavaIrEnumOperation.VALUES -> {
+        val writes = clazz.enumConstants.joinToString("; ") { constant ->
+          "\$__j_array_set(value, ${constant.ordinal}, $storage.values[\"${JsNameMangler.field(constant.field)}\"])"
+        }
+        "(() => { ${JsNameMangler.classInitializer(clazz.id)}(); " +
+          "const value = \$__j_new_array(${clazz.enumConstants.size}, null, ${JsNameMangler.prototype(clazz.id)}); " +
+          "$writes${if (writes.isEmpty()) "" else ";"} return value; })()"
+      }
+      JavaIrEnumOperation.VALUE_OF -> {
+        val cases = clazz.enumConstants.joinToString(" ") { constant ->
+          "if (name === ${writer.stringLiteral(constant.name)}) return $storage.values[\"${JsNameMangler.field(constant.field)}\"];"
+        }
+        val qualifiedPrefix = "${clazz.qualifiedName}."
+        "((name) => { ${JsNameMangler.classInitializer(clazz.id)}(); " +
+          "if (name == null) throw \$__j_new_exception(\"java.lang.NullPointerException\", null, null); " +
+          "$cases throw \$__j_new_exception(\"java.lang.IllegalArgumentException\", " +
+          "${writer.stringLiteral("No enum constant $qualifiedPrefix")} + name, null); " +
+          "})(${renderExpression(expression.arguments.single())})"
       }
     }
   }

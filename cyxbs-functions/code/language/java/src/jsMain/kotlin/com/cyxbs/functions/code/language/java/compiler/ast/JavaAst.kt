@@ -79,6 +79,22 @@ internal data class JavaAstTypeDeclaration(
   val superClass: JavaAstTypeReference?,
   val interfaces: List<JavaAstTypeReference>,
   val members: List<JavaAstMemberDeclaration>,
+  /** enum 常量按源码顺序保存；class/interface 为空。 */
+  val enumConstants: List<JavaAstEnumConstant> = emptyList(),
+) : JavaAstNode
+
+/**
+ * enum 常量的源码身份与规范化字段关联。
+ *
+ * [fieldDeclaratorNodeId] 指向 [JavaAstTypeDeclaration.members] 中编译器生成的 static final 字段，
+ * 后续语义层据此附加 name/ordinal，同时仍复用普通构造器重载和初始化顺序。
+ */
+internal data class JavaAstEnumConstant(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val name: String,
+  val ordinal: Int,
+  val fieldDeclaratorNodeId: JavaNodeId,
 ) : JavaAstNode
 
 /** 泛型类型参数及其显式上界。 */

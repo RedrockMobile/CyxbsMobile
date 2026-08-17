@@ -437,7 +437,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
    函数式接口适配链；
 5. （已完成，2026-08-18）多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/
    求值顺序；
-6. `enum`：枚举常量、`values/valueOf`、`name/ordinal`、switch 与受控成员；
+6. （已完成，2026-08-18）`enum`：枚举常量、字段/构造器/方法、`values/valueOf`、
+   `name/ordinal`、switch、接口实现与受控初始化；
 7. 完整数值：`long`、`float`、`double`、数值提升、转换、比较及常用 Math/包装 API；
 8. 泛型与语言收口：剩余常用推断、桥方法、数组/可变参数等教学高频边界，低频项稳定诊断；
 9. 产品化：源码栈映射、缓存与增量编译、npm/端上链路、资源限制、fuzz 和跨平台发布验证。
@@ -494,7 +495,14 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   协变视图下的嵌套写入仍执行递归 `ArrayStoreException` 检查，不退化为 JavaScript Array 判断；
 - 完整 `jsNodeTest` 共 240 项通过，真实源码到 JS 执行用例覆盖多维数组求值顺序、部分分配、
   嵌套初始化、协变写入、泛型接口/default 分派、异常流、lambda 与四种方法引用；
-- enum、long、浮点完整语义与泛型收口仍按上述第 6～8 批继续实现。
+- enum 常量在普通静态字段初始化顺序中完成唯一实例构造，`name/ordinal` 在构造器执行前即可观察；
+  `values()` 每次返回新的受类型检查数组，`valueOf()` 保持 null/未知名称异常，enum switch 使用稳定 ordinal；
+- enum 可声明实例字段、private/package-private 构造器、普通方法并实现接口；直接 `new`、public/protected
+  构造器、显式 abstract/final 和常量专属匿名 class body 会给出稳定诊断；
+- 完整 `jsNodeTest` 共 244 项通过，新增真实源码执行用例同时覆盖 enum 初始化、接口分派、比较、
+  防御性 values 数组、valueOf 异常与 switch；
+- `java.lang.Enum` 的低频 `compareTo/getDeclaringClass`、常量专属 class body，以及 long、浮点完整语义
+  与泛型收口仍按上述第 7～8 批继续实现。
 
 ### 阶段 2B：精选类库与宿主桥
 

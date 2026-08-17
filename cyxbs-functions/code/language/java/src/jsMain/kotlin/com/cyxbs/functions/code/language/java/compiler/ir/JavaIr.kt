@@ -46,6 +46,7 @@ internal data class JavaIrProgram(
 /** 运行时仍需区分可实例化 class 与只承载静态成员/default method 的 interface。 */
 internal enum class JavaIrTypeDeclarationKind {
   CLASS,
+  ENUM,
   INTERFACE,
 }
 
@@ -70,7 +71,24 @@ internal data class JavaIrClass(
   val interfaceDefaultMethods: Map<Int, JavaIrMethodId> = emptyMap(),
   /** 非空时表示该源码 class 是异常类型，值为直接异常父类型的限定名。 */
   val exceptionSuperQualifiedName: String? = null,
+  /** enum 常量按源码顺序保存，供 values/valueOf 与初始化校验使用。 */
+  val enumConstants: List<JavaIrEnumConstant> = emptyList(),
 )
+
+/** enum 常量的稳定字段、名称和 ordinal；常量对象本身仍存储在对应 static field。 */
+internal data class JavaIrEnumConstant(
+  val field: JavaIrFieldId,
+  val name: String,
+  val ordinal: Int,
+)
+
+/** 不依赖源码方法体的四个 enum 标准操作。 */
+internal enum class JavaIrEnumOperation {
+  NAME,
+  ORDINAL,
+  VALUES,
+  VALUE_OF,
+}
 
 /** 已完成静态/实例分类的字段。 */
 internal data class JavaIrField(
@@ -484,6 +502,32 @@ internal sealed interface JavaIrExpression {
   data class NewObject(
     val classId: JavaIrClassId,
     val constructor: JavaIrMethodId,
+    val arguments: List<JavaIrExpression>,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /**
+   * enum 声明内部的常量分配。
+   *
+   * 与普通 [NewObject] 分离后，后端可在构造器执行前写入 Java 保证可见的 name/ordinal，且用户
+   * 源码无法伪造 enum 实例。
+   */
+  data class NewEnumConstant(
+    val classId: JavaIrClassId,
+    val constructor: JavaIrMethodId,
+    val arguments: List<JavaIrExpression>,
+    val name: String,
+    val ordinal: Int,
+    override val type: JavaIrType.Reference,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /** enum 的 name/ordinal/values/valueOf 已在语义阶段绑定，不按方法名称猜测。 */
+  data class InvokeEnum(
+    val operation: JavaIrEnumOperation,
+    val enumClass: JavaIrClassId,
+    val receiver: JavaIrExpression?,
     val arguments: List<JavaIrExpression>,
     override val type: JavaIrType,
     override val span: JavaSourceSpan,

@@ -86,7 +86,51 @@ class JavaLezerAstFrontendTest {
   /** 未映射到阶段 1 的 Java 结构必须给出 stable unsupported diagnostic。 */
   @Test
   fun rejectsUnsupportedSyntax() {
-    val result = parse("enum Main { VALUE }")
+    val result = parse("@Deprecated class Main { }")
+
+    assertFalse(result.isSuccess)
+    assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
+  }
+
+  /** enum 常量必须规范化为同序 static final 字段，同时保留构造器参数和普通成员。 */
+  @Test
+  fun mapsEnumConstantsAndMembersFromRealLezerCst() {
+    val result = parse(
+      """
+      enum Color implements Runnable {
+        RED, GREEN(2);
+        private final int code;
+        Color() { this(1); }
+        Color(int code) { this.code = code; }
+        public int code() { return code; }
+        public void run() { }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val type = assertNotNull(result.value).units.single().types.single()
+    assertEquals(JavaAstTypeDeclarationKind.ENUM, type.kind)
+    assertEquals(listOf("RED", "GREEN"), type.enumConstants.map { it.name })
+    assertEquals(listOf(0, 1), type.enumConstants.map { it.ordinal })
+    val constantFields = type.members.take(2).map { assertIs<JavaAstMemberDeclaration.Field>(it) }
+    assertTrue(constantFields.all {
+      it.modifiers.containsAll(setOf(JavaAstModifier.PUBLIC, JavaAstModifier.STATIC, JavaAstModifier.FINAL))
+    })
+    assertEquals(listOf("RED", "GREEN"), constantFields.map { it.declarators.single().name })
+    val greenCreation = assertIs<JavaAstExpression.NewObject>(
+      constantFields[1].declarators.single().initializer,
+    )
+    assertEquals(1, greenCreation.arguments.size)
+    assertEquals(2, type.members.count { it is JavaAstMemberDeclaration.Constructor })
+    assertTrue(type.members.any { it is JavaAstMemberDeclaration.Method && it.name == "code" })
+    assertTrue(type.members.any { it is JavaAstMemberDeclaration.Method && it.name == "run" })
+  }
+
+  /** 常量专属 class body 会产生匿名子类，当前轻量运行时必须稳定拒绝而非擦除。 */
+  @Test
+  fun rejectsEnumConstantSpecificClassBody() {
+    val result = parse("enum Color { RED { int code() { return 1; } } }")
 
     assertFalse(result.isSuccess)
     assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })

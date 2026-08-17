@@ -109,10 +109,11 @@ private class JavaLowering(val model: JavaSemanticModel) {
     if (declaration.symbol != symbol.id || declaration.kind != expectedKind ||
       declaration.kind !in setOf(
         JavaSemanticTypeDeclarationKind.CLASS,
+        JavaSemanticTypeDeclarationKind.ENUM,
         JavaSemanticTypeDeclarationKind.INTERFACE,
       )
     ) {
-      unsupported("Only semantic class/interface declarations are executable in stage 2A.", source.span)
+      unsupported("Only semantic class/interface/enum declarations are executable.", source.span)
       return null
     }
     val owner = classIds[symbol.id] ?: return invalid("Missing class id.", source.span)
@@ -158,13 +159,16 @@ private class JavaLowering(val model: JavaSemanticModel) {
       null,
       source.span,
       null,
-      if (declaration.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
-        JavaIrTypeDeclarationKind.INTERFACE
-      } else {
-        JavaIrTypeDeclarationKind.CLASS
+      when (declaration.kind) {
+        JavaSemanticTypeDeclarationKind.INTERFACE -> JavaIrTypeDeclarationKind.INTERFACE
+        JavaSemanticTypeDeclarationKind.ENUM -> JavaIrTypeDeclarationKind.ENUM
+        else -> JavaIrTypeDeclarationKind.CLASS
       },
       defaults,
       exceptionSuperQualifiedName(declaration, source.span),
+      model.enumConstants.values.filter { it.owner == declaration.symbol }
+        .sortedBy(JavaEnumConstantBinding::ordinal)
+        .map { JavaIrEnumConstant(JavaIrFieldId(it.field.value), it.name, it.ordinal) },
     )
   }
 
@@ -220,8 +224,26 @@ private class JavaLowering(val model: JavaSemanticModel) {
     val source = sourceFields[declaration.symbol]
       ?: return invalid("Missing source field declarator.", symbol.declarationSpan)
     val type = typeOf(declaration.type, source.span) ?: return null
-    val initializer = source.initializer?.let {
+    var initializer = source.initializer?.let {
       BodyLowering(this, owner, null, !declaration.isStatic).expression(it)
+    }
+    val enumConstant = model.enumConstants[declaration.symbol]
+    if (enumConstant != null) {
+      val created = initializer as? JavaIrExpression.NewObject
+        ?: return invalid("Enum constant initializer must lower to a source object creation.", source.span)
+      if (!declaration.isStatic || created.classId != owner ||
+        enumConstant.owner.value != owner.value
+      ) return invalid("Enum constant field binding is inconsistent.", source.span)
+      initializer = JavaIrExpression.NewEnumConstant(
+        created.classId,
+        created.constructor,
+        created.arguments,
+        enumConstant.name,
+        enumConstant.ordinal,
+        created.type as? JavaIrType.Reference
+          ?: return invalid("Enum constant creation type must be a reference.", source.span),
+        created.span,
+      )
     }
     return JavaIrField(
       JavaIrFieldId(declaration.symbol.value), owner, symbol.name, type,
@@ -700,13 +722,32 @@ private class BodyLowering(
     ))
   }
 
-  /** switch label 必须已经由语义阶段证明为常量；entry 顺序原样保留 fallthrough。 */
+  /** switch label 已由语义阶段证明；enum selector/label 在此稳定转换为 ordinal。 */
   private fun lowerSwitch(statement: JavaAstStatement.Switch): List<JavaIrStatement> {
-    val selector = expression(statement.selector) ?: return emptyList()
+    var selector = expression(statement.selector) ?: return emptyList()
+    if (statement.selector.nodeId in lowering.model.enumSwitchSelectors) {
+      val enumType = selector.type as? JavaIrType.Reference
+        ?: return invalid("Enum switch selector must lower to a reference.", statement.selector.span)
+          .let { emptyList() }
+      selector = JavaIrExpression.InvokeEnum(
+        JavaIrEnumOperation.ORDINAL,
+        enumType.classId,
+        selector,
+        emptyList(),
+        JavaIrType.Primitive(JavaAstPrimitiveType.INT),
+        statement.selector.span,
+      )
+    }
     val entries = statement.entries.map { entry ->
       val label = entry.label?.let { source ->
-        expression(source) as? JavaIrExpression.Constant
-          ?: return invalid("Switch label is not a lowered constant.", source.span).let { emptyList() }
+        lowering.model.enumSwitchLabels[source.nodeId]?.let { ordinal ->
+          JavaIrExpression.Constant(
+            JavaIrConstant.IntValue(ordinal),
+            JavaIrType.Primitive(JavaAstPrimitiveType.INT),
+            source.span,
+          )
+        } ?: (expression(source) as? JavaIrExpression.Constant)
+        ?: return invalid("Switch label is not a lowered constant.", source.span).let { emptyList() }
       }
       JavaIrSwitchEntry(label, entry.statements.flatMap(::lowerStatement), entry.span)
     }
@@ -1263,6 +1304,26 @@ private class BodyLowering(
     ) return invalid("Selected method binding is inconsistent.", source.span)
     val owner = lowering.model.typeDeclarations[declaration.owner]
       ?: return invalid("Selected method owner declaration is missing.", source.span)
+    lowering.model.enumBuiltinCallables[binding.symbol]?.let { operation ->
+      val arguments = source.arguments.mapNotNull(::expression)
+      if (arguments.size != source.arguments.size || arguments.size != binding.parameterTypes.size) {
+        return invalid("Enum standard call argument count is inconsistent.", source.span)
+      }
+      val receiver = if (declaration.isStatic) null else {
+        receiver(binding.receiverKind, source.receiver, source.span) ?: return null
+      }
+      if ((receiver == null) != declaration.isStatic || owner.kind != JavaSemanticTypeDeclarationKind.ENUM) {
+        return invalid("Enum standard call binding is inconsistent.", source.span)
+      }
+      return JavaIrExpression.InvokeEnum(
+        operation.toIr(),
+        JavaIrClassId(owner.symbol.value),
+        receiver,
+        arguments,
+        type,
+        source.span,
+      )
+    }
     if (owner.kind == JavaSemanticTypeDeclarationKind.BUILTIN) {
       val builtin = lowering.model.builtinMembers[binding.symbol]
         ?: return invalid("Builtin callable is missing its operation binding.", source.span)
@@ -1486,6 +1547,14 @@ private class BodyLowering(
     return JavaIrExpression.NewObject(
       reference.classId, JavaIrMethodId(binding.symbol.value), arguments, type, source.span,
     )
+  }
+
+  /** 语义 enum operation 与 typed IR 保持一一对应。 */
+  private fun JavaEnumBuiltinOperation.toIr(): JavaIrEnumOperation = when (this) {
+    JavaEnumBuiltinOperation.NAME -> JavaIrEnumOperation.NAME
+    JavaEnumBuiltinOperation.ORDINAL -> JavaIrEnumOperation.ORDINAL
+    JavaEnumBuiltinOperation.VALUES -> JavaIrEnumOperation.VALUES
+    JavaEnumBuiltinOperation.VALUE_OF -> JavaIrEnumOperation.VALUE_OF
   }
 
   /** semantic conversion 原样落到 IR，包含 boxing/unboxing 的稳定 boxed class id。 */

@@ -466,6 +466,22 @@ internal data class JavaEnhancedForBinding(
   val conversion: JavaSemanticConversion,
 )
 
+/** enum 常量字段的稳定 name/ordinal 元数据。 */
+internal data class JavaEnumConstantBinding(
+  val field: JavaSymbolId,
+  val owner: JavaSymbolId,
+  val name: String,
+  val ordinal: Int,
+)
+
+/** 每个 enum 类型合成的四个标准成员；lowering 不按方法名称猜测。 */
+internal enum class JavaEnumBuiltinOperation {
+  NAME,
+  ORDINAL,
+  VALUES,
+  VALUE_OF,
+}
+
 /**
  * AST 的不可变语义 side table。
  *
@@ -522,6 +538,14 @@ internal data class JavaSemanticModel(
   val lambdaBindings: Map<JavaNodeId, JavaLambdaBinding> = emptyMap(),
   /** 方法引用 expression node 到已决议 SAM、callable 和参数/返回转换。 */
   val methodReferenceBindings: Map<JavaNodeId, JavaMethodReferenceBinding> = emptyMap(),
+  /** enum 常量字段 symbol 到声明顺序和标准名称。 */
+  val enumConstants: Map<JavaSymbolId, JavaEnumConstantBinding> = emptyMap(),
+  /** 合成 enum 标准方法 symbol 到稳定 operation。 */
+  val enumBuiltinCallables: Map<JavaSymbolId, JavaEnumBuiltinOperation> = emptyMap(),
+  /** enum switch selector 节点；lowering 会读取 ordinal，而非比较对象身份。 */
+  val enumSwitchSelectors: Set<JavaNodeId> = emptySet(),
+  /** enum switch case 名称节点到已经解析的常量 ordinal。 */
+  val enumSwitchLabels: Map<JavaNodeId, Int> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

@@ -965,9 +965,12 @@ class JavaAstToIrLowererTest {
     is JavaIrExpression.Lambda -> builtinOperations(expression.body) +
       expression.boundValues.flatMap { builtinOperations(it.expression) }
     is JavaIrExpression.NewObject -> expression.arguments.flatMap(::builtinOperations)
-      is JavaIrExpression.NewArray -> builtinOperations(expression.length)
-      is JavaIrExpression.NewMultiArray -> expression.lengths.flatMap(::builtinOperations)
-      is JavaIrExpression.ArrayInitializer -> expression.elements.flatMap(::builtinOperations)
+    is JavaIrExpression.NewEnumConstant -> expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.InvokeEnum -> expression.receiver?.let(::builtinOperations).orEmpty() +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.NewArray -> builtinOperations(expression.length)
+    is JavaIrExpression.NewMultiArray -> expression.lengths.flatMap(::builtinOperations)
+    is JavaIrExpression.ArrayInitializer -> expression.elements.flatMap(::builtinOperations)
     is JavaIrExpression.GetArrayElement -> builtinOperations(expression.array) + builtinOperations(expression.index)
     is JavaIrExpression.SetArrayElement -> builtinOperations(expression.array) +
       builtinOperations(expression.index) + builtinOperations(expression.value)
