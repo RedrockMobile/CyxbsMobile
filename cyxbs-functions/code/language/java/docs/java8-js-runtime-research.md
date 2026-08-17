@@ -441,7 +441,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
    `name/ordinal`、switch、接口实现与受控初始化；
 7. （已完成，2026-08-18）完整数值：`long`、`float`、`double`、数值提升、显式/隐式转换、
    位运算、比较及常用 Math/包装 API；
-8. 泛型与语言收口：剩余常用推断、桥方法、数组/可变参数等教学高频边界，低频项稳定诊断；
+8. （已完成，2026-08-18）泛型与语言收口：目标类型方法推断、常用 wildcard capture、桥接分派、
+   数组形式的可变参数声明与 Java 第三阶段调用决议，低频项保持稳定诊断；
 9. 产品化：源码栈映射、缓存与增量编译、npm/端上链路、资源限制、fuzz 和跨平台发布验证。
 
 接口分派、Object 虚方法和常用控制流已经作为上述九批的前置基础完成。低频 wildcard capture、
@@ -511,9 +512,16 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   `PrintStream`、`StringBuilder` 和 Math 的常用 long/float/double overload 也通过 builtin operation 接入；
 - 完整 `jsNodeTest` 共 249 项通过；新增真实源码执行覆盖 long 溢出与移位、浮点特殊值、Math、
   primitive/wrapper 强转和 StringBuilder 输出，Java 模块 35 个源码/测试文件经 IDE 全量诊断为 0 error；
-- `java.lang.Enum` 的低频 `compareTo/getDeclaringClass`、常量专属 class body、十六进制浮点字面量和
-  `-9223372036854775808L` 的特殊词法边界暂不扩展；常用泛型收口按上述第 8 批继续实现，低频项将在
-  第 8 批统一给出稳定诊断。
+- 已支持泛型方法从赋值、return 与调用目标类型反向推断，实参约束和目标约束共用统一推断器；
+  `List<? extends T>` 读取、`List<? super T>` 写入以及无界 wildcard 的 Object 读取/null 写入均已覆盖；
+- 已支持方法和构造器的 `T...` 声明，重载严格遵循 fixed strict -> fixed loose -> variable-arity
+  三阶段；只有第三阶段会在 lowering 中创建并打包新数组，直接传入现成数组仍保持 fixed arity；
+- 泛型 override 会先按子类视角代换父参数，再复用擦除后的稳定 JS 虚槽；这在运行结果上等价于 JVM
+  bridge method，因此 JS 产物无需额外生成只负责转发的物理桥方法；
+- 完整 `jsNodeTest` 共 254 项通过；新增真实源码执行覆盖目标类型推断、零/多尾参数 vararg、固定数组
+  调用、可变参数构造器与常用 wildcard 集合读写；
+- raw type、复杂 capture/F-bound/交叉约束推断、后置数组声明、泛型数组创建、常量专属 enum class body、
+  十六进制浮点字面量和 `-9223372036854775808L` 的特殊词法边界暂不扩展，均保持编译期诊断。
 
 ### 阶段 2B：精选类库与宿主桥
 

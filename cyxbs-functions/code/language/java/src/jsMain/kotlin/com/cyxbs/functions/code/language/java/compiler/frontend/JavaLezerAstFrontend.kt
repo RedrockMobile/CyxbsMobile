@@ -263,9 +263,6 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val modifiers = node.modifiersBefore(definition, METHOD_MODIFIERS, "方法")
     val annotations = methodAnnotations(node, definition)
     rejectReturnDimensions(node)
-    node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
-      unsupported(it, "阶段 1 尚不支持可变参数。")
-    }
     val bodyNode = node.children().firstOrNull { it.name == "Block" }
     when (ownerKind) {
       JavaAstTypeDeclarationKind.CLASS,
@@ -294,7 +291,8 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
         }
       }
     }
-    val parameters = node.descendants().filter { it.name == "FormalParameter" }
+    val parameters = node.descendants()
+      .filter { it.name == "FormalParameter" || it.name == "SpreadParameter" }
       .filter { it.nearest("MethodDeclaration") === node }.map(::parameter)
     return JavaAstMemberDeclaration.Method(
       ids.next(),
@@ -316,12 +314,10 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val definition = node.children().firstOrNull { it.name == "Definition" }
       ?: unsupported(node, "构造器缺少名称。")
     rejectAnnotationsBefore(node, definition, "构造器")
-    node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
-      unsupported(it, "阶段 1 尚不支持可变参数。")
-    }
     val body = node.children().firstOrNull { it.name == "ConstructorBody" }
       ?: unsupported(node, "构造器必须有 block 方法体。")
-    val parameters = node.descendants().filter { it.name == "FormalParameter" }
+    val parameters = node.descendants()
+      .filter { it.name == "FormalParameter" || it.name == "SpreadParameter" }
       .filter { it.nearest("ConstructorDeclaration") === node }.map(::parameter).toList()
     return JavaAstMemberDeclaration.Constructor(
       ids.next(),
@@ -335,13 +331,26 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     )
   }
 
-  /** 构建普通参数，vararg 由后续阶段开放。 */
+  /**
+   * 构建普通或可变参数。
+   *
+   * Lezer 把 `T... values` 表示为 `SpreadParameter(TypeName, VariableDeclarator(Definition))`；
+   * AST 统一把声明类型保存为 `T[]`，同时保留 [JavaAstParameter.isVararg]，供 overload 第三阶段
+   * 区分“直接传入数组”和“把尾部实参打包成数组”。
+   */
   private fun parameter(node: LezerSyntaxNode): JavaAstParameter {
     val definition = node.descendants().firstOrNull { it.name == "Definition" } ?: unsupported(node, "参数缺少名称。")
     rejectAnnotationsBefore(node, definition, "参数")
     rejectPostNameDimensions(definition, "参数")
-    return JavaAstParameter(ids.next(), span(node), node.modifiersBefore(definition, PARAMETER_MODIFIERS, "参数"), node.typeBefore(definition),
-      text(definition), false)
+    val isVararg = node.name == "SpreadParameter"
+    val declaredType = node.typeBefore(definition)
+    val type = if (isVararg) {
+      JavaAstTypeReference.Array(ids.next(), span(node), declaredType, dimensions = 1)
+    } else declaredType
+    return JavaAstParameter(
+      ids.next(), span(node), node.modifiersBefore(definition, PARAMETER_MODIFIERS, "参数"),
+      type, text(definition), isVararg,
+    )
   }
 
   /**

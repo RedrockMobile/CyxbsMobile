@@ -273,6 +273,68 @@ class JavaStage1SemanticAnalysisTest {
     assertTrue(model.valueAccesses.values.any { it.symbol in model.fieldDeclarations })
   }
 
+  /** Java 8 允许只从赋值/return 目标推断无实参泛型方法的类型变量。 */
+  @Test
+  fun infersGenericMethodFromTargetType() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static <T> T empty() { return null; }
+          static <T> T prefer(T value) { return value; }
+          static String run() {
+            String empty = empty();
+            return prefer(null);
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val substitutions = assertNotNull(result.value).selectedCallables.values
+      .filter { it.substitutions.isNotEmpty() }
+    assertTrue(substitutions.size >= 2)
+    assertTrue(substitutions.all { binding ->
+      binding.substitutions.values.none { it == JavaSemanticType.Null }
+    })
+  }
+
+  /** 固定 arity 必须优先于可变 arity，只有展开调用才登记数组打包组件。 */
+  @Test
+  fun resolvesVarargMethodsAndConstructorsInThirdPhase() {
+    val result = analyze(
+      "Main.java" to """
+        class Bucket {
+          int size;
+          Bucket(String... values) { size = values.length; }
+        }
+        class Main {
+          static int choose(int left, int right) { return 1; }
+          static int choose(int... values) { return 2; }
+          static <T> T first(T fallback, T... values) {
+            if (values.length == 0) return fallback;
+            return values[0];
+          }
+          static String run() {
+            int[] existing = {1, 2};
+            int fixed = choose(1, 2);
+            int directArray = choose(existing);
+            int expanded = choose(1, 2, 3);
+            Bucket bucket = new Bucket("a", "b");
+            return first("fallback", "value");
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    assertTrue(model.callableDeclarations.values.count { it.isVararg } >= 3)
+    assertTrue(model.selectedCallables.values.any { it.varargElementType != null })
+    assertTrue(model.selectedCallables.values.any { binding ->
+      model.callableDeclarations[binding.symbol]?.isVararg == true && binding.varargElementType == null
+    })
+  }
+
   /** 方法类型参数上界需要先应用 receiver owner 的固定类型代换。 */
   @Test
   fun substitutesOwnerTypeInsideMethodTypeParameterBound() {
@@ -377,6 +439,42 @@ class JavaStage1SemanticAnalysisTest {
         "Main.java" to "class Base{} class Box<T extends Base>{} class Main { Box<String> invalid; }",
       ),
       "java.semantic.type_argument_bound",
+    )
+  }
+
+  /** 常用集合 wildcard 读取上界与 super 写入规则无需完整 capture 求解即可稳定支持。 */
+  @Test
+  fun capturesCommonWildcardCollectionReadsAndWrites() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.List;
+        import java.util.ArrayList;
+        class Main {
+          static int run() {
+            List<Integer> integers = new ArrayList<Integer>();
+            integers.add(7);
+            List<? extends Number> readers = integers;
+            Number number = readers.get(0);
+            List<? super Integer> writers = integers;
+            writers.add(8);
+            List<?> unknown = integers;
+            unknown.add(null);
+            Object value = unknown.get(0);
+            return number.intValue();
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          import java.util.List;
+          class Main { static void bad(List<? extends Number> values) { values.add(1); } }
+        """.trimIndent(),
+      ),
+      "java.semantic.no_applicable_overload",
     )
   }
 

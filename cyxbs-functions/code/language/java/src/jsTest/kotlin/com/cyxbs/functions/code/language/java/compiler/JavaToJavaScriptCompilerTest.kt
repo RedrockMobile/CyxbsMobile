@@ -1852,6 +1852,79 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(6, executeEntry(artifact, 0))
   }
 
+  /** 目标类型泛型推断、固定/展开 vararg 与构造器数组打包必须贯穿真实 JS 执行。 */
+  @Test
+  fun compilesTargetTypedInferenceAndVarargs() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        class Bucket {
+          int size;
+          Bucket(String... values) { size = values.length; }
+        }
+        class Main {
+          static <T> T empty() { return null; }
+          static int choose(int left, int right) { return 10; }
+          static int choose(int... values) { return values.length; }
+          static <T> T first(T fallback, T... values) {
+            if (values.length == 0) return fallback;
+            return values[0];
+          }
+          static int run() {
+            String targetOnly = empty();
+            int[] direct = {1, 2, 3, 4};
+            Bucket bucket = new Bucket("a", "b");
+            String selected = first("fallback", "value");
+            String fallbackOnly = first("fallback");
+            if (targetOnly != null) return 0;
+            if (!selected.equals("value")) return 1;
+            if (!fallbackOnly.equals("fallback")) return 2;
+            return choose(1, 2) + choose(direct) + choose(1, 2, 3) + bucket.size;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(19, executeEntry(artifact, 0))
+  }
+
+  /** extends 读取、super 写入与无界 wildcard 的 null 写入必须保持集合别名和装箱语义。 */
+  @Test
+  fun compilesCommonWildcardCaptureOperations() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        import java.util.List;
+        import java.util.ArrayList;
+        class Main {
+          static int run() {
+            List<Integer> integers = new ArrayList<Integer>();
+            integers.add(7);
+            List<? extends Number> readers = integers;
+            Number first = readers.get(0);
+            List<? super Integer> writers = integers;
+            writers.add(8);
+            List<?> unknown = integers;
+            unknown.add(null);
+            Object observed = unknown.get(1);
+            if (observed == null) return 0;
+            return first.intValue() + integers.size();
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(10, executeEntry(artifact, 0))
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

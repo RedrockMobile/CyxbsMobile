@@ -6,7 +6,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
  * 阶段 1 使用的纯 Java 类型关系计算器。
  *
  * 本类只依赖已冻结的声明表，以精确 [JavaSymbolId] 判断类型身份，不读取限定名或产生诊断。
- * 损坏模型、raw type、尚未支持的 capture/boxing/vararg 等情况会保守返回 null 或 false，
+ * 损坏模型、raw type 或尚未支持的复杂 capture 等情况会保守返回 null 或 false，
  * 调用方应在自身阶段把失败转换为对应诊断。
  *
  * [objectSymbol] 必须指向声明表中的内建 java.lang.Object；该符号用于无界通配符擦除和数组
@@ -95,7 +95,8 @@ internal class JavaTypeRelations(
    * 返回赋值上下文允许的最小转换。
    *
    * 支持 Java 8 赋值上下文的 identity、primitive/reference widening、首批 wrapper boxing/unboxing
-   * 以及 unboxing 后 primitive widening；常量窄化与 vararg 联合仍稳定拒绝。
+   * 以及 unboxing 后 primitive widening。vararg 的第三阶段展开由语义分析器先投影成普通参数类型，
+   * 因而本类无需读取 callable 形状；常量窄化仍稳定拒绝。
    */
   fun assignmentConversion(
     source: JavaSemanticType,

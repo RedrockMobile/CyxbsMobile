@@ -444,7 +444,7 @@ private class BodyLowering(
       if (delegation.sourceConstructor != declaration.symbol) {
         lowering.invalid("Constructor delegation source is inconsistent.", span)
       } else {
-        val arguments = if (delegation.isImplicit) emptyList() else {
+        val rawArguments = if (delegation.isImplicit) emptyList() else {
           if (sourceInvocation == null || sourceInvocation.nodeId != delegation.invocationNode) {
             lowering.invalid("Constructor delegation invocation does not match AST.", span)
             emptyList()
@@ -456,6 +456,12 @@ private class BodyLowering(
         if (target?.kind != JavaSemanticCallableKind.CONSTRUCTOR) {
           lowering.invalid("Constructor delegation target is invalid.", span)
         } else {
+          val binding = sourceInvocation?.let { lowering.model.selectedCallables[it.nodeId] }
+          val arguments = if (binding != null) {
+            packVarargArguments(rawArguments, binding, target, sourceInvocation.span) ?: return null
+          } else {
+            packImplicitVarargArguments(rawArguments, target, span) ?: return null
+          }
           val builtin = lowering.model.builtinMembers[delegation.targetConstructor]
           if (builtin is JavaBuiltinMemberDescriptor.Callable) {
             if (delegation.kind != JavaConstructorDelegationKind.SUPER) {
@@ -1340,10 +1346,11 @@ private class BodyLowering(
     if (binding.symbol in lowering.model.builtinMembers) {
       return invalid("Source callable unexpectedly carries a builtin operation.", source.span)
     }
-    val arguments = source.arguments.mapNotNull(::expression)
-    if (arguments.size != source.arguments.size ||
-      arguments.size != binding.parameterTypes.size
+    val rawArguments = source.arguments.mapNotNull(::expression)
+    if (rawArguments.size != source.arguments.size ||
+      rawArguments.size != binding.parameterTypes.size
     ) return invalid("Selected method argument count is inconsistent.", source.span)
+    val arguments = packVarargArguments(rawArguments, binding, declaration, source.span) ?: return null
     val method = JavaIrMethodId(binding.symbol.value)
     return when (binding.dispatch) {
       JavaDispatchKind.STATIC -> {
@@ -1444,6 +1451,7 @@ private class BodyLowering(
     if (arguments.size != binding.parameterTypes.size ||
       declaration.erasedDescriptor != binding.erasedDescriptor
     ) return invalid("Synthetic call binding is inconsistent.", span)
+    val packedArguments = packVarargArguments(arguments, binding, declaration, span) ?: return null
     val type = lowering.typeOf(binding.returnType, span) ?: return null
     val builtin = lowering.model.builtinMembers[binding.symbol]
     if (builtin is JavaBuiltinMemberDescriptor.Callable) {
@@ -1451,7 +1459,7 @@ private class BodyLowering(
         if (receiver != null || binding.dispatch != JavaDispatchKind.STATIC) {
           return invalid("Synthetic static builtin call has an invalid receiver.", span)
         }
-        return JavaIrExpression.InvokeBuiltin(builtin.operation, null, arguments, type, span)
+        return JavaIrExpression.InvokeBuiltin(builtin.operation, null, packedArguments, type, span)
       }
       if (receiver == null || binding.receiverKind !in setOf(
           JavaReceiverKind.EXPLICIT,
@@ -1464,17 +1472,17 @@ private class BodyLowering(
           builtin.operation,
           receiver,
           binding.virtualSlot?.value ?: return invalid("Synthetic virtual call is missing its slot.", span),
-          arguments,
+          packedArguments,
           type,
           span,
         )
-      } else JavaIrExpression.InvokeBuiltin(builtin.operation, receiver, arguments, type, span)
+      } else JavaIrExpression.InvokeBuiltin(builtin.operation, receiver, packedArguments, type, span)
     }
     val method = JavaIrMethodId(binding.symbol.value)
     return when (binding.dispatch) {
       JavaDispatchKind.SPECIAL -> JavaIrExpression.InvokeSpecial(
         receiver ?: return invalid("Synthetic special call is missing its receiver.", span),
-        method, arguments, type, span,
+        method, packedArguments, type, span,
       )
       JavaDispatchKind.VIRTUAL,
       JavaDispatchKind.INTERFACE,
@@ -1482,13 +1490,13 @@ private class BodyLowering(
         receiver ?: return invalid("Synthetic virtual call is missing its receiver.", span),
         method,
         binding.virtualSlot?.value ?: return invalid("Synthetic virtual call is missing its slot.", span),
-        arguments,
+        packedArguments,
         type,
         span,
       )
       JavaDispatchKind.STATIC -> {
         if (receiver != null) return invalid("Synthetic static call unexpectedly has a receiver.", span)
-        JavaIrExpression.InvokeStatic(method, arguments, type, span)
+        JavaIrExpression.InvokeStatic(method, packedArguments, type, span)
       }
     }
   }
@@ -1507,13 +1515,14 @@ private class BodyLowering(
       binding.dispatch != JavaDispatchKind.SPECIAL ||
       arguments.size != binding.parameterTypes.size
     ) return invalid("Constructor reference binding is inconsistent.", span)
+    val packedArguments = packVarargArguments(arguments, binding, declaration, span) ?: return null
     val builtin = lowering.model.builtinMembers[binding.symbol]
     if (builtin is JavaBuiltinMemberDescriptor.Callable) {
       if (!builtin.isConstructor) return invalid("Constructor reference targets a non-constructor builtin.", span)
-      return JavaIrExpression.ConstructBuiltin(builtin.operation, arguments, result, span)
+      return JavaIrExpression.ConstructBuiltin(builtin.operation, packedArguments, result, span)
     }
     return JavaIrExpression.NewObject(
-      result.classId, JavaIrMethodId(binding.symbol.value), arguments, result, span,
+      result.classId, JavaIrMethodId(binding.symbol.value), packedArguments, result, span,
     )
   }
 
@@ -1535,10 +1544,11 @@ private class BodyLowering(
     if (reference.classId.value != declaration.owner.value) {
       return invalid("Object creation type and constructor owner differ.", source.span)
     }
-    val arguments = source.arguments.mapNotNull(::expression)
-    if (arguments.size != source.arguments.size ||
-      arguments.size != binding.parameterTypes.size
+    val rawArguments = source.arguments.mapNotNull(::expression)
+    if (rawArguments.size != source.arguments.size ||
+      rawArguments.size != binding.parameterTypes.size
     ) return invalid("Selected constructor argument count is inconsistent.", source.span)
+    val arguments = packVarargArguments(rawArguments, binding, declaration, source.span) ?: return null
     val builtin = lowering.model.builtinMembers[binding.symbol]
     if (builtin != null) {
       if (builtin !is JavaBuiltinMemberDescriptor.Callable || !builtin.isConstructor ||
@@ -1549,6 +1559,83 @@ private class BodyLowering(
     return JavaIrExpression.NewObject(
       reference.classId, JavaIrMethodId(binding.symbol.value), arguments, type, source.span,
     )
+  }
+
+  /**
+   * 将 variable-arity 调用的尾部实参打包成一个新数组。
+   *
+   * 固定 arity 调用（包括直接传入现成数组）不会进入该分支；打包元素已经由语义层逐项完成
+   * invocation conversion，因此这里只负责保持求值顺序并构建精确运行时 component token。
+   */
+  private fun packVarargArguments(
+    arguments: List<JavaIrExpression>,
+    binding: JavaCallableBinding,
+    declaration: JavaSemanticCallableDeclaration,
+    span: JavaSourceSpan,
+  ): List<JavaIrExpression>? {
+    val elementSemanticType = binding.varargElementType
+      ?: return arguments.takeIf { it.size == declaration.parameterTypes.size }
+        ?: invalid("Fixed-arity call argument count does not match its declaration.", span)
+    if (!declaration.isVararg || declaration.parameterTypes.isEmpty()) {
+      return invalid("Expanded vararg binding targets a non-vararg declaration.", span)
+    }
+    val fixedCount = declaration.parameterTypes.size - 1
+    if (arguments.size < fixedCount) {
+      return invalid("Expanded vararg call has fewer arguments than fixed parameters.", span)
+    }
+    val componentType = lowering.typeOf(elementSemanticType, span) ?: return null
+    val arrayType = JavaIrType.Array(componentType)
+    val packed = JavaIrExpression.ArrayInitializer(
+      componentType,
+      arguments.drop(fixedCount),
+      arrayType,
+      span,
+      runtimeReferenceComponentKind(componentType, span),
+    )
+    return arguments.take(fixedCount) + packed
+  }
+
+  /** implicit super() 没有 AST 调用 binding，但仍可能命中零元素 vararg 构造器。 */
+  private fun packImplicitVarargArguments(
+    arguments: List<JavaIrExpression>,
+    declaration: JavaSemanticCallableDeclaration,
+    span: JavaSourceSpan,
+  ): List<JavaIrExpression>? {
+    if (!declaration.isVararg) {
+      return arguments.takeIf { it.size == declaration.parameterTypes.size }
+        ?: invalid("Implicit constructor argument count does not match its declaration.", span)
+    }
+    val fixedCount = declaration.parameterTypes.size - 1
+    if (arguments.size < fixedCount) return invalid("Implicit vararg constructor has missing fixed arguments.", span)
+    val element = (declaration.parameterTypes.lastOrNull() as? JavaSemanticType.Array)?.componentType
+      ?: return invalid("Vararg constructor declaration is missing its array component.", span)
+    val syntheticBinding = JavaCallableBinding(
+      declaration.symbol,
+      JavaDispatchKind.SPECIAL,
+      List(arguments.size) { index ->
+        if (index < fixedCount) declaration.parameterTypes[index] else element
+      },
+      declaration.returnType,
+      emptyMap(),
+      erasedDescriptor = declaration.erasedDescriptor,
+      varargElementType = element,
+    )
+    return packVarargArguments(arguments, syntheticBinding, declaration, span)
+  }
+
+  /** 根据已擦除 IR 引用类型生成数组运行时分类，不读取源码名称或 JavaScript 值。 */
+  private fun runtimeReferenceComponentKind(
+    componentType: JavaIrType,
+    span: JavaSourceSpan,
+  ): JavaIrArrayReferenceComponentKind? {
+    val reference = componentType as? JavaIrType.Reference ?: return null
+    val declaration = lowering.model.typeDeclarations[JavaSymbolId(reference.classId.value)]
+      ?: return invalid("Vararg array component is missing its type declaration.", span)
+    return when (declaration.qualifiedName) {
+      "java.lang.Object" -> JavaIrArrayReferenceComponentKind.OBJECT
+      "java.lang.String" -> JavaIrArrayReferenceComponentKind.STRING
+      else -> JavaIrArrayReferenceComponentKind.USER_CLASS
+    }
   }
 
   /** 语义 enum operation 与 typed IR 保持一一对应。 */

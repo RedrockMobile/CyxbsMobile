@@ -167,6 +167,7 @@ internal enum class JavaSemanticCallableKind {
  * [parameters] 与 [parameterTypes] 按源码位置一一对应。[returnType] 对普通方法是声明返回类型；
  * 对构造器是所属类型的声明类型，便于 new 表达式和构造器 binding 共享同一契约。
  * [erasedDescriptor] 是 override、名称改编和运行时分派使用的稳定 Java 擦除 descriptor。
+ * [isVararg] 为 true 时最后一个 [parameterTypes] 必须是数组；声明本身仍只有一个数组参数。
  */
 internal data class JavaSemanticCallableDeclaration(
   val symbol: JavaSymbolId,
@@ -183,6 +184,7 @@ internal data class JavaSemanticCallableDeclaration(
   val erasedDescriptor: String,
   /** callable 可能向调用方传播的受检或非受检异常，已完成类型名称解析。 */
   val thrownTypes: List<JavaSemanticType.Declared> = emptyList(),
+  val isVararg: Boolean = false,
 ) {
   init {
     require(typeParameters.distinct().size == typeParameters.size) {
@@ -196,6 +198,9 @@ internal data class JavaSemanticCallableDeclaration(
     }
     require(erasedDescriptor.isNotEmpty()) {
       "A semantic callable must provide its erased descriptor."
+    }
+    require(!isVararg || parameterTypes.lastOrNull() is JavaSemanticType.Array) {
+      "A vararg callable must end with an array parameter."
     }
     require(
       kind != JavaSemanticCallableKind.CONSTRUCTOR ||
@@ -327,6 +332,8 @@ internal data class JavaValueAccessBinding(
  *
  * [erasedDescriptor] 在阶段 0 兼容期允许为空；阶段 1 成功模型必须填写。
  * [virtualSlot] 仅在 VIRTUAL/INTERFACE 分派时存在，静态和构造器调用不得依赖虚槽。
+ * [varargElementType] 非空表示本次调用采用 variable-arity phase，lowering 必须把固定参数之后的
+ * 实参打包成一个新数组；直接传入现成数组时保持为空。
  */
 internal data class JavaCallableBinding(
   val symbol: JavaSymbolId,
@@ -337,6 +344,7 @@ internal data class JavaCallableBinding(
   val receiverKind: JavaReceiverKind = JavaReceiverKind.NONE,
   val erasedDescriptor: String? = null,
   val virtualSlot: JavaVirtualSlotId? = null,
+  val varargElementType: JavaSemanticType? = null,
 )
 
 /** 方法调用在运行时需要采用的分派方式。 */

@@ -23,8 +23,10 @@ internal sealed interface JavaPartialGenericInferenceResult {
 /**
  * 阶段 1 方法与 diamond 构造器共用的保守泛型实参推断器。
  *
- * 仅从实参约束推断，不读取 target type；同一类型变量出现多个候选时只选择已有候选中的
- * 最小公共可赋值类型。无法唯一收敛、违反上界或需要 capture/F-bound 复杂求解时返回 null。
+ * 本类只消费 formal/actual 约束对，不直接读取 AST 上下文；调用方既可以传入实参约束，也可以把
+ * callable 返回类型与赋值、return 或调用位置的目标类型追加为约束。这样推断算法无需感知语法节点，
+ * 同时能覆盖 Java 8 常用 target typing。无法唯一收敛、违反上界或需要复杂 capture/F-bound 求解时
+ * 返回 null。
  */
 internal class JavaGenericInference(
   private val relations: JavaTypeRelations,

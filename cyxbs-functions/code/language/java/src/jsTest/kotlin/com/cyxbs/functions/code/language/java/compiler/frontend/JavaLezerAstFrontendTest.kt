@@ -136,13 +136,22 @@ class JavaLezerAstFrontendTest {
     assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
-  /** vararg 仍未开放，不能被静默降成普通数组参数。 */
+  /** 可变参数必须保留声明标记，并规范化为最后一个数组参数。 */
   @Test
-  fun rejectsUnsupportedVarargWithoutErasure() {
-    val result = parse("class Main { static int value(int... items) { return 0; } }")
+  fun mapsMethodAndConstructorVarargs() {
+    val result = parse(
+      "class Main { Main(String... names) {} static int value(int head, int... items) { return items.length; } }",
+    )
 
-    assertFalse(result.isSuccess)
-    assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" })
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val members = assertNotNull(result.value).units.single().types.single().members
+    val constructor = assertIs<JavaAstMemberDeclaration.Constructor>(members[0])
+    val method = assertIs<JavaAstMemberDeclaration.Method>(members[1])
+    assertTrue(constructor.parameters.single().isVararg)
+    assertTrue(method.parameters.last().isVararg)
+    assertFalse(method.parameters.first().isVararg)
+    assertEquals(1, assertIs<JavaAstTypeReference.Array>(constructor.parameters.single().type).dimensions)
+    assertEquals(1, assertIs<JavaAstTypeReference.Array>(method.parameters.last().type).dimensions)
   }
 
   /**

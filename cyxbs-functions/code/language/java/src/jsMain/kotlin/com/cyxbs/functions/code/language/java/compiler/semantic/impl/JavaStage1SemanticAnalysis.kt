@@ -840,10 +840,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       owner.selfType()
     }
     symbols[id] = symbols.getValue(id).copy(type = returnType)
+    val varargIndices = parameterNodes.indices.filter { parameterNodes[it].isVararg }
+    if (varargIndices.any { it != parameterNodes.lastIndex } || varargIndices.size > 1) {
+      error(declaration.span, "java.semantic.invalid_vararg_position", "可变参数必须是 callable 的最后一个且只能声明一次。")
+    }
     val parameterTypes = parameterNodes.map { parameter ->
-      if (parameter.isVararg) {
-        error(parameter.span, "java.semantic.vararg_unsupported", "Stage1 暂不支持 vararg。")
-      }
       resolveType(parameter.type, owner.unit, typeScope, allowVoid = false)
     }
     val declaredThrownTypes = (methodDeclaration?.thrownTypes ?: constructorDeclaration!!.thrownTypes)
@@ -899,6 +900,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       erasedSignatureKey = erasedSignatureKey,
       erasedDescriptor = erasedDescriptor,
       thrownTypes = declaredThrownTypes,
+      isVararg = varargIndices.size == 1 && varargIndices.single() == parameterNodes.lastIndex,
     )
     validateCallableShape(info)
     val siblings = if (kind == JavaSemanticCallableKind.METHOD) {
@@ -3262,10 +3264,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       return JavaSemanticType.Error
     }
     val accessible = modeCandidates.filter { isCallableAccessible(it.info) }
+    val expectedType = expectedExpressionTypes[expression.nodeId]
     val argumentTypes = analyzeInvocationArguments(
       expression.arguments,
       accessible,
       explicitTypeArguments,
+      expectedType,
     )
     if (argumentTypes.any { it == JavaSemanticType.Error }) return JavaSemanticType.Error
     if (modeCandidates.isNotEmpty() && accessible.isEmpty()) {
@@ -3276,6 +3280,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       accessible,
       argumentTypes,
       explicitTypeArguments,
+      expectedType,
     )
     val selected = selectMostSpecific(instantiated, expression.span, expression.methodName)
       ?: return JavaSemanticType.Error
@@ -3481,25 +3486,39 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     arguments: List<JavaAstExpression>,
     candidates: List<S1CallableCandidate>,
     explicitTypeArguments: List<JavaSemanticType> = emptyList(),
+    expectedReturnType: JavaSemanticType? = null,
   ): List<JavaSemanticType> {
     val types = MutableList<JavaSemanticType?>(arguments.size) { null }
     arguments.forEachIndexed { index, argument ->
       if (!argument.isTargetTypedDiamond()) types[index] = analyzeExpression(argument)
     }
-    val prepared = candidates.mapNotNull { candidate ->
-      if (candidate.info.parameterTypes.size != arguments.size) return@mapNotNull null
-      val ownerParameters = candidate.info.parameterTypes.map { parameter ->
+    fun prepare(expandVararg: Boolean): List<S1PolyCandidate> = candidates.mapNotNull { candidate ->
+      val declaredParameters = candidate.info.parameterTypes.map { parameter ->
         relations().substitute(parameter, candidate.ownerSubstitutions) ?: return@mapNotNull null
       }
+      val ownerParameters = invocationParameterTypes(
+        candidate.info,
+        declaredParameters,
+        arguments.size,
+        expandVararg,
+      ) ?: return@mapNotNull null
+      val ownerReturn = relations().substitute(candidate.info.returnType, candidate.ownerSubstitutions)
+        ?: return@mapNotNull null
       val fixed = if (candidate.info.typeParameters.isEmpty()) {
         if (explicitTypeArguments.isNotEmpty()) return@mapNotNull null
         emptyMap()
       } else {
         val knownIndices = types.indices.filter { types[it] != null }
+        val formalConstraints = knownIndices.map(ownerParameters::get).toMutableList()
+        val actualConstraints = knownIndices.map { checkNotNull(types[it]) }.toMutableList()
+        if (expectedReturnType != null) {
+          formalConstraints += ownerReturn
+          actualConstraints += expectedReturnType
+        }
         when (val partial = JavaGenericInference(relations(), typeParameterDeclarations).inferPartial(
           candidate.info.typeParameters,
-          knownIndices.map(ownerParameters::get),
-          knownIndices.map { checkNotNull(types[it]) },
+          formalConstraints,
+          actualConstraints,
           explicitTypeArguments,
           fixedSubstitutions = candidate.ownerSubstitutions,
         )) {
@@ -3520,12 +3539,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           arguments[index].isPolyCompatibleWith(parameter)
         } else {
           parameter.containsUnresolvedTypeVariable() ||
-            relations().invocationConversion(actual, parameter, allowBoxing) != null
+            invocationConversion(actual, parameter, allowBoxing) != null
         }
       }
-    val strict = prepared.filter { applicable(it, allowBoxing = false) }
+    val fixed = prepare(expandVararg = false)
+    val strict = fixed.filter { applicable(it, allowBoxing = false) }
     // Java overload phase 不能把 loose 候选与已有 strict 候选混在一起。
-    val remaining = strict.ifEmpty { prepared.filter { applicable(it, allowBoxing = true) } }
+    val loose = if (strict.isEmpty()) fixed.filter { applicable(it, allowBoxing = true) } else emptyList()
+    // variable-arity 是第三阶段，只有固定 arity 的 strict/loose 均无候选时才能参与 target 推断。
+    val remaining = strict.ifEmpty { loose }.ifEmpty {
+      prepare(expandVararg = true).filter { applicable(it, allowBoxing = true) }
+    }
     arguments.forEachIndexed { index, argument ->
       if (types[index] != null) return@forEachIndexed
       val targets = remaining.mapNotNull { candidate ->
@@ -3656,21 +3680,34 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     argumentTypes: List<JavaSemanticType>,
     explicitTypeArguments: List<JavaSemanticType>,
     allowBoxing: Boolean,
+    expandVararg: Boolean,
+    expectedReturnType: JavaSemanticType?,
   ): S1InstantiatedCallable? {
-    if (candidate.info.parameterTypes.size != argumentTypes.size) return null
-    val ownerParameters = candidate.info.parameterTypes.map {
+    val declaredParameters = candidate.info.parameterTypes.map {
       relations().substitute(it, candidate.ownerSubstitutions) ?: return null
     }
+    val ownerParameters = invocationParameterTypes(
+      candidate.info,
+      declaredParameters,
+      argumentTypes.size,
+      expandVararg,
+    ) ?: return null
     val ownerReturn = relations().substitute(candidate.info.returnType, candidate.ownerSubstitutions)
       ?: return null
     val callableSubstitutions = if (candidate.info.typeParameters.isEmpty()) {
       if (explicitTypeArguments.isNotEmpty()) return null
       emptyMap()
     } else {
+      val formalConstraints = ownerParameters.toMutableList()
+      val actualConstraints = argumentTypes.toMutableList()
+      if (expectedReturnType != null) {
+        formalConstraints += ownerReturn
+        actualConstraints += expectedReturnType
+      }
       JavaGenericInference(relations(), typeParameterDeclarations).infer(
         candidate.info.typeParameters,
-        ownerParameters,
-        argumentTypes,
+        formalConstraints,
+        actualConstraints,
         explicitTypeArguments,
         fixedSubstitutions = candidate.ownerSubstitutions,
       ) ?: return null
@@ -3679,18 +3716,45 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       relations().substitute(it, callableSubstitutions) ?: return null
     }
     if (!argumentTypes.zip(parameterTypes).all { (actual, expected) ->
-        relations().invocationConversion(actual, expected, allowBoxing) != null
+        invocationConversion(actual, expected, allowBoxing) != null
       }
     ) {
       return null
     }
-    val returnType = relations().substitute(ownerReturn, callableSubstitutions) ?: return null
+    val returnType = readableCapturedType(
+      relations().substitute(ownerReturn, callableSubstitutions) ?: return null,
+    )
     return S1InstantiatedCallable(
       candidate.info,
       parameterTypes,
       returnType,
       candidate.ownerSubstitutions + callableSubstitutions,
+      if (expandVararg) {
+        (declaredParameters.lastOrNull() as? JavaSemanticType.Array)?.componentType?.let { component ->
+          relations().substitute(component, callableSubstitutions)
+        }
+      } else null,
     )
+  }
+
+  /**
+   * 把声明参数投影为某一调用阶段实际观察到的参数列表。
+   *
+   * 固定 arity 阶段仍把末参数视为数组；variable-arity 阶段则把尾部每个实参映射到数组组件，
+   * 包括零个尾部实参。这样 overload、泛型推断和最终打包共享同一组已代换类型。
+   */
+  private fun invocationParameterTypes(
+    callable: S1CallableInfo,
+    declared: List<JavaSemanticType>,
+    argumentCount: Int,
+    expandVararg: Boolean,
+  ): List<JavaSemanticType>? {
+    if (!expandVararg) return declared.takeIf { it.size == argumentCount }
+    if (!callable.isVararg || declared.isEmpty()) return null
+    val fixedCount = declared.size - 1
+    if (argumentCount < fixedCount) return null
+    val element = (declared.last() as? JavaSemanticType.Array)?.componentType ?: return null
+    return declared.take(fixedCount) + List(argumentCount - fixedCount) { element }
   }
 
   /**
@@ -3701,13 +3765,27 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     candidates: List<S1CallableCandidate>,
     argumentTypes: List<JavaSemanticType>,
     explicitTypeArguments: List<JavaSemanticType>,
+    expectedReturnType: JavaSemanticType? = null,
   ): List<S1InstantiatedCallable> {
     val strict = candidates.mapNotNull { candidate ->
-      instantiateCallable(candidate, argumentTypes, explicitTypeArguments, allowBoxing = false)
+      instantiateCallable(
+        candidate, argumentTypes, explicitTypeArguments,
+        allowBoxing = false, expandVararg = false, expectedReturnType = expectedReturnType,
+      )
     }
     if (strict.isNotEmpty()) return strict
+    val loose = candidates.mapNotNull { candidate ->
+      instantiateCallable(
+        candidate, argumentTypes, explicitTypeArguments,
+        allowBoxing = true, expandVararg = false, expectedReturnType = expectedReturnType,
+      )
+    }
+    if (loose.isNotEmpty()) return loose
     return candidates.mapNotNull { candidate ->
-      instantiateCallable(candidate, argumentTypes, explicitTypeArguments, allowBoxing = true)
+      instantiateCallable(
+        candidate, argumentTypes, explicitTypeArguments,
+        allowBoxing = true, expandVararg = true, expectedReturnType = expectedReturnType,
+      )
     }
   }
 
@@ -3745,7 +3823,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     candidate: S1InstantiatedCallable,
     other: S1InstantiatedCallable,
   ): Boolean = candidate.parameterTypes.zip(other.parameterTypes).all { (left, right) ->
-    left == right || relations().invocationConversion(left, right, allowBoxing = false) != null
+    left == right || invocationConversion(left, right, allowBoxing = false) != null
   }
 
   /** 对最终选中的参数逐一写入转换 side table。 */
@@ -3755,8 +3833,39 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     parameterTypes: List<JavaSemanticType>,
   ) {
     arguments.zip(actualTypes.zip(parameterTypes)).forEach { (argument, pair) ->
-      compatibility(pair.first, pair.second)?.let { conversions[argument.nodeId] = it }
+      invocationConversion(pair.first, pair.second, allowBoxing = true)
+        ?.let { conversions[argument.nodeId] = it }
     }
+  }
+
+  /**
+   * 对常用 wildcard receiver 执行受控 capture 读写规则。
+   *
+   * `? extends U` 与无界 `?` 只允许写入 null；`? super L` 允许写入可转换到 L 的值。运行时参数
+   * 仍按擦除类型传递。方法返回直接类型变量被代换成 wildcard 时，读取类型使用上界（下界则为
+   * Object），覆盖 `List<?>.get`、`List<? extends Number>.get` 和 `List<? super T>.add` 等教学用法，
+   * 不尝试实现需要多个 capture 变量统一求解的复杂调用。
+   */
+  private fun invocationConversion(
+    actual: JavaSemanticType,
+    expected: JavaSemanticType,
+    allowBoxing: Boolean,
+  ): JavaSemanticConversion? {
+    if (expected !is JavaSemanticType.Wildcard) {
+      return relations().invocationConversion(actual, expected, allowBoxing)
+    }
+    if (actual == JavaSemanticType.Null) {
+      val target = expected.lowerBound ?: expected.upperBound ?: objectSemanticType()
+      return JavaSemanticConversion.ReferenceWidening(JavaSemanticType.Null, target)
+    }
+    val writableLowerBound = expected.lowerBound ?: return null
+    return relations().invocationConversion(actual, writableLowerBound, allowBoxing)
+  }
+
+  /** wildcard 读取采用其上界；`? super T` 的可观察读取类型只能是 Object。 */
+  private fun readableCapturedType(type: JavaSemanticType): JavaSemanticType = when (type) {
+    is JavaSemanticType.Wildcard -> type.upperBound ?: objectSemanticType()
+    else -> type
   }
 
   /** 解析 receiver；类型名限定符不会产生运行时求值。 */
@@ -4884,6 +4993,8 @@ private data class S1CallableInfo(
   val isBuiltinVirtualRoot: Boolean = false,
   /** 该 callable 声明可能传播的异常；调用点据此执行 checked exception 校验。 */
   val thrownTypes: List<JavaSemanticType.Declared> = emptyList(),
+  /** true 表示声明末参数是 variable-arity 数组。 */
+  val isVararg: Boolean = false,
 ) {
   val span: JavaSourceSpan get() = declaration?.span ?: owner.span
 
@@ -4902,6 +5013,7 @@ private data class S1CallableInfo(
     isAbstract,
     erasedDescriptor,
     thrownTypes,
+    isVararg,
   )
 }
 
@@ -4920,6 +5032,8 @@ private data class S1InstantiatedCallable(
   val parameterTypes: List<JavaSemanticType>,
   val returnType: JavaSemanticType,
   val substitutions: Map<JavaSymbolId, JavaSemanticType>,
+  /** 非空表示本次选择发生在 variable-arity 第三阶段。 */
+  val varargElementType: JavaSemanticType? = null,
 ) {
   /** 构造 lowering 可直接消费的最终 callable binding。 */
   fun binding(
@@ -4935,6 +5049,7 @@ private data class S1InstantiatedCallable(
     receiverKind,
     info.erasedDescriptor,
     virtualSlot,
+    varargElementType,
   )
 }
 
