@@ -1,143 +1,148 @@
 package com.cyxbs.pages.schedule.data.repository.v3
 
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResult
 import com.cyxbs.pages.schedule.data.remote.v3.CategorySyncResponse
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDelete
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDeleteResult
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.SyncResponse
+import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideSyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingDelete
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
 
-/**
- * 单条日常 Schedule mutation 的不可变捕获结果。
- *
- * [Failure] 只表示该 state 不能走非 atomic 日常接口；原子批次必须留给完整 Sync，不在 bridge 内拆批。
- */
+/** 日常聚合请求使用的 HTTP 方法；服务端仍由 typed payload 推断每个成员的 CREATE/PATCH/DELETE。 */
+enum class ScheduleV2DailyMutationMethod {
+  CREATE,
+  UPDATE,
+  DELETE,
+}
+
+/** 一次本地命令对应的不可变日常 Schedule 聚合 capture。 */
 sealed interface ScheduleV2DailyMutationCapture {
-  /** POST/PUT 共用完整 ScheduleInput；[create] 仅由 planner 投影后的 version 是否为 0 决定。 */
-  data class Upsert(
-    val input: ScheduleInput,
-    val create: Boolean,
+  /** [batch] 同时携带本次资源和与目标 Schedule 相关、仍待提交的 Category/Override。 */
+  data class Batch(
+    val method: ScheduleV2DailyMutationMethod,
+    val batch: AtomicBatch,
     val capture: ScheduleV2SyncCapture,
   ) : ScheduleV2DailyMutationCapture
 
-  /** DELETE 不携带 version，只保留 identity 与本地修改时间。 */
-  data class Delete(
-    val input: ScheduleDelete,
-    val capture: ScheduleV2SyncCapture,
-  ) : ScheduleV2DailyMutationCapture
-
-  /** 无 pending 或 atomic pending 等不适用于日常接口的稳定拒绝。 */
+  /** reducer 没有产生 pending，或本地状态无法形成非空批次。 */
   data class Failure(val message: String) : ScheduleV2DailyMutationCapture
 }
 
 /**
- * 把单个非 atomic Schedule pending 接到日常 POST/PUT/DELETE 的纯 common 适配层。
+ * 把一次本地命令产生的 pending 收敛为一个 Schedule 日常聚合请求。
  *
- * bridge 不复制版本合并或 compare-and-clear 状态机：capture 复用 [ScheduleV2RequestPlanner]，日常 typed
- * result 只被包装成最小 synthetic [SyncResponse]，再交给 [ScheduleV2ResponseApplier]。本层不解释 HTTP
- * envelope、不重试、不持久化，也不会把 atomic batch 拆成普通请求。
+ * capture 以本次 `localRevision` 为起点；若操作涉及某个 Schedule，还会带上该日程引用的待提交 Category、
+ * 同 parent 的待提交 OccurrenceOverride，以及这些成员已有的原子批次闭包。服务端因此能在一个 owner 事务内
+ * 校验最终图。bridge 不持久化、不重试，也不创建另一套 related DTO。
  */
 class ScheduleV2DailyMutationBridge(
   private val planner: ScheduleV2RequestPlanner = ScheduleV2RequestPlanner(),
   private val applier: ScheduleV2ResponseApplier = ScheduleV2ResponseApplier(),
 ) {
   /**
-   * 捕获一条 Schedule pending，并生成日常接口所需 input。
+   * 捕获本次命令及其 Schedule 关系闭包。
    *
-   * synthetic syncRequestId 仅用于本次内存中的 response 关联，由 identity 与 localRevision 确定性构造，
-   * 不作为 mutationId、回执或持久状态。
+   * 只选择仍有 pending 的 state；旧的无关失败不会被本次请求顺带绑定，避免一个业务拒绝回滚其他独立编辑。
    */
-  fun capture(state: ScheduleSyncState): ScheduleV2DailyMutationCapture {
-    val pending = state.pending
-      ?: return ScheduleV2DailyMutationCapture.Failure("Schedule has no pending mutation")
-    if (pending.localBatchId != null) {
-      return ScheduleV2DailyMutationCapture.Failure("atomic Schedule pending must use Sync")
+  fun capture(
+    syncRequestId: String,
+    localRevision: Long,
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    occurrenceOverrides: List<OccurrenceOverrideSyncState>,
+  ): ScheduleV2DailyMutationCapture {
+    val categoryIds = categories.filter { it.pending?.localRevision == localRevision }
+      .mapTo(linkedSetOf()) { it.identity }
+    val scheduleIds = schedules.filter { it.pending?.localRevision == localRevision }
+      .mapTo(linkedSetOf()) { it.identity }
+    val overrideIds = occurrenceOverrides.filter { it.pending?.localRevision == localRevision }
+      .mapTo(linkedSetOf()) { it.identity }
+    if (categoryIds.isEmpty() && scheduleIds.isEmpty() && overrideIds.isEmpty()) {
+      return ScheduleV2DailyMutationCapture.Failure("local command produced no pending mutation")
     }
-    val captured = planner.capture(
-      syncRequestId = "daily-schedule-${state.identity.id}-${pending.localRevision}",
-      categories = emptyList(),
-      schedules = listOf(state),
-      occurrenceOverrides = emptyList(),
+
+    // Override 命令属于其 parent Schedule；Schedule 命令则携带同 parent 的其他待提交 override。
+    overrideIds.mapTo(scheduleIds) { ScheduleIdentity(it.scheduleId) }
+    scheduleIds.toList().forEach { scheduleId ->
+      val schedule = schedules.firstOrNull { it.identity == scheduleId }
+      val categoryId = schedule?.effectiveResource()?.categoryId?.data
+        ?: schedule?.remoteSnapshot?.resource?.categoryId?.data
+      if (categoryId != null && categories.any { it.identity.id == categoryId && it.pending != null }) {
+        categoryIds += CategoryIdentity(categoryId)
+      }
+      occurrenceOverrides.filter { it.identity.scheduleId == scheduleId.id && it.pending != null }
+        .mapTo(overrideIds) { it.identity }
+    }
+
+    // 已持久化的 parent/delete 闭包不能被日常请求拆开；把命中的 localBatchId 成员完整纳入。
+    var expanded: Boolean
+    do {
+      val batchIds = buildSet {
+        categories.filter { it.identity in categoryIds }.mapNotNullTo(this) { it.pending?.localBatchId }
+        schedules.filter { it.identity in scheduleIds }.mapNotNullTo(this) { it.pending?.localBatchId }
+        occurrenceOverrides.filter { it.identity in overrideIds }.mapNotNullTo(this) { it.pending?.localBatchId }
+      }
+      val beforeSize = categoryIds.size + scheduleIds.size + overrideIds.size
+      categories.filter { it.pending?.localBatchId in batchIds }.mapTo(categoryIds) { it.identity }
+      schedules.filter { it.pending?.localBatchId in batchIds }.mapTo(scheduleIds) { it.identity }
+      occurrenceOverrides.filter { it.pending?.localBatchId in batchIds }.mapTo(overrideIds) { it.identity }
+      expanded = beforeSize != categoryIds.size + scheduleIds.size + overrideIds.size
+    } while (expanded)
+
+    val selectedCategories = categories.filter { it.identity in categoryIds && it.pending != null }
+    val selectedSchedules = schedules.filter { it.identity in scheduleIds && it.pending != null }
+    val selectedOverrides = occurrenceOverrides.filter { it.identity in overrideIds && it.pending != null }
+    val capture = planner.captureAtomic(
+      syncRequestId = syncRequestId,
+      batchId = "$syncRequestId-batch",
+      categories = selectedCategories,
+      schedules = selectedSchedules,
+      occurrenceOverrides = selectedOverrides,
     )
-    return when (pending) {
-      is PendingUpsert -> {
-        val input = captured.request.schedules.upserts.singleOrNull()
-          ?: return ScheduleV2DailyMutationCapture.Failure("planner did not produce one Schedule upsert")
-        ScheduleV2DailyMutationCapture.Upsert(
-          input = input,
-          create = input.version == 0uL,
-          capture = captured,
-        )
-      }
-      is PendingDelete -> {
-        val input = captured.request.schedules.deletes.singleOrNull()
-          ?: return ScheduleV2DailyMutationCapture.Failure("planner did not produce one Schedule delete")
-        ScheduleV2DailyMutationCapture.Delete(input, captured)
-      }
-    }
+    val method = selectMethod(selectedCategories, selectedSchedules, selectedOverrides)
+    return ScheduleV2DailyMutationCapture.Batch(method, capture.request.atomicBatches.single(), capture)
   }
 
-  /**
-   * 将日常 POST/PUT 的 typed result 交给统一 applier。
-   *
-   * [categories]、[schedules]、[occurrenceOverrides] 必须是响应到达时的当前完整状态，以保留 R→U。
-   */
-  fun applyUpsert(
-    captured: ScheduleV2DailyMutationCapture.Upsert,
-    result: ScheduleUpsertResult,
+  /** 把日常 AtomicBatchResult 包装为最小 SyncResponse，统一复用 canonical 合并与 R→U 清理。 */
+  fun apply(
+    captured: ScheduleV2DailyMutationCapture.Batch,
+    result: AtomicBatchResult,
     categories: List<CategorySyncState>,
     schedules: List<ScheduleSyncState>,
     occurrenceOverrides: List<OccurrenceOverrideSyncState>,
   ): ScheduleV2ApplyResult = applier.apply(
     capture = captured.capture,
-    response = syntheticResponse(captured.capture, upsertResult = result),
+    response = SyncResponse(
+      syncRequestId = captured.capture.request.syncRequestId,
+      categories = CategorySyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
+      schedules = ScheduleSyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
+      occurrenceOverrides = OccurrenceOverrideSyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
+      atomicBatchResults = listOf(result),
+    ),
     categories = categories,
     schedules = schedules,
     occurrenceOverrides = occurrenceOverrides,
   )
 
-  /** 将日常 DELETE typed result 包装后交给统一 applier，复用 tombstone 与 compare-and-clear 语义。 */
-  fun applyDelete(
-    captured: ScheduleV2DailyMutationCapture.Delete,
-    result: ScheduleDeleteResult,
+  /** 选择聚合请求的 HTTP 方法；混合批次优先使用主 Schedule 删除，其次 CREATE，最后 UPDATE。 */
+  private fun selectMethod(
     categories: List<CategorySyncState>,
     schedules: List<ScheduleSyncState>,
     occurrenceOverrides: List<OccurrenceOverrideSyncState>,
-  ): ScheduleV2ApplyResult = applier.apply(
-    capture = captured.capture,
-    response = syntheticResponse(captured.capture, deleteResult = result),
-    categories = categories,
-    schedules = schedules,
-    occurrenceOverrides = occurrenceOverrides,
-  )
-
-  /** 构造仅含单条 Schedule result 的完整 typed SyncResponse，其他 block/list 必须显式为空。 */
-  private fun syntheticResponse(
-    capture: ScheduleV2SyncCapture,
-    upsertResult: ScheduleUpsertResult? = null,
-    deleteResult: ScheduleDeleteResult? = null,
-  ): SyncResponse = SyncResponse(
-    syncRequestId = capture.request.syncRequestId,
-    categories = CategorySyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
-    schedules = ScheduleSyncResponse(
-      upserts = emptyList(),
-      deletes = emptyList(),
-      upsertResults = listOfNotNull(upsertResult),
-      deleteResults = listOfNotNull(deleteResult),
-    ),
-    occurrenceOverrides = OccurrenceOverrideSyncResponse(
-      emptyList(),
-      emptyList(),
-      emptyList(),
-      emptyList(),
-    ),
-    atomicBatchResults = emptyList(),
-  )
+  ): ScheduleV2DailyMutationMethod {
+    if (schedules.any { it.pending is PendingDelete }) return ScheduleV2DailyMutationMethod.DELETE
+    val pending = categories.mapNotNull { it.pending } +
+      schedules.mapNotNull { it.pending } + occurrenceOverrides.mapNotNull { it.pending }
+    if (pending.all { it is PendingDelete }) return ScheduleV2DailyMutationMethod.DELETE
+    if (pending.any { it is PendingUpsert<*, *> && it.resource.version == 0L }) {
+      return ScheduleV2DailyMutationMethod.CREATE
+    }
+    return ScheduleV2DailyMutationMethod.UPDATE
+  }
 }

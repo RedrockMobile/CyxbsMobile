@@ -87,17 +87,17 @@ class ProductionScheduleRepositoryFactoryIosTest {
 
     override suspend fun createSchedule(
       accountId: String,
-      input: com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput,
+      input: com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch,
     ) = error("factory initialize must not call daily create")
 
     override suspend fun updateSchedule(
       accountId: String,
-      input: com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput,
+      input: com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch,
     ) = error("factory initialize must not call daily update")
 
     override suspend fun deleteSchedule(
       accountId: String,
-      input: com.cyxbs.pages.schedule.data.remote.v3.ScheduleDelete,
+      input: com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch,
     ) = error("factory initialize must not call daily delete")
   }
 }

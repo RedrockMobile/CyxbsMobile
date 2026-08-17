@@ -23,11 +23,14 @@ import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideSyncState
+import com.cyxbs.pages.schedule.domain.sync.v2.PendingChange
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingDelete
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
+import com.cyxbs.pages.schedule.domain.sync.v2.ResourceIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
+import com.cyxbs.pages.schedule.domain.sync.v2.SyncResource
 
 /** capture 中记录的 pending 分支，仅用于把响应关联回发出时的本地 revision。 */
 enum class UploadedPendingKind {
@@ -273,6 +276,56 @@ class ScheduleV2RequestPlanner {
     )
   }
 
+  /**
+   * 把调用方选定的 pending 强制投影为一个日常原子批次。
+   *
+   * 该方法只在不可变 capture 中替换 batchId；Room 内原 pending 的 [PendingChange.localBatchId] 不变，并被
+   * 记录回 uploaded capture，响应仍按真实 localRevision/localBatchId compare-and-clear。这样日常聚合无需为了
+   * 一次 HTTP 调用改写本地分组，也不会把 batchId 当作服务端回执。
+   */
+  fun captureAtomic(
+    syncRequestId: String,
+    batchId: String,
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    occurrenceOverrides: List<OccurrenceOverrideSyncState>,
+  ): ScheduleV2SyncCapture {
+    require(batchId.isNotBlank()) { "batchId must not be blank" }
+    require(categories.isNotEmpty() || schedules.isNotEmpty() || occurrenceOverrides.isNotEmpty()) {
+      "daily atomic capture requires pending resources"
+    }
+    require(
+      categories.all { it.pending != null } &&
+        schedules.all { it.pending != null } &&
+        occurrenceOverrides.all { it.pending != null },
+    ) {
+      "daily atomic capture only accepts states with pending"
+    }
+
+    val categoryBatchIds = categories.associate { it.identity to it.pending?.localBatchId }
+    val scheduleBatchIds = schedules.associate { it.identity to it.pending?.localBatchId }
+    val overrideBatchIds = occurrenceOverrides.associate { it.identity to it.pending?.localBatchId }
+    val generated = capture(
+      syncRequestId = syncRequestId,
+      categories = categories.map { it.copy(pending = it.pending?.withBatchId(batchId)) },
+      schedules = schedules.map { it.copy(pending = it.pending?.withBatchId(batchId)) },
+      occurrenceOverrides = occurrenceOverrides.map { it.copy(pending = it.pending?.withBatchId(batchId)) },
+    )
+    val generatedBatch = generated.atomicBatches.singleOrNull()
+      ?: error("daily atomic capture must produce exactly one batch")
+    return generated.copy(
+      atomicBatches = listOf(
+        generatedBatch.copy(
+          categories = generatedBatch.categories.map { it.copy(batchId = categoryBatchIds[it.identity]) },
+          schedules = generatedBatch.schedules.map { it.copy(batchId = scheduleBatchIds[it.identity]) },
+          occurrenceOverrides = generatedBatch.occurrenceOverrides.map {
+            it.copy(batchId = overrideBatchIds[it.identity])
+          },
+        ),
+      ),
+    )
+  }
+
   private fun <T> requireUniqueIdentities(identities: List<T>, type: String) {
     require(identities.size == identities.toSet().size) { "$type states contain duplicate identities" }
   }
@@ -299,6 +352,14 @@ class ScheduleV2RequestPlanner {
   ): OccurrenceOverrideInput = pending.resource.toWire().let { wire ->
     remoteSnapshot?.let { wire.copy(version = it.version.toULong()) } ?: wire
   }
+}
+
+/** 为单次不可变 HTTP capture 替换 batchId，不改变 payload、revision 或 Room 中的 pending。 */
+private fun <I : ResourceIdentity, R : SyncResource<I>> PendingChange<I, R>.withBatchId(
+  batchId: String,
+): PendingChange<I, R> = when (this) {
+  is PendingUpsert -> copy(localBatchId = batchId)
+  is PendingDelete -> copy(localBatchId = batchId)
 }
 
 private class AtomicBatchBuilder(private val batchId: String) {

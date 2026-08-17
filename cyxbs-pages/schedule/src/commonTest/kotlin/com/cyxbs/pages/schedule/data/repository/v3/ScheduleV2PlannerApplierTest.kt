@@ -251,7 +251,7 @@ class ScheduleV2PlannerApplierTest {
   }
 
   @Test
-  fun rejectedOrdinaryResultKeepsPending() {
+  fun rejectedOrdinaryResultClearsMatchingPending() {
     val state = categoryState("category", remoteVersion = 3, pendingRevision = 4)
     val capture = planner.capture("sync-5", listOf(state), emptyList(), emptyList())
     val response = emptyResponse(
@@ -265,11 +265,11 @@ class ScheduleV2PlannerApplierTest {
       applier.apply(capture, response, listOf(state), emptyList(), emptyList()),
     )
 
-    assertEquals(4, result.categories.single().pending?.localRevision)
+    assertNull(result.categories.single().pending)
   }
 
   @Test
-  fun alreadyExistsKeepsMatchingPendingForLaterUserResolution() {
+  fun alreadyExistsClearsMatchingPending() {
     val state = categoryState("category", remoteVersion = 3, pendingRevision = 4)
     val capture = planner.capture("sync-already-exists", listOf(state), emptyList(), emptyList())
     val response = emptyResponse(
@@ -283,7 +283,30 @@ class ScheduleV2PlannerApplierTest {
       applier.apply(capture, response, listOf(state), emptyList(), emptyList()),
     )
 
-    assertEquals(4, result.categories.single().pending?.localRevision)
+    assertNull(result.categories.single().pending)
+  }
+
+  @Test
+  fun invalidRequestDiscardsOnlyUploadedRevision() {
+    val uploaded = categoryState("category", remoteVersion = 3, pendingRevision = 4)
+    val capture = planner.capture("sync-invalid", listOf(uploaded), emptyList(), emptyList())
+
+    val exact = assertIs<ScheduleV2ApplyResult.Success>(
+      applier.discardUploaded(capture, listOf(uploaded), emptyList(), emptyList()),
+    )
+    assertNull(exact.categories.single().pending)
+
+    val newer = uploaded.replacePending(
+      PendingUpsert(
+        categoryPendingResource(uploaded).copy(name = AtomicField("U", 200)),
+        localRevision = 5,
+      ),
+    )
+    val afterU = assertIs<ScheduleV2ApplyResult.Success>(
+      applier.discardUploaded(capture, listOf(newer), emptyList(), emptyList()),
+    )
+    assertEquals(5, afterU.categories.single().pending?.localRevision)
+    assertEquals("U", afterU.categories.single().effectiveResource()?.name?.data)
   }
 
   @Test

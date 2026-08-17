@@ -43,16 +43,16 @@ internal class KtorScheduleV2Gateway(
   suspend fun sync(accountId: String, request: SyncRequest): ScheduleV2CallResult<SyncResponse> =
     call(accountId) { api.sync(request, boundSession) }
 
-  /** 日常新增上传 version=0 的完整 Schedule。 */
-  suspend fun createSchedule(accountId: String, input: ScheduleInput): ScheduleV2CallResult<ScheduleUpsertResult> =
+  /** 日常新增上传一个 Schedule 聚合原子批次。 */
+  suspend fun createSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> =
     call(accountId) { api.createSchedule(input, boundSession) }
 
-  /** 日常更新上传完整 Schedule，服务端返回合并后的 canonical 结果。 */
-  suspend fun updateSchedule(accountId: String, input: ScheduleInput): ScheduleV2CallResult<ScheduleUpsertResult> =
+  /** 日常更新上传一个 Schedule 聚合原子批次。 */
+  suspend fun updateSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> =
     call(accountId) { api.updateSchedule(input, boundSession) }
 
-  /** 日常删除只发送 identity 与 localModifiedAt。 */
-  suspend fun deleteSchedule(accountId: String, input: ScheduleDelete): ScheduleV2CallResult<ScheduleDeleteResult> =
+  /** 日常删除上传包含 parent/child DELETE 的 Schedule 聚合原子批次。 */
+  suspend fun deleteSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> =
     call(accountId) { api.deleteSchedule(input, boundSession) }
 
   /**

@@ -9,10 +9,8 @@ import com.cyxbs.pages.schedule.data.local.room3.ScheduleV2RepositoryGateway
 import com.cyxbs.pages.schedule.data.local.room3.ScheduleV2RoomStateStore
 import com.cyxbs.pages.schedule.data.local.room3.bundledScheduleRoomDriver
 import com.cyxbs.pages.schedule.data.local.room3.closeScheduleRoomDatabase
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDelete
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDeleteResult
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResult
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleV2CallResult
 import com.cyxbs.pages.schedule.data.remote.v3.SyncRequest
 import com.cyxbs.pages.schedule.data.remote.v3.SyncResponse
@@ -33,7 +31,8 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
    * seam 必须把 exact session、同一数据库与调用方墙钟交给 Room factory。
    *
    * 测试只使用临时 bundled SQLite 和纯内存 gateway：构造阶段零网络，initialize 按合同发起一次完整 Sync，
-   * Category 本地提交不调用 daily API。Category pending 的 modifiedAt 同时证明 production seam 没有退回系统墙钟。
+   * Category 本地提交通过同一聚合 daily API 尝试上传；传输失败后 pending 仍保留。
+   * Category pending 的 modifiedAt 同时证明 production seam 没有退回系统墙钟。
    */
   @Test
   fun productionSeamBindsExactSessionDatabaseAndClockWithoutNetwork() = runTest {
@@ -67,8 +66,7 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
       assertEquals(1, gateway.syncCalls)
       assertEquals(0, gateway.dailyCalls)
       assertEquals(0, clock.reads)
-      assertEquals(
-        ScheduleSyncResult.Success(attempted = false),
+      assertIs<ScheduleSyncResult.Failure>(
         repository.execute(
           ScheduleCommand.CreateCategory(
             ScheduleCategory(
@@ -89,7 +87,7 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
       assertEquals(NOW_MILLIS, category.pendingSnapshot?.name?.modifiedAt)
       assertEquals(1, clock.reads)
       assertEquals(1, gateway.syncCalls)
-      assertEquals(0, gateway.dailyCalls)
+      assertEquals(1, gateway.dailyCalls)
     } finally {
       database.closeScheduleRoomDatabase()
       Files.deleteIfExists(path)
@@ -109,7 +107,7 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
     }
   }
 
-  /** Sync 返回可恢复的传输失败；任一 daily API 被调用都会使测试失败。 */
+  /** Sync 与 daily 都返回可恢复的传输失败，用来验证 pending 不因离线丢失。 */
   private class NoNetworkGateway : ScheduleV2RepositoryGateway {
     var syncCalls: Int = 0
       private set
@@ -117,9 +115,12 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
     var dailyCalls: Int = 0
       private set
 
-    private fun unexpectedDailyCall(): Nothing {
+    private fun failedDailyCall(): ScheduleV2CallResult<AtomicBatchResult> {
       dailyCalls += 1
-      error("Category local command must not call a Schedule daily endpoint")
+      return ScheduleV2CallResult.TransportFailure(
+        status = null,
+        cause = IllegalStateException("offline in production factory daily test"),
+      )
     }
 
     override suspend fun sync(
@@ -135,18 +136,18 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
 
     override suspend fun createSchedule(
       accountId: String,
-      input: ScheduleInput,
-    ): ScheduleV2CallResult<ScheduleUpsertResult> = unexpectedDailyCall()
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = failedDailyCall()
 
     override suspend fun updateSchedule(
       accountId: String,
-      input: ScheduleInput,
-    ): ScheduleV2CallResult<ScheduleUpsertResult> = unexpectedDailyCall()
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = failedDailyCall()
 
     override suspend fun deleteSchedule(
       accountId: String,
-      input: ScheduleDelete,
-    ): ScheduleV2CallResult<ScheduleDeleteResult> = unexpectedDailyCall()
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = failedDailyCall()
   }
 
   private companion object {

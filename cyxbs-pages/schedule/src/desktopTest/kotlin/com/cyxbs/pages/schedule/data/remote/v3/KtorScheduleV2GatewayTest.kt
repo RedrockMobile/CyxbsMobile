@@ -57,19 +57,19 @@ class KtorScheduleV2GatewayTest {
     }
 
     override suspend fun createSchedule(
-      input: ScheduleInput,
+      input: AtomicBatch,
       session: AccountSession,
-    ): ApiWrapper<ScheduleUpsertResult> = error("unexpected create")
+    ): ApiWrapper<AtomicBatchResult> = error("unexpected create")
 
     override suspend fun updateSchedule(
-      input: ScheduleInput,
+      input: AtomicBatch,
       session: AccountSession,
-    ): ApiWrapper<ScheduleUpsertResult> = error("unexpected update")
+    ): ApiWrapper<AtomicBatchResult> = error("unexpected update")
 
     override suspend fun deleteSchedule(
-      input: ScheduleDelete,
+      input: AtomicBatch,
       session: AccountSession,
-    ): ApiWrapper<ScheduleDeleteResult> = error("unexpected delete")
+    ): ApiWrapper<AtomicBatchResult> = error("unexpected delete")
   }
 
   private fun emptyRequest(requestId: String) = SyncRequest(

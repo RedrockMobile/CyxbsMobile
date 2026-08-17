@@ -7,13 +7,11 @@ import com.cyxbs.pages.schedule.data.local.room3.RoomScheduleRepositoryFactory
 import com.cyxbs.pages.schedule.data.local.room3.ScheduleV2RepositoryGateway
 import com.cyxbs.pages.schedule.data.local.room3.closeScheduleRoomDatabase
 import com.cyxbs.components.utils.network.ApiWrapper
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResult
 import com.cyxbs.pages.schedule.data.remote.v3.CategorySyncResponse
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDelete
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDeleteResult
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleV2CallResult
 import com.cyxbs.pages.schedule.data.remote.v3.SyncRequest
 import com.cyxbs.pages.schedule.data.remote.v3.SyncResponse
@@ -98,18 +96,18 @@ class ProductionScheduleRepositoryFactoryDesktopTest {
 
     override suspend fun createSchedule(
       accountId: String,
-      input: ScheduleInput,
-    ): ScheduleV2CallResult<ScheduleUpsertResult> = error("initialize must not call daily create")
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = error("initialize must not call daily create")
 
     override suspend fun updateSchedule(
       accountId: String,
-      input: ScheduleInput,
-    ): ScheduleV2CallResult<ScheduleUpsertResult> = error("initialize must not call daily update")
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = error("initialize must not call daily update")
 
     override suspend fun deleteSchedule(
       accountId: String,
-      input: ScheduleDelete,
-    ): ScheduleV2CallResult<ScheduleDeleteResult> = error("initialize must not call daily delete")
+      input: AtomicBatch,
+    ): ScheduleV2CallResult<AtomicBatchResult> = error("initialize must not call daily delete")
   }
 
   /** 删除临时目录、数据库主文件以及 Room 可能生成的 WAL/SHM。 */

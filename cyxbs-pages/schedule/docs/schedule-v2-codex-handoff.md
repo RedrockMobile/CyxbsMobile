@@ -10,7 +10,7 @@ Schedule v2 不再沿用旧 cursor、单条 outbox、receipt 或 semantic comman
 - 资源内部 `version` 与逐字段 `AtomicField`；
 - 每个 identity 一份 remote snapshot 和至多一份 pending；
 - 本地 `localRevision` 的 R→U 保护；
-- Schedule 日常新增、修改、删除接口；
+- 日常新增、修改、删除通过一个 typed `AtomicBatch` 同时携带相关 Category、Schedule、OccurrenceOverride；
 - 首次进入、网络恢复或手动触发的一次完整 Sync；
 - Android/iOS 单向导出到系统日历。
 
@@ -36,6 +36,7 @@ DELETE /v2/schedules
 关键约束：
 
 - Sync 请求包含三类资源的 `confirmed/upserts/deletes` 和不可拆分 `atomicBatches`；
+- 三个日常 `/v2/schedules` 接口的请求体同样是 `AtomicBatch`，响应是 `AtomicBatchResult`；
 - upsert 直接上传完整 typed Input，`version` 在资源内部；
 - CREATE 使用 `version=0`，PATCH 使用当前正版本；
 - DELETE 只上传 identity 与 `localModifiedAt`，不上传 version；
@@ -111,16 +112,17 @@ schedule_v2_occurrence_override_state
 4. common applier 处理 result、related、inventory 和 tombstone；
 5. 用一个 Room write transaction 替换账号三类完整状态。
 
-网络失败、HTTP 400 或业务 REJECTED 都不会清除无法确认的 pending。
+网络失败、超时或未知响应不会清除 pending。HTTP 400 和 data 内的 typed `REJECTED` 已明确证明本次业务输入不能接受，客户端只清除仍匹配 uploaded revision 的 R；请求期间形成的 U 继续保留。
 
 ### 4.2 日常命令
 
-本地命令先写 Room、发布快照，再决定是否调用日常接口：
+本地命令先写 Room、发布快照，再把本次 pending 及其 Schedule 关系闭包组成一个 `AtomicBatch` 调用日常接口：
 
-- 普通 Schedule CREATE → POST `/v2/schedules`；
-- 普通 Schedule UPDATE → PUT `/v2/schedules`；
-- 普通 Schedule DELETE → DELETE `/v2/schedules`；
-- Category、OccurrenceOverride 和带 `localBatchId` 的父子闭包只等待完整 Sync。
+- CREATE 或批次内含新资源 → POST `/v2/schedules`；
+- 仅修改现有资源 → PUT `/v2/schedules`；
+- Schedule 删除或批次全为删除 → DELETE `/v2/schedules`；
+- Schedule 操作会同时携带其引用的待提交 Category、同 parent 的待提交 OccurrenceOverride，以及已有的父子删除闭包；
+- Category、OccurrenceOverride 自身的新增、修改、删除也立即走同一组聚合接口，不再等待完整 Sync。
 
 网络调用期间不持有 repository mutex。响应应用前重新读库，所以 R 请求期间产生的 U 不会被旧响应覆盖。
 
@@ -135,7 +137,7 @@ schedule_v2_occurrence_override_state
 - `Unexpected`；
 - `BackendNotDeployed`：当前 Web 只读实现。
 
-最近远端错误只保留在 repository 进程内，用于让 UI 继续显示 Unavailable；它不写入 Room，也不是重试状态机。只有成功且无 REJECTED 的完整响应才清除该错误。
+最近远端错误只保留在 repository 进程内，用于让 UI 继续显示 Unavailable；它不写入 Room，也不是重试状态机。成功且无 REJECTED 的完整或日常聚合响应会清除该错误。
 
 ## 5. 平台接线
 
@@ -181,18 +183,13 @@ Android/iOS 初始化由账号 façade 在当前 delegate 初始化完成后调�
 已完成的验证：
 
 - common metadata 与 Room KSP 多轮通过；
-- Desktop production 源码在平台切换后编译通过；
+- Android、Desktop、iOS Simulator、JS、Wasm production 源码编译通过；
+- Desktop 全量测试通过；iOS Simulator、JS、Wasm test 源码编译通过，Android host test 已完成组装；
 - typed wire、mapper、reducer、planner/applier、daily bridge、Room mapper/store/repository 有聚焦测试；
+- 日常聚合批次覆盖 Category + Schedule + OccurrenceOverride、HTTP 400/REJECTED 清 R、transport 保留 pending 与 R→U；
 - nullable Category color 已覆盖 wire、domain、Room 与 repository；
+- 后端 `schedulev2wire` 与 `service` 的 Schedule v2 聚焦测试通过；
 - `git diff --check` 通过。
-
-仍需在最终集成前重跑：
-
-- Desktop 聚焦测试与完整 test compile；
-- Android host compile/test；
-- iOS metadata/test compile；
-- JS/Wasm test compile；
-- 当前四表 schema export 核对。
 
 真实 HTTP、真实账号、Android Provider、iOS EventKit 和生产数据库均未执行，也不在本轮默认授权范围内。
 
@@ -204,13 +201,7 @@ Android/iOS 初始化由账号 façade 在当前 delegate 初始化完成后调�
 guoxiangrui/feature/schedule
 ```
 
-当前客户端候选在固定 lane01/02/03 并发开发，由主 Agent 串行审查并合入。最终步骤：
-
-1. 清空剩余旧符号和旧测试；
-2. 完成跨平台编译与聚焦测试；
-3. 更新本文验证结果；
-4. 将候选提交合入 `guoxiangrui/feature/schedule`；
-5. 核对最终 commit body、工作树和分支状态。
+客户端实现已经收敛到主集成分支，不再从旧 lane 继续合并。后续只允许针对验收发现的问题做小范围修正，并保持少量、带完整 body 的提交。
 
 禁止把历史 Claude semantic 分支、旧 cursor/outbox 实现或 archive 文档重新合入。
 

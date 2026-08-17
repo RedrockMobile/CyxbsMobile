@@ -2,7 +2,27 @@ package com.cyxbs.pages.schedule.data.repository.v3
 
 import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResult
 import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResultCode
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.CategorySyncResponse
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.MutationResultCode
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideSyncResponse
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.ResultReason
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDeleteResult
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleSyncResponse
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.SyncRequest
 import com.cyxbs.pages.schedule.data.remote.v3.SyncResponse
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
@@ -74,6 +94,25 @@ class ScheduleV2ResponseApplier {
       failure.message ?: "Schedule v2 response contains invalid payload",
     )
   }
+
+  /**
+   * 丢弃服务端已经明确判定为无效的本次 uploaded pending。
+   *
+   * HTTP 400 没有 typed data 可合并，因此只生成内存中的 REJECTED 对齐结果并复用同一套 compare-and-clear；
+   * 请求期间形成的更高 revision U 或不同 localBatchId 仍会保留，remoteSnapshot 也不会被伪造或覆盖。
+   */
+  fun discardUploaded(
+    capture: ScheduleV2SyncCapture,
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    occurrenceOverrides: List<OccurrenceOverrideSyncState>,
+  ): ScheduleV2ApplyResult = apply(
+    capture = capture,
+    response = rejectedResponse(capture.request),
+    categories = categories,
+    schedules = schedules,
+    occurrenceOverrides = occurrenceOverrides,
+  )
 
   private fun applyOrThrow(
     capture: ScheduleV2SyncCapture,
@@ -243,28 +282,28 @@ class ScheduleV2ResponseApplier {
     capture.atomicBatches.forEach { batch ->
       val result = checkNotNull(resultsById[batch.batchId])
       validateAtomicMembers(batch, result)
+      val itemRejected = result.categories.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
+        result.categories.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
+        result.schedules.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
+        result.schedules.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
+        result.occurrenceOverrides.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
+        result.occurrenceOverrides.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED }
       if (result.code != AtomicBatchResultCode.REJECTED) {
-        val itemRejected = result.categories.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
-          result.categories.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
-          result.schedules.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
-          result.schedules.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
-          result.occurrenceOverrides.upsertResults.any { it.code == AtomicBatchResultCode.REJECTED } ||
-          result.occurrenceOverrides.deleteResults.any { it.code == AtomicBatchResultCode.REJECTED }
         abortUnless(
           !itemRejected,
           ScheduleV2ApplyFailureReason.RESPONSE_CORRELATION,
           "non-rejected atomic batch contains rejected member",
         )
-        val allRevisionsMatch =
-          batch.categories.all { categories[it.identity].matches(it) } &&
-            batch.schedules.all { schedules[it.identity].matches(it) } &&
-            batch.occurrenceOverrides.all { overrides[it.identity].matches(it) }
-        // 原子批次只有所有成员仍是上传时 revision 才能整体清除；任一成员变化则全部保留。
-        if (allRevisionsMatch) {
-          batch.categories.forEach { categoryClears[it.identity] = it }
-          batch.schedules.forEach { scheduleClears[it.identity] = it }
-          batch.occurrenceOverrides.forEach { overrideClears[it.identity] = it }
-        }
+      }
+      val allRevisionsMatch =
+        batch.categories.all { categories[it.identity].matches(it) } &&
+          batch.schedules.all { schedules[it.identity].matches(it) } &&
+          batch.occurrenceOverrides.all { overrides[it.identity].matches(it) }
+      // APPLIED 与明确 REJECTED 都已得到确定结论；只有所有成员仍为 R 时才整批清除，任一 U 出现则全部保留。
+      if (allRevisionsMatch) {
+        batch.categories.forEach { categoryClears[it.identity] = it }
+        batch.schedules.forEach { scheduleClears[it.identity] = it }
+        batch.occurrenceOverrides.forEach { overrideClears[it.identity] = it }
       }
     }
     return AtomicClears(categoryClears, scheduleClears, overrideClears)
@@ -631,6 +670,98 @@ private data class AtomicClears(
   val override: Map<OccurrenceOverrideIdentity, UploadedOccurrenceOverridePending>,
 )
 
+/** 为 HTTP 400 构造只用于本地 compare-and-clear 的对齐结果；不会伪造任何 canonical remote 数据。 */
+private fun rejectedResponse(request: SyncRequest): SyncResponse = SyncResponse(
+  syncRequestId = request.syncRequestId,
+  categories = CategorySyncResponse(
+    upserts = emptyList(),
+    deletes = emptyList(),
+    upsertResults = request.categories.upserts.map {
+      CategoryUpsertResult(it.id, MutationResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+    },
+    deleteResults = request.categories.deletes.map {
+      CategoryDeleteResult(it.id, MutationResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+    },
+  ),
+  schedules = ScheduleSyncResponse(
+    upserts = emptyList(),
+    deletes = emptyList(),
+    upsertResults = request.schedules.upserts.map {
+      ScheduleUpsertResult(it.id, MutationResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+    },
+    deleteResults = request.schedules.deletes.map {
+      ScheduleDeleteResult(it.id, MutationResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+    },
+  ),
+  occurrenceOverrides = OccurrenceOverrideSyncResponse(
+    upserts = emptyList(),
+    deletes = emptyList(),
+    upsertResults = request.occurrenceOverrides.upserts.map {
+      OccurrenceOverrideUpsertResult(
+        it.scheduleId,
+        it.occurrenceDate,
+        MutationResultCode.REJECTED,
+        ResultReason.INVALID_REQUEST,
+      )
+    },
+    deleteResults = request.occurrenceOverrides.deletes.map {
+      OccurrenceOverrideDeleteResult(
+        it.scheduleId,
+        it.occurrenceDate,
+        MutationResultCode.REJECTED,
+        ResultReason.INVALID_REQUEST,
+      )
+    },
+  ),
+  atomicBatchResults = request.atomicBatches.map { batch ->
+    AtomicBatchResult(
+      batchId = batch.batchId,
+      code = AtomicBatchResultCode.REJECTED,
+      reason = ResultReason.INVALID_REQUEST,
+      categories = CategoryAtomicResultBlock(
+        upsertResults = batch.categories.upserts.map {
+          CategoryAtomicUpsertResult(it.id, AtomicBatchResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+        },
+        deleteResults = batch.categories.deletes.map {
+          CategoryAtomicDeleteResult(it.id, AtomicBatchResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+        },
+        relatedUpserts = emptyList(),
+        relatedDeletes = emptyList(),
+      ),
+      schedules = ScheduleAtomicResultBlock(
+        upsertResults = batch.schedules.upserts.map {
+          ScheduleAtomicUpsertResult(it.id, AtomicBatchResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+        },
+        deleteResults = batch.schedules.deletes.map {
+          ScheduleAtomicDeleteResult(it.id, AtomicBatchResultCode.REJECTED, ResultReason.INVALID_REQUEST)
+        },
+        relatedUpserts = emptyList(),
+        relatedDeletes = emptyList(),
+      ),
+      occurrenceOverrides = OccurrenceOverrideAtomicResultBlock(
+        upsertResults = batch.occurrenceOverrides.upserts.map {
+          OccurrenceOverrideAtomicUpsertResult(
+            it.scheduleId,
+            it.occurrenceDate,
+            AtomicBatchResultCode.REJECTED,
+            ResultReason.INVALID_REQUEST,
+          )
+        },
+        deleteResults = batch.occurrenceOverrides.deletes.map {
+          OccurrenceOverrideAtomicDeleteResult(
+            it.scheduleId,
+            it.occurrenceDate,
+            AtomicBatchResultCode.REJECTED,
+            ResultReason.INVALID_REQUEST,
+          )
+        },
+        relatedUpserts = emptyList(),
+        relatedDeletes = emptyList(),
+      ),
+    )
+  },
+)
+
 private fun MutationResultCode.canClearPending(): Boolean = when (this) {
   MutationResultCode.CREATED,
   MutationResultCode.DELETED,
@@ -639,10 +770,9 @@ private fun MutationResultCode.canClearPending(): Boolean = when (this) {
   MutationResultCode.ALREADY_SATISFIED,
   MutationResultCode.SERVER_WON,
   MutationResultCode.RESOURCE_DELETED,
-  -> true
   MutationResultCode.REJECTED,
   MutationResultCode.ALREADY_EXISTS,
-  -> false
+  -> true
 }
 
 private fun CategorySyncState?.matches(uploaded: UploadedCategoryPending?): Boolean {

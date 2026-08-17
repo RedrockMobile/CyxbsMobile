@@ -1,6 +1,6 @@
 # Schedule v2 双快照与 typed 资源版本同步流程
 
-> **状态：本文是最新 canonical 目标；后端 `guoxiangrui/schedule` 已提交 typed Sync、日常 Schedule 接口和本文 version 合同，但尚未部署；客户端代码仍是旧合同。**
+> **状态：本文是最新 canonical 合同；后端与客户端已按 typed Sync、日常聚合接口和本文 version 合同完成实现，但尚未部署和真实账号验收。**
 >
 > 本文定义客户端后续接入流程，不授权本次修改 Android、iOS、Web 代码、UI、测试设备、部署或远端开关。
 
@@ -35,16 +35,16 @@ Schedule v2 使用轻量最终一致模型：服务端只保存三类资源的�
 
 ```text
 POST   /v2/schedule-mutations  # 首次进入、网络恢复与 pending 收敛
-POST   /v2/schedules           # 日常新增，完整 Schedule 且 version=0
-PUT    /v2/schedules           # 日常修改，完整 Schedule 且 version>0
-DELETE /v2/schedules           # 日常删除，ScheduleDelete
+POST   /v2/schedules           # 日常新增，AtomicBatch 中至少含一个 version=0 资源
+PUT    /v2/schedules           # 日常修改，AtomicBatch 中的 upsert 均为正版本
+DELETE /v2/schedules           # 日常删除，AtomicBatch 可同时携带父子 closure
 ```
 
-日常本地提交优先请求单资源接口，不为每次编辑触发完整 Sync。请求成功后按 typed result 更新
-`remoteSnapshot` 并 compare-and-clear；请求超时、断网或返回 5xx 时保存同一 typed 请求为
-`pendingSnapshot`，下次 Sync 原样进入 `schedules.upserts[]` 或 `schedules.deletes[]`。
-HTTP 400 是不可原样重试的请求错误；HTTP 200 + `status=20101` 是明确业务拒绝，需要消费
-result，而不是作为网络失败排队。
+日常本地提交不触发完整 Sync，而是把本次 pending 及其 Schedule 关系闭包组成一个 `AtomicBatch`。
+一次 Schedule 操作可以同时携带其待提交 Category 和 OccurrenceOverride；三类资源自身的命令也立即走
+这组聚合接口。请求成功后按 `AtomicBatchResult` 更新 `remoteSnapshot` 并 compare-and-clear；请求超时、
+断网或返回 5xx 时保留当前 typed pending，下一次完整 Sync 再上传。HTTP 400 与 HTTP 200 +
+`status=20101` 都是明确业务失败：只清除仍匹配 uploaded revision 的 R，R 请求期间产生的 U 保留。
 
 不使用 `/v2/schedule-sync`、`protocolVersion`、cursor、receipt、事件历史、`settledSnapshotToken` 或通用 mutation union。
 
@@ -380,7 +380,7 @@ R 响应：
 uploadedResource = 当前 pending 完整不可变副本
 uploadedRevision = pending.localRevision
 version = remoteSnapshot.version
-→ 日常编辑优先 PUT /v2/schedules
+→ 与本次关系闭包一起放入 AtomicBatch，日常编辑优先 PUT /v2/schedules
 ```
 
 客户端上传完整 resource，但只有真正修改过的 AtomicField 更新了 `data/modifiedAt`。
@@ -420,8 +420,8 @@ incoming reminders 相同   → no-op
 
 即使部分原子 server-won、部分原子写入，整体仍为 `APPLIED`，响应中的 `current` 是最终完整混合结果。
 
-客户端收到 PUT 响应后直接接受 `ScheduleUpsertResult.current` 作为新的 live
-`remoteSnapshot`，再按 `uploadedRevision` compare-and-clear。若请求期间已有更高
+客户端收到 PUT 响应后从 `AtomicBatchResult.relatedUpserts/relatedDeletes` 接受整个批次的 canonical
+状态，再按每个成员的 `uploadedRevision` compare-and-clear。若请求期间已有更高
 `localRevision`，只更新 remote 并保留较新 pending，不能用 current 覆盖它。
 
 普通 PATCH 的 `version` 表示客户端构造快照时的确认版本，不要求等于事务中的最新服务端版本；各原子的 `modifiedAt` 决定字段级合并结果。需要改变 recurrence 日期集合的结构修改仍必须进入 atomic batch。
@@ -566,16 +566,15 @@ mutation result 负责证明 uploaded operation 是否终结；归并后的 live
    → 还必须确认结果已经应用、满足或明确终结 uploaded operation，才能删除 pending。
 
 5. CREATE 返回 ALREADY_EXISTS
-   → 比较返回 current 与 uploadedResource；相同才清理。
-   → 不同时保留 pending，并使用返回的正数 version 在下一轮改为完整 PATCH。
+   → 服务端已明确拒绝重复 identity；应用返回的 canonical current，并清除仍匹配的 uploaded R。
 
-6. REJECTED 或需要改成 atomic batch
-   → 保留 pending，按返回 current/related 状态重新规划。
+6. REJECTED
+   → 服务端已经明确拒绝业务输入；清除仍匹配 uploaded revision 的 R，保留请求期间形成的 U。
 ```
 
 `uploadedRevision` 只能证明“请求期间没有新的本地编辑”，不能证明服务端已经满足 uploadedSnapshot。尤其不能只按 identity、operation 类型或 revision 相等清除 CREATE pending。
 
-同 revision 的终结映射必须穷举：UPSERT `CREATED/APPLIED/ALREADY_SATISFIED/SERVER_WON` 在完整 canonical current 成功应用后清理；`RESOURCE_DELETED` 在 tombstone 成功应用后清理，删除胜出且不得自动换 identity 复活；CREATE `ALREADY_EXISTS` 仅当 current 与 uploaded resource 语义相同时清理，不同时保留并转正数版本 PATCH；DELETE `DELETED/ALREADY_DELETED` 清理；`REJECTED`、缺失必要 current/tombstone/related 状态或非法响应不清。atomic batch 仅在 `APPLIED/ALREADY_SATISFIED`、related 状态完整且所有 member revision 均未变化时整体清理。
+同 revision 的终结映射必须穷举：UPSERT `CREATED/APPLIED/ALREADY_SATISFIED/SERVER_WON` 在完整 canonical current 成功应用后清理；`RESOURCE_DELETED` 在 tombstone 成功应用后清理，删除胜出且不得自动换 identity 复活；DELETE `DELETED/ALREADY_DELETED` 清理；`REJECTED` 与 HTTP 400 明确丢弃匹配的 uploaded R；缺失必要 current/tombstone/related 状态或无法解释的响应不清。atomic batch 只有在全部 member revision 和 localBatchId 均仍匹配时整体清理；任一成员出现 U 就整批保留。
 
 ---
 
@@ -595,10 +594,10 @@ currentPending.localRevision == uploadedRevision
 → 删除 pending
 → 资源 clean
 
-若 CREATE 只返回内容不同的 ALREADY_EXISTS
+若 CREATE 返回 ALREADY_EXISTS
 → 更新 remote
-→ 保留 pending
-→ 下一轮以返回的正数版本改为完整 PATCH
+→ 清除仍匹配 uploadedRevision 的 R
+→ 由用户基于当前 canonical 状态重新发起后续编辑
 ```
 
 ### 12.2 R 返回时已有 U
@@ -700,7 +699,7 @@ REJECTED          任一项不安全或最终图非法，整批不写
 - AtomicField 的 `data` 与 `modifiedAt` 必须同时出现；
 - UPSERT 的 `version` 和 Reminder 的 `minutesBefore` 必须出现；
 - DELETE 的 `localModifiedAt` 必须出现；
-- 除 `recurrence.data: null` 外，null 一律拒绝，可选字段应省略；
+- 仅 `recurrence.data: null` 与 `category.color.data: null` 合法，其它 null 一律拒绝，可选字段应省略；
 - 完全重复 key、同一对象内大小写折叠别名 key、未知字段、尾随第二个 JSON、非法枚举和重复 mutation identity 一律拒绝；
 - presence 与数值 `0` 分离。
 
@@ -718,4 +717,4 @@ Schedule v2 transport 必须保留完整 `ApiWrapper<SyncResponse>`：`status=10
 
 当前后端每条普通 mutation 分别在 SERIALIZABLE owner 事务中加载完整 owner graph。对含 `M` 条普通 mutation、owner 有 `R` 条资源的极端大请求，工作量约为 `O(M×R)`；这是小体量初始版本接受的非阻塞性能限制，不通过协议上限规避。只有后续真实集成/性能数据证明需要时再改 bulk transaction。
 
-当前客户端仍是旧合同，接入时必须整体切换到 typed request/response、AtomicField 和 `/v2/schedule-mutations`，不能继续沿用 `ResourceKind`、`ResourceInput`、`pendingCreates/pendingPatches`、散落 `*_modified_at` 或带 category override 的旧 OccurrenceException。
+当前客户端已经切换到 typed request/response、AtomicField、日常聚合 `/v2/schedules` 和完整 `/v2/schedule-mutations`；不得重新引入 `ResourceKind`、`ResourceInput`、`pendingCreates/pendingPatches`、散落 `*_modified_at` 或带 category override 的旧 OccurrenceException。

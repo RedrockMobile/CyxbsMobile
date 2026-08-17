@@ -6,14 +6,20 @@ import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.pages.schedule.data.remote.v3.CategorySyncResponse
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.MutationResultCode
+import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatch
 import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResult
 import com.cyxbs.pages.schedule.data.remote.v3.AtomicBatchResultCode
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicDeleteResult
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryAtomicUpsertResult
+import com.cyxbs.pages.schedule.data.remote.v3.CategoryTombstone
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicDeleteResult
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideAtomicUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideTombstone
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicDeleteResult
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicResultBlock
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleAtomicUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideInput
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceStatus
@@ -27,12 +33,9 @@ import com.cyxbs.pages.schedule.data.remote.v3.RecurrenceInput
 import com.cyxbs.pages.schedule.data.remote.v3.ReminderInput
 import com.cyxbs.pages.schedule.data.remote.v3.ResultReason
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleCurrent
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDelete
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleDeleteResult
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleTombstone
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleUpsertResult
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleV2CallResult
 import com.cyxbs.pages.schedule.data.remote.v3.ServerResourceMeta
 import com.cyxbs.pages.schedule.data.remote.v3.SyncRequest
@@ -81,12 +84,12 @@ class ScheduleV2RoomRepositoryDesktopTest {
   }
 
   @Test
-  fun dailyRejectedPublishesUnavailableAndKeepsPending() = runTest {
+  fun dailyRejectedPublishesUnavailableAndClearsMatchingPending() = runTest {
     withRepository { repository, gateway, database ->
-      gateway.createResponder = { input ->
+      gateway.createResponder = { batch ->
         ScheduleV2CallResult.Completed(
           ApiWrapper(
-            ScheduleUpsertResult(input.id, MutationResultCode.REJECTED, ResultReason.RESOURCE_CHANGED),
+            rejectedBatchResult(batch, ResultReason.RESOURCE_CHANGED),
             20101,
             "rejected",
           ),
@@ -99,13 +102,13 @@ class ScheduleV2RoomRepositoryDesktopTest {
       val failure = assertIs<ScheduleSyncResult.Failure>(result)
       assertIs<ScheduleRemoteError.MutationRejected>(failure.error)
       val status = assertIs<ScheduleRepositoryStatus.Unavailable>(repository.snapshot.value.status)
-      assertEquals(1, status.pendingCount)
-      assertEquals(1L, ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT).schedules.single().localRevision)
+      assertEquals(0, status.pendingCount)
+      assertTrue(ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT).schedules.isEmpty())
     }
   }
 
   @Test
-  fun categoryMutationStaysPendingAndDoesNotUseDailyScheduleEndpoint() = runTest {
+  fun categoryMutationUsesSameDailyAggregateEndpoint() = runTest {
     withRepository { repository, gateway, database ->
       repository.initialize()
 
@@ -114,12 +117,9 @@ class ScheduleV2RoomRepositoryDesktopTest {
       )
 
       assertIs<ScheduleSyncResult.Success>(result)
-      assertEquals(0, gateway.createCalls)
-      assertEquals(
-        1L,
-        ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
-          .categories.first { it.categoryId == SECOND_CATEGORY_ID }.localRevision,
-      )
+      assertEquals(1, gateway.createCalls)
+      assertEquals(null, ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
+        .categories.first { it.categoryId == SECOND_CATEGORY_ID }.localRevision)
     }
   }
 
@@ -140,20 +140,37 @@ class ScheduleV2RoomRepositoryDesktopTest {
   }
 
   @Test
-  fun localCategoryEditDoesNotClearPreviousUnavailable() = runTest {
-    withRepository { repository, gateway, _ ->
+  fun dailyInvalidRequestClearsMatchingPending() = runTest {
+    withRepository { repository, gateway, database ->
+      gateway.createResponder = {
+        ScheduleV2CallResult.RequestInvalid("invalid business payload")
+      }
+      repository.initialize()
+
+      val result = repository.execute(ScheduleCommand.Create(schedule("非法数据")))
+
+      assertIs<ScheduleRemoteError.InvalidResponse>(assertIs<ScheduleSyncResult.Failure>(result).error)
+      assertTrue(ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT).schedules.isEmpty())
+      assertEquals(0, assertIs<ScheduleRepositoryStatus.Unavailable>(repository.snapshot.value.status).pendingCount)
+    }
+  }
+
+  @Test
+  fun categoryTransportFailureAlsoKeepsPending() = runTest {
+    withRepository { repository, gateway, database ->
       gateway.createResponder = {
         ScheduleV2CallResult.TransportFailure(null, IllegalStateException("offline"))
       }
       repository.initialize()
-      assertIs<ScheduleSyncResult.Failure>(repository.execute(ScheduleCommand.Create(schedule("离线"))))
 
-      assertIs<ScheduleSyncResult.Success>(
+      assertIs<ScheduleSyncResult.Failure>(
         repository.execute(ScheduleCommand.CreateCategory(ScheduleCategory(CategoryId(SECOND_CATEGORY_ID), 0, "分类", null, 0))),
       )
 
       assertIs<ScheduleRepositoryStatus.Unavailable>(repository.snapshot.value.status)
       assertEquals(1, gateway.createCalls)
+      assertEquals(1L, ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
+        .categories.first { it.categoryId == SECOND_CATEGORY_ID }.localRevision)
     }
   }
 
@@ -189,8 +206,8 @@ class ScheduleV2RoomRepositoryDesktopTest {
   fun newerLocalUpdateSurvivesEarlierDailyResponse() = runTest {
     withRepository { repository, gateway, database ->
       val firstStarted = CompletableDeferred<Unit>()
-      val firstResponse = CompletableDeferred<ScheduleV2CallResult<ScheduleUpsertResult>>()
-      gateway.createResponder = { input ->
+      val firstResponse = CompletableDeferred<ScheduleV2CallResult<AtomicBatchResult>>()
+      gateway.createResponder = { batch ->
         if (gateway.createCalls == 1) {
           firstStarted.complete(Unit)
           firstResponse.await()
@@ -206,11 +223,7 @@ class ScheduleV2RoomRepositoryDesktopTest {
       firstResponse.complete(
         ScheduleV2CallResult.Completed(
           ApiWrapper(
-            ScheduleUpsertResult(
-              SCHEDULE_ID,
-              MutationResultCode.CREATED,
-              current = ScheduleCurrent(scheduleInput("R").copy(version = 1u), ServerResourceMeta(1, 2)),
-            ),
+            appliedBatchResult(batch = gateway.firstCreatedBatch!!),
             10000,
             "ok",
           ),
@@ -224,10 +237,13 @@ class ScheduleV2RoomRepositoryDesktopTest {
   }
 
   @Test
-  fun fullSyncRejectedKeepsPendingAndSurfacesBusinessError() = runTest {
+  fun fullSyncRejectedClearsMatchingPendingAndSurfacesBusinessError() = runTest {
     withRepository { repository, gateway, database ->
       repository.initialize()
-      assertIs<ScheduleSyncResult.Success>(
+      gateway.createResponder = {
+        ScheduleV2CallResult.TransportFailure(null, IllegalStateException("offline"))
+      }
+      assertIs<ScheduleSyncResult.Failure>(
         repository.execute(ScheduleCommand.CreateCategory(ScheduleCategory(CategoryId(SECOND_CATEGORY_ID), 0, "分类", null, 0))),
       )
       gateway.syncResponder = { request ->
@@ -251,11 +267,8 @@ class ScheduleV2RoomRepositoryDesktopTest {
       assertEquals(ScheduleRemoteError.MutationRejected(
         com.cyxbs.pages.schedule.domain.repository.ScheduleMutationBusinessRejectionReason.CATEGORY_NOT_FOUND,
       ), failure.error)
-      assertEquals(
-        1L,
-        ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
-          .categories.first { it.categoryId == SECOND_CATEGORY_ID }.localRevision,
-      )
+      assertTrue(ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
+        .categories.none { it.categoryId == SECOND_CATEGORY_ID })
     }
   }
 
@@ -274,7 +287,7 @@ class ScheduleV2RoomRepositoryDesktopTest {
   }
 
   @Test
-  fun atomicScheduleDeleteWithOverrideDoesNotUseDailyEndpoint() = runTest {
+  fun scheduleDeleteCarriesOverrideInSameDailyBatch() = runTest {
     withRepository { repository, gateway, database ->
       seedRecurringScheduleAndOverride(database)
       repository.initialize()
@@ -283,44 +296,11 @@ class ScheduleV2RoomRepositoryDesktopTest {
       val state = ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
 
       assertIs<ScheduleSyncResult.Success>(result)
-      assertEquals(0, gateway.deleteCalls)
-      assertEquals("schedule-delete-1", state.schedules.single().localBatchId)
-      assertEquals("schedule-delete-1", state.occurrenceOverrides.single().localBatchId)
-
-      gateway.syncResponder = { request ->
-        SyncResponse(
-          request.syncRequestId,
-          CategorySyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
-          ScheduleSyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
-          OccurrenceOverrideSyncResponse(emptyList(), emptyList(), emptyList(), emptyList()),
-          listOf(
-            AtomicBatchResult(
-              batchId = "schedule-delete-1",
-              code = AtomicBatchResultCode.APPLIED,
-              categories = CategoryAtomicResultBlock(emptyList(), emptyList(), emptyList(), emptyList()),
-              schedules = ScheduleAtomicResultBlock(
-                upsertResults = emptyList(),
-                deleteResults = listOf(ScheduleAtomicDeleteResult(SCHEDULE_ID, AtomicBatchResultCode.APPLIED)),
-                relatedUpserts = emptyList(),
-                relatedDeletes = listOf(ScheduleTombstone(SCHEDULE_ID, 200)),
-              ),
-              occurrenceOverrides = OccurrenceOverrideAtomicResultBlock(
-                upsertResults = emptyList(),
-                deleteResults = listOf(
-                  OccurrenceOverrideAtomicDeleteResult(SCHEDULE_ID, OCCURRENCE_DATE, AtomicBatchResultCode.APPLIED),
-                ),
-                relatedUpserts = emptyList(),
-                relatedDeletes = listOf(OccurrenceOverrideTombstone(SCHEDULE_ID, OCCURRENCE_DATE, 200)),
-              ),
-            ),
-          ),
-        )
-      }
-
-      assertIs<ScheduleSyncResult.Success>(repository.execute(ScheduleCommand.RequestSync))
-      val applied = ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT)
-      assertTrue(applied.schedules.isEmpty())
-      assertTrue(applied.occurrenceOverrides.isEmpty())
+      assertEquals(1, gateway.deleteCalls)
+      assertEquals(1, gateway.lastDeletedBatch?.schedules?.deletes?.size)
+      assertEquals(1, gateway.lastDeletedBatch?.occurrenceOverrides?.deletes?.size)
+      assertTrue(state.schedules.isEmpty())
+      assertTrue(state.occurrenceOverrides.isEmpty())
     }
   }
 
@@ -352,47 +332,117 @@ class ScheduleV2RoomRepositoryDesktopTest {
   private inner class FakeGateway : ScheduleV2RepositoryGateway {
     var createCalls = 0
     var deleteCalls = 0
+    var firstCreatedBatch: AtomicBatch? = null
+    var lastDeletedBatch: AtomicBatch? = null
     var syncResponder: (SyncRequest) -> SyncResponse = { request -> emptySyncResponse(request.syncRequestId) }
-    var createResponder: suspend (ScheduleInput) -> ScheduleV2CallResult<ScheduleUpsertResult> = { input ->
-      ScheduleV2CallResult.Completed(
-        ApiWrapper(
-          ScheduleUpsertResult(
-            input.id,
-            MutationResultCode.CREATED,
-            current = ScheduleCurrent(input.copy(version = 1u), ServerResourceMeta(1, 2)),
-          ),
-          10000,
-          "ok",
-        ),
-      )
+    var createResponder: suspend (AtomicBatch) -> ScheduleV2CallResult<AtomicBatchResult> = { batch ->
+      ScheduleV2CallResult.Completed(ApiWrapper(appliedBatchResult(batch), 10000, "ok"))
     }
-    var deleteResponder: suspend (ScheduleDelete) -> ScheduleV2CallResult<ScheduleDeleteResult> = { input ->
-      ScheduleV2CallResult.Completed(
-        ApiWrapper(
-          ScheduleDeleteResult(input.id, MutationResultCode.DELETED, tombstone = ScheduleTombstone(input.id, 2)),
-          10000,
-          "ok",
-        ),
-      )
-    }
+    var deleteResponder: suspend (AtomicBatch) -> ScheduleV2CallResult<AtomicBatchResult> = createResponder
 
     override suspend fun sync(accountId: String, request: SyncRequest): ScheduleV2CallResult<SyncResponse> =
       ScheduleV2CallResult.Completed(ApiWrapper(syncResponder(request), 10000, "ok"))
 
-    override suspend fun createSchedule(accountId: String, input: ScheduleInput): ScheduleV2CallResult<ScheduleUpsertResult> {
+    override suspend fun createSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> {
       createCalls += 1
+      if (firstCreatedBatch == null) firstCreatedBatch = input
       return createResponder(input)
     }
 
-    override suspend fun updateSchedule(accountId: String, input: ScheduleInput): ScheduleV2CallResult<ScheduleUpsertResult> {
+    override suspend fun updateSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> {
       return createResponder(input)
     }
 
-    override suspend fun deleteSchedule(accountId: String, input: ScheduleDelete): ScheduleV2CallResult<ScheduleDeleteResult> {
+    override suspend fun deleteSchedule(accountId: String, input: AtomicBatch): ScheduleV2CallResult<AtomicBatchResult> {
       deleteCalls += 1
+      lastDeletedBatch = input
       return deleteResponder(input)
     }
   }
+
+  /** 构造与请求逐项对齐的成功结果，模拟服务端在同一事务中返回整批 canonical 状态。 */
+  private fun appliedBatchResult(batch: AtomicBatch) = AtomicBatchResult(
+    batchId = batch.batchId,
+    code = AtomicBatchResultCode.APPLIED,
+    categories = CategoryAtomicResultBlock(
+      upsertResults = batch.categories.upserts.map {
+        CategoryAtomicUpsertResult(it.id, AtomicBatchResultCode.APPLIED)
+      },
+      deleteResults = batch.categories.deletes.map {
+        CategoryAtomicDeleteResult(it.id, AtomicBatchResultCode.APPLIED)
+      },
+      relatedUpserts = batch.categories.upserts.map {
+        CategoryCurrent(it.copy(version = nextVersion(it.version)), ServerResourceMeta(1, 2))
+      },
+      relatedDeletes = batch.categories.deletes.map { CategoryTombstone(it.id, 2) },
+    ),
+    schedules = ScheduleAtomicResultBlock(
+      upsertResults = batch.schedules.upserts.map {
+        ScheduleAtomicUpsertResult(it.id, AtomicBatchResultCode.APPLIED)
+      },
+      deleteResults = batch.schedules.deletes.map {
+        ScheduleAtomicDeleteResult(it.id, AtomicBatchResultCode.APPLIED)
+      },
+      relatedUpserts = batch.schedules.upserts.map {
+        ScheduleCurrent(it.copy(version = nextVersion(it.version)), ServerResourceMeta(1, 2))
+      },
+      relatedDeletes = batch.schedules.deletes.map { ScheduleTombstone(it.id, 2) },
+    ),
+    occurrenceOverrides = OccurrenceOverrideAtomicResultBlock(
+      upsertResults = batch.occurrenceOverrides.upserts.map {
+        OccurrenceOverrideAtomicUpsertResult(
+          it.scheduleId,
+          it.occurrenceDate,
+          AtomicBatchResultCode.APPLIED,
+        )
+      },
+      deleteResults = batch.occurrenceOverrides.deletes.map {
+        OccurrenceOverrideAtomicDeleteResult(
+          it.scheduleId,
+          it.occurrenceDate,
+          AtomicBatchResultCode.APPLIED,
+        )
+      },
+      relatedUpserts = batch.occurrenceOverrides.upserts.map {
+        OccurrenceOverrideCurrent(it.copy(version = nextVersion(it.version)), ServerResourceMeta(1, 2))
+      },
+      relatedDeletes = batch.occurrenceOverrides.deletes.map {
+        OccurrenceOverrideTombstone(it.scheduleId, it.occurrenceDate, 2)
+      },
+    ),
+  )
+
+  /** 构造完整对齐的业务拒绝结果；服务端不返回任何伪 canonical 快照。 */
+  private fun rejectedBatchResult(batch: AtomicBatch, reason: ResultReason) = AtomicBatchResult(
+    batchId = batch.batchId,
+    code = AtomicBatchResultCode.REJECTED,
+    reason = reason,
+    categories = CategoryAtomicResultBlock(
+      batch.categories.upserts.map { CategoryAtomicUpsertResult(it.id, AtomicBatchResultCode.REJECTED, reason) },
+      batch.categories.deletes.map { CategoryAtomicDeleteResult(it.id, AtomicBatchResultCode.REJECTED, reason) },
+      emptyList(),
+      emptyList(),
+    ),
+    schedules = ScheduleAtomicResultBlock(
+      batch.schedules.upserts.map { ScheduleAtomicUpsertResult(it.id, AtomicBatchResultCode.REJECTED, reason) },
+      batch.schedules.deletes.map { ScheduleAtomicDeleteResult(it.id, AtomicBatchResultCode.REJECTED, reason) },
+      emptyList(),
+      emptyList(),
+    ),
+    occurrenceOverrides = OccurrenceOverrideAtomicResultBlock(
+      batch.occurrenceOverrides.upserts.map {
+        OccurrenceOverrideAtomicUpsertResult(it.scheduleId, it.occurrenceDate, AtomicBatchResultCode.REJECTED, reason)
+      },
+      batch.occurrenceOverrides.deletes.map {
+        OccurrenceOverrideAtomicDeleteResult(it.scheduleId, it.occurrenceDate, AtomicBatchResultCode.REJECTED, reason)
+      },
+      emptyList(),
+      emptyList(),
+    ),
+  )
+
+  /** Create 从 version=0 进入 version=1；后续更新仅用于测试中模拟一次服务端递增。 */
+  private fun nextVersion(version: ULong): ULong = if (version == 0uL) 1uL else version + 1uL
 
   /** 空响应严格带齐三类 block，满足 ResponseApplier 的关联合同。 */
   private fun emptySyncResponse(requestId: String) = SyncResponse(

@@ -24,26 +24,26 @@ interface ScheduleV2ApiService {
     @Tag(EXPECTED_ACCOUNT_SESSION_TAG) session: AccountSession,
   ): ApiWrapper<SyncResponse>
 
-  /** 日常新增 version=0 的完整 Schedule。 */
+  /** 日常新增一个 Schedule 聚合批次，可同时携带关联 Category 与 OccurrenceOverride。 */
   @POST("v2/schedules")
   suspend fun createSchedule(
-    @Body input: ScheduleInput,
+    @Body input: AtomicBatch,
     @Tag(EXPECTED_ACCOUNT_SESSION_TAG) session: AccountSession,
-  ): ApiWrapper<ScheduleUpsertResult>
+  ): ApiWrapper<AtomicBatchResult>
 
-  /** 日常更新完整 Schedule；服务端返回合并后的 canonical 结果。 */
+  /** 日常更新一个 Schedule 聚合批次；服务端返回批次涉及 identity 的 canonical 结果。 */
   @PUT("v2/schedules")
   suspend fun updateSchedule(
-    @Body input: ScheduleInput,
+    @Body input: AtomicBatch,
     @Tag(EXPECTED_ACCOUNT_SESSION_TAG) session: AccountSession,
-  ): ApiWrapper<ScheduleUpsertResult>
+  ): ApiWrapper<AtomicBatchResult>
 
-  /** 日常删除只上传 identity 与 localModifiedAt，不上传 version。 */
+  /** 日常删除聚合批次；各 DELETE 成员仍只上传 identity 与 localModifiedAt。 */
   @HTTP(method = "DELETE", path = "v2/schedules", hasBody = true)
   suspend fun deleteSchedule(
-    @Body input: ScheduleDelete,
+    @Body input: AtomicBatch,
     @Tag(EXPECTED_ACCOUNT_SESSION_TAG) session: AccountSession,
-  ): ApiWrapper<ScheduleDeleteResult>
+  ): ApiWrapper<AtomicBatchResult>
 }
 
 /**
