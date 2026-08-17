@@ -5,8 +5,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicProgramHostAbi
 /**
  * 阶段 0 Java 语义所需的最小 JavaScript 运行时。
  *
- * 所有整数 helper 都把结果收敛为有符号 32 位值，避免 JavaScript Number 的浮点语义泄漏到
- * Java int 算术；long/BigInt 由后续阶段单独实现，当前后端会在生成前拒绝。
+ * int helper 把结果收敛为有符号 32 位；long 使用 BigInt.asIntN(64) 保持二进制补码溢出；
+ * float 则由 emitter 在每个写入与算术边界执行 Math.fround。
  */
 internal object JavaRuntimePrelude {
   /** 供 [JavaScriptEmitter] 写入每个模块开头的辅助函数源码。 */
@@ -27,6 +27,74 @@ internal object JavaRuntimePrelude {
         throw new Error("java.lang.ArithmeticException: / by zero");
       }
       return (left - @__j_int_div(left, right) * right) | 0;
+    }
+  """.trimIndent().replace('@', '$')
+
+  /** long/float/double 才需要的运行时，按 typed IR 声明按需注入以保持 int-only 包紧凑。 */
+  val numericSource: String = """
+    function @__j_long(value) {
+      return BigInt.asIntN(64, typeof value === "bigint" ? value : BigInt(value));
+    }
+
+    function @__j_long_div(left, right) {
+      left = @__j_long(left);
+      right = @__j_long(right);
+      if (right === 0n) throw new Error("java.lang.ArithmeticException: / by zero");
+      return BigInt.asIntN(64, left / right);
+    }
+
+    function @__j_long_rem(left, right) {
+      left = @__j_long(left);
+      right = @__j_long(right);
+      if (right === 0n) throw new Error("java.lang.ArithmeticException: / by zero");
+      return BigInt.asIntN(64, left % right);
+    }
+
+    function @__j_shift_count(value, mask) {
+      const count = typeof value === "bigint" ? Number(BigInt.asUintN(64, value)) : value;
+      return (count | 0) & mask;
+    }
+
+    function @__j_long_unsigned_shift(value, distance) {
+      return BigInt.asIntN(64, BigInt.asUintN(64, @__j_long(value)) >> BigInt(@__j_shift_count(distance, 63)));
+    }
+
+    // Java 浮点到 integral 的 narrowing 会先向零截断，再按目标范围饱和；NaN 结果为 0。
+    function @__j_to_int(value) {
+      if (typeof value === "bigint") return Number(BigInt.asIntN(32, value)) | 0;
+      if (Number.isNaN(value)) return 0;
+      if (value >= 2147483647) return 2147483647;
+      if (value <= -2147483648) return -2147483648;
+      return Math.trunc(value) | 0;
+    }
+
+    function @__j_to_long(value) {
+      if (typeof value === "bigint") return @__j_long(value);
+      if (Number.isNaN(value)) return 0n;
+      if (value >= 9223372036854775807) return 9223372036854775807n;
+      if (value <= -9223372036854775808) return -9223372036854775808n;
+      return @__j_long(BigInt(Math.trunc(value)));
+    }
+
+    function @__j_float(value) { return Math.fround(Number(value)); }
+
+    /** Java 常用浮点文本：稳定处理特殊值、负零、小数点与指数标记。 */
+    function @__j_float_text(value) {
+      value = Number(value);
+      if (Number.isNaN(value)) return "NaN";
+      if (value === Infinity) return "Infinity";
+      if (value === -Infinity) return "-Infinity";
+      if (Object.is(value, -0)) return "-0.0";
+      let text = String(value);
+      const exponent = text.search(/[eE]/);
+      if (exponent >= 0) {
+        let mantissa = text.slice(0, exponent);
+        if (mantissa.indexOf(".") < 0) mantissa += ".0";
+        let power = text.slice(exponent + 1);
+        if (power.charAt(0) === "+") power = power.slice(1);
+        return mantissa + "E" + power;
+      }
+      return text.indexOf(".") < 0 ? text + ".0" : text;
     }
   """.trimIndent().replace('@', '$')
 
@@ -219,6 +287,7 @@ internal object JavaRuntimePrelude {
 
     function @__j_array_default(component) {
       if (component === "primitive:BOOLEAN") return false;
+      if (component === "primitive:LONG") return 0n;
       return typeof component === "string" && component.indexOf("primitive:") === 0 ? 0 : null;
     }
 
@@ -260,6 +329,9 @@ internal object JavaRuntimePrelude {
         case "primitive:SHORT": return (value << 16) >> 16;
         case "primitive:CHAR": return value & 65535;
         case "primitive:INT": return value | 0;
+        case "primitive:LONG": return @__j_long(value);
+        case "primitive:FLOAT": return @__j_float(value);
+        case "primitive:DOUBLE": return Number(value);
         default: return value;
       }
     }
@@ -269,6 +341,9 @@ internal object JavaRuntimePrelude {
         case "NULL": return "null";
         case "BOOLEAN": return value ? "true" : "false";
         case "CHAR": return String.fromCharCode(value & 65535);
+        case "LONG": return String(@__j_long(value));
+        case "FLOAT": return @__j_float_text(@__j_float(value));
+        case "DOUBLE": return @__j_float_text(value);
         case "BOXED":
           if (value === null) return "null";
           if (value.@__j_box_tag === "BOOLEAN") return value.value ? "true" : "false";
@@ -276,6 +351,8 @@ internal object JavaRuntimePrelude {
           if (value.@__j_box_tag === "BYTE" || value.@__j_box_tag === "SHORT" || value.@__j_box_tag === "INT") {
             return String(value.value | 0);
           }
+          if (value.@__j_box_tag === "LONG") return String(value.value);
+          if (value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return @__j_float_text(value.value);
           throw new Error("java.lang.ClassCastException");
         default: return value === null ? "null" : String(value);
       }
@@ -316,6 +393,9 @@ internal object JavaRuntimePrelude {
     }
     function @__j_print_char_array(stream, value) { @__j_write_stream(stream, @__j_char_array_text(value)); }
     function @__j_print_int(stream, value) { @__j_write_stream(stream, String(value | 0)); }
+    function @__j_print_long(stream, value) { @__j_write_stream(stream, String(@__j_long(value))); }
+    function @__j_print_float(stream, value) { @__j_write_stream(stream, @__j_float_text(@__j_float(value))); }
+    function @__j_print_double(stream, value) { @__j_write_stream(stream, @__j_float_text(value)); }
     function @__j_print_string(stream, value) { @__j_write_stream(stream, value === null ? "null" : value); }
     function @__j_print_object(stream, value) { @__j_write_stream(stream, @__j_string_value_of_object(value)); }
     function @__j_println(stream) { @__j_write_stream(stream, "\n"); }
@@ -323,6 +403,9 @@ internal object JavaRuntimePrelude {
     function @__j_println_char(stream, value) { @__j_write_stream(stream, String.fromCharCode(value & 65535) + "\n"); }
     function @__j_println_char_array(stream, value) { @__j_write_stream(stream, @__j_char_array_text(value) + "\n"); }
     function @__j_println_int(stream, value) { @__j_write_stream(stream, String(value | 0) + "\n"); }
+    function @__j_println_long(stream, value) { @__j_write_stream(stream, String(@__j_long(value)) + "\n"); }
+    function @__j_println_float(stream, value) { @__j_write_stream(stream, @__j_float_text(@__j_float(value)) + "\n"); }
+    function @__j_println_double(stream, value) { @__j_write_stream(stream, @__j_float_text(value) + "\n"); }
     function @__j_println_string(stream, value) { @__j_write_stream(stream, (value === null ? "null" : value) + "\n"); }
     function @__j_println_object(stream, value) { @__j_write_stream(stream, @__j_string_value_of_object(value) + "\n"); }
 
@@ -395,6 +478,15 @@ internal object JavaRuntimePrelude {
     function @__j_math_abs_int(value) { return Math.abs(value | 0) | 0; }
     function @__j_math_min_int(left, right) { return Math.min(left | 0, right | 0) | 0; }
     function @__j_math_max_int(left, right) { return Math.max(left | 0, right | 0) | 0; }
+    function @__j_math_abs_long(value) { value = @__j_long(value); return BigInt.asIntN(64, value < 0n ? -value : value); }
+    function @__j_math_min_long(left, right) { left = @__j_long(left); right = @__j_long(right); return left <= right ? left : right; }
+    function @__j_math_max_long(left, right) { left = @__j_long(left); right = @__j_long(right); return left >= right ? left : right; }
+    function @__j_math_abs_float(value) { return @__j_float(Math.abs(@__j_float(value))); }
+    function @__j_math_min_float(left, right) { return @__j_float(Math.min(@__j_float(left), @__j_float(right))); }
+    function @__j_math_max_float(left, right) { return @__j_float(Math.max(@__j_float(left), @__j_float(right))); }
+    function @__j_math_abs_double(value) { return Math.abs(Number(value)); }
+    function @__j_math_min_double(left, right) { return Math.min(Number(left), Number(right)); }
+    function @__j_math_max_double(left, right) { return Math.max(Number(left), Number(right)); }
 
     // wrapper 使用显式标签，禁止把普通 JS Number/Boolean 当成 Java 引用。
     const @__j_box_cache = new Map();
@@ -406,6 +498,9 @@ internal object JavaRuntimePrelude {
         case "SHORT": return (value << 16) >> 16;
         case "CHAR": return value & 65535;
         case "INT": return value | 0;
+        case "LONG": return @__j_long(value);
+        case "FLOAT": return @__j_float(value);
+        case "DOUBLE": return Number(value);
         default: throw new Error("java.lang.IllegalStateException: unsupported wrapper kind");
       }
     }
@@ -414,6 +509,7 @@ internal object JavaRuntimePrelude {
       value = @__j_box_normalize(kind, value);
       const cached = kind === "BOOLEAN" || kind === "BYTE" ||
         ((kind === "SHORT" || kind === "INT") && value >= -128 && value <= 127) ||
+        (kind === "LONG" && value >= -128n && value <= 127n) ||
         (kind === "CHAR" && value >= 0 && value <= 127);
       const key = kind + ":" + String(value);
       if (cached && @__j_box_cache.has(key)) return @__j_box_cache.get(key);
@@ -430,19 +526,54 @@ internal object JavaRuntimePrelude {
 
     function @__j_number_int_value(value) {
       value = @__j_non_null(value);
-      if (value.@__j_box_tag !== "BYTE" && value.@__j_box_tag !== "SHORT" &&
-        value.@__j_box_tag !== "INT") throw new Error("java.lang.ClassCastException");
-      return value.value | 0;
+      if (value.@__j_box_tag === "LONG") return @__j_to_int(value.value);
+      if (value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return @__j_to_int(value.value);
+      if (value.@__j_box_tag === "BYTE" || value.@__j_box_tag === "SHORT" || value.@__j_box_tag === "INT") {
+        return value.value | 0;
+      }
+      throw new Error("java.lang.ClassCastException");
+    }
+
+    function @__j_number_long_value(value) {
+      value = @__j_non_null(value);
+      if (value.@__j_box_tag === "LONG") return value.value;
+      if (value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return @__j_to_long(value.value);
+      if (value.@__j_box_tag === "BYTE" || value.@__j_box_tag === "SHORT" || value.@__j_box_tag === "INT") {
+        return @__j_long(value.value);
+      }
+      throw new Error("java.lang.ClassCastException");
+    }
+
+    function @__j_number_float_value(value) {
+      value = @__j_non_null(value);
+      if (value.@__j_box_tag === "LONG") return @__j_float(Number(value.value));
+      if (value.@__j_box_tag === "BYTE" || value.@__j_box_tag === "SHORT" || value.@__j_box_tag === "INT" ||
+        value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return @__j_float(value.value);
+      throw new Error("java.lang.ClassCastException");
+    }
+
+    function @__j_number_double_value(value) {
+      value = @__j_non_null(value);
+      if (value.@__j_box_tag === "LONG") return Number(value.value);
+      if (value.@__j_box_tag === "BYTE" || value.@__j_box_tag === "SHORT" || value.@__j_box_tag === "INT" ||
+        value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return Number(value.value);
+      throw new Error("java.lang.ClassCastException");
     }
 
     function @__j_box_equals(value, other) {
       value = @__j_non_null(value);
-      return other !== null && value.@__j_box_tag === other.@__j_box_tag && value.value === other.value;
+      if (other === null || value.@__j_box_tag !== other.@__j_box_tag) return false;
+      return value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE"
+        ? Object.is(value.value, other.value) || (Number.isNaN(value.value) && Number.isNaN(other.value))
+        : value.value === other.value;
     }
 
     function @__j_box_hash(value) {
       value = @__j_non_null(value);
       if (value.@__j_box_tag === "BOOLEAN") return value.value ? 1231 : 1237;
+      if (value.@__j_box_tag === "LONG") return Number(BigInt.asIntN(32, value.value ^ (BigInt.asUintN(64, value.value) >> 32n))) | 0;
+      if (value.@__j_box_tag === "FLOAT") return @__j_float_hash(value.value);
+      if (value.@__j_box_tag === "DOUBLE") return @__j_double_hash(value.value);
       return value.value | 0;
     }
 
@@ -450,7 +581,22 @@ internal object JavaRuntimePrelude {
       value = @__j_non_null(value);
       if (value.@__j_box_tag === "BOOLEAN") return value.value ? "true" : "false";
       if (value.@__j_box_tag === "CHAR") return String.fromCharCode(value.value & 65535);
+      if (value.@__j_box_tag === "LONG") return String(value.value);
+      if (value.@__j_box_tag === "FLOAT" || value.@__j_box_tag === "DOUBLE") return @__j_float_text(value.value);
       return String(value.value | 0);
+    }
+
+    const @__j_float_bits_buffer = new ArrayBuffer(8);
+    const @__j_float_bits_view = new DataView(@__j_float_bits_buffer);
+    function @__j_float_hash(value) {
+      if (Number.isNaN(value)) return 2143289344;
+      @__j_float_bits_view.setFloat32(0, @__j_float(value), false);
+      return @__j_float_bits_view.getInt32(0, false) | 0;
+    }
+    function @__j_double_hash(value) {
+      if (Number.isNaN(value)) return 2146959360;
+      @__j_float_bits_view.setFloat64(0, Number(value), false);
+      return (@__j_float_bits_view.getInt32(0, false) ^ @__j_float_bits_view.getInt32(4, false)) | 0;
     }
 
     // Object 的默认 hashCode 只要求同一运行对象稳定；WeakMap 不污染用户字段或枚举结果。
@@ -559,6 +705,15 @@ internal object JavaRuntimePrelude {
     }
     function @__j_sb_append_int(builder, value) {
       builder = @__j_sb_receiver(builder); builder.value += String(value | 0); return builder;
+    }
+    function @__j_sb_append_long(builder, value) {
+      builder = @__j_sb_receiver(builder); builder.value += String(@__j_long(value)); return builder;
+    }
+    function @__j_sb_append_float(builder, value) {
+      builder = @__j_sb_receiver(builder); builder.value += @__j_float_text(@__j_float(value)); return builder;
+    }
+    function @__j_sb_append_double(builder, value) {
+      builder = @__j_sb_receiver(builder); builder.value += @__j_float_text(value); return builder;
     }
     function @__j_sb_append_string(builder, value) {
       builder = @__j_sb_receiver(builder); builder.value += value === null ? "null" : @__j_string_argument(value); return builder;

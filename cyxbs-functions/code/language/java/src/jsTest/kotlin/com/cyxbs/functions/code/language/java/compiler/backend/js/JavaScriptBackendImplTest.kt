@@ -110,16 +110,21 @@ class JavaScriptBackendImplTest {
     assertTrue("return \$m_11((\$l_1 | 0));" in artifact.source)
   }
 
-  /** long 当前没有 BigInt runtime 时必须返回结构化诊断，不能输出错误 JavaScript。 */
+  /** long 必须通过 BigInt runtime 保留 Java 64 位语义，并可从导出入口返回。 */
   @Test
-  fun rejectsUnsupportedLongIrWithoutArtifact() {
-    val result = JavaScriptBackendImpl.generate(longProgram(), longEntryPoint())
+  fun emitsLongIrWithBigIntRuntime() {
+    val artifact = assertNotNull(
+      JavaScriptBackendImpl.generate(longProgram(), longEntryPoint()).value,
+    ).modules.single()
+    val executable = artifact.source.replace(
+      "export function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+      "function " + JavaModuleLayout.ENTRY_EXPORT_NAME,
+    ) + "\nreturn " + JavaModuleLayout.ENTRY_EXPORT_NAME + ";"
+    val constructor: dynamic = js("Function")
+    val entry: dynamic = constructor(executable)()
 
-    assertNull(result.value)
-    assertTrue(result.diagnostics.any { diagnostic ->
-      diagnostic.code == "JAVA_BACKEND_UNSUPPORTED" &&
-        diagnostic.message.contains("long")
-    })
+    assertEquals("1", entry().toString())
+    assertTrue("BigInt.asIntN(64" in artifact.source)
   }
 
   /** 对象创建、实例字段默认初始化和 this-free getter 必须在真实 JavaScript 中返回 Java int。 */
@@ -1189,7 +1194,10 @@ class JavaScriptBackendImplTest {
         span(96),
       ), span(96),
     )
-    return JavaIrProgram(listOf(clazz(listOf(entry))))
+    return JavaIrProgram(
+      classes = listOf(clazz(listOf(entry))),
+      builtinTypeRoles = mapOf(JavaIrClassId(99) to JavaBuiltinTypeRole.STRING),
+    )
   }
 
   /** 构造同时覆盖 stdout、stderr 与 static Math 的最小 builtin typed IR。 */

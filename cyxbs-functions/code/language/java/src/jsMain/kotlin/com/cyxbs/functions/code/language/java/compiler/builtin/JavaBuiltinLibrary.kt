@@ -29,6 +29,9 @@ internal enum class JavaBuiltinTypeRole(val boxedPrimitive: JavaAstPrimitiveType
   SHORT(JavaAstPrimitiveType.SHORT),
   CHARACTER(JavaAstPrimitiveType.CHAR),
   INTEGER(JavaAstPrimitiveType.INT),
+  LONG(JavaAstPrimitiveType.LONG),
+  FLOAT(JavaAstPrimitiveType.FLOAT),
+  DOUBLE(JavaAstPrimitiveType.DOUBLE),
   STRING_BUILDER,
   LIST,
   ARRAY_LIST,
@@ -81,6 +84,9 @@ internal enum class JavaBuiltinOperation {
   PRINTSTREAM_PRINT_CHAR,
   PRINTSTREAM_PRINT_CHAR_ARRAY,
   PRINTSTREAM_PRINT_INT,
+  PRINTSTREAM_PRINT_LONG,
+  PRINTSTREAM_PRINT_FLOAT,
+  PRINTSTREAM_PRINT_DOUBLE,
   PRINTSTREAM_PRINT_STRING,
   PRINTSTREAM_PRINT_OBJECT,
   PRINTSTREAM_PRINTLN,
@@ -88,6 +94,9 @@ internal enum class JavaBuiltinOperation {
   PRINTSTREAM_PRINTLN_CHAR,
   PRINTSTREAM_PRINTLN_CHAR_ARRAY,
   PRINTSTREAM_PRINTLN_INT,
+  PRINTSTREAM_PRINTLN_LONG,
+  PRINTSTREAM_PRINTLN_FLOAT,
+  PRINTSTREAM_PRINTLN_DOUBLE,
   PRINTSTREAM_PRINTLN_STRING,
   PRINTSTREAM_PRINTLN_OBJECT,
 
@@ -104,15 +113,22 @@ internal enum class JavaBuiltinOperation {
   STRING_ENDS_WITH,
 
   MATH_ABS_INT,
+  MATH_ABS_LONG, MATH_ABS_FLOAT, MATH_ABS_DOUBLE,
   MATH_MIN_INT,
+  MATH_MIN_LONG, MATH_MIN_FLOAT, MATH_MIN_DOUBLE,
   MATH_MAX_INT,
+  MATH_MAX_LONG, MATH_MAX_FLOAT, MATH_MAX_DOUBLE,
+  MATH_SQRT, MATH_POW, MATH_FLOOR, MATH_CEIL,
 
   BOOLEAN_VALUE_OF, BOOLEAN_BOOLEAN_VALUE, BOOLEAN_EQUALS, BOOLEAN_HASH_CODE, BOOLEAN_TO_STRING,
   BYTE_VALUE_OF, BYTE_BYTE_VALUE, BYTE_EQUALS, BYTE_HASH_CODE, BYTE_TO_STRING,
   SHORT_VALUE_OF, SHORT_SHORT_VALUE, SHORT_EQUALS, SHORT_HASH_CODE, SHORT_TO_STRING,
   CHARACTER_VALUE_OF, CHARACTER_CHAR_VALUE, CHARACTER_EQUALS, CHARACTER_HASH_CODE, CHARACTER_TO_STRING,
   INTEGER_VALUE_OF, INTEGER_INT_VALUE, INTEGER_EQUALS, INTEGER_HASH_CODE, INTEGER_TO_STRING,
-  NUMBER_INT_VALUE,
+  LONG_VALUE_OF, LONG_LONG_VALUE, LONG_EQUALS, LONG_HASH_CODE, LONG_TO_STRING,
+  FLOAT_VALUE_OF, FLOAT_FLOAT_VALUE, FLOAT_EQUALS, FLOAT_HASH_CODE, FLOAT_TO_STRING,
+  DOUBLE_VALUE_OF, DOUBLE_DOUBLE_VALUE, DOUBLE_EQUALS, DOUBLE_HASH_CODE, DOUBLE_TO_STRING,
+  NUMBER_INT_VALUE, NUMBER_LONG_VALUE, NUMBER_FLOAT_VALUE, NUMBER_DOUBLE_VALUE,
 
   STRING_BUILDER_CONSTRUCT_EMPTY,
   STRING_BUILDER_CONSTRUCT_STRING,
@@ -120,6 +136,9 @@ internal enum class JavaBuiltinOperation {
   STRING_BUILDER_APPEND_CHAR,
   STRING_BUILDER_APPEND_CHAR_ARRAY,
   STRING_BUILDER_APPEND_INT,
+  STRING_BUILDER_APPEND_LONG,
+  STRING_BUILDER_APPEND_FLOAT,
+  STRING_BUILDER_APPEND_DOUBLE,
   STRING_BUILDER_APPEND_STRING,
   STRING_BUILDER_APPEND_OBJECT,
   STRING_BUILDER_LENGTH,
@@ -254,6 +273,9 @@ internal object JavaBuiltinLibrary {
   private val charType = JavaBuiltinTypeReference.Primitive(JavaAstPrimitiveType.CHAR)
   private val charArrayType = JavaBuiltinTypeReference.Array(charType)
   private val intType = JavaBuiltinTypeReference.Primitive(JavaAstPrimitiveType.INT)
+  private val longType = JavaBuiltinTypeReference.Primitive(JavaAstPrimitiveType.LONG)
+  private val floatType = JavaBuiltinTypeReference.Primitive(JavaAstPrimitiveType.FLOAT)
+  private val doubleType = JavaBuiltinTypeReference.Primitive(JavaAstPrimitiveType.DOUBLE)
   private val objectType = JavaBuiltinTypeReference.Declared("java.lang.Object")
   private val stringType = JavaBuiltinTypeReference.Declared("java.lang.String")
   private val printStreamType = JavaBuiltinTypeReference.Declared("java.io.PrintStream")
@@ -264,6 +286,9 @@ internal object JavaBuiltinLibrary {
   private val shortBoxType = JavaBuiltinTypeReference.Declared("java.lang.Short")
   private val characterBoxType = JavaBuiltinTypeReference.Declared("java.lang.Character")
   private val integerBoxType = JavaBuiltinTypeReference.Declared("java.lang.Integer")
+  private val longBoxType = JavaBuiltinTypeReference.Declared("java.lang.Long")
+  private val floatBoxType = JavaBuiltinTypeReference.Declared("java.lang.Float")
+  private val doubleBoxType = JavaBuiltinTypeReference.Declared("java.lang.Double")
   private val stringBuilderType = JavaBuiltinTypeReference.Declared("java.lang.StringBuilder")
   private val eType = JavaBuiltinTypeReference.TypeParameter("E")
   private val kType = JavaBuiltinTypeReference.TypeParameter("K")
@@ -312,6 +337,9 @@ internal object JavaBuiltinLibrary {
     JavaBuiltinTypeDescriptor("java.lang.Short", "java.lang.Number", true, JavaBuiltinTypeRole.SHORT),
     JavaBuiltinTypeDescriptor("java.lang.Character", "java.lang.Object", true, JavaBuiltinTypeRole.CHARACTER),
     JavaBuiltinTypeDescriptor("java.lang.Integer", "java.lang.Number", true, JavaBuiltinTypeRole.INTEGER),
+    JavaBuiltinTypeDescriptor("java.lang.Long", "java.lang.Number", true, JavaBuiltinTypeRole.LONG),
+    JavaBuiltinTypeDescriptor("java.lang.Float", "java.lang.Number", true, JavaBuiltinTypeRole.FLOAT),
+    JavaBuiltinTypeDescriptor("java.lang.Double", "java.lang.Number", true, JavaBuiltinTypeRole.DOUBLE),
     JavaBuiltinTypeDescriptor("java.lang.StringBuilder", "java.lang.Object", true, JavaBuiltinTypeRole.STRING_BUILDER),
     JavaBuiltinTypeDescriptor(
       "java.util.List", "java.lang.Object", isFinal = false,
@@ -479,6 +507,9 @@ internal object JavaBuiltinLibrary {
       parameters = listOf(intType),
       operation = JavaBuiltinOperation.PRINTSTREAM_PRINT_INT,
     )
+    callable("java.io.PrintStream", "print", listOf(longType), JavaBuiltinOperation.PRINTSTREAM_PRINT_LONG)
+    callable("java.io.PrintStream", "print", listOf(floatType), JavaBuiltinOperation.PRINTSTREAM_PRINT_FLOAT)
+    callable("java.io.PrintStream", "print", listOf(doubleType), JavaBuiltinOperation.PRINTSTREAM_PRINT_DOUBLE)
     callable(
       owner = "java.io.PrintStream",
       name = "print",
@@ -521,6 +552,9 @@ internal object JavaBuiltinLibrary {
       parameters = listOf(intType),
       operation = JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT,
     )
+    callable("java.io.PrintStream", "println", listOf(longType), JavaBuiltinOperation.PRINTSTREAM_PRINTLN_LONG)
+    callable("java.io.PrintStream", "println", listOf(floatType), JavaBuiltinOperation.PRINTSTREAM_PRINTLN_FLOAT)
+    callable("java.io.PrintStream", "println", listOf(doubleType), JavaBuiltinOperation.PRINTSTREAM_PRINTLN_DOUBLE)
     callable(
       owner = "java.io.PrintStream",
       name = "println",
@@ -614,6 +648,9 @@ internal object JavaBuiltinLibrary {
       returnType = intType,
       isStatic = true,
     )
+    callable("java.lang.Math", "abs", listOf(longType), JavaBuiltinOperation.MATH_ABS_LONG, longType, isStatic = true)
+    callable("java.lang.Math", "abs", listOf(floatType), JavaBuiltinOperation.MATH_ABS_FLOAT, floatType, isStatic = true)
+    callable("java.lang.Math", "abs", listOf(doubleType), JavaBuiltinOperation.MATH_ABS_DOUBLE, doubleType, isStatic = true)
     callable(
       owner = "java.lang.Math",
       name = "min",
@@ -622,6 +659,9 @@ internal object JavaBuiltinLibrary {
       returnType = intType,
       isStatic = true,
     )
+    callable("java.lang.Math", "min", listOf(longType, longType), JavaBuiltinOperation.MATH_MIN_LONG, longType, isStatic = true)
+    callable("java.lang.Math", "min", listOf(floatType, floatType), JavaBuiltinOperation.MATH_MIN_FLOAT, floatType, isStatic = true)
+    callable("java.lang.Math", "min", listOf(doubleType, doubleType), JavaBuiltinOperation.MATH_MIN_DOUBLE, doubleType, isStatic = true)
     callable(
       owner = "java.lang.Math",
       name = "max",
@@ -630,6 +670,13 @@ internal object JavaBuiltinLibrary {
       returnType = intType,
       isStatic = true,
     )
+    callable("java.lang.Math", "max", listOf(longType, longType), JavaBuiltinOperation.MATH_MAX_LONG, longType, isStatic = true)
+    callable("java.lang.Math", "max", listOf(floatType, floatType), JavaBuiltinOperation.MATH_MAX_FLOAT, floatType, isStatic = true)
+    callable("java.lang.Math", "max", listOf(doubleType, doubleType), JavaBuiltinOperation.MATH_MAX_DOUBLE, doubleType, isStatic = true)
+    callable("java.lang.Math", "sqrt", listOf(doubleType), JavaBuiltinOperation.MATH_SQRT, doubleType, isStatic = true)
+    callable("java.lang.Math", "pow", listOf(doubleType, doubleType), JavaBuiltinOperation.MATH_POW, doubleType, isStatic = true)
+    callable("java.lang.Math", "floor", listOf(doubleType), JavaBuiltinOperation.MATH_FLOOR, doubleType, isStatic = true)
+    callable("java.lang.Math", "ceil", listOf(doubleType), JavaBuiltinOperation.MATH_CEIL, doubleType, isStatic = true)
 
     wrapper(
       owner = "java.lang.Boolean", primitive = booleanType, boxed = booleanBoxType,
@@ -666,7 +713,31 @@ internal object JavaBuiltinLibrary {
       equals = JavaBuiltinOperation.INTEGER_EQUALS, hash = JavaBuiltinOperation.INTEGER_HASH_CODE,
       toString = JavaBuiltinOperation.INTEGER_TO_STRING,
     )
+    wrapper(
+      owner = "java.lang.Long", primitive = longType, boxed = longBoxType,
+      valueOf = JavaBuiltinOperation.LONG_VALUE_OF,
+      primitiveMethod = "longValue", primitiveOperation = JavaBuiltinOperation.LONG_LONG_VALUE,
+      equals = JavaBuiltinOperation.LONG_EQUALS, hash = JavaBuiltinOperation.LONG_HASH_CODE,
+      toString = JavaBuiltinOperation.LONG_TO_STRING,
+    )
+    wrapper(
+      owner = "java.lang.Float", primitive = floatType, boxed = floatBoxType,
+      valueOf = JavaBuiltinOperation.FLOAT_VALUE_OF,
+      primitiveMethod = "floatValue", primitiveOperation = JavaBuiltinOperation.FLOAT_FLOAT_VALUE,
+      equals = JavaBuiltinOperation.FLOAT_EQUALS, hash = JavaBuiltinOperation.FLOAT_HASH_CODE,
+      toString = JavaBuiltinOperation.FLOAT_TO_STRING,
+    )
+    wrapper(
+      owner = "java.lang.Double", primitive = doubleType, boxed = doubleBoxType,
+      valueOf = JavaBuiltinOperation.DOUBLE_VALUE_OF,
+      primitiveMethod = "doubleValue", primitiveOperation = JavaBuiltinOperation.DOUBLE_DOUBLE_VALUE,
+      equals = JavaBuiltinOperation.DOUBLE_EQUALS, hash = JavaBuiltinOperation.DOUBLE_HASH_CODE,
+      toString = JavaBuiltinOperation.DOUBLE_TO_STRING,
+    )
     callable("java.lang.Number", "intValue", operation = JavaBuiltinOperation.NUMBER_INT_VALUE, returnType = intType)
+    callable("java.lang.Number", "longValue", operation = JavaBuiltinOperation.NUMBER_LONG_VALUE, returnType = longType)
+    callable("java.lang.Number", "floatValue", operation = JavaBuiltinOperation.NUMBER_FLOAT_VALUE, returnType = floatType)
+    callable("java.lang.Number", "doubleValue", operation = JavaBuiltinOperation.NUMBER_DOUBLE_VALUE, returnType = doubleType)
 
     constructor("java.lang.StringBuilder", emptyList(), JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_EMPTY, stringBuilderType)
     constructor("java.lang.StringBuilder", listOf(stringType), JavaBuiltinOperation.STRING_BUILDER_CONSTRUCT_STRING, stringBuilderType)
@@ -674,6 +745,9 @@ internal object JavaBuiltinLibrary {
     callable("java.lang.StringBuilder", "append", listOf(charType), JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR, stringBuilderType)
     callable("java.lang.StringBuilder", "append", listOf(charArrayType), JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY, stringBuilderType)
     callable("java.lang.StringBuilder", "append", listOf(intType), JavaBuiltinOperation.STRING_BUILDER_APPEND_INT, stringBuilderType)
+    callable("java.lang.StringBuilder", "append", listOf(longType), JavaBuiltinOperation.STRING_BUILDER_APPEND_LONG, stringBuilderType)
+    callable("java.lang.StringBuilder", "append", listOf(floatType), JavaBuiltinOperation.STRING_BUILDER_APPEND_FLOAT, stringBuilderType)
+    callable("java.lang.StringBuilder", "append", listOf(doubleType), JavaBuiltinOperation.STRING_BUILDER_APPEND_DOUBLE, stringBuilderType)
     callable("java.lang.StringBuilder", "append", listOf(stringType), JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING, stringBuilderType)
     callable("java.lang.StringBuilder", "append", listOf(objectType), JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT, stringBuilderType)
     callable("java.lang.StringBuilder", "length", operation = JavaBuiltinOperation.STRING_BUILDER_LENGTH, returnType = intType)

@@ -630,6 +630,9 @@ internal enum class JavaIrStringConversionKind {
   BOOLEAN,
   CHAR,
   INT_LIKE,
+  LONG,
+  FLOAT,
+  DOUBLE,
   BOXED,
 }
 
@@ -644,6 +647,9 @@ internal sealed interface JavaIrConstant {
    * 使用字符串避免 Kotlin/JS 与 JSON 经过 Number 时损失 64 位精度，JS 后端再生成 BigInt。
    */
   data class LongValue(val canonicalText: String) : JavaIrConstant
+
+  /** 已验证为有限 Java 浮点 literal 的数值；表达式类型决定是否应用 Math.fround。 */
+  data class FloatingValue(val value: Double) : JavaIrConstant
 
   data class StringValue(val value: String) : JavaIrConstant
   data object NullValue : JavaIrConstant

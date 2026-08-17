@@ -2145,6 +2145,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstExpression.Parenthesized -> expectedExpressionTypes[expression.nodeId]?.let { expected ->
         analyzeExpressionExpected(expression.expression, expected)
       } ?: analyzeExpression(expression.expression)
+      is JavaAstExpression.Cast -> cast(expression)
       is JavaAstExpression.Binary -> binary(expression)
       is JavaAstExpression.Unary -> unary(expression)
       is JavaAstExpression.Assignment -> assignment(expression)
@@ -2167,6 +2168,75 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   ): JavaSemanticType {
     expectedExpressionTypes[expression.nodeId] = expected
     return analyzeExpression(expression)
+  }
+
+  /**
+   * 解析 Java 显式数值强转，并把全部中间步骤冻结到 cast 节点。
+   *
+   * 本阶段支持 primitive 之间的 widening/narrowing，以及受控包装类的装箱、拆箱后数值转换；
+   * 引用类型 downcast 需要运行时类型检查，统一留给下一阶段处理，不能退化为 JS 强制转换。
+   */
+  private fun cast(expression: JavaAstExpression.Cast): JavaSemanticType {
+    val target = resolveType(
+      expression.targetType,
+      context().unit,
+      currentTypeParameterScope(),
+      allowVoid = false,
+    )
+    val actual = analyzeExpression(expression.expression)
+    if (actual == JavaSemanticType.Error || target == JavaSemanticType.Error) return JavaSemanticType.Error
+    val conversion = explicitNumericCast(actual, target)
+    if (conversion == null) {
+      error(
+        expression.span,
+        "java.semantic.unsupported_cast",
+        "当前仅支持 primitive 数值、boolean 同类及受控包装类的显式转换。",
+      )
+      return JavaSemanticType.Error
+    }
+    conversions[expression.nodeId] = conversion
+    return target
+  }
+
+  /** 根据显式转换上下文选择 identity、widening、narrowing 或包装转换序列。 */
+  private fun explicitNumericCast(
+    actual: JavaSemanticType,
+    target: JavaSemanticType,
+  ): JavaSemanticConversion? {
+    if (actual == target) return JavaSemanticConversion.Identity
+    val targetPrimitive = when (target) {
+      is JavaSemanticType.Primitive -> target.kind
+      is JavaSemanticType.Declared -> relations().unboxedPrimitive(target)
+      else -> null
+    } ?: return null
+    val actualPrimitive = when (actual) {
+      is JavaSemanticType.Primitive -> actual.kind
+      is JavaSemanticType.Declared -> relations().unboxedPrimitive(actual)
+      else -> null
+    } ?: return null
+    if (actualPrimitive == JavaAstPrimitiveType.BOOLEAN || targetPrimitive == JavaAstPrimitiveType.BOOLEAN) {
+      if (actualPrimitive != targetPrimitive) return null
+    }
+
+    val steps = mutableListOf<JavaSemanticConversion>()
+    if (actual is JavaSemanticType.Declared) {
+      steps += JavaSemanticConversion.Unboxing(actual.symbol, actualPrimitive)
+    }
+    if (actualPrimitive != targetPrimitive) {
+      val primitiveActual = JavaSemanticType.Primitive(actualPrimitive)
+      val primitiveTarget = JavaSemanticType.Primitive(targetPrimitive)
+      steps += relations().assignmentConversion(primitiveActual, primitiveTarget)
+        ?: JavaSemanticConversion.PrimitiveNarrowing(actualPrimitive, targetPrimitive)
+    }
+    if (target is JavaSemanticType.Declared) {
+      // Java casting context 只在目标 wrapper 与最终 primitive 精确对应时执行装箱。
+      steps += JavaSemanticConversion.Boxing(targetPrimitive, target.symbol)
+    }
+    return when (steps.size) {
+      0 -> JavaSemanticConversion.Identity
+      1 -> steps.single()
+      else -> JavaSemanticConversion.Sequence(steps)
+    }
   }
 
   /**
@@ -2628,6 +2698,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           stringConcatenation(expression.nodeId, rawLeft, rawRight, expression.span)
         }
         else numericBinary(
+          expression.left,
+          expression.right,
           expression.span,
           primitiveOperand(expression.left, rawLeft),
           primitiveOperand(expression.right, rawRight),
@@ -2639,6 +2711,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaAstBinaryOperator.REMAINDER,
       JavaAstBinaryOperator.SUBTRACT,
       -> numericBinary(
+        expression.left,
+        expression.right,
         expression.span,
         primitiveOperand(expression.left, rawLeft),
         primitiveOperand(expression.right, rawRight),
@@ -2664,6 +2738,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaAstBinaryOperator.GREATER_THAN,
       JavaAstBinaryOperator.GREATER_THAN_OR_EQUAL,
       -> numericBinary(
+        expression.left,
+        expression.right,
         expression.span,
         primitiveOperand(expression.left, rawLeft),
         primitiveOperand(expression.right, rawRight),
@@ -2680,7 +2756,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           primitiveOperand(expression.right, rawRight)
         } else rawRight
         if (equalityCompatible(left, right)) {
-        booleanType()
+          if (left is JavaSemanticType.Primitive && right is JavaSemanticType.Primitive &&
+            left.kind != JavaAstPrimitiveType.BOOLEAN && right.kind != JavaAstPrimitiveType.BOOLEAN
+          ) {
+            val promoted = checkNotNull(numericPromotion(left, right))
+            registerNumericPromotion(expression.left, left, promoted)
+            registerNumericPromotion(expression.right, right, promoted)
+          }
+          booleanType()
         } else {
           error(expression.span, "java.semantic.invalid_binary_operands", "等值比较的操作数类型不兼容。")
           JavaSemanticType.Error
@@ -2694,7 +2777,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         val right = primitiveOperand(expression.right, rawRight)
         when {
         left == booleanType() && right == booleanType() -> booleanType()
-        isIntegral(left) && isIntegral(right) -> checkNotNull(numericPromotion(left, right))
+        isIntegral(left) && isIntegral(right) -> checkNotNull(numericPromotion(left, right)).also { promoted ->
+          registerNumericPromotion(expression.left, left, promoted)
+          registerNumericPromotion(expression.right, right, promoted)
+        }
         else -> {
           error(expression.span, "java.semantic.invalid_binary_operands", "位运算要求两个 integral 或两个 boolean 操作数。")
           JavaSemanticType.Error
@@ -2717,6 +2803,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
 
   /** 统一实现算术与关系运算的数值提升。 */
   private fun numericBinary(
+    leftExpression: JavaAstExpression,
+    rightExpression: JavaAstExpression,
     span: JavaSourceSpan,
     left: JavaSemanticType,
     right: JavaSemanticType,
@@ -2727,7 +2815,46 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(span, "java.semantic.invalid_binary_operands", "数值运算要求两个 numeric primitive 操作数。")
       return JavaSemanticType.Error
     }
+    registerNumericPromotion(leftExpression, left, promoted)
+    registerNumericPromotion(rightExpression, right, promoted)
     return if (relational) booleanType() else promoted
+  }
+
+  /**
+   * 把 binary numeric promotion 明确写入 side table。
+   *
+   * wrapper 操作数可能已经登记 unboxing；这里会把 widening 追加为扁平序列，保证 lowering
+   * 先拆箱再拓宽，尤其避免 JavaScript 在 int 与 BigInt 混算时抛出宿主 TypeError。
+   */
+  private fun registerNumericPromotion(
+    expression: JavaAstExpression,
+    source: JavaSemanticType,
+    target: JavaSemanticType.Primitive,
+  ) {
+    val primitive = source as? JavaSemanticType.Primitive ?: return
+    if (primitive == target) return
+    appendConversion(
+      expression.nodeId,
+      JavaSemanticConversion.PrimitiveWidening(primitive.kind, target.kind),
+    )
+  }
+
+  /** 在同一表达式上按 Java 求值顺序合并拆箱与 primitive widening。 */
+  private fun appendConversion(nodeId: JavaNodeId, conversion: JavaSemanticConversion) {
+    if (conversion == JavaSemanticConversion.Identity) {
+      if (nodeId !in conversions) conversions[nodeId] = conversion
+      return
+    }
+    val previous = conversions[nodeId]
+    if (previous == null || previous == JavaSemanticConversion.Identity) {
+      conversions[nodeId] = conversion
+      return
+    }
+    val steps = buildList {
+      if (previous is JavaSemanticConversion.Sequence) addAll(previous.steps) else add(previous)
+      if (conversion is JavaSemanticConversion.Sequence) addAll(conversion.steps) else add(conversion)
+    }
+    conversions[nodeId] = JavaSemanticConversion.Sequence(steps)
   }
 
   /** 一元数值操作先做 unary numeric promotion；递增递减保留左值声明类型。 */
@@ -2758,10 +2885,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         !isNumeric(operand) -> invalidUnary(expression.span, "递增递减目标必须是 numeric primitive 或首批 wrapper。")
         else -> {
           markLocalMutation(expression.operand)
-          if (declaredOperand != operand) {
+          val computedType = checkNotNull(unaryNumericPromotion(operand))
+          if (declaredOperand is JavaSemanticType.Declared || declaredOperand != computedType) {
             updateWriteConversion(
               expression.nodeId,
-              checkNotNull(unaryNumericPromotion(operand)),
+              computedType,
               declaredOperand,
             )
           }
@@ -2813,7 +2941,23 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         if (computedType == JavaSemanticType.Error) {
           JavaSemanticType.Error
         } else {
-          if (readTarget != targetType) {
+          val computedPrimitive = computedType as? JavaSemanticType.Primitive
+          if (computedPrimitive != null) {
+            when (expression.operator) {
+              JavaAstAssignmentOperator.SHIFT_LEFT_ASSIGN,
+              JavaAstAssignmentOperator.SHIFT_RIGHT_ASSIGN,
+              JavaAstAssignmentOperator.UNSIGNED_SHIFT_RIGHT_ASSIGN,
+              -> {
+                unaryNumericPromotion(readTarget)?.let { registerNumericPromotion(expression.target, readTarget, it) }
+                unaryNumericPromotion(readValue)?.let { registerNumericPromotion(expression.value, readValue, it) }
+              }
+              else -> {
+                registerNumericPromotion(expression.target, readTarget, computedPrimitive)
+                registerNumericPromotion(expression.value, readValue, computedPrimitive)
+              }
+            }
+          }
+          if (targetType is JavaSemanticType.Declared || computedType != targetType) {
             updateWriteConversion(expression.nodeId, computedType, targetType)
           }
           // Java 复合赋值表达式最终仍具有左值声明类型；计算中间类型只进入回写 side table。
@@ -3853,7 +3997,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** 登记常用 Java 字面量；浮点当前只需要类型，char 以无损 UTF-16 code unit 保存。 */
+  /** 登记常用 Java 字面量；浮点保留解析值，char 以无损 UTF-16 code unit 保存。 */
   private fun literal(expression: JavaAstExpression.Literal): JavaSemanticType =
     when (expression.kind) {
       JavaAstLiteralKind.BOOLEAN -> booleanType().also {
@@ -3889,15 +4033,22 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** 浮点 token 根据 f/F 后缀区分 float，其余为 double。 */
+  /**
+   * 浮点 token 根据 f/F 后缀区分 float，其余为 double。
+   *
+   * 常量只保存数学值；float 的逐步单精度舍入由 typed IR 类型驱动后端执行，不能在语义层
+   * 只对 literal 舍入，否则后续算术仍会错误地沿用 JavaScript double 精度。
+   */
   private fun floatingLiteral(expression: JavaAstExpression.Literal): JavaSemanticType {
     val compact = expression.tokenText.replace("_", "")
     val suffix = compact.lastOrNull()?.lowercaseChar()
     val number = if (suffix == 'f' || suffix == 'd') compact.dropLast(1) else compact
-    if (number.toDoubleOrNull() == null) {
+    val value = number.toDoubleOrNull()
+    if (value == null || !value.isFinite()) {
       error(expression.span, "java.semantic.invalid_floating_literal", "浮点 literal 格式无效。")
       return JavaSemanticType.Error
     }
+    constants[expression.nodeId] = JavaConstantValue.FloatingValue(value)
     return JavaSemanticType.Primitive(
       if (suffix == 'f') JavaAstPrimitiveType.FLOAT else JavaAstPrimitiveType.DOUBLE,
     )
@@ -4017,7 +4168,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(span, code, message)
       return false
     }
-    conversions[nodeId] = conversion
+    // Cast、拆箱等表达式自身转换必须先于外层赋值转换；identity 不能覆盖已有步骤。
+    if (conversion != JavaSemanticConversion.Identity || nodeId !in conversions) {
+      appendConversion(nodeId, conversion)
+    }
     return true
   }
 
@@ -4407,7 +4561,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   }
 
   /**
-   * 冻结 wrapper 更新后的隐式回写步骤：byte/short/char 的算术结果先窄化，再按精确 wrapper 装箱。
+   * 冻结 primitive 或 wrapper 更新后的隐式回写步骤。
+   *
+   * byte/short/char 以及 long/float/double 的复合赋值都可能需要 Java 隐式 narrowing；wrapper
+   * 在该步骤之后再按精确声明类型装箱。
    * 该窄化只属于 Java 的 ++/-- 与复合赋值规则，绝不会被普通赋值或 overload 复用。
    */
   private fun updateWriteConversion(
@@ -4415,19 +4572,25 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     computedType: JavaSemanticType,
     declaredTargetType: JavaSemanticType,
   ) {
-    val primitive = relations().unboxedPrimitive(declaredTargetType)
-      ?: error("An update write conversion requires a supported wrapper target.")
+    val primitive = when (declaredTargetType) {
+      is JavaSemanticType.Primitive -> declaredTargetType.kind
+      else -> relations().unboxedPrimitive(declaredTargetType)
+        ?: error("An update write conversion requires a numeric primitive or supported wrapper target.")
+    }
     val computedPrimitive = (computedType as? JavaSemanticType.Primitive)?.kind
       ?: error("An update write conversion requires a primitive computed value.")
-    val boxed = (declaredTargetType as JavaSemanticType.Declared).symbol
     val steps = buildList {
       if (computedPrimitive != primitive) {
         add(JavaSemanticConversion.PrimitiveNarrowing(computedPrimitive, primitive))
       }
-      add(JavaSemanticConversion.Boxing(primitive, boxed))
+      if (declaredTargetType is JavaSemanticType.Declared) {
+        add(JavaSemanticConversion.Boxing(primitive, declaredTargetType.symbol))
+      }
     }
-    updateWriteConversions[nodeId] = if (steps.size == 1) steps.single()
-    else JavaSemanticConversion.Sequence(steps)
+    if (steps.isNotEmpty()) {
+      updateWriteConversions[nodeId] = if (steps.size == 1) steps.single()
+      else JavaSemanticConversion.Sequence(steps)
+    }
   }
 
   /** unary numeric promotion 把 byte/short/char 提升到 int。 */
@@ -4469,7 +4632,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   /**
    * 校验并登记本阶段支持的 String 拼接转换。
    *
-   * 首批 wrapper 使用冻结的 tagged 字符串化；任意对象、数组、long 与浮点仍稳定拒绝。
+   * wrapper 使用冻结的 tagged 字符串化；任意对象与数组仍稳定拒绝。
    */
   private fun stringConcatenation(
     nodeId: JavaNodeId,
@@ -4483,7 +4646,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(
         span,
         "java.semantic.string_concat_operand_unsupported",
-        "String 拼接暂只支持 String、null、首批 wrapper、boolean、byte、short、char 与 int。",
+        "String 拼接暂只支持 String、null、primitive 与已登记 wrapper。",
       )
       return JavaSemanticType.Error
     }
@@ -4503,6 +4666,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaAstPrimitiveType.SHORT,
       JavaAstPrimitiveType.INT,
     ) -> JavaStringConversionKind.INT_LIKE
+    type == JavaSemanticType.Primitive(JavaAstPrimitiveType.LONG) ->
+      JavaStringConversionKind.LONG
+    type == JavaSemanticType.Primitive(JavaAstPrimitiveType.FLOAT) ->
+      JavaStringConversionKind.FLOAT
+    type == JavaSemanticType.Primitive(JavaAstPrimitiveType.DOUBLE) ->
+      JavaStringConversionKind.DOUBLE
     relations().unboxedPrimitive(type) != null -> JavaStringConversionKind.BOXED
     else -> null
   }

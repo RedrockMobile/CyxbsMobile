@@ -677,6 +677,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "BooleanLiteral" -> literal(node, JavaAstLiteralKind.BOOLEAN)
       "null" -> literal(node, JavaAstLiteralKind.NULL)
       "ParenthesizedExpression" -> JavaAstExpression.Parenthesized(ids.next(), span(node), expression(node.onlyExpression()))
+      "CastExpression" -> cast(node)
       "BinaryExpression" -> binary(node)
       "AssignmentExpression" -> assignment(node)
       "UnaryExpression", "PostfixExpression", "UpdateExpression" -> unary(node)
@@ -778,6 +779,19 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val token = node.children().map(::text).firstOrNull { it in BINARY } ?: unsupported(node, "二元操作符不受支持。")
     if (operands.size != 2) unsupported(node, "二元表达式操作数数量错误。")
     return JavaAstExpression.Binary(ids.next(), span(node), expression(operands[0]), BINARY.getValue(token), expression(operands[1]))
+  }
+
+  /** CastExpression 只保存显式目标类型与唯一操作数，具体可转换性由语义层判断。 */
+  private fun cast(node: LezerSyntaxNode): JavaAstExpression.Cast {
+    val target = node.children().firstOrNull { child ->
+      child.name in TYPE_REFERENCE_NODES || child.name in TYPE_REFERENCE_WRAPPERS
+    } ?: unsupported(node, "显式类型转换缺少目标类型。")
+    return JavaAstExpression.Cast(
+      ids.next(),
+      span(node),
+      typeReference(target),
+      expression(node.onlyExpression()),
+    )
   }
 
   /** 赋值表达式支持 = 与阶段 0 循环所需的复合赋值。 */
@@ -1241,7 +1255,7 @@ private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
 private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "MethodReference", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "CastExpression", "MethodInvocation", "MethodReference", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
 private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")
@@ -1253,8 +1267,44 @@ private val METHOD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PRO
 private val CONSTRUCTOR_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE)
 private val PARAMETER_MODIFIERS = setOf(JavaAstModifier.FINAL)
 private val LOCAL_MODIFIERS = setOf(JavaAstModifier.FINAL)
-private val BINARY = mapOf("*" to JavaAstBinaryOperator.MULTIPLY, "/" to JavaAstBinaryOperator.DIVIDE, "%" to JavaAstBinaryOperator.REMAINDER, "+" to JavaAstBinaryOperator.ADD, "-" to JavaAstBinaryOperator.SUBTRACT, "<" to JavaAstBinaryOperator.LESS_THAN, "<=" to JavaAstBinaryOperator.LESS_THAN_OR_EQUAL, ">" to JavaAstBinaryOperator.GREATER_THAN, ">=" to JavaAstBinaryOperator.GREATER_THAN_OR_EQUAL, "==" to JavaAstBinaryOperator.EQUAL, "!=" to JavaAstBinaryOperator.NOT_EQUAL, "&&" to JavaAstBinaryOperator.LOGICAL_AND, "||" to JavaAstBinaryOperator.LOGICAL_OR)
-private val ASSIGNMENT = mapOf("=" to JavaAstAssignmentOperator.ASSIGN, "+=" to JavaAstAssignmentOperator.ADD_ASSIGN, "-=" to JavaAstAssignmentOperator.SUBTRACT_ASSIGN, "*=" to JavaAstAssignmentOperator.MULTIPLY_ASSIGN, "/=" to JavaAstAssignmentOperator.DIVIDE_ASSIGN, "%=" to JavaAstAssignmentOperator.REMAINDER_ASSIGN)
+/** Java 8 二元操作符白名单；顺序只为便于审阅，Lezer token 决定实际优先级。 */
+private val BINARY = mapOf(
+  "*" to JavaAstBinaryOperator.MULTIPLY,
+  "/" to JavaAstBinaryOperator.DIVIDE,
+  "%" to JavaAstBinaryOperator.REMAINDER,
+  "+" to JavaAstBinaryOperator.ADD,
+  "-" to JavaAstBinaryOperator.SUBTRACT,
+  "<<" to JavaAstBinaryOperator.SHIFT_LEFT,
+  ">>" to JavaAstBinaryOperator.SHIFT_RIGHT,
+  ">>>" to JavaAstBinaryOperator.UNSIGNED_SHIFT_RIGHT,
+  "<" to JavaAstBinaryOperator.LESS_THAN,
+  "<=" to JavaAstBinaryOperator.LESS_THAN_OR_EQUAL,
+  ">" to JavaAstBinaryOperator.GREATER_THAN,
+  ">=" to JavaAstBinaryOperator.GREATER_THAN_OR_EQUAL,
+  "==" to JavaAstBinaryOperator.EQUAL,
+  "!=" to JavaAstBinaryOperator.NOT_EQUAL,
+  "&" to JavaAstBinaryOperator.BITWISE_AND,
+  "^" to JavaAstBinaryOperator.BITWISE_XOR,
+  "|" to JavaAstBinaryOperator.BITWISE_OR,
+  "&&" to JavaAstBinaryOperator.LOGICAL_AND,
+  "||" to JavaAstBinaryOperator.LOGICAL_OR,
+)
+
+/** 复合赋值保留目标类型；语义层负责二元数值提升后再执行隐式 narrowing。 */
+private val ASSIGNMENT = mapOf(
+  "=" to JavaAstAssignmentOperator.ASSIGN,
+  "*=" to JavaAstAssignmentOperator.MULTIPLY_ASSIGN,
+  "/=" to JavaAstAssignmentOperator.DIVIDE_ASSIGN,
+  "%=" to JavaAstAssignmentOperator.REMAINDER_ASSIGN,
+  "+=" to JavaAstAssignmentOperator.ADD_ASSIGN,
+  "-=" to JavaAstAssignmentOperator.SUBTRACT_ASSIGN,
+  "<<=" to JavaAstAssignmentOperator.SHIFT_LEFT_ASSIGN,
+  ">>=" to JavaAstAssignmentOperator.SHIFT_RIGHT_ASSIGN,
+  ">>>=" to JavaAstAssignmentOperator.UNSIGNED_SHIFT_RIGHT_ASSIGN,
+  "&=" to JavaAstAssignmentOperator.AND_ASSIGN,
+  "^=" to JavaAstAssignmentOperator.XOR_ASSIGN,
+  "|=" to JavaAstAssignmentOperator.OR_ASSIGN,
+)
 private val UNARY = mapOf("+" to JavaAstUnaryOperator.POSITIVE, "-" to JavaAstUnaryOperator.NEGATIVE, "!" to JavaAstUnaryOperator.LOGICAL_NOT, "~" to JavaAstUnaryOperator.BITWISE_NOT, "++" to JavaAstUnaryOperator.POST_INCREMENT, "--" to JavaAstUnaryOperator.POST_DECREMENT)
 
 /** 在进入 adapter 前查找 Lezer 错误恢复节点；skip rule 节点（例如注释）不能视为错误。 */

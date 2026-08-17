@@ -1745,6 +1745,113 @@ class JavaToJavaScriptCompilerTest {
     })
   }
 
+  /** long 必须使用 64 位二补数语义执行溢出、乘除余数和无符号右移。 */
+  @Test
+  fun compilesAndExecutesLongArithmetic() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        class Main {
+          static int run() {
+            long max = 9223372036854775807L;
+            long wrapped = max + 1L;
+            long shifted = wrapped >>> 63;
+            long product = 3000000000L * 3L;
+            if (wrapped >= 0L) return 0;
+            if (shifted != 1L) return 1;
+            if (product != 9000000000L) return 2;
+            if (-7L / 2L != -3L) return 3;
+            if (-7L % 3L != -1L) return 4;
+            return 5;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(5, executeEntry(artifact, 0))
+  }
+
+  /** float 每次运算都应收敛到单精度，double 保留 NaN/Infinity 与常用 Math 语义。 */
+  @Test
+  fun compilesAndExecutesFloatingPointArithmetic() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        class Main {
+          static int run() {
+            float rounded = 16777216.0f;
+            rounded += 1.0f;
+            double infinity = 1.0 / 0.0;
+            double nan = 0.0 / 0.0;
+            int saturated = (int) 2147483648.0;
+            int nanAsInt = (int) nan;
+            long truncated = (long) 9.9;
+            int wrapped = (int) 4294967297L;
+            short fromWrapper = (short) Integer.valueOf(65537);
+            if (rounded != 16777216.0f) return 0;
+            if (infinity < 1.0E300) return 1;
+            if (nan == nan) return 2;
+            if (Math.sqrt(81.0) != 9.0) return 3;
+            if (Math.pow(2.0, 8.0) != 256.0) return 4;
+            if (Math.max(2.5f, 1.5f) != 2.5f) return 5;
+            if (saturated != 2147483647) return 6;
+            if (nanAsInt != 0) return 7;
+            if (truncated != 9L) return 8;
+            if (wrapped != 1) return 9;
+            if (fromWrapper != 1) return 10;
+            return 11;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(11, executeEntry(artifact, 0))
+  }
+
+  /** 数值包装类缓存、IEEE equals 与 StringBuilder 数值追加必须使用 Java 兼容 runtime。 */
+  @Test
+  fun compilesAndExecutesNumericWrappersAndFormatting() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        class Main {
+          static int run() {
+            Long cachedA = Long.valueOf(127L);
+            Long cachedB = Long.valueOf(127L);
+            Long wideA = Long.valueOf(128L);
+            Long wideB = Long.valueOf(128L);
+            Float positiveZero = Float.valueOf(0.0f);
+            Float negativeZero = Float.valueOf(-0.0f);
+            Double nanA = Double.valueOf(0.0 / 0.0);
+            Double nanB = Double.valueOf(0.0 / 0.0);
+            String text = new StringBuilder().append(9L).append(1.5f).append(2.25).toString();
+            if (cachedA != cachedB) return 0;
+            if (wideA == wideB) return 1;
+            if (positiveZero.equals(negativeZero)) return 2;
+            if (!nanA.equals(nanB)) return 3;
+            if (cachedA.longValue() != 127L) return 4;
+            if (!text.equals("91.52.25")) return 5;
+            return 6;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(6, executeEntry(artifact, 0))
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

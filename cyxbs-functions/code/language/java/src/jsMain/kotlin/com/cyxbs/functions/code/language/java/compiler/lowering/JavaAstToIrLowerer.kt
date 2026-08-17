@@ -848,6 +848,7 @@ private class BodyLowering(
       is JavaAstExpression.NewArray -> newArray(source, type)
       is JavaAstExpression.ArrayAccess -> arrayAccess(source, type)
       is JavaAstExpression.Parenthesized -> expression(source.expression)
+      is JavaAstExpression.Cast -> expression(source.expression)
       is JavaAstExpression.Lambda -> lambda(source, type)
       is JavaAstExpression.MethodReference -> methodReference(source, type)
   } ?: return null
@@ -1148,6 +1149,7 @@ private class BodyLowering(
       is JavaConstantValue.BooleanValue -> JavaIrConstant.BooleanValue(constant.value)
       is JavaConstantValue.IntValue -> JavaIrConstant.IntValue(constant.value)
       is JavaConstantValue.LongValue -> JavaIrConstant.LongValue(constant.value.toString())
+      is JavaConstantValue.FloatingValue -> JavaIrConstant.FloatingValue(constant.value)
       is JavaConstantValue.StringValue -> JavaIrConstant.StringValue(constant.value)
       JavaConstantValue.NullValue -> JavaIrConstant.NullValue
     }
@@ -1727,16 +1729,21 @@ private class BodyLowering(
       operator == JavaAstUnaryOperator.POST_DECREMENT
     ) JavaIrBinaryOperator.SUBTRACT else JavaIrBinaryOperator.ADD
     val read = checkNotNull(boundConversion(source.operand, read(target, span)))
+    val computedType = when ((read.type as? JavaIrType.Primitive)?.kind) {
+      JavaAstPrimitiveType.LONG -> JavaIrType.Primitive(JavaAstPrimitiveType.LONG)
+      JavaAstPrimitiveType.FLOAT -> JavaIrType.Primitive(JavaAstPrimitiveType.FLOAT)
+      JavaAstPrimitiveType.DOUBLE -> JavaIrType.Primitive(JavaAstPrimitiveType.DOUBLE)
+      else -> JavaIrType.Primitive(JavaAstPrimitiveType.INT)
+    }
     val one = JavaIrExpression.Constant(
-      JavaIrConstant.IntValue(1),
-      JavaIrType.Primitive(JavaAstPrimitiveType.INT),
+      when (computedType.kind) {
+        JavaAstPrimitiveType.LONG -> JavaIrConstant.LongValue("1")
+        JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE -> JavaIrConstant.FloatingValue(1.0)
+        else -> JavaIrConstant.IntValue(1)
+      },
+      computedType,
       span,
     )
-    val computedType = if (read.type == JavaIrType.Primitive(JavaAstPrimitiveType.LONG)) {
-      read.type
-    } else {
-      JavaIrType.Primitive(JavaAstPrimitiveType.INT)
-    }
     val computed = JavaIrExpression.Binary(read, binary, one, computedType, span)
     val writeValue = checkNotNull(updateWriteConversion(source.nodeId, computed, span))
     return write(

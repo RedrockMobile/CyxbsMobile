@@ -420,8 +420,8 @@ internal sealed interface JavaSemanticConversion {
 /**
  * String 拼接单个操作数的 Java 源语言转换类别。
  *
- * 该分类刻意不包含任意引用、数组、long 与浮点类型：它们需要尚未进入本阶段的
- * String.valueOf/toString 或后端数值格式化契约，语义阶段必须稳定拒绝而不能借用 JS 动态 `+`。
+ * 该分类刻意不包含任意引用与数组：primitive 数值和受控 wrapper 已由数值 runtime 冻结格式，
+ * 其他对象仍需后续 Object.toString 虚分派契约，不能借用 JavaScript 动态 `+`。
  */
 internal enum class JavaStringConversionKind {
   STRING,
@@ -429,6 +429,12 @@ internal enum class JavaStringConversionKind {
   BOOLEAN,
   CHAR,
   INT_LIKE,
+  /** long 使用 BigInt 保存，必须显式去掉 JavaScript 的 `n` 表示细节。 */
+  LONG,
+  /** float 每一步都已按 Java 单精度收敛，字符串化仍由运行时统一处理特殊值。 */
+  FLOAT,
+  /** double 使用 JavaScript Number，但不能直接泄漏 JavaScript 的 Infinity/NaN 拼写差异。 */
+  DOUBLE,
   /** 首批 wrapper 引用按 Java String.valueOf(Object) 处理，null 不触发拆箱。 */
   BOXED,
 }
@@ -448,6 +454,8 @@ internal sealed interface JavaConstantValue {
   data class BooleanValue(val value: Boolean) : JavaConstantValue
   data class IntValue(val value: Int) : JavaConstantValue
   data class LongValue(val value: Long) : JavaConstantValue
+  /** 浮点常量统一保存解析后的 double；实际 float 精度由 typed IR 类型和后端 fround 决定。 */
+  data class FloatingValue(val value: Double) : JavaConstantValue
   data class StringValue(val value: String) : JavaConstantValue
   data object NullValue : JavaConstantValue
 }

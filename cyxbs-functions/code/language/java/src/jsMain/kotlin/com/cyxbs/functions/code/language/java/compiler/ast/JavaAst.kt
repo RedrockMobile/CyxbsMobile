@@ -540,6 +540,14 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     val expression: JavaAstExpression,
   ) : JavaAstExpression
 
+  /** 显式类型转换；语义层决定 primitive 数值转换或后续阶段的引用转换是否合法。 */
+  data class Cast(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val targetType: JavaAstTypeReference,
+    val expression: JavaAstExpression,
+  ) : JavaAstExpression
+
   /**
    * Java 8 lambda；参数类型为空表示由目标函数式接口推断。
    *

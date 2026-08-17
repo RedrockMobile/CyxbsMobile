@@ -511,9 +511,9 @@ class JavaStage1SemanticAnalysisTest {
     assertTrue(bindings.any { it.rightKind == JavaStringConversionKind.INT_LIKE })
   }
 
-  /** 首批不借用 boxing、Object.toString 或后端长整型/浮点格式化完成 String 拼接。 */
+  /** String 拼接覆盖完整 primitive 数值格式，仍拒绝未冻结的 Object 与数组转换。 */
   @Test
-  fun rejectsStringConcatenationWithoutFrozenRuntimeConversion() {
+  fun bindsNumericStringConcatenationAndRejectsUnsupportedReferences() {
     assertDiagnostic(
       analyze(
         "Main.java" to
@@ -528,14 +528,17 @@ class JavaStage1SemanticAnalysisTest {
       ),
       "java.semantic.string_concat_operand_unsupported",
     )
-    assertDiagnostic(
-      analyze("Main.java" to "class Main { static String bad(long value) { return \"v\" + value; } }"),
-      "java.semantic.string_concat_operand_unsupported",
+    val numericResult = analyze(
+      "Main.java" to
+        "class Main { static String ok(long wide, float single, double decimal) { return \"v\" + wide + single + decimal; } }",
     )
-    assertDiagnostic(
-      analyze("Main.java" to "class Main { static String bad(double value) { return \"v\" + value; } }"),
-      "java.semantic.string_concat_operand_unsupported",
-    )
+    assertTrue(numericResult.isSuccess, numericResult.diagnostics.toString())
+    val kinds = assertNotNull(numericResult.value).stringConcatenations.values.flatMap { binding ->
+      listOf(binding.leftKind, binding.rightKind)
+    }
+    assertTrue(JavaStringConversionKind.LONG in kinds)
+    assertTrue(JavaStringConversionKind.FLOAT in kinds)
+    assertTrue(JavaStringConversionKind.DOUBLE in kinds)
   }
 
   /** System、PrintStream 与 Math 应复用现有可见性、widening 和调用绑定基础设施。 */
@@ -578,6 +581,9 @@ class JavaStage1SemanticAnalysisTest {
         "java.lang.Short",
         "java.lang.Character",
         "java.lang.Integer",
+        "java.lang.Long",
+        "java.lang.Float",
+        "java.lang.Double",
         "java.lang.StringBuilder",
         "java.util.List",
         "java.util.ArrayList",
@@ -871,7 +877,7 @@ class JavaStage1SemanticAnalysisTest {
       "java.semantic.no_applicable_overload",
     )
     assertDiagnostic(
-      analyze("Main.java" to "class Main { static int bad() { return Math.sqrt(1); } }"),
+      analyze("Main.java" to "class Main { static double bad() { return Math.sin(1); } }"),
       "java.semantic.no_applicable_overload",
     )
     assertDiagnostic(

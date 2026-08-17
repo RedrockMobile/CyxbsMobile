@@ -439,7 +439,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
    求值顺序；
 6. （已完成，2026-08-18）`enum`：枚举常量、字段/构造器/方法、`values/valueOf`、
    `name/ordinal`、switch、接口实现与受控初始化；
-7. 完整数值：`long`、`float`、`double`、数值提升、转换、比较及常用 Math/包装 API；
+7. （已完成，2026-08-18）完整数值：`long`、`float`、`double`、数值提升、显式/隐式转换、
+   位运算、比较及常用 Math/包装 API；
 8. 泛型与语言收口：剩余常用推断、桥方法、数组/可变参数等教学高频边界，低频项稳定诊断；
 9. 产品化：源码栈映射、缓存与增量编译、npm/端上链路、资源限制、fuzz 和跨平台发布验证。
 
@@ -501,8 +502,18 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   构造器、显式 abstract/final 和常量专属匿名 class body 会给出稳定诊断；
 - 完整 `jsNodeTest` 共 244 项通过，新增真实源码执行用例同时覆盖 enum 初始化、接口分派、比较、
   防御性 values 数组、valueOf 异常与 switch；
-- `java.lang.Enum` 的低频 `compareTo/getDeclaringClass`、常量专属 class body，以及 long、浮点完整语义
-  与泛型收口仍按上述第 7～8 批继续实现。
+- 已完成 `long`、`float`、`double` 字面量与运行表示、Java 数值提升、窄化/拓宽、显式数值 cast、
+  复合赋值及 `++/--` 回写；`long` 通过 BigInt helper 保持 64 位溢出、除余、移位与无符号右移语义，
+  `float` 在运算和写回边界使用 `Math.fround` 收敛为单精度；
+- 位移、按位运算、NaN/Infinity、浮点比较、数组默认值和字符串拼接均沿 typed IR 显式建模，
+  不直接借用 JavaScript 的动态转换；数值 cast 与外层赋值转换可顺序组合，不会互相覆盖；
+- `Long/Float/Double` 已加入装箱、拆箱、缓存身份、equals/hashCode/toString 与 Number 转换链；
+  `PrintStream`、`StringBuilder` 和 Math 的常用 long/float/double overload 也通过 builtin operation 接入；
+- 完整 `jsNodeTest` 共 249 项通过；新增真实源码执行覆盖 long 溢出与移位、浮点特殊值、Math、
+  primitive/wrapper 强转和 StringBuilder 输出，Java 模块 35 个源码/测试文件经 IDE 全量诊断为 0 error；
+- `java.lang.Enum` 的低频 `compareTo/getDeclaringClass`、常量专属 class body、十六进制浮点字面量和
+  `-9223372036854775808L` 的特殊词法边界暂不扩展；常用泛型收口按上述第 8 批继续实现，低频项将在
+  第 8 批统一给出稳定诊断。
 
 ### 阶段 2B：精选类库与宿主桥
 

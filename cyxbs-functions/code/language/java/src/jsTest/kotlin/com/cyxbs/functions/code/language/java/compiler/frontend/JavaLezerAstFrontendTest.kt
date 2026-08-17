@@ -568,6 +568,64 @@ class JavaLezerAstFrontendTest {
     assertTrue(references[3].isConstructor)
   }
 
+  /** 移位、位运算及其复合赋值必须从真实 Lezer token 无损映射到 AST。 */
+  @Test
+  fun mapsIntegralShiftAndBitwiseOperators() {
+    val result = parse(
+      """
+      class Main {
+        static long run(long value) {
+          value >>>= 1;
+          value &= 7;
+          return (value << 2) | (value ^ 1);
+        }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val statements = assertNotNull(method.body).statements
+    assertEquals(
+      JavaAstAssignmentOperator.UNSIGNED_SHIFT_RIGHT_ASSIGN,
+      assertIs<JavaAstExpression.Assignment>(assertIs<JavaAstStatement.Expression>(statements[0]).expression).operator,
+    )
+    assertEquals(
+      JavaAstAssignmentOperator.AND_ASSIGN,
+      assertIs<JavaAstExpression.Assignment>(assertIs<JavaAstStatement.Expression>(statements[1]).expression).operator,
+    )
+    val resultExpression = assertIs<JavaAstExpression.Binary>(
+      assertNotNull(assertIs<JavaAstStatement.Return>(statements[2]).expression),
+    )
+    assertEquals(JavaAstBinaryOperator.BITWISE_OR, resultExpression.operator)
+    assertEquals(
+      JavaAstBinaryOperator.SHIFT_LEFT,
+      assertIs<JavaAstExpression.Binary>(assertIs<JavaAstExpression.Parenthesized>(resultExpression.left).expression).operator,
+    )
+    assertEquals(
+      JavaAstBinaryOperator.BITWISE_XOR,
+      assertIs<JavaAstExpression.Binary>(assertIs<JavaAstExpression.Parenthesized>(resultExpression.right).expression).operator,
+    )
+  }
+
+  /** 显式数值转换必须保留目标类型和被转换表达式，不能被括号 wrapper 擦除。 */
+  @Test
+  fun mapsPrimitiveCastExpression() {
+    val result = parse("class Main { static int cast(double value) { return (int) value; } }")
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val cast = assertIs<JavaAstExpression.Cast>(
+      assertNotNull(assertIs<JavaAstStatement.Return>(assertNotNull(method.body).statements.single()).expression),
+    )
+    assertEquals(JavaAstPrimitiveType.INT, assertIs<JavaAstTypeReference.Primitive>(cast.targetType).kind)
+    assertIs<JavaAstExpression.Name>(cast.expression)
+  }
+
   /** 构造唯一文件编号和规范化工作区路径。 */
   private fun parse(source: String) = JavaLezerAstFrontend.parse(
     JavaSourceWorkspace(listOf(JavaSourceFile(JavaSourceFileId(0), "Main.java", source))),

@@ -497,9 +497,7 @@ private class JavaScriptBackendValidator(
   private fun validateExpression(expression: JavaIrExpression) {
     validateType(expression.type, expression.span)
     when (expression) {
-      is JavaIrExpression.Constant -> if (expression.value is JavaIrConstant.LongValue) {
-        unsupported("Java long constants require the later BigInt backend.", expression.span)
-      }
+      is JavaIrExpression.Constant -> validateConstant(expression)
       is JavaIrExpression.GetLocal -> requireLocal(expression.local, expression.span)
       is JavaIrExpression.This -> if (index.classes[expression.type.classId] == null) {
         invalid("Java IR this expression references an unknown class.", expression.span)
@@ -609,6 +607,30 @@ private class JavaScriptBackendValidator(
       }
       is JavaIrExpression.StringConcat -> expression.parts.forEach { part -> validateExpression(part.expression) }
     }
+  }
+
+  /** 常量的运行表示必须与 typed IR 类型一致，防止 Number/BigInt 在后端意外混用。 */
+  private fun validateConstant(expression: JavaIrExpression.Constant) {
+    val valid = when (expression.value) {
+      is JavaIrConstant.BooleanValue ->
+        expression.type == JavaIrType.Primitive(JavaAstPrimitiveType.BOOLEAN)
+      is JavaIrConstant.IntValue -> expression.type is JavaIrType.Primitive &&
+        expression.type.kind in setOf(
+          JavaAstPrimitiveType.BYTE,
+          JavaAstPrimitiveType.SHORT,
+          JavaAstPrimitiveType.CHAR,
+          JavaAstPrimitiveType.INT,
+        )
+      is JavaIrConstant.LongValue ->
+        expression.type == JavaIrType.Primitive(JavaAstPrimitiveType.LONG) &&
+          expression.value.canonicalText.toLongOrNull() != null
+      is JavaIrConstant.FloatingValue -> expression.type is JavaIrType.Primitive &&
+        expression.type.kind in setOf(JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE) &&
+          expression.value.value.isFinite()
+      is JavaIrConstant.StringValue -> expression.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING)
+      JavaIrConstant.NullValue -> expression.type == JavaIrType.Null
+    }
+    if (!valid) invalid("Java IR constant does not match its typed value.", expression.span)
   }
 
   /** enum 常量只能调用同一 enum 的构造器，且 name/ordinal 必须与 class 元数据一致。 */
@@ -794,6 +816,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_LONG -> BuiltinSignature(true, listOf(BuiltinType.LONG), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_FLOAT -> BuiltinSignature(true, listOf(BuiltinType.FLOAT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_DOUBLE -> BuiltinSignature(true, listOf(BuiltinType.DOUBLE), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN -> BuiltinSignature(true, emptyList(), BuiltinType.VOID)
@@ -801,6 +826,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_LONG -> BuiltinSignature(true, listOf(BuiltinType.LONG), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_FLOAT -> BuiltinSignature(true, listOf(BuiltinType.FLOAT), BuiltinType.VOID)
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_DOUBLE -> BuiltinSignature(true, listOf(BuiltinType.DOUBLE), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.VOID)
     JavaBuiltinOperation.STRING_LENGTH -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
@@ -815,38 +843,72 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.STRING_STARTS_WITH,
     JavaBuiltinOperation.STRING_ENDS_WITH -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
     JavaBuiltinOperation.MATH_ABS_INT -> BuiltinSignature(false, listOf(BuiltinType.INT), BuiltinType.INT)
+    JavaBuiltinOperation.MATH_ABS_LONG -> BuiltinSignature(false, listOf(BuiltinType.LONG), BuiltinType.LONG)
+    JavaBuiltinOperation.MATH_ABS_FLOAT -> BuiltinSignature(false, listOf(BuiltinType.FLOAT), BuiltinType.FLOAT)
+    JavaBuiltinOperation.MATH_ABS_DOUBLE -> BuiltinSignature(false, listOf(BuiltinType.DOUBLE), BuiltinType.DOUBLE)
     JavaBuiltinOperation.MATH_MIN_INT,
     JavaBuiltinOperation.MATH_MAX_INT -> BuiltinSignature(false, listOf(BuiltinType.INT, BuiltinType.INT), BuiltinType.INT)
+    JavaBuiltinOperation.MATH_MIN_LONG,
+    JavaBuiltinOperation.MATH_MAX_LONG -> BuiltinSignature(false, listOf(BuiltinType.LONG, BuiltinType.LONG), BuiltinType.LONG)
+    JavaBuiltinOperation.MATH_MIN_FLOAT,
+    JavaBuiltinOperation.MATH_MAX_FLOAT -> BuiltinSignature(false, listOf(BuiltinType.FLOAT, BuiltinType.FLOAT), BuiltinType.FLOAT)
+    JavaBuiltinOperation.MATH_MIN_DOUBLE,
+    JavaBuiltinOperation.MATH_MAX_DOUBLE -> BuiltinSignature(false, listOf(BuiltinType.DOUBLE, BuiltinType.DOUBLE), BuiltinType.DOUBLE)
+    JavaBuiltinOperation.MATH_SQRT,
+    JavaBuiltinOperation.MATH_FLOOR,
+    JavaBuiltinOperation.MATH_CEIL -> BuiltinSignature(false, listOf(BuiltinType.DOUBLE), BuiltinType.DOUBLE)
+    JavaBuiltinOperation.MATH_POW -> BuiltinSignature(false, listOf(BuiltinType.DOUBLE, BuiltinType.DOUBLE), BuiltinType.DOUBLE)
     JavaBuiltinOperation.BOOLEAN_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.BOOLEAN), BuiltinType.REFERENCE)
     JavaBuiltinOperation.BYTE_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.BYTE), BuiltinType.REFERENCE)
     JavaBuiltinOperation.SHORT_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.SHORT), BuiltinType.REFERENCE)
     JavaBuiltinOperation.CHARACTER_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.CHAR), BuiltinType.REFERENCE)
     JavaBuiltinOperation.INTEGER_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.LONG_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.LONG), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.FLOAT_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.FLOAT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.DOUBLE_VALUE_OF -> BuiltinSignature(false, listOf(BuiltinType.DOUBLE), BuiltinType.REFERENCE)
     JavaBuiltinOperation.BOOLEAN_BOOLEAN_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.BOOLEAN)
     JavaBuiltinOperation.BYTE_BYTE_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.BYTE)
     JavaBuiltinOperation.SHORT_SHORT_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.SHORT)
     JavaBuiltinOperation.CHARACTER_CHAR_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.CHAR)
     JavaBuiltinOperation.INTEGER_INT_VALUE,
     JavaBuiltinOperation.NUMBER_INT_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.LONG_LONG_VALUE,
+    JavaBuiltinOperation.NUMBER_LONG_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.LONG)
+    JavaBuiltinOperation.FLOAT_FLOAT_VALUE,
+    JavaBuiltinOperation.NUMBER_FLOAT_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.FLOAT)
+    JavaBuiltinOperation.DOUBLE_DOUBLE_VALUE,
+    JavaBuiltinOperation.NUMBER_DOUBLE_VALUE -> BuiltinSignature(true, emptyList(), BuiltinType.DOUBLE)
     JavaBuiltinOperation.BOOLEAN_EQUALS,
     JavaBuiltinOperation.BYTE_EQUALS,
     JavaBuiltinOperation.SHORT_EQUALS,
     JavaBuiltinOperation.CHARACTER_EQUALS,
-    JavaBuiltinOperation.INTEGER_EQUALS -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.INTEGER_EQUALS,
+    JavaBuiltinOperation.LONG_EQUALS,
+    JavaBuiltinOperation.FLOAT_EQUALS,
+    JavaBuiltinOperation.DOUBLE_EQUALS -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
     JavaBuiltinOperation.BOOLEAN_HASH_CODE,
     JavaBuiltinOperation.BYTE_HASH_CODE,
     JavaBuiltinOperation.SHORT_HASH_CODE,
     JavaBuiltinOperation.CHARACTER_HASH_CODE,
-    JavaBuiltinOperation.INTEGER_HASH_CODE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.INTEGER_HASH_CODE,
+    JavaBuiltinOperation.LONG_HASH_CODE,
+    JavaBuiltinOperation.FLOAT_HASH_CODE,
+    JavaBuiltinOperation.DOUBLE_HASH_CODE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
     JavaBuiltinOperation.BOOLEAN_TO_STRING,
     JavaBuiltinOperation.BYTE_TO_STRING,
     JavaBuiltinOperation.SHORT_TO_STRING,
     JavaBuiltinOperation.CHARACTER_TO_STRING,
-    JavaBuiltinOperation.INTEGER_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.INTEGER_TO_STRING,
+    JavaBuiltinOperation.LONG_TO_STRING,
+    JavaBuiltinOperation.FLOAT_TO_STRING,
+    JavaBuiltinOperation.DOUBLE_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_INT -> BuiltinSignature(true, listOf(BuiltinType.INT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_LONG -> BuiltinSignature(true, listOf(BuiltinType.LONG), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_FLOAT -> BuiltinSignature(true, listOf(BuiltinType.FLOAT), BuiltinType.REFERENCE)
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_DOUBLE -> BuiltinSignature(true, listOf(BuiltinType.DOUBLE), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT -> BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.REFERENCE)
     JavaBuiltinOperation.STRING_BUILDER_LENGTH -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
@@ -930,6 +992,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_INT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_LONG,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_FLOAT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINT_DOUBLE,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN,
@@ -937,6 +1002,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_LONG,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_FLOAT,
+    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_DOUBLE,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING,
     JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> setOf(JavaBuiltinTypeRole.PRINT_STREAM)
 
@@ -962,15 +1030,28 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.CHARACTER_HASH_CODE, JavaBuiltinOperation.CHARACTER_TO_STRING -> setOf(JavaBuiltinTypeRole.CHARACTER)
     JavaBuiltinOperation.INTEGER_INT_VALUE, JavaBuiltinOperation.INTEGER_EQUALS,
     JavaBuiltinOperation.INTEGER_HASH_CODE, JavaBuiltinOperation.INTEGER_TO_STRING -> setOf(JavaBuiltinTypeRole.INTEGER)
-    JavaBuiltinOperation.NUMBER_INT_VALUE -> setOf(
+    JavaBuiltinOperation.LONG_LONG_VALUE, JavaBuiltinOperation.LONG_EQUALS,
+    JavaBuiltinOperation.LONG_HASH_CODE, JavaBuiltinOperation.LONG_TO_STRING -> setOf(JavaBuiltinTypeRole.LONG)
+    JavaBuiltinOperation.FLOAT_FLOAT_VALUE, JavaBuiltinOperation.FLOAT_EQUALS,
+    JavaBuiltinOperation.FLOAT_HASH_CODE, JavaBuiltinOperation.FLOAT_TO_STRING -> setOf(JavaBuiltinTypeRole.FLOAT)
+    JavaBuiltinOperation.DOUBLE_DOUBLE_VALUE, JavaBuiltinOperation.DOUBLE_EQUALS,
+    JavaBuiltinOperation.DOUBLE_HASH_CODE, JavaBuiltinOperation.DOUBLE_TO_STRING -> setOf(JavaBuiltinTypeRole.DOUBLE)
+    JavaBuiltinOperation.NUMBER_INT_VALUE,
+    JavaBuiltinOperation.NUMBER_LONG_VALUE,
+    JavaBuiltinOperation.NUMBER_FLOAT_VALUE,
+    JavaBuiltinOperation.NUMBER_DOUBLE_VALUE -> setOf(
       JavaBuiltinTypeRole.NUMBER, JavaBuiltinTypeRole.BYTE,
-      JavaBuiltinTypeRole.SHORT, JavaBuiltinTypeRole.INTEGER,
+      JavaBuiltinTypeRole.SHORT, JavaBuiltinTypeRole.INTEGER, JavaBuiltinTypeRole.LONG,
+      JavaBuiltinTypeRole.FLOAT, JavaBuiltinTypeRole.DOUBLE,
     )
 
     JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_INT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_LONG,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_FLOAT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_DOUBLE,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
     JavaBuiltinOperation.STRING_BUILDER_LENGTH,
@@ -1038,6 +1119,9 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.SHORT_TO_STRING,
     JavaBuiltinOperation.CHARACTER_TO_STRING,
     JavaBuiltinOperation.INTEGER_TO_STRING,
+    JavaBuiltinOperation.LONG_TO_STRING,
+    JavaBuiltinOperation.FLOAT_TO_STRING,
+    JavaBuiltinOperation.DOUBLE_TO_STRING,
     JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_FROM,
     JavaBuiltinOperation.STRING_BUILDER_SUBSTRING_RANGE,
     JavaBuiltinOperation.STRING_BUILDER_TO_STRING,
@@ -1049,10 +1133,16 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.SHORT_VALUE_OF -> setOf(JavaBuiltinTypeRole.SHORT)
     JavaBuiltinOperation.CHARACTER_VALUE_OF -> setOf(JavaBuiltinTypeRole.CHARACTER)
     JavaBuiltinOperation.INTEGER_VALUE_OF -> setOf(JavaBuiltinTypeRole.INTEGER)
+    JavaBuiltinOperation.LONG_VALUE_OF -> setOf(JavaBuiltinTypeRole.LONG)
+    JavaBuiltinOperation.FLOAT_VALUE_OF -> setOf(JavaBuiltinTypeRole.FLOAT)
+    JavaBuiltinOperation.DOUBLE_VALUE_OF -> setOf(JavaBuiltinTypeRole.DOUBLE)
     JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_INT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_LONG,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_FLOAT,
+    JavaBuiltinOperation.STRING_BUILDER_APPEND_DOUBLE,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING,
     JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
     JavaBuiltinOperation.STRING_BUILDER_REVERSE -> setOf(JavaBuiltinTypeRole.STRING_BUILDER)
@@ -1109,6 +1199,9 @@ private class JavaScriptBackendValidator(
     BuiltinType.CHAR_ARRAY -> type is JavaIrType.Array &&
       type.componentType is JavaIrType.Primitive && type.componentType.kind.name == "CHAR"
     BuiltinType.INT -> type is JavaIrType.Primitive && type.kind.name == "INT"
+    BuiltinType.LONG -> type is JavaIrType.Primitive && type.kind.name == "LONG"
+    BuiltinType.FLOAT -> type is JavaIrType.Primitive && type.kind.name == "FLOAT"
+    BuiltinType.DOUBLE -> type is JavaIrType.Primitive && type.kind.name == "DOUBLE"
     BuiltinType.REFERENCE -> type is JavaIrType.Reference
     BuiltinType.REFERENCE_OR_NULL -> type is JavaIrType.Reference || type is JavaIrType.Array || type == JavaIrType.Null
     BuiltinType.VOID -> type == JavaIrType.Void
@@ -1127,10 +1220,11 @@ private class JavaScriptBackendValidator(
   )
 
   private enum class BuiltinType {
-    BOOLEAN, BYTE, SHORT, CHAR, CHAR_ARRAY, INT, REFERENCE, REFERENCE_OR_NULL, VOID,
+    BOOLEAN, BYTE, SHORT, CHAR, CHAR_ARRAY, INT, LONG, FLOAT, DOUBLE,
+    REFERENCE, REFERENCE_OR_NULL, VOID,
   }
 
-  /** 当前运行子集支持 identity、引用拓宽与不涉及 long/浮点的整数 widening。 */
+  /** 校验 primitive 转换端点；运行表示差异由 emitter 的显式 helper 处理。 */
   private fun validateConversion(expression: JavaIrExpression.Convert) {
     val conversion = expression.conversion
     val sourceType = expression.expression.type
@@ -1144,18 +1238,15 @@ private class JavaScriptBackendValidator(
         !isValidReferenceWidening(sourceType, resultType)
       ) invalid("Reference conversion endpoints do not match typed IR.", expression.span)
       is JavaIrConversion.PrimitiveWidening -> {
-        if (!conversion.from.name.isStage0IntegralPrimitiveName() ||
-          !conversion.to.name.isStage0IntegralPrimitiveName()
-        ) {
-          unsupported("Only integral primitive widening is available in the current JavaScript backend.", expression.span)
+        if (!conversion.from.canWidenTo(conversion.to)) {
+          invalid("Primitive widening is not legal in Java.", expression.span)
         }
         if (sourceType != JavaIrType.Primitive(conversion.from) ||
           resultType != JavaIrType.Primitive(conversion.to)
         ) invalid("Primitive widening endpoints do not match typed IR.", expression.span)
       }
       is JavaIrConversion.PrimitiveNarrowing -> {
-        if (!conversion.from.name.isStage0IntegralPrimitiveName() ||
-          !conversion.to.name.isStage0IntegralPrimitiveName() ||
+        if (!conversion.from.canNarrowTo(conversion.to) ||
           sourceType != JavaIrType.Primitive(conversion.from) ||
           resultType != JavaIrType.Primitive(conversion.to)
         ) {
@@ -1275,15 +1366,7 @@ private class JavaScriptBackendValidator(
   /** 引用类型以运行时对象身份参与 null、相等性、字段和调用；内建类库仍未注入。 */
   private fun validateType(type: JavaIrType, span: JavaSourceSpan) {
     when (type) {
-      is JavaIrType.Primitive -> when (type.kind.name) {
-        "LONG" -> unsupported("Java long requires the later BigInt backend.", span)
-        "FLOAT",
-        "DOUBLE" -> unsupported(
-          "Java floating-point values are not available in the current JavaScript backend.",
-          span,
-        )
-        else -> Unit
-      }
+      is JavaIrType.Primitive -> Unit
       is JavaIrType.Array -> validateArrayComponent(type.componentType, span)
       is JavaIrType.Reference,
       JavaIrType.Null,
@@ -1411,6 +1494,10 @@ private class JavaScriptEmitter(
   /** 输出 runtime prelude、全部静态方法和稳定入口导出。 */
   fun emit(): JavaScriptProgramArtifact {
     JavaRuntimePrelude.source.lines().forEach(writer::line)
+    if (usesExtendedNumericRuntime()) {
+      writer.line()
+      JavaRuntimePrelude.numericSource.lines().forEach(writer::line)
+    }
     if (usesRuntimeHelpers()) {
       writer.line()
       JavaRuntimePrelude.objectSource.lines().forEach(writer::line)
@@ -1477,6 +1564,18 @@ private class JavaScriptEmitter(
     clazz.superClass != null || clazz.fields.isNotEmpty() || clazz.staticInitializer != null ||
       clazz.instanceInitializer != null || clazz.methods.any { it.dispatch != JavaIrDispatchKind.STATIC }
   }
+
+  /**
+   * 扩展数值声明直接触发 helper；builtin 与 String/数组运行时也可能从嵌套表达式使用数值，
+   * 因此一并启用，仍保证纯 int static 快照不增加体积。
+   */
+  private fun usesExtendedNumericRuntime(): Boolean = index.program.classes.any { clazz ->
+    clazz.fields.any { it.type.containsExtendedNumeric() } || clazz.methods.any { method ->
+      method.returnType.containsExtendedNumeric() ||
+        method.parameters.any { it.type.containsExtendedNumeric() } ||
+      method.locals.any { it.type.containsExtendedNumeric() }
+    }
+  } || usesBuiltinRuntime() || usesArrayOrStringRuntime()
 
   /** 数组和显式 StringConcat 可存在于纯 static 程序，仍需额外 runtime helper。 */
   private fun usesArrayOrStringRuntime(): Boolean = index.program.classes.any { clazz ->
@@ -2294,7 +2393,7 @@ private class JavaScriptEmitter(
   /** 将单个 typed IR 表达式渲染为带充分括号的 JavaScript 文本。 */
   private fun renderExpression(expression: JavaIrExpression): String {
     return when (expression) {
-      is JavaIrExpression.Constant -> renderConstant(expression.value)
+      is JavaIrExpression.Constant -> renderConstant(expression.value, expression.type)
       is JavaIrExpression.GetLocal -> JsNameMangler.local(expression.local)
       is JavaIrExpression.This -> currentThisName
       is JavaIrExpression.SetLocal -> {
@@ -2546,6 +2645,9 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> instance("\$__j_print_char")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> instance("\$__j_print_char_array")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_INT -> instance("\$__j_print_int")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_LONG -> instance("\$__j_print_long")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_FLOAT -> instance("\$__j_print_float")
+      JavaBuiltinOperation.PRINTSTREAM_PRINT_DOUBLE -> instance("\$__j_print_double")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_STRING -> instance("\$__j_print_string")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT -> instance("\$__j_print_object")
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN -> instance("\$__j_println")
@@ -2553,6 +2655,9 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR -> instance("\$__j_println_char")
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN_CHAR_ARRAY -> instance("\$__j_println_char_array")
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN_INT -> instance("\$__j_println_int")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_LONG -> instance("\$__j_println_long")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_FLOAT -> instance("\$__j_println_float")
+      JavaBuiltinOperation.PRINTSTREAM_PRINTLN_DOUBLE -> instance("\$__j_println_double")
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN_STRING -> instance("\$__j_println_string")
       JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT -> instance("\$__j_println_object")
       JavaBuiltinOperation.STRING_LENGTH -> instance("\$__j_string_length")
@@ -2567,38 +2672,72 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.STRING_STARTS_WITH -> instance("\$__j_string_starts_with")
       JavaBuiltinOperation.STRING_ENDS_WITH -> instance("\$__j_string_ends_with")
       JavaBuiltinOperation.MATH_ABS_INT -> static("\$__j_math_abs_int")
+      JavaBuiltinOperation.MATH_ABS_LONG -> static("\$__j_math_abs_long")
+      JavaBuiltinOperation.MATH_ABS_FLOAT -> static("\$__j_math_abs_float")
+      JavaBuiltinOperation.MATH_ABS_DOUBLE -> static("\$__j_math_abs_double")
       JavaBuiltinOperation.MATH_MIN_INT -> static("\$__j_math_min_int")
+      JavaBuiltinOperation.MATH_MIN_LONG -> static("\$__j_math_min_long")
+      JavaBuiltinOperation.MATH_MIN_FLOAT -> static("\$__j_math_min_float")
+      JavaBuiltinOperation.MATH_MIN_DOUBLE -> static("\$__j_math_min_double")
       JavaBuiltinOperation.MATH_MAX_INT -> static("\$__j_math_max_int")
+      JavaBuiltinOperation.MATH_MAX_LONG -> static("\$__j_math_max_long")
+      JavaBuiltinOperation.MATH_MAX_FLOAT -> static("\$__j_math_max_float")
+      JavaBuiltinOperation.MATH_MAX_DOUBLE -> static("\$__j_math_max_double")
+      JavaBuiltinOperation.MATH_SQRT -> static("Math.sqrt")
+      JavaBuiltinOperation.MATH_POW -> static("Math.pow")
+      JavaBuiltinOperation.MATH_FLOOR -> static("Math.floor")
+      JavaBuiltinOperation.MATH_CEIL -> static("Math.ceil")
       JavaBuiltinOperation.BOOLEAN_VALUE_OF -> "\$__j_box(\"BOOLEAN\", ${arguments.single()})"
       JavaBuiltinOperation.BYTE_VALUE_OF -> "\$__j_box(\"BYTE\", ${arguments.single()})"
       JavaBuiltinOperation.SHORT_VALUE_OF -> "\$__j_box(\"SHORT\", ${arguments.single()})"
       JavaBuiltinOperation.CHARACTER_VALUE_OF -> "\$__j_box(\"CHAR\", ${arguments.single()})"
       JavaBuiltinOperation.INTEGER_VALUE_OF -> "\$__j_box(\"INT\", ${arguments.single()})"
+      JavaBuiltinOperation.LONG_VALUE_OF -> "\$__j_box(\"LONG\", ${arguments.single()})"
+      JavaBuiltinOperation.FLOAT_VALUE_OF -> "\$__j_box(\"FLOAT\", ${arguments.single()})"
+      JavaBuiltinOperation.DOUBLE_VALUE_OF -> "\$__j_box(\"DOUBLE\", ${arguments.single()})"
       JavaBuiltinOperation.BOOLEAN_BOOLEAN_VALUE -> "\$__j_unbox($receiver, \"BOOLEAN\")"
       JavaBuiltinOperation.BYTE_BYTE_VALUE -> "\$__j_unbox($receiver, \"BYTE\")"
       JavaBuiltinOperation.SHORT_SHORT_VALUE -> "\$__j_unbox($receiver, \"SHORT\")"
       JavaBuiltinOperation.CHARACTER_CHAR_VALUE -> "\$__j_unbox($receiver, \"CHAR\")"
       JavaBuiltinOperation.INTEGER_INT_VALUE -> "\$__j_unbox($receiver, \"INT\")"
+      JavaBuiltinOperation.LONG_LONG_VALUE -> "\$__j_unbox($receiver, \"LONG\")"
+      JavaBuiltinOperation.FLOAT_FLOAT_VALUE -> "\$__j_unbox($receiver, \"FLOAT\")"
+      JavaBuiltinOperation.DOUBLE_DOUBLE_VALUE -> "\$__j_unbox($receiver, \"DOUBLE\")"
       JavaBuiltinOperation.NUMBER_INT_VALUE -> instance("\$__j_number_int_value")
+      JavaBuiltinOperation.NUMBER_LONG_VALUE -> instance("\$__j_number_long_value")
+      JavaBuiltinOperation.NUMBER_FLOAT_VALUE -> instance("\$__j_number_float_value")
+      JavaBuiltinOperation.NUMBER_DOUBLE_VALUE -> instance("\$__j_number_double_value")
       JavaBuiltinOperation.BOOLEAN_EQUALS,
       JavaBuiltinOperation.BYTE_EQUALS,
       JavaBuiltinOperation.SHORT_EQUALS,
       JavaBuiltinOperation.CHARACTER_EQUALS,
-      JavaBuiltinOperation.INTEGER_EQUALS -> instance("\$__j_box_equals")
+      JavaBuiltinOperation.INTEGER_EQUALS,
+      JavaBuiltinOperation.LONG_EQUALS,
+      JavaBuiltinOperation.FLOAT_EQUALS,
+      JavaBuiltinOperation.DOUBLE_EQUALS -> instance("\$__j_box_equals")
       JavaBuiltinOperation.BOOLEAN_HASH_CODE,
       JavaBuiltinOperation.BYTE_HASH_CODE,
       JavaBuiltinOperation.SHORT_HASH_CODE,
       JavaBuiltinOperation.CHARACTER_HASH_CODE,
-      JavaBuiltinOperation.INTEGER_HASH_CODE -> instance("\$__j_box_hash")
+      JavaBuiltinOperation.INTEGER_HASH_CODE,
+      JavaBuiltinOperation.LONG_HASH_CODE,
+      JavaBuiltinOperation.FLOAT_HASH_CODE,
+      JavaBuiltinOperation.DOUBLE_HASH_CODE -> instance("\$__j_box_hash")
       JavaBuiltinOperation.BOOLEAN_TO_STRING,
       JavaBuiltinOperation.BYTE_TO_STRING,
       JavaBuiltinOperation.SHORT_TO_STRING,
       JavaBuiltinOperation.CHARACTER_TO_STRING,
-      JavaBuiltinOperation.INTEGER_TO_STRING -> instance("\$__j_box_to_string")
+      JavaBuiltinOperation.INTEGER_TO_STRING,
+      JavaBuiltinOperation.LONG_TO_STRING,
+      JavaBuiltinOperation.FLOAT_TO_STRING,
+      JavaBuiltinOperation.DOUBLE_TO_STRING -> instance("\$__j_box_to_string")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_BOOLEAN -> instance("\$__j_sb_append_boolean")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR -> instance("\$__j_sb_append_char")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_CHAR_ARRAY -> instance("\$__j_sb_append_char_array")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_INT -> instance("\$__j_sb_append_int")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_LONG -> instance("\$__j_sb_append_long")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_FLOAT -> instance("\$__j_sb_append_float")
+      JavaBuiltinOperation.STRING_BUILDER_APPEND_DOUBLE -> instance("\$__j_sb_append_double")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_STRING -> instance("\$__j_sb_append_string")
       JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT -> instance("\$__j_sb_append_object")
       JavaBuiltinOperation.STRING_BUILDER_LENGTH -> instance("\$__j_sb_length")
@@ -2657,44 +2796,62 @@ private class JavaScriptEmitter(
     }
   }
 
-  /** 根据表达式 result type 选择 Java int helper 或 JavaScript 布尔/引用运算。 */
+  /** 根据已提升的 operand/result type 选择 int、long、float 或 double 的 Java 语义。 */
   private fun renderBinary(expression: JavaIrExpression.Binary): String {
     val left = renderExpression(expression.left)
     val right = renderExpression(expression.right)
+    val numericKind = (expression.left.type as? JavaIrType.Primitive)?.kind
+    fun long(code: String): String = "BigInt.asIntN(64, $code)"
+    fun float(code: String): String = "Math.fround($code)"
     return when (expression.operator) {
-      JavaIrBinaryOperator.MULTIPLY -> if (expression.type.isStage0Integral()) {
-        "Math.imul($left, $right)"
-      } else {
-        "($left * $right)"
+      JavaIrBinaryOperator.MULTIPLY -> when (numericKind) {
+        JavaAstPrimitiveType.LONG -> long("$left * $right")
+        JavaAstPrimitiveType.FLOAT -> float("$left * $right")
+        JavaAstPrimitiveType.DOUBLE -> "($left * $right)"
+        else -> "Math.imul($left, $right)"
       }
-      JavaIrBinaryOperator.DIVIDE -> if (expression.type.isStage0Integral()) {
-        "\$__j_int_div($left, $right)"
-      } else {
-        "($left / $right)"
+      JavaIrBinaryOperator.DIVIDE -> when (numericKind) {
+        JavaAstPrimitiveType.LONG -> "\$__j_long_div($left, $right)"
+        JavaAstPrimitiveType.FLOAT -> float("$left / $right")
+        JavaAstPrimitiveType.DOUBLE -> "($left / $right)"
+        else -> "\$__j_int_div($left, $right)"
       }
-      JavaIrBinaryOperator.REMAINDER -> if (expression.type.isStage0Integral()) {
-        "\$__j_int_rem($left, $right)"
-      } else {
-        "($left % $right)"
+      JavaIrBinaryOperator.REMAINDER -> when (numericKind) {
+        JavaAstPrimitiveType.LONG -> "\$__j_long_rem($left, $right)"
+        JavaAstPrimitiveType.FLOAT -> float("$left % $right")
+        JavaAstPrimitiveType.DOUBLE -> "($left % $right)"
+        else -> "\$__j_int_rem($left, $right)"
       }
-      JavaIrBinaryOperator.ADD -> if (expression.type.isStage0Integral()) {
-        "(($left + $right) | 0)"
-      } else {
-        "($left + $right)"
+      JavaIrBinaryOperator.ADD -> when (numericKind) {
+        JavaAstPrimitiveType.LONG -> long("$left + $right")
+        JavaAstPrimitiveType.FLOAT -> float("$left + $right")
+        JavaAstPrimitiveType.DOUBLE -> "($left + $right)"
+        else -> "(($left + $right) | 0)"
       }
-      JavaIrBinaryOperator.SUBTRACT -> "(($left - $right) | 0)"
-      JavaIrBinaryOperator.SHIFT_LEFT -> "(($left << $right) | 0)"
-      JavaIrBinaryOperator.SHIFT_RIGHT -> "(($left >> $right) | 0)"
-      JavaIrBinaryOperator.UNSIGNED_SHIFT_RIGHT -> "(($left >>> $right) | 0)"
+      JavaIrBinaryOperator.SUBTRACT -> when (numericKind) {
+        JavaAstPrimitiveType.LONG -> long("$left - $right")
+        JavaAstPrimitiveType.FLOAT -> float("$left - $right")
+        JavaAstPrimitiveType.DOUBLE -> "($left - $right)"
+        else -> "(($left - $right) | 0)"
+      }
+      JavaIrBinaryOperator.SHIFT_LEFT -> if (numericKind == JavaAstPrimitiveType.LONG) {
+        long("$left << BigInt(\$__j_shift_count($right, 63))")
+      } else "(($left << \$__j_shift_count($right, 31)) | 0)"
+      JavaIrBinaryOperator.SHIFT_RIGHT -> if (numericKind == JavaAstPrimitiveType.LONG) {
+        long("$left >> BigInt(\$__j_shift_count($right, 63))")
+      } else "(($left >> \$__j_shift_count($right, 31)) | 0)"
+      JavaIrBinaryOperator.UNSIGNED_SHIFT_RIGHT -> if (numericKind == JavaAstPrimitiveType.LONG) {
+        "\$__j_long_unsigned_shift($left, $right)"
+      } else "(($left >>> \$__j_shift_count($right, 31)) | 0)"
       JavaIrBinaryOperator.LESS_THAN -> "($left < $right)"
       JavaIrBinaryOperator.LESS_THAN_OR_EQUAL -> "($left <= $right)"
       JavaIrBinaryOperator.GREATER_THAN -> "($left > $right)"
       JavaIrBinaryOperator.GREATER_THAN_OR_EQUAL -> "($left >= $right)"
       JavaIrBinaryOperator.EQUAL -> "($left === $right)"
       JavaIrBinaryOperator.NOT_EQUAL -> "($left !== $right)"
-      JavaIrBinaryOperator.BITWISE_AND -> "(($left & $right) | 0)"
-      JavaIrBinaryOperator.BITWISE_XOR -> "(($left ^ $right) | 0)"
-      JavaIrBinaryOperator.BITWISE_OR -> "(($left | $right) | 0)"
+      JavaIrBinaryOperator.BITWISE_AND -> if (numericKind == JavaAstPrimitiveType.LONG) long("$left & $right") else "(($left & $right) | 0)"
+      JavaIrBinaryOperator.BITWISE_XOR -> if (numericKind == JavaAstPrimitiveType.LONG) long("$left ^ $right") else "(($left ^ $right) | 0)"
+      JavaIrBinaryOperator.BITWISE_OR -> if (numericKind == JavaAstPrimitiveType.LONG) long("$left | $right") else "(($left | $right) | 0)"
       JavaIrBinaryOperator.LOGICAL_AND -> "($left && $right)"
       JavaIrBinaryOperator.LOGICAL_OR -> "($left || $right)"
     }
@@ -2703,10 +2860,18 @@ private class JavaScriptEmitter(
   /** 生成已消除前后缀副作用的一元表达式。 */
   private fun renderUnary(expression: JavaIrExpression.Unary): String {
     val operand = renderExpression(expression.operand)
+    val kind = (expression.type as? JavaIrType.Primitive)?.kind
     return when (expression.operator) {
-      JavaIrUnaryOperator.NEGATE -> "(-$operand | 0)"
+      JavaIrUnaryOperator.NEGATE -> when (kind) {
+        JavaAstPrimitiveType.LONG -> "BigInt.asIntN(64, -$operand)"
+        JavaAstPrimitiveType.FLOAT -> "Math.fround(-$operand)"
+        JavaAstPrimitiveType.DOUBLE -> "(-$operand)"
+        else -> "(-$operand | 0)"
+      }
       JavaIrUnaryOperator.LOGICAL_NOT -> "(!$operand)"
-      JavaIrUnaryOperator.BITWISE_NOT -> "(~$operand | 0)"
+      JavaIrUnaryOperator.BITWISE_NOT -> if (kind == JavaAstPrimitiveType.LONG) {
+        "BigInt.asIntN(64, ~$operand)"
+      } else "(~$operand | 0)"
     }
   }
 
@@ -2739,16 +2904,20 @@ private class JavaScriptEmitter(
   ): String = when (conversion) {
       JavaIrConversion.Identity,
       is JavaIrConversion.ReferenceWidening -> code
-      is JavaIrConversion.PrimitiveWidening -> if (resultType.isStage0Integral()) {
-        "($code | 0)"
-      } else {
-        code
+      is JavaIrConversion.PrimitiveWidening -> when (conversion.to) {
+        JavaAstPrimitiveType.LONG -> "\$__j_long($code)"
+        JavaAstPrimitiveType.FLOAT -> "\$__j_float($code)"
+        JavaAstPrimitiveType.DOUBLE -> if (conversion.from == JavaAstPrimitiveType.LONG) "Number($code)" else code
+        else -> "($code | 0)"
       }
       is JavaIrConversion.PrimitiveNarrowing -> when (conversion.to.name) {
-        "BYTE" -> "(($code << 24) >> 24)"
-        "SHORT" -> "(($code << 16) >> 16)"
-        "CHAR" -> "($code & 65535)"
-        "INT" -> "($code | 0)"
+        "BYTE" -> "((\$__j_to_int($code) << 24) >> 24)"
+        "SHORT" -> "((\$__j_to_int($code) << 16) >> 16)"
+        "CHAR" -> "(\$__j_to_int($code) & 65535)"
+        "INT" -> "\$__j_to_int($code)"
+        "LONG" -> "\$__j_to_long($code)"
+        "FLOAT" -> "\$__j_float($code)"
+        "DOUBLE" -> "Number($code)"
         else -> error("Validated primitive narrowing has an unsupported target.")
       }
       is JavaIrConversion.Boxing ->
@@ -2780,27 +2949,43 @@ private class JavaScriptEmitter(
     JavaAstPrimitiveType.SHORT -> "SHORT"
     JavaAstPrimitiveType.CHAR -> "CHAR"
     JavaAstPrimitiveType.INT -> "INT"
+    JavaAstPrimitiveType.LONG -> "LONG"
+    JavaAstPrimitiveType.FLOAT -> "FLOAT"
+    JavaAstPrimitiveType.DOUBLE -> "DOUBLE"
     else -> error("Validated boxing conversion contains an unsupported primitive.")
   }
 
   /** 常量使用 JSON 兼容转义，整数文本保持不经过 JavaScript Number 重新格式化。 */
-  private fun renderConstant(constant: JavaIrConstant): String = when (constant) {
+  private fun renderConstant(constant: JavaIrConstant, type: JavaIrType? = null): String = when (constant) {
     is JavaIrConstant.BooleanValue -> constant.value.toString()
     is JavaIrConstant.IntValue -> constant.value.toString()
+    is JavaIrConstant.LongValue -> "\$__j_long(\"${constant.canonicalText}\")"
+    is JavaIrConstant.FloatingValue -> constant.value.toString().let { value ->
+      if (type == JavaIrType.Primitive(JavaAstPrimitiveType.FLOAT)) "\$__j_float($value)" else value
+    }
     is JavaIrConstant.StringValue -> writer.stringLiteral(constant.value)
     JavaIrConstant.NullValue -> "null"
-    is JavaIrConstant.LongValue -> error("Validated Java IR cannot contain long constants.")
   }
 
   /** 对 int-like 本地变量或参数写入统一加上 Java 32 位截断。 */
   private fun coerceToType(code: String, type: JavaIrType): String {
-    return if (type.isStage0Integral()) "($code | 0)" else code
+    return when ((type as? JavaIrType.Primitive)?.kind) {
+      JavaAstPrimitiveType.BYTE -> "(($code << 24) >> 24)"
+      JavaAstPrimitiveType.SHORT -> "(($code << 16) >> 16)"
+      JavaAstPrimitiveType.CHAR -> "($code & 65535)"
+      JavaAstPrimitiveType.INT -> "($code | 0)"
+      JavaAstPrimitiveType.LONG -> "\$__j_long($code)"
+      JavaAstPrimitiveType.FLOAT -> "\$__j_float($code)"
+      JavaAstPrimitiveType.DOUBLE -> "Number($code)"
+      else -> code
+    }
   }
 
   /** Java 默认字段值必须独立于 JavaScript 的 undefined。 */
   private fun defaultValue(type: JavaIrType): String = when (type) {
     is JavaIrType.Primitive -> when (type.kind.name) {
       "BOOLEAN" -> "false"
+      "LONG" -> "0n"
       else -> "0"
     }
     is JavaIrType.Reference, is JavaIrType.Array, JavaIrType.Null -> "null"
@@ -2847,10 +3032,43 @@ private fun JavaIrType.isStage0Integral(): Boolean {
   return this is JavaIrType.Primitive && kind.name.isStage0IntegralPrimitiveName()
 }
 
+/** 数组组件递归检查，保证仅在程序确实使用扩展数值表示时注入对应 helper。 */
+private fun JavaIrType.containsExtendedNumeric(): Boolean = when (this) {
+  is JavaIrType.Primitive -> kind in setOf(
+    JavaAstPrimitiveType.LONG,
+    JavaAstPrimitiveType.FLOAT,
+    JavaAstPrimitiveType.DOUBLE,
+  )
+  is JavaIrType.Array -> componentType.containsExtendedNumeric()
+  is JavaIrType.Reference, JavaIrType.Null, JavaIrType.Void -> false
+}
+
 /** long、float、double 需要不同 runtime representation，不得静默按 Number 降级。 */
 private fun String.isStage0IntegralPrimitiveName(): Boolean {
   return this == "BYTE" || this == "SHORT" || this == "CHAR" || this == "INT"
 }
+
+/** Java 8 primitive widening 表；validator 与 semantic 使用同一语言规则但保持独立信任边界。 */
+private fun JavaAstPrimitiveType.canWidenTo(target: JavaAstPrimitiveType): Boolean = when (this) {
+  JavaAstPrimitiveType.BYTE -> target in setOf(
+    JavaAstPrimitiveType.SHORT, JavaAstPrimitiveType.INT, JavaAstPrimitiveType.LONG,
+    JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE,
+  )
+  JavaAstPrimitiveType.SHORT, JavaAstPrimitiveType.CHAR -> target in setOf(
+    JavaAstPrimitiveType.INT, JavaAstPrimitiveType.LONG,
+    JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE,
+  )
+  JavaAstPrimitiveType.INT -> target in setOf(
+    JavaAstPrimitiveType.LONG, JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE,
+  )
+  JavaAstPrimitiveType.LONG -> target in setOf(JavaAstPrimitiveType.FLOAT, JavaAstPrimitiveType.DOUBLE)
+  JavaAstPrimitiveType.FLOAT -> target == JavaAstPrimitiveType.DOUBLE
+  JavaAstPrimitiveType.BOOLEAN, JavaAstPrimitiveType.DOUBLE -> false
+}
+
+/** 复合赋值允许在数值计算后隐式回写到任意 numeric primitive，identity 不会生成该节点。 */
+private fun JavaAstPrimitiveType.canNarrowTo(target: JavaAstPrimitiveType): Boolean =
+  this != JavaAstPrimitiveType.BOOLEAN && target != JavaAstPrimitiveType.BOOLEAN && this != target
 
 /** 集合 operation 的集中判定同时服务 helper 注入，不依赖 Java 类型名。 */
 private fun JavaBuiltinOperation.isCollectionOperation(): Boolean = when (this) {
