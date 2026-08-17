@@ -465,6 +465,66 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(330, (executeEntryValue(artifact, null) as Number).toInt())
   }
 
+  /** 多维数组应支持完整/部分分配、递归 initializer，并保证维度表达式只求值一次。 */
+  @Test
+  fun compilesMultidimensionalArrayCoreOperations() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static int state = 0;
+          static int dimension(int value) { state = state * 10 + value; return value; }
+
+          static int run() {
+            int[][] matrix = new int[dimension(2)][dimension(3)];
+            matrix[1][2] = 7;
+            int[][] partial = new int[2][];
+            partial[0] = new int[]{4, 5};
+            int[][] initialized = {{1, 2}, {3, 4, 5}};
+            return state * 10000 + matrix.length * 1000 + matrix[0].length * 100
+              + matrix[1][2] * 10 + partial[0][1] + initialized[1][2];
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(232380, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
+  /** 多维引用数组写入必须递归检查实际 component，不能只判断值是 JavaScript Array。 */
+  @Test
+  fun checksMultidimensionalArrayCovariantStores() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static int run() {
+            Object[][] values = new String[1][];
+            try {
+              values[0] = new Object[1];
+              return -1;
+            } catch (ArrayStoreException expected) {
+              values[0] = null;
+              return values.length;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(1, (executeEntryValue(artifact, null) as Number).toInt())
+  }
+
   /** 数组写入必须按 receiver、index、右值顺序各求值一次。 */
   @Test
   fun preservesArrayWriteEvaluationOrder() {

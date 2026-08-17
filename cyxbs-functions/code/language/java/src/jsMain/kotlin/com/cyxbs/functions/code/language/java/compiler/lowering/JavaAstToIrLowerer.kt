@@ -971,36 +971,70 @@ private class BodyLowering(
     }
   }
 
-  /** 首批只 lowering 一维创建和扁平 initializer；多维由 semantic 先稳定拒绝。 */
+  /**
+   * 将一维或多维数组创建降为 typed IR。
+   *
+   * 多维长度只保存连续的已分配前缀，后端据此一次求值后递归分配；花括号初始化器则按结果
+   * Array 类型递归构建 IR，确保每一层都有独立 component token 和写入检查。
+   */
   private fun newArray(source: JavaAstExpression.NewArray, type: JavaIrType): JavaIrExpression? {
     val arrayType = type as? JavaIrType.Array ?: return invalid("Array creation result is not an array.", source.span)
-    if (arrayType.componentType is JavaIrType.Array || source.dimensions.size != 1) {
-      return unsupported("Multidimensional arrays are deferred.", source.span)
-    }
+    val leafType = arrayLeafType(arrayType)
+    val leafReferenceKind = arrayReferenceComponentKind(source.componentType, leafType, source.span)
     val initializer = source.initializer
     if (initializer != null) {
       if (source.dimensions.any { it.size != null }) return invalid("Array initializer cannot include a dimension size.", source.span)
-      val elements = initializer.elements.map { element ->
-        val expression = (element as? JavaAstArrayInitializerElement.Expression)?.expression
-          ?: return unsupported("Nested array initializers are deferred.", initializer.span)
-        expression(expression) ?: return null
-      }
-      return JavaIrExpression.ArrayInitializer(
-        arrayType.componentType,
-        elements,
-        arrayType,
-        source.span,
-        arrayReferenceComponentKind(source.componentType, arrayType.componentType, source.span),
-      )
+      return arrayInitializer(initializer, arrayType, leafReferenceKind)
     }
-    val length = source.dimensions.single().size ?: return invalid("Array creation is missing its length.", source.span)
+    val sizes = source.dimensions.takeWhile { it.size != null }.map { dimension ->
+      expression(dimension.size ?: return invalid("Allocated array dimension is missing its length.", dimension.span))
+        ?: return null
+    }
+    if (sizes.isEmpty() || source.dimensions.drop(sizes.size).any { it.size != null }) {
+      return invalid("Array dimensions do not form an allocated prefix.", source.span)
+    }
+    if (source.dimensions.size > 1) {
+      return JavaIrExpression.NewMultiArray(sizes, arrayType, source.span, leafReferenceKind)
+    }
     return JavaIrExpression.NewArray(
       arrayType.componentType,
-      expression(length) ?: return null,
+      sizes.single(),
       arrayType,
       source.span,
-      arrayReferenceComponentKind(source.componentType, arrayType.componentType, source.span),
+      leafReferenceKind,
     )
+  }
+
+  /** 递归 lowering 单层数组初始化器；嵌套节点必须与当前 component 的 Array 类型一一对应。 */
+  private fun arrayInitializer(
+    source: JavaAstArrayInitializer,
+    type: JavaIrType.Array,
+    leafReferenceKind: JavaIrArrayReferenceComponentKind?,
+  ): JavaIrExpression.ArrayInitializer? {
+    val elements = source.elements.map { element ->
+      when (element) {
+        is JavaAstArrayInitializerElement.Expression -> expression(element.expression) ?: return null
+        is JavaAstArrayInitializerElement.Nested -> {
+          val nestedType = type.componentType as? JavaIrType.Array
+            ?: return invalid("Nested array initializer exceeds the result rank.", element.initializer.span)
+          arrayInitializer(element.initializer, nestedType, leafReferenceKind) ?: return null
+        }
+      }
+    }
+    return JavaIrExpression.ArrayInitializer(
+      type.componentType,
+      elements,
+      type,
+      source.span,
+      leafReferenceKind,
+    )
+  }
+
+  /** 返回嵌套数组最内层的运行时 component，供引用类型 token 分类。 */
+  private fun arrayLeafType(type: JavaIrType.Array): JavaIrType {
+    var current: JavaIrType = type.componentType
+    while (current is JavaIrType.Array) current = current.componentType
+    return current
   }
 
   /** 将 semantic 已解析的引用组件分类传给 runtime，避免后端按 JavaScript 值猜测 String/Object。 */

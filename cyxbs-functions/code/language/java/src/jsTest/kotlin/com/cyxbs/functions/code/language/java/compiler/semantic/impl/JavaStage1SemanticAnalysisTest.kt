@@ -414,6 +414,27 @@ class JavaStage1SemanticAnalysisTest {
     assertTrue(model.expressionTypes.values.none { it == JavaSemanticType.Error })
   }
 
+  /** 多维数组应保留完整 rank，并接受连续长度前缀、部分分配和递归花括号初始化器。 */
+  @Test
+  fun analyzesMultidimensionalArrayCreation() {
+    val result = analyze(
+      "Main.java" to """
+        class Main {
+          static int[][] full(int rows, int columns) { return new int[rows][columns]; }
+          static int[][] partial(int rows) { return new int[rows][]; }
+          static int[][] initialized() { return new int[][]{{1}, {2, 3}}; }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val twoDimensional = model.expressionTypes.values.filterIsInstance<JavaSemanticType.Array>()
+      .filter { it.componentType is JavaSemanticType.Array }
+    assertTrue(twoDimensional.size >= 3)
+    assertTrue(model.expressionTypes.values.none { it == JavaSemanticType.Error })
+  }
+
   /** 数组形态、索引、元素和 length 的越界语义都应产生稳定诊断。 */
   @Test
   fun rejectsUnsupportedOrInvalidArrayOperations() {
@@ -447,12 +468,8 @@ class JavaStage1SemanticAnalysisTest {
       "java.semantic.invalid_assignment_target",
     )
     assertDiagnostic(
-      analyze("Main.java" to "class Main { static int[][] bad() { return new int[1][2]; } }"),
-      "java.semantic.multidimensional_array_creation_unsupported",
-    )
-    assertDiagnostic(
-      analyze("Main.java" to "class Main { static int[][] bad() { return new int[][]{{1}}; } }"),
-      "java.semantic.nested_array_initializer_unsupported",
+      analyze("Main.java" to "class Main { static int[] bad() { return new int[]{{1}}; } }"),
+      "java.semantic.array_initializer_dimension_mismatch",
     )
     assertDiagnostic(
       analyze("Main.java" to "class Main<T> { T[] bad() { return new T[1]; } }"),

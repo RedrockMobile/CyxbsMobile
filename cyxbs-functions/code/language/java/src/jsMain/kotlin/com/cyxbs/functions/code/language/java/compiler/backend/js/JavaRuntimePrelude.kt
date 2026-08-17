@@ -182,16 +182,69 @@ internal object JavaRuntimePrelude {
       return array;
     }
 
+    // component descriptor 对数组类型递归保存，避免多维协变检查退化为 JavaScript Array 判断。
+    function @__j_array_component(component) {
+      return { @__j_array_component: component };
+    }
+
+    function @__j_array_component_subtype(actual, expected) {
+      if (actual === expected) return true;
+      if (expected === "object") {
+        return actual === "object" || actual === "string" ||
+          (actual !== null && typeof actual !== "string");
+      }
+      if (actual === null || expected === null) return false;
+      if (typeof actual === "string" || typeof expected === "string") return false;
+      const actualNested = actual.@__j_array_component;
+      const expectedNested = expected.@__j_array_component;
+      if (actualNested !== undefined || expectedNested !== undefined) {
+        return actualNested !== undefined && expectedNested !== undefined &&
+          @__j_array_component_subtype(actualNested, expectedNested);
+      }
+      return expected === actual || expected.isPrototypeOf(actual);
+    }
+
+    function @__j_array_value_matches(value, component) {
+      if (value === null || component === "object") return true;
+      if (component === "string") return typeof value === "string";
+      if (component === null || typeof component === "string") return true;
+      const expectedNested = component.@__j_array_component;
+      if (expectedNested !== undefined) {
+        return Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, "@__j_component") &&
+          @__j_array_component_subtype(value.@__j_component, expectedNested);
+      }
+      return component.isPrototypeOf(value);
+    }
+
+    function @__j_array_default(component) {
+      if (component === "primitive:BOOLEAN") return false;
+      return typeof component === "string" && component.indexOf("primitive:") === 0 ? 0 : null;
+    }
+
+    // lengths 已由生成代码以数组字面量从左到右求值一次；递归阶段不得再次执行源码表达式。
+    function @__j_new_multi_array(lengths, component) {
+      function allocate(depth, currentComponent) {
+        const value = @__j_new_array(
+          lengths[depth],
+          @__j_array_default(currentComponent),
+          currentComponent
+        );
+        if (depth + 1 < lengths.length) {
+          const nested = currentComponent.@__j_array_component;
+          for (let index = 0; index < value.length; index++) {
+            value[index] = allocate(depth + 1, nested);
+          }
+        }
+        return value;
+      }
+      return allocate(0, component);
+    }
+
     function @__j_array_set(array, index, value) {
       index = @__j_array_index(array, index);
       const component = array.@__j_component;
-      if (value !== null) {
-        if (component === "string") {
-          if (typeof value !== "string") throw new Error("java.lang.ArrayStoreException");
-        } else if (component !== null && component !== "object" &&
-          typeof component !== "string" && !component.isPrototypeOf(value)) {
-          throw new Error("java.lang.ArrayStoreException");
-        }
+      if (!@__j_array_value_matches(value, component)) {
+        throw new Error("java.lang.ArrayStoreException");
       }
       value = @__j_array_component_value(value, component);
       array[index] = value;

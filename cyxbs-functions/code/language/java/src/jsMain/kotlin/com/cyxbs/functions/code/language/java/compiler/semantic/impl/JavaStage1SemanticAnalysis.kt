@@ -2750,10 +2750,10 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   }
 
   /**
-   * 分析一维数组创建，并把大小或初始化元素的赋值转换写入通用转换表。
+   * 分析数组创建，并把逐维长度和递归初始化元素的转换写入通用转换表。
    *
-   * 首批只接受一个有大小且无初始化器的维度，或一个无大小且携带一维初始化器的维度；
-   * 多维、嵌套初始化器与不可具体化泛型 component 均稳定拒绝。
+   * 多维数组使用嵌套 [JavaSemanticType.Array] 表示。长度表达式严格按源码顺序分析，允许
+   * `new T[a][b][]` 这类尾部未分配维度，但一旦出现空维度，后续维度不能重新提供长度。
    */
   private fun newArray(expression: JavaAstExpression.NewArray): JavaSemanticType {
     val component = resolveType(
@@ -2771,54 +2771,74 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       )
       return JavaSemanticType.Error
     }
-    if (expression.dimensions.size != 1) {
-      expression.dimensions.forEach { dimension -> dimension.size?.let(::analyzeExpression) }
-      analyzeArrayInitializerElements(expression.initializer, component)
-      error(
-        expression.span,
-        "java.semantic.multidimensional_array_creation_unsupported",
-        "Stage2A 首批只支持一维数组创建。",
-      )
-      return JavaSemanticType.Error
+    val resultType = expression.dimensions.fold(component) { current, _ ->
+      JavaSemanticType.Array(current)
     }
-
-    val dimension = expression.dimensions.single()
     val initializer = expression.initializer
-    return when {
-      dimension.size != null && initializer == null -> {
-        val sizeType = analyzeExpression(dimension.size)
-        if (assignArrayIndex(dimension.size, sizeType, "数组长度")) {
-          JavaSemanticType.Array(component)
-        } else {
-          JavaSemanticType.Error
-        }
-      }
-      dimension.size == null && initializer != null -> {
-        if (analyzeArrayInitializerElements(initializer, component)) {
-          JavaSemanticType.Array(component)
-        } else {
-          JavaSemanticType.Error
-        }
-      }
-      else -> {
-        dimension.size?.let(::analyzeExpression)
-        analyzeArrayInitializerElements(initializer, component)
+    if (initializer != null) {
+      val hasSizedDimension = expression.dimensions.any { it.size != null }
+      val validInitializer = analyzeArrayInitializer(initializer, resultType)
+      if (hasSizedDimension) {
         error(
           expression.span,
           "java.semantic.invalid_array_creation_shape",
-          "数组创建必须提供一个长度，或使用一个无长度维度配合初始化器。",
+          "数组初始化器不能与显式维度长度同时使用。",
         )
-        JavaSemanticType.Error
+      }
+      return if (!hasSizedDimension && validInitializer) resultType else JavaSemanticType.Error
+    }
+
+    var seenEmptyDimension = false
+    var hasAllocatedDimension = false
+    var valid = true
+    expression.dimensions.forEach { dimension ->
+      val size = dimension.size
+      if (size == null) {
+        seenEmptyDimension = true
+      } else {
+        hasAllocatedDimension = true
+        if (seenEmptyDimension) {
+          error(
+            dimension.span,
+            "java.semantic.array_dimension_after_empty_dimension",
+            "数组空维度之后不能再次提供长度。",
+          )
+          valid = false
+        }
+        val sizeType = analyzeExpression(size)
+        if (!assignArrayIndex(size, sizeType, "数组长度")) valid = false
       }
     }
+    if (!hasAllocatedDimension) {
+      error(
+        expression.span,
+        "java.semantic.invalid_array_creation_shape",
+        "没有初始化器的数组创建至少需要一个维度长度。",
+      )
+      valid = false
+    }
+    return if (valid) resultType else JavaSemanticType.Error
   }
 
-  /** 分析一维数组初始化器；嵌套花括号属于尚未开放的多维能力。 */
-  private fun analyzeArrayInitializerElements(
-    initializer: JavaAstArrayInitializer?,
-    component: JavaSemanticType,
+  /**
+   * 按当前数组层级递归分析花括号初始化器。
+   *
+   * 普通表达式按当前层 component 执行赋值转换；嵌套花括号必须对应下一层数组，从而让
+   * `new int[][]{{1}, {2, 3}}` 与混合的 `new int[][]{new int[1], {2}}` 共用同一规则。
+   */
+  private fun analyzeArrayInitializer(
+    initializer: JavaAstArrayInitializer,
+    arrayType: JavaSemanticType,
   ): Boolean {
-    if (initializer == null) return true
+    val array = arrayType as? JavaSemanticType.Array
+    if (array == null) {
+      error(
+        initializer.span,
+        "java.semantic.array_initializer_dimension_mismatch",
+        "嵌套数组初始化器超过了声明的数组维度。",
+      )
+      return false
+    }
     var valid = true
     initializer.elements.forEach { element ->
       when (element) {
@@ -2827,7 +2847,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           if (!assign(
               element.expression.nodeId,
               actual,
-              component,
+              array.componentType,
               element.expression.span,
               code = "java.semantic.array_initializer_type_mismatch",
               message = "数组初始化元素类型与 component 类型不兼容。",
@@ -2837,12 +2857,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           }
         }
         is JavaAstArrayInitializerElement.Nested -> {
-          error(
-            element.initializer.span,
-            "java.semantic.nested_array_initializer_unsupported",
-            "Stage2A 首批不支持嵌套数组初始化器。",
-          )
-          valid = false
+          if (!analyzeArrayInitializer(element.initializer, array.componentType)) valid = false
         }
       }
     }

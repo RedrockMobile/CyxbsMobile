@@ -435,7 +435,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
    目标类型推断；
 4. （已完成，2026-08-18）方法引用：静态、绑定 receiver、未绑定 receiver 与构造器引用，复用
    函数式接口适配链；
-5. 多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/求值顺序；
+5. （已完成，2026-08-18）多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/
+   求值顺序；
 6. `enum`：枚举常量、`values/valueOf`、`name/ordinal`、switch 与受控成员；
 7. 完整数值：`long`、`float`、`double`、数值提升、转换、比较及常用 Math/包装 API；
 8. 泛型与语言收口：剩余常用推断、桥方法、数组/可变参数等教学高频边界，低频项稳定诊断；
@@ -449,7 +450,7 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 
 #### 当前阶段 2A 首批实现进度（2026-08-18）
 
-- 已贯通一维 primitive/引用数组的前置类型声明、`new T[n]`、一维花括号初始化器、元素读写、
+- 已贯通 primitive/引用数组的前置类型声明、`new T[n]`、花括号初始化器、元素读写、
   `length`、复合赋值和 `++/--`；数组 receiver、index 与右值保持 Java 从左到右且只求值一次；
 - JS runtime 已补齐默认元素值、负长度、空数组引用、越界和引用数组协变写入检查；引用组件在
   typed IR 中明确区分 Object、String 与用户类，非法协变写入会抛出 `ArrayStoreException`；
@@ -487,9 +488,13 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   引用先按目标 SAM 参数执行 overload 和转换，再复用 Lambda 函数对象 ABI 与既有虚槽分派；
 - 绑定 receiver 会在函数对象创建时求值并固定一次，null 会立即抛出 `NullPointerException`；
   `System.out::println`、`String::length`、`StringBuilder::new` 等 builtin 同样只通过 catalog binding；
-- 完整 `jsNodeTest` 共 237 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
-  泛型接口/default 分派、循环跳转、switch、异常流、lambda 与四种方法引用；
-- 多维数组运行、enum、long 与浮点完整语义仍按上述第 5～8 批继续实现。
+- 已支持 `new T[a][b]`、`new T[a][]` 和递归花括号初始化器；所有维度长度先按源码顺序
+  各求值一次，再只分配具有长度的连续前缀，未分配的内层保持 null；
+- 多维数组的运行时 component descriptor 会逐层保存 primitive/String/Object/用户类信息；数组
+  协变视图下的嵌套写入仍执行递归 `ArrayStoreException` 检查，不退化为 JavaScript Array 判断；
+- 完整 `jsNodeTest` 共 240 项通过，真实源码到 JS 执行用例覆盖多维数组求值顺序、部分分配、
+  嵌套初始化、协变写入、泛型接口/default 分派、异常流、lambda 与四种方法引用；
+- enum、long、浮点完整语义与泛型收口仍按上述第 6～8 批继续实现。
 
 ### 阶段 2B：精选类库与宿主桥
 

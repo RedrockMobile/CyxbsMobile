@@ -534,9 +534,31 @@ private class JavaScriptBackendValidator(
         validateExpression(expression.length)
         if (!expression.length.type.isStage0Integral()) invalid("Java IR array length must be integral.", expression.length.span)
       }
+      is JavaIrExpression.NewMultiArray -> {
+        validateType(expression.type, expression.span)
+        if (expression.lengths.isEmpty()) {
+          invalid("Java IR multidimensional array must allocate at least one dimension.", expression.span)
+        }
+        var remaining: JavaIrType = expression.type
+        expression.lengths.forEach { length ->
+          val array = remaining as? JavaIrType.Array
+          if (array == null) {
+            invalid("Java IR multidimensional array allocates more dimensions than its result rank.", expression.span)
+          } else {
+            remaining = array.componentType
+          }
+          validateExpression(length)
+          if (!length.type.isStage0Integral()) invalid("Java IR array length must be integral.", length.span)
+        }
+      }
       is JavaIrExpression.ArrayInitializer -> {
         validateArrayComponent(expression.componentType, expression.span)
-        expression.elements.forEach(::validateExpression)
+        expression.elements.forEach { element ->
+          validateExpression(element)
+          if (element.type != expression.componentType) {
+            invalid("Java IR array initializer element does not match its component type.", element.span)
+          }
+        }
       }
       is JavaIrExpression.GetArrayElement -> {
         validateExpression(expression.array)
@@ -1266,13 +1288,9 @@ private class JavaScriptBackendValidator(
     else if (method.dispatch == JavaIrDispatchKind.STATIC || method.kind != JavaIrMethodKind.METHOD || method.body == null) invalid("Java IR instance call targets a non-executable static method.", span)
   }
 
-  /** 首批仅支持一维、当前运行时可表示的数组组件。 */
+  /** 数组 component 可以递归为数组，但叶节点必须是当前运行时可表示的 Java 类型。 */
   private fun validateArrayComponent(type: JavaIrType, span: JavaSourceSpan) {
-    if (type is JavaIrType.Array) {
-      unsupported("Multidimensional Java arrays are not available in the current JavaScript backend.", span)
-    } else {
-      validateType(type, span)
-    }
+    validateType(type, span)
   }
 
   /** 数组读写与 length 都必须由明确 Array 类型驱动，不能把普通引用伪装为数组。 */
@@ -1468,6 +1486,7 @@ private class JavaScriptEmitter(
       boundValues.any { it.requireNonNull || it.expression.requiresExceptionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresExceptionRuntime()
+    is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.GetArrayElement -> array.requiresExceptionRuntime() || index.requiresExceptionRuntime()
     is JavaIrExpression.SetArrayElement -> array.requiresExceptionRuntime() ||
@@ -1540,6 +1559,7 @@ private class JavaScriptEmitter(
       boundValues.any { it.expression.requiresBuiltinRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.NewArray -> length.requiresBuiltinRuntime()
+    is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresBuiltinRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { element -> element.requiresBuiltinRuntime() }
     is JavaIrExpression.GetArrayElement -> array.requiresBuiltinRuntime() || index.requiresBuiltinRuntime()
     is JavaIrExpression.SetArrayElement -> array.requiresBuiltinRuntime() || index.requiresBuiltinRuntime() || value.requiresBuiltinRuntime()
@@ -1611,6 +1631,7 @@ private class JavaScriptEmitter(
       boundValues.any { it.expression.requiresCollectionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresCollectionRuntime()
+    is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.GetArrayElement -> array.requiresCollectionRuntime() || index.requiresCollectionRuntime()
     is JavaIrExpression.SetArrayElement -> array.requiresCollectionRuntime() ||
@@ -1682,6 +1703,7 @@ private class JavaScriptEmitter(
       boundValues.any { it.expression.requiresScannerRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.NewArray -> length.requiresScannerRuntime()
+    is JavaIrExpression.NewMultiArray -> lengths.any { it.requiresScannerRuntime() }
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresScannerRuntime() }
     is JavaIrExpression.GetArrayElement -> array.requiresScannerRuntime() || index.requiresScannerRuntime()
     is JavaIrExpression.SetArrayElement -> array.requiresScannerRuntime() ||
@@ -1733,6 +1755,7 @@ private class JavaScriptEmitter(
   /** 递归扫描嵌套表达式，避免例如数组索引藏在 static 调用参数中而漏注入 helper。 */
   private fun JavaIrExpression.requiresArrayOrStringRuntime(): Boolean = when (this) {
     is JavaIrExpression.NewArray,
+    is JavaIrExpression.NewMultiArray,
     is JavaIrExpression.ArrayInitializer,
     is JavaIrExpression.GetArrayElement,
     is JavaIrExpression.SetArrayElement,
@@ -2278,6 +2301,10 @@ private class JavaScriptEmitter(
       }
       is JavaIrExpression.NewArray ->
         "\$__j_new_array(${renderExpression(expression.length)}, ${defaultValue(expression.componentType)}, ${renderArrayComponent(expression.componentType, expression.referenceComponentKind)})"
+      is JavaIrExpression.NewMultiArray -> {
+        val lengths = expression.lengths.joinToString(", ") { renderExpression(it) }
+        "\$__j_new_multi_array([$lengths], ${renderArrayComponent(expression.type.componentType, expression.leafReferenceComponentKind)})"
+      }
       is JavaIrExpression.ArrayInitializer -> {
         val writes = expression.elements.mapIndexed { index, element ->
           "\$__j_array_set(value, $index, ${renderExpression(element)})"
@@ -2675,7 +2702,8 @@ private class JavaScriptEmitter(
         index.classes[type.classId]?.let { JsNameMangler.prototype(it.id) } ?: "null"
       null -> index.classes[type.classId]?.let { JsNameMangler.prototype(it.id) } ?: "null"
     }
-    else -> "null"
+    is JavaIrType.Array -> "\$__j_array_component(${renderArrayComponent(type.componentType, referenceKind)})"
+    JavaIrType.Null, JavaIrType.Void -> "null"
   }
 
   /** 入口绑定已由 validator 验证唯一性，这里只执行确定性索引读取。 */

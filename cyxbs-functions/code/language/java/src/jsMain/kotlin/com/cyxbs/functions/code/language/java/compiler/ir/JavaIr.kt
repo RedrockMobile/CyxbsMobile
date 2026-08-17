@@ -499,6 +499,20 @@ internal sealed interface JavaIrExpression {
     val referenceComponentKind: JavaIrArrayReferenceComponentKind? = null,
   ) : JavaIrExpression
 
+  /**
+   * 多维数组分配；[lengths] 只包含源码中实际给出长度的连续前缀。
+   *
+   * 完整数组 rank 由 [type] 决定，因此 `new int[a][]` 会保存一个长度和二维结果类型。后端必须
+   * 先按列表顺序各求值一次，再递归分配已给出长度的层级，不能在外层循环中重复求值内层长度。
+   */
+  data class NewMultiArray(
+    val lengths: List<JavaIrExpression>,
+    override val type: JavaIrType.Array,
+    override val span: JavaSourceSpan,
+    /** 最内层引用 component 的运行时分类；primitive 多维数组为 null。 */
+    val leafReferenceComponentKind: JavaIrArrayReferenceComponentKind? = null,
+  ) : JavaIrExpression
+
   /** 一维数组 initializer；elements 保持源码顺序，后端不得重排或合并副作用。 */
   data class ArrayInitializer(
     val componentType: JavaIrType,
