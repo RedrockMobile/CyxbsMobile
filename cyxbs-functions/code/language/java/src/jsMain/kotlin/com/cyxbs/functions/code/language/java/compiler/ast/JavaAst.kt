@@ -281,7 +281,26 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val body: JavaAstStatement,
   ) : JavaAstStatement
 
-  /** 退出最近一层循环；带标签形式由前端稳定拒绝。 */
+  /** Java 增强 for；迭代变量在循环体内拥有独立词法作用域。 */
+  data class EnhancedFor(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val modifiers: Set<JavaAstModifier>,
+    val type: JavaAstTypeReference,
+    val variable: JavaAstVariableDeclarator,
+    val iterable: JavaAstExpression,
+    val body: JavaAstStatement,
+  ) : JavaAstStatement
+
+  /** Java switch statement；case 顺序与空 case 均保留以维持 fallthrough。 */
+  data class Switch(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val selector: JavaAstExpression,
+    val entries: List<JavaAstSwitchEntry>,
+  ) : JavaAstStatement
+
+  /** 退出最近一层循环或 switch；带标签形式由前端稳定拒绝。 */
   data class Break(
     override val nodeId: JavaNodeId,
     override val span: JavaSourceSpan,
@@ -306,6 +325,15 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     override val span: JavaSourceSpan,
   ) : JavaAstStatement
 }
+
+/** switch 中单个 case/default 及其后直到下一 label 的语句。 */
+internal data class JavaAstSwitchEntry(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  /** null 表示 default。 */
+  val label: JavaAstExpression?,
+  val statements: List<JavaAstStatement>,
+) : JavaAstNode
 
 /** 显式构造器调用的目标。 */
 internal enum class JavaAstConstructorInvocationKind {

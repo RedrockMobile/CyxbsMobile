@@ -427,9 +427,9 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 
 后续批次按依赖顺序推进：
 
-1. 用户接口、`implements`、接口继承、接口分派与 default method；
-2. `Object.toString/equals/hashCode` 虚分派，并让集合受控接入用户对象语义；
-3. 增强 `for`、`break/continue`、`do-while` 与 `switch` 等常用控制流；
+1. （已完成）用户接口、`implements`、接口继承、接口分派与 default method；
+2. （已完成）`Object.toString/equals/hashCode` 虚分派，并让集合受控接入用户对象语义；
+3. （已完成）增强 `for`、`break/continue`、`do-while` 与 `switch` 等常用控制流；
 4. `throw`、`try/catch/finally` 与常用异常；
 5. 函数式接口、lambda、方法引用和捕获变量；
 6. 多维数组、`enum` 以及 `long/float/double` 的完整运行语义。
@@ -440,7 +440,7 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 阶段闸门：不依赖大规模类库的 Java 8 语言样例能够稳定编译执行，生成 JS 中不存在未解析的
 Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义。
 
-#### 当前阶段 2A 首批实现进度（2026-08-16）
+#### 当前阶段 2A 首批实现进度（2026-08-18）
 
 - 已贯通一维 primitive/引用数组的前置类型声明、`new T[n]`、一维花括号初始化器、元素读写、
   `length`、复合赋值和 `++/--`；数组 receiver、index 与右值保持 Java 从左到右且只求值一次；
@@ -459,10 +459,12 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   `PrintStream`、`StringBuilder.append(Object)` 与集合查询均通过动态分派观察用户对象语义；
 - 已支持 `do-while`、无标签 `break/continue`，经典 `for` 在 typed IR 中保留 update 区域，确保
   `continue` 仍先执行 update；循环 break 出口也会参与 definite-assignment 交集；
-- 完整 `jsNodeTest` 共 214 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
-  字符串左结合、泛型接口/default 分派、Object 虚方法及循环跳转；
-- 多维数组运行、嵌套初始化器、增强 `for`、`switch`、异常、lambda、方法引用、enum、long 与
-  浮点完整语义仍留给后续批次。
+- 已支持数组、`List`、`Set` 的增强 `for`，迭代变量的装箱/拆箱与赋值转换由 semantic side table
+  固定；`switch` 已支持 int-like（含对应 wrapper）与 String 教学用法、连续 case、fallthrough、
+  default、switch break 及 String null 检查；重复 case/default 和不可迭代对象会在编译期报告稳定诊断；
+- 完整 `jsNodeTest` 共 217 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
+  字符串左结合、泛型接口/default 分派、Object 虚方法、循环跳转、增强 `for` 与 switch；
+- 多维数组运行、嵌套初始化器、异常、lambda、方法引用、enum、long 与浮点完整语义仍留给后续批次。
 
 ### 阶段 2B：精选类库与宿主桥
 

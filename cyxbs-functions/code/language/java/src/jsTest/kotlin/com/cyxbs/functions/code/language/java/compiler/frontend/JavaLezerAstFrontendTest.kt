@@ -348,6 +348,39 @@ class JavaLezerAstFrontendTest {
     assertTrue(labeled.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
+  /** 增强 for 与 switch 必须保留迭代变量、连续 case 和 fallthrough 顺序。 */
+  @Test
+  fun parsesEnhancedForAndSwitch() {
+    val result = parse(
+      """
+        class Main {
+          int run(int[] values, int mode) {
+            for (int value : values) { if (value == 0) continue; }
+            switch (mode) {
+              case 1:
+              case 2: mode++; break;
+              default: mode = 0;
+            }
+            return mode;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val statements = assertNotNull(method.body).statements
+    val enhanced = assertIs<JavaAstStatement.EnhancedFor>(statements[0])
+    assertEquals("value", enhanced.variable.name)
+    val switch = assertIs<JavaAstStatement.Switch>(statements[1])
+    assertEquals(3, switch.entries.size)
+    assertTrue(switch.entries[0].statements.isEmpty())
+    assertNotNull(switch.entries[1].label)
+    assertTrue(switch.entries[2].label == null)
+  }
+
   /** 真实 CST 中的未开放 Java 8 或阶段 2A 结构必须被稳定拒绝，不能在 adapter 中消失。 */
   @Test
   fun rejectsStageOneExcludedSyntaxWithoutErasure() {

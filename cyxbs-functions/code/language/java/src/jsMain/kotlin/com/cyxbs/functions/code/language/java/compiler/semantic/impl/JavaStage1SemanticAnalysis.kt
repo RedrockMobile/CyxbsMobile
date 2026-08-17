@@ -69,6 +69,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val unassignedBlankFinalFields = mutableSetOf<JavaSymbolId>()
   private var loopDepth = 0
   private val loopFlows = mutableListOf<S1LoopFlow>()
+  private val breakFlows = mutableListOf<S1LoopFlow>()
+  private val enhancedForBindings = linkedMapOf<JavaNodeId, JavaEnhancedForBinding>()
+  private val switchesCompletingNormally = mutableSetOf<JavaNodeId>()
 
   /** 执行全部语义遍次；错误结果不会泄露含恢复类型的半成品模型。 */
   fun analyze(): JavaCompilerPhaseResult<JavaSemanticModel> {
@@ -1424,12 +1427,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         val blankEntryUnassigned = unassignedBlankFinalFields.toSet()
         val flow = S1LoopFlow()
         loopFlows += flow
+        breakFlows += flow
         loopDepth++
         try {
           analyzeStatement(statement.body)
         } finally {
           loopDepth--
           loopFlows.removeAt(loopFlows.lastIndex)
+          breakFlows.removeAt(breakFlows.lastIndex)
         }
         val blankBodyUnassigned = unassignedBlankFinalFields.toSet()
         val exits = flow.breakExits.toMutableList()
@@ -1443,12 +1448,14 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstStatement.DoWhile -> {
         val flow = S1LoopFlow()
         loopFlows += flow
+        breakFlows += flow
         loopDepth++
         try {
           analyzeStatement(statement.body)
         } finally {
           loopDepth--
           loopFlows.removeAt(loopFlows.lastIndex)
+          breakFlows.removeAt(breakFlows.lastIndex)
         }
         requireType(statement.condition, booleanType(), "do-while 条件必须是 boolean。")
         val exits = flow.breakExits.toMutableList()
@@ -1468,6 +1475,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         val blankEntryUnassigned = unassignedBlankFinalFields.toSet()
         val flow = S1LoopFlow()
         loopFlows += flow
+        breakFlows += flow
         loopDepth++
         try {
           analyzeStatement(statement.body)
@@ -1475,6 +1483,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         } finally {
           loopDepth--
           loopFlows.removeAt(loopFlows.lastIndex)
+          breakFlows.removeAt(breakFlows.lastIndex)
         }
         val blankLoopUnassigned = unassignedBlankFinalFields.toSet()
         val exits = flow.breakExits.toMutableList()
@@ -1485,10 +1494,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           afterCondition, blankEntryAssigned, blankEntryUnassigned.intersect(blankLoopUnassigned),
         ))
       }
+      is JavaAstStatement.EnhancedFor -> analyzeEnhancedFor(statement)
+      is JavaAstStatement.Switch -> analyzeSwitch(statement)
       is JavaAstStatement.Break -> {
-        val flow = loopFlows.lastOrNull()
+        val flow = breakFlows.lastOrNull()
         if (flow == null) {
-          error(statement.span, "java.semantic.break_outside_loop", "break 只能出现在循环体内。")
+          error(statement.span, "java.semantic.break_outside_target", "break 只能出现在循环或 switch 内。")
         } else flow.breakExits += currentFlowState()
       }
       is JavaAstStatement.Continue -> if (loopFlows.isEmpty()) {
@@ -1497,6 +1508,143 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstStatement.Return -> analyzeReturn(statement)
       is JavaAstStatement.Empty -> Unit
     }
+  }
+
+  /** 增强 for 首批覆盖数组及 builtin List/Set；用户 Iterable 等待通用接口库补齐。 */
+  private fun analyzeEnhancedFor(statement: JavaAstStatement.EnhancedFor) = withScope {
+    val context = context()
+    val variableType = resolveType(
+      statement.type, context.unit, currentTypeParameterScope(), allowVoid = false,
+    )
+    val iterableType = analyzeExpression(statement.iterable)
+    val resolved = when (iterableType) {
+      is JavaSemanticType.Array -> JavaEnhancedForKind.ARRAY to iterableType.componentType
+      is JavaSemanticType.Declared -> {
+        val candidates = listOf(
+          JavaBuiltinTypeRole.LIST to JavaEnhancedForKind.LIST,
+          JavaBuiltinTypeRole.SET to JavaEnhancedForKind.SET,
+        )
+        candidates.firstNotNullOfOrNull { (role, kind) ->
+          val symbol = builtinTypeRoles.entries.firstOrNull { it.value == role }?.key
+            ?: return@firstNotNullOfOrNull null
+          val projected = relations().asSupertype(iterableType, symbol)
+            ?: return@firstNotNullOfOrNull null
+          kind to (projected.arguments.singleOrNull() ?: objectSemanticType())
+        }
+      }
+      else -> null
+    }
+    if (resolved == null) {
+      error(
+        statement.iterable.span,
+        "java.semantic.enhanced_for_not_iterable",
+        "增强 for 当前只支持数组以及 builtin List/Set。",
+      )
+      return@withScope
+    }
+    val conversion = compatibility(resolved.second, variableType)
+    if (conversion == null) {
+      error(
+        statement.variable.span,
+        "java.semantic.enhanced_for_element_type_mismatch",
+        "增强 for 元素类型不能赋值给迭代变量。",
+      )
+      return@withScope
+    }
+    enhancedForBindings[statement.nodeId] = JavaEnhancedForBinding(
+      resolved.first, resolved.second, conversion,
+    )
+    val local = declareLocal(
+      JavaSymbolKind.LOCAL_VARIABLE,
+      statement.variable.name,
+      context.callable?.symbol ?: context.owner.symbol,
+      statement.variable.nodeId,
+      statement.variable.span,
+      variableType,
+    )
+    definitelyAssigned += local
+    if (JavaAstModifier.FINAL in statement.modifiers) finalSymbols += local
+    val entry = currentFlowState()
+    val flow = S1LoopFlow()
+    loopFlows += flow
+    breakFlows += flow
+    loopDepth++
+    try {
+      analyzeStatement(statement.body)
+    } finally {
+      loopDepth--
+      loopFlows.removeAt(loopFlows.lastIndex)
+      breakFlows.removeAt(breakFlows.lastIndex)
+    }
+    // 数组或集合都可能为空，因此零次迭代出口始终参与 DA 交集。
+    replaceFlowState((flow.breakExits + entry).intersectionOrNull() ?: entry)
+  }
+
+  /** switch 首批接受 int-like 与 String 常量 label，并按 fallthrough 合并 DA 出口。 */
+  private fun analyzeSwitch(statement: JavaAstStatement.Switch) = withScope {
+    val declaredSelectorType = analyzeExpression(statement.selector)
+    val selectorType = if (
+      declaredSelectorType == JavaSemanticType.Declared(stringType.symbol, emptyList())
+    ) {
+      declaredSelectorType
+    } else {
+      // Java 允许 Byte/Short/Character/Integer selector；转换直接绑定到 selector 表达式。
+      primitiveOperand(statement.selector, declaredSelectorType)
+    }
+    val validSelector = selectorType == JavaSemanticType.Declared(stringType.symbol, emptyList()) ||
+      (selectorType as? JavaSemanticType.Primitive)?.kind in setOf(
+        JavaAstPrimitiveType.BYTE,
+        JavaAstPrimitiveType.SHORT,
+        JavaAstPrimitiveType.CHAR,
+        JavaAstPrimitiveType.INT,
+      )
+    if (!validSelector) {
+      error(
+        statement.selector.span,
+        "java.semantic.switch_selector_unsupported",
+        "switch selector 当前只支持 byte/short/char/int、对应 wrapper 与 String。",
+      )
+    }
+    var defaultSeen = false
+    val labels = mutableSetOf<String>()
+    statement.entries.forEach { entry ->
+      val label = entry.label
+      if (label == null) {
+        if (defaultSeen) error(entry.span, "java.semantic.duplicate_switch_default", "switch 只能包含一个 default。")
+        defaultSeen = true
+      } else {
+        val actual = analyzeExpression(label)
+        if (compatibility(actual, selectorType) == null || constants[label.nodeId] == null) {
+          error(
+            label.span,
+            "java.semantic.invalid_switch_label",
+            "case 必须是与 selector 兼容的编译期常量。",
+          )
+        } else if (!labels.add(constants.getValue(label.nodeId).toString())) {
+          error(label.span, "java.semantic.duplicate_switch_label", "switch case 常量重复。")
+        }
+      }
+    }
+    val entryState = currentFlowState()
+    var fallthrough: S1FlowState? = null
+    val flow = S1LoopFlow()
+    breakFlows += flow
+    try {
+      statement.entries.forEach { entry ->
+        replaceFlowState(listOfNotNull(entryState, fallthrough).intersectionOrNull() ?: entryState)
+        analyzeStatements(entry.statements)
+        val block = JavaAstStatement.Block(entry.nodeId, entry.span, entry.statements)
+        fallthrough = if (canCompleteNormally(block)) currentFlowState() else null
+      }
+    } finally {
+      breakFlows.removeAt(breakFlows.lastIndex)
+    }
+    val exits = flow.breakExits.toMutableList()
+    fallthrough?.let(exits::add)
+    if (!defaultSeen) exits += entryState
+    // break、末尾 fallthrough 或缺少 default 均会形成 switch 的正常完成路径。
+    if (exits.isNotEmpty()) switchesCompletingNormally += statement.nodeId
+    replaceFlowState(exits.intersectionOrNull() ?: entryState)
   }
 
   /** 初始化式先于局部名称入作用域，避免错误接受局部变量自引用。 */
@@ -3090,6 +3238,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       containsBreakForCurrentLoop(statement.body)
     is JavaAstStatement.For -> statement.condition?.let(::isConstantTrue) != true ||
       containsBreakForCurrentLoop(statement.body)
+    is JavaAstStatement.EnhancedFor -> true
+    is JavaAstStatement.Switch -> statement.nodeId in switchesCompletingNormally
     is JavaAstStatement.Break,
     is JavaAstStatement.Continue,
     is JavaAstStatement.Return -> false
@@ -3105,6 +3255,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     is JavaAstStatement.While,
     is JavaAstStatement.DoWhile,
     is JavaAstStatement.For -> false
+    is JavaAstStatement.EnhancedFor,
+    is JavaAstStatement.Switch -> false
     else -> false
   }
 
@@ -3517,6 +3669,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         builtinTypeRoles.toMap(),
         wrapperPrimitiveTypes.toMap(),
         interfaceDefaultMethods.toMap(),
+        enhancedForBindings.toMap(),
       ),
       diagnostics,
     )

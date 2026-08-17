@@ -19,6 +19,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstParameter
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstStatement
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstSwitchEntry
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclarationKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeParameter
@@ -77,8 +78,9 @@ internal object JavaLezerAstFrontend : JavaAstFrontend {
  * 等长规避 @lezer/java 1.1.3 对 interface `default` modifier 的 grammar 缺陷。
  *
  * 该版本把 `default` 与 `synchronized` 误写为必须连续出现，合法 default 方法会产生恢复节点。
- * 这里只替换交给 Lezer 的临时文本，节点 span 与长度保持不变；adapter 仍从原始源码读取 token 和
- * 字面量，因此不会改变诊断位置、字符串内容或最终 AST。待上游 grammar 修复并升级后可移除此兼容层。
+ * 这里只替换交给 Lezer 的临时文本，并明确排除 `switch default:` 标签；节点 span 与长度保持不变，
+ * adapter 仍从原始源码读取 token 和字面量，因此不会改变诊断位置、字符串内容或最终 AST。
+ * 待上游 grammar 修复并升级后可移除此兼容层。
  */
 private fun String.normalizeDefaultModifierForLezer(): String {
   val keyword = "default"
@@ -90,12 +92,22 @@ private fun String.normalizeDefaultModifierForLezer(): String {
   while (index >= 0) {
     val before = getOrNull(index - 1)
     val after = getOrNull(index + keyword.length)
-    if (!before.isJavaIdentifierPart() && !after.isJavaIdentifierPart()) {
+    val nextToken = indexOfFirstNonWhitespace(index + keyword.length)
+    val isSwitchDefaultLabel = nextToken >= 0 && get(nextToken) == ':'
+    if (!before.isJavaIdentifierPart() && !after.isJavaIdentifierPart() && !isSwitchDefaultLabel) {
       replacement.forEachIndexed { offset, char -> normalized[index + offset] = char }
     }
     index = indexOf(keyword, index + keyword.length)
   }
   return normalized.toString()
+}
+
+/** 从 [startIndex] 起查找下一个非空白字符；只用于区分 `default` 方法与 switch 标签。 */
+private fun String.indexOfFirstNonWhitespace(startIndex: Int): Int {
+  for (index in startIndex until length) {
+    if (!get(index).isWhitespace()) return index
+  }
+  return -1
 }
 
 /** 与本次 Java 关键字边界判断相关的最小 identifier-part 规则。 */
@@ -326,6 +338,8 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "WhileStatement" -> whileStatement(node)
     "DoStatement" -> doWhileStatement(node)
     "ForStatement" -> forStatement(node)
+    "EnhancedForStatement" -> enhancedForStatement(node)
+    "SwitchStatement" -> switchStatement(node)
     "BreakStatement" -> loopJump(node, isBreak = true)
     "ContinueStatement" -> loopJump(node, isBreak = false)
     "EmptyStatement" -> JavaAstStatement.Empty(ids.next(), span(node))
@@ -405,6 +419,71 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     return JavaAstStatement.For(ids.next(), span(node), forInitializer(parts[0]),
       parts[1].expressionNodes().singleOrNull()?.let(::expression),
       parts[2].expressionNodes().map(::expression), statement(body))
+  }
+
+  /** 增强 for 的 ForSpec 只读取直接类型、名称、冒号后表达式，避免误收循环体节点。 */
+  private fun enhancedForStatement(node: LezerSyntaxNode): JavaAstStatement.EnhancedFor {
+    val spec = node.children().firstOrNull { it.name == "ForSpec" }
+      ?: unsupported(node, "增强 for 缺少 ForSpec。")
+    val definition = spec.children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(spec, "增强 for 缺少迭代变量。")
+    rejectAnnotationsBefore(spec, definition, "增强 for 变量")
+    rejectPostNameDimensions(definition, "增强 for 变量")
+    val declaredType = spec.typeBefore(definition)
+    val iterable = spec.children().expressionNodes().singleOrNull()
+      ?: unsupported(spec, "增强 for 必须包含唯一 iterable 表达式。")
+    val body = node.children().lastOrNull { it.name in STATEMENT_NODES }
+      ?: unsupported(node, "增强 for 缺少循环体。")
+    return JavaAstStatement.EnhancedFor(
+      ids.next(),
+      span(node),
+      spec.modifiersBefore(definition, LOCAL_MODIFIERS, "增强 for 变量"),
+      declaredType,
+      JavaAstVariableDeclarator(ids.next(), span(definition), text(definition), null),
+      expression(iterable),
+      statement(body),
+    )
+  }
+
+  /**
+   * switch block 按 label 顺序切分，连续 case 会产生空 entry，从而保留 Java fallthrough。
+   */
+  private fun switchStatement(node: LezerSyntaxNode): JavaAstStatement.Switch {
+    val selector = node.children().firstOrNull { it.name == "ParenthesizedExpression" }
+      ?: unsupported(node, "switch 缺少 selector。")
+    val block = node.children().firstOrNull { it.name == "SwitchBlock" }
+      ?: unsupported(node, "switch 缺少 block。")
+    data class EntryBuilder(
+      val labelNode: LezerSyntaxNode,
+      val label: JavaAstExpression?,
+      val statements: MutableList<JavaAstStatement> = mutableListOf(),
+    )
+    val entries = mutableListOf<EntryBuilder>()
+    block.children().forEach { child ->
+      when {
+        child.name == "SwitchLabel" -> {
+          val isDefault = child.children().any { text(it) == "default" }
+          val label = if (isDefault) null else child.children()
+            .firstOrNull { it.name in EXPRESSION_NODES }
+            ?.let(::expression)
+            ?: unsupported(child, "case 缺少常量表达式。")
+          entries += EntryBuilder(child, label)
+        }
+        child.name in STATEMENT_NODES -> entries.lastOrNull()?.statements?.add(statement(child))
+          ?: unsupported(child, "switch 语句必须位于 case/default 之后。")
+        child.name == "{" || child.name == "}" || child.trivia() -> Unit
+        else -> unsupported(child, "阶段 2A 暂不支持该 switch 成员。")
+      }
+    }
+    return JavaAstStatement.Switch(
+      ids.next(), span(node), expression(selector), entries.map { entry ->
+        val end = entry.statements.lastOrNull()?.span?.to ?: entry.labelNode.to
+        JavaAstSwitchEntry(
+          ids.next(), JavaSourceSpan(file.id, entry.labelNode.from, end), entry.label,
+          entry.statements.toList(),
+        )
+      },
+    )
   }
 
   /** for 初始化支持局部变量或表达式列表。 */
@@ -945,8 +1024,8 @@ private val TYPE_NODES = setOf("ClassDeclaration", "InterfaceDeclaration", "Enum
 private val MEMBER_NODES = setOf("FieldDeclaration", "MethodDeclaration", "ConstructorDeclaration")
 private val STATEMENT_NODES = setOf(
   "Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement",
-  "WhileStatement", "DoStatement", "ForStatement", "BreakStatement", "ContinueStatement",
-  "EmptyStatement",
+  "WhileStatement", "DoStatement", "ForStatement", "EnhancedForStatement", "SwitchStatement",
+  "BreakStatement", "ContinueStatement", "EmptyStatement",
 )
 private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void", "ArrayType")
 private val TYPE_REFERENCE_WRAPPERS = setOf("GenericType")

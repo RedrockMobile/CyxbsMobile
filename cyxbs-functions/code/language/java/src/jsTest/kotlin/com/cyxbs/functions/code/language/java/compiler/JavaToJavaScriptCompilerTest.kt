@@ -1110,7 +1110,153 @@ class JavaToJavaScriptCompilerTest {
       descriptor = "()V",
       "demo/Invalid.java" to "package demo; class Invalid { static void run() { break; } }",
     )
-    assertTrue(invalid.diagnostics.any { it.code == "java.semantic.break_outside_loop" })
+    assertTrue(invalid.diagnostics.any { it.code == "java.semantic.break_outside_target" })
+  }
+
+  /** 数组/List/Set 增强 for 与 int-like/String switch 必须保持元素转换和 case fallthrough。 */
+  @Test
+  fun compilesEnhancedForAndSwitch() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        import java.util.ArrayList;
+        import java.util.HashSet;
+        import java.util.List;
+        import java.util.Set;
+
+        class Main {
+          static int run() {
+            int total = 0;
+            int[] array = {1, 2, 3};
+            for (int value : array) total += value;
+
+            List<Integer> list = new ArrayList<>();
+            list.add(4); list.add(5);
+            for (Integer value : list) total += value;
+
+            Set<Integer> set = new HashSet<>();
+            set.add(1); set.add(2); set.add(3);
+            for (Integer value : set) total += value;
+
+            switch (total) {
+              case 20: total += 100; break;
+              case 21: total += 2;
+              case 22: total += 3; break;
+              default: total = -1;
+            }
+            String key = "ok";
+            switch (key) {
+              case "ok": total++; break;
+              default: total = -2;
+            }
+            char marker = 'a';
+            switch (marker) {
+              case 'a': total++; break;
+              default: total = -3;
+            }
+            Integer boxed = 1;
+            switch (boxed) {
+              case 1: total++; break;
+              default: total = -4;
+            }
+            return total;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(29, (createEntry(artifact, {}, {})() as Number).toInt())
+
+    val nullSwitch = compile(
+      entryClass = "demo.NullSwitch",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/NullSwitch.java" to """
+        package demo;
+        class NullSwitch {
+          static int run() {
+            String value = null;
+            switch (value) {
+              default: return 0;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+    val nullArtifact = assertNotNull(nullSwitch.value, nullSwitch.diagnostics.toString())
+    assertTrue("NullPointerException" in executionFailure { createEntry(nullArtifact, {}, {})() })
+  }
+
+  /** 增强 for 与 switch 的非法边界必须停在语义阶段，不能生成依赖 JS 动态行为的产物。 */
+  @Test
+  fun rejectsInvalidEnhancedForAndSwitch() {
+    val invalidIterable = compile(
+      entryClass = "demo.InvalidIterable",
+      entryMethod = "run",
+      descriptor = "()V",
+      "demo/InvalidIterable.java" to """
+        package demo;
+        class InvalidIterable {
+          static void run() {
+            int value = 1;
+            for (int item : value) { }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(invalidIterable.value == null)
+    assertTrue(invalidIterable.diagnostics.any {
+      it.code == "java.semantic.enhanced_for_not_iterable"
+    })
+
+    val duplicateLabels = compile(
+      entryClass = "demo.DuplicateLabels",
+      entryMethod = "run",
+      descriptor = "(I)V",
+      "demo/DuplicateLabels.java" to """
+        package demo;
+        class DuplicateLabels {
+          static void run(int value) {
+            switch (value) {
+              case 1: break;
+              case 1: break;
+              default: break;
+              default: break;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(duplicateLabels.value == null)
+    assertTrue(duplicateLabels.diagnostics.any {
+      it.code == "java.semantic.duplicate_switch_label"
+    })
+    assertTrue(duplicateLabels.diagnostics.any {
+      it.code == "java.semantic.duplicate_switch_default"
+    })
+
+    val missingReturn = compile(
+      entryClass = "demo.MissingReturn",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/MissingReturn.java" to """
+        package demo;
+        class MissingReturn {
+          static int run(int value) {
+            switch (value) {
+              case 1: break;
+              default: return 2;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(missingReturn.value == null)
+    assertTrue(missingReturn.diagnostics.any { it.code == "java.semantic.missing_return" })
   }
 
   private fun compile(

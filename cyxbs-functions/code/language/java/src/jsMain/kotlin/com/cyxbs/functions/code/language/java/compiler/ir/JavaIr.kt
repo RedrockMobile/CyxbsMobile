@@ -204,7 +204,25 @@ internal sealed interface JavaIrStatement {
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
 
-  /** 退出最近循环。 */
+  /** 增强 for 的运行协议已经由语义阶段冻结。 */
+  data class EnhancedFor(
+    val kind: JavaIrEnhancedForKind,
+    val local: JavaIrLocalId,
+    val iterable: JavaIrExpression,
+    val elementType: JavaIrType,
+    val elementConversions: List<JavaIrConversion>,
+    val body: JavaIrStatement,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
+  /** switch 保留顺序与 fallthrough；default 的 label 为 null。 */
+  data class Switch(
+    val selector: JavaIrExpression,
+    val entries: List<JavaIrSwitchEntry>,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
+  /** 退出最近循环或 switch。 */
   data class Break(override val span: JavaSourceSpan) : JavaIrStatement
 
   /** 继续最近循环；for 的更新表达式由后端原生 for 结构保证执行。 */
@@ -233,6 +251,16 @@ internal sealed interface JavaIrStatement {
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
 }
+
+/** 增强 for 后端协议；集合种类显式区分以选择稳定 iterator operation。 */
+internal enum class JavaIrEnhancedForKind { ARRAY, LIST, SET }
+
+/** typed IR switch case/default。 */
+internal data class JavaIrSwitchEntry(
+  val label: JavaIrExpression.Constant?,
+  val statements: List<JavaIrStatement>,
+  val span: JavaSourceSpan,
+)
 
 /** 每个表达式都携带已经确定的运行时类型，JS 后端不得再次推断。 */
 internal sealed interface JavaIrExpression {

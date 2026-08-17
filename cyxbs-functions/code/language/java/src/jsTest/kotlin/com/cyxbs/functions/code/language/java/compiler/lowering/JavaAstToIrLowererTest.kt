@@ -893,6 +893,10 @@ class JavaAstToIrLowererTest {
     is JavaIrStatement.DoWhile -> builtinOperations(statement.body) + builtinOperations(statement.condition)
     is JavaIrStatement.For -> builtinOperations(statement.condition) +
       statement.updates.flatMap(::builtinOperations) + builtinOperations(statement.body)
+    is JavaIrStatement.EnhancedFor -> builtinOperations(statement.iterable) +
+      builtinOperations(statement.body)
+    is JavaIrStatement.Switch -> builtinOperations(statement.selector) +
+      statement.entries.flatMap { entry -> entry.statements.flatMap(::builtinOperations) }
     is JavaIrStatement.Break,
     is JavaIrStatement.Continue -> emptyList()
     is JavaIrStatement.Return -> statement.expression?.let(::builtinOperations).orEmpty()

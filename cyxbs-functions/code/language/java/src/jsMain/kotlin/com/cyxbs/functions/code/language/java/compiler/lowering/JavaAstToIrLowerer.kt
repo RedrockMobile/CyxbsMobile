@@ -439,6 +439,13 @@ private class BodyLowering(
           ?.declarators?.forEach(::registerLocal)
         collectLocals(statement.body)
       }
+      is JavaAstStatement.EnhancedFor -> {
+        registerLocal(statement.variable)
+        collectLocals(statement.body)
+      }
+      is JavaAstStatement.Switch -> statement.entries.forEach { entry ->
+        entry.statements.forEach(::collectLocals)
+      }
       else -> Unit
     }
   }
@@ -490,6 +497,8 @@ private class BodyLowering(
       listOf(JavaIrStatement.DoWhile(branch(statement.body), it, statement.span))
     } ?: emptyList()
     is JavaAstStatement.For -> lowerFor(statement)
+    is JavaAstStatement.EnhancedFor -> lowerEnhancedFor(statement)
+    is JavaAstStatement.Switch -> lowerSwitch(statement)
     is JavaAstStatement.Break -> listOf(JavaIrStatement.Break(statement.span))
     is JavaAstStatement.Continue -> listOf(JavaIrStatement.Continue(statement.span))
     is JavaAstStatement.Return -> lowerReturn(statement)
@@ -544,6 +553,68 @@ private class BodyLowering(
         condition, updates, branch(statement.body), statement.span,
       ),
       statement.span,
+    ))
+  }
+
+  /** 增强 for 只消费 semantic binding，集合类别与元素转换均不从源码名称推断。 */
+  private fun lowerEnhancedFor(statement: JavaAstStatement.EnhancedFor): List<JavaIrStatement> {
+    val binding = lowering.model.enhancedForBindings[statement.nodeId]
+      ?: return invalid("Enhanced for is missing its semantic binding.", statement.span).let { emptyList() }
+    val symbol = lowering.declaration(
+      statement.variable.nodeId, statement.variable.span, JavaSymbolKind.LOCAL_VARIABLE,
+    ) ?: return emptyList()
+    val local = localBySymbol[symbol.id]
+      ?: return invalid("Enhanced for variable is missing its IR local.", statement.variable.span).let { emptyList() }
+    val iterable = expression(statement.iterable) ?: return emptyList()
+    val elementType = lowering.typeOf(binding.elementType, statement.variable.span) ?: return emptyList()
+    val conversions = irConversions(binding.conversion, statement.variable.span) ?: return emptyList()
+    val kind = when (binding.kind) {
+      JavaEnhancedForKind.ARRAY -> JavaIrEnhancedForKind.ARRAY
+      JavaEnhancedForKind.LIST -> JavaIrEnhancedForKind.LIST
+      JavaEnhancedForKind.SET -> JavaIrEnhancedForKind.SET
+    }
+    return listOf(JavaIrStatement.EnhancedFor(
+      kind, local.id, iterable, elementType, conversions, branch(statement.body), statement.span,
+    ))
+  }
+
+  /** switch label 必须已经由语义阶段证明为常量；entry 顺序原样保留 fallthrough。 */
+  private fun lowerSwitch(statement: JavaAstStatement.Switch): List<JavaIrStatement> {
+    val selector = expression(statement.selector) ?: return emptyList()
+    val entries = statement.entries.map { entry ->
+      val label = entry.label?.let { source ->
+        expression(source) as? JavaIrExpression.Constant
+          ?: return invalid("Switch label is not a lowered constant.", source.span).let { emptyList() }
+      }
+      JavaIrSwitchEntry(label, entry.statements.flatMap(::lowerStatement), entry.span)
+    }
+    return listOf(JavaIrStatement.Switch(selector, entries, statement.span))
+  }
+
+  /** 将可能为 Sequence 的元素赋值转换展平成后端可顺序应用的 IR conversion。 */
+  private fun irConversions(
+    conversion: JavaSemanticConversion,
+    span: JavaSourceSpan,
+  ): List<JavaIrConversion>? = when (conversion) {
+    JavaSemanticConversion.Identity -> listOf(JavaIrConversion.Identity)
+    is JavaSemanticConversion.Sequence -> conversion.steps.flatMap { step ->
+      irConversions(step, span) ?: return null
+    }
+    is JavaSemanticConversion.PrimitiveWidening -> listOf(
+      JavaIrConversion.PrimitiveWidening(conversion.from, conversion.to),
+    )
+    is JavaSemanticConversion.PrimitiveNarrowing -> listOf(
+      JavaIrConversion.PrimitiveNarrowing(conversion.from, conversion.to),
+    )
+    is JavaSemanticConversion.ReferenceWidening -> listOf(JavaIrConversion.ReferenceWidening(
+      lowering.typeOf(conversion.from, span) ?: return null,
+      lowering.typeOf(conversion.to, span) ?: return null,
+    ))
+    is JavaSemanticConversion.Boxing -> listOf(JavaIrConversion.Boxing(
+      conversion.primitive, JavaIrClassId(conversion.boxedType.value),
+    ))
+    is JavaSemanticConversion.Unboxing -> listOf(JavaIrConversion.Unboxing(
+      JavaIrClassId(conversion.boxedType.value), conversion.primitive,
     ))
   }
 

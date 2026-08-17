@@ -17,6 +17,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstant
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConversion
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrDispatchKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrExpression
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrEnhancedForKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrField
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrFieldId
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrLocal
@@ -139,8 +140,8 @@ private class JavaScriptBackendValidator(
       validateType(field.type, field.span)
       field.initializer?.let(::validateExpression)
     }
-    clazz.staticInitializer?.let { validateStatement(it, loopDepth = 0) }
-    clazz.instanceInitializer?.let { validateStatement(it, loopDepth = 0) }
+    clazz.staticInitializer?.let { validateStatement(it, loopDepth = 0, breakDepth = 0) }
+    clazz.instanceInitializer?.let { validateStatement(it, loopDepth = 0, breakDepth = 0) }
     clazz.methods.forEach { method ->
       if (method.owner != clazz.id) invalid("Java IR method owner does not match its class.", method.span)
       validateMethod(method)
@@ -200,7 +201,7 @@ private class JavaScriptBackendValidator(
     locals.forEach { local -> validateType(local.type, local.span) }
     method.body?.let { body ->
       validateConstructorInvocations(method, body)
-      validateStatement(body, loopDepth = 0)
+      validateStatement(body, loopDepth = 0, breakDepth = 0)
     }
   }
 
@@ -217,6 +218,10 @@ private class JavaScriptBackendValidator(
         is JavaIrStatement.While -> collect(statement.body)
         is JavaIrStatement.DoWhile -> collect(statement.body)
         is JavaIrStatement.For -> collect(statement.body)
+        is JavaIrStatement.EnhancedFor -> collect(statement.body)
+        is JavaIrStatement.Switch -> statement.entries.forEach { entry ->
+          entry.statements.forEach(::collect)
+        }
         is JavaIrStatement.ConstructorInvocation -> invocations += statement
         else -> Unit
       }
@@ -302,9 +307,11 @@ private class JavaScriptBackendValidator(
   }
 
   /** 递归校验在阶段 0 可直接翻译的控制流。 */
-  private fun validateStatement(statement: JavaIrStatement, loopDepth: Int) {
+  private fun validateStatement(statement: JavaIrStatement, loopDepth: Int, breakDepth: Int) {
     when (statement) {
-      is JavaIrStatement.Block -> statement.statements.forEach { validateStatement(it, loopDepth) }
+      is JavaIrStatement.Block -> statement.statements.forEach {
+        validateStatement(it, loopDepth, breakDepth)
+      }
       is JavaIrStatement.DeclareLocal -> {
         requireLocal(statement.local, statement.span)
         statement.initializer?.let(::validateExpression)
@@ -312,24 +319,92 @@ private class JavaScriptBackendValidator(
       is JavaIrStatement.Expression -> validateExpression(statement.expression)
       is JavaIrStatement.If -> {
         validateExpression(statement.condition)
-        validateStatement(statement.thenBranch, loopDepth)
-        statement.elseBranch?.let { validateStatement(it, loopDepth) }
+        validateStatement(statement.thenBranch, loopDepth, breakDepth)
+        statement.elseBranch?.let { validateStatement(it, loopDepth, breakDepth) }
       }
       is JavaIrStatement.While -> {
         validateExpression(statement.condition)
-        validateStatement(statement.body, loopDepth + 1)
+        validateStatement(statement.body, loopDepth + 1, breakDepth + 1)
       }
       is JavaIrStatement.DoWhile -> {
-        validateStatement(statement.body, loopDepth + 1)
+        validateStatement(statement.body, loopDepth + 1, breakDepth + 1)
         validateExpression(statement.condition)
       }
       is JavaIrStatement.For -> {
         validateExpression(statement.condition)
         statement.updates.forEach(::validateExpression)
-        validateStatement(statement.body, loopDepth + 1)
+        validateStatement(statement.body, loopDepth + 1, breakDepth + 1)
       }
-      is JavaIrStatement.Break -> if (loopDepth == 0) {
-        invalid("Java IR break statement must be nested in a loop.", statement.span)
+      is JavaIrStatement.EnhancedFor -> {
+        requireLocal(statement.local, statement.span)
+        validateExpression(statement.iterable)
+        validateType(statement.elementType, statement.span)
+        var current = statement.elementType
+        statement.elementConversions.forEach { conversion ->
+          val result = conversionResultType(conversion, current)
+          validateConversion(JavaIrExpression.Convert(
+            conversion,
+            JavaIrExpression.Constant(JavaIrConstant.NullValue, current, statement.span),
+            result,
+            statement.span,
+          ))
+          current = result
+        }
+        if (index.locals[statement.local]?.type != current || statement.elementConversions.isEmpty()) {
+          invalid("Enhanced for conversions do not reach the loop local type.", statement.span)
+        }
+        when (statement.kind) {
+          JavaIrEnhancedForKind.ARRAY -> {
+            val array = statement.iterable.type as? JavaIrType.Array
+            if (array == null || array.componentType != statement.elementType) {
+              invalid("Array enhanced for element type does not match its iterable.", statement.span)
+            }
+          }
+          JavaIrEnhancedForKind.LIST -> requireBuiltinRole(
+            statement.iterable.type,
+            setOf(JavaBuiltinTypeRole.LIST, JavaBuiltinTypeRole.ARRAY_LIST),
+            statement.span,
+          )
+          JavaIrEnhancedForKind.SET -> requireBuiltinRole(
+            statement.iterable.type,
+            setOf(JavaBuiltinTypeRole.SET, JavaBuiltinTypeRole.HASH_SET),
+            statement.span,
+          )
+        }
+        validateStatement(statement.body, loopDepth + 1, breakDepth + 1)
+      }
+      is JavaIrStatement.Switch -> {
+        validateExpression(statement.selector)
+        val stringSelector = statement.selector.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING)
+        val integralSelector = statement.selector.type.isStage0Integral()
+        if (!stringSelector && !integralSelector) {
+          invalid("Java IR switch selector must be integral or String.", statement.span)
+        }
+        var defaultSeen = false
+        val labels = mutableSetOf<String>()
+        statement.entries.forEach { entry ->
+          val label = entry.label
+          if (label == null) {
+            if (defaultSeen) invalid("Java IR switch contains duplicate default labels.", entry.span)
+            defaultSeen = true
+          } else {
+            validateExpression(label)
+            val compatible = if (stringSelector) {
+              label.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING) &&
+                label.value is JavaIrConstant.StringValue
+            } else {
+              label.type.isStage0Integral() && label.value is JavaIrConstant.IntValue
+            }
+            if (!compatible) invalid("Java IR switch label type does not match its selector.", entry.span)
+            if (!labels.add(label.value.toString())) {
+              invalid("Java IR switch contains duplicate case labels.", entry.span)
+            }
+          }
+          entry.statements.forEach { validateStatement(it, loopDepth, breakDepth + 1) }
+        }
+      }
+      is JavaIrStatement.Break -> if (breakDepth == 0) {
+        invalid("Java IR break statement must be nested in a loop or switch.", statement.span)
       }
       is JavaIrStatement.Continue -> if (loopDepth == 0) {
         invalid("Java IR continue statement must be nested in a loop.", statement.span)
@@ -866,6 +941,35 @@ private class JavaScriptBackendValidator(
     }
   }
 
+  /** 根据 conversion 的显式端点返回下一步类型，不从 JavaScript 值推断。 */
+  private fun conversionResultType(
+    conversion: JavaIrConversion,
+    source: JavaIrType,
+  ): JavaIrType = when (conversion) {
+    JavaIrConversion.Identity -> source
+    is JavaIrConversion.ReferenceWidening -> conversion.to
+    is JavaIrConversion.PrimitiveWidening -> JavaIrType.Primitive(conversion.to)
+    is JavaIrConversion.PrimitiveNarrowing -> JavaIrType.Primitive(conversion.to)
+    is JavaIrConversion.Boxing -> JavaIrType.Reference(conversion.boxedClass)
+    is JavaIrConversion.Unboxing -> JavaIrType.Primitive(conversion.primitive)
+  }
+
+  /** 增强 for 集合协议只接受 catalog 冻结的 builtin role。 */
+  private fun requireBuiltinRole(
+    type: JavaIrType,
+    roles: Set<JavaBuiltinTypeRole>,
+    span: JavaSourceSpan,
+  ) {
+    val role = (type as? JavaIrType.Reference)?.classId?.let(index.program.builtinTypeRoles::get)
+    if (role !in roles) invalid("Enhanced for iterable has an invalid builtin role.", span)
+  }
+
+  /** validator 通过冻结的 builtin role 判断引用身份，不读取限定名。 */
+  private fun JavaIrType.hasBuiltinRole(role: JavaBuiltinTypeRole): Boolean {
+    val classId = (this as? JavaIrType.Reference)?.classId ?: return false
+    return index.program.builtinTypeRoles[classId] == role
+  }
+
   /**
    * 以 typed IR 用户类层级和 catalog builtin role 层级验证引用拓宽。
    *
@@ -1172,6 +1276,12 @@ private class JavaScriptEmitter(
     is JavaIrStatement.DoWhile -> body.requiresBuiltinRuntime() || condition.requiresBuiltinRuntime()
     is JavaIrStatement.For -> condition.requiresBuiltinRuntime() ||
       updates.any { it.requiresBuiltinRuntime() } || body.requiresBuiltinRuntime()
+    is JavaIrStatement.EnhancedFor -> iterable.requiresBuiltinRuntime() ||
+      elementConversions.any { it is JavaIrConversion.Boxing || it is JavaIrConversion.Unboxing } ||
+      body.requiresBuiltinRuntime()
+    is JavaIrStatement.Switch -> selector.requiresBuiltinRuntime() || entries.any { entry ->
+      entry.label?.requiresBuiltinRuntime() == true || entry.statements.any { it.requiresBuiltinRuntime() }
+    }
     is JavaIrStatement.Break,
     is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
@@ -1227,6 +1337,11 @@ private class JavaScriptEmitter(
     is JavaIrStatement.DoWhile -> body.requiresCollectionRuntime() || condition.requiresCollectionRuntime()
     is JavaIrStatement.For -> condition.requiresCollectionRuntime() ||
       updates.any { it.requiresCollectionRuntime() } || body.requiresCollectionRuntime()
+    is JavaIrStatement.EnhancedFor -> kind != JavaIrEnhancedForKind.ARRAY ||
+      iterable.requiresCollectionRuntime() || body.requiresCollectionRuntime()
+    is JavaIrStatement.Switch -> selector.requiresCollectionRuntime() || entries.any { entry ->
+      entry.statements.any { it.requiresCollectionRuntime() }
+    }
     is JavaIrStatement.Break,
     is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresCollectionRuntime() }
@@ -1283,6 +1398,10 @@ private class JavaScriptEmitter(
     is JavaIrStatement.DoWhile -> body.requiresScannerRuntime() || condition.requiresScannerRuntime()
     is JavaIrStatement.For -> condition.requiresScannerRuntime() ||
       updates.any { it.requiresScannerRuntime() } || body.requiresScannerRuntime()
+    is JavaIrStatement.EnhancedFor -> iterable.requiresScannerRuntime() || body.requiresScannerRuntime()
+    is JavaIrStatement.Switch -> selector.requiresScannerRuntime() || entries.any { entry ->
+      entry.statements.any { it.requiresScannerRuntime() }
+    }
     is JavaIrStatement.Break,
     is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresScannerRuntime() }
@@ -1334,6 +1453,13 @@ private class JavaScriptEmitter(
       condition.requiresArrayOrStringRuntime()
     is JavaIrStatement.For -> condition.requiresArrayOrStringRuntime() ||
       updates.any { it.requiresArrayOrStringRuntime() } || body.requiresArrayOrStringRuntime()
+    is JavaIrStatement.EnhancedFor -> kind == JavaIrEnhancedForKind.ARRAY ||
+      iterable.requiresArrayOrStringRuntime() || body.requiresArrayOrStringRuntime()
+    is JavaIrStatement.Switch -> selector.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING) ||
+      selector.requiresArrayOrStringRuntime() || entries.any { entry ->
+      entry.label?.requiresArrayOrStringRuntime() == true ||
+        entry.statements.any { it.requiresArrayOrStringRuntime() }
+    }
     is JavaIrStatement.Break,
     is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
@@ -1551,6 +1677,29 @@ private class JavaScriptEmitter(
         writer.write(") ")
         emitBranch(statement.body)
       }
+      is JavaIrStatement.EnhancedFor -> emitEnhancedFor(statement)
+      is JavaIrStatement.Switch -> {
+        writer.writeIndentation()
+        writer.write("switch (")
+        val selector = renderExpression(statement.selector)
+        val selectorCode = if (statement.selector.type.hasBuiltinRole(JavaBuiltinTypeRole.STRING)) {
+          "\$__j_non_null($selector)"
+        } else {
+          selector
+        }
+        writer.writeMapped(selectorCode, statement.selector.span)
+        writer.write(") {\n")
+        writer.indented {
+          statement.entries.forEach { entry ->
+            writer.writeIndentation()
+            val label = entry.label
+            if (label == null) writer.write("default:\n")
+            else writer.write("case ${renderConstant(label.value)}:\n")
+            writer.indented { entry.statements.forEach(::emitStatement) }
+          }
+        }
+        writer.line("}")
+      }
       is JavaIrStatement.DoWhile -> {
         writer.writeIndentation()
         writer.write("do ")
@@ -1597,6 +1746,50 @@ private class JavaScriptEmitter(
       }
       is JavaIrStatement.Throw -> error("Validated Java IR cannot contain throw statements.")
     }
+  }
+
+  /** 增强 for 只求值 iterable 一次，并用稳定数组/集合协议驱动循环。 */
+  private fun emitEnhancedFor(statement: JavaIrStatement.EnhancedFor) {
+    val local = index.locals.getValue(statement.local)
+    val suffix = statement.local.value
+    val source = "\$__j_enhanced_source_$suffix"
+    val cursor = "\$__j_enhanced_cursor_$suffix"
+    val indexName = "\$__j_enhanced_index_$suffix"
+    writer.line("{")
+    writer.indented {
+      writer.writeIndentation()
+      writer.write("const $source = ")
+      writer.writeMapped(renderExpression(statement.iterable), statement.iterable.span)
+      writer.write(";\n")
+      writer.line("if ($source == null) throw new Error(\"java.lang.NullPointerException\");")
+      val rawElement: String
+      when (statement.kind) {
+        JavaIrEnhancedForKind.ARRAY -> {
+          writer.line("for (let $indexName = 0; $indexName < $source.length; $indexName++) {")
+          rawElement = "$source[$indexName]"
+        }
+        JavaIrEnhancedForKind.LIST -> {
+          writer.line("const $cursor = \$__j_list_iterator($source);")
+          writer.line("while (\$__j_iterator_has_next($cursor)) {")
+          rawElement = "\$__j_iterator_next($cursor)"
+        }
+        JavaIrEnhancedForKind.SET -> {
+          writer.line("const $cursor = \$__j_set_iterator($source);")
+          writer.line("while (\$__j_iterator_has_next($cursor)) {")
+          rawElement = "\$__j_iterator_next($cursor)"
+        }
+      }
+      writer.indented {
+        val converted = renderConversions(
+          statement.elementConversions, rawElement, statement.elementType,
+        )
+        writer.line("let ${JsNameMangler.local(local.id)} = ${coerceToType(converted, local.type)};")
+        val body = statement.body
+        if (body is JavaIrStatement.Block) emitBlockContents(body) else emitStatement(body)
+      }
+      writer.line("}")
+    }
+    writer.line("}")
   }
 
   /** 对非 block 分支补齐花括号，避免条件与循环生成时产生悬挂 else。 */
@@ -1887,15 +2080,38 @@ private class JavaScriptEmitter(
   /** 将 lowering 明确给出的转换渲染为 JavaScript 中对应的安全表示。 */
   private fun renderConversion(expression: JavaIrExpression.Convert): String {
     val code = renderExpression(expression.expression)
-    return when (expression.conversion) {
+    return renderConversionCode(expression.conversion, code, expression.type)
+  }
+
+  /** 按顺序渲染增强 for 的元素赋值转换。 */
+  private fun renderConversions(
+    conversions: List<JavaIrConversion>,
+    source: String,
+    sourceType: JavaIrType,
+  ): String {
+    var code = source
+    var type = sourceType
+    conversions.forEach { conversion ->
+      type = conversion.outputType(type)
+      code = renderConversionCode(conversion, code, type)
+    }
+    return code
+  }
+
+  /** 转换渲染只依赖明确 operation 与结果类型，可复用于表达式和循环元素。 */
+  private fun renderConversionCode(
+    conversion: JavaIrConversion,
+    code: String,
+    resultType: JavaIrType,
+  ): String = when (conversion) {
       JavaIrConversion.Identity,
       is JavaIrConversion.ReferenceWidening -> code
-      is JavaIrConversion.PrimitiveWidening -> if (expression.type.isStage0Integral()) {
+      is JavaIrConversion.PrimitiveWidening -> if (resultType.isStage0Integral()) {
         "($code | 0)"
       } else {
         code
       }
-      is JavaIrConversion.PrimitiveNarrowing -> when (expression.conversion.to.name) {
+      is JavaIrConversion.PrimitiveNarrowing -> when (conversion.to.name) {
         "BYTE" -> "(($code << 24) >> 24)"
         "SHORT" -> "(($code << 16) >> 16)"
         "CHAR" -> "($code & 65535)"
@@ -1903,10 +2119,25 @@ private class JavaScriptEmitter(
         else -> error("Validated primitive narrowing has an unsupported target.")
       }
       is JavaIrConversion.Boxing ->
-        "\$__j_box(\"${expression.conversion.primitive.boxTag()}\", $code)"
+        "\$__j_box(\"${conversion.primitive.boxTag()}\", $code)"
       is JavaIrConversion.Unboxing ->
-        "\$__j_unbox($code, \"${expression.conversion.primitive.boxTag()}\")"
+        "\$__j_unbox($code, \"${conversion.primitive.boxTag()}\")"
     }
+
+  /** emitter 仅根据 conversion 明示端点推进类型。 */
+  private fun JavaIrConversion.outputType(source: JavaIrType): JavaIrType = when (this) {
+    JavaIrConversion.Identity -> source
+    is JavaIrConversion.ReferenceWidening -> to
+    is JavaIrConversion.PrimitiveWidening -> JavaIrType.Primitive(to)
+    is JavaIrConversion.PrimitiveNarrowing -> JavaIrType.Primitive(to)
+    is JavaIrConversion.Boxing -> JavaIrType.Reference(boxedClass)
+    is JavaIrConversion.Unboxing -> JavaIrType.Primitive(primitive)
+  }
+
+  /** emitter 通过 typed IR 的 builtin role 判断 String，不依赖类名。 */
+  private fun JavaIrType.hasBuiltinRole(role: JavaBuiltinTypeRole): Boolean {
+    val classId = (this as? JavaIrType.Reference)?.classId ?: return false
+    return index.program.builtinTypeRoles[classId] == role
   }
 
   /** 首批 primitive 与 tagged wrapper 的稳定运行时标签。 */

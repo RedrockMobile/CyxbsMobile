@@ -384,6 +384,20 @@ internal sealed interface JavaConstantValue {
   data object NullValue : JavaConstantValue
 }
 
+/** 增强 for 已决议的运行形态，后端无需从类型名猜测集合类别。 */
+internal enum class JavaEnhancedForKind {
+  ARRAY,
+  LIST,
+  SET,
+}
+
+/** 增强 for 的元素类型与赋值转换。 */
+internal data class JavaEnhancedForBinding(
+  val kind: JavaEnhancedForKind,
+  val elementType: JavaSemanticType,
+  val conversion: JavaSemanticConversion,
+)
+
 /**
  * AST 的不可变语义 side table。
  *
@@ -430,6 +444,8 @@ internal data class JavaSemanticModel(
    */
   val interfaceDefaultMethods:
     Map<JavaSymbolId, Map<JavaVirtualSlotId, JavaSymbolId>> = emptyMap(),
+  /** EnhancedFor statement node 到已验证迭代协议的绑定。 */
+  val enhancedForBindings: Map<JavaNodeId, JavaEnhancedForBinding> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {
