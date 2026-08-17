@@ -243,17 +243,28 @@ class JavaLezerAstFrontendTest {
     assertNotNull(statement.finallyBlock)
   }
 
-  /** 多异常 catch 与带资源 try 留给阶段 2，阶段 1 必须稳定拒绝而不是擦除语义。 */
+  /** throws、multi-catch 与多个资源必须完整保留类型及声明顺序。 */
   @Test
-  fun rejectsStageTwoExceptionSyntax() {
-    listOf(
-      "class Main { void run() { try { } catch (IllegalArgumentException | IllegalStateException error) { } } }",
-      "class Main { void run() { try (Resource resource = open()) { } } }",
-    ).forEach { source ->
-      val result = parse(source)
-      assertFalse(result.isSuccess, source)
-      assertTrue(result.diagnostics.any { it.code == "java.frontend.unsupported" }, source)
-    }
+  fun parsesCompleteExceptionSyntax() {
+    val result = parse(
+      """
+      class Main {
+        void run() throws FirstException, SecondException {
+          try (Resource first = open(); Resource second = open()) { }
+          catch (IllegalArgumentException | IllegalStateException error) { }
+        }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    assertEquals(2, method.thrownTypes.size)
+    val statement = assertIs<JavaAstStatement.Try>(assertNotNull(method.body).statements.single())
+    assertEquals(listOf("first", "second"), statement.resources.map { it.name })
+    assertEquals(2, statement.catches.single().types.size)
   }
 
   /** 嵌套类型的成员不能被吸收到外层类型。 */
@@ -432,7 +443,6 @@ class JavaLezerAstFrontendTest {
   @Test
   fun rejectsStageOneExcludedSyntaxWithoutErasure() {
     listOf(
-      "class Main { int value() throws Exception { return 1; } }",
       "class Main { @Deprecated int value() { return 1; } }",
       "class Main { strictfp int value() { return 1; } }",
       "public public class Main { }",

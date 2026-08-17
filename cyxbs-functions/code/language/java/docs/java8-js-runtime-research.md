@@ -429,8 +429,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 
 1. （已完成，2026-08-18）异常基础：`throw`、`try/catch/finally`、有序多 catch、常用运行时异常，
    并让数组、集合和 Scanner 已产生的 Java 命名异常可被源码 catch；
-2. 异常完整语义：checked exception 与 `throws`、multi-catch、自定义异常、常用 Throwable API，
-   以及受控资源上的 try-with-resources/AutoCloseable；
+2. （已完成，2026-08-18）异常完整语义：checked exception 与 `throws`、multi-catch、自定义异常、
+   常用 Throwable API，以及受控资源上的 try-with-resources/AutoCloseable；
 3. 函数式接口与 lambda：无捕获/有捕获 lambda、effectively-final 校验和目标类型推断；
 4. 方法引用：静态、绑定 receiver、未绑定 receiver 与构造器引用，复用函数式接口适配链；
 5. 多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/求值顺序；
@@ -471,10 +471,15 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   显式抛出以及数组、集合、Scanner 已有运行时错误都按 Java 继承关系匹配首个 catch；
 - JS 后端使用原生结构化 try/finally，因而 `finally` 会正确覆盖 return/throw，并在 break/continue
   前执行；宿主超时、取消和内存终止信号仍不包装为可被 Java 源码捕获的普通异常；
-- 完整 `jsNodeTest` 共 223 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
+- checked exception 已在 throw、调用、构造器委托和 override 边界校验 `throws` 传播；multi-catch 会检查
+  备选类型关系与可达性，自定义 checked exception 会保留继承、message、cause 和动态 `toString`；
+- `Throwable.getMessage/getCause/toString` 与 `AutoCloseable.close` 通过 builtin 虚槽进入用户 override；
+  try-with-resources 会按 Java 顺序初始化、逆序关闭，并在关闭失败时保留主异常和 suppressed 链；
+- `Scanner` 已实现幂等 `close`，关闭后继续读取会抛 `IllegalStateException`；文件、网络等资源仍不开放，
+  资源语法只接受用户 `AutoCloseable` 和 allowlist 内的受控资源；
+- 完整 `jsNodeTest` 共 228 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
   字符串左结合、泛型接口/default 分派、Object 虚方法、循环跳转、增强 `for`、switch 与异常流；
-- checked exception、multi-catch、try-with-resources、自定义异常完整 API、多维数组运行、lambda、
-  方法引用、enum、long 与浮点完整语义仍按上述第 2～8 批继续实现。
+- 多维数组运行、lambda、方法引用、enum、long 与浮点完整语义仍按上述第 3～8 批继续实现。
 
 ### 阶段 2B：精选类库与宿主桥
 

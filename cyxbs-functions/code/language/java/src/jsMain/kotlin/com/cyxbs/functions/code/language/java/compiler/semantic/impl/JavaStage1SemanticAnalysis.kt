@@ -46,6 +46,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     linkedMapOf<JavaSymbolId, Map<JavaVirtualSlotId, JavaSymbolId>>()
   private val constructorDelegations =
     linkedMapOf<JavaSymbolId, JavaConstructorDelegation>()
+  private val catchTypes = linkedMapOf<JavaNodeId, List<JavaSemanticType.Declared>>()
+  private val resourceCloseBindings = linkedMapOf<JavaNodeId, JavaResourceCloseBinding>()
 
   private val typesByQualifiedName = linkedMapOf<String, S1TypeInfo>()
   private val typesByNode = linkedMapOf<JavaNodeId, S1TypeInfo>()
@@ -73,6 +75,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val enhancedForBindings = linkedMapOf<JavaNodeId, JavaEnhancedForBinding>()
   private val switchesCompletingNormally = mutableSetOf<JavaNodeId>()
   private val triesCompletingNormally = mutableSetOf<JavaNodeId>()
+  /** 仅在分析 try 主体时生效；catch/finally 不会错误继承同一捕获范围。 */
+  private val activeCatchScopes = mutableListOf<List<JavaSemanticType.Declared>>()
 
   /** 执行全部语义遍次；错误结果不会泄露含恢复类型的半成品模型。 */
   fun analyze(): JavaCompilerPhaseResult<JavaSemanticModel> {
@@ -301,7 +305,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       visibility = JavaVisibility.PUBLIC,
       isStatic = if (descriptor.isConstructor) false else descriptor.isStatic,
       isFinal = if (descriptor.isConstructor) false else descriptor.isFinal,
-      isAbstract = false,
+      isAbstract = descriptor.isAbstract,
       erasedSignatureKey = erasedSignatureKey(descriptor.name, parameterTypes),
       erasedDescriptor = erasedMethodDescriptor(
         kind,
@@ -311,6 +315,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       isSynthetic = true,
       isBuiltin = true,
       isBuiltinVirtualRoot = descriptor.isVirtualRoot,
+      thrownTypes = descriptor.thrownTypes.map { it.toSemanticType(owner) }
+        .mapNotNull { it as? JavaSemanticType.Declared },
     )
     val siblings = if (descriptor.isConstructor) {
       constructorsByOwner.getOrPut(owner.symbol) { mutableListOf() }
@@ -529,8 +535,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       } ?: objectSemanticType()
       type.directSuperClass = superType as? JavaSemanticType.Declared
       val selectedParent = type.directSuperClass?.symbol?.let(::typeInfo)
+      val selectedBuiltinParent = selectedParent?.let { parent ->
+        JavaBuiltinLibrary.types.firstOrNull { it.qualifiedName == parent.qualifiedName }
+      }
       if (selectedParent != null && JavaBuiltinLibrary.types.any { descriptor ->
-          descriptor.qualifiedName == selectedParent.qualifiedName && descriptor.isInterfaceFacade
+          descriptor.qualifiedName == selectedParent.qualifiedName &&
+            descriptor.isInterfaceFacade && !descriptor.allowsUserImplementation
         }
       ) {
         error(
@@ -545,6 +555,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       if (selectedParent?.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
         error(declaration.superClass?.span ?: declaration.span, "java.semantic.interface_as_superclass", "class 不能通过 extends 继承 interface。")
       }
+      if (selectedBuiltinParent?.allowsUserImplementation == true && declaration.superClass != null) {
+        error(declaration.superClass.span, "java.semantic.interface_as_superclass", "受控接口只能通过 implements 实现。")
+      }
       type.directInterfaces += declaration.interfaces.mapNotNull { reference ->
         val resolved = resolveType(reference, type.unit, type.typeParameterNames, allowVoid = false)
         val declared = resolved as? JavaSemanticType.Declared
@@ -555,11 +568,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           return@mapNotNull null
         }
         val target = typeInfo(declared.symbol)
-        if (target?.kind != JavaSemanticTypeDeclarationKind.INTERFACE) {
+        val builtinDescriptor = target?.let { targetType ->
+          JavaBuiltinLibrary.types.firstOrNull { it.qualifiedName == targetType.qualifiedName }
+        }
+        if (target?.kind != JavaSemanticTypeDeclarationKind.INTERFACE &&
+          builtinDescriptor?.allowsUserImplementation != true
+        ) {
           error(reference.span, "java.semantic.not_an_interface", "implements/extends interface 只能指向 interface。")
         }
         if (target != null && JavaBuiltinLibrary.types.any { descriptor ->
-            descriptor.qualifiedName == target.qualifiedName && descriptor.isInterfaceFacade
+            descriptor.qualifiedName == target.qualifiedName &&
+              descriptor.isInterfaceFacade && !descriptor.allowsUserImplementation
           }
         ) {
           error(
@@ -786,6 +805,18 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       }
       resolveType(parameter.type, owner.unit, typeScope, allowVoid = false)
     }
+    val declaredThrownTypes = (methodDeclaration?.thrownTypes ?: constructorDeclaration!!.thrownTypes)
+      .mapNotNull { reference ->
+        val resolved = resolveType(reference, owner.unit, typeScope, allowVoid = false)
+        val declared = resolved as? JavaSemanticType.Declared
+        val throwable = typesByQualifiedName["java.lang.Throwable"]?.selfType()
+        if (declared == null || throwable == null || !relations().isSubtype(declared, throwable)) {
+          if (resolved != JavaSemanticType.Error) {
+            error(reference.span, "java.semantic.throws_not_throwable", "throws 中的类型必须继承 Throwable。")
+          }
+          null
+        } else declared
+      }
     val parameterSymbols = parameterNodes.zip(parameterTypes).map { (parameter, type) ->
       symbol(
         JavaSymbolKind.PARAMETER,
@@ -821,6 +852,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         isInterfaceMethod && methodDeclaration.body == null,
       erasedSignatureKey = erasedSignatureKey,
       erasedDescriptor = erasedDescriptor,
+      thrownTypes = declaredThrownTypes,
     )
     validateCallableShape(info)
     val siblings = if (kind == JavaSemanticCallableKind.METHOD) {
@@ -1003,6 +1035,15 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
               "java.semantic.override_return_type_mismatch",
               "override 方法返回类型必须相同或协变。",
             )
+          }
+          method.thrownTypes.filter(::isCheckedException).forEach { thrown ->
+            if (parent.thrownTypes.none { inherited -> relations().isSubtype(thrown, inherited) }) {
+              error(
+                method.span,
+                "java.semantic.override_checked_exception_broadened",
+                "override 方法不能新增或扩大父方法未声明的受检异常。",
+              )
+            }
           }
         }
         if (annotation && overridden.isEmpty()) {
@@ -1289,6 +1330,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       callable.span,
       invocationNode = null,
     ) ?: return
+    validateCallableThrows(target.info, callable.span)
     constructorDelegations[callable.symbol] = JavaConstructorDelegation(
       callable.symbol,
       target.info.symbol,
@@ -1321,6 +1363,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaReceiverKind.NONE,
       virtualSlot = null,
     )
+    validateCallableThrows(target.info, invocation.span)
     resolved[invocation.nodeId] = target.info.symbol
     constructorDelegations[source.symbol] = JavaConstructorDelegation(
       source.symbol,
@@ -1513,7 +1556,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** throw 只接受 Throwable 引用或 null；checked exception 的 throws 校验在下一批完成。 */
+  /** throw 只接受 Throwable 引用或 null，并立即校验受检异常是否已被捕获或声明。 */
   private fun analyzeThrow(statement: JavaAstStatement.Throw) {
     val type = analyzeExpression(statement.expression)
     val throwable = checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
@@ -1526,6 +1569,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         "throw 表达式必须是 Throwable 或 null。",
       )
     }
+    (type as? JavaSemanticType.Declared)?.let { validateCheckedException(it, statement.expression.span) }
   }
 
   /**
@@ -1536,35 +1580,28 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
    */
   private fun analyzeTry(statement: JavaAstStatement.Try) {
     val entry = currentFlowState()
-    analyzeStatement(statement.body)
-    val normalExits = mutableListOf<S1FlowState>()
-    if (canCompleteNormally(statement.body)) normalExits += currentFlowState()
-
-    val throwable = checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
     val previousCatchTypes = mutableListOf<JavaSemanticType.Declared>()
-    statement.catches.forEach { clause ->
-      replaceFlowState(entry)
-      val catchType = resolveType(
-        clause.type,
-        context().unit,
-        currentTypeParameterScope(),
-        allowVoid = false,
-      )
-      val declared = catchType as? JavaSemanticType.Declared
-      if (declared == null || !relations().isSubtype(declared, throwable)) {
-        if (catchType != JavaSemanticType.Error) {
-          error(clause.type.span, "java.semantic.catch_not_throwable", "catch 参数类型必须继承 Throwable。")
-        }
-      } else {
-        if (previousCatchTypes.any { previous -> relations().isSubtype(declared, previous) }) {
-          error(
-            clause.type.span,
-            "java.semantic.unreachable_catch",
-            "该 catch 已被前面的父类型 catch 覆盖。",
-          )
-        }
-        previousCatchTypes += declared
+    val resolvedCatches = statement.catches.map { clause ->
+      resolveCatchTypes(clause, previousCatchTypes).also(previousCatchTypes::addAll)
+    }
+    val caughtByThisTry = resolvedCatches.flatten()
+    val normalExits = mutableListOf<S1FlowState>()
+
+    activeCatchScopes += caughtByThisTry
+    try {
+      withScope {
+        statement.resources.forEach(::analyzeResource)
+        analyzeStatement(statement.body)
+        if (canCompleteNormally(statement.body)) normalExits += currentFlowState()
       }
+    } finally {
+      activeCatchScopes.removeAt(activeCatchScopes.lastIndex)
+    }
+
+    statement.catches.zip(resolvedCatches).forEach { (clause, declaredTypes) ->
+      replaceFlowState(entry)
+      val catchType = declaredTypes.singleOrNull()
+        ?: checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
       withScope {
         val symbol = declareLocal(
           JavaSymbolKind.PARAMETER,
@@ -1575,7 +1612,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           catchType,
         )
         definitelyAssigned += symbol
-        if (JavaAstModifier.FINAL in clause.modifiers) finalSymbols += symbol
+        if (declaredTypes.size > 1 || JavaAstModifier.FINAL in clause.modifiers) finalSymbols += symbol
         analyzeStatement(clause.body)
       }
       if (canCompleteNormally(clause.body)) normalExits += currentFlowState()
@@ -1598,6 +1635,142 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     if (normalExits.isNotEmpty() && canCompleteNormally(finallyBlock)) {
       triesCompletingNormally += statement.nodeId
     }
+  }
+
+  /** 解析并校验一个 catch 的全部备选类型，同时冻结 multi-catch side table。 */
+  private fun resolveCatchTypes(
+    clause: JavaAstCatchClause,
+    previousCatchTypes: List<JavaSemanticType.Declared>,
+  ): List<JavaSemanticType.Declared> {
+    val throwable = checkNotNull(typesByQualifiedName["java.lang.Throwable"]).selfType()
+    val resolvedTypes = clause.types.mapNotNull { reference ->
+      val resolved = resolveType(
+        reference,
+        context().unit,
+        currentTypeParameterScope(),
+        allowVoid = false,
+      )
+      val declared = resolved as? JavaSemanticType.Declared
+      if (declared == null || !relations().isSubtype(declared, throwable)) {
+        if (resolved != JavaSemanticType.Error) {
+          error(reference.span, "java.semantic.catch_not_throwable", "catch 参数类型必须继承 Throwable。")
+        }
+        null
+      } else declared
+    }
+    resolvedTypes.forEachIndexed { index, current ->
+      if (resolvedTypes.take(index).any { other ->
+          relations().isSubtype(current, other) || relations().isSubtype(other, current)
+        }
+      ) {
+        error(
+          clause.types[index].span,
+          "java.semantic.invalid_multi_catch_alternatives",
+          "multi-catch 的备选异常类型不能存在父子关系。",
+        )
+      }
+      if (previousCatchTypes.any { prior -> relations().isSubtype(current, prior) }) {
+        error(
+          clause.types[index].span,
+          "java.semantic.unreachable_catch",
+          "该 catch 已被前面的父类型 catch 覆盖。",
+        )
+      }
+    }
+    catchTypes[clause.nodeId] = resolvedTypes
+    return resolvedTypes
+  }
+
+  /**
+   * 分析 Java 8 资源声明并选择确定的 close() 分派。
+   *
+   * 资源按源码顺序进入同一词法作用域，前一个资源对后一个 initializer 可见；每个资源都隐式 final。
+   */
+  private fun analyzeResource(resource: JavaAstResource) {
+    val declaredType = resolveType(
+      resource.type,
+      context().unit,
+      currentTypeParameterScope(),
+      allowVoid = false,
+    )
+    val initializerType = analyzeExpression(resource.initializer)
+    val initializerConversion = compatibility(initializerType, declaredType)
+    if (initializerConversion != null) {
+      conversions[resource.initializer.nodeId] = initializerConversion
+    } else if (initializerType != JavaSemanticType.Error && declaredType != JavaSemanticType.Error) {
+      error(resource.initializer.span, "java.semantic.resource_type_mismatch", "资源 initializer 不能赋值给声明类型。")
+    }
+    val local = declareLocal(
+      JavaSymbolKind.LOCAL_VARIABLE,
+      resource.name,
+      context().callable?.symbol ?: context().owner.symbol,
+      resource.nodeId,
+      resource.nameSpan,
+      declaredType,
+    )
+    definitelyAssigned += local
+    finalSymbols += local
+
+    val declared = declaredType as? JavaSemanticType.Declared
+    val autoCloseable = checkNotNull(typesByQualifiedName["java.lang.AutoCloseable"]).selfType()
+    if (declared == null || !relations().isSubtype(declared, autoCloseable)) {
+      if (declaredType != JavaSemanticType.Error) {
+        error(resource.type.span, "java.semantic.resource_not_auto_closeable", "资源类型必须实现 AutoCloseable。")
+      }
+      return
+    }
+    val candidates = methodCandidates(declared, "close")
+      .filter { it.info.parameterTypes.isEmpty() && isCallableAccessible(it.info) }
+    val selected = instantiateApplicablePhase(candidates, emptyList(), emptyList()).singleOrNull()
+    if (selected == null) {
+      error(resource.span, "java.semantic.resource_close_unresolved", "资源类型必须提供唯一可访问的无参数 close()。")
+      return
+    }
+    val dispatch = when {
+      selected.info.isBuiltinVirtualRoot -> JavaDispatchKind.INTERFACE
+      selected.info.isBuiltin -> JavaDispatchKind.SPECIAL
+      selected.info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE -> JavaDispatchKind.INTERFACE
+      else -> JavaDispatchKind.VIRTUAL
+    }
+    val binding = selected.binding(
+      dispatch,
+      JavaReceiverKind.EXPLICIT,
+      if (dispatch == JavaDispatchKind.VIRTUAL || dispatch == JavaDispatchKind.INTERFACE) {
+        virtualSlots[selected.info.symbol]
+      } else null,
+    )
+    resourceCloseBindings[resource.nodeId] = JavaResourceCloseBinding(local, binding)
+    validateCallableThrows(selected.info, resource.span)
+  }
+
+  /** RuntimeException 与 Error 家族无需 throws；其余 Throwable 均按受检异常处理。 */
+  private fun isCheckedException(type: JavaSemanticType.Declared): Boolean {
+    val runtimeException = checkNotNull(typesByQualifiedName["java.lang.RuntimeException"]).selfType()
+    val errorType = checkNotNull(typesByQualifiedName["java.lang.Error"]).selfType()
+    return !relations().isSubtype(type, runtimeException) && !relations().isSubtype(type, errorType)
+  }
+
+  /** 校验单个可能传播的异常是否被当前 try 捕获，或由所在 callable 的 throws 声明继续传播。 */
+  private fun validateCheckedException(type: JavaSemanticType.Declared, span: JavaSourceSpan) {
+    if (!isCheckedException(type)) return
+    val caught = activeCatchScopes.asReversed().any { scopeTypes ->
+      scopeTypes.any { catchType -> relations().isSubtype(type, catchType) }
+    }
+    val declared = context().callable?.thrownTypes.orEmpty().any { thrown ->
+      relations().isSubtype(type, thrown)
+    }
+    if (!caught && !declared) {
+      error(
+        span,
+        "java.semantic.unhandled_checked_exception",
+        "受检异常必须由当前 try/catch 捕获，或在 callable 的 throws 中声明。",
+      )
+    }
+  }
+
+  /** 把选中 callable 声明的每个异常应用到当前调用点的受检异常规则。 */
+  private fun validateCallableThrows(callable: S1CallableInfo, span: JavaSourceSpan) {
+    callable.thrownTypes.forEach { validateCheckedException(it, span) }
   }
 
   /** 增强 for 首批覆盖数组及 builtin List/Set；用户 Iterable 等待通用接口库补齐。 */
@@ -2444,6 +2617,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         null
       },
     )
+    validateCallableThrows(selected.info, expression.span)
     return selected.returnType
   }
 
@@ -2502,6 +2676,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       JavaReceiverKind.NONE,
       virtualSlot = null,
     )
+    validateCallableThrows(selected.info, expression.span)
     resolved[named.nodeId] = owner.symbol
     return createdType
   }
@@ -3767,6 +3942,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         wrapperPrimitiveTypes.toMap(),
         interfaceDefaultMethods.toMap(),
         enhancedForBindings.toMap(),
+        catchTypes.toMap(),
+        resourceCloseBindings.toMap(),
       ),
       diagnostics,
     )
@@ -3884,6 +4061,8 @@ private data class S1CallableInfo(
   val isBuiltin: Boolean = false,
   /** Object.equals/hashCode/toString 作为虚方法根，源码 override 必须继承它的槽位。 */
   val isBuiltinVirtualRoot: Boolean = false,
+  /** 该 callable 声明可能传播的异常；调用点据此执行 checked exception 校验。 */
+  val thrownTypes: List<JavaSemanticType.Declared> = emptyList(),
 ) {
   val span: JavaSourceSpan get() = declaration?.span ?: owner.span
 
@@ -3901,6 +4080,7 @@ private data class S1CallableInfo(
     isFinal,
     isAbstract,
     erasedDescriptor,
+    thrownTypes,
   )
 }
 

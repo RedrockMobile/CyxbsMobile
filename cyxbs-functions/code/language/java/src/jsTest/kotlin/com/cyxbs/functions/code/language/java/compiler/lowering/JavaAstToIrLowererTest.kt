@@ -934,8 +934,14 @@ class JavaAstToIrLowererTest {
     is JavaIrStatement.Throw -> builtinOperations(statement.expression)
     is JavaIrStatement.Try -> builtinOperations(statement.body) +
       statement.catches.flatMap { builtinOperations(it.body) } +
-      statement.finallyBlock?.let(::builtinOperations).orEmpty()
+      statement.finallyBlock?.let(::builtinOperations).orEmpty() +
+      statement.resources.flatMap { resource ->
+        builtinOperations(resource.initializer) + builtinOperations(resource.closeExpression)
+      }
     is JavaIrStatement.ConstructorInvocation -> statement.arguments.flatMap(::builtinOperations)
+    is JavaIrStatement.InitializeException ->
+      statement.message?.let(::builtinOperations).orEmpty() +
+        statement.cause?.let(::builtinOperations).orEmpty()
   }
 
   /** 按 IR 求值结构递归读取 operation；测试只关心 builtin 节点，普通叶子返回空集合。 */
@@ -953,6 +959,8 @@ class JavaAstToIrLowererTest {
     is JavaIrExpression.InvokeSpecial -> builtinOperations(expression.receiver) +
       expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.InvokeVirtual -> builtinOperations(expression.receiver) +
+      expression.arguments.flatMap(::builtinOperations)
+    is JavaIrExpression.InvokeVirtualSlot -> builtinOperations(expression.receiver) +
       expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.NewObject -> expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.NewArray -> builtinOperations(expression.length)

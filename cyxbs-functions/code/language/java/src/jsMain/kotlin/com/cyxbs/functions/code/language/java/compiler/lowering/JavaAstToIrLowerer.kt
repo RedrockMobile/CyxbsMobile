@@ -3,6 +3,7 @@ package com.cyxbs.functions.code.language.java.compiler.lowering
 import com.cyxbs.functions.code.language.java.compiler.JavaIrLowerer
 import com.cyxbs.functions.code.language.java.compiler.ast.*
 import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinMemberDescriptor
+import com.cyxbs.functions.code.language.java.compiler.builtin.JavaBuiltinOperation
 import com.cyxbs.functions.code.language.java.compiler.diagnostic.*
 import com.cyxbs.functions.code.language.java.compiler.ir.*
 import com.cyxbs.functions.code.language.java.compiler.semantic.*
@@ -163,7 +164,28 @@ private class JavaLowering(val model: JavaSemanticModel) {
         JavaIrTypeDeclarationKind.CLASS
       },
       defaults,
+      exceptionSuperQualifiedName(declaration, source.span),
     )
+  }
+
+  /** 源码异常类保留直接异常父类名称，供 JS catch 匹配与自定义异常层级注册。 */
+  private fun exceptionSuperQualifiedName(
+    declaration: JavaSemanticTypeDeclaration,
+    span: JavaSourceSpan,
+  ): String? {
+    val throwable = model.typeDeclarations.values.singleOrNull {
+      it.kind == JavaSemanticTypeDeclarationKind.BUILTIN && it.qualifiedName == "java.lang.Throwable"
+    } ?: return null
+    val self = JavaSemanticType.Declared(declaration.symbol, emptyList())
+    if (relations?.isSubtype(
+        self,
+        JavaSemanticType.Declared(throwable.symbol, emptyList()),
+      ) != true
+    ) return null
+    val parent = declaration.directSuperClass
+      ?: return invalid("A source exception must have a direct superclass.", span)
+    return model.typeDeclarations[parent.symbol]?.qualifiedName
+      ?: invalid("A source exception parent declaration is missing.", span)
   }
 
   /** Object 不进入用户类列表并作为运行时根；泛型父类先擦除。 */
@@ -175,6 +197,11 @@ private class JavaLowering(val model: JavaSemanticModel) {
     val erased = erase(source, span) as? JavaSemanticType.Declared ?: return null
     if (erased.symbol == objectSymbol) return null
     if (sourceTypes[erased.symbol] == null) {
+      // builtin Throwable 家族由异常 runtime 承担，不生成普通 class prototype 父边。
+      val parent = model.typeDeclarations[erased.symbol]
+      if (parent?.kind == JavaSemanticTypeDeclarationKind.BUILTIN &&
+        parent.qualifiedName in setOf("java.lang.Throwable", "java.lang.Exception", "java.lang.Error")
+      ) return null
       invalid("Superclass is not an emitted source class.", span)
       return null
     }
@@ -407,13 +434,36 @@ private class BodyLowering(
         if (target?.kind != JavaSemanticCallableKind.CONSTRUCTOR) {
           lowering.invalid("Constructor delegation target is invalid.", span)
         } else {
-          statements += JavaIrStatement.ConstructorInvocation(
-            if (delegation.kind == JavaConstructorDelegationKind.THIS) {
-              JavaIrConstructorInvocationKind.THIS
-            } else JavaIrConstructorInvocationKind.SUPER,
-            JavaIrMethodId(delegation.targetConstructor.value), arguments,
-            sourceInvocation?.span ?: span,
-          )
+          val builtin = lowering.model.builtinMembers[delegation.targetConstructor]
+          if (builtin is JavaBuiltinMemberDescriptor.Callable) {
+            if (delegation.kind != JavaConstructorDelegationKind.SUPER) {
+              lowering.invalid("A builtin exception constructor can only be invoked through super.", span)
+            } else {
+              val expectedCount = when (builtin.operation) {
+                JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY -> 0
+                JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING -> 1
+                JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING_CAUSE -> 2
+                else -> -1
+              }
+              if (expectedCount < 0 || arguments.size != expectedCount) {
+                lowering.invalid("Unsupported builtin superclass constructor delegation.", span)
+              } else {
+                statements += JavaIrStatement.InitializeException(
+                  arguments.getOrNull(0),
+                  arguments.getOrNull(1),
+                  sourceInvocation?.span ?: span,
+                )
+              }
+            }
+          } else {
+            statements += JavaIrStatement.ConstructorInvocation(
+              if (delegation.kind == JavaConstructorDelegationKind.THIS) {
+                JavaIrConstructorInvocationKind.THIS
+              } else JavaIrConstructorInvocationKind.SUPER,
+              JavaIrMethodId(delegation.targetConstructor.value), arguments,
+              sourceInvocation?.span ?: span,
+            )
+          }
         }
       }
     }
@@ -447,6 +497,7 @@ private class BodyLowering(
         entry.statements.forEach(::collectLocals)
       }
       is JavaAstStatement.Try -> {
+        statement.resources.forEach { resource -> registerResourceLocal(resource) }
         collectLocals(statement.body)
         statement.catches.forEach { clause ->
           registerCatchLocal(clause)
@@ -455,6 +506,14 @@ private class BodyLowering(
         statement.finallyBlock?.let(::collectLocals)
       }
       else -> Unit
+    }
+  }
+
+  /** resource 声明和普通 local 使用同一套稳定 symbol/local id。 */
+  private fun registerResourceLocal(source: JavaAstResource) {
+    val symbol = lowering.declaration(source.nodeId, source.span, JavaSymbolKind.LOCAL_VARIABLE) ?: return
+    if (localBySymbol[symbol.id] == null) {
+      createLocal(symbol.id, symbol.name, symbol.type, false, source.span)
     }
   }
 
@@ -526,7 +585,7 @@ private class BodyLowering(
     is JavaAstStatement.Empty -> emptyList()
   }
 
-  /** try/catch/finally 原样降低，catch 类型与参数局部只消费语义声明。 */
+  /** try/catch/finally 与资源关闭协议只消费语义 side table，不重新做类型或成员查找。 */
   private fun lowerTry(statement: JavaAstStatement.Try): List<JavaIrStatement> {
     val catches = statement.catches.map { clause ->
       val symbol = lowering.declaration(
@@ -536,9 +595,26 @@ private class BodyLowering(
       ) ?: return emptyList()
       val local = localBySymbol[symbol.id]
         ?: return invalid("Catch parameter is missing its IR local.", clause.parameterSpan).let { emptyList() }
-      val type = lowering.typeOf(symbol.type, clause.type.span) as? JavaIrType.Reference
-        ?: return invalid("Catch parameter must lower to a reference type.", clause.type.span).let { emptyList() }
-      JavaIrCatchClause(type, local.id, lowerBlock(clause.body), clause.span)
+      val semanticTypes = lowering.model.catchTypes[clause.nodeId]
+        ?: return invalid("Catch clause is missing its resolved exception types.", clause.span).let { emptyList() }
+      val types = semanticTypes.mapNotNull { type ->
+        lowering.typeOf(type, clause.type.span) as? JavaIrType.Reference
+      }
+      if (types.size != semanticTypes.size || types.isEmpty()) {
+        return invalid("Catch alternatives must lower to reference types.", clause.type.span).let { emptyList() }
+      }
+      JavaIrCatchClause(types.first(), local.id, lowerBlock(clause.body), clause.span, types.drop(1))
+    }
+    val resources = statement.resources.map { resource ->
+      val binding = lowering.model.resourceCloseBindings[resource.nodeId]
+        ?: return invalid("Resource is missing its close binding.", resource.span).let { emptyList() }
+      val local = localBySymbol[binding.localSymbol]
+        ?: return invalid("Resource is missing its IR local.", resource.span).let { emptyList() }
+      val initializer = expression(resource.initializer) ?: return emptyList()
+      val receiver = JavaIrExpression.GetLocal(local.id, local.type, resource.span)
+      val closeExpression = invocation(binding.closeCallable, receiver, emptyList(), resource.span)
+        ?: return emptyList()
+      JavaIrResource(local.id, initializer, closeExpression, resource.span)
     }
     return listOf(
       JavaIrStatement.Try(
@@ -546,6 +622,7 @@ private class BodyLowering(
         catches,
         statement.finallyBlock?.let(::lowerBlock),
         statement.span,
+        resources,
       ),
     )
   }
@@ -869,7 +946,12 @@ private class BodyLowering(
         }
         val local = localBySymbol[binding.symbol]
           ?: return invalid("Value access references an unknown local.", source.span)
-        if (local.isParameter != (binding.kind == JavaValueAccessKind.PARAMETER)) {
+        // catch 参数在 semantic 中仍是 PARAMETER，但 IR 必须把它放进 locals，交给 catch 入口赋值；
+        // 因此这里只校验“是否为 callable 形参”，不能把所有 PARAMETER binding 都当作方法形参。
+        val isCallableParameter = binding.symbol in callable?.parameters.orEmpty()
+        if (local.isParameter != isCallableParameter ||
+          (binding.kind == JavaValueAccessKind.LOCAL && isCallableParameter)
+        ) {
           return invalid("Value access kind does not match local declaration kind.", source.span)
         }
         JavaIrExpression.GetLocal(local.id, type, source.span)
@@ -1086,13 +1168,72 @@ private class BodyLowering(
     ) {
       return invalid("Builtin call argument count is inconsistent.", source.span)
     }
-    return JavaIrExpression.InvokeBuiltin(
-      builtin.operation,
-      runtimeReceiver,
-      arguments,
-      type,
-      source.span,
+    return if (builtin.isVirtualRoot) {
+      JavaIrExpression.InvokeVirtualSlot(
+        builtin.operation,
+        checkNotNull(runtimeReceiver),
+        binding.virtualSlot?.value ?: return invalid("Builtin virtual call is missing its slot.", source.span),
+        arguments,
+        type,
+        source.span,
+      )
+    } else JavaIrExpression.InvokeBuiltin(
+      builtin.operation, runtimeReceiver, arguments, type, source.span,
     )
+  }
+
+  /**
+   * 为 try-with-resources 等合成调用降低已决议 callable。
+   *
+   * 这里没有对应的 MethodInvocation AST，因此 receiver 和参数由调用方显式提供；目标身份、
+   * 分派种类与虚槽仍完全取自 semantic binding。
+   */
+  private fun invocation(
+    binding: JavaCallableBinding,
+    receiver: JavaIrExpression,
+    arguments: List<JavaIrExpression>,
+    span: JavaSourceSpan,
+  ): JavaIrExpression? {
+    val declaration = lowering.model.callableDeclarations[binding.symbol]
+      ?: return invalid("Synthetic call is missing its declaration.", span)
+    if (arguments.size != binding.parameterTypes.size ||
+      declaration.erasedDescriptor != binding.erasedDescriptor
+    ) return invalid("Synthetic call binding is inconsistent.", span)
+    val type = lowering.typeOf(binding.returnType, span) ?: return null
+    val builtin = lowering.model.builtinMembers[binding.symbol]
+    if (builtin is JavaBuiltinMemberDescriptor.Callable) {
+      if (builtin.isStatic || binding.receiverKind !in setOf(
+          JavaReceiverKind.EXPLICIT,
+          JavaReceiverKind.IMPLICIT_THIS,
+          JavaReceiverKind.SUPER,
+        )
+      ) return invalid("Synthetic builtin instance call has an invalid receiver.", span)
+      return if (builtin.isVirtualRoot) {
+        JavaIrExpression.InvokeVirtualSlot(
+          builtin.operation,
+          receiver,
+          binding.virtualSlot?.value ?: return invalid("Synthetic virtual call is missing its slot.", span),
+          arguments,
+          type,
+          span,
+        )
+      } else JavaIrExpression.InvokeBuiltin(builtin.operation, receiver, arguments, type, span)
+    }
+    val method = JavaIrMethodId(binding.symbol.value)
+    return when (binding.dispatch) {
+      JavaDispatchKind.SPECIAL -> JavaIrExpression.InvokeSpecial(receiver, method, arguments, type, span)
+      JavaDispatchKind.VIRTUAL,
+      JavaDispatchKind.INTERFACE,
+      -> JavaIrExpression.InvokeVirtual(
+        receiver,
+        method,
+        binding.virtualSlot?.value ?: return invalid("Synthetic virtual call is missing its slot.", span),
+        arguments,
+        type,
+        span,
+      )
+      JavaDispatchKind.STATIC -> invalid("Resource close cannot be static.", span)
+    }
   }
 
   /** new 的 owner 和 constructor id 都来自 semantic binding/result type。 */

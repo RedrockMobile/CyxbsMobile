@@ -181,6 +181,8 @@ internal data class JavaSemanticCallableDeclaration(
   val isFinal: Boolean,
   val isAbstract: Boolean,
   val erasedDescriptor: String,
+  /** callable 可能向调用方传播的受检或非受检异常，已完成类型名称解析。 */
+  val thrownTypes: List<JavaSemanticType.Declared> = emptyList(),
 ) {
   init {
     require(typeParameters.distinct().size == typeParameters.size) {
@@ -203,6 +205,17 @@ internal data class JavaSemanticCallableDeclaration(
     }
   }
 }
+
+/**
+ * try-with-resources 中单个资源的确定关闭协议。
+ *
+ * [localSymbol] 是资源声明生成的 final 局部变量；[closeCallable] 已完成动态分派与虚槽选择，
+ * lowering 不得再次按 `close` 名称查找成员。
+ */
+internal data class JavaResourceCloseBinding(
+  val localSymbol: JavaSymbolId,
+  val closeCallable: JavaCallableBinding,
+)
 
 /** 一次编译内稳定的虚方法槽编号；编号不应跨编译请求持久化。 */
 internal data class JavaVirtualSlotId(val value: Int) {
@@ -446,6 +459,10 @@ internal data class JavaSemanticModel(
     Map<JavaSymbolId, Map<JavaVirtualSlotId, JavaSymbolId>> = emptyMap(),
   /** EnhancedFor statement node 到已验证迭代协议的绑定。 */
   val enhancedForBindings: Map<JavaNodeId, JavaEnhancedForBinding> = emptyMap(),
+  /** multi-catch clause node 到按源码顺序解析后的全部异常类型。 */
+  val catchTypes: Map<JavaNodeId, List<JavaSemanticType.Declared>> = emptyMap(),
+  /** 资源 AST node 到已验证的 final 局部变量和 close() 分派。 */
+  val resourceCloseBindings: Map<JavaNodeId, JavaResourceCloseBinding> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

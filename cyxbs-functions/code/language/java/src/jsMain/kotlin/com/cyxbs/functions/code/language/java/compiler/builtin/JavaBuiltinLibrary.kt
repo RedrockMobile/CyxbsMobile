@@ -38,7 +38,9 @@ internal enum class JavaBuiltinTypeRole(val boxedPrimitive: JavaAstPrimitiveType
   HASH_MAP,
   ITERATOR,
   SCANNER,
+  AUTO_CLOSEABLE,
   THROWABLE,
+  ERROR,
   EXCEPTION,
   RUNTIME_EXCEPTION,
   ILLEGAL_ARGUMENT_EXCEPTION,
@@ -141,10 +143,17 @@ internal enum class JavaBuiltinOperation {
   SCANNER_NEXT_INT,
   SCANNER_HAS_NEXT_LINE,
   SCANNER_NEXT_LINE,
+  SCANNER_CLOSE,
+
+  THROWABLE_GET_MESSAGE,
+  THROWABLE_GET_CAUSE,
+  THROWABLE_TO_STRING,
+  AUTO_CLOSEABLE_CLOSE,
 
   /** 异常构造器共享行为，实际 Java 类型由 ConstructBuiltin 的 result role 决定。 */
   EXCEPTION_CONSTRUCT_EMPTY,
   EXCEPTION_CONSTRUCT_STRING,
+  EXCEPTION_CONSTRUCT_STRING_CAUSE,
 }
 
 /** catalog 中与一次编译 symbol 编号无关的类型引用。 */
@@ -176,6 +185,8 @@ internal data class JavaBuiltinTypeDescriptor(
   val directSuperArguments: List<JavaBuiltinTypeReference> = emptyList(),
   /** facade 只参与声明/继承成员代换，不允许 new，也不向用户开放 extends/implements。 */
   val isInterfaceFacade: Boolean = false,
+  /** AutoCloseable 等受控接口允许用户类型实现，但仍不允许直接构造。 */
+  val allowsUserImplementation: Boolean = false,
 )
 
 /**
@@ -213,6 +224,10 @@ internal sealed interface JavaBuiltinMemberDescriptor {
     val isConstructor: Boolean = false,
     /** true 时作为 Object 虚方法族的根参与 override 与动态分派。 */
     val isVirtualRoot: Boolean = false,
+    /** builtin 抽象契约没有 JS 函数体，只能经用户 override 或受控实现分派。 */
+    val isAbstract: Boolean = false,
+    /** 声明可能传播的异常类型，供 checked exception 校验使用。 */
+    val thrownTypes: List<JavaBuiltinTypeReference> = emptyList(),
     override val operation: JavaBuiltinOperation,
     override val compatibility: JavaBuiltinCompatibility,
   ) : JavaBuiltinMemberDescriptor
@@ -233,6 +248,7 @@ internal object JavaBuiltinLibrary {
   private val stringType = JavaBuiltinTypeReference.Declared("java.lang.String")
   private val printStreamType = JavaBuiltinTypeReference.Declared("java.io.PrintStream")
   private val inputStreamType = JavaBuiltinTypeReference.Declared("java.io.InputStream")
+  private val throwableType = JavaBuiltinTypeReference.Declared("java.lang.Throwable")
   private val booleanBoxType = JavaBuiltinTypeReference.Declared("java.lang.Boolean")
   private val byteBoxType = JavaBuiltinTypeReference.Declared("java.lang.Byte")
   private val shortBoxType = JavaBuiltinTypeReference.Declared("java.lang.Short")
@@ -321,8 +337,17 @@ internal object JavaBuiltinLibrary {
       typeParameters = listOf("E"), isInterfaceFacade = true,
     ),
     JavaBuiltinTypeDescriptor("java.io.InputStream", "java.lang.Object", false, JavaBuiltinTypeRole.INPUT_STREAM),
-    JavaBuiltinTypeDescriptor("java.util.Scanner", "java.lang.Object", true, JavaBuiltinTypeRole.SCANNER),
+    JavaBuiltinTypeDescriptor(
+      "java.lang.AutoCloseable",
+      "java.lang.Object",
+      isFinal = false,
+      role = JavaBuiltinTypeRole.AUTO_CLOSEABLE,
+      isInterfaceFacade = true,
+      allowsUserImplementation = true,
+    ),
+    JavaBuiltinTypeDescriptor("java.util.Scanner", "java.lang.AutoCloseable", true, JavaBuiltinTypeRole.SCANNER),
     JavaBuiltinTypeDescriptor("java.lang.Throwable", "java.lang.Object", false, JavaBuiltinTypeRole.THROWABLE),
+    JavaBuiltinTypeDescriptor("java.lang.Error", "java.lang.Throwable", false, JavaBuiltinTypeRole.ERROR),
     JavaBuiltinTypeDescriptor("java.lang.Exception", "java.lang.Throwable", false, JavaBuiltinTypeRole.EXCEPTION),
     JavaBuiltinTypeDescriptor("java.lang.RuntimeException", "java.lang.Exception", false, JavaBuiltinTypeRole.RUNTIME_EXCEPTION),
     JavaBuiltinTypeDescriptor("java.lang.IllegalArgumentException", "java.lang.RuntimeException", false, JavaBuiltinTypeRole.ILLEGAL_ARGUMENT_EXCEPTION),
@@ -684,10 +709,47 @@ internal object JavaBuiltinLibrary {
     callable("java.util.Scanner", "nextInt", operation = JavaBuiltinOperation.SCANNER_NEXT_INT, returnType = intType)
     callable("java.util.Scanner", "hasNextLine", operation = JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE, returnType = booleanType)
     callable("java.util.Scanner", "nextLine", operation = JavaBuiltinOperation.SCANNER_NEXT_LINE, returnType = stringType)
+    callable("java.util.Scanner", "close", operation = JavaBuiltinOperation.SCANNER_CLOSE)
 
-    // 阶段 1 为常用 unchecked exception 开放 Java 8 的空构造器与 message 构造器；
-    // Throwable/Exception 仅作为 catch 根类型，checked exception 的构造和 throws 在下一批开放。
+    callable(
+      owner = "java.lang.AutoCloseable",
+      name = "close",
+      operation = JavaBuiltinOperation.AUTO_CLOSEABLE_CLOSE,
+      isFinal = false,
+      isVirtualRoot = true,
+      isAbstract = true,
+      thrownTypes = listOf(JavaBuiltinTypeReference.Declared("java.lang.Exception")),
+    )
+    callable(
+      "java.lang.Throwable",
+      "getMessage",
+      operation = JavaBuiltinOperation.THROWABLE_GET_MESSAGE,
+      returnType = stringType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+    callable(
+      "java.lang.Throwable",
+      "getCause",
+      operation = JavaBuiltinOperation.THROWABLE_GET_CAUSE,
+      returnType = throwableType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+    callable(
+      "java.lang.Throwable",
+      "toString",
+      operation = JavaBuiltinOperation.THROWABLE_TO_STRING,
+      returnType = stringType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+
+    // 阶段 2 为异常家族开放空、message 与 message+cause 构造器；共享 operation 由结果 role 区分类型。
     listOf(
+      "java.lang.Throwable",
+      "java.lang.Error",
+      "java.lang.Exception",
       "java.lang.RuntimeException",
       "java.lang.IllegalArgumentException",
       "java.lang.IllegalStateException",
@@ -706,6 +768,12 @@ internal object JavaBuiltinLibrary {
       val exceptionType = JavaBuiltinTypeReference.Declared(owner)
       constructor(owner, emptyList(), JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY, exceptionType)
       constructor(owner, listOf(stringType), JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING, exceptionType)
+      constructor(
+        owner,
+        listOf(stringType, throwableType),
+        JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING_CAUSE,
+        exceptionType,
+      )
     }
   }
 
@@ -716,6 +784,7 @@ internal object JavaBuiltinLibrary {
     val sharedConstructorOperations = setOf(
       JavaBuiltinOperation.EXCEPTION_CONSTRUCT_EMPTY,
       JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING,
+      JavaBuiltinOperation.EXCEPTION_CONSTRUCT_STRING_CAUSE,
     )
     require(
       members.filter { it.operation !in sharedConstructorOperations }
@@ -771,6 +840,8 @@ internal object JavaBuiltinLibrary {
     isConstructor: Boolean = false,
     isFinal: Boolean = true,
     isVirtualRoot: Boolean = false,
+    isAbstract: Boolean = false,
+    thrownTypes: List<JavaBuiltinTypeReference> = emptyList(),
   ) {
     add(
       JavaBuiltinMemberDescriptor.Callable(
@@ -782,6 +853,8 @@ internal object JavaBuiltinLibrary {
         isFinal = isFinal,
         isConstructor = isConstructor,
         isVirtualRoot = isVirtualRoot,
+        isAbstract = isAbstract,
+        thrownTypes = thrownTypes,
         operation = operation,
         compatibility = if (owner.startsWith("java.util.")) {
           // java.util 只开放教学子集：集合不承诺完整哈希/fail-fast；Scanner 只读取预加载输入，

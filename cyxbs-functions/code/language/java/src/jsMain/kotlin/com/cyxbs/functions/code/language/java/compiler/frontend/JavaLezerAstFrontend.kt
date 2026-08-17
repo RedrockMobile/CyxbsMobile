@@ -19,6 +19,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclarat
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstParameter
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstResource
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstStatement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstSwitchEntry
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclaration
@@ -216,9 +217,6 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val modifiers = node.modifiersBefore(definition, METHOD_MODIFIERS, "方法")
     val annotations = methodAnnotations(node, definition)
     rejectReturnDimensions(node)
-    node.descendants().firstOrNull { it.name in THROWS_CLAUSES }?.let {
-      unsupported(it, "阶段 1 尚不支持 throws 或受检异常。")
-    }
     node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
       unsupported(it, "阶段 1 尚不支持可变参数。")
     }
@@ -263,6 +261,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       parameters.toList(),
       bodyNode?.let { block(it) },
       annotations,
+      node.children().firstOrNull { it.name == "Throws" }?.typeReferences().orEmpty(),
     )
   }
 
@@ -272,9 +271,6 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val definition = node.children().firstOrNull { it.name == "Definition" }
       ?: unsupported(node, "构造器缺少名称。")
     rejectAnnotationsBefore(node, definition, "构造器")
-    node.descendants().firstOrNull { it.name in THROWS_CLAUSES }?.let {
-      unsupported(it, "阶段 1 尚不支持 throws 或受检异常。")
-    }
     node.descendants().firstOrNull { it.name == "SpreadParameter" }?.let {
       unsupported(it, "阶段 1 尚不支持可变参数。")
     }
@@ -290,6 +286,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       text(definition),
       parameters,
       block(body, allowConstructorInvocation = true),
+      node.children().firstOrNull { it.name == "Throws" }?.typeReferences().orEmpty(),
     )
   }
 
@@ -343,6 +340,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "SwitchStatement" -> switchStatement(node)
     "ThrowStatement" -> throwStatement(node)
     "TryStatement" -> tryStatement(node)
+    "TryWithResourcesStatement" -> tryStatement(node)
     "BreakStatement" -> loopJump(node, isBreak = true)
     "ContinueStatement" -> loopJump(node, isBreak = false)
     "EmptyStatement" -> JavaAstStatement.Empty(ids.next(), span(node))
@@ -359,12 +357,11 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
   /**
    * 保留 try、顺序 catch 与 finally 的原始嵌套。
    *
-   * 资源声明和 multi-catch 属于下一批异常完整性，当前必须明确拒绝，不能忽略后继续生成代码。
+   * 普通 try 与 try-with-resources 共用结构；资源声明顺序与 multi-catch 类型顺序都必须原样保留。
    */
   private fun tryStatement(node: LezerSyntaxNode): JavaAstStatement.Try {
-    node.children().firstOrNull { it.name == "ResourceSpecification" }?.let {
-      unsupported(it, "异常阶段 1 尚不支持 try-with-resources。")
-    }
+    val resources = node.children().firstOrNull { it.name == "ResourceSpecification" }
+      ?.children()?.filter { it.name == "Resource" }?.map(::resource).orEmpty()
     val body = node.children().firstOrNull { it.name == "Block" }
       ?: unsupported(node, "try 缺少方法体。")
     val catches = node.children().filter { it.name == "CatchClause" }.map(::catchClause)
@@ -372,13 +369,13 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       ?.children()
       ?.firstOrNull { it.name == "Block" }
       ?.let(::block)
-    if (catches.isEmpty() && finallyBlock == null) {
+    if (resources.isEmpty() && catches.isEmpty() && finallyBlock == null) {
       unsupported(node, "try 必须至少包含 catch 或 finally。")
     }
-    return JavaAstStatement.Try(ids.next(), span(node), block(body), catches, finallyBlock)
+    return JavaAstStatement.Try(ids.next(), span(node), block(body), catches, finallyBlock, resources)
   }
 
-  /** 构建单类型 catch 参数；多个异常类型留给下一批 multi-catch。 */
+  /** 构建 catch 参数并保留 multi-catch 的全部备选类型。 */
   private fun catchClause(node: LezerSyntaxNode): JavaAstCatchClause {
     val parameter = node.children().firstOrNull { it.name == "CatchFormalParameter" }
       ?: unsupported(node, "catch 缺少参数。")
@@ -387,19 +384,35 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val catchType = parameter.children().firstOrNull { it.name == "CatchType" }
       ?: unsupported(parameter, "catch 参数缺少异常类型。")
     val types = catchType.typeReferences()
-    if (types.size != 1) {
-      unsupported(catchType, "异常阶段 1 尚不支持 multi-catch。")
-    }
+    if (types.isEmpty()) unsupported(catchType, "catch 参数缺少异常类型。")
     val body = node.children().firstOrNull { it.name == "Block" }
       ?: unsupported(node, "catch 缺少方法体。")
     return JavaAstCatchClause(
       ids.next(),
       span(node),
       parameter.modifiersBefore(definition, PARAMETER_MODIFIERS, "catch 参数"),
-      types.single(),
+      types.first(),
       text(definition),
       span(definition),
       block(body),
+      types.drop(1),
+    )
+  }
+
+  /** Java 8 资源只接受声明形式；Java 9 的既有变量资源不会被 Lezer 映射成此节点。 */
+  private fun resource(node: LezerSyntaxNode): JavaAstResource {
+    val definition = node.children().firstOrNull { it.name == "Definition" }
+      ?: unsupported(node, "资源声明缺少名称。")
+    val initializer = node.children().firstOrNull { it.name in EXPRESSION_NODES }
+      ?: unsupported(node, "资源声明必须包含 initializer。")
+    return JavaAstResource(
+      ids.next(),
+      span(node),
+      node.modifiersBefore(definition, PARAMETER_MODIFIERS, "资源"),
+      node.typeBefore(definition),
+      text(definition),
+      span(definition),
+      expression(initializer),
     )
   }
 
@@ -1082,13 +1095,12 @@ private val MEMBER_NODES = setOf("FieldDeclaration", "MethodDeclaration", "Const
 private val STATEMENT_NODES = setOf(
   "Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement",
   "WhileStatement", "DoStatement", "ForStatement", "EnhancedForStatement", "SwitchStatement",
-  "ThrowStatement", "TryStatement", "BreakStatement", "ContinueStatement", "EmptyStatement",
+  "ThrowStatement", "TryStatement", "TryWithResourcesStatement", "BreakStatement", "ContinueStatement", "EmptyStatement",
 )
 private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void", "ArrayType")
 private val TYPE_REFERENCE_WRAPPERS = setOf("GenericType")
 private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
 private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
-private val THROWS_CLAUSES = setOf("Throws")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
 private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")

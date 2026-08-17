@@ -921,6 +921,137 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(20, executeEntry(assertNotNull(loopResult.value, loopResult.diagnostics.toString()), 0))
   }
 
+  /** checked exception、自定义异常、cause 与 multi-catch 必须贯穿完整编译执行链路。 */
+  @Test
+  fun compilesCheckedCustomExceptionsAndMultiCatch() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/LessonException.java" to """
+        package demo;
+
+        class LessonException extends Exception {
+          LessonException(String message) {
+            super(message);
+          }
+
+          LessonException(String message, Throwable cause) {
+            super(message, cause);
+          }
+        }
+      """.trimIndent(),
+      "demo/Main.java" to """
+        package demo;
+
+        class Main {
+          static void checked() throws LessonException {
+            throw new LessonException("checked");
+          }
+
+          static int run(int mode) {
+            try {
+              if (mode == 0) checked();
+              if (mode == 1) throw new IllegalArgumentException("argument");
+              throw new LessonException("outer", new Exception("inner"));
+            } catch (LessonException | IllegalArgumentException error) {
+              if (mode == 0) {
+                if ("checked".equals(error.getMessage())) return 10;
+                return -1;
+              }
+              if (mode == 1) {
+                if ("java.lang.IllegalArgumentException: argument".equals(error.toString())) return 20;
+                return -2;
+              }
+              if ("outer".equals(error.getMessage()) &&
+                  "inner".equals(error.getCause().getMessage())) return 30;
+              return -3;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(10, executeEntry(artifact, 0))
+    assertEquals(20, executeEntry(artifact, 1))
+    assertEquals(30, executeEntry(artifact, 2))
+  }
+
+  /** 受控资源必须逆序关闭，关闭异常不得替换主异常，Scanner 关闭后也必须拒绝继续读取。 */
+  @Test
+  fun compilesTryWithResourcesAndScannerClose() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/Resource.java" to """
+        package demo;
+
+        class Resource implements AutoCloseable {
+          static int trace = 0;
+          int id;
+          boolean fails;
+
+          Resource(int id, boolean fails) {
+            this.id = id;
+            this.fails = fails;
+          }
+
+          public void close() throws Exception {
+            trace = trace * 10 + id;
+            if (fails) throw new Exception("close");
+          }
+        }
+      """.trimIndent(),
+      "demo/Main.java" to """
+        package demo;
+
+        import java.util.Scanner;
+
+        class Main {
+          static int run(int mode) {
+            Resource.trace = 0;
+            if (mode == 2) {
+              Scanner scanner = new Scanner(System.in);
+              scanner.close();
+              try {
+                scanner.hasNext();
+                return -4;
+              } catch (IllegalStateException error) {
+                return 40;
+              }
+            }
+            try (
+              Resource first = new Resource(1, false);
+              Resource second = new Resource(2, mode == 1)
+            ) {
+              if (mode == 1) throw new LessonException("body");
+            } catch (LessonException error) {
+              if (!"body".equals(error.getMessage())) return -1;
+              return Resource.trace;
+            } catch (Exception error) {
+              return -2;
+            }
+            return Resource.trace;
+          }
+        }
+      """.trimIndent(),
+      "demo/LessonException.java" to """
+        package demo;
+        class LessonException extends Exception {
+          LessonException(String message) { super(message); }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    val entry = createEntry(artifact, {}, {})
+    assertEquals(21, (entry(0) as Number).toInt())
+    assertEquals(21, (entry(1) as Number).toInt())
+    assertEquals(40, (entry(2) as Number).toInt())
+  }
+
   /** Object 虚分派覆盖用户 override、默认实现、输出与集合查找，并保留集合 self-reference。 */
   @Test
   fun dispatchesObjectMethodsAcrossOutputAndCollections() {

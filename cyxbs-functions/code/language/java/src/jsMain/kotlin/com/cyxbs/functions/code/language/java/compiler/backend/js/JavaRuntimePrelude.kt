@@ -49,8 +49,9 @@ internal object JavaRuntimePrelude {
    * 因此匹配器也会读取其稳定的 `java.*Exception` message 前缀，让旧运行时错误可被 catch。
    */
   val exceptionSource: String = """
-    const @__j_exception_parent = Object.freeze({
+    const @__j_exception_parent = {
       "java.lang.Throwable": null,
+      "java.lang.Error": "java.lang.Throwable",
       "java.lang.Exception": "java.lang.Throwable",
       "java.lang.RuntimeException": "java.lang.Exception",
       "java.lang.IllegalArgumentException": "java.lang.RuntimeException",
@@ -66,7 +67,16 @@ internal object JavaRuntimePrelude {
       "java.lang.ArrayStoreException": "java.lang.RuntimeException",
       "java.util.NoSuchElementException": "java.lang.RuntimeException",
       "java.util.InputMismatchException": "java.util.NoSuchElementException"
-    });
+    };
+
+    /** 源码异常类在 prototype 发射阶段登记父边，catch 不依赖 JavaScript constructor.name。 */
+    function @__j_register_exception_type(name, parent) {
+      if (typeof name !== "string" || typeof parent !== "string" ||
+        !Object.prototype.hasOwnProperty.call(@__j_exception_parent, parent)) {
+        throw new Error("java.lang.IllegalStateException: invalid exception hierarchy");
+      }
+      @__j_exception_parent[name] = parent;
+    }
 
     function @__j_exception_name(value) {
       if (value !== null && typeof value === "object" &&
@@ -79,11 +89,53 @@ internal object JavaRuntimePrelude {
       return Object.prototype.hasOwnProperty.call(@__j_exception_parent, name) ? name : null;
     }
 
-    function @__j_new_exception(name, message) {
-      const error = new Error(message === null ? name : name + ": " + message);
-      Object.defineProperty(error, "@__j_exception_name", { value: name });
-      Object.defineProperty(error, "@__j_exception_message", { value: message });
-      return error;
+    function @__j_initialize_exception(target, name, message, cause) {
+      Object.defineProperty(target, "@__j_exception_name", { value: name, configurable: true });
+      Object.defineProperty(target, "@__j_exception_message", { value: message, configurable: true });
+      Object.defineProperty(target, "@__j_exception_cause", { value: cause, configurable: true });
+      Object.defineProperty(target, "@__j_suppressed", { value: [], configurable: true });
+      if (target instanceof Error) target.message = message === null ? name : name + ": " + message;
+      return target;
+    }
+
+    function @__j_new_exception(name, message, cause) {
+      return @__j_initialize_exception(new Error(), name, message, cause === undefined ? null : cause);
+    }
+
+    function @__j_exception_get_message(value) {
+      value = @__j_non_null(value);
+      if (Object.prototype.hasOwnProperty.call(value, "@__j_exception_message")) {
+        return value.@__j_exception_message;
+      }
+      const name = @__j_exception_name(value);
+      if (name === null || typeof value.message !== "string") return null;
+      const prefix = name + ": ";
+      return value.message.indexOf(prefix) === 0 ? value.message.slice(prefix.length) : null;
+    }
+
+    function @__j_exception_get_cause(value) {
+      value = @__j_non_null(value);
+      return Object.prototype.hasOwnProperty.call(value, "@__j_exception_cause")
+        ? value.@__j_exception_cause : null;
+    }
+
+    function @__j_exception_to_string(value) {
+      value = @__j_non_null(value);
+      const name = @__j_exception_name(value);
+      if (name === null) throw new Error("java.lang.ClassCastException");
+      const message = @__j_exception_get_message(value);
+      return message === null ? name : name + ": " + message;
+    }
+
+    function @__j_add_suppressed(primary, suppressed) {
+      primary = @__j_non_null(primary);
+      suppressed = @__j_non_null(suppressed);
+      if (primary === suppressed) throw @__j_new_exception(
+        "java.lang.IllegalArgumentException", "Self-suppression not permitted", null);
+      if (!Object.prototype.hasOwnProperty.call(primary, "@__j_suppressed")) {
+        Object.defineProperty(primary, "@__j_suppressed", { value: [], configurable: true });
+      }
+      primary.@__j_suppressed.push(suppressed);
     }
 
     function @__j_exception_is(value, target) {
@@ -99,7 +151,7 @@ internal object JavaRuntimePrelude {
 
     function @__j_throw(value) {
       if (value === null) {
-        throw @__j_new_exception("java.lang.NullPointerException", null);
+        throw @__j_new_exception("java.lang.NullPointerException", null, null);
       }
       throw value;
     }
@@ -668,13 +720,24 @@ internal object JavaRuntimePrelude {
         throw new Error("java.lang.IllegalArgumentException: Scanner only supports System.in");
       }
       @__j_scanner_input();
-      return { @__j_scanner: true };
+      return { @__j_scanner: true, closed: false };
     }
 
-    function @__j_scanner(value) {
+    function @__j_scanner_value(value) {
       value = @__j_non_null(value);
       if (value.@__j_scanner !== true) throw new Error("java.lang.ClassCastException");
       return value;
+    }
+
+    function @__j_scanner(value) {
+      value = @__j_scanner_value(value);
+      if (value.closed) throw new Error("java.lang.IllegalStateException: Scanner closed");
+      return value;
+    }
+
+    /** Scanner.close 可重复调用；关闭后所有读取 API 都稳定抛 IllegalStateException。 */
+    function @__j_scanner_close(value) {
+      @__j_scanner_value(value).closed = true;
     }
 
     // 对齐 Character.isWhitespace 的教学常用子集；NBSP 等空白不会被静默当作 delimiter。

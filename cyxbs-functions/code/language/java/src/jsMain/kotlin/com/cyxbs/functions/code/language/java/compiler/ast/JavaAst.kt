@@ -176,6 +176,8 @@ internal sealed interface JavaAstMemberDeclaration : JavaAstNode {
     val body: JavaAstStatement.Block?,
     /** 仅保留阶段 1 明确允许的 `@Override`，默认值保持既有构造调用兼容。 */
     val annotations: List<JavaAstAnnotation> = emptyList(),
+    /** throws 中按源码顺序声明的异常类型。 */
+    val thrownTypes: List<JavaAstTypeReference> = emptyList(),
   ) : JavaAstMemberDeclaration
 
   /** 构造器声明；显式 this/super 调用保留为方法体首条表达式。 */
@@ -187,6 +189,8 @@ internal sealed interface JavaAstMemberDeclaration : JavaAstNode {
     val name: String,
     val parameters: List<JavaAstParameter>,
     val body: JavaAstStatement.Block,
+    /** 构造器 throws 中按源码顺序声明的异常类型。 */
+    val thrownTypes: List<JavaAstTypeReference> = emptyList(),
   ) : JavaAstMemberDeclaration
 }
 
@@ -338,6 +342,8 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val body: Block,
     val catches: List<JavaAstCatchClause>,
     val finallyBlock: Block?,
+    /** Java 8 try-with-resources 的声明顺序；普通 try 为空。 */
+    val resources: List<JavaAstResource> = emptyList(),
   ) : JavaAstStatement
 
   /** 空语句。 */
@@ -347,7 +353,7 @@ internal sealed interface JavaAstStatement : JavaAstNode {
   ) : JavaAstStatement
 }
 
-/** 单个 catch 分支；阶段 1 只允许一个异常类型，multi-catch 在下一批单独开放。 */
+/** 单个 catch 分支；[additionalTypes] 与首个 [type] 共同保持 multi-catch 的源码顺序。 */
 internal data class JavaAstCatchClause(
   override val nodeId: JavaNodeId,
   override val span: JavaSourceSpan,
@@ -356,6 +362,21 @@ internal data class JavaAstCatchClause(
   val parameterName: String,
   val parameterSpan: JavaSourceSpan,
   val body: JavaAstStatement.Block,
+  val additionalTypes: List<JavaAstTypeReference> = emptyList(),
+) : JavaAstNode {
+  /** catch 的全部备选类型；至少包含首个 [type]。 */
+  val types: List<JavaAstTypeReference> get() = listOf(type) + additionalTypes
+}
+
+/** Java 8 try-with-resources 中单个资源声明；initializer 必须在进入 try body 前求值一次。 */
+internal data class JavaAstResource(
+  override val nodeId: JavaNodeId,
+  override val span: JavaSourceSpan,
+  val modifiers: Set<JavaAstModifier>,
+  val type: JavaAstTypeReference,
+  val name: String,
+  val nameSpan: JavaSourceSpan,
+  val initializer: JavaAstExpression,
 ) : JavaAstNode
 
 /** switch 中单个 case/default 及其后直到下一 label 的语句。 */

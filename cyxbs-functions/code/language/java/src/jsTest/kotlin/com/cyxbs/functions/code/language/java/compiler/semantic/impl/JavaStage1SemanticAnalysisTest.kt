@@ -569,8 +569,10 @@ class JavaStage1SemanticAnalysisTest {
         "java.util.HashMap",
         "java.util.Iterator",
         "java.io.InputStream",
+        "java.lang.AutoCloseable",
         "java.util.Scanner",
         "java.lang.Throwable",
+        "java.lang.Error",
         "java.lang.Exception",
         "java.lang.RuntimeException",
         "java.lang.IllegalArgumentException",
@@ -1154,6 +1156,92 @@ class JavaStage1SemanticAnalysisTest {
         """.trimIndent(),
       ),
       "java.semantic.unreachable_catch",
+    )
+  }
+
+  /** checked exception 必须沿 throw、调用与构造器边传播，直到被 catch 或 throws 接住。 */
+  @Test
+  fun validatesCheckedExceptionPropagation() {
+    val success = analyze(
+      "Main.java" to """
+        class Main {
+          static void fail() throws Exception { throw new Exception("checked"); }
+          static void declared() throws Exception { fail(); }
+          static void caught() { try { fail(); } catch (Exception error) { } }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(success.isSuccess, success.diagnostics.toString())
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          class Main {
+            static void fail() throws Exception { throw new Exception(); }
+            static void run() { fail(); }
+          }
+        """.trimIndent(),
+      ),
+      "java.semantic.unhandled_checked_exception",
+    )
+  }
+
+  /** multi-catch 保留全部备选类型，参数隐式 final，并拒绝存在父子关系的备选项。 */
+  @Test
+  fun validatesMultiCatchAlternatives() {
+    val success = analyze(
+      "Main.java" to """
+        class Main {
+          static void run(boolean first) {
+            try {
+              if (first) throw new IllegalArgumentException();
+              throw new IllegalStateException();
+            } catch (IllegalArgumentException | IllegalStateException error) { }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(success.isSuccess, success.diagnostics.toString())
+    assertEquals(2, assertNotNull(success.value).catchTypes.values.single().size)
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          class Main {
+            static void run() {
+              try { } catch (RuntimeException | IllegalArgumentException error) { }
+            }
+          }
+        """.trimIndent(),
+      ),
+      "java.semantic.invalid_multi_catch_alternatives",
+    )
+  }
+
+  /** 用户资源与受控 Scanner 都通过 AutoCloseable 绑定 close；普通对象必须稳定拒绝。 */
+  @Test
+  fun bindsTryWithResourcesCloseProtocol() {
+    val success = analyze(
+      "Main.java" to """
+        import java.util.Scanner;
+        class Resource implements AutoCloseable {
+          public void close() throws Exception { }
+        }
+        class Main {
+          static void run() throws Exception {
+            try (Resource resource = new Resource(); Scanner scanner = new Scanner(System.in)) { }
+          }
+        }
+      """.trimIndent(),
+    )
+    assertTrue(success.isSuccess, success.diagnostics.toString())
+    assertEquals(2, assertNotNull(success.value).resourceCloseBindings.size)
+
+    assertDiagnostic(
+      analyze(
+        "Main.java" to "class Main { static void run() { try (Main value = new Main()) { } } }",
+      ),
+      "java.semantic.resource_not_auto_closeable",
     )
   }
 

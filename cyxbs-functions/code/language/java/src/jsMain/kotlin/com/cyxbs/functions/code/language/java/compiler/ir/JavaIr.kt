@@ -68,6 +68,8 @@ internal data class JavaIrClass(
   val kind: JavaIrTypeDeclarationKind = JavaIrTypeDeclarationKind.CLASS,
   /** class 最终继承的接口默认实现，key 为虚槽，value 为已验证的接口方法。 */
   val interfaceDefaultMethods: Map<Int, JavaIrMethodId> = emptyMap(),
+  /** 非空时表示该源码 class 是异常类型，值为直接异常父类型的限定名。 */
+  val exceptionSuperQualifiedName: String? = null,
 )
 
 /** 已完成静态/实例分类的字段。 */
@@ -241,6 +243,17 @@ internal sealed interface JavaIrStatement {
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
 
+  /**
+   * 源码自定义异常构造器委托到 builtin Throwable 家族时的初始化动作。
+   *
+   * [message] 与 [cause] 已按目标构造器签名完成求值；后端只负责把元数据写入当前 `this`。
+   */
+  data class InitializeException(
+    val message: JavaIrExpression?,
+    val cause: JavaIrExpression?,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
   data class Return(
     val expression: JavaIrExpression?,
     override val span: JavaSourceSpan,
@@ -260,6 +273,7 @@ internal sealed interface JavaIrStatement {
     val catches: List<JavaIrCatchClause>,
     val finallyBlock: Block?,
     override val span: JavaSourceSpan,
+    val resources: List<JavaIrResource> = emptyList(),
   ) : JavaIrStatement
 }
 
@@ -268,6 +282,17 @@ internal data class JavaIrCatchClause(
   val exceptionType: JavaIrType.Reference,
   val local: JavaIrLocalId,
   val body: JavaIrStatement.Block,
+  val span: JavaSourceSpan,
+  val additionalExceptionTypes: List<JavaIrType.Reference> = emptyList(),
+) {
+  val exceptionTypes: List<JavaIrType.Reference> get() = listOf(exceptionType) + additionalExceptionTypes
+}
+
+/** try-with-resources 已完成 initializer 与 close() 分派的单个资源。 */
+internal data class JavaIrResource(
+  val local: JavaIrLocalId,
+  val initializer: JavaIrExpression,
+  val closeExpression: JavaIrExpression,
   val span: JavaSourceSpan,
 )
 
@@ -417,6 +442,21 @@ internal sealed interface JavaIrExpression {
   data class InvokeVirtual(
     val receiver: JavaIrExpression,
     val method: JavaIrMethodId,
+    val virtualSlot: Int,
+    val arguments: List<JavaIrExpression>,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
+  /**
+   * 调用没有源码方法体、但已经由 builtin catalog 冻结槽位的虚方法根。
+   *
+   * 该节点让 AutoCloseable.close、Throwable API 等接口/根类方法可以动态分派到用户实现，
+   * 同时避免伪造一个不存在于 [JavaIrProgram.classes] 中的 builtin 方法编号。
+   */
+  data class InvokeVirtualSlot(
+    val operation: JavaBuiltinOperation,
+    val receiver: JavaIrExpression,
     val virtualSlot: Int,
     val arguments: List<JavaIrExpression>,
     override val type: JavaIrType,
