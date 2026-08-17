@@ -17,6 +17,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstImport
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLiteralKind
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaBody
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaParameter
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMethodReferenceQualifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstParameter
@@ -643,6 +644,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "ArrayAccess" -> arrayAccess(node)
       "FieldAccess" -> fieldAccess(node)
       "LambdaExpression" -> lambda(node)
+      "MethodReference" -> methodReference(node)
       else -> unsupported(node, "Stage1 不支持该表达式。")
     }
   }
@@ -693,6 +695,38 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       } else {
         JavaAstLambdaBody.Expression(expression(body))
       },
+    )
+  }
+
+  /**
+   * 映射 Java 8 方法引用，并保留 Type 与 expression qualifier 的语法差异。
+   *
+   * 显式方法类型实参暂不进入本批，避免在 frontend 丢弃后让语义层错误选择 overload。
+   */
+  private fun methodReference(node: LezerSyntaxNode): JavaAstExpression.MethodReference {
+    val children = node.children()
+    children.firstOrNull { it.name == "TypeArguments" }?.let {
+      unsupported(it, "方法引用的显式类型实参暂不支持。")
+    }
+    val qualifierNode = children.firstOrNull { child ->
+      child.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS ||
+        child.name in EXPRESSION_NODES && child.name != "MethodReference"
+    } ?: unsupported(node, "方法引用缺少 qualifier。")
+    val qualifier = if (qualifierNode.name in TYPE_REFERENCE_NODES + TYPE_REFERENCE_WRAPPERS) {
+      JavaAstMethodReferenceQualifier.Type(typeReference(qualifierNode))
+    } else {
+      JavaAstMethodReferenceQualifier.Expression(expression(qualifierNode))
+    }
+    val constructor = children.any { text(it) == "new" }
+    val member = if (constructor) {
+      "new"
+    } else {
+      children.lastOrNull { it.name == "Identifier" }
+        ?.let(::text)
+        ?: unsupported(node, "方法引用缺少成员名称。")
+    }
+    return JavaAstExpression.MethodReference(
+      ids.next(), span(node), qualifier, member, constructor,
     )
   }
 
@@ -1165,7 +1199,7 @@ private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
 private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "MethodInvocation", "MethodReference", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
 private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")

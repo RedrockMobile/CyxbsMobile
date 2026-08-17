@@ -433,7 +433,8 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
    常用 Throwable API，以及受控资源上的 try-with-resources/AutoCloseable；
 3. （已完成，2026-08-18）函数式接口与 lambda：无捕获/有捕获 lambda、effectively-final 校验和
    目标类型推断；
-4. 方法引用：静态、绑定 receiver、未绑定 receiver 与构造器引用，复用函数式接口适配链；
+4. （已完成，2026-08-18）方法引用：静态、绑定 receiver、未绑定 receiver 与构造器引用，复用
+   函数式接口适配链；
 5. 多维数组：部分维度创建、嵌套初始化器、协变写入与逐维越界/求值顺序；
 6. `enum`：枚举常量、`values/valueOf`、`name/ordinal`、switch 与受控成员；
 7. 完整数值：`long`、`float`、`double`、数值提升、转换、比较及常用 Math/包装 API；
@@ -482,9 +483,13 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   lambda；参数类型由目标接口代换，捕获值保持词法闭包，外围任意写入都会触发 effectively-final 诊断；
 - Lambda 已贯穿 CST、AST、semantic binding、typed IR 和 JS vtable；无捕获/有捕获、显式/推断参数、
   泛型函数式接口与 overload 目标类型均有回归，非 SAM 目标会在编译期稳定拒绝；
-- 完整 `jsNodeTest` 共 232 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
-  字符串左结合、泛型接口/default 分派、Object 虚方法、循环跳转、增强 `for`、switch、异常流和 lambda；
-- 多维数组运行、方法引用、enum、long 与浮点完整语义仍按上述第 4～8 批继续实现。
+- 已支持 `Type::staticMethod`、`value::instanceMethod`、`Type::instanceMethod` 与 `Type::new`；所有
+  引用先按目标 SAM 参数执行 overload 和转换，再复用 Lambda 函数对象 ABI 与既有虚槽分派；
+- 绑定 receiver 会在函数对象创建时求值并固定一次，null 会立即抛出 `NullPointerException`；
+  `System.out::println`、`String::length`、`StringBuilder::new` 等 builtin 同样只通过 catalog binding；
+- 完整 `jsNodeTest` 共 237 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
+  泛型接口/default 分派、循环跳转、switch、异常流、lambda 与四种方法引用；
+- 多维数组运行、enum、long 与浮点完整语义仍按上述第 5～8 批继续实现。
 
 ### 阶段 2B：精选类库与宿主桥
 
@@ -520,7 +525,7 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   覆写 `toString` 时走 Object 虚槽，未覆写时生成稳定的 Java 风格 `ClassName@identityHash` 文本；
 - Java 与通用语言模块的完整测试已覆盖真实源码到 JS、真实 JS runtime、Unicode I/O、配额、
   泛型集合、包装缓存和 Scanner 混合读取。接口分派、常用函数式接口、lambda 与捕获变量语义已经
-  接通；方法引用仍等待第 4 批复用相同 SAM 适配链实现。
+  接通；方法引用也已复用相同 SAM 适配链，不额外维护第二套函数对象 runtime。
 
 ### 阶段 3：产品化与发布验证
 

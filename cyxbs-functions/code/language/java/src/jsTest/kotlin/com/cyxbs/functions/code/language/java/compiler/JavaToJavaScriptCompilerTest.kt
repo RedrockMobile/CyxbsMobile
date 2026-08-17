@@ -1527,6 +1527,74 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(16, executeEntryValue(artifact, null) as Int)
   }
 
+  /** 四种方法引用共享 Lambda 函数对象 ABI，绑定 receiver 只在创建时求值一次。 */
+  @Test
+  fun compilesAndExecutesJavaEightMethodReferences() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        interface Binary { int apply(int left, int right); }
+        interface Bound { int apply(int value); }
+        interface Unbound { int apply(Box box, int value); }
+        interface Factory { Box create(int value); }
+        class Box {
+          static int created;
+          int base;
+          Box(int base) { this.base = base; }
+          static Box make() { created++; return new Box(5); }
+          static int add(int left, int right) { return left + right; }
+          int plus(int value) { return base + value; }
+        }
+        class Main {
+          static int run() {
+            Binary staticRef = Box::add;
+            Bound boundRef = Box.make()::plus;
+            Unbound unboundRef = Box::plus;
+            Factory constructorRef = Box::new;
+            Box value = constructorRef.create(4);
+            return staticRef.apply(1, 2) + boundRef.apply(1) + boundRef.apply(2) +
+              unboundRef.apply(value, 3) + Box.created;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(24, executeEntryValue(artifact, null) as Int)
+  }
+
+  /** 绑定 null receiver 必须在方法引用创建处抛出 NPE，而不是推迟到首次调用。 */
+  @Test
+  fun checksBoundMethodReferenceReceiverAtCreation() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        interface Action { int run(); }
+        class Box { int value() { return 1; } }
+        class Main {
+          static int run() {
+            Box value = null;
+            try {
+              Action action = value::value;
+              return 0;
+            } catch (NullPointerException expected) {
+              return 1;
+            }
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(1, executeEntryValue(artifact, null) as Int)
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

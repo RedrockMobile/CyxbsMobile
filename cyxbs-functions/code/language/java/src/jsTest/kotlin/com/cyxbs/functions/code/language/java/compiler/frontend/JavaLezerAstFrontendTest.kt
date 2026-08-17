@@ -8,6 +8,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInv
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstLambdaBody
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMethodReferenceQualifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
@@ -490,6 +491,37 @@ class JavaLezerAstFrontendTest {
     val localLambda = assertIs<JavaAstExpression.Lambda>(outerDeclaration.declarators.single().initializer)
     val localBody = assertIs<JavaAstLambdaBody.Block>(localLambda.body)
     assertEquals(1, localBody.block.statements.size)
+  }
+
+  /** 四种常用方法引用必须保留 qualifier 形态，供语义层按目标 SAM 决定分派。 */
+  @Test
+  fun mapsJavaEightMethodReferences() {
+    val result = parse(
+      """
+      class Box { Box() {} static Box create() { return new Box(); } int size() { return 1; } }
+      class Main {
+        static void refs(Box value) {
+          Object a = Box::create;
+          Object b = value::size;
+          Object c = Box::size;
+          Object d = Box::new;
+        }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val statements = assertNotNull(
+      assertIs<JavaAstMemberDeclaration.Method>(assertNotNull(result.value).units.single().types[1].members.single()).body,
+    ).statements
+    val references = statements.map { statement ->
+      val declaration = assertIs<JavaAstStatement.VariableDeclaration>(statement)
+      assertIs<JavaAstExpression.MethodReference>(declaration.declarators.single().initializer)
+    }
+    assertIs<JavaAstMethodReferenceQualifier.Type>(references[0].qualifier)
+    assertIs<JavaAstMethodReferenceQualifier.Expression>(references[1].qualifier)
+    assertIs<JavaAstMethodReferenceQualifier.Type>(references[2].qualifier)
+    assertTrue(references[3].isConstructor)
   }
 
   /** 构造唯一文件编号和规范化工作区路径。 */

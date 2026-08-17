@@ -576,7 +576,9 @@ private class JavaScriptBackendValidator(
     }
     if (expression.parameters.distinct().size != expression.parameters.size ||
       expression.captures.distinct().size != expression.captures.size ||
-      expression.parameters.any { it in expression.captures }
+      expression.boundValues.map { it.local }.distinct().size != expression.boundValues.size ||
+      expression.parameters.any { it in expression.captures } ||
+      expression.boundValues.any { it.local in expression.parameters || it.local in expression.captures }
     ) {
       invalid("Java IR lambda has duplicate or overlapping local bindings.", expression.span)
     }
@@ -587,6 +589,15 @@ private class JavaScriptBackendValidator(
       }
     }
     expression.captures.forEach { requireLocal(it, expression.span) }
+    expression.boundValues.forEach { bound ->
+      validateExpression(bound.expression)
+      val declaration = index.locals[bound.local]
+      if (declaration == null || declaration.isParameter || declaration.type != bound.expression.type ||
+        bound.requireNonNull && bound.expression.type !is JavaIrType.Reference
+      ) {
+        invalid("Java IR lambda bound value has an invalid local or type.", expression.span)
+      }
+    }
     validateStatement(expression.body, loopDepth = 0, breakDepth = 0)
   }
 
@@ -1453,7 +1464,8 @@ private class JavaScriptEmitter(
           JavaBuiltinOperation.THROWABLE_GET_CAUSE,
           JavaBuiltinOperation.THROWABLE_TO_STRING,
         ) || receiver.requiresExceptionRuntime() || arguments.any { it.requiresExceptionRuntime() }
-    is JavaIrExpression.Lambda -> body.containsExceptionRuntime()
+    is JavaIrExpression.Lambda -> body.containsExceptionRuntime() ||
+      boundValues.any { it.requireNonNull || it.expression.requiresExceptionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresExceptionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresExceptionRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresExceptionRuntime() }
@@ -1524,7 +1536,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeSpecial -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.InvokeVirtual -> receiver.requiresBuiltinRuntime() || arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> true
-    is JavaIrExpression.Lambda -> body.containsBuiltinRuntime()
+    is JavaIrExpression.Lambda -> body.containsBuiltinRuntime() ||
+      boundValues.any { it.expression.requiresBuiltinRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrExpression.NewArray -> length.requiresBuiltinRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { element -> element.requiresBuiltinRuntime() }
@@ -1594,7 +1607,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresCollectionRuntime() || arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresCollectionRuntime() ||
       arguments.any { it.requiresCollectionRuntime() }
-    is JavaIrExpression.Lambda -> body.containsCollectionRuntime()
+    is JavaIrExpression.Lambda -> body.containsCollectionRuntime() ||
+      boundValues.any { it.expression.requiresCollectionRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresCollectionRuntime() }
     is JavaIrExpression.NewArray -> length.requiresCollectionRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresCollectionRuntime() }
@@ -1664,7 +1678,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresScannerRuntime() || arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresScannerRuntime() ||
       arguments.any { it.requiresScannerRuntime() }
-    is JavaIrExpression.Lambda -> body.containsScannerRuntime()
+    is JavaIrExpression.Lambda -> body.containsScannerRuntime() ||
+      boundValues.any { it.expression.requiresScannerRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { it.requiresScannerRuntime() }
     is JavaIrExpression.NewArray -> length.requiresScannerRuntime()
     is JavaIrExpression.ArrayInitializer -> elements.any { it.requiresScannerRuntime() }
@@ -1740,7 +1755,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.InvokeVirtual -> receiver.requiresArrayOrStringRuntime() || arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     is JavaIrExpression.InvokeVirtualSlot -> receiver.requiresArrayOrStringRuntime() ||
       arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
-    is JavaIrExpression.Lambda -> body.containsArrayOrStringRuntime()
+    is JavaIrExpression.Lambda -> body.containsArrayOrStringRuntime() ||
+      boundValues.any { it.expression.requiresArrayOrStringRuntime() }
     is JavaIrExpression.NewObject -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     else -> false
   }
@@ -2302,8 +2318,17 @@ private class JavaScriptEmitter(
       ?: "null"
     val slot = JsNameMangler.virtualSlot(expression.virtualSlot)
     val body = bodyWriter.source.lineSequence().joinToString("\n") { line -> "  $line" }
-    return "(() => { const value = Object.create($prototype); " +
-      "value[\"$slot\"] = ($parameters) => {\n$body}; return value; })()"
+    val objectBody = "{ const value = Object.create($prototype); " +
+      "value[\"$slot\"] = ($parameters) => {\n$body}; return value; }"
+    if (expression.boundValues.isEmpty()) return "(() => $objectBody)()"
+    val boundParameters = expression.boundValues.joinToString(", ") { bound ->
+      JsNameMangler.local(bound.local)
+    }
+    val boundArguments = expression.boundValues.joinToString(", ") { bound ->
+      val rendered = renderExpression(bound.expression)
+      if (bound.requireNonNull) "\$__j_non_null($rendered)" else rendered
+    }
+    return "(($boundParameters) => $objectBody)($boundArguments)"
   }
 
   /**

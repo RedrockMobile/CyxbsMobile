@@ -9,6 +9,7 @@ import com.cyxbs.functions.code.language.java.compiler.frontend.JavaLezerAstFron
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaDispatchKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaConstructorDelegationKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaConstantValue
+import com.cyxbs.functions.code.language.java.compiler.semantic.JavaMethodReferenceKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticCallableKind
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticConversion
 import com.cyxbs.functions.code.language.java.compiler.semantic.JavaSemanticModel
@@ -1329,6 +1330,75 @@ class JavaStage1SemanticAnalysisTest {
         """.trimIndent(),
       ),
       "java.semantic.lambda_target_not_functional_interface",
+    )
+  }
+
+  /** static、绑定/未绑定实例和构造器引用必须复用同一 SAM 与 overload 绑定链。 */
+  @Test
+  fun bindsJavaEightMethodReferenceKinds() {
+    val result = analyze(
+      "Main.java" to """
+        import java.util.function.Consumer;
+        import java.util.function.Function;
+        import java.util.function.Supplier;
+        interface Binary { int apply(int left, int right); }
+        interface Bound { int apply(int value); }
+        interface Unbound { int apply(Box box, int value); }
+        interface Factory { Box create(int value); }
+        class Box {
+          int base;
+          Box(int base) { this.base = base; }
+          static int add(int left, int right) { return left + right; }
+          int plus(int value) { return base + value; }
+        }
+        class Main {
+          static void refs(Box box) {
+            Binary first = Box::add;
+            Bound second = box::plus;
+            Unbound third = Box::plus;
+            Factory fourth = Box::new;
+            Consumer<Integer> output = System.out::println;
+            Function<String, Integer> length = String::length;
+            Supplier<StringBuilder> builder = StringBuilder::new;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val bindings = assertNotNull(result.value).methodReferenceBindings.values
+    assertEquals(7, bindings.size)
+    assertEquals(
+      setOf(
+        JavaMethodReferenceKind.STATIC,
+        JavaMethodReferenceKind.BOUND_INSTANCE,
+        JavaMethodReferenceKind.UNBOUND_INSTANCE,
+        JavaMethodReferenceKind.CONSTRUCTOR,
+      ),
+      bindings.mapTo(mutableSetOf()) { it.kind },
+    )
+    assertTrue(bindings.all { it.functionalMethod.virtualSlot != null })
+  }
+
+  /** 方法引用必须有 SAM 目标，且参数或返回不兼容时不得动态降级。 */
+  @Test
+  fun rejectsInvalidMethodReferences() {
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          interface Bad { String apply(int value); }
+          class Main { static int source(int value) { return value; } Bad bad = Main::source; }
+        """.trimIndent(),
+      ),
+      "java.semantic.method_reference_return_mismatch",
+    )
+    assertDiagnostic(
+      analyze(
+        "Main.java" to """
+          class Main { static void run() { Object value = Main::new; } }
+        """.trimIndent(),
+      ),
+      "java.semantic.method_reference_target_not_functional_interface",
     )
   }
 

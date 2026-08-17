@@ -49,6 +49,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val catchTypes = linkedMapOf<JavaNodeId, List<JavaSemanticType.Declared>>()
   private val resourceCloseBindings = linkedMapOf<JavaNodeId, JavaResourceCloseBinding>()
   private val lambdaBindings = linkedMapOf<JavaNodeId, JavaLambdaBinding>()
+  private val methodReferenceBindings = linkedMapOf<JavaNodeId, JavaMethodReferenceBinding>()
 
   private val typesByQualifiedName = linkedMapOf<String, S1TypeInfo>()
   private val typesByNode = linkedMapOf<JavaNodeId, S1TypeInfo>()
@@ -2033,6 +2034,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       is JavaAstExpression.ArrayAccess -> arrayAccess(expression)
       is JavaAstExpression.FieldAccess -> fieldAccess(expression)
       is JavaAstExpression.Lambda -> lambda(expression)
+      is JavaAstExpression.MethodReference -> methodReference(expression)
     }
     expressionTypes[expression.nodeId] = type
     return type
@@ -2181,6 +2183,153 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   }
 
   /**
+   * 以目标 SAM 参数作为方法引用的虚拟实参，完成 overload、分派与转换冻结。
+   *
+   * 类型 qualifier 会分别尝试 static 与未绑定实例候选；表达式 qualifier 在创建函数对象时求值，
+   * 因而只允许实例候选。构造器引用复用构造器重载链，不在 lowering 按名称重新选择。
+   */
+  private fun methodReference(expression: JavaAstExpression.MethodReference): JavaSemanticType {
+    val target = expectedExpressionTypes[expression.nodeId] as? JavaSemanticType.Declared
+    if (target == null) {
+      error(expression.span, "java.semantic.method_reference_target_required", "方法引用必须具有明确的函数式接口目标类型。")
+      return JavaSemanticType.Error
+    }
+    val sam = functionalMethod(
+      target,
+      expression.span,
+      invalidTargetCode = "java.semantic.method_reference_target_not_functional_interface",
+      subject = "方法引用",
+    ) ?: return JavaSemanticType.Error
+    val selected: S1InstantiatedCallable
+    val kind: JavaMethodReferenceKind
+    val receiverConversion: JavaSemanticConversion?
+    val callableArguments: List<JavaSemanticType>
+    val receiverKind: JavaReceiverKind
+
+    when (val qualifier = expression.qualifier) {
+      is JavaAstMethodReferenceQualifier.Expression -> {
+        if (expression.isConstructor) {
+          analyzeExpression(qualifier.expression)
+          error(expression.span, "java.semantic.invalid_constructor_reference", "构造器引用必须使用类型 qualifier。")
+          return JavaSemanticType.Error
+        }
+        val receiverType = analyzeExpression(qualifier.expression) as? JavaSemanticType.Declared
+        if (receiverType == null) {
+          error(expression.span, "java.semantic.method_reference_receiver_not_declared", "绑定方法引用 receiver 必须是 class 或 interface 类型。")
+          return JavaSemanticType.Error
+        }
+        val candidates = methodCandidates(receiverType, expression.memberName)
+          .filter { !it.info.isStatic && isCallableAccessible(it.info) }
+        selected = selectMostSpecific(
+          instantiateApplicablePhase(candidates, sam.parameterTypes, emptyList()),
+          expression.span,
+          expression.memberName,
+        ) ?: return JavaSemanticType.Error
+        kind = JavaMethodReferenceKind.BOUND_INSTANCE
+        receiverConversion = null
+        callableArguments = sam.parameterTypes
+        receiverKind = if (qualifier.expression is JavaAstExpression.Super) {
+          JavaReceiverKind.SUPER
+        } else {
+          JavaReceiverKind.EXPLICIT
+        }
+      }
+      is JavaAstMethodReferenceQualifier.Type -> {
+        val qualifierType = resolveType(
+          qualifier.type, context().unit, currentTypeParameterScope(), allowVoid = false,
+        ) as? JavaSemanticType.Declared ?: return JavaSemanticType.Error
+        if (expression.isConstructor) {
+          val owner = typeInfo(qualifierType.symbol)
+          if (owner == null || owner.kind !in setOf(JavaSemanticTypeDeclarationKind.CLASS, JavaSemanticTypeDeclarationKind.BUILTIN) ||
+            owner.declaration?.modifiers?.contains(JavaAstModifier.ABSTRACT) == true
+          ) {
+            error(expression.span, "java.semantic.invalid_constructor_reference", "构造器引用目标必须是可实例化 class。")
+            return JavaSemanticType.Error
+          }
+          selected = selectMostSpecific(
+            instantiateApplicablePhase(constructorCandidates(qualifierType), sam.parameterTypes, emptyList()),
+            expression.span,
+            "new",
+          ) ?: return JavaSemanticType.Error
+          kind = JavaMethodReferenceKind.CONSTRUCTOR
+          receiverConversion = null
+          callableArguments = sam.parameterTypes
+          receiverKind = JavaReceiverKind.NONE
+        } else {
+          val named = methodCandidates(qualifierType, expression.memberName)
+            .filter { isCallableAccessible(it.info) }
+          val staticApplicable = instantiateApplicablePhase(
+            named.filter { it.info.isStatic }, sam.parameterTypes, emptyList(),
+          )
+          val unboundReceiver = sam.parameterTypes.firstOrNull()
+          val unboundConversion = unboundReceiver?.let { actual ->
+            relations().invocationConversion(actual, qualifierType, allowBoxing = false)
+          }
+          val unboundApplicable = if (unboundConversion == null) emptyList() else {
+            instantiateApplicablePhase(
+              named.filter { !it.info.isStatic }, sam.parameterTypes.drop(1), emptyList(),
+            )
+          }
+          if (staticApplicable.isNotEmpty() && unboundApplicable.isNotEmpty()) {
+            error(expression.span, "java.semantic.ambiguous_method_reference", "方法引用同时匹配 static 与未绑定实例方法。")
+            return JavaSemanticType.Error
+          }
+          if (staticApplicable.isNotEmpty()) {
+            selected = selectMostSpecific(staticApplicable, expression.span, expression.memberName)
+              ?: return JavaSemanticType.Error
+            kind = JavaMethodReferenceKind.STATIC
+            receiverConversion = null
+            callableArguments = sam.parameterTypes
+            receiverKind = JavaReceiverKind.TYPE_QUALIFIED
+          } else {
+            selected = selectMostSpecific(unboundApplicable, expression.span, expression.memberName)
+              ?: return JavaSemanticType.Error
+            kind = JavaMethodReferenceKind.UNBOUND_INSTANCE
+            receiverConversion = checkNotNull(unboundConversion)
+            callableArguments = sam.parameterTypes.drop(1)
+            receiverKind = JavaReceiverKind.EXPLICIT
+          }
+        }
+      }
+    }
+
+    val argumentConversions = callableArguments.zip(selected.parameterTypes).map { (actual, expected) ->
+      relations().invocationConversion(actual, expected, allowBoxing = true)
+        ?: return JavaSemanticType.Error
+    }
+    val referencedReturn = selected.returnType
+    val returnConversion = if (sam.returnType == JavaSemanticType.Void) {
+      null
+    } else {
+      compatibility(referencedReturn, sam.returnType) ?: run {
+        error(expression.span, "java.semantic.method_reference_return_mismatch", "被引用 callable 的返回类型与 SAM 返回类型不兼容。")
+        return JavaSemanticType.Error
+      }
+    }
+    val dispatch = when {
+      kind == JavaMethodReferenceKind.CONSTRUCTOR -> JavaDispatchKind.SPECIAL
+      selected.info.isStatic -> JavaDispatchKind.STATIC
+      selected.info.isBuiltinVirtualRoot -> JavaDispatchKind.VIRTUAL
+      selected.info.isBuiltin -> JavaDispatchKind.SPECIAL
+      receiverKind == JavaReceiverKind.SUPER -> JavaDispatchKind.SPECIAL
+      selected.info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE -> JavaDispatchKind.INTERFACE
+      else -> JavaDispatchKind.VIRTUAL
+    }
+    val slot = if (dispatch in setOf(JavaDispatchKind.VIRTUAL, JavaDispatchKind.INTERFACE)) {
+      virtualSlots[selected.info.symbol]
+    } else {
+      null
+    }
+    val referenced = selected.binding(dispatch, receiverKind, slot)
+    methodReferenceBindings[expression.nodeId] = JavaMethodReferenceBinding(
+      target, sam, referenced, kind, argumentConversions, receiverConversion, returnConversion,
+    )
+    resolved[expression.nodeId] = selected.info.symbol
+    validateCallableThrows(selected.info, expression.span)
+    return target
+  }
+
+  /**
    * 查找目标类型继承图中唯一的抽象实例方法，并完成 owner 泛型代换。
    *
    * 最近的 concrete/default 声明会压住同签名父方法；与 Object 公共方法同签名的声明不计入 SAM。
@@ -2188,6 +2337,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private fun functionalMethod(
     target: JavaSemanticType.Declared,
     span: JavaSourceSpan,
+    invalidTargetCode: String = "java.semantic.lambda_target_not_functional_interface",
+    subject: String = "lambda",
   ): JavaCallableBinding? {
     val targetInfo = typeInfo(target.symbol)
     val builtinDescriptor = builtinTypeRoles[target.symbol]?.let { role ->
@@ -2196,7 +2347,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     val isInterface = targetInfo?.kind == JavaSemanticTypeDeclarationKind.INTERFACE ||
       builtinDescriptor?.isInterfaceFacade == true
     if (!isInterface || targetInfo == null) {
-      error(span, "java.semantic.lambda_target_not_functional_interface", "lambda 目标必须是函数式接口。")
+      error(span, invalidTargetCode, "$subject 目标必须是函数式接口。")
       return null
     }
 
@@ -2233,7 +2384,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     if (selected == null) {
       error(
         span,
-        "java.semantic.lambda_target_not_functional_interface",
+        invalidTargetCode,
         if (abstractMethods.isEmpty()) "目标接口没有可实现的抽象方法。" else "目标接口包含多个独立抽象方法。",
       )
       return null
@@ -3102,10 +3253,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return types.map { checkNotNull(it) }
   }
 
-  /** Java 8 本批 poly expression 包含 diamond new 与 lambda，并允许任意层括号包装。 */
+  /** Java 8 本批 poly expression 包含 diamond new、lambda 与方法引用，并允许任意层括号包装。 */
   private fun JavaAstExpression.isTargetTypedDiamond(): Boolean = when (this) {
     is JavaAstExpression.NewObject -> (type as? JavaAstTypeReference.Named)?.usesDiamond == true
     is JavaAstExpression.Lambda -> true
+    is JavaAstExpression.MethodReference -> true
     is JavaAstExpression.Parenthesized -> expression.isTargetTypedDiamond()
     else -> false
   }
@@ -3116,6 +3268,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       val target = parameter as? JavaSemanticType.Declared
       target != null && functionalMethodShape(target)?.parameterCount == parameters.size
     }
+    is JavaAstExpression.MethodReference -> parameter is JavaSemanticType.Declared &&
+      functionalMethodShape(parameter) != null
     is JavaAstExpression.Parenthesized -> expression.isPolyCompatibleWith(parameter)
     is JavaAstExpression.NewObject -> parameter is JavaSemanticType.Declared
     else -> true
@@ -4293,6 +4447,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         catchTypes.toMap(),
         resourceCloseBindings.toMap(),
         lambdaBindings.toMap(),
+        methodReferenceBindings.toMap(),
       ),
       diagnostics,
     )

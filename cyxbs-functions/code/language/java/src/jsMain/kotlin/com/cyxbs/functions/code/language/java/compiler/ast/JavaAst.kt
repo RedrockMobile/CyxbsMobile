@@ -536,6 +536,26 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     val parameters: List<JavaAstLambdaParameter>,
     val body: JavaAstLambdaBody,
   ) : JavaAstExpression
+
+  /**
+   * Java 8 方法引用；具体 static/绑定实例/未绑定实例/构造器形态由目标 SAM 与语义成员共同决定。
+   *
+   * 类型 qualifier 与表达式 qualifier 必须保持区分：`Type::method` 可能匹配 static 或未绑定实例
+   * 方法，而 `value::method` 必须在创建函数对象时求值并固定 receiver。
+   */
+  data class MethodReference(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val qualifier: JavaAstMethodReferenceQualifier,
+    val memberName: String,
+    val isConstructor: Boolean,
+  ) : JavaAstExpression
+}
+
+/** 方法引用的类型或表达式 qualifier。 */
+internal sealed interface JavaAstMethodReferenceQualifier {
+  data class Type(val type: JavaAstTypeReference) : JavaAstMethodReferenceQualifier
+  data class Expression(val expression: JavaAstExpression) : JavaAstMethodReferenceQualifier
 }
 
 /** Lambda 参数；[type] 为空时使用函数式接口 SAM 参数类型。 */

@@ -477,6 +477,8 @@ internal sealed interface JavaIrExpression {
     val body: JavaIrStatement.Block,
     override val type: JavaIrType.Reference,
     override val span: JavaSourceSpan,
+    /** 方法引用创建时按源码顺序求值并固定的 receiver；普通 lambda 为空。 */
+    val boundValues: List<JavaIrBoundValue> = emptyList(),
   ) : JavaIrExpression
 
   data class NewObject(
@@ -538,6 +540,17 @@ internal sealed interface JavaIrExpression {
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 }
+
+/**
+ * Lambda/方法引用创建时立即求值的闭包值。
+ *
+ * [local] 仅在函数对象 body 内可见；[requireNonNull] 用于 Java 绑定方法引用的创建时 NPE 语义。
+ */
+internal data class JavaIrBoundValue(
+  val local: JavaIrLocalId,
+  val expression: JavaIrExpression,
+  val requireNonNull: Boolean,
+)
 
 /** 引用数组写入检查不依赖 JavaScript 动态类型，明确区分 Object、String 与用户类。 */
 internal enum class JavaIrArrayReferenceComponentKind {

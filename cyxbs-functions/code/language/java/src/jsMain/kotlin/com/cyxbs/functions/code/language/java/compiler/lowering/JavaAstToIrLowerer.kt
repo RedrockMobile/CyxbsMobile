@@ -808,6 +808,7 @@ private class BodyLowering(
       is JavaAstExpression.ArrayAccess -> arrayAccess(source, type)
       is JavaAstExpression.Parenthesized -> expression(source.expression)
       is JavaAstExpression.Lambda -> lambda(source, type)
+      is JavaAstExpression.MethodReference -> methodReference(source, type)
   } ?: return null
     return conversion(source, raw)
   }
@@ -865,6 +866,96 @@ private class BodyLowering(
       body,
       referenceType,
       source.span,
+    )
+  }
+
+  /**
+   * 把已决议方法引用规范化为 Lambda IR，统一复用 SAM 虚槽和闭包 emitter。
+   *
+   * 绑定 receiver 会先落入 [JavaIrBoundValue]，从而在函数对象创建时只求值一次并立即执行
+   * null 检查；未绑定 receiver 使用 SAM 第一个合成参数。
+   */
+  private fun methodReference(
+    source: JavaAstExpression.MethodReference,
+    type: JavaIrType,
+  ): JavaIrExpression? {
+    val referenceType = type as? JavaIrType.Reference
+      ?: return invalid("Method reference target must lower to a reference type.", source.span)
+    val binding = lowering.model.methodReferenceBindings[source.nodeId]
+      ?: return invalid("Method reference is missing its semantic binding.", source.span)
+    if (referenceType.classId != JavaIrClassId(binding.targetType.symbol.value)) {
+      return invalid("Method reference target type is inconsistent.", source.span)
+    }
+    val slot = binding.functionalMethod.virtualSlot?.value
+      ?: return invalid("Method reference SAM binding is missing its virtual slot.", source.span)
+    val parameters = binding.functionalMethod.parameterTypes.mapIndexed { index, semanticType ->
+      temporary(
+        lowering.typeOf(semanticType, source.span) ?: return null,
+        "methodReferenceParameter$index",
+        source.span,
+      )
+    }
+    val parameterValues = parameters.map { local ->
+      JavaIrExpression.GetLocal(local.id, local.type, source.span)
+    }
+    val boundValues = mutableListOf<JavaIrBoundValue>()
+    val receiver = when (binding.kind) {
+      JavaMethodReferenceKind.STATIC,
+      JavaMethodReferenceKind.CONSTRUCTOR,
+      -> null
+      JavaMethodReferenceKind.UNBOUND_INSTANCE -> {
+        val raw = parameterValues.firstOrNull()
+          ?: return invalid("Unbound method reference is missing its receiver parameter.", source.span)
+        binding.receiverConversion?.let { applyConversion(it, raw, source.span) }
+          ?: return invalid("Unbound method reference is missing its receiver conversion.", source.span)
+      }
+      JavaMethodReferenceKind.BOUND_INSTANCE -> {
+        val qualifier = (source.qualifier as? JavaAstMethodReferenceQualifier.Expression)?.expression
+          ?: return invalid("Bound method reference is missing its expression qualifier.", source.span)
+        when (qualifier) {
+          is JavaAstExpression.This,
+          is JavaAstExpression.Super,
+          -> thisExpression(qualifier.span)
+          else -> {
+            val value = expression(qualifier) ?: return null
+            val local = temporary(value.type, "methodReferenceReceiver", qualifier.span)
+            boundValues += JavaIrBoundValue(local.id, value, requireNonNull = true)
+            JavaIrExpression.GetLocal(local.id, local.type, qualifier.span)
+          }
+        }
+      }
+    }
+    val rawArguments = if (binding.kind == JavaMethodReferenceKind.UNBOUND_INSTANCE) {
+      parameterValues.drop(1)
+    } else {
+      parameterValues
+    }
+    if (rawArguments.size != binding.argumentConversions.size) {
+      return invalid("Method reference argument conversion count is inconsistent.", source.span)
+    }
+    val arguments = rawArguments.zip(binding.argumentConversions).map { (argument, conversion) ->
+      applyConversion(conversion, argument, source.span) ?: return null
+    }
+    val invoked = if (binding.kind == JavaMethodReferenceKind.CONSTRUCTOR) {
+      construct(binding.referencedCallable, arguments, source.span) ?: return null
+    } else {
+      invocation(binding.referencedCallable, receiver, arguments, source.span) ?: return null
+    }
+    val result = binding.returnConversion?.let { applyConversion(it, invoked, source.span) } ?: invoked
+    val bodyStatement = if (binding.functionalMethod.returnType == JavaSemanticType.Void) {
+      JavaIrStatement.Expression(result, source.span)
+    } else {
+      JavaIrStatement.Return(result, source.span)
+    }
+    return JavaIrExpression.Lambda(
+      referenceType.classId,
+      slot,
+      parameters.map(JavaIrLocal::id),
+      emptyList(),
+      JavaIrStatement.Block(listOf(bodyStatement), source.span),
+      referenceType,
+      source.span,
+      boundValues,
     )
   }
 
@@ -1247,7 +1338,7 @@ private class BodyLowering(
    */
   private fun invocation(
     binding: JavaCallableBinding,
-    receiver: JavaIrExpression,
+    receiver: JavaIrExpression?,
     arguments: List<JavaIrExpression>,
     span: JavaSourceSpan,
   ): JavaIrExpression? {
@@ -1259,7 +1350,13 @@ private class BodyLowering(
     val type = lowering.typeOf(binding.returnType, span) ?: return null
     val builtin = lowering.model.builtinMembers[binding.symbol]
     if (builtin is JavaBuiltinMemberDescriptor.Callable) {
-      if (builtin.isStatic || binding.receiverKind !in setOf(
+      if (builtin.isStatic) {
+        if (receiver != null || binding.dispatch != JavaDispatchKind.STATIC) {
+          return invalid("Synthetic static builtin call has an invalid receiver.", span)
+        }
+        return JavaIrExpression.InvokeBuiltin(builtin.operation, null, arguments, type, span)
+      }
+      if (receiver == null || binding.receiverKind !in setOf(
           JavaReceiverKind.EXPLICIT,
           JavaReceiverKind.IMPLICIT_THIS,
           JavaReceiverKind.SUPER,
@@ -1278,19 +1375,49 @@ private class BodyLowering(
     }
     val method = JavaIrMethodId(binding.symbol.value)
     return when (binding.dispatch) {
-      JavaDispatchKind.SPECIAL -> JavaIrExpression.InvokeSpecial(receiver, method, arguments, type, span)
+      JavaDispatchKind.SPECIAL -> JavaIrExpression.InvokeSpecial(
+        receiver ?: return invalid("Synthetic special call is missing its receiver.", span),
+        method, arguments, type, span,
+      )
       JavaDispatchKind.VIRTUAL,
       JavaDispatchKind.INTERFACE,
       -> JavaIrExpression.InvokeVirtual(
-        receiver,
+        receiver ?: return invalid("Synthetic virtual call is missing its receiver.", span),
         method,
         binding.virtualSlot?.value ?: return invalid("Synthetic virtual call is missing its slot.", span),
         arguments,
         type,
         span,
       )
-      JavaDispatchKind.STATIC -> invalid("Resource close cannot be static.", span)
+      JavaDispatchKind.STATIC -> {
+        if (receiver != null) return invalid("Synthetic static call unexpectedly has a receiver.", span)
+        JavaIrExpression.InvokeStatic(method, arguments, type, span)
+      }
     }
+  }
+
+  /** 方法引用的构造器调用只读取最终 binding，并支持 source 与 allowlist builtin 构造器。 */
+  private fun construct(
+    binding: JavaCallableBinding,
+    arguments: List<JavaIrExpression>,
+    span: JavaSourceSpan,
+  ): JavaIrExpression? {
+    val declaration = lowering.model.callableDeclarations[binding.symbol]
+      ?: return invalid("Constructor reference is missing its declaration.", span)
+    val result = lowering.typeOf(binding.returnType, span) as? JavaIrType.Reference
+      ?: return invalid("Constructor reference result must be a reference type.", span)
+    if (declaration.kind != JavaSemanticCallableKind.CONSTRUCTOR ||
+      binding.dispatch != JavaDispatchKind.SPECIAL ||
+      arguments.size != binding.parameterTypes.size
+    ) return invalid("Constructor reference binding is inconsistent.", span)
+    val builtin = lowering.model.builtinMembers[binding.symbol]
+    if (builtin is JavaBuiltinMemberDescriptor.Callable) {
+      if (!builtin.isConstructor) return invalid("Constructor reference targets a non-constructor builtin.", span)
+      return JavaIrExpression.ConstructBuiltin(builtin.operation, arguments, result, span)
+    }
+    return JavaIrExpression.NewObject(
+      result.classId, JavaIrMethodId(binding.symbol.value), arguments, result, span,
+    )
   }
 
   /** new 的 owner 和 constructor id 都来自 semantic binding/result type。 */

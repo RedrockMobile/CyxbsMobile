@@ -239,6 +239,39 @@ internal data class JavaLambdaBinding(
   }
 }
 
+/** 方法引用在创建函数对象时采用的 receiver/构造形态。 */
+internal enum class JavaMethodReferenceKind {
+  STATIC,
+  BOUND_INSTANCE,
+  UNBOUND_INSTANCE,
+  CONSTRUCTOR,
+}
+
+/**
+ * 方法引用完成目标类型与 overload 选择后的执行契约。
+ *
+ * [argumentConversions] 对应被引用 callable 的显式参数；未绑定实例引用额外使用
+ * [receiverConversion] 转换 SAM 第一个参数。[returnConversion] 为空表示 SAM 返回 void，调用结果丢弃。
+ */
+internal data class JavaMethodReferenceBinding(
+  val targetType: JavaSemanticType.Declared,
+  val functionalMethod: JavaCallableBinding,
+  val referencedCallable: JavaCallableBinding,
+  val kind: JavaMethodReferenceKind,
+  val argumentConversions: List<JavaSemanticConversion>,
+  val receiverConversion: JavaSemanticConversion? = null,
+  val returnConversion: JavaSemanticConversion? = null,
+) {
+  init {
+    require(argumentConversions.size == referencedCallable.parameterTypes.size) {
+      "A Java method reference must convert every referenced callable parameter."
+    }
+    require(kind == JavaMethodReferenceKind.UNBOUND_INSTANCE || receiverConversion == null) {
+      "Only an unbound instance method reference may convert a SAM receiver parameter."
+    }
+  }
+}
+
 /** 一次编译内稳定的虚方法槽编号；编号不应跨编译请求持久化。 */
 internal data class JavaVirtualSlotId(val value: Int) {
   init {
@@ -487,6 +520,8 @@ internal data class JavaSemanticModel(
   val resourceCloseBindings: Map<JavaNodeId, JavaResourceCloseBinding> = emptyMap(),
   /** lambda expression node 到已决议 SAM、参数与 effectively-final 捕获的绑定。 */
   val lambdaBindings: Map<JavaNodeId, JavaLambdaBinding> = emptyMap(),
+  /** 方法引用 expression node 到已决议 SAM、callable 和参数/返回转换。 */
+  val methodReferenceBindings: Map<JavaNodeId, JavaMethodReferenceBinding> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {
