@@ -5,8 +5,8 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.pages.schedule.data.repository.ScheduleIdGenerators
 import com.cyxbs.pages.schedule.data.repository.UuidV7ScheduleIdGenerators
-import com.cyxbs.pages.schedule.domain.repository.createProductionScheduleRepositoryFactory
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
+import com.cyxbs.pages.schedule.domain.repository.createProductionScheduleRepositoryFactory
 import com.cyxbs.pages.schedule.domain.uuid.UuidV7Generator
 import kotlin.time.Clock
 
@@ -29,7 +29,8 @@ object ScheduleRepositoryProvider {
    * 延迟创建并全局共享的稳定代理。
    *
    * 对象身份在登录、登出与游客切换中不变；每次 Login 创建绑定学号的不可变 façade，先发布对应 Loading 流再
-   * 初始化。Logout/Tourist 只公开空事实，并由代理拒绝后续命令。
+   * 初始化。Logout/Tourist 只公开空事实，并由代理拒绝后续命令。平台若提供可靠网络状态，还会在离线恢复且
+   * 当前账号确有本地临时提交时请求一次 Sync。
    */
   val repository: ScheduleRepository by lazy {
     AccountSwitchingScheduleRepository(
@@ -37,6 +38,7 @@ object ScheduleRepositoryProvider {
       scope = appCoroutineScope,
     ).also { repository ->
       repository.bindAccounts(IAccountService::class.impl().session)
+      bindScheduleNetworkRecoverySync(repository, appCoroutineScope)
     }
   }
 }

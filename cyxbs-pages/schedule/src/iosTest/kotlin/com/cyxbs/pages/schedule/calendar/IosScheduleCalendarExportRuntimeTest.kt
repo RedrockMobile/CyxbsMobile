@@ -114,6 +114,37 @@ class IosScheduleCalendarExportRuntimeTest {
     assertEquals(0, preferences.cacheWrites)
   }
 
+  /** 远端响应持久化后必须重新读取最新仓库快照，不能等到下一次本地编辑才刷新 EventKit。 */
+  @Test
+  fun remoteCommittedRequestsFullReconcileFromPersistedSnapshot() = runTest {
+    val accountId = "runtime-remote-committed"
+    val account = FakeAccount(backgroundScope, session(accountId))
+    val repository = FakeRepository(accountId)
+    val gateway = FakeRuntimeGateway()
+    val runtime = IosScheduleCalendarExportRuntime(
+      accountService = account,
+      repository = repository,
+      session = account.session.value,
+      scope = account.accountCoroutineScope,
+      owner = account.accountCoroutineScope.coroutineContext[Job]!!,
+      gatewayFactory = { gateway },
+      preferences = FakePreferences(
+        IosScheduleCalendarExportSettings.Preference(true, "selected", null),
+      ),
+    )
+
+    runtime.start()
+    repository.awaitCalendarChangesCollector()
+    runCurrent()
+    val readsBeforeRemoteCommit = repository.snapshotReads
+
+    repository.emitAwait(ScheduleCalendarChange.RemoteCommitted(accountId, scheduleIds = null))
+    runCurrent()
+    runtime.stop()
+
+    assertTrue(repository.snapshotReads > readsBeforeRemoteCommit)
+  }
+
   /**
    * iOS initializer 在 mutex 内只安装 entry：handoff release 前不能读取 preference/snapshot、检查 full access 或调用
    * gateway/cache；release 后 baseline 与 replayed Initialized 合并为一个 Full，重复 release 仍是 one-shot。

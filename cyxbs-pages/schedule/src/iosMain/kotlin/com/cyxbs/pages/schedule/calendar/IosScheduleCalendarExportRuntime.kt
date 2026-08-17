@@ -160,8 +160,8 @@ internal class IosScheduleCalendarExportRuntime(
         when (change) {
           is ScheduleCalendarChange.Initialized -> requestInitialFullOnce()
           is ScheduleCalendarChange.SchedulesCommitted -> requestFullFromRepository()
-          // remote receipt 不等于已落盘的 exportable snapshot，不能把它当成本地 Full 触发。
-          is ScheduleCalendarChange.RemoteCommitted -> Unit
+          // RemoteCommitted 只在远端完整响应已合并、持久化并发布最新快照后发出，可以安全触发完整导出。
+          is ScheduleCalendarChange.RemoteCommitted -> requestFullFromRepository()
         }
       }
     }
