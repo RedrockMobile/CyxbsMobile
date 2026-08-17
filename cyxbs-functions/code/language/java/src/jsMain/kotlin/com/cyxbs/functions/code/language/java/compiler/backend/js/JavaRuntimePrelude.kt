@@ -148,14 +148,14 @@ internal object JavaRuntimePrelude {
     function @__j_print_char_array(stream, value) { @__j_write_stream(stream, @__j_char_array_text(value)); }
     function @__j_print_int(stream, value) { @__j_write_stream(stream, String(value | 0)); }
     function @__j_print_string(stream, value) { @__j_write_stream(stream, value === null ? "null" : value); }
-    function @__j_print_object(stream, value) { @__j_write_stream(stream, @__j_object_to_string(value)); }
+    function @__j_print_object(stream, value) { @__j_write_stream(stream, @__j_string_value_of_object(value)); }
     function @__j_println(stream) { @__j_write_stream(stream, "\n"); }
     function @__j_println_boolean(stream, value) { @__j_write_stream(stream, (value ? "true" : "false") + "\n"); }
     function @__j_println_char(stream, value) { @__j_write_stream(stream, String.fromCharCode(value & 65535) + "\n"); }
     function @__j_println_char_array(stream, value) { @__j_write_stream(stream, @__j_char_array_text(value) + "\n"); }
     function @__j_println_int(stream, value) { @__j_write_stream(stream, String(value | 0) + "\n"); }
     function @__j_println_string(stream, value) { @__j_write_stream(stream, (value === null ? "null" : value) + "\n"); }
-    function @__j_println_object(stream, value) { @__j_write_stream(stream, @__j_object_to_string(value) + "\n"); }
+    function @__j_println_object(stream, value) { @__j_write_stream(stream, @__j_string_value_of_object(value) + "\n"); }
 
     function @__j_string_receiver(value) {
       value = @__j_non_null(value);
@@ -284,26 +284,89 @@ internal object JavaRuntimePrelude {
       return String(value.value | 0);
     }
 
-    /** 精选 Object 输出转换；未知对象不能绕过尚未实现的 Object.toString 虚分派。 */
+    // Object 的默认 hashCode 只要求同一运行对象稳定；WeakMap 不污染用户字段或枚举结果。
+    const @__j_identity_hashes = new WeakMap();
+    let @__j_next_identity_hash = 1;
+
+    function @__j_identity_hash(value) {
+      if (value === 0 || value === 1) return (value + 1) | 0;
+      if (value === 2) return 3;
+      if ((typeof value !== "object" && typeof value !== "function") || value === null) {
+        return 0;
+      }
+      let hash = @__j_identity_hashes.get(value);
+      if (hash === undefined) {
+        hash = @__j_next_identity_hash++ | 0;
+        if (hash === 0) hash = @__j_next_identity_hash++ | 0;
+        @__j_identity_hashes.set(value, hash);
+      }
+      return hash | 0;
+    }
+
+    function @__j_string_hash(value) {
+      let hash = 0;
+      for (let index = 0; index < value.length; index++) {
+        hash = (Math.imul(hash, 31) + value.charCodeAt(index)) | 0;
+      }
+      return hash | 0;
+    }
+
+    /** Object.equals：源码 override 优先，精选 builtin 使用各自 Java 值语义，其他对象按身份比较。 */
+    function @__j_object_equals(value, other) {
+      value = @__j_non_null(value);
+      const override = value[@__j_object_equals_slot];
+      if (typeof override === "function") return !!override.call(value, other);
+      if (typeof value === "string") return typeof other === "string" && value === other;
+      if (value.@__j_box_tag !== undefined) return @__j_box_equals(value, other);
+      return value === other;
+    }
+
+    /** Collection 查找允许 null，并按照查询对象.equals(已有元素) 的 Java 方向调用。 */
+    function @__j_object_equals_nullable(value, other) {
+      return value === null ? other === null : @__j_object_equals(value, other);
+    }
+
+    /** Object.hashCode：源码 override 优先，String/wrapper 使用 Java 算法，其余保持运行期身份稳定。 */
+    function @__j_object_hash_code(value) {
+      value = @__j_non_null(value);
+      const override = value[@__j_object_hash_code_slot];
+      if (typeof override === "function") return override.call(value) | 0;
+      if (typeof value === "string") return @__j_string_hash(value);
+      if (value.@__j_box_tag !== undefined) return @__j_box_hash(value);
+      return @__j_identity_hash(value);
+    }
+
+    /** Object.toString：源码 override 优先，再处理精选 builtin，最终回退 Java 默认类名@十六进制哈希。 */
     function @__j_object_to_string(value) {
-      if (value === null) return "null";
+      value = @__j_non_null(value);
+      const override = value[@__j_object_to_string_slot];
+      if (typeof override === "function") return @__j_string_receiver(override.call(value));
       if (typeof value === "string") return value;
-      if (value === 0 || value === 1) return "java.io.PrintStream@" + String(value + 1);
-      if (value === 2) return "java.io.InputStream@1";
+      if (value === 0 || value === 1) return "java.io.PrintStream" + String.fromCharCode(64) + String(value + 1);
+      if (value === 2) return "java.io.InputStream" + String.fromCharCode(64) + "1";
       if (value.@__j_box_tag !== undefined) return @__j_box_to_string(value);
       if (value.@__j_string_builder === true) return value.value;
       switch (value.@__j_collection) {
         case "LIST": return "[" + value.values.map(item =>
-          item === value ? "(this Collection)" : @__j_object_to_string(item)).join(", ") + "]";
+          item === value ? "(this Collection)" : @__j_string_value_of_object(item)).join(", ") + "]";
         case "SET": return "[" + value.values.map(item =>
-          item === value ? "(this Collection)" : @__j_object_to_string(item)).join(", ") + "]";
+          item === value ? "(this Collection)" : @__j_string_value_of_object(item)).join(", ") + "]";
         case "KEY_SET": return "[" + value.owner.entries.map(entry =>
-          entry.key === value ? "(this Collection)" : @__j_object_to_string(entry.key)).join(", ") + "]";
+          entry.key === value ? "(this Collection)" : @__j_string_value_of_object(entry.key)).join(", ") + "]";
         case "MAP": return "{" + value.entries.map(entry =>
-          (entry.key === value ? "(this Map)" : @__j_object_to_string(entry.key)) + "=" +
-          (entry.value === value ? "(this Map)" : @__j_object_to_string(entry.value))).join(", ") + "}";
+          (entry.key === value ? "(this Map)" : @__j_string_value_of_object(entry.key)) + "=" +
+          (entry.value === value ? "(this Map)" : @__j_string_value_of_object(entry.value))).join(", ") + "}";
       }
-      throw new Error("java.lang.UnsupportedOperationException: Object.toString runtime type is unavailable");
+      const className = value["@__j_class_name"];
+      if (typeof className === "string") {
+        return className + String.fromCharCode(64) + ((@__j_identity_hash(value) >>> 0).toString(16));
+      }
+      return "java.lang.Object" + String.fromCharCode(64) + ((@__j_identity_hash(value) >>> 0).toString(16));
+    }
+
+    /** String.valueOf(Object) 与 print(Object) 接受 null；直接 receiver 调用仍由上面的 non-null 检查抛 NPE。 */
+    function @__j_string_value_of_object(value) {
+      return value === null ? "null" : @__j_object_to_string(value);
     }
 
     function @__j_sb_receiver(value) {
@@ -332,7 +395,7 @@ internal object JavaRuntimePrelude {
       builder = @__j_sb_receiver(builder); builder.value += value === null ? "null" : @__j_string_argument(value); return builder;
     }
     function @__j_sb_append_object(builder, value) {
-      builder = @__j_sb_receiver(builder); builder.value += @__j_object_to_string(value); return builder;
+      builder = @__j_sb_receiver(builder); builder.value += @__j_string_value_of_object(value); return builder;
     }
     function @__j_sb_length(builder) { return @__j_sb_receiver(builder).value.length | 0; }
     function @__j_sb_char_at(builder, index) { return @__j_string_char_at(@__j_sb_receiver(builder).value, index); }
@@ -361,20 +424,13 @@ internal object JavaRuntimePrelude {
    * 精选集合运行时，仅在 typed IR 含集合 operation 时注入。
    *
    * Set/Map 使用受控线性表而不是 JavaScript Map：这样 String、null 与缓存范围外的
-   * wrapper 也能遵守 Java 值语义。普通用户对象仍按引用身份比较；本阶段明确不承诺用户
-   * override equals/hashCode 参与集合键比较，也不实现 fail-fast iterator。iterator 只保存 backing
+   * wrapper 也能遵守 Java 值语义。查询对象会通过 Object.equals 虚槽调用用户 override；当前
+   * 线性表不依赖 hashCode 分桶，也不实现 fail-fast iterator。iterator 只保存 backing
    * collection 与当前位置，不复制整个集合；迭代期间修改后的可见顺序属于受限兼容行为。
    */
   val collectionSource: String = """
     function @__j_collection_key_equals(left, right) {
-      if (left === right) return true;
-      if (left === null || right === null) return false;
-      if (typeof left === "string" || typeof right === "string") {
-        return typeof left === "string" && typeof right === "string" && left === right;
-      }
-      const leftTag = left.@__j_box_tag;
-      const rightTag = right.@__j_box_tag;
-      return leftTag !== undefined && leftTag === rightTag && left.value === right.value;
+      return @__j_object_equals_nullable(right, left);
     }
 
     function @__j_list(value) {

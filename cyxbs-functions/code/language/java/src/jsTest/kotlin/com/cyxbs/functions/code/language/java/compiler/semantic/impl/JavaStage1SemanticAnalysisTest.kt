@@ -994,9 +994,9 @@ class JavaStage1SemanticAnalysisTest {
     )
   }
 
-  /** Object 输出只承接已冻结 builtin 类型；用户类在源码参数位置稳定拒绝。 */
+  /** Object 输出既承接内建包装类型，也允许用户对象在运行时走虚方法分派。 */
   @Test
-  fun bindsObjectOutputForWrapperAndRejectsKnownUserClass() {
+  fun bindsObjectOutputForWrapperAndUserClass() {
     val supported = analyze(
       "Main.java" to """
         class Main {
@@ -1016,12 +1016,21 @@ class JavaStage1SemanticAnalysisTest {
     assertTrue(JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT in operations)
     assertTrue(JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT in operations)
 
-    assertDiagnostic(
-      analyze(
-        "Main.java" to "class User {} class Main { static void run() { System.out.println(new User()); } }",
-      ),
-      "java.semantic.object_string_conversion_unsupported",
+    val userClass = analyze(
+      "Main.java" to """
+        class User {
+          public String toString() { return "User"; }
+        }
+        class Main {
+          static void run() { System.out.println(new User()); }
+        }
+      """.trimIndent(),
     )
+    assertTrue(userClass.isSuccess, userClass.diagnostics.toString())
+    val userModel = assertNotNull(userClass.value)
+    assertTrue(userModel.selectedCallables.values.any { binding ->
+      userModel.builtinMembers[binding.symbol]?.operation == JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT
+    })
   }
 
   /** char[] 精确重载输出字符内容；裸 null 在 String 与 char[] 之间必须保持 Java 歧义。 */

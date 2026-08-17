@@ -8,6 +8,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstConstructorInv
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstExpression
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstForInitializer
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstMemberDeclaration
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstModifier
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstStatement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeDeclarationKind
@@ -283,6 +284,28 @@ class JavaLezerAstFrontendTest {
     assertTrue(assertIs<JavaAstMemberDeclaration.Method>(marker.members.single()).body == null)
   }
 
+  /** interface 的 abstract、default 与 static 方法必须保留不同 modifier/body 形态。 */
+  @Test
+  fun mapsInterfaceDefaultAndStaticMethods() {
+    val result = parse(
+      """
+      interface Calculator {
+        int calculate(int value);
+        default int increment(int value) { return value + 1; }
+        static int twice(int value) { return value * 2; }
+      }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val methods = assertNotNull(result.value).units.single().types.single().members
+      .filterIsInstance<JavaAstMemberDeclaration.Method>()
+    assertTrue(methods.single { it.name == "calculate" }.body == null)
+    assertTrue(JavaAstModifier.DEFAULT in methods.single { it.name == "increment" }.modifiers)
+    assertNotNull(methods.single { it.name == "increment" }.body)
+    assertTrue(JavaAstModifier.STATIC in methods.single { it.name == "twice" }.modifiers)
+  }
+
   /** 链式调用必须把内层调用保留为外层 receiver，名称和 ArgumentList 不得跨层混用。 */
   @Test
   fun parsesChainedInvocationFromCurrentCstNode() {
@@ -302,6 +325,27 @@ class JavaLezerAstFrontendTest {
     val inner = assertIs<JavaAstExpression.MethodInvocation>(assertNotNull(outer.receiver))
     assertEquals("substring", inner.methodName)
     assertEquals(2, inner.arguments.size)
+  }
+
+  /** do-while、break 与 continue 必须保留为独立 AST 节点，不能被 block 递归展平。 */
+  @Test
+  fun parsesLoopControlStatements() {
+    val result = parse(
+      "class Main { void run() { do { if (true) continue; break; } while (false); } }",
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.joinToString())
+    val method = assertIs<JavaAstMemberDeclaration.Method>(
+      assertNotNull(result.value).units.single().types.single().members.single(),
+    )
+    val loop = assertIs<JavaAstStatement.DoWhile>(assertNotNull(method.body).statements.single())
+    val body = assertIs<JavaAstStatement.Block>(loop.body)
+    assertIs<JavaAstStatement.Continue>(assertIs<JavaAstStatement.If>(body.statements[0]).thenBranch)
+    assertIs<JavaAstStatement.Break>(body.statements[1])
+
+    val labeled = parse("class Main { void run() { outer: while (true) { break outer; } } }")
+    assertFalse(labeled.isSuccess)
+    assertTrue(labeled.diagnostics.any { it.code == "java.frontend.unsupported" })
   }
 
   /** 真实 CST 中的未开放 Java 8 或阶段 2A 结构必须被稳定拒绝，不能在 adapter 中消失。 */

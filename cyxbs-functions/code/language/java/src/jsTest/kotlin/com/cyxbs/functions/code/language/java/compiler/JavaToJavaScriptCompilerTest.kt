@@ -142,6 +142,144 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(7, executeEntry(artifact, 5))
   }
 
+  /** interface 变量调用必须通过统一虚槽分派到 class 实现。 */
+  @Test
+  fun compilesInterfaceImplementationAndDispatch() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/Main.java" to """
+        package demo;
+
+        interface IntOperation {
+          int apply(int value);
+        }
+
+        class Twice implements IntOperation {
+          @Override public int apply(int value) { return value * 2; }
+        }
+
+        class Main {
+          static int run(int value) {
+            IntOperation operation = new Twice();
+            return operation.apply(value);
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(10, executeEntry(artifact, 5))
+  }
+
+  /** 未覆写时继承最具体 default method，class 自身实现仍应覆盖接口默认值。 */
+  @Test
+  fun compilesDefaultMethodAndClassWinsRule() {
+    val defaultResult = compile(
+      entryClass = "demo.DefaultMain",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/DefaultMain.java" to """
+        package demo;
+
+        interface Increment {
+          default int apply(int value) { return value + 1; }
+          static int twice(int value) { return value * 2; }
+        }
+
+        class DefaultIncrement implements Increment { }
+
+        class DefaultMain {
+          static int run(int value) {
+            Increment operation = new DefaultIncrement();
+            return operation.apply(Increment.twice(value));
+          }
+        }
+      """.trimIndent(),
+    )
+    val defaultArtifact = assertNotNull(defaultResult.value, defaultResult.diagnostics.toString())
+    assertEquals(11, executeEntry(defaultArtifact, 5))
+
+    val overrideResult = compile(
+      entryClass = "demo.OverrideMain",
+      entryMethod = "run",
+      descriptor = "(I)I",
+      "demo/OverrideMain.java" to """
+        package demo;
+
+        interface Increment {
+          default int apply(int value) { return value + 1; }
+        }
+
+        class CustomIncrement implements Increment {
+          @Override public int apply(int value) { return value + 10; }
+        }
+
+        class OverrideMain {
+          static int run(int value) {
+            Increment operation = new CustomIncrement();
+            return operation.apply(value);
+          }
+        }
+      """.trimIndent(),
+    )
+    val overrideArtifact = assertNotNull(overrideResult.value, overrideResult.diagnostics.toString())
+    assertEquals(15, executeEntry(overrideArtifact, 5))
+  }
+
+  /** 泛型接口的实现类型必须沿 implements 边完成类型参数代换。 */
+  @Test
+  fun compilesGenericInterfaceSubstitution() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()Z",
+      "demo/Main.java" to """
+        package demo;
+
+        interface Box<T> {
+          T get();
+        }
+
+        class StringBox implements Box<String> {
+          public String get() { return "ok"; }
+        }
+
+        class Main {
+          static boolean run() {
+            Box<String> box = new StringBox();
+            return box.get() != null;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(true, executeEntryValue(artifact, null) as Boolean)
+  }
+
+  /** 两个互不相关的 default method 必须要求 class 显式解决冲突。 */
+  @Test
+  fun rejectsConflictingInterfaceDefaults() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+
+        interface Left { default int value() { return 1; } }
+        interface Right { default int value() { return 2; } }
+        class Conflict implements Left, Right { }
+        class Main { static int run() { return 0; } }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.value == null)
+    assertTrue(result.diagnostics.any { it.code == "java.semantic.conflicting_interface_defaults" })
+  }
+
   /** 参数化字段、继承代换和泛型返回值必须在擦除后保持正确运行结果。 */
   @Test
   fun compilesGenericClassAndInheritedSubstitution() {
@@ -691,9 +829,9 @@ class JavaToJavaScriptCompilerTest {
     }
   }
 
-  /** Object 输出覆盖 wrapper/集合；直接 self-reference 不递归，未知用户对象保持稳定拒绝。 */
+  /** Object 虚分派覆盖用户 override、默认实现、输出与集合查找，并保留集合 self-reference。 */
   @Test
-  fun formatsSupportedObjectValuesAndRejectsUnknownRuntimeObjects() {
+  fun dispatchesObjectMethodsAcrossOutputAndCollections() {
     val supported = compile(
       entryClass = "demo.Main",
       entryMethod = "run",
@@ -722,26 +860,53 @@ class JavaToJavaScriptCompilerTest {
       executeEntryValue(supportedArtifact, null) as String,
     )
 
-    val unknown = compile(
+    val userObjects = compile(
       entryClass = "demo.Main",
       entryMethod = "run",
-      descriptor = "()I",
+      descriptor = "()Ljava/lang/String;",
       "demo/Main.java" to """
         package demo;
-        class User {}
+        import java.util.ArrayList;
+        import java.util.HashMap;
+        import java.util.List;
+        import java.util.Map;
+        class User {
+          @Override public boolean equals(Object other) { return other != null; }
+          @Override public int hashCode() { return 37; }
+          @Override public String toString() { return "User"; }
+        }
+        class Plain {}
         class Main {
-          static int run() {
-            Object value = new User();
+          static String run() {
+            User first = new User();
+            User second = new User();
+            Object value = first;
+            List<Object> list = new ArrayList<>();
+            list.add(first);
+            Map<Object, String> map = new HashMap<>();
+            map.put(first, "hit");
+            Object plain = new Plain();
             System.out.println(value);
-            return 0;
+            return new StringBuilder()
+              .append(value.equals(second)).append(":")
+              .append(value.hashCode()).append(":")
+              .append(value).append(":")
+              .append(list.contains(second)).append(":")
+              .append(map.get(second)).append(":")
+              .append(plain.hashCode() == plain.hashCode()).append(":")
+              .append(plain.toString())
+              .toString();
           }
         }
       """.trimIndent(),
     )
-    val unknownArtifact = assertNotNull(unknown.value, unknown.diagnostics.toString())
-    assertTrue(
-      "UnsupportedOperationException" in executionFailure { createEntry(unknownArtifact, {}, {})() },
+    val userArtifact = assertNotNull(userObjects.value, userObjects.diagnostics.toString())
+    var output = ""
+    assertEquals(
+      "true:37:User:true:hit:true:demo.Plain@1",
+      createEntry(userArtifact, { output += it }, {})() as String,
     )
+    assertEquals("User\n", output)
   }
 
   /** PrintStream 与 StringBuilder 的 char[] 重载输出 UTF-16 字符，null 数组保持 NPE。 */
@@ -901,6 +1066,53 @@ class JavaToJavaScriptCompilerTest {
   }
 
   /** 创建包含稳定入口 descriptor 的完整编译请求。 */
+  /** do-while、break、continue 与 for update 必须保持 Java 的跳转及 definite-assignment 语义。 */
+  @Test
+  fun compilesLoopControlFlow() {
+    val result = compile(
+      entryClass = "demo.Main",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/Main.java" to """
+        package demo;
+        class Main {
+          static int run() {
+            int total = 0;
+            int i = 0;
+            do {
+              i++;
+              if (i == 2) continue;
+              total += i;
+              if (i == 4) break;
+            } while (i < 10);
+            for (int j = 0; j < 5; j++) {
+              if (j == 1) continue;
+              if (j == 4) break;
+              total += j;
+            }
+            int assigned;
+            while (true) {
+              assigned = 7;
+              break;
+            }
+            return total * 10 + assigned;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(137, (createEntry(artifact, {}, {})() as Number).toInt())
+
+    val invalid = compile(
+      entryClass = "demo.Invalid",
+      entryMethod = "run",
+      descriptor = "()V",
+      "demo/Invalid.java" to "package demo; class Invalid { static void run() { break; } }",
+    )
+    assertTrue(invalid.diagnostics.any { it.code == "java.semantic.break_outside_loop" })
+  }
+
   private fun compile(
     entryClass: String,
     entryMethod: String,

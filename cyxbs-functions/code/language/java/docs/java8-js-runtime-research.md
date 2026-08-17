@@ -415,11 +415,27 @@ JS 生成、QuickJS 行为测试和 javac 差分测试，避免前端与后端�
 
 ### 阶段 2A：补齐 Java 语言 MVP
 
+阶段 2A 与阶段 2B 是两条可以交错交付的能力线，而不是必须全部串行完成的版本号。当前阶段 2B 的
+精选类库与宿主桥已经形成纵向闭环，但不代表阶段 2A 的 Java 语言能力已经完成。后续工作继续归入
+阶段 2A，不新增“阶段 2C”；只有下列剩余语言能力通过阶段闸门后，才进入阶段 3 产品化。
+
 - 在已有 class 构造器链、初始化和虚分派基础上补齐接口初始化、接口分派与 default method；
 - 完成数组、boxing/unboxing、字符串拼接、异常/`finally`、enum；
 - 完成常见泛型擦除与桥接、lambda、方法引用和函数式接口；
 - 对复杂 wildcard capture、低频语法和不支持 API 给出稳定的编译期诊断，不动态降级；
 - 每项能力继续通过 typed IR 单测、JS 快照、QuickJS 行为和 javac 差分四层验证。
+
+后续批次按依赖顺序推进：
+
+1. 用户接口、`implements`、接口继承、接口分派与 default method；
+2. `Object.toString/equals/hashCode` 虚分派，并让集合受控接入用户对象语义；
+3. 增强 `for`、`break/continue`、`do-while` 与 `switch` 等常用控制流；
+4. `throw`、`try/catch/finally` 与常用异常；
+5. 函数式接口、lambda、方法引用和捕获变量；
+6. 多维数组、`enum` 以及 `long/float/double` 的完整运行语义。
+
+第一批优先实现接口，是因为接口分派同时是函数式接口、增强 `for`、集合标准抽象以及用户对象基础
+方法正确接入的共同前置能力。低频 wildcard capture、反射、文件、网络和动态类加载仍保持关闭。
 
 阶段闸门：不依赖大规模类库的 Java 8 语言样例能够稳定编译执行，生成 JS 中不存在未解析的
 Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义。
@@ -434,9 +450,19 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   泄漏为 Java 数组元素；boolean 数组同样在统一写回入口收敛为布尔值；
 - String `+` 与 `+=` 已支持 String、null、boolean、byte、short、char 和 int，并显式保存每个
   操作数的转换类别；任意对象、数组、long 与浮点字符串化继续返回稳定的不支持诊断；
-- 完整 `jsNodeTest` 共 164 项通过，新增真实源码到 JS 执行用例覆盖数组求值顺序、byte/char
-  写回窄化与字符串左结合，后端运行测试覆盖两类引用数组 `ArrayStoreException`；
-- 多维数组运行、嵌套初始化器、boxing/unboxing、任意对象 `toString`、接口与异常仍留给后续批次。
+- 已支持用户 interface、interface 继承、class `implements`、泛型接口代换和 interface 虚分派；
+  class 方法优先于 default method，互不相关的 default 冲突会在编译期报告；
+- 接口 abstract、default 和 static 方法均沿正式 AST、语义 side table、typed IR 与 JS vtable 链路
+  执行；针对 @lezer/java 1.1.3 的 default modifier grammar 缺陷，前端使用等长解析文本归一化，
+  不改变源码 span、字面量或最终 AST；
+- 已把 `Object.toString/equals/hashCode` 建模为稳定虚方法根；用户类 override 会复用相同虚槽，
+  `PrintStream`、`StringBuilder.append(Object)` 与集合查询均通过动态分派观察用户对象语义；
+- 已支持 `do-while`、无标签 `break/continue`，经典 `for` 在 typed IR 中保留 update 区域，确保
+  `continue` 仍先执行 update；循环 break 出口也会参与 definite-assignment 交集；
+- 完整 `jsNodeTest` 共 214 项通过，真实源码到 JS 执行用例覆盖数组求值顺序、byte/char 写回窄化、
+  字符串左结合、泛型接口/default 分派、Object 虚方法及循环跳转；
+- 多维数组运行、嵌套初始化器、增强 `for`、`switch`、异常、lambda、方法引用、enum、long 与
+  浮点完整语义仍留给后续批次。
 
 ### 阶段 2B：精选类库与宿主桥
 
@@ -462,16 +488,17 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   可变对象与别名语义，越界与 null 通过 Java 命名异常报告；
 - 已支持 List/ArrayList、Set/HashSet、Map/HashMap、Iterator 教学子集、目标类型 diamond、
   `remove(int)`/`remove(Object)` 重载、backed `keySet` 以及集合别名修改；
-- 集合键对 null、String 和包装类型采用值语义，普通用户对象采用身份语义。用户自定义
-  `equals/hashCode` 与 fail-fast iterator 尚未实现，因此集合 API 标记为受限兼容；
+- 集合键对 null、String、包装类型和用户对象采用 Java `equals/hashCode` 查询语义；用户类覆盖
+  两个 Object 根方法后会参与 contains/get 等查询。fail-fast iterator 尚未实现，因此集合 API
+  仍标记为受限兼容；
 - 已支持预加载输入下的 `new Scanner(System.in)`，包含 hasNext、next、hasNextInt、nextInt、
   hasNextLine、nextLine；多个 Scanner 共享输入游标，非法 nextInt 不消费 token；整数仅接受常用
   ASCII 十进制形式，不支持运行中等待输入；
-- `PrintStream` 与 `StringBuilder` 已覆盖 String、char[]、包装值和受控 builtin 对象的常用输出；
-  用户类覆写 `toString` 尚未接入 Object 虚分派，相关调用返回稳定的不支持诊断，不伪造 Java 结果；
+- `PrintStream` 与 `StringBuilder` 已覆盖 String、char[]、包装值、受控 builtin 和用户对象；用户类
+  覆写 `toString` 时走 Object 虚槽，未覆写时生成稳定的 Java 风格 `ClassName@identityHash` 文本；
 - Java 与通用语言模块的完整测试已覆盖真实源码到 JS、真实 JS runtime、Unicode I/O、配额、
-  泛型集合、包装缓存和 Scanner 混合读取。函数式接口仍受 lambda、方法引用和接口分派缺失阻塞，
-  不在类库层伪实现。
+  泛型集合、包装缓存和 Scanner 混合读取。接口分派已经接通；函数式接口仍等待 lambda、方法引用
+  与捕获变量语义完成，不在类库层伪实现。
 
 ### 阶段 3：产品化与发布验证
 

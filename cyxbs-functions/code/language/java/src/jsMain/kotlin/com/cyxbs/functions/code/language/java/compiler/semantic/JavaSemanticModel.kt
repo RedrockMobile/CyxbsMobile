@@ -101,6 +101,8 @@ internal data class JavaSemanticTypeDeclaration(
   val typeParameters: List<JavaSymbolId>,
   val directSuperClass: JavaSemanticType.Declared?,
   val membersInSourceOrder: List<JavaSymbolId>,
+  /** class 的 implements 与 interface 的 extends 均冻结为显式直接接口边。 */
+  val directInterfaces: List<JavaSemanticType.Declared> = emptyList(),
 ) {
   init {
     require(qualifiedName.isNotEmpty()) { "A semantic type must have a qualified name." }
@@ -109,6 +111,9 @@ internal data class JavaSemanticTypeDeclaration(
     }
     require(membersInSourceOrder.distinct().size == membersInSourceOrder.size) {
       "A semantic type must not repeat a source member symbol."
+    }
+    require(directInterfaces.map { it.symbol }.distinct().size == directInterfaces.size) {
+      "A semantic type must not repeat a direct interface symbol."
     }
   }
 }
@@ -418,6 +423,13 @@ internal data class JavaSemanticModel(
   val builtinTypeRoles: Map<JavaSymbolId, JavaBuiltinTypeRole> = emptyMap(),
   /** 精选 wrapper symbol 到 primitive 的唯一 catalog 映射。 */
   val wrapperPrimitiveTypes: Map<JavaSymbolId, JavaAstPrimitiveType> = emptyMap(),
+  /**
+   * class/interface 在自身未声明实现时最终继承的 default method。
+   *
+   * 外层 key 是类型 symbol，内层 key 是虚槽；value 必须指向带可执行方法体的接口方法。
+   */
+  val interfaceDefaultMethods:
+    Map<JavaSymbolId, Map<JavaVirtualSlotId, JavaSymbolId>> = emptyMap(),
 ) {
   /** 返回表达式的确定类型；缺失结果表示语义阶段违反了完整性契约。 */
   fun requireExpressionType(nodeId: JavaNodeId): JavaSemanticType {

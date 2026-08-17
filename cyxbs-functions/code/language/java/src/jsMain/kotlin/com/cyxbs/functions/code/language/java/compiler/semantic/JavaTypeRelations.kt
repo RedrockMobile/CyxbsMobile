@@ -44,7 +44,7 @@ internal class JavaTypeRelations(
   }
 
   /**
-   * 将 [source] 沿直接父类链投影成 [targetSymbol] 的参数化声明类型。
+   * 将 [source] 沿父类与接口图投影成 [targetSymbol] 的参数化声明类型。
    *
    * 每跨越一层都会按当前声明的类型参数代换父类实参。继承环、缺失声明、raw type
    * 或不完整类型参数声明均返回 null，确保损坏模型不会导致无限递归。
@@ -55,18 +55,24 @@ internal class JavaTypeRelations(
   ): JavaSemanticType.Declared? {
     if (typeDeclarations[targetSymbol] == null || !isWellFormedDeclared(source)) return null
 
-    var current = source
-    val visited = mutableSetOf<JavaSymbolId>()
-    while (visited.add(current.symbol)) {
+    val pending = ArrayDeque<JavaSemanticType.Declared>()
+    pending += source
+    val visited = mutableSetOf<JavaSemanticType.Declared>()
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current)) continue
       if (current.symbol == targetSymbol) return current
 
       val declaration = typeDeclarations[current.symbol] ?: return null
-      val directSuperClass = declaration.directSuperClass ?: return null
       val substitutions = declaration.typeParameters.zip(current.arguments).toMap()
-      val substituted = substitute(directSuperClass, substitutions)
-        as? JavaSemanticType.Declared ?: return null
-      if (!isWellFormedDeclared(substituted)) return null
-      current = substituted
+      val directSupertypes = listOfNotNull(declaration.directSuperClass) +
+        declaration.directInterfaces
+      directSupertypes.forEach { directSupertype ->
+        val substituted = substitute(directSupertype, substitutions)
+          as? JavaSemanticType.Declared ?: return null
+        if (!isWellFormedDeclared(substituted)) return null
+        pending += substituted
+      }
     }
     return null
   }

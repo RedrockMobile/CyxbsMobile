@@ -57,6 +57,13 @@ private class JavaLowering(val model: JavaSemanticModel) {
     return if (failed) null else JavaIrProgram(
       classes,
       model.builtinTypeRoles.mapKeys { (symbol, _) -> JavaIrClassId(symbol.value) },
+      model.builtinMembers.mapNotNull { (symbol, descriptor) ->
+        val callable = descriptor as? JavaBuiltinMemberDescriptor.Callable
+        if (callable?.isVirtualRoot != true) return@mapNotNull null
+        val slot = model.virtualSlots[symbol]?.value
+          ?: return invalid("Builtin virtual root is missing its slot.", null)
+        callable.operation to slot
+      }.toMap(),
     )
   }
 
@@ -88,20 +95,23 @@ private class JavaLowering(val model: JavaSemanticModel) {
     }
   }
 
-  /** 类头和成员均来自 semantic declarations；接口能力在本阶段显式延期。 */
+  /** class/interface 头和成员均来自 semantic declarations，接口边不从 AST 名称重新解析。 */
   private fun lowerClass(source: JavaAstTypeDeclaration): JavaIrClass? {
     val symbol = declaration(source.nodeId, source.span, JavaSymbolKind.TYPE) ?: return null
     val declaration = model.typeDeclarations[symbol.id]
       ?: return invalid("Missing semantic type declaration.", source.span)
-    if (declaration.symbol != symbol.id ||
-      declaration.kind != JavaSemanticTypeDeclarationKind.CLASS ||
-      source.kind != JavaAstTypeDeclarationKind.CLASS
-    ) {
-      unsupported("Only semantic class declarations are executable in stage 1.", source.span)
-      return null
+    val expectedKind = when (source.kind) {
+      JavaAstTypeDeclarationKind.CLASS -> JavaSemanticTypeDeclarationKind.CLASS
+      JavaAstTypeDeclarationKind.INTERFACE -> JavaSemanticTypeDeclarationKind.INTERFACE
+      JavaAstTypeDeclarationKind.ENUM -> JavaSemanticTypeDeclarationKind.ENUM
     }
-    if (source.interfaces.isNotEmpty()) {
-      unsupported("Interfaces and implements clauses are deferred beyond stage 1.", source.span)
+    if (declaration.symbol != symbol.id || declaration.kind != expectedKind ||
+      declaration.kind !in setOf(
+        JavaSemanticTypeDeclarationKind.CLASS,
+        JavaSemanticTypeDeclarationKind.INTERFACE,
+      )
+    ) {
+      unsupported("Only semantic class/interface declarations are executable in stage 2A.", source.span)
       return null
     }
     val owner = classIds[symbol.id] ?: return invalid("Missing class id.", source.span)
@@ -122,9 +132,37 @@ private class JavaLowering(val model: JavaSemanticModel) {
         (field?.owner ?: callable?.owner) != declaration.symbol
       ) invalid("Invalid semantic source member declaration.", source.span)
     }
+    val interfaces = declaration.directInterfaces.mapNotNull { inherited ->
+      val erased = erase(inherited, source.span) as? JavaSemanticType.Declared ?: return@mapNotNull null
+      classIds[erased.symbol] ?: run {
+        invalid("Missing direct interface class id.", source.span)
+        null
+      }
+    }
+    val defaults = model.interfaceDefaultMethods[declaration.symbol].orEmpty().mapNotNull { (slot, method) ->
+      if (model.callableDeclarations[method]?.isAbstract != false) {
+        invalid("Interface default binding must target an executable method.", source.span)
+        null
+      } else {
+        slot.value to JavaIrMethodId(method.value)
+      }
+    }.toMap()
     return JavaIrClass(
-      owner, declaration.qualifiedName, lowerSuper(declaration, source.span), emptyList(),
-      fields, methods, null, source.span, null,
+      owner,
+      declaration.qualifiedName,
+      lowerSuper(declaration, source.span),
+      interfaces,
+      fields,
+      methods,
+      null,
+      source.span,
+      null,
+      if (declaration.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
+        JavaIrTypeDeclarationKind.INTERFACE
+      } else {
+        JavaIrTypeDeclarationKind.CLASS
+      },
+      defaults,
     )
   }
 
@@ -195,13 +233,13 @@ private class JavaLowering(val model: JavaSemanticModel) {
     val body = if (declaration.kind == JavaSemanticCallableKind.CONSTRUCTOR) {
       bodyLowering.lowerConstructor(sourceBody, symbol.declarationSpan)
     } else if (sourceBody == null || declaration.isAbstract) {
-      unsupported("Methods without executable bodies are deferred beyond stage 1.", symbol.declarationSpan)
       null
     } else bodyLowering.lowerBlock(sourceBody)
     val slot = model.virtualSlots[declaration.symbol]?.value
     val dispatch = when {
       declaration.kind == JavaSemanticCallableKind.CONSTRUCTOR -> JavaIrDispatchKind.SPECIAL
       declaration.isStatic -> JavaIrDispatchKind.STATIC
+      ownerDeclaration.kind == JavaSemanticTypeDeclarationKind.INTERFACE -> JavaIrDispatchKind.INTERFACE
       slot != null -> JavaIrDispatchKind.VIRTUAL
       else -> JavaIrDispatchKind.SPECIAL
     }
@@ -395,6 +433,7 @@ private class BodyLowering(
         collectLocals(statement.elseBranch)
       }
       is JavaAstStatement.While -> collectLocals(statement.body)
+      is JavaAstStatement.DoWhile -> collectLocals(statement.body)
       is JavaAstStatement.For -> {
         (statement.initializer as? JavaAstForInitializer.VariableDeclaration)
           ?.declarators?.forEach(::registerLocal)
@@ -432,7 +471,7 @@ private class BodyLowering(
     return JavaIrStatement.Block(block.statements.flatMap(::lowerStatement), block.span)
   }
 
-  /** classic for 规范化为 block + while；constructor invocation 只能由构造专用入口消费。 */
+  /** 结构化降低语句；constructor invocation 只能由构造专用入口消费。 */
   private fun lowerStatement(statement: JavaAstStatement): List<JavaIrStatement> = when (statement) {
     is JavaAstStatement.Block -> listOf(lowerBlock(statement))
     is JavaAstStatement.VariableDeclaration -> lowerDeclarations(statement.declarators, statement.span)
@@ -447,7 +486,12 @@ private class BodyLowering(
     is JavaAstStatement.While -> expression(statement.condition)?.let {
       listOf(JavaIrStatement.While(it, branch(statement.body), statement.span))
     } ?: emptyList()
+    is JavaAstStatement.DoWhile -> expression(statement.condition)?.let {
+      listOf(JavaIrStatement.DoWhile(branch(statement.body), it, statement.span))
+    } ?: emptyList()
     is JavaAstStatement.For -> lowerFor(statement)
+    is JavaAstStatement.Break -> listOf(JavaIrStatement.Break(statement.span))
+    is JavaAstStatement.Continue -> listOf(JavaIrStatement.Continue(statement.span))
     is JavaAstStatement.Return -> lowerReturn(statement)
     is JavaAstStatement.Empty -> emptyList()
   }
@@ -477,6 +521,7 @@ private class BodyLowering(
     } else listOf(JavaIrStatement.DeclareLocal(local.id, initializer?.let(::expression), span))
   }
 
+  /** initializer 放入外层 block，condition/update/body 保留为 for IR 以维持 continue 语义。 */
   private fun lowerFor(statement: JavaAstStatement.For): List<JavaIrStatement> {
     val init = when (val source = statement.initializer) {
       null -> emptyList()
@@ -486,13 +531,17 @@ private class BodyLowering(
     val condition = statement.condition?.let(::expression) ?: JavaIrExpression.Constant(
       JavaIrConstant.BooleanValue(true), JavaIrType.Primitive(JavaAstPrimitiveType.BOOLEAN), statement.span,
     )
-    val body = if (statement.body is JavaAstStatement.Block) {
-      lowerBlock(statement.body).statements.toMutableList()
-    } else lowerStatement(statement.body).toMutableList()
-    statement.updates.forEach { body += expressionStatement(it, it.span) }
+    val updates = statement.updates.mapNotNull { update ->
+      val lowered = expressionStatement(update, update.span)
+      if (lowered.size != 1 || lowered.single() !is JavaIrStatement.Expression) {
+        lowering.unsupported("for 更新表达式暂不支持需要临时语句的后缀结果。", update.span)
+        null
+      } else (lowered.single() as JavaIrStatement.Expression).expression
+    }
+    if (updates.size != statement.updates.size) return emptyList()
     return listOf(JavaIrStatement.Block(
-      init + JavaIrStatement.While(
-        condition, JavaIrStatement.Block(body, statement.body.span), statement.span,
+      init + JavaIrStatement.For(
+        condition, updates, branch(statement.body), statement.span,
       ),
       statement.span,
     ))
@@ -819,7 +868,7 @@ private class BodyLowering(
     return write(target, writeValue, type, source.span)
   }
 
-  /** selectedCallables 与 receiverKind 决定 static/special/virtual；接口分派稳定延期。 */
+  /** selectedCallables 与 receiverKind 决定 static/special/virtual/interface 分派。 */
   private fun invocation(
     source: JavaAstExpression.MethodInvocation,
     type: JavaIrType,
@@ -872,8 +921,14 @@ private class BodyLowering(
           method, slot.value, arguments, type, source.span,
         )
       }
-      JavaDispatchKind.INTERFACE ->
-        unsupported("Interface dispatch is deferred beyond stage 1.", source.span)
+      JavaDispatchKind.INTERFACE -> {
+        val slot = binding.virtualSlot ?: lowering.model.virtualSlots[binding.symbol]
+          ?: return invalid("Interface call is missing its slot.", source.span)
+        JavaIrExpression.InvokeVirtual(
+          receiver(binding.receiverKind, source.receiver, source.span) ?: return null,
+          method, slot.value, arguments, type, source.span,
+        )
+      }
     }
   }
 
@@ -895,8 +950,16 @@ private class BodyLowering(
       }
       null
     } else {
-      if (binding.dispatch != JavaDispatchKind.SPECIAL) {
-        return invalid("Instance builtin call must use special dispatch.", source.span)
+      val expectedDispatch = if (builtin.isVirtualRoot) {
+        JavaDispatchKind.VIRTUAL
+      } else {
+        JavaDispatchKind.SPECIAL
+      }
+      if (binding.dispatch != expectedDispatch ||
+        (builtin.isVirtualRoot && binding.virtualSlot?.value !=
+          lowering.model.virtualSlots[binding.symbol]?.value)
+      ) {
+        return invalid("Instance builtin call has an invalid dispatch or virtual slot.", source.span)
       }
       receiver(binding.receiverKind, source.receiver, source.span) ?: return null
     }

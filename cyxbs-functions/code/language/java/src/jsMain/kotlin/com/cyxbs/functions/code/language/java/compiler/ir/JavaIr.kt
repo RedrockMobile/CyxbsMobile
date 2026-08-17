@@ -35,7 +35,19 @@ internal data class JavaIrProgram(
   val classes: List<JavaIrClass>,
   /** builtin classId 到稳定角色的映射；不把内建类型伪造成可发射的用户 class。 */
   val builtinTypeRoles: Map<JavaIrClassId, JavaBuiltinTypeRole> = emptyMap(),
+  /** Object 虚方法 operation 到槽位的映射，供运行时动态分派且不按源码名称猜测。 */
+  val builtinVirtualSlots: Map<JavaBuiltinOperation, Int> = mapOf(
+    JavaBuiltinOperation.OBJECT_EQUALS to 0,
+    JavaBuiltinOperation.OBJECT_HASH_CODE to 1,
+    JavaBuiltinOperation.OBJECT_TO_STRING to 2,
+  ),
 )
+
+/** 运行时仍需区分可实例化 class 与只承载静态成员/default method 的 interface。 */
+internal enum class JavaIrTypeDeclarationKind {
+  CLASS,
+  INTERFACE,
+}
 
 /** 一个已经解析继承关系的 Java 类型。 */
 internal data class JavaIrClass(
@@ -53,6 +65,9 @@ internal data class JavaIrClass(
    * 后端必须在成功完成 super 构造器调用后、当前构造器普通语句前执行一次，不能根据字段声明重新猜测。
    */
   val instanceInitializer: JavaIrStatement.Block? = null,
+  val kind: JavaIrTypeDeclarationKind = JavaIrTypeDeclarationKind.CLASS,
+  /** class 最终继承的接口默认实现，key 为虚槽，value 为已验证的接口方法。 */
+  val interfaceDefaultMethods: Map<Int, JavaIrMethodId> = emptyMap(),
 )
 
 /** 已完成静态/实例分类的字段。 */
@@ -134,7 +149,7 @@ internal enum class JavaIrConstructorInvocationKind {
 }
 
 /**
- * 已消除 for、复合赋值等语法糖的结构化 IR 语句。
+ * 已消除复合赋值等表达式语法糖的结构化 IR 语句；for 保留 update 区域以维持 continue 语义。
  *
  * 保留结构化控制流比提前转换成 SSA 更适合 JavaScript 后端和 Java 源码栈映射。
  */
@@ -169,6 +184,31 @@ internal sealed interface JavaIrStatement {
     val body: JavaIrStatement,
     override val span: JavaSourceSpan,
   ) : JavaIrStatement
+
+  /** do-while 保留尾部条件，避免 lowering 复制循环体或改变 continue 目标。 */
+  data class DoWhile(
+    val body: JavaIrStatement,
+    val condition: JavaIrExpression,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
+  /**
+   * 已完成 initializer lowering 的经典 for。
+   *
+   * initializer 由外层 block 承载；保留 [updates] 是为了让 continue 仍按 Java 规则先执行更新。
+   */
+  data class For(
+    val condition: JavaIrExpression,
+    val updates: List<JavaIrExpression>,
+    val body: JavaIrStatement,
+    override val span: JavaSourceSpan,
+  ) : JavaIrStatement
+
+  /** 退出最近循环。 */
+  data class Break(override val span: JavaSourceSpan) : JavaIrStatement
+
+  /** 继续最近循环；for 的更新表达式由后端原生 for 结构保证执行。 */
+  data class Continue(override val span: JavaSourceSpan) : JavaIrStatement
 
   /**
    * 构造器的首条委托语句。

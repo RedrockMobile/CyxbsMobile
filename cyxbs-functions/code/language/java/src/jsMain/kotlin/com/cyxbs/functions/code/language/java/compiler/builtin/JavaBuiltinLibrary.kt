@@ -47,6 +47,10 @@ internal enum class JavaBuiltinTypeRole(val boxedPrimitive: JavaAstPrimitiveType
  * 生成代码形态重新猜测行为。重载在运行行为不同处使用独立 operation。
  */
 internal enum class JavaBuiltinOperation {
+  OBJECT_EQUALS,
+  OBJECT_HASH_CODE,
+  OBJECT_TO_STRING,
+
   SYSTEM_OUT,
   SYSTEM_ERR,
 
@@ -187,6 +191,8 @@ internal sealed interface JavaBuiltinMemberDescriptor {
     val isFinal: Boolean,
     /** true 时作为 builtin 构造器参与 new overload，不伪造源码构造器。 */
     val isConstructor: Boolean = false,
+    /** true 时作为 Object 虚方法族的根参与 override 与动态分派。 */
+    val isVirtualRoot: Boolean = false,
     override val operation: JavaBuiltinOperation,
     override val compatibility: JavaBuiltinCompatibility,
   ) : JavaBuiltinMemberDescriptor
@@ -311,6 +317,32 @@ internal object JavaBuiltinLibrary {
   }
 
   val members: List<JavaBuiltinMemberDescriptor> = buildList {
+    callable(
+      owner = "java.lang.Object",
+      name = "equals",
+      parameters = listOf(objectType),
+      operation = JavaBuiltinOperation.OBJECT_EQUALS,
+      returnType = booleanType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+    callable(
+      owner = "java.lang.Object",
+      name = "hashCode",
+      operation = JavaBuiltinOperation.OBJECT_HASH_CODE,
+      returnType = intType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+    callable(
+      owner = "java.lang.Object",
+      name = "toString",
+      operation = JavaBuiltinOperation.OBJECT_TO_STRING,
+      returnType = stringType,
+      isFinal = false,
+      isVirtualRoot = true,
+    )
+
     field(
       owner = "java.lang.System",
       name = "out",
@@ -670,6 +702,8 @@ internal object JavaBuiltinLibrary {
     isStatic: Boolean = false,
     compatibility: JavaBuiltinCompatibility = JavaBuiltinCompatibility.RESULT_COMPATIBLE,
     isConstructor: Boolean = false,
+    isFinal: Boolean = true,
+    isVirtualRoot: Boolean = false,
   ) {
     add(
       JavaBuiltinMemberDescriptor.Callable(
@@ -678,8 +712,9 @@ internal object JavaBuiltinLibrary {
         parameterTypes = parameters,
         returnType = returnType,
         isStatic = isStatic,
-        isFinal = true,
+        isFinal = isFinal,
         isConstructor = isConstructor,
+        isVirtualRoot = isVirtualRoot,
         operation = operation,
         compatibility = if (owner.startsWith("java.util.")) {
           // java.util 只开放教学子集：集合不承诺完整哈希/fail-fast；Scanner 只读取预加载输入，

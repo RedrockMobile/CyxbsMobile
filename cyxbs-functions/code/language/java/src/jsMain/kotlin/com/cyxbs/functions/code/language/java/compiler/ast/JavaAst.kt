@@ -44,6 +44,7 @@ internal enum class JavaAstModifier {
   PROTECTED,
   PRIVATE,
   ABSTRACT,
+  DEFAULT,
   STATIC,
   FINAL,
 }
@@ -262,6 +263,14 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val body: JavaAstStatement,
   ) : JavaAstStatement
 
+  /** do-while 至少执行一次循环体，再在尾部判断条件。 */
+  data class DoWhile(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val body: JavaAstStatement,
+    val condition: JavaAstExpression,
+  ) : JavaAstStatement
+
   /** 仍保留源码结构、等待 lowering 的经典 for 语句。 */
   data class For(
     override val nodeId: JavaNodeId,
@@ -270,6 +279,18 @@ internal sealed interface JavaAstStatement : JavaAstNode {
     val condition: JavaAstExpression?,
     val updates: List<JavaAstExpression>,
     val body: JavaAstStatement,
+  ) : JavaAstStatement
+
+  /** 退出最近一层循环；带标签形式由前端稳定拒绝。 */
+  data class Break(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+  ) : JavaAstStatement
+
+  /** 继续最近一层循环；带标签形式由前端稳定拒绝。 */
+  data class Continue(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
   ) : JavaAstStatement
 
   /** 方法返回语句。 */

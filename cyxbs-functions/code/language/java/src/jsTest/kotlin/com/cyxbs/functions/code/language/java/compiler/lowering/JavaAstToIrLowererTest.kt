@@ -9,6 +9,7 @@ import com.cyxbs.functions.code.language.java.compiler.semantic.impl.JavaSemanti
 import com.cyxbs.functions.code.language.java.compiler.source.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -120,14 +121,15 @@ class JavaAstToIrLowererTest {
     assertTrue(result.diagnostics.any { it.code == "JAVA_LOWERING_INVALID_SEMANTIC_MODEL" })
   }
 
-  /** classic for 必须被规范化为外层 block 内的 while，供后端统一处理。 */
+  /** classic for 保留显式 IR，使 continue 能在下一次条件判断前执行 update。 */
   @Test
-  fun normalizesClassicForToWhile() {
+  fun preservesClassicForUpdateSemantics() {
     val result = JavaAstToIrLowerer.lower(fixture(withFor = true).model)
     val loopBlock = assertNotNull(result.value).onlyMethod().body!!.statements[1]
       as JavaIrStatement.Block
 
-    assertTrue(loopBlock.statements.single() is JavaIrStatement.While)
+    val loop = assertIs<JavaIrStatement.For>(loopBlock.statements.single())
+    assertTrue(loop.updates.isEmpty())
   }
 
   /** 字段声明按 semantic declarationOrder 降低并保留 initializer。 */
@@ -888,6 +890,11 @@ class JavaAstToIrLowererTest {
       builtinOperations(statement.thenBranch) +
       statement.elseBranch?.let(::builtinOperations).orEmpty()
     is JavaIrStatement.While -> builtinOperations(statement.condition) + builtinOperations(statement.body)
+    is JavaIrStatement.DoWhile -> builtinOperations(statement.body) + builtinOperations(statement.condition)
+    is JavaIrStatement.For -> builtinOperations(statement.condition) +
+      statement.updates.flatMap(::builtinOperations) + builtinOperations(statement.body)
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> emptyList()
     is JavaIrStatement.Return -> statement.expression?.let(::builtinOperations).orEmpty()
     is JavaIrStatement.Throw -> builtinOperations(statement.expression)
     is JavaIrStatement.ConstructorInvocation -> statement.arguments.flatMap(::builtinOperations)

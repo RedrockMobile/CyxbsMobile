@@ -34,12 +34,6 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val builtinTypeRoles = linkedMapOf<JavaSymbolId, JavaBuiltinTypeRole>()
   private val wrapperPrimitiveTypes = linkedMapOf<JavaSymbolId, JavaAstPrimitiveType>()
   private val expectedExpressionTypes = linkedMapOf<JavaNodeId, JavaSemanticType>()
-  private val objectStringConversionOperations = setOf(
-    JavaBuiltinOperation.PRINTSTREAM_PRINT_OBJECT,
-    JavaBuiltinOperation.PRINTSTREAM_PRINTLN_OBJECT,
-    JavaBuiltinOperation.STRING_BUILDER_APPEND_OBJECT,
-  )
-
   private val typeDeclarations = linkedMapOf<JavaSymbolId, JavaSemanticTypeDeclaration>()
   private val typeParameterDeclarations =
     linkedMapOf<JavaSymbolId, JavaSemanticTypeParameterDeclaration>()
@@ -48,6 +42,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     linkedMapOf<JavaSymbolId, JavaSemanticCallableDeclaration>()
   private val virtualSlots = linkedMapOf<JavaSymbolId, JavaVirtualSlotId>()
   private val overriddenMethods = linkedMapOf<JavaSymbolId, List<JavaSymbolId>>()
+  private val interfaceDefaultMethods =
+    linkedMapOf<JavaSymbolId, Map<JavaVirtualSlotId, JavaSymbolId>>()
   private val constructorDelegations =
     linkedMapOf<JavaSymbolId, JavaConstructorDelegation>()
 
@@ -72,6 +68,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private val assignedBlankFinalFields = mutableSetOf<JavaSymbolId>()
   private val unassignedBlankFinalFields = mutableSetOf<JavaSymbolId>()
   private var loopDepth = 0
+  private val loopFlows = mutableListOf<S1LoopFlow>()
 
   /** 执行全部语义遍次；错误结果不会泄露含恢复类型的半成品模型。 */
   fun analyze(): JavaCompilerPhaseResult<JavaSemanticModel> {
@@ -91,6 +88,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     declareMembers()
     declareBuiltinMembers()
     validateOverridesAndAssignSlots()
+    resolveInterfaceDefaultMethods()
     analyzeFieldInitializers()
     analyzeCallableBodies()
     validateConstructorCycles()
@@ -308,6 +306,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       ),
       isSynthetic = true,
       isBuiltin = true,
+      isBuiltinVirtualRoot = descriptor.isVirtualRoot,
     )
     val siblings = if (descriptor.isConstructor) {
       constructorsByOwner.getOrPut(owner.symbol) { mutableListOf() }
@@ -348,11 +347,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         error(it.span, "java.semantic.static_import_unsupported", "Stage1 暂不支持 static import。")
       }
       unit.types.forEach { declaration ->
-        if (declaration.kind != JavaAstTypeDeclarationKind.CLASS) {
+        if (declaration.kind == JavaAstTypeDeclarationKind.ENUM) {
           error(
             declaration.span,
             "java.semantic.type_kind_unsupported",
-            "当前 Stage1 稳定执行范围仅包含 class；interface 与 enum 暂不执行。",
+            "enum 将在阶段 2A 后续批次开放。",
           )
         }
         if (declaration.modifiers.any {
@@ -363,8 +362,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           error(
             declaration.span,
             "java.semantic.invalid_top_level_modifier",
-            "顶层 class 不能声明为 private、protected 或 static。",
+            "顶层 class/interface 不能声明为 private、protected 或 static。",
           )
+        }
+        if (declaration.kind == JavaAstTypeDeclarationKind.INTERFACE &&
+          JavaAstModifier.FINAL in declaration.modifiers
+        ) {
+          error(declaration.span, "java.semantic.final_interface", "interface 不能声明为 final。")
+        }
+        if (declaration.kind == JavaAstTypeDeclarationKind.CLASS &&
+          JavaAstModifier.ABSTRACT in declaration.modifiers &&
+          JavaAstModifier.FINAL in declaration.modifiers
+        ) {
+          error(declaration.span, "java.semantic.abstract_final_class", "class 不能同时声明为 abstract 和 final。")
         }
         if (JavaAstModifier.PUBLIC in declaration.modifiers &&
           javaStage1FileName(unit.sourceFile.path) != declaration.name
@@ -404,9 +414,15 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           declaration,
           qualifiedName,
           id,
-          JavaSemanticTypeDeclarationKind.CLASS,
+          when (declaration.kind) {
+            JavaAstTypeDeclarationKind.CLASS -> JavaSemanticTypeDeclarationKind.CLASS
+            JavaAstTypeDeclarationKind.INTERFACE -> JavaSemanticTypeDeclarationKind.INTERFACE
+            JavaAstTypeDeclarationKind.ENUM -> JavaSemanticTypeDeclarationKind.ENUM
+          },
           visibility(declaration.modifiers),
           JavaAstModifier.FINAL in declaration.modifiers,
+          declaration.kind == JavaAstTypeDeclarationKind.INTERFACE ||
+            JavaAstModifier.ABSTRACT in declaration.modifiers,
         )
         typesByQualifiedName[qualifiedName] = info
         typesByNode[declaration.nodeId] = info
@@ -497,16 +513,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** 解析直接父类；未显式声明的源码 class 默认继承 Object。 */
+  /** 解析 class 父类、implements 与 interface extends；未显式父类的引用类型均连接 Object 根。 */
   private fun resolveHierarchy() {
     sourceTypes().forEach { type ->
       val declaration = checkNotNull(type.declaration)
-      if (declaration.interfaces.isNotEmpty()) {
-        error(
-          declaration.interfaces.first().span,
-          "java.semantic.interface_unsupported",
-          "Stage1 当前稳定拒绝 implements/interface 语义。",
-        )
+      if (type.kind == JavaSemanticTypeDeclarationKind.INTERFACE && declaration.superClass != null) {
+        error(declaration.superClass.span, "java.semantic.interface_superclass", "interface 不能声明 class 父类。")
       }
       val superType = declaration.superClass?.let {
         resolveType(it, type.unit, type.typeParameterNames, allowVoid = false)
@@ -525,6 +537,37 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       }
       if (type.directSuperClass == null && superType != JavaSemanticType.Error) {
         error(declaration.span, "java.semantic.invalid_superclass", "class 的直接父类必须是声明类型。")
+      }
+      if (selectedParent?.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
+        error(declaration.superClass?.span ?: declaration.span, "java.semantic.interface_as_superclass", "class 不能通过 extends 继承 interface。")
+      }
+      type.directInterfaces += declaration.interfaces.mapNotNull { reference ->
+        val resolved = resolveType(reference, type.unit, type.typeParameterNames, allowVoid = false)
+        val declared = resolved as? JavaSemanticType.Declared
+        if (declared == null) {
+          if (resolved != JavaSemanticType.Error) {
+            error(reference.span, "java.semantic.invalid_superinterface", "接口继承边必须指向声明类型。")
+          }
+          return@mapNotNull null
+        }
+        val target = typeInfo(declared.symbol)
+        if (target?.kind != JavaSemanticTypeDeclarationKind.INTERFACE) {
+          error(reference.span, "java.semantic.not_an_interface", "implements/extends interface 只能指向 interface。")
+        }
+        if (target != null && JavaBuiltinLibrary.types.any { descriptor ->
+            descriptor.qualifiedName == target.qualifiedName && descriptor.isInterfaceFacade
+          }
+        ) {
+          error(
+            reference.span,
+            "java.semantic.builtin_facade_inheritance_unsupported",
+            "精选集合接口当前只供内建实现使用，用户类型暂不能 implements 它。",
+          )
+        }
+        declared
+      }
+      if (type.directInterfaces.map { it.symbol }.distinct().size != type.directInterfaces.size) {
+        error(declaration.span, "java.semantic.duplicate_superinterface", "类型不能重复声明同一个直接接口。")
       }
       typeDeclarations[type.symbol] = type.semanticDeclaration()
     }
@@ -554,6 +597,12 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         ensureTypeAccessible(parent, type.unit, type.span)
         visit(parent)
       }
+      type.directInterfaces.forEach { interfaceType ->
+        typeInfo(interfaceType.symbol)?.let { inherited ->
+          ensureTypeAccessible(inherited, type.unit, type.span)
+          visit(inherited)
+        }
+      }
       states[type.symbol] = 2
     }
     sourceTypes().forEach(::visit)
@@ -581,7 +630,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           is JavaAstMemberDeclaration.Constructor -> declareCallable(owner, member)
         }
       }
-      if (constructorsByOwner[owner.symbol].isNullOrEmpty()) synthesizeDefaultConstructor(owner)
+      if (owner.kind == JavaSemanticTypeDeclarationKind.CLASS &&
+        constructorsByOwner[owner.symbol].isNullOrEmpty()
+      ) synthesizeDefaultConstructor(owner)
       typeDeclarations[owner.symbol] = owner.semanticDeclaration()
     }
     synthesizeBuiltinConstructors()
@@ -595,6 +646,13 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     type: JavaSemanticType,
     order: Int,
   ) {
+    val isInterfaceField = owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE
+    if (isInterfaceField && declaration.modifiers.any { modifier ->
+        modifier == JavaAstModifier.PRIVATE || modifier == JavaAstModifier.PROTECTED
+      }
+    ) {
+      error(declaration.span, "java.semantic.invalid_interface_field_modifier", "Java 8 interface 字段只能是 public static final。")
+    }
     val key = owner.symbol to declarator.name
     val previous = fieldsByOwnerAndName[key]
     if (previous != null) {
@@ -620,9 +678,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       id,
       declarator.name,
       type,
-      visibility(declaration.modifiers),
-      JavaAstModifier.STATIC in declaration.modifiers,
-      JavaAstModifier.FINAL in declaration.modifiers,
+      if (isInterfaceField) JavaVisibility.PUBLIC else visibility(declaration.modifiers),
+      isInterfaceField || JavaAstModifier.STATIC in declaration.modifiers,
+      isInterfaceField || JavaAstModifier.FINAL in declaration.modifiers,
       order,
       declarator.span,
     )
@@ -670,6 +728,8 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     val name = methodDeclaration?.name ?: "<init>"
     val modifiers = methodDeclaration?.modifiers ?: checkNotNull(constructorDeclaration).modifiers
+    val isInterfaceMethod = methodDeclaration != null &&
+      owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE
     val typeParameterNodes = methodDeclaration?.typeParameters ?: constructorDeclaration!!.typeParameters
     val parameterNodes = methodDeclaration?.parameters ?: constructorDeclaration!!.parameters
     val id = symbol(
@@ -750,10 +810,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       parameterSymbols = parameterSymbols,
       parameterTypes = parameterTypes,
       returnType = returnType,
-      visibility = visibility(modifiers),
+      visibility = if (isInterfaceMethod) JavaVisibility.PUBLIC else visibility(modifiers),
       isStatic = JavaAstModifier.STATIC in modifiers,
       isFinal = JavaAstModifier.FINAL in modifiers,
-      isAbstract = JavaAstModifier.ABSTRACT in modifiers,
+      isAbstract = JavaAstModifier.ABSTRACT in modifiers ||
+        isInterfaceMethod && methodDeclaration.body == null,
       erasedSignatureKey = erasedSignatureKey,
       erasedDescriptor = erasedDescriptor,
     )
@@ -782,6 +843,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private fun validateCallableShape(info: S1CallableInfo) {
     if (info.kind == JavaSemanticCallableKind.CONSTRUCTOR) {
       val declaration = info.declaration as JavaAstMemberDeclaration.Constructor
+      if (info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE) {
+        error(declaration.span, "java.semantic.interface_constructor", "interface 不能声明构造器。")
+      }
       if (JavaAstModifier.STATIC in declaration.modifiers ||
         JavaAstModifier.FINAL in declaration.modifiers ||
         JavaAstModifier.ABSTRACT in declaration.modifiers
@@ -791,7 +855,9 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       return
     }
     val method = info.declaration as JavaAstMemberDeclaration.Method
-    if (info.isAbstract != (method.body == null)) {
+    val isInterface = info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE
+    val isDefault = JavaAstModifier.DEFAULT in method.modifiers
+    if (!isInterface && info.isAbstract != (method.body == null)) {
       error(
         method.span,
         "java.semantic.invalid_method_body",
@@ -800,6 +866,21 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     if (info.isAbstract && (info.isStatic || info.isFinal || info.owner.isFinal)) {
       error(method.span, "java.semantic.invalid_abstract_method", "abstract 方法不能是 static/final，也不能位于 final class。")
+    }
+    if (isInterface) {
+      if (method.modifiers.any { modifier ->
+          modifier == JavaAstModifier.PRIVATE || modifier == JavaAstModifier.PROTECTED ||
+            modifier == JavaAstModifier.FINAL
+        }
+      ) {
+        error(method.span, "java.semantic.invalid_interface_method_modifier", "Java 8 interface 方法不能是 private、protected 或 final。")
+      }
+      if (isDefault && (info.isStatic || info.isAbstract || method.body == null)) {
+        error(method.span, "java.semantic.invalid_default_method", "default 方法必须是带方法体的 interface 实例方法。")
+      }
+      if (method.body != null && !isDefault && !info.isStatic) {
+        error(method.span, "java.semantic.interface_method_body_requires_default", "interface 实例方法带方法体时必须声明 default。")
+      }
     }
   }
 
@@ -851,15 +932,17 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   /** 父类先于子类分配虚槽；合法 override 复用最近父方法的稳定槽。 */
   private fun validateOverridesAndAssignSlots() {
     val visited = mutableSetOf<JavaSymbolId>()
+    val slotsByErasedSignature = linkedMapOf<String, JavaVirtualSlotId>()
     fun process(type: S1TypeInfo) {
       if (!visited.add(type.symbol)) return
       type.directSuperClass?.symbol?.let(::typeInfo)?.let(::process)
+      type.directInterfaces.forEach { inherited -> inherited.symbol.let(::typeInfo)?.let(::process) }
       val methods = callables.filter {
         it.owner.symbol == type.symbol && it.kind == JavaSemanticCallableKind.METHOD
       }
       methods.forEach { method ->
-        // builtin 实例方法由显式 IR operation 分派，不占用用户类虚槽。
-        if (method.isBuiltin) return@forEach
+        // 普通 builtin 由显式 operation 执行；只有 Object 三个虚方法根需要参与 override 槽位。
+        if (method.isBuiltin && !method.isBuiltinVirtualRoot) return@forEach
         val inherited = inheritedMethods(type)
           .filter { it.name == method.name && isOverrideSubsignature(type, method, it) }
         val visibleInherited = inherited.filter { isMemberAccessible(it.visibility, it.owner, type) }
@@ -925,13 +1008,119 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
             "带 @Override 的方法没有可覆盖的父类实例方法。",
           )
         }
-        val parentSlot = overridden.firstOrNull()?.let { virtualSlots[it.symbol] }
-        virtualSlots[method.symbol] = parentSlot ?: JavaVirtualSlotId(nextVirtualSlot++)
+        // 已确认 override 时必须继承父槽，不能再按当前声明的擦除签名分配：泛型父方法的
+        // Object 擦除与子类具体参数可能不同，但 Java 动态分派仍属于同一个方法族。
+        val inheritedSlots = overridden.mapNotNull { virtualSlots[it.symbol] }.distinct()
+        if (inheritedSlots.size > 1) {
+          error(
+            method.span,
+            "java.semantic.incompatible_override_slots",
+            "方法 ${method.name} 覆盖的父声明属于不兼容的虚槽。",
+          )
+        }
+        // 全新虚方法继续使用“擦除签名 -> 全工作区稳定槽”，让一个实现可以同时满足
+        // 多个无继承关系但签名相同的接口声明。
+        virtualSlots[method.symbol] = inheritedSlots.firstOrNull()
+          ?: slotsByErasedSignature.getOrPut(method.erasedSignatureKey) {
+            JavaVirtualSlotId(nextVirtualSlot++)
+          }
         if (overridden.isNotEmpty()) overriddenMethods[method.symbol] = overridden.map { it.symbol }
       }
     }
     allTypes().forEach(::process)
   }
+
+  /**
+   * 为 class 选择最终继承的 interface default method，并检查未实现抽象方法与菱形冲突。
+   *
+   * class 层级中的声明始终优先于接口默认实现；接口侧只保留最具体声明，因此子接口重新声明
+   * abstract 方法可以压住父接口 default，两个互不相关的 default 则必须由 class 显式解决。
+   */
+  private fun resolveInterfaceDefaultMethods() {
+    sourceTypes().filter { it.kind == JavaSemanticTypeDeclarationKind.CLASS }.forEach { type ->
+      val classMethods = classHierarchyMethods(type)
+      val interfaceMethods = interfaceHierarchyMethods(type)
+      val defaults = linkedMapOf<JavaVirtualSlotId, JavaSymbolId>()
+      val signatures = interfaceMethods.map(S1CallableInfo::erasedSignatureKey).distinct()
+      signatures.forEach { signature ->
+        val classDeclaration = classMethods.firstOrNull { it.erasedSignatureKey == signature }
+        if (classDeclaration != null) {
+          if (classDeclaration.isAbstract && !type.isAbstract) {
+            error(type.span, "java.semantic.abstract_method_not_implemented", "非 abstract class ${type.simpleName} 未实现方法 ${classDeclaration.name}。")
+          }
+          return@forEach
+        }
+        val declarations = interfaceMethods.filter { it.erasedSignatureKey == signature }
+        val mostSpecific = declarations.filter { candidate ->
+          declarations.none { other ->
+            other !== candidate && isInterfaceSubtype(other.owner, candidate.owner)
+          }
+        }
+        val concreteDefaults = mostSpecific.filter { !it.isAbstract && !it.isStatic }
+        when {
+          concreteDefaults.size > 1 -> error(
+            type.span,
+            "java.semantic.conflicting_interface_defaults",
+            "类型 ${type.simpleName} 继承了多个冲突的 default 方法 ${concreteDefaults.first().name}。",
+            concreteDefaults.map { JavaDiagnosticNote("冲突的 default 方法。", it.span) },
+          )
+          concreteDefaults.size == 1 -> {
+            val method = concreteDefaults.single()
+            val slot = virtualSlots[method.symbol]
+            if (slot != null) defaults[slot] = method.symbol
+          }
+          mostSpecific.any { it.isAbstract } && !type.isAbstract -> error(
+            type.span,
+            "java.semantic.abstract_method_not_implemented",
+            "非 abstract class ${type.simpleName} 未实现接口方法 ${mostSpecific.first().name}。",
+          )
+        }
+      }
+      if (defaults.isNotEmpty()) interfaceDefaultMethods[type.symbol] = defaults
+    }
+  }
+
+  /** class 自身到父类的声明顺序；最近声明用于执行 Java 的 class-wins 规则。 */
+  private fun classHierarchyMethods(type: S1TypeInfo): List<S1CallableInfo> {
+    val result = mutableListOf<S1CallableInfo>()
+    var current: S1TypeInfo? = type
+    val visited = mutableSetOf<JavaSymbolId>()
+    while (current != null && visited.add(current.symbol)) {
+      result += callables.filter { callable ->
+        callable.owner.symbol == current.symbol && callable.kind == JavaSemanticCallableKind.METHOD &&
+          !callable.isStatic
+      }
+      current = current.directSuperClass?.symbol?.let(::typeInfo)
+    }
+    return result
+  }
+
+  /** 收集 class 及其父类直接实现的全部接口方法，重复接口边只访问一次。 */
+  private fun interfaceHierarchyMethods(type: S1TypeInfo): List<S1CallableInfo> {
+    val result = mutableListOf<S1CallableInfo>()
+    val pending = ArrayDeque<S1TypeInfo>()
+    val classVisited = mutableSetOf<JavaSymbolId>()
+    var currentClass: S1TypeInfo? = type
+    while (currentClass != null && classVisited.add(currentClass.symbol)) {
+      currentClass.directInterfaces.mapNotNullTo(pending) { it.symbol.let(::typeInfo) }
+      currentClass = currentClass.directSuperClass?.symbol?.let(::typeInfo)
+    }
+    val visited = mutableSetOf<JavaSymbolId>()
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current.symbol)) continue
+      result += callables.filter { callable ->
+        callable.owner.symbol == current.symbol && callable.kind == JavaSemanticCallableKind.METHOD &&
+          !callable.isStatic
+      }
+      current.directInterfaces.mapNotNullTo(pending) { it.symbol.let(::typeInfo) }
+    }
+    return result
+  }
+
+  /** 判断接口声明之间的继承方向，用于 default method 的“最具体”选择。 */
+  private fun isInterfaceSubtype(child: S1TypeInfo, parent: S1TypeInfo): Boolean =
+    child.symbol != parent.symbol && relations().asSupertype(child.selfType(), parent.symbol) != null
 
   /** 把父方法返回类型投影到当前子类的泛型视角。 */
   private fun inheritedReturnType(
@@ -1233,18 +1422,38 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         val afterCondition = definitelyAssigned.toSet()
         val blankEntryAssigned = assignedBlankFinalFields.toSet()
         val blankEntryUnassigned = unassignedBlankFinalFields.toSet()
+        val flow = S1LoopFlow()
+        loopFlows += flow
         loopDepth++
         try {
           analyzeStatement(statement.body)
         } finally {
           loopDepth--
+          loopFlows.removeAt(loopFlows.lastIndex)
         }
         val blankBodyUnassigned = unassignedBlankFinalFields.toSet()
-        replaceAssigned(afterCondition)
-        replaceBlankFinalState(
-          blankEntryAssigned,
-          blankEntryUnassigned.intersect(blankBodyUnassigned),
-        )
+        val exits = flow.breakExits.toMutableList()
+        if (!isConstantTrue(statement.condition)) {
+          exits += S1FlowState(afterCondition, blankEntryAssigned, blankEntryUnassigned)
+        }
+        replaceFlowState(exits.intersectionOrNull() ?: S1FlowState(
+          afterCondition, blankEntryAssigned, blankEntryUnassigned.intersect(blankBodyUnassigned),
+        ))
+      }
+      is JavaAstStatement.DoWhile -> {
+        val flow = S1LoopFlow()
+        loopFlows += flow
+        loopDepth++
+        try {
+          analyzeStatement(statement.body)
+        } finally {
+          loopDepth--
+          loopFlows.removeAt(loopFlows.lastIndex)
+        }
+        requireType(statement.condition, booleanType(), "do-while 条件必须是 boolean。")
+        val exits = flow.breakExits.toMutableList()
+        if (!isConstantTrue(statement.condition)) exits += currentFlowState()
+        replaceFlowState(exits.intersectionOrNull() ?: currentFlowState())
       }
       is JavaAstStatement.For -> withScope {
         when (val initializer = statement.initializer) {
@@ -1257,19 +1466,33 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         val afterCondition = definitelyAssigned.toSet()
         val blankEntryAssigned = assignedBlankFinalFields.toSet()
         val blankEntryUnassigned = unassignedBlankFinalFields.toSet()
+        val flow = S1LoopFlow()
+        loopFlows += flow
         loopDepth++
         try {
           analyzeStatement(statement.body)
           statement.updates.forEach(::analyzeExpression)
         } finally {
           loopDepth--
+          loopFlows.removeAt(loopFlows.lastIndex)
         }
         val blankLoopUnassigned = unassignedBlankFinalFields.toSet()
-        replaceAssigned(afterCondition)
-        replaceBlankFinalState(
-          blankEntryAssigned,
-          blankEntryUnassigned.intersect(blankLoopUnassigned),
-        )
+        val exits = flow.breakExits.toMutableList()
+        if (statement.condition?.let(::isConstantTrue) != true) {
+          exits += S1FlowState(afterCondition, blankEntryAssigned, blankEntryUnassigned)
+        }
+        replaceFlowState(exits.intersectionOrNull() ?: S1FlowState(
+          afterCondition, blankEntryAssigned, blankEntryUnassigned.intersect(blankLoopUnassigned),
+        ))
+      }
+      is JavaAstStatement.Break -> {
+        val flow = loopFlows.lastOrNull()
+        if (flow == null) {
+          error(statement.span, "java.semantic.break_outside_loop", "break 只能出现在循环体内。")
+        } else flow.breakExits += currentFlowState()
+      }
+      is JavaAstStatement.Continue -> if (loopFlows.isEmpty()) {
+        error(statement.span, "java.semantic.continue_outside_loop", "continue 只能出现在循环体内。")
       }
       is JavaAstStatement.Return -> analyzeReturn(statement)
       is JavaAstStatement.Empty -> Unit
@@ -1919,7 +2142,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     if (declaredReceiver == null) {
       expression.arguments.forEach(::analyzeExpression)
       if (receiver.type == JavaSemanticType.Error) return JavaSemanticType.Error
-      error(expression.span, "java.semantic.method_receiver_not_declared", "方法 receiver 必须是 class 类型。")
+      error(expression.span, "java.semantic.method_receiver_not_declared", "方法 receiver 必须是 class 或 interface 类型。")
       return JavaSemanticType.Error
     }
     val explicitTypeArguments = expression.typeArguments.map {
@@ -1960,14 +2183,13 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     )
     val selected = selectMostSpecific(instantiated, expression.span, expression.methodName)
       ?: return JavaSemanticType.Error
-    if (rejectUnsupportedObjectStringConversion(expression.arguments, argumentTypes, selected)) {
-      return JavaSemanticType.Error
-    }
     recordArgumentConversions(expression.arguments, argumentTypes, selected.parameterTypes)
     val dispatch = when {
       selected.info.isStatic -> JavaDispatchKind.STATIC
+      selected.info.isBuiltinVirtualRoot -> JavaDispatchKind.VIRTUAL
       selected.info.isBuiltin -> JavaDispatchKind.SPECIAL
       receiver.kind == JavaReceiverKind.SUPER -> JavaDispatchKind.SPECIAL
+      selected.info.owner.kind == JavaSemanticTypeDeclarationKind.INTERFACE -> JavaDispatchKind.INTERFACE
       else -> JavaDispatchKind.VIRTUAL
     }
     val bindingReceiver = when {
@@ -1978,7 +2200,11 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     calls[expression.nodeId] = selected.binding(
       dispatch,
       bindingReceiver,
-      if (dispatch == JavaDispatchKind.VIRTUAL) virtualSlots[selected.info.symbol] else null,
+      if (dispatch == JavaDispatchKind.VIRTUAL || dispatch == JavaDispatchKind.INTERFACE) {
+        virtualSlots[selected.info.symbol]
+      } else {
+        null
+      },
     )
     return selected.returnType
   }
@@ -2253,34 +2479,6 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     return maximal.singleOrNull()
   }
 
-  /**
-   * 本批不伪造 Object.toString 虚分派。
-   *
-   * 静态类型已经明确是用户源码 class 时，在源码参数位置拒绝 Object 输出；静态 Object、
-   * 类型变量等无法提前确认的值由运行时 helper 以 Java 命名 UnsupportedOperationException 拒绝。
-   */
-  private fun rejectUnsupportedObjectStringConversion(
-    arguments: List<JavaAstExpression>,
-    argumentTypes: List<JavaSemanticType>,
-    selected: S1InstantiatedCallable,
-  ): Boolean {
-    val operation = builtinMembers[selected.info.symbol]?.operation
-    if (operation !in objectStringConversionOperations) return false
-    var rejected = false
-    arguments.zip(argumentTypes).forEach { (argument, type) ->
-      val declared = type as? JavaSemanticType.Declared ?: return@forEach
-      if (typeInfo(declared.symbol)?.declaration != null) {
-        error(
-          argument.span,
-          "java.semantic.object_string_conversion_unsupported",
-          "当前阶段不支持对用户源码类型执行 Object.toString 输出转换。",
-        )
-        rejected = true
-      }
-    }
-    return rejected
-  }
-
   /** 把 owner 代换与方法类型推断合并，得到可参与 overload 的实际签名。 */
   private fun instantiateCallable(
     candidate: S1CallableCandidate,
@@ -2410,16 +2608,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
   }
 
-  /** 从 receiver class 向上收集方法；子类同擦除 descriptor 会遮蔽父候选。 */
+  /** 从 receiver 类型沿父类和接口图收集方法；最近声明的同擦除 descriptor 遮蔽祖先候选。 */
   private fun methodCandidates(
     receiverType: JavaSemanticType.Declared,
     name: String,
   ): List<S1CallableCandidate> {
     val result = mutableListOf<S1CallableCandidate>()
     val seenDescriptors = mutableSetOf<String>()
-    var current: JavaSemanticType.Declared? = receiverType
+    val pending = ArrayDeque<JavaSemanticType.Declared>()
+    pending += receiverType
     val visited = mutableSetOf<JavaSymbolId>()
-    while (current != null && visited.add(current.symbol)) {
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current.symbol)) continue
       val owner = typeInfo(current.symbol) ?: break
       val substitutions = owner.typeParameters.zip(current.arguments).toMap()
       methodsByOwnerAndName[owner.symbol to name].orEmpty().forEach { method ->
@@ -2431,23 +2632,30 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
           result += S1CallableCandidate(method, substitutions)
         }
       }
-      current = owner.directSuperClass?.let {
-        relations().substitute(it, substitutions) as? JavaSemanticType.Declared
+      owner.directSuperClass?.let { relations().substitute(it, substitutions) as? JavaSemanticType.Declared }
+        ?.let(pending::addLast)
+      owner.directInterfaces.mapNotNullTo(pending) { inherited ->
+        relations().substitute(inherited, substitutions) as? JavaSemanticType.Declared
       }
     }
     return result
   }
 
-  /** 返回全部祖先方法，供 override 校验使用；不做子类 descriptor 遮蔽。 */
+  /** 返回父类与接口图中的全部祖先方法，供 override 校验使用。 */
   private fun inheritedMethods(type: S1TypeInfo): List<S1CallableInfo> {
     val result = mutableListOf<S1CallableInfo>()
-    var parent = type.directSuperClass?.symbol?.let(::typeInfo)
+    val pending = ArrayDeque<S1TypeInfo>()
+    type.directSuperClass?.symbol?.let(::typeInfo)?.let(pending::addLast)
+    type.directInterfaces.mapNotNullTo(pending) { it.symbol.let(::typeInfo) }
     val visited = mutableSetOf<JavaSymbolId>()
-    while (parent != null && visited.add(parent.symbol)) {
+    while (pending.isNotEmpty()) {
+      val parent = pending.removeFirst()
+      if (!visited.add(parent.symbol)) continue
       result += callables.filter {
         it.owner.symbol == parent.symbol && it.kind == JavaSemanticCallableKind.METHOD
       }
-      parent = parent.directSuperClass?.symbol?.let(::typeInfo)
+      parent.directSuperClass?.symbol?.let(::typeInfo)?.let(pending::addLast)
+      parent.directInterfaces.mapNotNullTo(pending) { it.symbol.let(::typeInfo) }
     }
     return result
   }
@@ -2457,17 +2665,22 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     receiverType: JavaSemanticType.Declared,
     name: String,
   ): S1FieldView? {
-    var current: JavaSemanticType.Declared? = receiverType
+    val pending = ArrayDeque<JavaSemanticType.Declared>()
+    pending += receiverType
     val visited = mutableSetOf<JavaSymbolId>()
-    while (current != null && visited.add(current.symbol)) {
+    while (pending.isNotEmpty()) {
+      val current = pending.removeFirst()
+      if (!visited.add(current.symbol)) continue
       val owner = typeInfo(current.symbol) ?: return null
       val substitutions = owner.typeParameters.zip(current.arguments).toMap()
       fieldsByOwnerAndName[owner.symbol to name]?.let { field ->
         val type = relations().substitute(field.type, substitutions) ?: JavaSemanticType.Error
         return S1FieldView(field, type)
       }
-      current = owner.directSuperClass?.let {
-        relations().substitute(it, substitutions) as? JavaSemanticType.Declared
+      owner.directSuperClass?.let { relations().substitute(it, substitutions) as? JavaSemanticType.Declared }
+        ?.let(pending::addLast)
+      owner.directInterfaces.mapNotNullTo(pending) { inherited ->
+        relations().substitute(inherited, substitutions) as? JavaSemanticType.Declared
       }
     }
     return null
@@ -2871,10 +3084,53 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
     }
     is JavaAstStatement.If -> statement.elseBranch == null ||
       canCompleteNormally(statement.thenBranch) || canCompleteNormally(statement.elseBranch)
-    is JavaAstStatement.While -> !isConstantTrue(statement.condition)
-    is JavaAstStatement.For -> statement.condition?.let(::isConstantTrue) != true
+    is JavaAstStatement.While -> !isConstantTrue(statement.condition) ||
+      containsBreakForCurrentLoop(statement.body)
+    is JavaAstStatement.DoWhile -> !isConstantTrue(statement.condition) ||
+      containsBreakForCurrentLoop(statement.body)
+    is JavaAstStatement.For -> statement.condition?.let(::isConstantTrue) != true ||
+      containsBreakForCurrentLoop(statement.body)
+    is JavaAstStatement.Break,
+    is JavaAstStatement.Continue,
     is JavaAstStatement.Return -> false
     else -> true
+  }
+
+  /** 仅查找直接属于当前循环的 break，嵌套循环会消费自己的跳转。 */
+  private fun containsBreakForCurrentLoop(statement: JavaAstStatement): Boolean = when (statement) {
+    is JavaAstStatement.Break -> true
+    is JavaAstStatement.Block -> statement.statements.any(::containsBreakForCurrentLoop)
+    is JavaAstStatement.If -> containsBreakForCurrentLoop(statement.thenBranch) ||
+      statement.elseBranch?.let(::containsBreakForCurrentLoop) == true
+    is JavaAstStatement.While,
+    is JavaAstStatement.DoWhile,
+    is JavaAstStatement.For -> false
+    else -> false
+  }
+
+  /** 捕获当前 DA/DU 状态，供循环 break 出口参与交集。 */
+  private fun currentFlowState() = S1FlowState(
+    definitelyAssigned.toSet(),
+    assignedBlankFinalFields.toSet(),
+    unassignedBlankFinalFields.toSet(),
+  )
+
+  /** 同时恢复普通局部与 blank-final 的流状态。 */
+  private fun replaceFlowState(state: S1FlowState) {
+    replaceAssigned(state.assigned)
+    replaceBlankFinalState(state.blankAssigned, state.blankUnassigned)
+  }
+
+  /** 所有可达出口均满足时才保留 definite-assigned/definite-unassigned。 */
+  private fun List<S1FlowState>.intersectionOrNull(): S1FlowState? {
+    val first = firstOrNull() ?: return null
+    return drop(1).fold(first) { left, right ->
+      S1FlowState(
+        left.assigned.intersect(right.assigned),
+        left.blankAssigned.intersect(right.blankAssigned),
+        left.blankUnassigned.intersect(right.blankUnassigned),
+      )
+    }
   }
 
   /** 识别 true 与括号包装。 */
@@ -3260,6 +3516,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         builtinMembers.toMap(),
         builtinTypeRoles.toMap(),
         wrapperPrimitiveTypes.toMap(),
+        interfaceDefaultMethods.toMap(),
       ),
       diagnostics,
     )
@@ -3291,11 +3548,13 @@ private class S1TypeInfo(
   val kind: JavaSemanticTypeDeclarationKind,
   val visibility: JavaVisibility,
   val isFinal: Boolean,
+  val isAbstract: Boolean = false,
   var directSuperClass: JavaSemanticType.Declared? = null,
 ) {
   val typeParameters = mutableListOf<JavaSymbolId>()
   val typeParameterNames = linkedMapOf<String, JavaSymbolId>()
   val membersInSourceOrder = mutableListOf<JavaSymbolId>()
+  val directInterfaces = mutableListOf<JavaSemanticType.Declared>()
   val packageName: String? get() = qualifiedName.substringBeforeLast('.', "").ifEmpty { null }
   val simpleName: String get() = qualifiedName.substringAfterLast('.')
   val nodeId: JavaNodeId get() = declaration?.nodeId ?: unit.nodeId
@@ -3317,6 +3576,7 @@ private class S1TypeInfo(
     typeParameters.toList(),
     directSuperClass,
     membersInSourceOrder.toList(),
+    directInterfaces.toList(),
   )
 }
 
@@ -3370,8 +3630,10 @@ private data class S1CallableInfo(
   val erasedSignatureKey: String,
   val erasedDescriptor: String,
   val isSynthetic: Boolean = false,
-  /** builtin callable 由稳定 operation 执行，不参与用户类虚槽分配。 */
+  /** builtin callable 由稳定 operation 执行；除 Object 虚方法根外不参与用户类槽位。 */
   val isBuiltin: Boolean = false,
+  /** Object.equals/hashCode/toString 作为虚方法根，源码 override 必须继承它的槽位。 */
+  val isBuiltinVirtualRoot: Boolean = false,
 ) {
   val span: JavaSourceSpan get() = declaration?.span ?: owner.span
 
@@ -3431,6 +3693,18 @@ private data class S1BodyContext(
   val owner: S1TypeInfo,
   val callable: S1CallableInfo?,
   val isStatic: Boolean,
+)
+
+/** 循环分析期间收集的 break 正常出口。 */
+private data class S1LoopFlow(
+  val breakExits: MutableList<S1FlowState> = mutableListOf(),
+)
+
+/** 局部 definite-assignment 与 blank-final DA/DU 的不可变快照。 */
+private data class S1FlowState(
+  val assigned: Set<JavaSymbolId>,
+  val blankAssigned: Set<JavaSymbolId>,
+  val blankUnassigned: Set<JavaSymbolId>,
 )
 
 /** receiver 的运行时形态；[isImplicit] 区分无 receiver 调用。 */

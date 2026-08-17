@@ -46,7 +46,7 @@ internal object JavaLezerAstFrontend : JavaAstFrontend {
   override fun parse(workspace: JavaSourceWorkspace): JavaCompilerPhaseResult<JavaAstWorkspace> {
     val diagnostics = mutableListOf<JavaCompilerDiagnostic>()
     val units = workspace.files.mapNotNull { file ->
-      val tree = parser.parse(file.source)
+      val tree = parser.parse(file.source.normalizeDefaultModifierForLezer())
       val recovered = tree.topNode.firstRecoveryNode()
       if (recovered != null) {
         diagnostics += error(file, recovered, "java.syntax.recovery", "Java 源码包含语法错误恢复节点，不能编译。")
@@ -72,6 +72,35 @@ internal object JavaLezerAstFrontend : JavaAstFrontend {
     return JavaCompilerDiagnostic(code, message, JavaDiagnosticSeverity.ERROR, JavaSourceSpan(file.id, node.from, node.to))
   }
 }
+
+/**
+ * 等长规避 @lezer/java 1.1.3 对 interface `default` modifier 的 grammar 缺陷。
+ *
+ * 该版本把 `default` 与 `synchronized` 误写为必须连续出现，合法 default 方法会产生恢复节点。
+ * 这里只替换交给 Lezer 的临时文本，节点 span 与长度保持不变；adapter 仍从原始源码读取 token 和
+ * 字面量，因此不会改变诊断位置、字符串内容或最终 AST。待上游 grammar 修复并升级后可移除此兼容层。
+ */
+private fun String.normalizeDefaultModifierForLezer(): String {
+  val keyword = "default"
+  // `private` 与 `default` 同为 7 个字符，CST modifier span 才能完整覆盖原关键字。
+  val replacement = "private"
+  var index = indexOf(keyword)
+  if (index < 0) return this
+  val normalized = StringBuilder(this)
+  while (index >= 0) {
+    val before = getOrNull(index - 1)
+    val after = getOrNull(index + keyword.length)
+    if (!before.isJavaIdentifierPart() && !after.isJavaIdentifierPart()) {
+      replacement.forEachIndexed { offset, char -> normalized[index + offset] = char }
+    }
+    index = indexOf(keyword, index + keyword.length)
+  }
+  return normalized.toString()
+}
+
+/** 与本次 Java 关键字边界判断相关的最小 identifier-part 规则。 */
+private fun Char?.isJavaIdentifierPart(): Boolean =
+  this != null && (isLetterOrDigit() || this == '_' || this == '$')
 
 /** 单文件 CST adapter；表达式只按节点层级和 token 节点建模，不通过源码扫描重建。 */
 private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
@@ -181,13 +210,33 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       unsupported(it, "阶段 1 尚不支持可变参数。")
     }
     val bodyNode = node.children().firstOrNull { it.name == "Block" }
-    if (bodyNode == null && ownerKind == JavaAstTypeDeclarationKind.CLASS &&
-      JavaAstModifier.ABSTRACT !in modifiers
-    ) {
-      unsupported(node, "class 中的非 abstract 方法必须有 block 方法体。")
-    }
-    if (bodyNode != null && JavaAstModifier.ABSTRACT in modifiers) {
-      unsupported(bodyNode, "abstract 方法不能提供 block 方法体。")
+    when (ownerKind) {
+      JavaAstTypeDeclarationKind.CLASS -> {
+        if (bodyNode == null && JavaAstModifier.ABSTRACT !in modifiers) {
+          unsupported(node, "class 中的非 abstract 方法必须有 block 方法体。")
+        }
+        if (bodyNode != null && JavaAstModifier.ABSTRACT in modifiers) {
+          unsupported(bodyNode, "abstract 方法不能提供 block 方法体。")
+        }
+        if (JavaAstModifier.DEFAULT in modifiers) {
+          unsupported(node, "default 方法只能声明在 interface 中。")
+        }
+      }
+      JavaAstTypeDeclarationKind.INTERFACE -> {
+        val hasExecutableModifier = JavaAstModifier.DEFAULT in modifiers ||
+          JavaAstModifier.STATIC in modifiers
+        if (bodyNode == null && hasExecutableModifier) {
+          unsupported(node, "interface 的 default/static 方法必须提供方法体。")
+        }
+        if (bodyNode != null && !hasExecutableModifier) {
+          unsupported(bodyNode, "interface 中带方法体的方法必须声明为 default 或 static。")
+        }
+        if (bodyNode != null && JavaAstModifier.ABSTRACT in modifiers) {
+          unsupported(bodyNode, "abstract interface 方法不能提供方法体。")
+        }
+      }
+      JavaAstTypeDeclarationKind.ENUM ->
+        unsupported(node, "enum 方法将在阶段 2A 后续批次开放。")
     }
     val parameters = node.descendants().filter { it.name == "FormalParameter" }
       .filter { it.nearest("MethodDeclaration") === node }.map(::parameter)
@@ -275,7 +324,10 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     "ReturnStatement" -> JavaAstStatement.Return(ids.next(), span(node), node.returnExpression())
     "IfStatement" -> ifStatement(node)
     "WhileStatement" -> whileStatement(node)
+    "DoStatement" -> doWhileStatement(node)
     "ForStatement" -> forStatement(node)
+    "BreakStatement" -> loopJump(node, isBreak = true)
+    "ContinueStatement" -> loopJump(node, isBreak = false)
     "EmptyStatement" -> JavaAstStatement.Empty(ids.next(), span(node))
     else -> unsupported(node, "阶段 1 不支持该语句。")
   }
@@ -321,6 +373,26 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
     val body = node.children().lastOrNull { it.name in STATEMENT_NODES }
       ?: unsupported(node, "while 缺少循环体。")
     return JavaAstStatement.While(ids.next(), span(node), expression(condition), statement(body))
+  }
+
+  /** 构建 do-while；真实 CST 将循环体放在条件前，不能按普通 while 的末级语句查找。 */
+  private fun doWhileStatement(node: LezerSyntaxNode): JavaAstStatement.DoWhile {
+    val body = node.children().firstOrNull { it.name in STATEMENT_NODES }
+      ?: unsupported(node, "do-while 缺少循环体。")
+    val condition = node.children().firstOrNull { it.name == "ParenthesizedExpression" }
+      ?: unsupported(node, "do-while 缺少条件。")
+    return JavaAstStatement.DoWhile(
+      ids.next(), span(node), statement(body), expression(condition),
+    )
+  }
+
+  /** break/continue 首批只支持无标签形式，避免静默改变外层跳转目标。 */
+  private fun loopJump(node: LezerSyntaxNode, isBreak: Boolean): JavaAstStatement {
+    node.children().firstOrNull { it.name == "Identifier" }?.let {
+      unsupported(it, "阶段 2A 暂不支持带标签的 break/continue。")
+    }
+    return if (isBreak) JavaAstStatement.Break(ids.next(), span(node))
+    else JavaAstStatement.Continue(ids.next(), span(node))
   }
 
   /** 经典 for 使用 ForSpec 的直接分号 token 分段，绝不通过源码切分。 */
@@ -871,7 +943,11 @@ private class JavaFrontendIssue(val node: LezerSyntaxNode, val code: String, ove
 
 private val TYPE_NODES = setOf("ClassDeclaration", "InterfaceDeclaration", "EnumDeclaration")
 private val MEMBER_NODES = setOf("FieldDeclaration", "MethodDeclaration", "ConstructorDeclaration")
-private val STATEMENT_NODES = setOf("Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement", "WhileStatement", "ForStatement", "EmptyStatement")
+private val STATEMENT_NODES = setOf(
+  "Block", "LocalVariableDeclaration", "ExpressionStatement", "ReturnStatement", "IfStatement",
+  "WhileStatement", "DoStatement", "ForStatement", "BreakStatement", "ContinueStatement",
+  "EmptyStatement",
+)
 private val TYPE_REFERENCE_NODES = setOf("PrimitiveType", "TypeName", "ScopedTypeName", "void", "ArrayType")
 private val TYPE_REFERENCE_WRAPPERS = setOf("GenericType")
 private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
@@ -883,11 +959,11 @@ private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "Assignme
 private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")
-private val MODIFIERS = mapOf("public" to JavaAstModifier.PUBLIC, "protected" to JavaAstModifier.PROTECTED, "private" to JavaAstModifier.PRIVATE, "abstract" to JavaAstModifier.ABSTRACT, "static" to JavaAstModifier.STATIC, "final" to JavaAstModifier.FINAL)
-private val JAVA_MODIFIER_TOKENS = MODIFIERS.keys + setOf("strictfp", "default", "synchronized", "native", "transient", "volatile")
+private val MODIFIERS = mapOf("public" to JavaAstModifier.PUBLIC, "protected" to JavaAstModifier.PROTECTED, "private" to JavaAstModifier.PRIVATE, "abstract" to JavaAstModifier.ABSTRACT, "default" to JavaAstModifier.DEFAULT, "static" to JavaAstModifier.STATIC, "final" to JavaAstModifier.FINAL)
+private val JAVA_MODIFIER_TOKENS = MODIFIERS.keys + setOf("strictfp", "synchronized", "native", "transient", "volatile")
 private val TYPE_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.ABSTRACT, JavaAstModifier.FINAL)
 private val FIELD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE, JavaAstModifier.STATIC, JavaAstModifier.FINAL)
-private val METHOD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE, JavaAstModifier.STATIC, JavaAstModifier.FINAL, JavaAstModifier.ABSTRACT)
+private val METHOD_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE, JavaAstModifier.STATIC, JavaAstModifier.FINAL, JavaAstModifier.ABSTRACT, JavaAstModifier.DEFAULT)
 private val CONSTRUCTOR_MODIFIERS = setOf(JavaAstModifier.PUBLIC, JavaAstModifier.PROTECTED, JavaAstModifier.PRIVATE)
 private val PARAMETER_MODIFIERS = setOf(JavaAstModifier.FINAL)
 private val LOCAL_MODIFIERS = setOf(JavaAstModifier.FINAL)

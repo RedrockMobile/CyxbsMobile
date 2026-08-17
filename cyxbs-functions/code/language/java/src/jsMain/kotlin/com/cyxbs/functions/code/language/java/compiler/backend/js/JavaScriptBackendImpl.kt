@@ -28,6 +28,7 @@ import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrProgram
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrStatement
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrConstructorInvocationKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrType
+import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrTypeDeclarationKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrBinaryOperator
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrArrayReferenceComponentKind
 import com.cyxbs.functions.code.language.java.compiler.ir.JavaIrUnaryOperator
@@ -96,40 +97,93 @@ private class JavaScriptBackendValidator(
     if (index.fields.size != index.program.classes.sumOf { it.fields.size }) {
       invalid("Java IR contains duplicate field ids.", null)
     }
+    validateBuiltinVirtualSlots()
     index.program.classes.sortedBy { it.id.value }.forEach(::validateClass)
-    index.program.classes.forEach { clazz ->
-      val seen = mutableSetOf<JavaIrClassId>()
-      var current: JavaIrClass? = clazz
-      while (current != null && seen.add(current.id)) current = current.superClass?.let(index.classes::get)
-      if (current != null) invalid("Java IR inheritance graph contains a cycle.", clazz.span)
-    }
+    index.program.classes.forEach { clazz -> validateHierarchyAcyclic(clazz) }
     validateEntryPoint()
     return diagnostics.toList()
   }
 
-  /** 校验阶段 1 类关系、字段归属和初始化块。接口默认方法仍未实现。 */
+  /** Object 三个虚方法根必须各自拥有唯一非负槽位，其他 builtin operation 不得混入。 */
+  private fun validateBuiltinVirtualSlots() {
+    val required = setOf(
+      JavaBuiltinOperation.OBJECT_EQUALS,
+      JavaBuiltinOperation.OBJECT_HASH_CODE,
+      JavaBuiltinOperation.OBJECT_TO_STRING,
+    )
+    val slots = index.program.builtinVirtualSlots
+    if (slots.keys != required || slots.values.any { it < 0 } || slots.values.distinct().size != required.size) {
+      invalid("Java IR builtin virtual slot table is incomplete or inconsistent.", null)
+    }
+  }
+
+  /** 校验 class/interface 关系、成员归属和已决议 default method 映射。 */
   private fun validateClass(clazz: JavaIrClass) {
-    if (clazz.interfaces.isNotEmpty()) unsupported("Java interfaces are not available in the stage 1 JavaScript backend.", clazz.span)
     clazz.superClass?.let { parent -> if (index.classes[parent] == null) invalid("Java IR references an unknown superclass id ${parent.value}.", clazz.span) }
+    clazz.interfaces.forEach { interfaceId ->
+      val inherited = index.classes[interfaceId]
+      if (inherited == null || inherited.kind != JavaIrTypeDeclarationKind.INTERFACE) {
+        invalid("Java IR direct interface must reference an emitted interface.", clazz.span)
+      }
+    }
+    if (clazz.kind == JavaIrTypeDeclarationKind.INTERFACE) {
+      if (clazz.superClass != null || clazz.fields.any { !it.isStatic } ||
+        clazz.methods.any { it.kind == JavaIrMethodKind.CONSTRUCTOR } ||
+        clazz.instanceInitializer != null
+      ) {
+        invalid("Java IR interface contains class-only runtime members.", clazz.span)
+      }
+    }
     clazz.fields.forEach { field ->
       if (field.owner != clazz.id) invalid("Java IR field owner does not match its class.", field.span)
       validateType(field.type, field.span)
       field.initializer?.let(::validateExpression)
     }
-    clazz.staticInitializer?.let(::validateStatement)
-    clazz.instanceInitializer?.let(::validateStatement)
+    clazz.staticInitializer?.let { validateStatement(it, loopDepth = 0) }
+    clazz.instanceInitializer?.let { validateStatement(it, loopDepth = 0) }
     clazz.methods.forEach { method ->
       if (method.owner != clazz.id) invalid("Java IR method owner does not match its class.", method.span)
       validateMethod(method)
     }
+    clazz.interfaceDefaultMethods.forEach { (slot, methodId) ->
+      val method = index.methods[methodId]
+      val owner = method?.owner?.let(index.classes::get)
+      if (method == null || owner?.kind != JavaIrTypeDeclarationKind.INTERFACE ||
+        method.body == null || method.virtualSlot != slot ||
+        method.dispatch != JavaIrDispatchKind.INTERFACE
+      ) {
+        invalid("Java IR default method mapping is inconsistent.", clazz.span)
+      }
+    }
     validateVirtualSlots(clazz)
+  }
+
+  /** 父类和接口共享同一继承图，validator 必须拒绝任意方向的循环。 */
+  private fun validateHierarchyAcyclic(root: JavaIrClass) {
+    val visiting = mutableSetOf<JavaIrClassId>()
+    val visited = mutableSetOf<JavaIrClassId>()
+    fun visit(classId: JavaIrClassId) {
+      if (classId in visited) return
+      if (!visiting.add(classId)) {
+        invalid("Java IR inheritance graph contains a cycle.", root.span)
+        return
+      }
+      index.classes[classId]?.let { current ->
+        listOfNotNull(current.superClass).plus(current.interfaces).forEach(::visit)
+      }
+      visiting.remove(classId)
+      visited += classId
+    }
+    visit(root.id)
   }
 
   /** 校验方法签名、构造器首句和局部变量引用。 */
   private fun validateMethod(method: JavaIrMethod) {
-    if (method.body == null) {
-      unsupported("Abstract or native Java methods cannot be emitted as JavaScript.", method.span)
-    }
+    if (method.body == null && method.dispatch !in setOf(
+        JavaIrDispatchKind.VIRTUAL,
+        JavaIrDispatchKind.INTERFACE,
+      )
+    ) invalid("Only virtual/interface declarations may omit an executable body.", method.span)
     if (method.kind == JavaIrMethodKind.CONSTRUCTOR && method.dispatch != JavaIrDispatchKind.SPECIAL) {
       invalid("Java IR constructors must use SPECIAL dispatch.", method.span)
     }
@@ -146,7 +200,7 @@ private class JavaScriptBackendValidator(
     locals.forEach { local -> validateType(local.type, local.span) }
     method.body?.let { body ->
       validateConstructorInvocations(method, body)
-      validateStatement(body)
+      validateStatement(body, loopDepth = 0)
     }
   }
 
@@ -161,6 +215,8 @@ private class JavaScriptBackendValidator(
           statement.elseBranch?.let(::collect)
         }
         is JavaIrStatement.While -> collect(statement.body)
+        is JavaIrStatement.DoWhile -> collect(statement.body)
+        is JavaIrStatement.For -> collect(statement.body)
         is JavaIrStatement.ConstructorInvocation -> invocations += statement
         else -> Unit
       }
@@ -199,7 +255,9 @@ private class JavaScriptBackendValidator(
     val declared = mutableMapOf<Int, JavaIrMethod>()
     clazz.methods.filter { it.virtualSlot != null }.forEach { method ->
       val slot = checkNotNull(method.virtualSlot)
-      if (method.dispatch != JavaIrDispatchKind.VIRTUAL || method.kind != JavaIrMethodKind.METHOD) {
+      if (method.dispatch !in setOf(JavaIrDispatchKind.VIRTUAL, JavaIrDispatchKind.INTERFACE) ||
+        method.kind != JavaIrMethodKind.METHOD
+      ) {
         invalid("Java IR virtual slot $slot must belong to an instance virtual method.", method.span)
       }
       val previous = declared.put(slot, method)
@@ -221,8 +279,8 @@ private class JavaScriptBackendValidator(
         val root = virtualSlotRoots[slot]
         if (root == null) {
           virtualSlotRoots[slot] = method
-        } else if (root.owner != method.owner) {
-          invalid("Java IR virtual slot $slot is reused by unrelated override owners.", method.span)
+        } else if (!hasCompatibleVirtualParameters(root, method)) {
+          invalid("Java IR virtual slot $slot is reused by an incompatible method signature.", method.span)
         }
       }
     }
@@ -244,9 +302,9 @@ private class JavaScriptBackendValidator(
   }
 
   /** 递归校验在阶段 0 可直接翻译的控制流。 */
-  private fun validateStatement(statement: JavaIrStatement) {
+  private fun validateStatement(statement: JavaIrStatement, loopDepth: Int) {
     when (statement) {
-      is JavaIrStatement.Block -> statement.statements.forEach(::validateStatement)
+      is JavaIrStatement.Block -> statement.statements.forEach { validateStatement(it, loopDepth) }
       is JavaIrStatement.DeclareLocal -> {
         requireLocal(statement.local, statement.span)
         statement.initializer?.let(::validateExpression)
@@ -254,12 +312,27 @@ private class JavaScriptBackendValidator(
       is JavaIrStatement.Expression -> validateExpression(statement.expression)
       is JavaIrStatement.If -> {
         validateExpression(statement.condition)
-        validateStatement(statement.thenBranch)
-        statement.elseBranch?.let(::validateStatement)
+        validateStatement(statement.thenBranch, loopDepth)
+        statement.elseBranch?.let { validateStatement(it, loopDepth) }
       }
       is JavaIrStatement.While -> {
         validateExpression(statement.condition)
-        validateStatement(statement.body)
+        validateStatement(statement.body, loopDepth + 1)
+      }
+      is JavaIrStatement.DoWhile -> {
+        validateStatement(statement.body, loopDepth + 1)
+        validateExpression(statement.condition)
+      }
+      is JavaIrStatement.For -> {
+        validateExpression(statement.condition)
+        statement.updates.forEach(::validateExpression)
+        validateStatement(statement.body, loopDepth + 1)
+      }
+      is JavaIrStatement.Break -> if (loopDepth == 0) {
+        invalid("Java IR break statement must be nested in a loop.", statement.span)
+      }
+      is JavaIrStatement.Continue -> if (loopDepth == 0) {
+        invalid("Java IR continue statement must be nested in a loop.", statement.span)
       }
       is JavaIrStatement.ConstructorInvocation -> {
         val target = index.methods[statement.constructor]
@@ -314,7 +387,11 @@ private class JavaScriptBackendValidator(
       is JavaIrExpression.InvokeSpecial -> { requireInstanceMethod(expression.method, expression.span); validateExpression(expression.receiver); expression.arguments.forEach(::validateExpression) }
       is JavaIrExpression.InvokeVirtual -> {
         val target = index.methods[expression.method]
-        if (target == null || target.dispatch != JavaIrDispatchKind.VIRTUAL || target.virtualSlot != expression.virtualSlot) invalid("Java IR virtual call slot does not match its selected method.", expression.span)
+        if (target == null || target.dispatch !in setOf(
+            JavaIrDispatchKind.VIRTUAL,
+            JavaIrDispatchKind.INTERFACE,
+          ) || target.virtualSlot != expression.virtualSlot
+        ) invalid("Java IR virtual/interface call slot does not match its selected method.", expression.span)
         validateExpression(expression.receiver); expression.arguments.forEach(::validateExpression)
       }
       is JavaIrExpression.NewObject -> {
@@ -374,7 +451,13 @@ private class JavaScriptBackendValidator(
       invalid("Java IR operation is not a callable builtin.", expression.span)
       return
     }
+    val virtualSlotValid = if (expression.operation.isObjectVirtualOperation()) {
+      index.program.builtinVirtualSlots[expression.operation] != null
+    } else {
+      true
+    }
     if ((expression.receiver != null) != signature.hasReceiver ||
+      !virtualSlotValid ||
       (signature.hasReceiver && expression.receiver?.type !is JavaIrType.Reference) ||
       !matchesBuiltinRole(expression.receiver?.type, builtinReceiverRoles(expression.operation)) ||
       expression.arguments.size != signature.parameters.size ||
@@ -426,6 +509,10 @@ private class JavaScriptBackendValidator(
     JavaBuiltinOperation.SYSTEM_OUT,
     JavaBuiltinOperation.SYSTEM_ERR,
     JavaBuiltinOperation.SYSTEM_IN -> null
+    JavaBuiltinOperation.OBJECT_EQUALS ->
+      BuiltinSignature(true, listOf(BuiltinType.REFERENCE_OR_NULL), BuiltinType.BOOLEAN)
+    JavaBuiltinOperation.OBJECT_HASH_CODE -> BuiltinSignature(true, emptyList(), BuiltinType.INT)
+    JavaBuiltinOperation.OBJECT_TO_STRING -> BuiltinSignature(true, emptyList(), BuiltinType.REFERENCE)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> BuiltinSignature(true, listOf(BuiltinType.BOOLEAN), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> BuiltinSignature(true, listOf(BuiltinType.CHAR), BuiltinType.VOID)
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> BuiltinSignature(true, listOf(BuiltinType.CHAR_ARRAY), BuiltinType.VOID)
@@ -550,6 +637,10 @@ private class JavaScriptBackendValidator(
 
   /** builtin receiver 的精确运行时角色；null 表示 static/field/constructor 或无需引用约束。 */
   private fun builtinReceiverRoles(operation: JavaBuiltinOperation): Set<JavaBuiltinTypeRole>? = when (operation) {
+    JavaBuiltinOperation.OBJECT_EQUALS,
+    JavaBuiltinOperation.OBJECT_HASH_CODE,
+    JavaBuiltinOperation.OBJECT_TO_STRING -> null
+
     JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR,
     JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY,
@@ -647,6 +738,7 @@ private class JavaScriptBackendValidator(
 
   /** 仅对返回 builtin 引用的 operation 约束精确 class role。 */
   private fun builtinResultRoles(operation: JavaBuiltinOperation): Set<JavaBuiltinTypeRole>? = when (operation) {
+    JavaBuiltinOperation.OBJECT_TO_STRING,
     JavaBuiltinOperation.STRING_SUBSTRING_FROM,
     JavaBuiltinOperation.STRING_SUBSTRING_RANGE,
     JavaBuiltinOperation.BOOLEAN_TO_STRING,
@@ -975,6 +1067,7 @@ private class JavaScriptEmitter(
       fun visit(clazz: JavaIrClass) {
         if (!visited.add(clazz.id)) return
         clazz.superClass?.let(index.classes::get)?.let(::visit)
+        clazz.interfaces.mapNotNull(index.classes::get).forEach(::visit)
         add(clazz)
       }
       index.program.classes.sortedBy { it.id.value }.forEach(::visit)
@@ -994,6 +1087,7 @@ private class JavaScriptEmitter(
     }
     if (usesBuiltinRuntime()) {
       writer.line()
+      emitBuiltinVirtualSlotConstants()
       JavaRuntimePrelude.builtinSource.lines().forEach(writer::line)
     }
     if (usesCollectionRuntime()) {
@@ -1010,6 +1104,7 @@ private class JavaScriptEmitter(
     writer.line()
     val methods = index.program.classes
       .flatMap(JavaIrClass::methods)
+      .filter { method -> method.body != null }
       .sortedBy { method -> method.id.value }
     if (usesObjectRuntime()) emitClassShells()
     methods.forEach(::emitMethod)
@@ -1027,6 +1122,16 @@ private class JavaScriptEmitter(
         ),
       ),
     )
+  }
+
+  /** 将 semantic 冻结的 Object 虚槽写成模块内常量，runtime 不读取源码方法名。 */
+  private fun emitBuiltinVirtualSlotConstants() {
+    fun slot(operation: JavaBuiltinOperation): String = JsNameMangler.virtualSlot(
+      index.program.builtinVirtualSlots.getValue(operation),
+    )
+    writer.line("const \$__j_object_equals_slot = ${writer.stringLiteral(slot(JavaBuiltinOperation.OBJECT_EQUALS))};")
+    writer.line("const \$__j_object_hash_code_slot = ${writer.stringLiteral(slot(JavaBuiltinOperation.OBJECT_HASH_CODE))};")
+    writer.line("const \$__j_object_to_string_slot = ${writer.stringLiteral(slot(JavaBuiltinOperation.OBJECT_TO_STRING))};")
   }
 
   /** 阶段 0 的纯 static 程序不发射对象壳，保持其既有稳定快照。 */
@@ -1064,6 +1169,11 @@ private class JavaScriptEmitter(
     is JavaIrStatement.If -> condition.requiresBuiltinRuntime() ||
       thenBranch.requiresBuiltinRuntime() || elseBranch?.requiresBuiltinRuntime() == true
     is JavaIrStatement.While -> condition.requiresBuiltinRuntime() || body.requiresBuiltinRuntime()
+    is JavaIrStatement.DoWhile -> body.requiresBuiltinRuntime() || condition.requiresBuiltinRuntime()
+    is JavaIrStatement.For -> condition.requiresBuiltinRuntime() ||
+      updates.any { it.requiresBuiltinRuntime() } || body.requiresBuiltinRuntime()
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresBuiltinRuntime() }
     is JavaIrStatement.Return -> expression?.requiresBuiltinRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresBuiltinRuntime()
@@ -1114,6 +1224,11 @@ private class JavaScriptEmitter(
     is JavaIrStatement.If -> condition.requiresCollectionRuntime() ||
       thenBranch.requiresCollectionRuntime() || elseBranch?.requiresCollectionRuntime() == true
     is JavaIrStatement.While -> condition.requiresCollectionRuntime() || body.requiresCollectionRuntime()
+    is JavaIrStatement.DoWhile -> body.requiresCollectionRuntime() || condition.requiresCollectionRuntime()
+    is JavaIrStatement.For -> condition.requiresCollectionRuntime() ||
+      updates.any { it.requiresCollectionRuntime() } || body.requiresCollectionRuntime()
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresCollectionRuntime() }
     is JavaIrStatement.Return -> expression?.requiresCollectionRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresCollectionRuntime()
@@ -1165,6 +1280,11 @@ private class JavaScriptEmitter(
     is JavaIrStatement.If -> condition.requiresScannerRuntime() ||
       thenBranch.requiresScannerRuntime() || elseBranch?.requiresScannerRuntime() == true
     is JavaIrStatement.While -> condition.requiresScannerRuntime() || body.requiresScannerRuntime()
+    is JavaIrStatement.DoWhile -> body.requiresScannerRuntime() || condition.requiresScannerRuntime()
+    is JavaIrStatement.For -> condition.requiresScannerRuntime() ||
+      updates.any { it.requiresScannerRuntime() } || body.requiresScannerRuntime()
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { it.requiresScannerRuntime() }
     is JavaIrStatement.Return -> expression?.requiresScannerRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresScannerRuntime()
@@ -1210,6 +1330,12 @@ private class JavaScriptEmitter(
       thenBranch.requiresArrayOrStringRuntime() ||
       (elseBranch?.requiresArrayOrStringRuntime() == true)
     is JavaIrStatement.While -> condition.requiresArrayOrStringRuntime() || body.requiresArrayOrStringRuntime()
+    is JavaIrStatement.DoWhile -> body.requiresArrayOrStringRuntime() ||
+      condition.requiresArrayOrStringRuntime()
+    is JavaIrStatement.For -> condition.requiresArrayOrStringRuntime() ||
+      updates.any { it.requiresArrayOrStringRuntime() } || body.requiresArrayOrStringRuntime()
+    is JavaIrStatement.Break,
+    is JavaIrStatement.Continue -> false
     is JavaIrStatement.ConstructorInvocation -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
     is JavaIrStatement.Return -> expression?.requiresArrayOrStringRuntime() == true
     is JavaIrStatement.Throw -> expression.requiresArrayOrStringRuntime()
@@ -1252,9 +1378,20 @@ private class JavaScriptEmitter(
         writer.line("${JsNameMangler.staticStorage(clazz.id)}.values[\"${JsNameMangler.field(field.id)}\"] = ${defaultValue(field.type)};")
       }
       writer.line("const ${JsNameMangler.prototype(clazz.id)} = Object.create($parent);")
+      writer.line("${JsNameMangler.prototype(clazz.id)}[\"\$__j_class_name\"] = ${writer.stringLiteral(clazz.qualifiedName)};")
     }
-    index.program.classes.flatMap { it.methods }.filter { it.virtualSlot != null }.sortedBy { it.id.value }.forEach { method ->
+    index.program.classes.flatMap { it.methods }
+      .filter { it.virtualSlot != null && it.body != null }
+      .sortedBy { it.id.value }
+      .forEach { method ->
       writer.line("${JsNameMangler.prototype(method.owner)}[\"${JsNameMangler.virtualSlot(checkNotNull(method.virtualSlot))}\"] = ${JsNameMangler.method(method.id)};")
+    }
+    classesInParentFirstOrder.filter { it.kind == JavaIrTypeDeclarationKind.CLASS }.forEach { clazz ->
+      clazz.interfaceDefaultMethods.entries.sortedBy { it.key }.forEach { (slot, method) ->
+        val key = JsNameMangler.virtualSlot(slot)
+        // 语义层已经解决 default 冲突；这里仅安装显式选择结果，class/superclass 自身实现优先。
+        writer.line("if (!(\"$key\" in ${JsNameMangler.prototype(clazz.id)})) ${JsNameMangler.prototype(clazz.id)}[\"$key\"] = ${JsNameMangler.method(method)};")
+      }
     }
     writer.line()
   }
@@ -1414,6 +1551,26 @@ private class JavaScriptEmitter(
         writer.write(") ")
         emitBranch(statement.body)
       }
+      is JavaIrStatement.DoWhile -> {
+        writer.writeIndentation()
+        writer.write("do ")
+        emitBranch(statement.body)
+        writer.writeIndentation()
+        writer.write("while (")
+        writer.writeMapped(renderExpression(statement.condition), statement.condition.span)
+        writer.write(");\n")
+      }
+      is JavaIrStatement.For -> {
+        writer.writeIndentation()
+        writer.write("for (; ")
+        writer.writeMapped(renderExpression(statement.condition), statement.condition.span)
+        writer.write("; ")
+        writer.write(statement.updates.joinToString(", ") { renderExpression(it) })
+        writer.write(") ")
+        emitBranch(statement.body)
+      }
+      is JavaIrStatement.Break -> writer.line("break;")
+      is JavaIrStatement.Continue -> writer.line("continue;")
       is JavaIrStatement.ConstructorInvocation -> {
         val arguments = statement.arguments.joinToString(", ") { renderExpression(it) }
         writer.writeIndentation()
@@ -1442,7 +1599,7 @@ private class JavaScriptEmitter(
     }
   }
 
-  /** 对非 block 分支补齐花括号，避免 if/while 生成时产生悬挂 else。 */
+  /** 对非 block 分支补齐花括号，避免条件与循环生成时产生悬挂 else。 */
   private fun emitBranch(statement: JavaIrStatement) {
     if (statement is JavaIrStatement.Block) {
       writer.write("{\n")
@@ -1560,6 +1717,9 @@ private class JavaScriptEmitter(
       JavaBuiltinOperation.SYSTEM_OUT,
       JavaBuiltinOperation.SYSTEM_ERR,
       JavaBuiltinOperation.SYSTEM_IN -> error("Validated callable builtin cannot be a stream value operation.")
+      JavaBuiltinOperation.OBJECT_EQUALS -> instance("\$__j_object_equals")
+      JavaBuiltinOperation.OBJECT_HASH_CODE -> instance("\$__j_object_hash_code")
+      JavaBuiltinOperation.OBJECT_TO_STRING -> instance("\$__j_object_to_string")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_BOOLEAN -> instance("\$__j_print_boolean")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR -> instance("\$__j_print_char")
       JavaBuiltinOperation.PRINTSTREAM_PRINT_CHAR_ARRAY -> instance("\$__j_print_char_array")
@@ -1873,5 +2033,13 @@ private fun JavaBuiltinOperation.isScannerOperation(): Boolean = when (this) {
   JavaBuiltinOperation.SCANNER_NEXT_INT,
   JavaBuiltinOperation.SCANNER_HAS_NEXT_LINE,
   JavaBuiltinOperation.SCANNER_NEXT_LINE -> true
+  else -> false
+}
+
+/** Object 三个 builtin operation 是用户 override 的虚方法根。 */
+private fun JavaBuiltinOperation.isObjectVirtualOperation(): Boolean = when (this) {
+  JavaBuiltinOperation.OBJECT_EQUALS,
+  JavaBuiltinOperation.OBJECT_HASH_CODE,
+  JavaBuiltinOperation.OBJECT_TO_STRING -> true
   else -> false
 }
