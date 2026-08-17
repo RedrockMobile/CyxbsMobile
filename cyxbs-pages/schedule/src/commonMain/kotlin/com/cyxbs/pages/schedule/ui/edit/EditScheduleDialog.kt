@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
@@ -73,7 +74,10 @@ import com.cyxbs.components.utils.compose.bringIntoViewFullBounds
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
+import com.cyxbs.pages.schedule.domain.model.*
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.atTime
+import kotlin.time.Instant
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleCalendarArea
@@ -97,7 +101,7 @@ import kotlinx.serialization.Serializable
  * - 周数由 commonMain 的 [SchoolCalendar] 推导（学期内显示「第N周」，否则只显示日期），不依赖课表帧，
  *   所以邮子清单与课表能真正共用、长得一样。
  *
- * 三态：编辑/删除「重复系列某一次」（[editSchedule] 重复 && [occurrenceDate] != null）时先弹三选一。
+ * 范围状态机：编辑/删除重复系列实例时先选择“仅本次 / 本次及以后 / 全部”；非重复项直接使用全部范围。
  */
 
 /** 弹窗内容固定高度，对齐课表 item 弹窗（[com.cyxbs.pages.course.dialog] 的 280dp），两处观感一致。 */
@@ -117,48 +121,42 @@ class EditScheduleDialogPreview : AppNavEntry<EditScheduleDialogNavArgument>() {
     EditScheduleDialog(
       show = true,
       editSchedule = previewSampleSchedule(),
-      occurrenceDate = Date.now(),
+      recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 4, 10, 0), "Asia/Shanghai", false),
       onDismiss = {},
       onConfirm = { _, _ -> }
     )
   }
 
-  private fun previewSampleSchedule() = ScheduleEntity(
-    todoId = 1L,
-    title = "项目答辩",
-    detail = "综合楼 503，记得带 U 盘",
-    startTime = "2026年7月4日 10:00",
-    endTime = "2026年7月4日 11:30",
-    recurrence = com.cyxbs.pages.schedule.recurrence.Recurrence(
-      rrule = com.cyxbs.pages.schedule.recurrence.RRule(
-        freq = com.cyxbs.pages.schedule.recurrence.Freq.WEEKLY,
-        byDay = listOf(7),
-      ),
-    ),
-    remindMinutes = 10,
-    lastModifyTime = 0L,
+  private fun previewSampleSchedule() = Schedule(
+    id = ScheduleId("00000000-0000-7000-8000-000000000001"), revision = 0, title = "项目答辩",
+    description = "综合楼 503，记得带 U 盘", categoryId = null,
+    timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 4, 10, 0), 90, "Asia/Shanghai"),
+    recurrence = RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.SATURDAY)),
+    reminders = listOf(ScheduleReminder(ReminderId("preview-reminder"), 10, ReminderChannel.DEVICE)),
+    completion = ScheduleCompletion.PENDING, createdAt = Instant.DISTANT_PAST, updatedAt = Instant.DISTANT_PAST,
   )
 }
 
 @Composable
 fun EditScheduleDialog(
   show: Boolean,
-  editSchedule: ScheduleEntity? = null,
-  occurrenceDate: Date? = null,
+  editSchedule: Schedule? = null,
+  editOccurrence: ScheduleOccurrence? = null,
+  recurrenceId: RecurrenceId? = null,
   onDismiss: () -> Unit,
   onConfirm: (EditScheduleModelState, EditScope) -> Unit,
   onDelete: ((EditScope) -> Unit)? = null,
 ) {
   if (!show) return
 
-  val modelState = rememberEditScheduleModelState(editSchedule)
+  val modelState = rememberEditScheduleModelState(editSchedule, editOccurrence)
 
   var showUnsavedExit by remember { mutableStateOf(false) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }
 
   // 开学第一天（周一）：用于推导第N周，一次会话读一次即可。
   val firstMonday = remember { SchoolCalendar.getFirstMonDay() }
-  val needScope = editSchedule?.recurrence != null && occurrenceDate != null
+  val needScope = editSchedule?.recurrence != null && recurrenceId != null
 
   val requestDismiss = { if (modelState.isChanged) showUnsavedExit = true else onDismiss() }
   val doSave = {
@@ -230,15 +228,18 @@ fun EditScheduleDialog(
   )
 }
 
+/** 范围选择弹层当前要提交的动作；保存与删除共用范围状态机，但最终命令入口严格分离。 */
 private enum class ScopeAction { SAVE, DELETE }
 
+/** 统一弹窗的查看态与编辑子区域状态；仅控制展示流转，不承载仓库写入状态。 */
 private sealed interface ScheduleUi {
   data object Show : ScheduleUi
 
   /**
-   * 编辑态下「标题行下方区域」当前展示什么，用枚举统一流转：
-   * [Note] 备注输入（默认）/ [Date] 日历选日期 / [Time] 时分滚轮 / [Repeat] 重复规则 / [Remind] 提前提醒。
-   * 点信息栏对应段切到对应区，← 返回回到 [Note]，改动均实时写回 state。
+   * 编辑弹窗内部区域的状态机，统一描述标题下方当前展示的子编辑器。
+   * [Note] 为默认备注区，[Date]/[Time]/[Repeat]/[Remind] 分别承载日期、时间、重复与提醒编辑；
+   * 点击信息栏只切换区域，所有改动立即写回同一个 [EditScheduleModelState]，返回 [Note] 不回滚。
+   * 作用范围选择是提交/删除前的独立状态，不与本区域状态混用，避免子编辑返回被误判为关闭弹窗。
    */
   sealed interface Edit : ScheduleUi {
     data object Note : ScheduleUi.Edit
@@ -348,7 +349,7 @@ private fun ScheduleContent(
     // 重复：内容较多，外层弹窗会增高；结束条件固定在底部，主体选择区内部滚动。
     ScheduleUi.Edit.Repeat -> EditScheduleRecurrenceArea(
       draft = modelState.recurrence,
-      anchorDate = modelState.anchorDate,
+      anchorDate = modelState.recurrenceAnchorDate,
       firstMonday = firstMonday,
       onChange = { modelState.recurrence = it },
       modifier = Modifier.fillMaxWidth(),
@@ -540,7 +541,7 @@ private data class InfoTextSegment(
   val color: Color,
   val onClick: (() -> Unit)?,
 ) {
-  // icon
+  // 图标
   val inlineContent = mapOf(
     id to InlineTextContent(
       placeholder = Placeholder(

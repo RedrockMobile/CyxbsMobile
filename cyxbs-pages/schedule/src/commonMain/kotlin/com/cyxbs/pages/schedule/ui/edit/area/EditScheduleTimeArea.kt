@@ -61,7 +61,17 @@ internal fun EditScheduleTimeArea(
 
   Column(modifier = Modifier.fillMaxWidth()) {
     // 时间段 / 截止 分段框框切换（沿用 todo cmp 的样式）。
-    ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { deadlineOnly = !it })
+    ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { interval ->
+      deadlineOnly = !interval
+      // 模式切换是显式用户事件：立即提交当前滚轮值；collector 不随模式重启，因而不会吞掉本次切换。
+      state.applyExplicitTimeModeSelection(
+        interval = interval,
+        startMinuteOfDay = startHour.value.roundToInt().coerceIn(0, 23) * 60 +
+          startMinute.value.roundToInt().coerceIn(0, 59),
+        endMinuteOfDay = endHour.value.roundToInt().coerceIn(0, 23) * 60 +
+          endMinute.value.roundToInt().coerceIn(0, 59),
+      )
+    })
     // 去掉「完成」按钮后，滚轮整体下移一点。
     Spacer(modifier = Modifier.height(12.dp))
     Row(
@@ -80,26 +90,55 @@ internal fun EditScheduleTimeArea(
     }
   }
 
-  // 滚轮值（及 截止/时间段 切换）实时写回 state：顶部「返回」← 收起即生效，无需单独「完成」按钮。
-  LaunchedEffect(deadlineOnly) {
+  // collector 生命周期与区域一致：首次 composition 无条件跳过，避免 Unscheduled/AllDay 被默认 now/end 写回。
+  // 模式切换由点击回调显式提交，不再以 deadlineOnly 重启 collector，因此真实切换不会被“首次 emission”吞掉。
+  LaunchedEffect(Unit) {
+    var firstEmission = true
     snapshotFlow {
       listOf(
         startHour.value.roundToInt(), startMinute.value.roundToInt(),
         endHour.value.roundToInt(), endMinute.value.roundToInt(),
       )
     }.collect {
-      val date = state.anchorDate
-      val eH = endHour.value.roundToInt().coerceIn(0, 23)
-      val eM = endMinute.value.roundToInt().coerceIn(0, 59)
-      state.endTime = formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, eH, eM)
-      state.startTime = if (deadlineOnly) {
-        "" // 截止型：清空开始
-      } else {
-        val sH = startHour.value.roundToInt().coerceIn(0, 23)
-        val sM = startMinute.value.roundToInt().coerceIn(0, 59)
-        formatScheduleDateTime(date.year, date.monthNumber, date.dayOfMonth, sH, sM)
+      if (firstEmission) {
+        firstEmission = false
+        return@collect
       }
+      state.applyExplicitTimeModeSelection(
+        interval = !deadlineOnly,
+        startMinuteOfDay = startHour.value.roundToInt().coerceIn(0, 23) * 60 +
+          startMinute.value.roundToInt().coerceIn(0, 59),
+        endMinuteOfDay = endHour.value.roundToInt().coerceIn(0, 23) * 60 +
+          endMinute.value.roundToInt().coerceIn(0, 59),
+      )
     }
+  }
+}
+
+/**
+ * 提交用户显式的时间模式/滚轮动作；初始化 composition 不调用此函数，因此 Unscheduled/AllDay 保持原样。
+ */
+internal fun EditScheduleModelState.applyExplicitTimeModeSelection(
+  interval: Boolean,
+  startMinuteOfDay: Int,
+  endMinuteOfDay: Int,
+) {
+  val date = anchorDate
+  isAllDay = false
+  isInterval = interval
+  endTime = formatScheduleDateTime(
+    date.year, date.monthNumber, date.dayOfMonth,
+    endMinuteOfDay.coerceIn(0, 23 * 60 + 59) / 60,
+    endMinuteOfDay.coerceIn(0, 23 * 60 + 59) % 60,
+  )
+  startTime = if (interval) {
+    formatScheduleDateTime(
+      date.year, date.monthNumber, date.dayOfMonth,
+      startMinuteOfDay.coerceIn(0, 23 * 60 + 59) / 60,
+      startMinuteOfDay.coerceIn(0, 23 * 60 + 59) % 60,
+    )
+  } else {
+    ""
   }
 }
 

@@ -4,5 +4,7 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>仅在您明确开启系统日历导出后，掌邮会使用完整日历访问来创建、更新、删除并核对“邮子清单”事件。</string>
 </dict>
 </plist>

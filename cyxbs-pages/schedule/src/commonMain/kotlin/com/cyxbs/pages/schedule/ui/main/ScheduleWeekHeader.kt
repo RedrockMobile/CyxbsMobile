@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -35,8 +37,6 @@ import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.config.time.toChinese
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.utils.get.Num2CN
-import com.cyxbs.pages.schedule.calendar.ScheduleCalendarSettingsButton
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -48,13 +48,14 @@ import org.jetbrains.compose.resources.painterResource
  * @param clickDate 日历当前选中的日期（随翻页变化）。
  * @param onBack 返回上一页。
  * @param onBackToday 跳回今天（清除日历翻页）。
+ * @param onSettings 打开邮子清单设置页。
  */
 @Composable
 fun ScheduleWeekHeader(
   clickDate: Date,
-  schedules: List<ScheduleEntity>,
   onBack: () -> Unit,
   onBackToday: () -> Unit,
+  onSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -115,7 +116,7 @@ fun ScheduleWeekHeader(
 
     Spacer(modifier = Modifier.weight(1f))
 
-    ScheduleCalendarSettingsButton(schedules)
+    // 系统日历导出继续隔离在专用适配层；Header 不直接解释 Schedule v2 的四态时间。
 
     AnimatedVisibility(
       visible = !isCurrentWeek,
@@ -124,7 +125,7 @@ fun ScheduleWeekHeader(
     ) {
       Box(
         modifier = Modifier
-          .padding(end = 12.dp)
+          .padding(end = 4.dp)
           .clip(RoundedCornerShape(50))
           .background(
             Brush.horizontalGradient(
@@ -141,6 +142,13 @@ fun ScheduleWeekHeader(
           color = Color.White,
         )
       }
+    }
+    IconButton(onClick = onSettings) {
+      Icon(
+        imageVector = Icons.Default.Settings,
+        contentDescription = "设置",
+        tint = colors.tvLv1,
+      )
     }
   }
 }

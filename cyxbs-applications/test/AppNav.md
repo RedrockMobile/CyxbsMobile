@@ -251,11 +251,27 @@ deeplink: cyxbs://schedule/edit
 - argument: `com.cyxbs.pages.schedule.api.ScheduleMainNavArgument`
 
 ```text
-deeplink: cyxbs://schedule?todoId=[Long?]&recurrenceId=[Date?]
+deeplink: cyxbs://schedule?scheduleId=[ScheduleId?]&recurrenceId=[RecurrenceId?]
 object fields:
-  [recurrenceId]: Date? {
-    value: Int
+  [scheduleId]: ScheduleId? {
+    value: String
   }
+  [recurrenceId]: RecurrenceId? {
+    originalDateTime: MinuteTimeDate {
+      value: Int
+    }
+    timeZoneId: String?
+    allDay: Boolean
+  }
+```
+
+### schedule_settings
+
+- entry: `com.cyxbs.pages.schedule.ui.settings.ScheduleSettingsNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.settings.ScheduleSettingsNavArgument`
+
+```text
+deeplink: cyxbs://schedule_settings
 ```
 
 ## :cyxbs-pages:schoolcar

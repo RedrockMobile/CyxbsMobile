@@ -1,13 +1,13 @@
 package com.cyxbs.pages.schedule.ui.feed
 
-import com.cyxbs.components.config.time.Date
+import com.cyxbs.pages.schedule.domain.model.RecurrenceId
+import com.cyxbs.pages.schedule.domain.model.ScheduleId
 
 /**
  * 邮子清单 feed 卡片的展示状态。
  *
- * 把旧版 [com.cyxbs.pages.schedule.ui.fragment.ScheduleFeedFragment] 里散落的「加载中 / 空 / 有数据」
- * 三种 RecyclerView+空态切换收敛成单一状态，由 androidMain 的桥接层（ScheduleService）从
- * ScheduleViewModel 的数据映射而来，commonMain UI 仅按状态被动渲染。
+ * 将「加载中 / 空 / 有数据」三种视图切换收敛成单一状态，由 [com.cyxbs.pages.schedule.viewmodel.ScheduleFeedViewModel]
+ * 直接观察 Schedule v2 共享快照并映射；commonMain UI 仅按状态被动渲染，不再依赖旧 ScheduleService 桥接。
  */
 sealed interface ScheduleFeedUiState {
 
@@ -24,15 +24,15 @@ sealed interface ScheduleFeedUiState {
 /**
  * feed 列表项的轻量 UI 模型（不依赖 Room 的 `Schedule` bean，便于放在 commonMain）。
  *
- * @param id 对应 `Schedule.todoId`，回调时用于在 androidMain 定位原始 bean
- * @param recurrenceId 重复项的原始 occurrence 锚点；非重复 todo 为 null
+ * @param id 稳定的 UUIDv7 系列标识，用于导航与仓库命令
+ * @param recurrenceId 重复实例的原始 occurrence 锚点；移动后仍保持不变，非重复项为 null
  * @param title 待办标题
  * @param timeText 已格式化好的提醒/截止时间文案；为 null 时不展示铃铛与时间行
  * @param isOverTime 是否已超时（决定红色样式与超时铃铛）
  */
 data class ScheduleFeedItemUi(
-  val id: Long,
-  val recurrenceId: Date?,
+  val id: ScheduleId,
+  val recurrenceId: RecurrenceId?,
   val title: String,
   val timeText: String?,
   val isOverTime: Boolean,

@@ -304,6 +304,11 @@ fun LocalDate.toDate(): Date {
   return Date(year, month.number, day)
 }
 
+/** 转换为 kotlinx-datetime 日期，供时区、协议和平台边界使用。 */
+fun Date.toLocalDate(): LocalDate {
+  return LocalDate(year, monthNumber, dayOfMonth)
+}
+
 object DateSerializer : KSerializer<Date> {
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Date", PrimitiveKind.STRING)
 

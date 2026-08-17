@@ -1,0 +1,661 @@
+package com.cyxbs.pages.schedule.data.repository.v3
+
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.toLocalDate
+import com.cyxbs.components.config.time.toLocalDateTime
+import com.cyxbs.pages.schedule.domain.model.FieldPatch as UiFieldPatch
+import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
+import com.cyxbs.pages.schedule.domain.model.OccurrencePatch
+import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus as UiOccurrenceStatus
+import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
+import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency as UiRecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceId
+import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
+import com.cyxbs.pages.schedule.domain.model.ReminderChannel
+import com.cyxbs.pages.schedule.domain.model.Schedule
+import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
+import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
+import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
+import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
+import com.cyxbs.pages.schedule.domain.repository.ScheduleCommand
+import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
+import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
+import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
+import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
+import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
+import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideSyncState
+import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.PendingDelete
+import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
+import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
+import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
+import com.cyxbs.pages.schedule.domain.sync.v2.TimingInput
+import com.cyxbs.pages.schedule.domain.sync.v2.TimingKind
+import com.cyxbs.pages.schedule.domain.sync.v2.Weekday
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toInstant
+import kotlin.time.Duration.Companion.minutes
+
+private const val UTC_DAY_MILLIS = 86_400_000L
+
+/** 本地命令无法安全投影到当前后端协议时的最小稳定原因。 */
+enum class ScheduleV2LocalCommandRejectionReason {
+  /** 当前后端合同明确不支持该业务语义。 */
+  UNSUPPORTED,
+
+  /** 命令引用的本地有效资源不存在。 */
+  NOT_FOUND,
+
+  /** 当前集合、时间或 localRevision 不满足双快照不变量。 */
+  INVALID_STATE,
+}
+
+/** reducer 的纯结果；不会执行持久化、网络或并发操作。 */
+sealed interface ScheduleV2LocalCommandResult {
+  /** 命令已转换为新的完整三类状态集合。 */
+  data class Applied(
+    val categories: List<CategorySyncState>,
+    val schedules: List<ScheduleSyncState>,
+    val occurrenceOverrides: List<OccurrenceOverrideSyncState>,
+  ) : ScheduleV2LocalCommandResult
+
+  /** 命令不改变 typed 状态，例如 RequestSync 或字段值完全相同的 Update。 */
+  data object NoOp : ScheduleV2LocalCommandResult
+
+  /** 命令被稳定拒绝；调用方必须继续使用原三类集合。 */
+  data class Rejected(
+    val reason: ScheduleV2LocalCommandRejectionReason,
+  ) : ScheduleV2LocalCommandResult
+}
+
+/**
+ * 将现有 UI [ScheduleCommand] 投影为 Schedule v2 typed pending。
+ *
+ * 调用方必须传入已由 Room 分配的 [localRevision] 与 [nowMillis]；reducer 不生成 ID、时间或 revision，
+ * 也不读取 Room。旧领域对象的 revision 不属于新协议，始终不会被当作 resource version 或 localRevision。
+ */
+class ScheduleV2LocalCommandReducer {
+  /**
+   * 纯函数式应用一条命令。
+   *
+   * [localRevision] 必须严格大于目标 identity 当前 pending revision。Unsupported 命令不会产生临时状态、
+   * 补偿命令或隐藏批次；所有异常输入都转换为 [ScheduleV2LocalCommandResult.Rejected]。
+   */
+  fun reduce(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    occurrenceOverrides: List<OccurrenceOverrideSyncState>,
+    command: ScheduleCommand,
+    nowMillis: Long,
+    localRevision: Long,
+  ): ScheduleV2LocalCommandResult = try {
+    require(nowMillis >= 0) { "nowMillis must not be negative" }
+    require(localRevision > 0) { "localRevision must be positive" }
+    requireUnique(categories.map { it.identity }, "Category")
+    requireUnique(schedules.map { it.identity }, "Schedule")
+    requireUnique(occurrenceOverrides.map { it.identity }, "OccurrenceOverride")
+
+    when (command) {
+      is ScheduleCommand.Create -> createSchedule(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.schedule,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.Update -> updateSchedule(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.schedule,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.Delete -> deleteSchedule(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        ScheduleIdentity(command.scheduleId.value),
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.CompleteNonRepeating -> completeNonRepeating(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        ScheduleIdentity(command.scheduleId.value),
+        command.completed,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.CreateCategory -> createCategory(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.category,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.UpdateCategory -> updateCategory(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.category,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.DeleteCategory -> deleteCategory(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        CategoryIdentity(command.categoryId.value),
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.UpsertOccurrenceException -> upsertOccurrence(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.exception,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.DeleteOccurrenceException -> deleteOccurrence(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        occurrenceIdentity(command.scheduleId.value, command.recurrenceId),
+        nowMillis,
+        localRevision,
+      )
+      ScheduleCommand.RequestSync -> ScheduleV2LocalCommandResult.NoOp
+      is ScheduleCommand.SplitSeries,
+      is ScheduleCommand.DeleteThisAndFollowing,
+      -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+  } catch (rejected: ReducerRejected) {
+    ScheduleV2LocalCommandResult.Rejected(rejected.reason)
+  } catch (_: IllegalArgumentException) {
+    ScheduleV2LocalCommandResult.Rejected(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+  }
+
+  private fun createSchedule(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    schedule: Schedule,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = ScheduleIdentity(schedule.id.value)
+    if (schedules.any { it.identity == identity }) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val resource = schedule.toResource(version = 0, old = null, now = now)
+    val state = ScheduleSyncState(
+      identity = identity,
+      remoteSnapshot = null,
+      pending = PendingUpsert(resource, revision),
+    )
+    return applied(categories, schedules + state, overrides)
+  }
+
+  private fun updateSchedule(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    schedule: Schedule,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = ScheduleIdentity(schedule.id.value)
+    val state = schedules.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val effective = state.effectiveResource()
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val resource = schedule.toResource(effective.version, effective, now)
+    if (resource == effective) return ScheduleV2LocalCommandResult.NoOp
+    val updated = state.replacePending(PendingUpsert(resource, revision))
+    return applied(categories, schedules.replace(identity) { updated }, overrides)
+  }
+
+  private fun deleteSchedule(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    identity: ScheduleIdentity,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val state = schedules.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val liveChildren = overrides.filter {
+      it.identity.scheduleId == identity.id &&
+        (it.remoteSnapshot != null || it.effectiveResource() != null)
+    }
+    // 本地 effective 或服务端 remote 仍 live 的 Override 都必须与 parent 同批删除，避免遗漏已 pending DELETE 的子项。
+    val batchId = if (liveChildren.isEmpty()) null else "schedule-delete-$revision"
+    val updated = state.replacePending(
+      PendingDelete(
+        identity,
+        localModifiedAt = now,
+        localRevision = revision,
+        localBatchId = batchId,
+      ),
+    )
+    val updatedOverrides = if (batchId == null) {
+      overrides
+    } else {
+      overrides.map { child ->
+        if (child !in liveChildren) {
+          child
+        } else {
+          child.replacePending(
+            PendingDelete(
+              identity = child.identity,
+              localModifiedAt = now,
+              localRevision = revision,
+              localBatchId = batchId,
+            ),
+          )
+        }
+      }
+    }
+    return applied(categories, schedules.replace(identity) { updated }, updatedOverrides)
+  }
+
+  private fun completeNonRepeating(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    identity: ScheduleIdentity,
+    completed: Boolean,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val state = schedules.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val effective = state.effectiveResource()
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    if (effective.recurrence.data != null) {
+      reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    val completion = if (completed) CompletionStatus.COMPLETED else CompletionStatus.OPEN
+    if (effective.completion.data == completion) return ScheduleV2LocalCommandResult.NoOp
+    val resource = effective.copy(completion = AtomicField(completion, now))
+    val updated = state.replacePending(PendingUpsert(resource, revision))
+    return applied(categories, schedules.replace(identity) { updated }, overrides)
+  }
+
+  private fun createCategory(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    category: ScheduleCategory,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = CategoryIdentity(category.id.value)
+    if (categories.any { it.identity == identity }) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val resource = category.toResource(version = 0, old = null, now = now)
+    val state = CategorySyncState(
+      identity = identity,
+      remoteSnapshot = null,
+      pending = PendingUpsert(resource, revision),
+    )
+    return applied(categories + state, schedules, overrides)
+  }
+
+  private fun updateCategory(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    category: ScheduleCategory,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = CategoryIdentity(category.id.value)
+    val state = categories.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val effective = state.effectiveResource()
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val resource = category.toResource(effective.version, effective, now)
+    if (resource == effective) return ScheduleV2LocalCommandResult.NoOp
+    val updated = state.replacePending(PendingUpsert(resource, revision))
+    return applied(categories.replace(identity) { updated }, schedules, overrides)
+  }
+
+  private fun deleteCategory(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    identity: CategoryIdentity,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val state = categories.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val categoryInUse = schedules.any { schedule ->
+      schedule.remoteSnapshot?.resource?.categoryId?.data == identity.id ||
+        schedule.effectiveResource()?.categoryId?.data == identity.id
+    }
+    if (categoryInUse) {
+      // remote 即使被本地 pending DELETE 隐藏，确认前仍会让服务端拒绝分类删除，因此本地先拒绝。
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val updated = state.replacePending(
+      PendingDelete(identity, localModifiedAt = now, localRevision = revision),
+    )
+    return applied(categories.replace(identity) { updated }, schedules, overrides)
+  }
+
+  private fun upsertOccurrence(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    exception: ScheduleOccurrenceException,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = occurrenceIdentity(exception.scheduleId.value, exception.recurrenceId)
+    val existing = overrides.firstOrNull { it.identity == identity }
+    val effective = existing?.effectiveResource()
+    val version = effective?.version ?: 0
+    val resource = exception.toResource(identity, version, effective, now)
+    if (resource == effective) return ScheduleV2LocalCommandResult.NoOp
+    val updated = if (existing == null) {
+      OccurrenceOverrideSyncState(
+        identity = identity,
+        remoteSnapshot = null,
+        pending = PendingUpsert(resource, revision),
+      )
+    } else {
+      existing.replacePending(PendingUpsert(resource, revision))
+    }
+    return applied(
+      categories,
+      schedules,
+      if (existing == null) overrides + updated else overrides.replace(identity) { updated },
+    )
+  }
+
+  private fun deleteOccurrence(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    identity: OccurrenceOverrideIdentity,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val state = overrides.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val updated = state.replacePending(
+      PendingDelete(identity, localModifiedAt = now, localRevision = revision),
+    )
+    return applied(categories, schedules, overrides.replace(identity) { updated })
+  }
+
+  private fun Schedule.toResource(
+    version: Long,
+    old: ScheduleResource?,
+    now: Long,
+  ): ScheduleResource {
+    val category = categoryId
+      ?: reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    val timingValue = timing.toWireTiming()
+    val recurrenceValue = recurrence?.toWireRecurrence(timing)
+    val reminderValues = reminders.toWireReminders()
+    return ScheduleResource(
+      identity = ScheduleIdentity(id.value),
+      version = version,
+      title = atomic(title, old?.title, now),
+      description = atomic(description, old?.description, now),
+      categoryId = atomic(category.value, old?.categoryId, now),
+      timing = atomic(timingValue, old?.timing, now),
+      recurrence = atomic(recurrenceValue, old?.recurrence, now),
+      reminders = atomic(reminderValues, old?.reminders, now),
+      completion = atomic(completion.toWire(), old?.completion, now),
+    )
+  }
+
+  private fun ScheduleCategory.toResource(
+    version: Long,
+    old: CategoryResource?,
+    now: Long,
+  ): CategoryResource = CategoryResource(
+    identity = CategoryIdentity(id.value),
+    version = version,
+    name = atomic(name, old?.name, now),
+    // `null` 是“未设置自定义颜色”的协议事实，不能归一化为空串。
+    color = atomic(color, old?.color, now),
+    sortOrder = atomic(sortOrder.toLong(), old?.sortOrder, now),
+  )
+
+  private fun ScheduleOccurrenceException.toResource(
+    identity: OccurrenceOverrideIdentity,
+    version: Long,
+    old: OccurrenceOverrideResource?,
+    now: Long,
+  ): OccurrenceOverrideResource {
+    val patchValue = patch ?: OccurrencePatch()
+    if (patchValue.timing !is UiFieldPatch.Inherit ||
+      patchValue.categoryId !is UiFieldPatch.Inherit
+    ) {
+      reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    val titleValue = patchValue.title.toWireTitlePatch()
+    val descriptionValue = patchValue.description.toWireStringPatch()
+    val reminderValue = patchValue.reminders.toWireReminderPatch()
+    return OccurrenceOverrideResource(
+      identity = identity,
+      version = version,
+      status = atomic(status.toWire(), old?.status, now),
+      title = atomic(titleValue, old?.title, now),
+      description = atomic(descriptionValue, old?.description, now),
+      reminders = atomic(reminderValue, old?.reminders, now),
+    )
+  }
+
+  /**
+   * 仅字段业务值变化时写入 now；未变化字段复用整个旧 AtomicField，保留原 modifiedAt。
+   */
+  private fun <T> atomic(value: T, old: AtomicField<T>?, now: Long): AtomicField<T> =
+    if (old != null && old.data == value) old else AtomicField(value, now)
+
+  private fun ScheduleTiming.toWireTiming(): TimingInput = when (this) {
+    is ScheduleTiming.Timed -> {
+      val startMillis = start.toLocalDateTime()
+        .toInstant(TimeZone.of(timeZoneId))
+        .toEpochMilliseconds()
+      TimingInput(
+        kind = TimingKind.TIMED,
+        startAt = startMillis,
+        endAt = startMillis + durationMinutes.minutes.inWholeMilliseconds,
+      )
+    }
+    is ScheduleTiming.Deadline -> TimingInput(
+      kind = TimingKind.DEADLINE,
+      dueAt = due.toLocalDateTime()
+        .toInstant(TimeZone.of(timeZoneId))
+        .toEpochMilliseconds(),
+    )
+    is ScheduleTiming.AllDay -> {
+      val startMillis = startDate.toUtcDaySlot()
+      TimingInput(
+        kind = TimingKind.ALL_DAY,
+        startAt = startMillis,
+        endAt = startMillis + durationDays * UTC_DAY_MILLIS,
+      )
+    }
+    ScheduleTiming.Unscheduled -> TimingInput(kind = TimingKind.UNSCHEDULED)
+  }
+
+  private fun RecurrenceRule.toWireRecurrence(timing: ScheduleTiming): RecurrenceInput {
+    if (byMonthDays.isNotEmpty() || byMonths.isNotEmpty()) {
+      reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    val frequency = when (frequency) {
+      UiRecurrenceFrequency.DAILY -> RecurrenceFrequency.DAILY
+      UiRecurrenceFrequency.WEEKLY -> RecurrenceFrequency.WEEKLY
+      UiRecurrenceFrequency.MONTHLY,
+      UiRecurrenceFrequency.YEARLY,
+      -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    val anchor = when (timing) {
+      is ScheduleTiming.Timed -> timing.start.date
+      is ScheduleTiming.Deadline -> timing.due.date
+      is ScheduleTiming.AllDay -> timing.startDate
+      ScheduleTiming.Unscheduled -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    val count: Int?
+    val untilDate: Long?
+    when (val recurrenceEnd = end) {
+      RecurrenceEnd.Never -> {
+        count = null
+        untilDate = null
+      }
+      is RecurrenceEnd.Count -> {
+        count = recurrenceEnd.value
+        untilDate = null
+      }
+      is RecurrenceEnd.Until -> {
+        count = null
+        untilDate = recurrenceEnd.date.toUtcDaySlot()
+      }
+    }
+    return RecurrenceInput(
+      frequency = frequency,
+      interval = interval,
+      anchorDate = anchor.toUtcDaySlot(),
+      count = count,
+      untilDate = untilDate,
+      weekdays = when (frequency) {
+        RecurrenceFrequency.DAILY -> byWeekDays.map { it.toWire() }.toSet()
+        RecurrenceFrequency.WEEKLY -> {
+          val anchorWeekday = requireNotNull(IsoWeekDay.fromIsoNumber(anchor.dayOfWeekNumber))
+          val effectiveWeekdays = byWeekDays.ifEmpty { setOf(anchorWeekday) }
+          if (anchorWeekday !in effectiveWeekdays) {
+            // 后端要求稳定 anchor 本身属于 WEEKLY 集合，不能静默移动系列首个 occurrence。
+            reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+          }
+          effectiveWeekdays.map { it.toWire() }.toSet()
+        }
+      },
+    )
+  }
+
+  private fun List<ScheduleReminder>.toWireReminders(): List<ReminderInput> = map { reminder ->
+    if (reminder.channel != ReminderChannel.DEVICE) {
+      reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    }
+    ReminderInput(
+      minutesBefore = reminder.offsetMinutes,
+      // ReminderId 只用于客户端列表 identity，协议 message 当前没有对应的用户文案来源。
+      message = "",
+    )
+  }
+
+  private fun UiFieldPatch<String>.toWireTitlePatch(): FieldPatch<String> = when (this) {
+    UiFieldPatch.Inherit -> FieldPatch.Inherit
+    UiFieldPatch.Clear -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
+    is UiFieldPatch.Replace -> FieldPatch.Replace(value)
+  }
+
+  private fun UiFieldPatch<String>.toWireStringPatch(): FieldPatch<String> = when (this) {
+    UiFieldPatch.Inherit -> FieldPatch.Inherit
+    UiFieldPatch.Clear -> FieldPatch.Clear
+    is UiFieldPatch.Replace -> FieldPatch.Replace(value)
+  }
+
+  private fun UiFieldPatch<List<ScheduleReminder>>.toWireReminderPatch():
+    FieldPatch<List<ReminderInput>> = when (this) {
+    UiFieldPatch.Inherit -> FieldPatch.Inherit
+    UiFieldPatch.Clear -> FieldPatch.Clear
+    is UiFieldPatch.Replace -> FieldPatch.Replace(value.toWireReminders())
+  }
+
+  /**
+   * Occurrence identity 只取 recurrenceId 原始墙上时间的日期并转 UTC 日期槽；
+   * timeZoneId、allDay 与后续 timing 移动都不能改变该 identity。
+   */
+  private fun occurrenceIdentity(
+    scheduleId: String,
+    recurrenceId: RecurrenceId,
+  ): OccurrenceOverrideIdentity = OccurrenceOverrideIdentity(
+    scheduleId = scheduleId,
+    occurrenceDate = recurrenceId.originalDateTime.date.toUtcDaySlot(),
+  )
+
+  private fun Date.toUtcDaySlot(): Long =
+    toLocalDate().atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+
+  private fun ScheduleCompletion.toWire(): CompletionStatus = when (this) {
+    ScheduleCompletion.PENDING -> CompletionStatus.OPEN
+    ScheduleCompletion.COMPLETED -> CompletionStatus.COMPLETED
+  }
+
+  private fun UiOccurrenceStatus.toWire(): OccurrenceStatus = when (this) {
+    UiOccurrenceStatus.ACTIVE -> OccurrenceStatus.ACTIVE
+    UiOccurrenceStatus.COMPLETED -> OccurrenceStatus.COMPLETED
+    UiOccurrenceStatus.CANCELLED -> OccurrenceStatus.CANCELLED
+  }
+
+  private fun IsoWeekDay.toWire(): Weekday = when (this) {
+    IsoWeekDay.MONDAY -> Weekday.MO
+    IsoWeekDay.TUESDAY -> Weekday.TU
+    IsoWeekDay.WEDNESDAY -> Weekday.WE
+    IsoWeekDay.THURSDAY -> Weekday.TH
+    IsoWeekDay.FRIDAY -> Weekday.FR
+    IsoWeekDay.SATURDAY -> Weekday.SA
+    IsoWeekDay.SUNDAY -> Weekday.SU
+  }
+
+  private fun applied(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+  ): ScheduleV2LocalCommandResult.Applied =
+    ScheduleV2LocalCommandResult.Applied(
+      categories = categories,
+      schedules = schedules,
+      occurrenceOverrides = overrides,
+    )
+
+  private fun <T> requireUnique(values: List<T>, type: String) {
+    require(values.size == values.toSet().size) { "$type states contain duplicate identities" }
+  }
+
+  private fun List<CategorySyncState>.replace(
+    identity: CategoryIdentity,
+    transform: (CategorySyncState) -> CategorySyncState,
+  ): List<CategorySyncState> = map { if (it.identity == identity) transform(it) else it }
+
+  private fun List<ScheduleSyncState>.replace(
+    identity: ScheduleIdentity,
+    transform: (ScheduleSyncState) -> ScheduleSyncState,
+  ): List<ScheduleSyncState> = map { if (it.identity == identity) transform(it) else it }
+
+  private fun List<OccurrenceOverrideSyncState>.replace(
+    identity: OccurrenceOverrideIdentity,
+    transform: (OccurrenceOverrideSyncState) -> OccurrenceOverrideSyncState,
+  ): List<OccurrenceOverrideSyncState> = map { if (it.identity == identity) transform(it) else it }
+}
+
+private class ReducerRejected(
+  val reason: ScheduleV2LocalCommandRejectionReason,
+) : IllegalStateException()
+
+private fun reject(reason: ScheduleV2LocalCommandRejectionReason): Nothing =
+  throw ReducerRejected(reason)

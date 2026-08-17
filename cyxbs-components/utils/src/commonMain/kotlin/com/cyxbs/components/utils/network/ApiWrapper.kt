@@ -1,8 +1,6 @@
 package com.cyxbs.components.utils.network
 
-import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.config.serializable.GsonDataBean
-import com.cyxbs.components.config.service.impl
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -22,6 +20,13 @@ expect class ApiWrapper<T>: IApiWrapper<T>{
   override val data: T
   override val status: Int
   override val info: String
+  /**
+   * 服务端原始 data；业务状态失败时允许为空。
+   *
+   * 常规接口仍应读取 [data] 并复用统一状态校验。只有明确约定“非成功状态仍返回可处理 data”的接口，才能在
+   * 自己的适配层检查 [status] 后读取本属性。
+   */
+  val rawData: T?
 }
 /**
  * 没有 data 字段的接口数据包裹类
@@ -65,17 +70,14 @@ interface IApiStatus {
     return status == 10000 || status == 200 // 请不要私自加其他的成功状态！！！
   }
 
+  /**
+   * 仅校验业务状态并抛出 [ApiException]，不执行任何账号或 token 副作用。
+   *
+   * 认证状态码由网络层使用请求发起时冻结的 lease 处理；保持本方法纯粹可避免 wrapper 反序列化后切号，再延迟
+   * 访问 `data` 时把旧响应错误施加到新账号。
+   */
   @Throws(ApiException::class)
   fun throwApiExceptionIfFail() {
-    // 后端文档：https://redrock.feishu.cn/wiki/wikcnB9p6U45ZJZmxwTEu8QXvye
-    // 后端后台密钥对7天一更新，此时使用token请求会报 20002 verify failed，按照token过期的逻辑处理，刷新token
-    if (status == 20002 || status == 20003) {
-      // token 过期
-      ITokenService::class.impl().tryTokenExpired()
-    } else if (status == 20004) {
-      // refreshToken 过期，这里只能让用户重新登录，正常情况下会在主界面就触发拦截跳转至登录页
-      ITokenService::class.impl().tryRefreshTokenExpired("ApiException, status=20004")
-    }
     if (!isSuccess()) {
       throw ApiException(status, info)
     }

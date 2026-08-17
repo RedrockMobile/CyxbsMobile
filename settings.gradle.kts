@@ -56,6 +56,21 @@ dependencyResolutionManagement {
 val excludeList = setOf<String>(
 )
 
+/**
+ * 判断目录是否允许参与 Gradle 子模块扫描。
+ *
+ * 必须在根目录和递归扫描中复用：若扫描 `.gradle/configuration-cache`，Gradle 会在构建末尾写入
+ * cache 条目，导致 settings 的目录读取输入持续变化，configuration cache 无法复用。
+ */
+fun File.isModuleSearchCandidate(): Boolean {
+  return isDirectory &&
+      name != "src" &&
+      name != "build" &&
+      name != "iosApp" &&
+      name != "gradle" &&
+      !name.startsWith(".")
+}
+
 fun includeModule(topName: String, file: File) {
   if (!file.resolve("settings.gradle.kts").exists() && !excludeList.contains(file.name)) {
     if (file.resolve("build.gradle.kts").exists()) {
@@ -70,19 +85,13 @@ fun includeModule(topName: String, file: File) {
       include(path)
     }
     // 递归寻找所有子模块
-    file.listFiles()?.filter {
-      it.name != "src" // 去掉 src 文件夹
-          && it.name != "build"
-          && it.name != "iosApp"
-          && it.name != "gradle"
-          && !it.name.startsWith(".")
-    }?.forEach {
+    file.listFiles()?.filter(File::isModuleSearchCandidate)?.forEach {
       includeModule(topName, it)
     }
   }
 }
 
-rootDir.listFiles()!!.filter { it.isDirectory }.forEach {
+rootDir.listFiles()?.filter(File::isModuleSearchCandidate)?.forEach {
   includeModule(it.name, it)
 }
 

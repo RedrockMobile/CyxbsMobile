@@ -79,6 +79,7 @@ internal fun EditScheduleRecurrenceArea(
     !draft.isRepeating -> RepeatUnitOption.ONCE
     draft.freq == RepeatFreqOption.DAILY -> RepeatUnitOption.DAY
     draft.freq == RepeatFreqOption.MONTHLY -> RepeatUnitOption.MONTH
+    draft.freq == RepeatFreqOption.YEARLY -> RepeatUnitOption.YEAR
     else -> RepeatUnitOption.WEEK
   }
 
@@ -108,6 +109,11 @@ internal fun EditScheduleRecurrenceArea(
                 freq = RepeatFreqOption.MONTHLY,
                 interval = d.interval.coerceIn(1, RepeatUnitOption.MONTH.maxInterval)
               )
+
+              RepeatUnitOption.YEAR -> d.copy(
+                freq = RepeatFreqOption.YEARLY,
+                interval = d.interval.coerceIn(1, RepeatUnitOption.YEAR.maxInterval)
+              )
             }
           )
         }
@@ -117,6 +123,7 @@ internal fun EditScheduleRecurrenceArea(
     val intervalMax = selectedUnit.maxInterval
     val numberOptions = remember(intervalMax) { (1..intervalMax).map { it.toString() }.toPersistentList() }
     val nLine = remember(selectedUnit) {
+      // 不可表达的现有 interval 只影响滚轮初始可视位置，首次 emission 不得回写；用户滚动后才按 UI 范围替换。
       Animatable((draft.interval - 1).coerceIn(0, intervalMax - 1).toFloat())
     }
     if (draft.isRepeating) {
@@ -134,9 +141,14 @@ internal fun EditScheduleRecurrenceArea(
           Text(selectedUnit.suffix, fontSize = 16.sp, color = colors.tvLv2)
         }
       }
-      LaunchedEffect(Unit) {
+      LaunchedEffect(selectedUnit) {
+        var firstEmission = true
         snapshotFlow { nLine.value.roundToInt() }
           .collect { n ->
+            if (firstEmission) {
+              firstEmission = false
+              return@collect
+            }
             val d = draftS.value
             if (d.isRepeating) {
               onChangeS.value(d.copy(interval = (n + 1).coerceIn(1, intervalMax)))
@@ -203,13 +215,9 @@ internal fun EditScheduleRecurrenceArea(
           onChange(draft.copy(count = it))
         }
       } else if (draft.endOption == RepeatEndOption.UNTIL) {
+        // 预览使用 parent RRULE 自身的 UNTIL 作为稳定基线；打开 moved occurrence 不得自动写回或延长规则。
         val untilStartDate = draft.firstOccurrenceOnOrAfter(anchorDate)
-        val untilDate = (draft.until ?: untilStartDate).coerceAtLeast(untilStartDate)
-        LaunchedEffect(untilDate, draft.until) {
-          if (draft.until != untilDate) {
-            onChangeS.value(draftS.value.copy(until = untilDate))
-          }
-        }
+        val untilDate = draft.until ?: untilStartDate
         val count = draft.countUntil(anchorDate, untilDate)
         Text(
           text = "直到${formatRecurrenceEndDate(untilDate, firstMonday)}，共${count}次",
@@ -219,8 +227,8 @@ internal fun EditScheduleRecurrenceArea(
         )
         val calendarState = rememberCalendarState(
           initialClickDate = untilDate,
-          startDate = untilStartDate,
-          endDate = untilStartDate.plusYears(8).lastDate
+          startDate = minOf(untilStartDate, untilDate),
+          endDate = maxOf(untilStartDate, untilDate).plusYears(8).lastDate
         )
         CalendarCompose(
           modifier = Modifier.fillMaxWidth(),
@@ -236,9 +244,10 @@ internal fun EditScheduleRecurrenceArea(
           },
         )
         LaunchedEffect(Unit) { calendarState.expand() } // 默认展开整月
-        LaunchedEffect(Unit) {
-          snapshotFlow { calendarState.clickDate }.collect { date ->
-            onChange(draft.copy(until = date.coerceAtLeast(untilStartDate)))
+        LaunchedEffect(calendarState) {
+          calendarState.clickEventFlow.collect { event ->
+            // 只消费 CalendarState 的真实点击事件；bounds clamp、翻页与初始化都不会修改 UNTIL。
+            onChangeS.value(draftS.value.copy(until = event.new.coerceAtLeast(untilStartDate)))
           }
         }
       }
@@ -251,6 +260,7 @@ private enum class RepeatUnitOption(val label: String, val suffix: String, val m
   DAY("日", "天", 365),
   WEEK("周", "周", 52),
   MONTH("月", "月", 12),
+  YEAR("年", "年", 100),
 }
 
 private enum class EndOption(val label: String, val value: RepeatEndOption) {

@@ -1,9 +1,9 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.schedule.recurrence.Freq
-import com.cyxbs.pages.schedule.recurrence.RRule
-import com.cyxbs.pages.schedule.recurrence.Recurrence
+import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
+import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -88,8 +88,8 @@ class ScheduleInfoRowTest {
   /** 重复缩写：每周单日用紧凑「每周一」；不重复为 null。 */
   @Test
   fun recurrence_row_label() {
-    assertEquals("每周一", recurrenceRowLabel(Recurrence(rrule = RRule(freq = Freq.WEEKLY, byDay = listOf(1)))))
-    assertEquals("每2天", recurrenceRowLabel(Recurrence(rrule = RRule(freq = Freq.DAILY, interval = 2))))
+    assertEquals("每周一", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.MONDAY))))
+    assertEquals("每2天", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.DAILY, interval = 2)))
     assertNull(recurrenceRowLabel(null))
   }
 

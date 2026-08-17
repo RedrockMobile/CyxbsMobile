@@ -51,7 +51,7 @@ fun ScheduleCheckCircle(
   lineWidth: Dp = 1.5.dp,
   startAngle: Float = 40f,
 ) {
-  // process: 0..200，对齐旧 View 的动画进度（0~100 收拢圆弧，100~200 完成态）
+  // 动画进度为 0..200：0~100 收拢圆弧，100~200 进入完成态，以保持旧 View 的节奏。
   val process = remember { Animatable(200f) }
   val currentOnAnimEnd by rememberUpdatedState(onAnimEnd)
   LaunchedEffect(checked) {

@@ -24,7 +24,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.config.time.Date
+import com.cyxbs.pages.schedule.domain.model.RecurrenceId
+import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.components.utils.compose.clickableSingle
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_empty_notify
@@ -43,19 +44,19 @@ import org.jetbrains.compose.resources.stringResource
  * - 下方最多 3 条未完成待办；无数据时显示「查询中…」或「还没有待做事项哦~快去添加吧！」
  * - 底部一条淡分割线
  *
- * 这是纯被动 UI：数据与点击行为（跳转、勾选后删除/更新）由 androidMain 的 ScheduleService 注入，
- * 详见 [com.cyxbs.pages.schedule.api.IScheduleService.ScheduleFeed]。
+ * 这是纯被动 UI：数据来自 [ScheduleFeedUiState]，导航与精确实例完成命令由 ViewModel 回调注入；
+ * 组件本身不观察仓库，也不再依赖旧 ScheduleService。
  *
  * @param onCardClick 点击整张卡片（跳邮子清单主页）
- * @param onItemClick 点击某条待办标题（跳详情页），参数为 [ScheduleFeedItemUi.id]
- * @param onItemCheck 勾选某条待办完成（动画结束后触发），参数为 [ScheduleFeedItemUi.id]
+ * @param onItemClick 点击标题后跳到该系列/实例详情，参数包含稳定的系列 ID 与 recurrence ID。
+ * @param onItemCheck 勾选动画结束后完成精确实例，参数 identity 与 [onItemClick] 一致。
  */
 @Composable
 fun ScheduleFeed(
   state: ScheduleFeedUiState,
   onCardClick: () -> Unit,
-  onItemClick: (Long, Date?) -> Unit,
-  onItemCheck: (Long, Date?) -> Unit,
+  onItemClick: (ScheduleId, RecurrenceId?) -> Unit,
+  onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -107,8 +108,8 @@ private fun ScheduleFeedHint(text: String) {
 @Composable
 private fun ScheduleFeedItem(
   item: ScheduleFeedItemUi,
-  onItemClick: (Long, Date?) -> Unit,
-  onItemCheck: (Long, Date?) -> Unit,
+  onItemClick: (ScheduleId, RecurrenceId?) -> Unit,
+  onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
 ) {
   val colors = LocalAppColors.current
   // 本地完成态：点击勾选圈后立即置灰（对齐旧版点击瞬间变色），动画结束再触发 onItemCheck

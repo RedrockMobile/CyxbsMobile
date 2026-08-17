@@ -44,6 +44,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>仅在您明确开启课表日历导出后，掌邮会使用完整日历访问来创建、更新、删除并核对“邮子清单”中的课表事件。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>仅在您明确开启课表日历导出后，掌邮会访问日历来创建、更新、删除并核对“邮子清单”中的课表事件。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>邮问上传图片，修改头像等可能需要使用相机，需要您允许。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -125,6 +125,17 @@ fun LocalDateTime.toMinuteTimeDate(): MinuteTimeDate {
   )
 }
 
+/** 转换为不携带时区的本地墙上时间，供时区、协议和平台边界使用。 */
+fun MinuteTimeDate.toLocalDateTime(): LocalDateTime {
+  return LocalDateTime(
+    year = date.year,
+    month = date.monthNumber,
+    day = date.dayOfMonth,
+    hour = time.hour,
+    minute = time.minute,
+  )
+}
+
 object MinuteTimeDateSerializer : KSerializer<MinuteTimeDate> {
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("MinuteTimeDate", PrimitiveKind.STRING)
 

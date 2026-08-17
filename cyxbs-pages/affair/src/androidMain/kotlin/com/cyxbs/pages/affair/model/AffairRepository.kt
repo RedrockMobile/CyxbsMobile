@@ -392,47 +392,30 @@ object AffairRepository {
     if (time > 0) {
       val eventIdList = arrayListOf<Long>()
       atWhatTime.forEach { whatTime ->
+        if (whatTime.week.none { it == 0 }) {
+          // 具体周事务不再导出，避免为已废弃的多日期事件创建系统日历映射。
+          return@forEach
+        }
         val startMinute = getStartTimeMinute(getStartRow(whatTime.beginLesson))
         val endMinute = getEndTimeMinute(getEndRow(whatTime.beginLesson, whatTime.period))
-        // 如果是整学期,添加重复事件
-        if (whatTime.week.any { it == 0 }) {
-          PhoneCalendar.add(
-            PhoneCalendar.FrequencyEvent(
-              title = title,
-              description = content,
-              remind = time,
-              duration = PhoneCalendar.Event.Duration(
-                minute = endMinute - startMinute
-              ),
-              startTime = (Calendar.getInstance()).apply {
-                timeInMillis = firstMonDay
-                add(Calendar.DATE, whatTime.day)
-                add(Calendar.MINUTE, startMinute)
-              },
-              freq = PhoneCalendar.FrequencyEvent.Freq.WEEKLY,
-              count = ICourseService.maxWeek
-            )
-          )?.also { eventIdList.add(it) }
-        } else {
-          // 如果不是整学期,添加一次性事件
-          PhoneCalendar.add(
-            PhoneCalendar.CommonEvent(
-              title = title,
-              description = content,
-              remind = time,
-              duration = PhoneCalendar.Event.Duration(
-                minute = endMinute - startMinute
-              ),
-              startTime = whatTime.week.map {
-                (Calendar.getInstance()).apply {
-                  timeInMillis = firstMonDay
-                  add(Calendar.DATE, whatTime.day + (it - 1) * 7)
-                  add(Calendar.MINUTE, startMinute)
-                }
-              }
-            )
-          )?.also { eventIdList.add(it) }
-        }
+        // 整学期事务使用每周重复事件导出。
+        PhoneCalendar.add(
+          PhoneCalendar.FrequencyEvent(
+            title = title,
+            description = content,
+            remind = time,
+            duration = PhoneCalendar.Event.Duration(
+              minute = endMinute - startMinute
+            ),
+            startTime = (Calendar.getInstance()).apply {
+              timeInMillis = firstMonDay
+              add(Calendar.DATE, whatTime.day)
+              add(Calendar.MINUTE, startMinute)
+            },
+            freq = PhoneCalendar.FrequencyEvent.Freq.WEEKLY,
+            count = ICourseService.maxWeek
+          )
+        )?.also { eventIdList.add(it) }
       }
       if (eventIdList.isNotEmpty()) {
         AffairCalendarDao.insert(AffairCalendarEntity(onlyId, eventIdList))

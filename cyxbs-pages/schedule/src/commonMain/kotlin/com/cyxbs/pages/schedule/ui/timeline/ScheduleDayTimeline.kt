@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
+import com.cyxbs.pages.schedule.domain.model.CategoryId
+import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 
 /** 每小时对应的像素高度，外部计算默认滚动位置时复用。 */
 internal val HourHeight: Dp = 64.dp
@@ -76,7 +77,7 @@ private fun fullDayStripWidth(n: Int, totalWidth: Dp): Dp {
 fun ScheduleTimelinePane(
   timed: List<DayTimedSchedule>,
   scrollState: ScrollState,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -152,7 +153,7 @@ private fun TimeAxis(modifier: Modifier) {
 @Composable
 private fun EventArea(
   timed: List<DayTimedSchedule>,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -188,21 +189,21 @@ private fun EventArea(
         val e = pos.event
         if (e.isInterval) {
           IntervalBlock(
-            todo = e.todo,
+            occurrence = e.occurrence,
             startMin = e.startMin,
             endMin = e.endMin,
-            onClick = { onScheduleClick(e.todo) },
+            onClick = { onScheduleClick(e.occurrence) },
           )
         } else {
           DeadlineLine(
-            todo = e.todo,
-            onClick = { onScheduleClick(e.todo) },
+            occurrence = e.occurrence,
+            onClick = { onScheduleClick(e.occurrence) },
           )
         }
       }
       // [positions.size ..] 整日块彩色条（无标题，标题在 overlay 层）。
       fullDay.forEach { e ->
-        FullDayBar(todo = e.todo, onClick = { onScheduleClick(e.todo) })
+        FullDayBar(occurrence = e.occurrence, onClick = { onScheduleClick(e.occurrence) })
       }
     },
   ) { measurables, constraints ->
@@ -261,10 +262,10 @@ private fun EventArea(
 /** 整日块的彩色条（无标题）：跨 0-24 点全高，圆角纯色底。标题由 overlay 层渲染。 */
 @Composable
 private fun FullDayBar(
-  todo: ScheduleEntity,
+  occurrence: ScheduleUiOccurrence,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
+  val accent = occurrenceAccent(occurrence)
   Box(
     modifier = Modifier
       .fillMaxHeight()
@@ -282,7 +283,7 @@ private fun FullDayBar(
 @Composable
 private fun FullDayTitleOverlay(
   fullDay: List<DayTimedSchedule>,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   Row(
@@ -300,15 +301,15 @@ private fun FullDayTitleOverlay(
     horizontalArrangement = Arrangement.spacedBy(EventGap),
   ) {
     fullDay.forEach { e ->
-      val accent = todoAccent(e.todo)
+      val accent = occurrenceAccent(e.occurrence)
       Box(
         modifier = Modifier
           .weight(1f)
-          .clickableNoIndicator(onClick = { onScheduleClick(e.todo) }),
+          .clickableNoIndicator(onClick = { onScheduleClick(e.occurrence) }),
         contentAlignment = Alignment.Center,
       ) {
         Text(
-          text = e.todo.title,
+          text = e.occurrence.title,
           fontSize = 13.sp,
           fontWeight = FontWeight.Medium,
           color = accent,
@@ -324,12 +325,12 @@ private fun FullDayTitleOverlay(
 
 @Composable
 private fun IntervalBlock(
-  todo: ScheduleEntity,
+  occurrence: ScheduleUiOccurrence,
   startMin: Int,
   endMin: Int,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
+  val accent = occurrenceAccent(occurrence)
   Box(
     modifier = Modifier
       .clip(RoundedCornerShape(6.dp))
@@ -340,7 +341,7 @@ private fun IntervalBlock(
       modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
       Text(
-        text = todo.title,
+        text = occurrence.title,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
         color = accent,
@@ -359,15 +360,15 @@ private fun IntervalBlock(
 
 @Composable
 private fun DeadlineLine(
-  todo: ScheduleEntity,
+  occurrence: ScheduleUiOccurrence,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
+  val accent = occurrenceAccent(occurrence)
   Box(
     modifier = Modifier.clickableNoIndicator(onClick = onClick),
   ) {
     Text(
-      text = todo.title,
+      text = occurrence.title,
       fontSize = 12.sp,
       fontWeight = FontWeight.Medium,
       color = accent,
@@ -388,11 +389,10 @@ private fun DeadlineLine(
   }
 }
 
-/** 按分类 / 过期态取强调色。 */
-private fun todoAccent(todo: ScheduleEntity): Color = when {
-  todo.isOvered == 1 -> Color(0xFFFF6262)
-  todo.type == ScheduleEntity.TYPE_STUDY -> Color(0xFF4A6FE3)
-  todo.type == ScheduleEntity.TYPE_LIFE -> Color(0xFF38B6A6)
+/** 按稳定分类 identity 选择强调色；是否过期由上层状态样式决定，避免颜色映射混入时间判断。 */
+private fun occurrenceAccent(occurrence: ScheduleUiOccurrence): Color = when (occurrence.categoryId?.value) {
+  "study" -> Color(0xFF4A6FE3)
+  "life" -> Color(0xFF38B6A6)
   else -> Color(0xFFF2994A)
 }
 

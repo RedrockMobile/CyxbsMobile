@@ -8,120 +8,240 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
-import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
-import com.cyxbs.pages.schedule.recurrence.Recurrence
-import com.cyxbs.pages.schedule.ui.timeline.ScheduleDateTime
+import com.cyxbs.components.config.time.MinuteTimeDate
+import com.cyxbs.components.config.time.toLocalDateTime
+import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.pages.schedule.domain.model.*
+import com.cyxbs.pages.schedule.domain.time.LocalDateTimeResolution
+import com.cyxbs.pages.schedule.domain.time.ScheduleDstResolver
+import com.cyxbs.pages.schedule.domain.validation.ScheduleValidationIssue
+import com.cyxbs.pages.schedule.domain.validation.ScheduleValidator
+import com.cyxbs.pages.schedule.ui.model.ScheduleDraft
+import com.cyxbs.pages.schedule.ui.timeline.formatScheduleDateTime
 import com.cyxbs.pages.schedule.ui.timeline.parseScheduleDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
- * 添加 / 编辑弹窗（[EditScheduleDialog]）的表单状态：标题、备注、分组、时间（开始/结束 + 截止/时间段切换）、
- * 重复规则草稿（[RecurrenceDraft]，对齐 RFC5545）。仅承载「日程可编辑数据」与派生标志。
+ * Compose 持有的日程编辑状态，负责在文本输入控件与领域值之间转换。
  *
- * 与旧 todo 版的差异：重复从 `TodoRemindMode`（弱化自定义模型）换成了 [RecurrenceDraft]（RRULE 子集）。
- * 保存时读 [outputRecurrence] 写入 [ScheduleEntity.recurrence]。
- *
- * @param origin 编辑的原始日程（新建为 null），用作 [isChanged] 比较基准与重复 base（保留 exdate/overrides）。
+ * 初始化时实例 [initialOccurrence] 的标题、描述、分类、时间和提醒优先于系列 [origin]，
+ * 这样编辑已移动或覆盖的重复实例时不会回退到系列原值；重复规则仍来自 [origin]，因为实例例外不拥有 RRULE。
+ * 该对象只保存本次弹窗会话状态，不直接写仓库；只有 [toDraft] 的结果会进入异步命令。
  */
 @Stable
-class EditScheduleModelState(val origin: ScheduleEntity?) {
-  val title = TextFieldState(origin?.title ?: "")
-  val detail = TextFieldState(origin?.detail ?: "")
-  var type by mutableStateOf(origin?.type ?: ScheduleEntity.TYPE_OTHER)
-  var startTime by mutableStateOf(origin?.startTime ?: "")
-  var endTime by mutableStateOf(origin?.endTime ?: "")
+class EditScheduleModelState(
+  val origin: Schedule?,
+  val initialOccurrence: ScheduleOccurrence? = null,
+) {
+  private val initialTiming = initialOccurrence?.timing ?: origin?.timing
+  private val initialStartText = initialTiming?.toStartEditText().orEmpty()
+  private val initialEndText = initialTiming?.toEndEditText().orEmpty()
+  private val initialIsInterval = initialTiming is ScheduleTiming.Timed || origin == null
+  private val initialIsAllDay = initialTiming is ScheduleTiming.AllDay
+  private val initialRecurrenceDraft = origin?.recurrence.toDraft()
+  private val initialReminders = if (initialOccurrence != null) initialOccurrence.reminders else origin?.reminders.orEmpty()
+  val title = TextFieldState(if (initialOccurrence != null) initialOccurrence.title else origin?.title.orEmpty())
+  val detail = TextFieldState(if (initialOccurrence != null) initialOccurrence.description else origin?.description.orEmpty())
+  var categoryId by mutableStateOf(if (initialOccurrence != null) initialOccurrence.categoryId else origin?.categoryId)
+  var startTime by mutableStateOf(initialStartText)
+  var endTime by mutableStateOf(initialEndText)
+  var isInterval by mutableStateOf(initialIsInterval)
+  var isAllDay by mutableStateOf(initialIsAllDay)
+  var recurrence by mutableStateOf(initialRecurrenceDraft)
+  private val initialReminderMinutes = initialReminders.firstOrNull()?.offsetMinutes ?: -1
+  var remindMinutes by mutableStateOf(initialReminderMinutes)
 
-  // 新建默认优先「时间段」；编辑时按数据判断（有 startTime 为时间段）。
-  var isInterval by mutableStateOf(origin?.startTime?.isNotBlank() ?: true,)
+  /** RRULE 编辑预览必须以父系列起点为 anchor，不能使用 moved occurrence 的展示日期。 */
+  val recurrenceAnchorDate: Date get() = origin?.timing?.let(::timingAnchorDate) ?: anchorDate
 
-  // 重复规则草稿：编辑时从原 recurrence 反解，新建为「不重复」。
-  var recurrence by mutableStateOf(origin?.recurrence.toDraft())
-
-  // 提前多少分钟提醒（写系统日历闹钟偏移）；-1 表示不提醒。
-  var remindMinutes by mutableStateOf(origin?.remindMinutes ?: -1)
-
-  /** 锚点日期：开始时间优先、否则截止时间、再否则今天。用于把草稿补全成完整 RRULE。 */
-  val anchorDate: Date
-    get() = parseScheduleDateTime(outputStartTime)?.date
-      ?: parseScheduleDateTime(outputEndTime)?.date
-      ?: Date.now()
-
-  /** 开始时刻的当天分钟数（截止型 / 未填返回 null）。 */
+  val anchorDate: Date get() = parseScheduleDateTime(outputStartTime)?.date
+    ?: parseScheduleDateTime(outputEndTime)?.date
+    ?: Date.now()
   val startMinuteOfDay: Int? get() = parseScheduleDateTime(outputStartTime)?.minuteOfDay
-
-  /** 结束时刻的当天分钟数（未填返回 null）。 */
   val endMinuteOfDay: Int? get() = parseScheduleDateTime(outputEndTime)?.minuteOfDay
-
-  /** 时间段类型下需开始/结束都合法；截止类型恒为 true。 */
-  val intervalValid: Boolean
-    get() = !isInterval || isIntervalValid(startTime, endTime)
-
-  /** 可保存：标题非空且时间段合法。 */
-  val canConfirm: Boolean
-    get() = title.text.isNotBlank() && intervalValid
-
-  /** 相对初始是否有改动，用于未保存退出确认。 */
-  val isChanged: Boolean
-    get() = title.text.toString() != (origin?.title ?: "") ||
-      detail.text.toString() != (origin?.detail ?: "") ||
-      type != (origin?.type ?: ScheduleEntity.TYPE_OTHER) ||
-      startTime != (origin?.startTime ?: "") ||
-      endTime != (origin?.endTime ?: "") ||
-      remindMinutes != (origin?.remindMinutes ?: -1) ||
-      recurrence != origin?.recurrence.toDraft()
-
-  /** 保存写库用的标题（去首尾空格）。 */
-  val outputTitle: String get() = title.text.toString().trim()
-
-  /** 保存写库用的备注（去首尾空格）。 */
-  val outputDetail: String get() = detail.text.toString().trim()
-
-  /** 开始时间：仅「时间段」类型有效，空串归一为 null。 */
-  val outputStartTime: String? get() = if (isInterval) startTime.takeIf { it.isNotBlank() } else null
-
-  /** 结束 / 截止时间，空串归一为 null。 */
-  val outputEndTime: String? get() = endTime.takeIf { it.isNotBlank() }
-
-  /** 保存写库用的重复定义（不重复为 null）；编辑整条系列时保留原 exdate/overrides。 */
-  val outputRecurrence: Recurrence? get() = recurrence.toRecurrence(anchorDate, base = origin?.recurrence)
+  val outputStartTime: String? get() = if (isInterval) startTime.takeIf(String::isNotBlank) else null
+  val outputEndTime: String? get() = endTime.takeIf(String::isNotBlank)
+  /** 摘要与 recurrence UI 均使用有效规则，避免 moved occurrence 的 anchor 改写隐式 BY* 展示。 */
+  val outputRecurrence: RecurrenceRule? get() = effectiveRecurrence
 
   /**
-   * 用当前表单产出一个完整 [ScheduleEntity]（用于「编辑整条系列」与「此次及后续」的新建源）。
-   *
-   * @param base 作为不可编辑字段（id/置顶/完成等）的来源；新建时传 null。
+   * 时间字段是否发生语义输入变化；只比较初始显示文本和模式，Compose 启动时回写相同文本不会误置 dirty。
    */
-  fun toEntity(base: ScheduleEntity?): ScheduleEntity = ScheduleEntity(
-    todoId = base?.todoId ?: 0L,
+  internal val isTimingInputChanged: Boolean get() =
+    startTime != initialStartText || endTime != initialEndText ||
+      isInterval != initialIsInterval || isAllDay != initialIsAllDay
+
+  /**
+   * 重复编辑器是否被用户改变。未改变时直接保留原始 RRULE，避免 YEARLY 多月份等当前 UI 不可表达字段丢失。
+   */
+  internal val isRecurrenceInputChanged: Boolean get() = recurrence != initialRecurrenceDraft
+
+  /** 未触碰 timing 时返回初始领域值，避免 DST overlap 的 local end 文本无法携带 fold 而重算错时长。 */
+  internal val effectiveTiming: ScheduleTiming get() =
+    if (!isTimingInputChanged && initialTiming != null) initialTiming else parsedTiming
+
+  /** 未触碰 RRULE 时精确保留 origin；实际编辑后明确用当前 UI 支持子集整体替换。 */
+  internal val effectiveRecurrence: RecurrenceRule? get() =
+    if (!isRecurrenceInputChanged) origin?.recurrence else recurrence.toRecurrenceRule(recurrenceAnchorDate)
+
+  /**
+   * 根据“全天/是否为时间段/起止输入”组合生成四态时间模型。
+   *
+   * 实际编辑 Timed 时，起止均通过 [ScheduleDstResolver] 使用冻结的 gap/overlap 策略解析为 instant，再计算时长；
+   * 非整分钟 gap 或无法消歧会降为非法时长并由 validator 阻止保存。未编辑路径不进入这里，而是保留 [initialTiming]。
+   */
+  private val parsedTiming: ScheduleTiming get() {
+    val zone = when (val timing = origin?.timing) {
+      is ScheduleTiming.Timed -> timing.timeZoneId
+      is ScheduleTiming.Deadline -> timing.timeZoneId
+      else -> TimeZone.currentSystemDefault().id
+    }
+    if (isAllDay) return ScheduleTiming.AllDay(anchorDate)
+    val start = parseMinuteTimeDate(outputStartTime)
+    val end = parseMinuteTimeDate(outputEndTime)
+    return when {
+      isInterval && start != null && end != null -> {
+        val startResolved = ScheduleDstResolver.resolve(start, zone) as? LocalDateTimeResolution.Resolved
+        val endResolved = ScheduleDstResolver.resolve(end, zone) as? LocalDateTimeResolution.Resolved
+        val duration = if (startResolved != null && endResolved != null) {
+          (endResolved.instant - startResolved.instant).inWholeMinutes.toInt()
+        } else {
+          0
+        }
+        ScheduleTiming.Timed(start, duration, zone)
+      }
+      !isInterval && end != null -> ScheduleTiming.Deadline(end, zone)
+      else -> ScheduleTiming.Unscheduled
+    }
+  }
+
+  val validationIssues: List<ScheduleValidationIssue> get() = ScheduleValidator.validate(
+    toDraft().let { draft ->
+      if (draft.timing == ScheduleTiming.Unscheduled) draft.copy(reminders = emptyList()) else draft
+    }.toNewDomainForValidation()
+  )
+  val canConfirm: Boolean get() = validationIssues.isEmpty()
+  /** occurrence 投影中的标题是否被用户实际改动；用于保留其他未触碰的 existing patch。 */
+  internal val isOccurrenceTitleChanged: Boolean get() = initialOccurrence?.let { outputTitle != it.title.trim() } ?: true
+  /** occurrence 投影中的描述是否被用户实际改动。 */
+  internal val isOccurrenceDescriptionChanged: Boolean get() = initialOccurrence?.let { outputDetail != it.description.trim() } ?: true
+  /** occurrence 投影中的分类是否被用户实际改动。 */
+  internal val isOccurrenceCategoryChanged: Boolean get() = initialOccurrence?.let { categoryId != it.categoryId } ?: true
+  /** occurrence 投影中的完整 timing 是否被用户实际改动。 */
+  internal val isOccurrenceTimingChanged: Boolean get() = isTimingInputChanged
+  /** occurrence 的提醒控件是否被用户实际修改；timing 派生为空不得伪装成 reminder edit。 */
+  internal val isOccurrenceRemindersChanged: Boolean get() = remindMinutes != initialReminderMinutes
+
+  /**
+   * 仅判断 occurrence 可覆盖字段是否变化；RRULE 是系列属性，不应让 THIS_ONLY 生成无意义 exception。
+   */
+  internal val isOccurrenceFieldsChanged: Boolean get() =
+    isOccurrenceTitleChanged || isOccurrenceDescriptionChanged || isOccurrenceCategoryChanged ||
+      isOccurrenceTimingChanged || isOccurrenceRemindersChanged
+
+  /** RRULE 是否相对父系列发生变化，供 ALL 与 THIS_AND_FOLLOWING 独立判断系列编辑。 */
+  internal val isSeriesRecurrenceChanged: Boolean get() = isRecurrenceInputChanged
+
+  /**
+   * 判断弹窗是否有任意未保存输入，用于关闭确认；scope 路由会进一步区分 occurrence 字段与系列 RRULE。
+   *
+   * occurrence 字段与初始化投影比较，避免 parent 演进后误判；RRULE 仍与 parent 比较，使从 occurrence 打开后
+   * 只改重复规则也会提示未保存，但 THIS_ONLY 保存时不会把 RRULE 写进单次 patch。
+   */
+  val isChanged: Boolean get() {
+    if (initialOccurrence != null) return isOccurrenceFieldsChanged || isSeriesRecurrenceChanged
+    return origin == null || toDraft().let { draft ->
+      draft.title.trim() != origin.title || draft.description.trim() != origin.description ||
+        draft.categoryId != origin.categoryId || draft.timing != origin.timing ||
+        isRecurrenceInputChanged || draft.reminders != origin.reminders
+    }
+  }
+
+  val outputTitle: String get() = title.text.toString().trim()
+  val outputDetail: String get() = detail.text.toString().trim()
+
+  /**
+   * 提醒 payload 只由提醒控件输入决定；timing 改为 Unscheduled 时由路由层执行显式原子清理，不能伪造 dirty。
+   */
+  internal val effectiveReminders: List<ScheduleReminder> get() = when {
+    remindMinutes < 0 -> emptyList()
+    initialReminderMinutes == remindMinutes -> initialReminders
+    else -> listOf(
+      ScheduleReminder(
+        ReminderId(initialReminders.firstOrNull()?.id?.value ?: "draft-reminder"),
+        remindMinutes,
+        ReminderChannel.DEVICE,
+      ),
+    )
+  }
+
+  /**
+   * 生成不含持久化 DTO 的编辑草稿，供校验和仓库命令复用。
+   *
+   * 新建态使用固定占位 [ScheduleId]，仅用于让草稿满足完整领域校验；命令边界必须在写入前替换成真实 UUIDv7。
+   * 时间戳、revision 与正式 ID 均由调用方/仓库拥有；未排期或“不提醒”不会生成提醒。
+   */
+  fun toDraft(): ScheduleDraft = ScheduleDraft(
+    id = origin?.id ?: ScheduleId("00000000-0000-7000-8000-000000000000"),
     title = outputTitle,
-    detail = outputDetail,
-    type = type,
-    startTime = outputStartTime ?: "",
-    endTime = outputEndTime ?: "",
-    recurrence = outputRecurrence,
-    remindMode = base?.remindMode ?: ScheduleRemindMode(),
-    remindMinutes = remindMinutes,
-    isDone = base?.isDone ?: 0,
-    isPinned = base?.isPinned ?: 0,
-    isOvered = base?.isOvered ?: 0,
-    lastModifyTime = base?.lastModifyTime ?: 0L,
+    description = outputDetail,
+    categoryId = categoryId,
+    timing = effectiveTiming,
+    recurrence = effectiveRecurrence,
+    reminders = effectiveReminders,
+    completion = origin?.completion ?: ScheduleCompletion.PENDING,
   )
 
-  /** 校验时间段：开始、结束都可解析且开始 < 结束。 */
-  private fun isIntervalValid(startTime: String, endTime: String): Boolean {
-    val s = parseScheduleDateTime(startTime) ?: return false
-    val e = parseScheduleDateTime(endTime) ?: return false
-    return compareDateTime(s, e) < 0
-  }
-
-  /** 比较两个解析后的时间；无时分按 0 分处理。 */
-  private fun compareDateTime(a: ScheduleDateTime, b: ScheduleDateTime): Int {
-    val dateCmp = a.date.compareTo(b.date)
-    if (dateCmp != 0) return dateCmp
-    return (a.minuteOfDay ?: 0).compareTo(b.minuteOfDay ?: 0)
-  }
+  /** 仅为运行完整领域校验补齐非编辑字段；占位时间与 revision 绝不会进入仓库。 */
+  private fun ScheduleDraft.toNewDomainForValidation() = Schedule(
+    id, 0, title, description, categoryId, timing, recurrence, reminders, completion,
+    Instant.DISTANT_PAST, Instant.DISTANT_PAST,
+  )
 }
 
-/** 按 [editSchedule] 记忆一份 [EditScheduleModelState]；切换编辑对象时重建。 */
 @Composable
-internal fun rememberEditScheduleModelState(editSchedule: ScheduleEntity?): EditScheduleModelState =
-  remember(editSchedule) { EditScheduleModelState(editSchedule) }
+internal fun rememberEditScheduleModelState(
+  editSchedule: Schedule?,
+  occurrence: ScheduleOccurrence? = null,
+): EditScheduleModelState = remember(editSchedule, occurrence) {
+  EditScheduleModelState(editSchedule, occurrence)
+}
+
+private fun timingAnchorDate(timing: ScheduleTiming): Date = when (timing) {
+  is ScheduleTiming.Timed -> timing.start.date
+  is ScheduleTiming.Deadline -> timing.due.date
+  is ScheduleTiming.AllDay -> timing.startDate
+  ScheduleTiming.Unscheduled -> Date.now()
+}
+
+private fun ScheduleTiming.toStartEditText(): String = when (this) {
+  is ScheduleTiming.Timed -> start.toEditText()
+  is ScheduleTiming.AllDay -> MinuteTimeDate(startDate, 0, 0).toEditText()
+  else -> ""
+}
+
+private fun ScheduleTiming.toEndEditText(): String = when (this) {
+  is ScheduleTiming.Timed -> start.toLocalDateTime().toInstant(TimeZone.of(timeZoneId))
+    .plus(durationMinutes, kotlinx.datetime.DateTimeUnit.MINUTE, TimeZone.of(timeZoneId))
+    .toLocalDateTime(TimeZone.of(timeZoneId)).toMinuteTimeDate().toEditText()
+  is ScheduleTiming.Deadline -> due.toEditText()
+  is ScheduleTiming.AllDay -> MinuteTimeDate(startDate, 0, 0).toEditText()
+  ScheduleTiming.Unscheduled -> ""
+}
+
+private fun Schedule?.timingStartText(): String = this?.timing?.toStartEditText() ?: ""
+private fun Schedule?.timingEndText(): String = this?.timing?.toEndEditText() ?: ""
+private fun MinuteTimeDate.toEditText() = formatScheduleDateTime(
+  date.year, date.monthNumber, date.dayOfMonth, time.hour, time.minute,
+)
+
+/** 将已解析的编辑输入收窄为分钟级领域时间，不引入秒或隐式系统时区。 */
+private fun parseMinuteTimeDate(value: String?): MinuteTimeDate? =
+  parseScheduleDateTime(value)?.let { parsed ->
+    val minuteOfDay = parsed.minuteOfDay ?: 0
+    MinuteTimeDate(parsed.date, minuteOfDay / 60, minuteOfDay % 60)
+  }

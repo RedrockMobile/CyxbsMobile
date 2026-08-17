@@ -6,12 +6,14 @@ import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ITokenService
+import com.cyxbs.components.account.api.TokenLifecycleLease
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.allImpl
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
+import com.cyxbs.components.utils.network.plugin.handleAuthenticatedTypedResponse
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.cyxbs.components.utils.utils.get.getAppVersionName
@@ -29,6 +31,7 @@ import okhttp3.RequestBody
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import okio.BufferedSource
 import retrofit2.Converter
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
@@ -282,9 +285,53 @@ object ApiGenerator {
                 })
             }
         }))
+            // 必须位于实际 converter 之前：委托一次反序列化后，才能用同一请求 lease 处理 typed 状态码。
+            .addConverterFactory(LifecycleAwareConverterFactory())
             .addConverterFactory(KotlinXSerializationFactory()) // 需要放在 gson 之前
             .addConverterFactory(GsonConverterFactory.create())
             .addCallAdapterFactory(RxJava3CallAdapterFactory.createSynchronous())
+    }
+
+    /**
+     * 携带本次 OkHttp 请求实际附加的认证 lease，不读取、缓存或复制响应字节。
+     *
+     * Retrofit converter 最终仍消费 [delegate] 的同一个 source；本包装只把请求上下文带到 typed 转换完成点。
+     */
+    private class TokenLifecycleResponseBody(
+        private val delegate: ResponseBody,
+        val lease: TokenLifecycleLease,
+    ) : ResponseBody() {
+        override fun contentType() = delegate.contentType()
+        override fun contentLength(): Long = delegate.contentLength()
+        override fun source(): BufferedSource = delegate.source()
+    }
+
+    /**
+     * 委托既有 KotlinX/Gson converter 完成一次反序列化，再处理 typed 认证状态码。
+     *
+     * 未携带 lease 的 common/login 响应以及非 [IApiStatus] 结果由公共 helper fail-closed；delegate 抛错时不会执行
+     * 任何账号副作用。
+     */
+    private class LifecycleAwareConverterFactory : Converter.Factory() {
+
+        private val tokenService = ITokenService::class.impl()
+
+        override fun responseBodyConverter(
+            type: Type,
+            annotations: Array<out Annotation?>,
+            retrofit: Retrofit,
+        ): Converter<ResponseBody?, *> {
+            val delegate = retrofit.nextResponseBodyConverter<Any?>(this, type, annotations)
+            return Converter<ResponseBody?, Any?> { body ->
+                val responseBody = requireNotNull(body)
+                val lease = (responseBody as? TokenLifecycleResponseBody)?.lease
+                val result = delegate.convert(responseBody)
+                if (result != null) {
+                    handleAuthenticatedTypedResponse(tokenService, lease, result)
+                }
+                result
+            }
+        }
     }
 
     private class KotlinXSerializationFactory : Converter.Factory() {
@@ -387,19 +434,33 @@ object ApiGenerator {
         }.build()
     }
 
+    /**
+     * 冻结请求实际附加的 token lease，并把它随 ResponseBody 传播到 Retrofit converter。
+     *
+     * lease 获取结束后即使切号，响应仍携带原 AccountSession 与源 TokenBean identity；converter 只能条件处理原
+     * lifecycle。没有登录或冻结失败时按无认证请求继续，响应不会获得 lease。
+     */
     private fun Interceptor.Chain.proceedWithToken(
         block: (Request.Builder.() -> Unit)? = null
     ): Response {
-        val token = ITokenService::class.impl().getOrRequestToken2 {
+        val tokenService = ITokenService::class.impl()
+        val lease = tokenService.getOrRequestTokenLease2 {
             it.asSingle(Dispatchers.IO).blockingGet() // 无奈之举，先使用这种方式转换成 rxjava 在堵塞等待结果
         }
-        return proceed(
+        val response = proceed(
             request()
                 .newBuilder()
-                .apply { if (token != null) header("Authorization", "Bearer $token") }
+                .apply { if (lease != null) header("Authorization", "Bearer ${lease.token}") }
                 .also { block?.invoke(it) }
                 .build()
         )
+        return if (lease == null) {
+            response
+        } else {
+            response.newBuilder()
+                .body(TokenLifecycleResponseBody(response.body, lease))
+                .build()
+        }
     }
 
     object BackupInterceptor : Interceptor {

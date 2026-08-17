@@ -1,213 +1,83 @@
 package com.cyxbs.pages.schedule.ui.timeline
 
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
-import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode
-import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode.Companion
-import com.cyxbs.pages.schedule.data.model.ScheduleRemindMode.Companion.NONE
+import com.cyxbs.components.config.time.MinuteTimeDate
+import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
+import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 
 /**
- * todo 时间字符串解析与「所属日期」派生工具。
- *
- * todo 的时间字段（[ScheduleEntity.startTime] / [ScheduleEntity.endTime]）沿用老端中文格式
- * `"yyyy年M月d日 HH:mm"`（与 `ui/edit/EditScheduleDialog.kt` 写入格式一致），月/日/时/分均可能不补零。
- * 本文件全部为 commonMain 纯函数，不依赖任何平台 API，便于单测。
+ * 编辑框日期时间文本的解析结果，仅作为 UI 输入过渡格式；Schedule v2 持久化始终使用四态 [ScheduleTiming]，
+ * 不会保存该字符串或 minuteOfDay 表示。
  */
+data class ScheduleDateTime(val date: Date, val minuteOfDay: Int?)
 
-/**
- * 解析结果。
- *
- * @param date 日期部分（一定存在）。
- * @param minuteOfDay 当天的分钟数 `0..1439`；当字符串只有日期、没有时分时为 null。
- */
-data class ScheduleDateTime(
-  val date: Date,
-  val minuteOfDay: Int?,
-)
-
-/**
- * 解析 `"yyyy年M月d日 HH:mm"`（时分可缺省）。无法解析返回 null。
- *
- * 不使用 JVM-only 的 `SimpleDateFormat` / `String.format`，纯手动 split。
- */
 fun parseScheduleDateTime(raw: String?): ScheduleDateTime? {
   if (raw.isNullOrBlank()) return null
-  val s = raw.trim()
-  val yi = s.indexOf('年')
-  val mi = s.indexOf('月')
-  val di = s.indexOf('日')
-  if (yi <= 0 || mi <= yi || di <= mi) return null
-  val year = s.substring(0, yi).trim().toIntOrNull() ?: return null
-  val month = s.substring(yi + 1, mi).trim().toIntOrNull() ?: return null
-  val day = s.substring(mi + 1, di).trim().toIntOrNull() ?: return null
-  val date = runCatching { Date(year, month, day) }.getOrNull() ?: return null
-
-  val timeStr = s.substring(di + 1).trim()
-  val minuteOfDay = if (timeStr.isEmpty()) {
-    null
-  } else {
-    val parts = timeStr.split(':', '：')
-    val h = parts.getOrNull(0)?.trim()?.toIntOrNull()
-    val m = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
-    if (h == null || h !in 0..23 || m !in 0..59) null else h * 60 + m
+  val match = Regex("""(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s*(\d{1,2})[:：](\d{1,2}))?""")
+    .matchEntire(raw.trim()) ?: return null
+  val values = match.groupValues
+  val date = runCatching { Date(values[1].toInt(), values[2].toInt(), values[3].toInt()) }.getOrNull() ?: return null
+  val minute = values[4].takeIf(String::isNotEmpty)?.toIntOrNull()?.let { hour ->
+    val min = values[5].toIntOrNull() ?: return null
+    if (hour !in 0..23 || min !in 0..59) return null
+    hour * 60 + min
   }
-  return ScheduleDateTime(date, minuteOfDay)
-}
-
-/** 是否为「时间段类型」：同时存在开始与结束时间。 */
-fun ScheduleEntity.isInterval(): Boolean = startTime.isNotBlank() && endTime.isNotBlank()
-
-/** 是否为「未排期」：既没有开始时间也没有结束时间，无所属日期。 */
-fun ScheduleEntity.isUnscheduled(): Boolean = startTime.isBlank() && endTime.isBlank()
-
-/**
- * 该 todo 所属的日期：
- * - 时间段类型取开始时间的日期；
- * - 截止类型取结束时间的日期；
- * - 未排期或无法解析返回 null。
- */
-fun ScheduleEntity.ownerDate(): Date? {
-  return if (!startTime.isNullOrBlank()) {
-    parseScheduleDateTime(startTime)?.date
-  } else {
-    parseScheduleDateTime(endTime)?.date
-  }
+  return ScheduleDateTime(date, minute)
 }
 
 /**
- * 时间轴上的一条「有时刻」事件。
- *
- * @param isInterval true=时间段区间块；false=截止粗线。
- * @param startMin 起始分钟（截止类型等于 [endMin]）。
- * @param endMin 结束分钟；区间块保证 `endMin > startMin`。
+ * 单个 occurrence 在某一天时间轴上的裁剪结果。
+ * [startMin]/[endMin] 均限制在当天 0..1440；跨日区间会在相交的每一天生成一个片段，
+ * 但 [occurrence] 的系列/实例 identity 始终保持不变，点击仍定位原实例。
  */
 data class DayTimedSchedule(
-  val todo: ScheduleEntity,
+  val occurrence: ScheduleUiOccurrence,
   val isInterval: Boolean,
   val startMin: Int,
   val endMin: Int,
 )
 
-/** 区间块在 endMin <= startMin 或跨天时，给一个最小可视时长（分钟）。 */
-private const val MIN_INTERVAL_MINUTES = 30
-
-/** 整天分钟数（0..1440）。无时刻待办铺成跨 0-24 点区间块时用它当 endMin。 */
 internal const val FULL_DAY_MINUTES = 24 * 60
-
-/**
- * 把「无具体时刻」的待办（当日全天 / 未排期）表示成跨 0-24 点的整日区间块，
- * 与有时刻事件一起进入列分配（[layoutTimedSchedules]），并排显示在时间轴里。
- *
- * 全天块 `startMin=0`，排序后落在最左列；可用 [DayTimedSchedule.isFullDay] 判断。
- */
-internal fun fullDayBlocks(todos: List<ScheduleEntity>): List<DayTimedSchedule> =
-  todos.map { DayTimedSchedule(it, isInterval = true, startMin = 0, endMin = FULL_DAY_MINUTES) }
-
-/** 是否为跨 0-24 点的整日块（当日 / 未排期）。 */
 internal fun DayTimedSchedule.isFullDay(): Boolean = isInterval && startMin <= 0 && endMin >= FULL_DAY_MINUTES
 
 /**
- * 取某天「有具体时刻」的事件（用于时间轴），按 [DayTimedSchedule.startMin] 升序。
+ * 将已由业务引擎展开的实例投影到单个可见日的时间轴。
  *
- * - 时间段类型：开始/结束都需在同一天且开始有时分；结束分钟缺省或不晚于开始时，用 [MIN_INTERVAL_MINUTES] 兜底。
- * - 截止类型：结束时间在该天且有时分。
+ * 时间段会按墙上时间占用区间与 `[date 00:00, nextDate 00:00)` 相交后裁剪到当天 0..24 点，
+ * 因此跨日或超过一天的实例会在每个相交日分别占据正确片段；截止项只落在 due 所在日，全天项覆盖
+ * durationDays 中的每一天，未排期项仅在 [includeUnscheduled] 为 true 时进入整日栏。该布局层绝不自行
+ * 展开重复规则，避免与业务引擎产生窗口/例外语义分叉。
  */
-internal fun timedSchedulesForDate(all: List<ScheduleEntity>, date: Date): List<DayTimedSchedule> {
-  val result = ArrayList<DayTimedSchedule>()
-  for (todo in all) {
-    if (!startTimeIsInterval(todo)) {
-      // 截止类型
-      val dt = parseScheduleDateTime(todo.endTime) ?: continue
-      if (dt.date != date) continue
-      val min = dt.minuteOfDay ?: continue
-      result += DayTimedSchedule(todo, isInterval = false, startMin = min, endMin = min)
-    } else {
-      val start = parseScheduleDateTime(todo.startTime) ?: continue
-      if (start.date != date) continue
-      val startMin = start.minuteOfDay ?: continue
-      val end = parseScheduleDateTime(todo.endTime)
-      val rawEndMin = end?.minuteOfDay?.takeIf { end.date == date }
-      val endMin = if (rawEndMin == null || rawEndMin <= startMin) {
-        (startMin + MIN_INTERVAL_MINUTES).coerceAtMost(24 * 60)
-      } else {
-        rawEndMin
+internal fun timelineSchedulesForDate(
+  occurrences: List<ScheduleUiOccurrence>,
+  date: Date,
+  includeUnscheduled: Boolean = false,
+): List<DayTimedSchedule> {
+  val dayStart = MinuteTimeDate(date, 0, 0)
+  val dayEndExclusive = MinuteTimeDate(date.plusDays(1), 0, 0)
+  return occurrences.mapNotNull { occurrence ->
+    when (val timing = occurrence.timing) {
+      is ScheduleTiming.Timed -> {
+        val start = timing.start
+        val endExclusive = start.plusMinutes(timing.durationMinutes)
+        if (start >= dayEndExclusive || endExclusive <= dayStart) null else DayTimedSchedule(
+          occurrence = occurrence,
+          isInterval = true,
+          startMin = if (start <= dayStart) 0 else start.minuteOfDay,
+          endMin = if (endExclusive >= dayEndExclusive) FULL_DAY_MINUTES else endExclusive.minuteOfDay,
+        )
       }
-      result += DayTimedSchedule(todo, isInterval = true, startMin = startMin, endMin = endMin)
+      is ScheduleTiming.Deadline -> if (timing.due.date == date) {
+        val minute = timing.due.minuteOfDay
+        DayTimedSchedule(occurrence, false, minute, minute)
+      } else null
+      is ScheduleTiming.AllDay -> if (date >= timing.startDate && date < timing.startDate.plusDays(timing.durationDays)) {
+        DayTimedSchedule(occurrence, true, 0, FULL_DAY_MINUTES)
+      } else null
+      ScheduleTiming.Unscheduled -> if (includeUnscheduled) DayTimedSchedule(occurrence, true, 0, FULL_DAY_MINUTES) else null
     }
-  }
-  result.sortBy { it.startMin }
-  return result
+  }.sortedBy(DayTimedSchedule::startMin)
 }
 
-/**
- * 取某天「有日期但无具体时刻」的待办（在时间轴顶部以「全天」形式展示）。
- *
- * 例如截止类型只写了日期没写时分的旧数据。
- */
-internal fun allDaySchedulesForDate(all: List<ScheduleEntity>, date: Date): List<ScheduleEntity> {
-  return all.filter { todo ->
-    if (todo.isUnscheduled()) return@filter false
-    val owner = todo.ownerDate() ?: return@filter false
-    if (owner != date) return@filter false
-    // 没有任何时分才算「全天」
-    val hasClock = if (startTimeIsInterval(todo)) {
-      parseScheduleDateTime(todo.startTime)?.minuteOfDay != null
-    } else {
-      parseScheduleDateTime(todo.endTime)?.minuteOfDay != null
-    }
-    !hasClock
-  }
-}
-
-/** 全部未排期的待办（常驻「未排期」区，不随日期过滤）。 */
-internal fun unscheduledSchedules(all: List<ScheduleEntity>): List<ScheduleEntity> {
-  return all.filter { it.isUnscheduled() }
-}
-
-/** 格式化时间字符串，对齐老端 `"yyyy年M月d日 HH:mm"`（时分补零）。 */
-internal fun formatScheduleDateTime(year: Int, month: Int, day: Int, hour: Int, minute: Int): String {
-  val h = hour.toString().padStart(2, '0')
-  val m = minute.toString().padStart(2, '0')
-  return "${year}年${month}月${day}日 $h:$m"
-}
-
-/** 移除第 [index] 个重复项；移除后为空则切回 [ScheduleRemindMode.NONE]。 */
-internal fun removeRepeatAt(remindMode: ScheduleRemindMode, index: Int): ScheduleRemindMode {
-  return when (remindMode.repeatMode) {
-    ScheduleRemindMode.DAY -> remindMode.copy(repeatMode = ScheduleRemindMode.NONE)
-    ScheduleRemindMode.WEEK -> {
-      val newWeek = remindMode.week.toMutableList().apply { if (index in indices) removeAt(index) }
-      if (newWeek.isEmpty()) remindMode.copy(repeatMode = ScheduleRemindMode.NONE, week = emptyList())
-      else remindMode.copy(week = newWeek)
-    }
-    ScheduleRemindMode.MONTH -> {
-      val newDay = remindMode.day.toMutableList().apply { if (index in indices) removeAt(index) }
-      if (newDay.isEmpty()) remindMode.copy(repeatMode = ScheduleRemindMode.NONE, day = emptyList())
-      else remindMode.copy(day = newDay)
-    }
-    else -> remindMode
-  }
-}
-
-/** 把 [ScheduleRemindMode] 展开成可显示的 chip 标签列表。 */
-fun buildRepeatLabels(remindMode: ScheduleRemindMode): List<String> =
-  when (remindMode.repeatMode) {
-    ScheduleRemindMode.DAY -> listOf("每天")
-    ScheduleRemindMode.WEEK -> remindMode.week.map { "周${weekDigitToChinese(it)}" }
-    ScheduleRemindMode.MONTH -> remindMode.day.map { "每月${it}日" }
-    else -> emptyList()
-  }
-
-private fun weekDigitToChinese(digit: Int): String = when (digit) {
-  1 -> "一"
-  2 -> "二"
-  3 -> "三"
-  4 -> "四"
-  5 -> "五"
-  6 -> "六"
-  7 -> "日"
-  else -> ""
-}
-
-private fun startTimeIsInterval(todo: ScheduleEntity): Boolean =
-  !todo.startTime.isNullOrBlank()
+internal fun formatScheduleDateTime(year: Int, month: Int, day: Int, hour: Int, minute: Int): String =
+  "${year}年${month}月${day}日 ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
