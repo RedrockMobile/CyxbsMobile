@@ -590,10 +590,11 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - （已完成，2026-08-18）建立可扩展的 javac/java 差分测试体系：语料独立放在
   `src/javacDifferentialTest/cases`，`generateJavacDifferentialFixtures` 在 jsTest 编译前使用 Gradle
   当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
-  诊断类别、stdout、stderr 和未捕获异常类型。语料已从首批 16 项扩展到 40 项，并设置不可静默
-  缩减与 ID 唯一性闸门；新增覆盖 strict/loose 重载、泛型方法与上下界、集合视图、装箱缓存、
-  UTF-16 String、数值/数组边界、类初始化、构造期虚分派、接口默认方法、lambda 捕获、方法引用、
-  嵌套异常和 Scanner 行终止符。语料同时发现并修复类型变量 receiver 未按首上界查找成员的问题；
+  诊断类别、stdout、stderr 和未捕获异常类型。语料已从首批 16 项扩展到 100 项，并设置不可静默
+  缩减与 ID 唯一性闸门；新增覆盖控制流组合、数值转换、长整数与浮点边界、多维数组、String、
+  包装类型、集合别名与视图、泛型和重载、接口分派、lambda/方法引用、enum、异常、受控资源、
+  Scanner、类初始化、构造器链和多文件调用。语料扩充同时发现并修复三元表达式缺失、
+  无 catch/finally 的 try-with-resources 生成非法 JS，以及未知 expression 在实参位置被静默擦除的问题；
 - （已完成，2026-08-18）建立 Android、iOS 与 Desktop 共用的五阶段性能基准，统一测量语言包
   加载、FULL、INCREMENTAL、EXACT 编译及隔离 Runtime 执行，并允许各平台注入内存采样器；
   Desktop 已使用本地 debug npm 图完成真实 QuickJS 基线，获取命令、报告位置、Android PSS 与

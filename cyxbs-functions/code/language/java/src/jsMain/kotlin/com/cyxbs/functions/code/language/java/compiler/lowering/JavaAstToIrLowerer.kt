@@ -847,6 +847,13 @@ private class BodyLowering(
       is JavaAstExpression.This -> thisExpression(source.span)
       is JavaAstExpression.Super -> invalid("Standalone super cannot enter IR.", source.span)
       is JavaAstExpression.Binary -> binary(source, type)
+      is JavaAstExpression.Conditional -> JavaIrExpression.Conditional(
+        condition = expression(source.condition) ?: return null,
+        whenTrue = expression(source.whenTrue) ?: return null,
+        whenFalse = expression(source.whenFalse) ?: return null,
+        type = type,
+        span = source.span,
+      )
       is JavaAstExpression.Unary -> unary(source, type)
       is JavaAstExpression.Assignment -> assignment(source, type)
       is JavaAstExpression.MethodInvocation -> invocation(source, type)

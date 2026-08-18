@@ -953,6 +953,8 @@ class JavaAstToIrLowererTest {
     is JavaIrExpression.ConstructBuiltin -> listOf(expression.operation) +
       expression.arguments.flatMap(::builtinOperations)
     is JavaIrExpression.Binary -> builtinOperations(expression.left) + builtinOperations(expression.right)
+    is JavaIrExpression.Conditional -> builtinOperations(expression.condition) +
+      builtinOperations(expression.whenTrue) + builtinOperations(expression.whenFalse)
     is JavaIrExpression.Unary -> builtinOperations(expression.operand)
     is JavaIrExpression.Convert -> builtinOperations(expression.expression)
     is JavaIrExpression.InvokeStatic -> expression.arguments.flatMap(::builtinOperations)

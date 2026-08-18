@@ -406,6 +406,15 @@ internal sealed interface JavaIrExpression {
     override val span: JavaSourceSpan,
   ) : JavaIrExpression
 
+  /** 惰性条件表达式；后端只能执行被选中的一个结果分支。 */
+  data class Conditional(
+    val condition: JavaIrExpression,
+    val whenTrue: JavaIrExpression,
+    val whenFalse: JavaIrExpression,
+    override val type: JavaIrType,
+    override val span: JavaSourceSpan,
+  ) : JavaIrExpression
+
   data class Unary(
     val operator: JavaIrUnaryOperator,
     val operand: JavaIrExpression,

@@ -2149,6 +2149,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       } ?: analyzeExpression(expression.expression)
       is JavaAstExpression.Cast -> cast(expression)
       is JavaAstExpression.Binary -> binary(expression)
+      is JavaAstExpression.Conditional -> conditional(expression)
       is JavaAstExpression.Unary -> unary(expression)
       is JavaAstExpression.Assignment -> assignment(expression)
       is JavaAstExpression.MethodInvocation -> invocation(expression)
@@ -2801,6 +2802,58 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
         JavaSemanticType.Error
       }
     }
+  }
+
+  /**
+   * 校验条件表达式的布尔条件，并为两个惰性分支选择同一个 Java 结果类型。
+   *
+   * 有赋值/返回目标时优先使用目标类型，使 lambda、diamond 等 poly expression 能继续获得上下文；
+   * 无目标时仅接受 Java 中可安全合并的同型、数值提升、null/引用与单向引用拓宽。
+   */
+  private fun conditional(expression: JavaAstExpression.Conditional): JavaSemanticType {
+    val rawCondition = analyzeExpression(expression.condition)
+    if (primitiveOperand(expression.condition, rawCondition) != booleanType()) {
+      error(expression.condition.span, "java.semantic.conditional_requires_boolean", "条件表达式的 condition 必须是 boolean。")
+      return JavaSemanticType.Error
+    }
+
+    val expected = expectedExpressionTypes[expression.nodeId]
+    val trueType = expected?.let { analyzeExpressionExpected(expression.whenTrue, it) }
+      ?: analyzeExpression(expression.whenTrue)
+    val falseType = expected?.let { analyzeExpressionExpected(expression.whenFalse, it) }
+      ?: analyzeExpression(expression.whenFalse)
+    if (trueType == JavaSemanticType.Error || falseType == JavaSemanticType.Error) return JavaSemanticType.Error
+
+    if (expected != null) {
+      val trueCompatible = assign(expression.whenTrue.nodeId, trueType, expected, expression.whenTrue.span)
+      val falseCompatible = assign(expression.whenFalse.nodeId, falseType, expected, expression.whenFalse.span)
+      return if (trueCompatible && falseCompatible) expected else JavaSemanticType.Error
+    }
+    if (trueType == falseType) return trueType
+
+    val truePrimitive = primitiveOperand(expression.whenTrue, trueType)
+    val falsePrimitive = primitiveOperand(expression.whenFalse, falseType)
+    val promoted = numericPromotion(truePrimitive, falsePrimitive)
+    if (promoted != null) {
+      registerNumericPromotion(expression.whenTrue, truePrimitive, promoted)
+      registerNumericPromotion(expression.whenFalse, falsePrimitive, promoted)
+      return promoted
+    }
+
+    val result = when {
+      trueType == JavaSemanticType.Null && isReference(falseType) -> falseType
+      falseType == JavaSemanticType.Null && isReference(trueType) -> trueType
+      isReference(trueType) && isReference(falseType) && relations().isSubtype(trueType, falseType) -> falseType
+      isReference(trueType) && isReference(falseType) && relations().isSubtype(falseType, trueType) -> trueType
+      else -> null
+    }
+    if (result == null) {
+      error(expression.span, "java.semantic.incompatible_conditional_branches", "条件表达式的两个结果分支类型不兼容。")
+      return JavaSemanticType.Error
+    }
+    assign(expression.whenTrue.nodeId, trueType, result, expression.whenTrue.span)
+    assign(expression.whenFalse.nodeId, falseType, result, expression.whenFalse.span)
+    return result
   }
 
   /** 统一实现算术与关系运算的数值提升。 */

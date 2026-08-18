@@ -34,62 +34,72 @@ class JavaJavacDifferentialTest {
       generatedJavacDifferentialFixtures.map(JavacDifferentialFixture::id).distinct().size,
       "Differential case ids must remain unique.",
     )
+    val failures = mutableListOf<String>()
     generatedJavacDifferentialFixtures.forEach { fixture ->
-      val result = JavaToJavaScriptCompiler.compile(
-        JavaCompilerRequest(
-          workspace = JavaSourceWorkspace(
-            fixture.sources.mapIndexed { index, source ->
-              JavaSourceFile(
-                id = JavaSourceFileId(index),
-                path = source.first,
-                source = source.second,
-              )
-            },
+      try {
+        val result = JavaToJavaScriptCompiler.compile(
+          JavaCompilerRequest(
+            workspace = JavaSourceWorkspace(
+              fixture.sources.mapIndexed { index, source ->
+                JavaSourceFile(
+                  id = JavaSourceFileId(index),
+                  path = source.first,
+                  source = source.second,
+                )
+              },
+            ),
+            entryPoint = JavaCompilerEntryPoint(
+              qualifiedClassName = fixture.entryClass,
+              methodName = fixture.entryMethod,
+              descriptor = fixture.descriptor,
+            ),
           ),
-          entryPoint = JavaCompilerEntryPoint(
-            qualifiedClassName = fixture.entryClass,
-            methodName = fixture.entryMethod,
-            descriptor = fixture.descriptor,
-          ),
-        ),
-      )
-      if (!fixture.javacCompiled) {
-        assertNull(result.value, "Case '${fixture.id}' should fail compilation.")
-        assertEquals(
-          expected = fixture.expectedDiagnosticCategories,
-          actual = result.diagnostics.mapNotNull { diagnostic ->
-            diagnosticCategory(diagnostic.code)
-          }.toSet(),
-          message = "Case '${fixture.id}' produced different diagnostic categories: ${result.diagnostics}",
         )
-        return@forEach
-      }
+        if (!fixture.javacCompiled) {
+          assertNull(result.value, "Case '${fixture.id}' should fail compilation.")
+          assertEquals(
+            expected = fixture.expectedDiagnosticCategories,
+            actual = result.diagnostics.mapNotNull { diagnostic ->
+              diagnosticCategory(diagnostic.code)
+            }.toSet(),
+            message = "Case '${fixture.id}' produced different diagnostic categories: ${result.diagnostics}",
+          )
+          return@forEach
+        }
 
-      val artifact = assertNotNull(
-        result.value,
-        "Case '${fixture.id}' should compile: ${result.diagnostics}",
-      )
-      val execution = execute(artifact, fixture.standardInput)
-      assertEquals(
-        fixture.expectedStandardOutput,
-        execution.standardOutput,
-        "Case '${fixture.id}' stdout differs from java.",
-      )
-      assertEquals(
-        fixture.expectedStandardError,
-        execution.standardError,
-        "Case '${fixture.id}' stderr differs from java.",
-      )
-      if (fixture.expectedThrowableSimpleName == null) {
-        assertNull(execution.failure, "Case '${fixture.id}' unexpectedly failed.")
-      } else {
-        val failure = assertNotNull(execution.failure, "Case '${fixture.id}' should fail at runtime.")
-        assertTrue(
-          failure.contains(fixture.expectedThrowableSimpleName),
-          "Case '${fixture.id}' expected ${fixture.expectedThrowableSimpleName}, actual: $failure",
+        val artifact = assertNotNull(
+          result.value,
+          "Case '${fixture.id}' should compile: ${result.diagnostics}",
         )
+        val execution = execute(artifact, fixture.standardInput)
+        assertEquals(
+          fixture.expectedStandardOutput,
+          execution.standardOutput,
+          "Case '${fixture.id}' stdout differs from java.",
+        )
+        assertEquals(
+          fixture.expectedStandardError,
+          execution.standardError,
+          "Case '${fixture.id}' stderr differs from java.",
+        )
+        if (fixture.expectedThrowableSimpleName == null) {
+          assertNull(execution.failure, "Case '${fixture.id}' unexpectedly failed.")
+        } else {
+          val failure =
+            assertNotNull(execution.failure, "Case '${fixture.id}' should fail at runtime.")
+          assertTrue(
+            failure.contains(fixture.expectedThrowableSimpleName),
+            "Case '${fixture.id}' expected ${fixture.expectedThrowableSimpleName}, actual: $failure",
+          )
+        }
+      } catch (failure: Throwable) {
+        failures += "${fixture.id}: ${failure.message ?: failure}"
       }
     }
+    assertTrue(
+      failures.isEmpty(),
+      "Differential corpus mismatches:\n" + failures.joinToString(separator = "\n"),
+    )
   }
 
   /**
@@ -148,11 +158,13 @@ class JavaJavacDifferentialTest {
   private fun diagnosticCategory(code: String): String? = when (code) {
     "java.semantic.undefined_name",
     "java.semantic.unknown_type",
-    -> "UNRESOLVED_SYMBOL"
+      -> "UNRESOLVED_SYMBOL"
+
     "java.semantic.type_mismatch",
     "java.semantic.no_applicable_overload",
     "java.semantic.invalid_return_type",
-    -> "TYPE_MISMATCH"
+      -> "TYPE_MISMATCH"
+
     "java.semantic.ambiguous_overload" -> "AMBIGUOUS_CALL"
     "java.semantic.final_assignment" -> "FINAL_ASSIGNMENT"
     "java.semantic.missing_return" -> "MISSING_RETURN"
@@ -160,7 +172,7 @@ class JavaJavacDifferentialTest {
   }
 
   private companion object {
-    const val MINIMUM_REFERENCE_CASES = 40
+    const val MINIMUM_REFERENCE_CASES = 100
   }
 }
 

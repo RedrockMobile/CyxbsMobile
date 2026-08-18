@@ -467,6 +467,20 @@ internal sealed interface JavaAstExpression : JavaAstNode {
     val right: JavaAstExpression,
   ) : JavaAstExpression
 
+  /**
+   * Java 条件表达式。
+   *
+   * 三个子表达式必须保持源码求值边界：先求值 [condition]，随后只执行 [whenTrue] 或
+   * [whenFalse] 之一，不能在 lowering 阶段把分支提前求值。
+   */
+  data class Conditional(
+    override val nodeId: JavaNodeId,
+    override val span: JavaSourceSpan,
+    val condition: JavaAstExpression,
+    val whenTrue: JavaAstExpression,
+    val whenFalse: JavaAstExpression,
+  ) : JavaAstExpression
+
   /** 前缀或后缀一元运算。 */
   data class Unary(
     override val nodeId: JavaNodeId,

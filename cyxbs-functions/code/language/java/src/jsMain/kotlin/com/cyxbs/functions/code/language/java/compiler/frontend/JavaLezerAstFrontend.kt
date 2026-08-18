@@ -701,6 +701,7 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "ParenthesizedExpression" -> JavaAstExpression.Parenthesized(ids.next(), span(node), expression(node.onlyExpression()))
       "CastExpression" -> cast(node)
       "BinaryExpression" -> binary(node)
+      "TernaryExpression" -> ternary(node)
       "AssignmentExpression" -> assignment(node)
       "UnaryExpression", "PostfixExpression", "UpdateExpression" -> unary(node)
       "MethodInvocation" -> invocation(node)
@@ -712,6 +713,24 @@ private class JavaLezerFileAdapter(private val file: JavaSourceFile) {
       "MethodReference" -> methodReference(node)
       else -> unsupported(node, "Stage1 不支持该表达式。")
     }
+  }
+
+  /**
+   * 按 Lezer 的三个直接 expression child 映射 Java 条件表达式。
+   *
+   * 问号在 @lezer/java 1.1.3 中名为 LogicOp，冒号是匿名 token；这里只消费表达式节点，
+   * 避免通过源码字符切割而破坏嵌套条件表达式。
+   */
+  private fun ternary(node: LezerSyntaxNode): JavaAstExpression.Conditional {
+    val parts = node.children().filter { child -> child.name in EXPRESSION_NODES }
+    if (parts.size != 3) unsupported(node, "条件表达式必须包含 condition、true 与 false 三个分支。")
+    return JavaAstExpression.Conditional(
+      nodeId = ids.next(),
+      span = span(node),
+      condition = expression(parts[0]),
+      whenTrue = expression(parts[1]),
+      whenFalse = expression(parts[2]),
+    )
   }
 
   /**
@@ -1277,7 +1296,7 @@ private val INTERFACE_CLAUSES = setOf("SuperInterfaces", "ExtendsInterfaces")
 private val CONSTRUCTOR_INVOCATION_NODES = setOf("ExplicitConstructorInvocation")
 private val ANNOTATION_NODES = setOf("MarkerAnnotation", "Annotation")
 private val NAME_NODES = setOf("QualifiedName", "ScopedIdentifier", "TypeName", "Identifier")
-private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "CastExpression", "MethodInvocation", "MethodReference", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
+private val EXPRESSION_NODES = setOf("Expression", "BinaryExpression", "TernaryExpression", "InstanceofExpression", "AssignmentExpression", "UnaryExpression", "PostfixExpression", "UpdateExpression", "CastExpression", "MethodInvocation", "MethodReference", "ObjectCreationExpression", "ArrayCreationExpression", "ArrayAccess", "FieldAccess", "ParenthesizedExpression", "LambdaExpression", "Identifier", "ScopedIdentifier", "this", "super", "IntegerLiteral", "FloatingPointLiteral", "StringLiteral", "CharacterLiteral", "BooleanLiteral", "null")
 private val ARRAY_INITIALIZER_TOKENS = setOf("{", "}", ",")
 private val WRAPPERS = setOf("Expression", "ConditionalExpression", "ConditionalOrExpression", "ConditionalAndExpression")
 private val UNSUPPORTED_NODES = setOf("RecordDeclaration", "ModuleDeclaration", "TextBlock", "SwitchExpression", "YieldStatement")

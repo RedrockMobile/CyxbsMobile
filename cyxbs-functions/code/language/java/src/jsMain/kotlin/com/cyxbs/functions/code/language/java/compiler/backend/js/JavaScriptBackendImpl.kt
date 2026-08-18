@@ -515,6 +515,16 @@ private class JavaScriptBackendValidator(
         validateExpression(expression.left)
         validateExpression(expression.right)
       }
+      is JavaIrExpression.Conditional -> {
+        validateExpression(expression.condition)
+        validateExpression(expression.whenTrue)
+        validateExpression(expression.whenFalse)
+        if (expression.condition.type != JavaIrType.Primitive(JavaAstPrimitiveType.BOOLEAN) ||
+          expression.whenTrue.type != expression.type || expression.whenFalse.type != expression.type
+        ) {
+          invalid("Java IR conditional expression has inconsistent branch types.", expression.span)
+        }
+      }
       is JavaIrExpression.Unary -> validateExpression(expression.operand)
       is JavaIrExpression.Convert -> {
         validateExpression(expression.expression)
@@ -1633,6 +1643,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.SetField -> receiver.requiresExceptionRuntime() || value.requiresExceptionRuntime()
     is JavaIrExpression.SetStaticField -> value.requiresExceptionRuntime()
     is JavaIrExpression.Binary -> left.requiresExceptionRuntime() || right.requiresExceptionRuntime()
+    is JavaIrExpression.Conditional -> condition.requiresExceptionRuntime() ||
+      whenTrue.requiresExceptionRuntime() || whenFalse.requiresExceptionRuntime()
     is JavaIrExpression.Unary -> operand.requiresExceptionRuntime()
     is JavaIrExpression.Convert -> expression.requiresExceptionRuntime()
     is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresExceptionRuntime() }
@@ -1713,6 +1725,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.SetField -> receiver.requiresBuiltinRuntime() || value.requiresBuiltinRuntime()
     is JavaIrExpression.SetStaticField -> value.requiresBuiltinRuntime()
     is JavaIrExpression.Binary -> left.requiresBuiltinRuntime() || right.requiresBuiltinRuntime()
+    is JavaIrExpression.Conditional -> condition.requiresBuiltinRuntime() ||
+      whenTrue.requiresBuiltinRuntime() || whenFalse.requiresBuiltinRuntime()
     is JavaIrExpression.Unary -> operand.requiresBuiltinRuntime()
     is JavaIrExpression.Convert -> conversion is JavaIrConversion.Boxing ||
       conversion is JavaIrConversion.Unboxing || expression.requiresBuiltinRuntime()
@@ -1788,6 +1802,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.SetField -> receiver.requiresCollectionRuntime() || value.requiresCollectionRuntime()
     is JavaIrExpression.SetStaticField -> value.requiresCollectionRuntime()
     is JavaIrExpression.Binary -> left.requiresCollectionRuntime() || right.requiresCollectionRuntime()
+    is JavaIrExpression.Conditional -> condition.requiresCollectionRuntime() ||
+      whenTrue.requiresCollectionRuntime() || whenFalse.requiresCollectionRuntime()
     is JavaIrExpression.Unary -> operand.requiresCollectionRuntime()
     is JavaIrExpression.Convert -> expression.requiresCollectionRuntime()
     is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresCollectionRuntime() }
@@ -1863,6 +1879,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.SetField -> receiver.requiresScannerRuntime() || value.requiresScannerRuntime()
     is JavaIrExpression.SetStaticField -> value.requiresScannerRuntime()
     is JavaIrExpression.Binary -> left.requiresScannerRuntime() || right.requiresScannerRuntime()
+    is JavaIrExpression.Conditional -> condition.requiresScannerRuntime() ||
+      whenTrue.requiresScannerRuntime() || whenFalse.requiresScannerRuntime()
     is JavaIrExpression.Unary -> operand.requiresScannerRuntime()
     is JavaIrExpression.Convert -> expression.requiresScannerRuntime()
     is JavaIrExpression.InvokeStatic -> arguments.any { it.requiresScannerRuntime() }
@@ -1945,6 +1963,8 @@ private class JavaScriptEmitter(
     is JavaIrExpression.SetField -> receiver.requiresArrayOrStringRuntime() || value.requiresArrayOrStringRuntime()
     is JavaIrExpression.SetStaticField -> value.requiresArrayOrStringRuntime()
     is JavaIrExpression.Binary -> left.requiresArrayOrStringRuntime() || right.requiresArrayOrStringRuntime()
+    is JavaIrExpression.Conditional -> condition.requiresArrayOrStringRuntime() ||
+      whenTrue.requiresArrayOrStringRuntime() || whenFalse.requiresArrayOrStringRuntime()
     is JavaIrExpression.Unary -> operand.requiresArrayOrStringRuntime()
     is JavaIrExpression.Convert -> expression.requiresArrayOrStringRuntime()
     is JavaIrExpression.InvokeStatic -> arguments.any { argument -> argument.requiresArrayOrStringRuntime() }
@@ -2244,6 +2264,16 @@ private class JavaScriptEmitter(
    * 多个 Java catch 在同一 JavaScript catch 中按源码顺序匹配，未命中值必须原样再次抛出。
    */
   private fun emitTry(statement: JavaIrStatement.Try) {
+    if (statement.resources.isNotEmpty() &&
+      statement.catches.isEmpty() &&
+      statement.finallyBlock == null
+    ) {
+      // 资源展开自身已经生成完整的嵌套 try/catch/finally；没有源码 catch/finally 时再包一层裸
+      // JavaScript try 会产生非法语法，因此直接发射资源作用域。
+      writer.writeIndentation()
+      emitResourceScope(statement.resources, 0, statement.body)
+      return
+    }
     writer.writeIndentation()
     writer.write("try ")
     if (statement.resources.isEmpty()) emitBranch(statement.body)
@@ -2402,6 +2432,8 @@ private class JavaScriptEmitter(
           coerceToType(renderExpression(expression.value), local.type) + ")"
       }
       is JavaIrExpression.Binary -> renderBinary(expression)
+      is JavaIrExpression.Conditional ->
+        "(${renderExpression(expression.condition)} ? ${renderExpression(expression.whenTrue)} : ${renderExpression(expression.whenFalse)})"
       is JavaIrExpression.Unary -> renderUnary(expression)
       is JavaIrExpression.Convert -> renderConversion(expression)
       is JavaIrExpression.InvokeStatic -> {
@@ -2952,7 +2984,6 @@ private class JavaScriptEmitter(
     JavaAstPrimitiveType.LONG -> "LONG"
     JavaAstPrimitiveType.FLOAT -> "FLOAT"
     JavaAstPrimitiveType.DOUBLE -> "DOUBLE"
-    else -> error("Validated boxing conversion contains an unsupported primitive.")
   }
 
   /** 常量使用 JSON 兼容转义，整数文本保持不经过 JavaScript Number 重新格式化。 */
