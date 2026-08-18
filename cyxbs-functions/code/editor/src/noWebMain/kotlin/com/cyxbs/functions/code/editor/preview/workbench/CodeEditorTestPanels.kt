@@ -76,6 +76,9 @@ import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanelGroup
 import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnosticSeverity
+import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 
 /** 测试工作台文件面板的稳定标识。 */
 internal const val FILES_PANEL_ID = "files"
@@ -200,6 +203,9 @@ internal fun codeEditorTestToolWindows(
   activeFilePath: String,
   output: String,
   performanceText: String,
+  diagnostics: List<DynamicCompilationDiagnostic>,
+  diagnosticSources: Map<String, String>,
+  onDiagnosticSelected: (DynamicSourceLocation) -> Unit,
 ): List<CodeEditorToolWindow> {
   return listOf(
     CodeEditorToolWindow(
@@ -207,7 +213,12 @@ internal fun codeEditorTestToolWindows(
       title = "Run · $activeFilePath",
       icon = Icons.Default.PlayArrow,
     ) {
-      ToolWindowText(output)
+      RunToolWindowContent(
+        output = output,
+        diagnostics = diagnostics,
+        diagnosticSources = diagnosticSources,
+        onDiagnosticSelected = onDiagnosticSelected,
+      )
     },
     CodeEditorToolWindow(
       id = "performance",
@@ -217,6 +228,128 @@ internal fun codeEditorTestToolWindows(
       ToolWindowText(performanceText)
     },
   )
+}
+
+/** 运行输出与可定位编译诊断共用一个滚动区，避免错误列表遮挡标准输出。 */
+@Composable
+private fun RunToolWindowContent(
+  output: String,
+  diagnostics: List<DynamicCompilationDiagnostic>,
+  diagnosticSources: Map<String, String>,
+  onDiagnosticSelected: (DynamicSourceLocation) -> Unit,
+) {
+  Column(
+    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    if (output.isNotEmpty()) {
+      SelectionContainer {
+        Text(
+          text = output,
+          color = EditorWorkbenchColors.PrimaryText,
+          fontFamily = FontFamily.Monospace,
+          fontSize = 11.sp,
+          lineHeight = 16.sp,
+        )
+      }
+    }
+    diagnostics.forEach { diagnostic ->
+      val location = diagnostic.location
+      val clickableModifier = if (location == null) {
+        Modifier
+      } else {
+        Modifier.clickable { onDiagnosticSelected(location) }
+      }
+      Surface(
+        modifier = Modifier.fillMaxWidth().then(clickableModifier),
+        color = diagnostic.severity.backgroundColor(),
+        shape = RoundedCornerShape(6.dp),
+      ) {
+        Column(
+          modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+          verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Text(
+              text = diagnostic.severity.displayName(),
+              color = diagnostic.severity.foregroundColor(),
+              fontSize = 10.sp,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              text = diagnostic.code,
+              color = EditorWorkbenchColors.SecondaryText,
+              fontFamily = FontFamily.Monospace,
+              fontSize = 10.sp,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1F),
+            )
+            location?.let { sourceLocation ->
+              Text(
+                text = sourceLocation.toEditorLocationText(diagnosticSources[sourceLocation.filePath]),
+                color = EditorWorkbenchColors.Accent,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                maxLines = 1,
+              )
+            }
+          }
+          SelectionContainer {
+            Text(
+              text = diagnostic.message,
+              color = EditorWorkbenchColors.PrimaryText,
+              fontSize = 11.sp,
+              lineHeight = 15.sp,
+            )
+          }
+          diagnostic.notes.forEach { note ->
+            Text(
+              text = "↳ ${note.message}",
+              color = EditorWorkbenchColors.SecondaryText,
+              fontSize = 10.sp,
+              lineHeight = 14.sp,
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+/** 把 UTF-16 偏移转换为编辑器常见的 1-based 文件、行、列文本。 */
+internal fun DynamicSourceLocation.toEditorLocationText(source: String?): String {
+  if (source == null) return filePath
+  val offset = range.from.coerceIn(0, source.length)
+  val prefix = source.take(offset)
+  val line = prefix.count { it == '\n' } + 1
+  val column = offset - prefix.lastIndexOf('\n')
+  return "$filePath:$line:$column"
+}
+
+/** 诊断严重程度的紧凑中文标签。 */
+private fun DynamicCompilationDiagnosticSeverity.displayName(): String = when (this) {
+  DynamicCompilationDiagnosticSeverity.ERROR -> "错误"
+  DynamicCompilationDiagnosticSeverity.WARNING -> "警告"
+  DynamicCompilationDiagnosticSeverity.INFO -> "信息"
+}
+
+/** 诊断卡片前景色；仅作层级提示，不替代文字标签。 */
+private fun DynamicCompilationDiagnosticSeverity.foregroundColor(): Color = when (this) {
+  DynamicCompilationDiagnosticSeverity.ERROR -> Color(0xFFFF7777)
+  DynamicCompilationDiagnosticSeverity.WARNING -> Color(0xFFFFC66D)
+  DynamicCompilationDiagnosticSeverity.INFO -> Color(0xFF6CB6FF)
+}
+
+/** 诊断卡片使用轻量透明底色，保持与深色工具窗口一致。 */
+private fun DynamicCompilationDiagnosticSeverity.backgroundColor(): Color = when (this) {
+  DynamicCompilationDiagnosticSeverity.ERROR -> Color(0x1FFF7777)
+  DynamicCompilationDiagnosticSeverity.WARNING -> Color(0x1FFFC66D)
+  DynamicCompilationDiagnosticSeverity.INFO -> Color(0x1F6CB6FF)
 }
 
 /** 教学场景的示例课程入口；正式课程模块后续可用相同模型替换。 */

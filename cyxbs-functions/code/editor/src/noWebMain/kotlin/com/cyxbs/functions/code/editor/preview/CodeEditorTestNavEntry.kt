@@ -45,6 +45,7 @@ import com.cyxbs.functions.code.language.DynamicLanguageManager
 import com.cyxbs.functions.code.language.DynamicLanguageSession
 import com.cyxbs.functions.code.language.DynamicProgramRunRequest
 import com.cyxbs.functions.code.language.DynamicProgramRunResult
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
@@ -109,6 +110,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val openFilePaths = remember { mutableStateListOf(JAVA_MAIN_FILE_PATH) }
     var activeFilePath by remember { mutableStateOf(JAVA_MAIN_FILE_PATH) }
     var runTargets by remember { mutableStateOf<List<DynamicRunTarget>>(emptyList()) }
+    var runDiagnostics by remember { mutableStateOf<List<DynamicCompilationDiagnostic>>(emptyList()) }
+    var runDiagnosticSources by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingLineRunTarget by remember { mutableStateOf<DynamicRunTarget?>(null) }
     var showRunTargetPicker by remember { mutableStateOf(false) }
     val activeLanguageId = resolveDynamicLanguageIdForFile(activeFilePath, supportedLanguages)
@@ -314,9 +317,15 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
      * 重新确认入口位置后编译并运行，避免用户编辑源码后点击到异步刷新前的旧位置。
      */
     fun runTarget(requestedTarget: DynamicRunTarget) {
+      if (isRunning) {
+        output = "程序正在运行，请等待当前任务结束。"
+        return
+      }
       workbenchState.showToolWindow(RUN_TOOL_WINDOW_ID)
       coroutineScope.launch {
         isRunning = true
+        runDiagnostics = emptyList()
+        runDiagnosticSources = emptyMap()
         try {
           val service = activeLanguageService ?: error("当前语言服务尚未加载完成。")
           val requestedWorkspace = currentWorkspace()
@@ -335,9 +344,15 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
               ),
             ),
           )
+          runDiagnostics = result.diagnostics
+          runDiagnosticSources = requestedWorkspace.files.associate { file ->
+            file.path to file.source
+          }
           output = result.toDisplayText(target)
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
+          runDiagnostics = emptyList()
+          runDiagnosticSources = emptyMap()
           output = throwable.toFailureText("程序运行失败")
         } finally {
           isRunning = false
@@ -534,6 +549,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         activeFilePath = activeFilePath,
         output = output,
         performanceText = autoHighlightReport,
+        diagnostics = runDiagnostics,
+        diagnosticSources = runDiagnosticSources,
+        onDiagnosticSelected = { location ->
+          val source = sourceFiles[location.filePath] ?: return@codeEditorTestToolWindows
+          val from = location.range.from.coerceIn(0, source.length)
+          val to = location.range.to.coerceIn(from, source.length)
+          openFile(location.filePath, DynamicTextRange(from, to))
+        },
       ),
       state = workbenchState,
       isRunning = isRunning,
@@ -601,16 +624,13 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       if (isNotEmpty() && last() != '\n') appendLine()
       append("⚠ 输出已截断，丢弃 ").append(droppedOutputBytes).appendLine(" 个 UTF-8 字节。")
     }
-    diagnostics.forEach { diagnostic ->
-      if (isNotEmpty() && last() != '\n') appendLine()
-      append('[').append(diagnostic.severity).append("] ")
-        .append(diagnostic.code).append(": ").appendLine(diagnostic.message)
-    }
     if (isNotEmpty() && last() != '\n') appendLine()
     if (executed) {
       append("运行完成：").append(target.displayName)
       returnValue?.let { value -> append("\n返回值：").append(value) }
-    } else if (diagnostics.isEmpty()) {
+    } else if (diagnostics.isNotEmpty()) {
+      append("编译失败：共 ").append(diagnostics.size).append(" 条诊断，点击下方条目可定位源码。")
+    } else {
       append("编译未生成可执行程序。")
     }
   }
