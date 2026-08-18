@@ -366,6 +366,48 @@ class DynamicExecutableProgramRunnerTest {
     assertTrue(factory.runtimes.isEmpty())
   }
 
+  /** 非法、重复、越界或可注入的 Module 图必须全部在创建 Runtime 前失败。 */
+  @Test
+  fun rejectsMalformedModuleGraphsBeforeCreatingRuntime() = runTest {
+    val valid = program()
+    val invalidPrograms = listOf(
+      valid.copy(modules = emptyList()),
+      valid.copy(modules = valid.modules + valid.modules.single()),
+      valid.copy(entryModuleName = "lesson/missing.mjs"),
+      valid.copy(
+        entryModuleName = "../escape.mjs",
+        modules = listOf(valid.modules.single().copy(name = "../escape.mjs")),
+      ),
+      valid.copy(entryExportName = "runLesson();"),
+      valid.copy(
+        entryModuleName = "module-0.mjs",
+        modules = List(257) { index ->
+          DynamicExecutableModule(
+            name = "module-$index.mjs",
+            source = "export const value$index = $index;",
+          )
+        },
+      ),
+    )
+
+    invalidPrograms.forEachIndexed { sample, invalidProgram ->
+      val factory = FakeRuntimeFactory(emitConsole = false)
+      val failure = assertFailsWith<DynamicLanguageExecutionException>(
+        message = "Malformed Module graph sample $sample must be rejected.",
+      ) {
+        DynamicExecutableProgramRunner { factory }.run(
+          program = invalidProgram,
+          arguments = emptyList(),
+          config = JsRuntimeConfig(),
+          maxOutputBytes = 1_024,
+        )
+      }
+
+      assertTrue(failure.message.orEmpty().contains("invalid executable Module graph"))
+      assertTrue(factory.runtimes.isEmpty())
+    }
+  }
+
   /** 创建各测试共用的最小合法 Module 图。 */
   private fun program(): DynamicExecutableProgram = DynamicExecutableProgram(
     entryModuleName = "lesson/main.mjs",

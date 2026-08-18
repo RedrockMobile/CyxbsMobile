@@ -2,6 +2,8 @@ package com.cyxbs.functions.code.language.internal
 
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
+import com.cyxbs.functions.code.js.runtime.JsRuntimeErrorKind
+import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
 import com.cyxbs.functions.code.language.DynamicProgramOutputChannel
 import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
@@ -357,6 +359,30 @@ class DynamicExecutableProgramRunnerQuickJsTest {
       listOf(DynamicProgramOutputEvent(DynamicProgramOutputChannel.STANDARD_OUTPUT, "🐶x")),
       events,
     )
+  }
+
+  /** 恶意入口的无限循环必须由真实 QuickJS 原生中断器终止，不能长期占用执行线程。 */
+  @Test
+  fun interruptsInfiniteLoopAtQuickJsExecutionQuota() = runTest {
+    val failure = assertFailsWith<DynamicLanguageExecutionException> {
+      DynamicExecutableProgramRunner { QuickJsRuntimeFactory }.run(
+        program = DynamicExecutableProgram(
+          entryModuleName = "lesson/infinite-loop.mjs",
+          entryExportName = "runLesson",
+          modules = listOf(
+            DynamicExecutableModule(
+              name = "lesson/infinite-loop.mjs",
+              source = "export function runLesson(){ while (true) {} }",
+            ),
+          ),
+        ),
+        arguments = emptyList(),
+        config = JsRuntimeConfig(evaluationTimeoutMillis = 50),
+        maxOutputBytes = 1_024,
+      )
+    }
+
+    assertEquals(JsRuntimeErrorKind.INTERRUPTED, (failure.cause as JsRuntimeException).kind)
   }
 
   /** JS helper 初始化后即使常用原型被用户污染，预加载输入和输出仍只使用捕获的原生函数。 */

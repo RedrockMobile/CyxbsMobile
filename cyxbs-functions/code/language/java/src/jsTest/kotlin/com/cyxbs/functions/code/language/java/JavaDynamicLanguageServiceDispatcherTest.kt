@@ -763,6 +763,24 @@ class JavaDynamicLanguageServiceDispatcherTest {
     assertEquals("java.compilation.too_many_files", result.diagnostics.single().code)
   }
 
+  /** 超过源码 code unit 上限的单文件必须在 parser 前拒绝，避免异常文本占满语言 Runtime。 */
+  @Test
+  fun rejectsCompilationWorkspaceOverSourceLimit() = runTest {
+    val oversizedSource = "class Oversized {" + " ".repeat(1_000_000) + "}"
+    val result = JavaDynamicLanguageService.compile(
+      DynamicCompilationRequest(
+        workspace = DynamicLanguageWorkspace(
+          listOf(DynamicSourceFile("Oversized.java", oversizedSource)),
+        ),
+        entry = DynamicProgramEntry("Oversized.java"),
+      ),
+    )
+
+    assertNull(result.program)
+    assertEquals("java.compilation.source_too_large", result.diagnostics.single().code)
+    assertEquals(oversizedSource.length, result.metrics?.sourceLength)
+  }
+
   /** 生成分发器应完整暴露 DynamicLanguageService 协议并支持重复初始化。 */
   @Test
   fun generatedDispatcherInvokesService() = runTest {

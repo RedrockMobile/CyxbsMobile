@@ -573,8 +573,10 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - 编译入口限制为最多 128 个文件和 1,000,000 个 UTF-16 code unit；通用 Runner 在创建隔离
   Runtime 前限制 256 个 Module 与合计 4 MiB 生成源码，并继续执行 32 MiB 内存、256 KiB 栈、
   5 秒运行、64 KiB 输入输出等既有边界；
-- 增加固定种子的 200 例畸形源码 corpus，覆盖删除、插入、替换、恢复树和孤立代理字符；任何
-  输入都必须得到 AST 或结构化诊断，不能把 parser/adapter 内部异常泄漏给业务；
+- （已完成，2026-08-18）建立固定种子的分层畸形源码 corpus：512 个多点扰动样本覆盖 Lezer
+  CST adapter，另取 256 个样本贯穿 AST、语义、typed IR 与 JS 后端；扰动包含删除、插入、替换、
+  截断、片段复制、恢复树、NUL 和损坏 Unicode 转义。任何输入都必须得到完整产物或带稳定 code
+  的结构化诊断，不能把 parser/compiler 内部异常泄漏给业务；
 - （已完成，2026-08-18）建立可扩展的 javac/java 差分测试体系：语料独立放在
   `src/javacDifferentialTest/cases`，`generateJavacDifferentialFixtures` 在 jsTest 编译前使用 Gradle
   当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
@@ -591,9 +593,13 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - `@cyxbs-mobile/language-java@0.2.0` 已按依赖拓扑生成独立 tgz，压缩 268.3 kB、解压约
   1.9 MB，仅包含 ESM、类型声明和 package.json，不携带 source map；调试图也已生成到项目根
   `build/npm/debug-source`，版本提升会使桌面与端上缓存自然失效；
-- 完整 Java `jsNodeTest` 共 258 项、通用语言 `desktopTest` 共 31 项通过；Android 语言/编辑器、
+- 完整 Java `jsNodeTest` 共 260 项、通用语言 `desktopTest` 共 33 项通过；Android 语言/编辑器、
   iOS Simulator Arm64 语言链以及 Desktop 编辑器均已实际编译通过，真实 QuickJS 测试覆盖源码
   栈映射、Unicode 输入输出和隔离宿主桥。
+- （已完成，2026-08-18）补齐安全与畸形边界回归：Java Service 在 parser 前拒绝超大源码，
+  通用 Runner 在创建 Runtime 前拒绝空、重复、越界、路径逃逸、入口注入和超量 Module 图；
+  Desktop 真实 QuickJS 用无限循环验证原生超时中断，既有测试继续覆盖 UTF-8 输入输出配额、
+  非 canonical Base64、孤立代理、源码映射和原型污染。
 
 以下仍是正式公开发布前的产品数据闸门，不影响现有工程实现完成：
 

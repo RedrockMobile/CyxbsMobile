@@ -1,6 +1,6 @@
 package com.cyxbs.functions.code.language.java.compiler.frontend
 
-import com.cyxbs.functions.code.language.java.parser
+import com.cyxbs.functions.code.language.java.compiler.deterministicMalformedJavaSources
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstAssignmentOperator
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstArrayInitializerElement
 import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstBinaryOperator
@@ -18,6 +18,7 @@ import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstTypeReference
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFile
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceFileId
 import com.cyxbs.functions.code.language.java.compiler.source.JavaSourceWorkspace
+import com.cyxbs.functions.code.language.java.parser
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -653,17 +654,7 @@ class JavaLezerAstFrontendTest {
         }
       }
     """.trimIndent()
-    var seed = 0x5EED1234
-    repeat(200) { sample ->
-      seed = seed * 1_103_515_245 + 12_345
-      val position = (seed ushr 1) % base.length
-      val mutated = when (sample % 3) {
-        0 -> base.removeRange(position, (position + 1).coerceAtMost(base.length))
-        1 -> base.substring(0, position) + listOf("{", ")", "?", "@", "\\uD83D")[sample % 5] +
-          base.substring(position)
-        else -> base.replaceRange(position, (position + 1).coerceAtMost(base.length), " ")
-      }
-
+    deterministicMalformedJavaSources(base, count = 512).forEachIndexed { sample, mutated ->
       val result = parse(mutated)
       assertTrue(
         result.value != null || result.diagnostics.isNotEmpty(),
