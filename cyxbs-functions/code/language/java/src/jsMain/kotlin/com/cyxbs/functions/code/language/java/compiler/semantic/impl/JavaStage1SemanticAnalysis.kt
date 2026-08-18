@@ -3193,7 +3193,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       error(expression.span, "java.semantic.unknown_array_member", "数组只提供只读 length 成员。")
       return JavaSemanticType.Error
     }
-    val declared = receiver.type as? JavaSemanticType.Declared
+    val declared = declaredMemberReceiver(receiver.type)
     if (declared == null) {
       error(expression.span, "java.semantic.field_receiver_not_declared", "字段 receiver 必须是 class 类型。")
       return JavaSemanticType.Error
@@ -3236,7 +3236,7 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
       if (context().isStatic) JavaReceiverKind.NONE else JavaReceiverKind.IMPLICIT_THIS,
       isImplicit = true,
     )
-    val declaredReceiver = receiver.type as? JavaSemanticType.Declared
+    val declaredReceiver = declaredMemberReceiver(receiver.type)
     if (declaredReceiver == null) {
       expression.arguments.forEach(::analyzeExpression)
       if (receiver.type == JavaSemanticType.Error) return JavaSemanticType.Error
@@ -4577,6 +4577,19 @@ internal class JavaStage1SemanticAnalysis(private val ast: JavaAstWorkspace) {
   private fun currentTypeParameterScope(): Map<String, JavaSymbolId> =
     LinkedHashMap(context().owner.typeParameterNames).apply {
       putAll(context().callable?.typeParameterNames.orEmpty())
+    }
+
+  /**
+   * 把成员 receiver 投影为运行时可查找声明。
+   *
+   * Java 允许在类型变量上访问其首上界成员；当前泛型运行时按 Java 擦除工作，因此这里与 lowering
+   * 共用首上界擦除结果。交叉上界的附加接口成员仍由方言边界单独限制，不能凭名称猜测。
+   */
+  private fun declaredMemberReceiver(type: JavaSemanticType): JavaSemanticType.Declared? =
+    when (type) {
+      is JavaSemanticType.Declared -> type
+      is JavaSemanticType.TypeVariable -> relations().erasure(type) as? JavaSemanticType.Declared
+      else -> null
     }
 
   /** 根据当前声明表创建纯类型关系计算器。 */

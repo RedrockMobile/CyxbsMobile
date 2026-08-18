@@ -25,7 +25,15 @@ class JavaJavacDifferentialTest {
   /** 比较编译结论、稳定诊断类别、stdout/stderr 与未捕获异常类型。 */
   @Test
   fun matchesJavacAndJavaReferenceCorpus() {
-    assertTrue(generatedJavacDifferentialFixtures.isNotEmpty())
+    assertTrue(
+      generatedJavacDifferentialFixtures.size >= MINIMUM_REFERENCE_CASES,
+      "The differential corpus must not silently shrink.",
+    )
+    assertEquals(
+      generatedJavacDifferentialFixtures.size,
+      generatedJavacDifferentialFixtures.map(JavacDifferentialFixture::id).distinct().size,
+      "Differential case ids must remain unique.",
+    )
     generatedJavacDifferentialFixtures.forEach { fixture ->
       val result = JavaToJavaScriptCompiler.compile(
         JavaCompilerRequest(
@@ -149,6 +157,10 @@ class JavaJavacDifferentialTest {
     "java.semantic.final_assignment" -> "FINAL_ASSIGNMENT"
     "java.semantic.missing_return" -> "MISSING_RETURN"
     else -> null
+  }
+
+  private companion object {
+    const val MINIMUM_REFERENCE_CASES = 40
   }
 }
 

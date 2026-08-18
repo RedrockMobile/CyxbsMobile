@@ -578,8 +578,10 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - （已完成，2026-08-18）建立可扩展的 javac/java 差分测试体系：语料独立放在
   `src/javacDifferentialTest/cases`，`generateJavacDifferentialFixtures` 在 jsTest 编译前使用 Gradle
   当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
-  诊断类别、stdout、stderr 和未捕获异常类型。首批 16 个 case 覆盖 11 条运行链路及 5 类编译
-  失败，新增 case 不需要再手写两套期望；
+  诊断类别、stdout、stderr 和未捕获异常类型。语料已从首批 16 项扩展到 40 项，并设置不可静默
+  缩减与 ID 唯一性闸门；新增覆盖 strict/loose 重载、泛型方法与上下界、集合视图、装箱缓存、
+  UTF-16 String、数值/数组边界、类初始化、构造期虚分派、接口默认方法、lambda 捕获、方法引用、
+  嵌套异常和 Scanner 行终止符。语料同时发现并修复类型变量 receiver 未按首上界查找成员的问题；
 - （已完成，2026-08-18）建立 Android、iOS 与 Desktop 共用的五阶段性能基准，统一测量语言包
   加载、FULL、INCREMENTAL、EXACT 编译及隔离 Runtime 执行，并允许各平台注入内存采样器；
   Desktop 已使用本地 debug npm 图完成真实 QuickJS 基线，获取命令、报告位置、Android PSS 与
