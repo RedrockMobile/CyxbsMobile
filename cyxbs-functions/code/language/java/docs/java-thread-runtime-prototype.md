@@ -1,7 +1,7 @@
 # Java 受限真并行线程原型
 
-> 状态：2026-08-18 完成 Desktop 技术原型；尚未接入 Java `Thread` API，也未完成 Android/iOS
-> 闸门，因此不能对业务声明“已支持 Java 多线程”。
+> 状态：2026-08-18 完成 Desktop 技术原型；经成本评估后决定暂缓生产实现。Java 语言包当前不
+> 支持 `Thread`、`synchronized` 或跨线程共享对象，也不会用单 Runtime 交错执行冒充多线程。
 
 ## 1. 原型目标
 
@@ -59,11 +59,40 @@ Desktop 可见至少两个处理器时并行耗时小于串行耗时，不锁死
 6. Android 与 iOS 必须使用相同三项用例验证 QuickJS 线程亲和、真实并行和资源峰值。任一平台
    失败时都不能退回单 Runtime 交错后仍对外称为“并行”。
 
-## 5. 结论
+## 5. 当前产品决策：暂不支持线程
 
-Desktop 结果证明“每线程独立 Runtime + 宿主共享堆/monitor”方向可行，值得继续做受限实现；
-它没有证明完整 Java Memory Model，也没有开放跨线程普通对象图、集合、volatile、wait/notify、
-ThreadLocal、原子类、线程池或优先级。
+线程调度本身不是主要阻塞。真正昂贵的是让多个独立 QuickJS Runtime 正确观察同一份 Java
+可变状态。不同 Runtime 不能直接交换 `JSValue` 或普通 JS 对象，因此生产实现至少需要以下一种
+跨 Runtime 桥：
 
-下一步若进入生产实现，应先完成最小 `Thread(Runnable)`、`start/join/sleep`、基础共享字段和
-`synchronized` 的纵向闭环，再分别运行 Android/iOS 原型；不应从完整 JMM 或大型并发类库开始。
+- 宿主 SharedHeap，以稳定 Handle 表示对象身份、字段、静态字段、数组和 monitor；
+- SharedArrayBuffer 与固定内存布局，承载高频基础字段、原子量和等待信号；
+- 所有共享访问转发给对象所属 Runtime，但这会串行化热路径，也无法自然覆盖完整对象图。
+
+只实现 `Thread.start/join` 而复制捕获对象，会让常见的共享自增代码修改副本；把所有共享访问
+逐次转发到 Kotlin `Map` 又会让字段热循环承担大量跨语言调用。这两种做法都不适合作为 Java
+教学能力公开。quickjs-kt 的实验性原生上下文 API只能降低未来桥接实现的开销，不能让多个
+Runtime 直接共享普通 JS 对象，也不能消除 Java 对象身份、内存可见性和 monitor 语义的工作量。
+
+因此当前冻结以下边界：
+
+1. 不向 Java builtin catalog 登记 `Thread`、原子类或并发容器；
+2. 不开放 `synchronized`、`volatile`、`wait/notify`、ThreadLocal 或线程池；
+3. 不以 Worker、Promise、协程或单 Runtime 交错执行模拟并对外宣称 Java 多线程；
+4. 本文件和 Desktop 测试仅作为可行性证据，不属于正式语言包兼容承诺；
+5. 线程相关源码继续在 frontend/semantic 阶段得到“不支持”诊断，不能退化为生成 JS 后的
+   `undefined` 或宿主异常。
+
+未来只有同时满足以下条件才重新开启生产实现：
+
+1. 课程或产品出现明确、持续的 Java 多线程教学需求；
+2. 先冻结 SharedHeap/Handle ABI、对象身份、引用写屏障和 monitor 生命周期设计；
+3. Desktop、Android、iOS 都验证 Runtime 线程亲和、取消、超时和资源上限；
+4. 高频共享基础字段使用 SharedArrayBuffer 或原生连续内存，不能依赖逐字段 Kotlin Map 回调；
+5. 差分测试覆盖 `start/join` happens-before、丢失更新、`synchronized`、异常退出和构造期间逃逸。
+
+## 6. 结论
+
+Desktop 结果只证明“每线程独立 Runtime + 宿主共享堆/monitor”在技术上可行，不代表当前语言包
+已支持 Java 多线程。考虑共享对象桥、性能和完整资源治理的实现成本，线程能力现阶段明确延期；
+后续功能扩展继续聚焦单线程 Java 8 教学语法、类库、诊断和编辑器体验。
