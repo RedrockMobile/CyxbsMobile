@@ -76,6 +76,7 @@ import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanelGroup
 import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
+import com.cyxbs.functions.code.language.DynamicLanguageUnsupportedCapabilityStatistic
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnosticSeverity
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
@@ -102,6 +103,7 @@ internal fun rememberCodeEditorTestSidePanels(
   isLoadingLanguage: Boolean,
   isAnalyzingSymbol: Boolean,
   highlightCacheCapacity: Int,
+  unsupportedCapabilityStatistics: List<DynamicLanguageUnsupportedCapabilityStatistic>,
   includeCourse: Boolean,
   projectPath: String = TestProjectPath,
   fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)? = null,
@@ -109,6 +111,7 @@ internal fun rememberCodeEditorTestSidePanels(
   onCreateFile: (String) -> Boolean,
   onLoadLanguage: () -> Unit,
   onHighlightCacheCapacityChange: (Int) -> Unit,
+  onClearUnsupportedCapabilityStatistics: () -> Unit,
   onFindDefinition: () -> Unit,
   onFindReferences: () -> Unit,
   onRename: (String) -> Unit,
@@ -186,8 +189,10 @@ internal fun rememberCodeEditorTestSidePanels(
           isLoadingLanguage = isLoadingLanguage,
           isAnalyzingSymbol = isAnalyzingSymbol,
           highlightCacheCapacity = highlightCacheCapacity,
+          unsupportedCapabilityStatistics = unsupportedCapabilityStatistics,
           onLoadLanguage = onLoadLanguage,
           onHighlightCacheCapacityChange = onHighlightCacheCapacityChange,
+          onClearUnsupportedCapabilityStatistics = onClearUnsupportedCapabilityStatistics,
           onFindDefinition = onFindDefinition,
           onFindReferences = onFindReferences,
           onRename = onRename,
@@ -1059,8 +1064,10 @@ private fun SettingsPanelContent(
   isLoadingLanguage: Boolean,
   isAnalyzingSymbol: Boolean,
   highlightCacheCapacity: Int,
+  unsupportedCapabilityStatistics: List<DynamicLanguageUnsupportedCapabilityStatistic>,
   onLoadLanguage: () -> Unit,
   onHighlightCacheCapacityChange: (Int) -> Unit,
+  onClearUnsupportedCapabilityStatistics: () -> Unit,
   onFindDefinition: () -> Unit,
   onFindReferences: () -> Unit,
   onRename: (String) -> Unit,
@@ -1133,6 +1140,46 @@ private fun SettingsPanelContent(
       color = EditorWorkbenchColors.SecondaryText,
       fontSize = 10.sp,
       modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+    )
+    SettingsSectionTitle("不支持能力统计")
+    if (unsupportedCapabilityStatistics.isEmpty()) {
+      Text(
+        text = "尚未记录不支持能力；只有实际编译返回的 unsupported 诊断会进入本地统计。",
+        color = EditorWorkbenchColors.SecondaryText,
+        fontSize = 10.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+      )
+    } else {
+      unsupportedCapabilityStatistics.take(5).forEach { statistic ->
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+          Text(
+            text = "${statistic.languageId} · ${statistic.diagnosticCode}",
+            color = EditorWorkbenchColors.PrimaryText,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Text(
+            text = "${statistic.affectedCompilationCount} 次编译 · " +
+              "${statistic.diagnosticOccurrenceCount} 条 · ${statistic.npmPackageVersion}",
+            color = EditorWorkbenchColors.SecondaryText,
+            fontSize = 10.sp,
+          )
+        }
+      }
+      TextButton(onClick = onClearUnsupportedCapabilityStatistics) {
+        Text("清空本地统计")
+      }
+    }
+    Text(
+      text = "仅保存语言、npm 版本和诊断 code，不保存源码、消息、文件路径或符号名。",
+      color = EditorWorkbenchColors.SecondaryText,
+      fontSize = 10.sp,
+      modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
     )
     SettingsSectionTitle("符号工具")
     Row(

@@ -43,6 +43,7 @@ import com.cyxbs.functions.code.language.DynamicLanguageExecutionException
 import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.cyxbs.functions.code.language.DynamicLanguageManager
 import com.cyxbs.functions.code.language.DynamicLanguageSession
+import com.cyxbs.functions.code.language.DynamicLanguageUnsupportedCapabilityStatistic
 import com.cyxbs.functions.code.language.DynamicProgramRunRequest
 import com.cyxbs.functions.code.language.DynamicProgramRunResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
@@ -90,6 +91,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var dynamicLanguageService by remember { mutableStateOf<DynamicLanguageSession?>(null) }
     var loadedLanguageId by remember { mutableStateOf<String?>(null) }
     var supportedLanguages by remember { mutableStateOf<List<DynamicLanguageInfo>>(emptyList()) }
+    var unsupportedCapabilityStatistics by remember {
+      mutableStateOf<List<DynamicLanguageUnsupportedCapabilityStatistic>>(emptyList())
+    }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
     val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
       if (supportedLanguages.isEmpty()) {
@@ -236,6 +240,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       try {
         supportedLanguages = dynamicLanguageManager.supportedLanguages()
         languageIconCache.updateAll(dynamicLanguageManager.cachedIcons())
+        unsupportedCapabilityStatistics =
+          dynamicLanguageManager.unsupportedCapabilityStatistics()
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
         languageStatus = throwable.toFailureText("动态语言目录加载失败")
@@ -348,6 +354,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           runDiagnosticSources = requestedWorkspace.files.associate { file ->
             file.path to file.source
           }
+          unsupportedCapabilityStatistics =
+            dynamicLanguageManager.unsupportedCapabilityStatistics()
           output = result.toDisplayText(target)
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
@@ -426,6 +434,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isLoadingLanguage = isLoadingLanguage,
       isAnalyzingSymbol = isAnalyzingSymbol,
       highlightCacheCapacity = highlightCacheCapacity,
+      unsupportedCapabilityStatistics = unsupportedCapabilityStatistics,
       includeCourse = true,
       fileIcon = dynamicDocumentIcon,
       onOpenFile = ::openFile,
@@ -437,6 +446,12 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       },
       onHighlightCacheCapacityChange = { capacity ->
         highlightCacheCapacity = capacity
+      },
+      onClearUnsupportedCapabilityStatistics = {
+        coroutineScope.launch {
+          dynamicLanguageManager.clearUnsupportedCapabilityStatistics()
+          unsupportedCapabilityStatistics = emptyList()
+        }
       },
       onFindDefinition = {
         coroutineScope.launch {

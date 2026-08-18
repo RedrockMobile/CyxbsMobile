@@ -31,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class DynamicLanguageManagerTest {
 
@@ -107,6 +108,45 @@ class DynamicLanguageManagerTest {
 
     service.close()
     assertEquals(1, languageService.closeCount)
+  }
+
+  /** Session 的显式 compile 与 run 内部 compile 都会进入同一匿名化能力统计链。 */
+  @Test
+  fun compilationRecordsUnsupportedCapabilityStatistics() = runTest {
+    val statistics = DynamicLanguageUnsupportedCapabilityStatistics.inMemory()
+    val unsupported = DynamicCompilationDiagnostic(
+      code = "JAVASCRIPT_COMMONJS_UNSUPPORTED",
+      message = "CommonJS is not supported.",
+      severity = DynamicCompilationDiagnosticSeverity.ERROR,
+    )
+    val loader = FakePackageLoader(
+      catalogJson = Json.encodeToString(validCatalog()),
+      languageService = FakeLanguageService(
+        compilationDiagnostics = listOf(unsupported, unsupported),
+      ),
+      npmPackageVersion = "2.0.0",
+    )
+    val manager = DynamicLanguageManager(
+      packageLoader = loader,
+      unsupportedCapabilityStatistics = statistics,
+    )
+    val session = manager.load("js")
+    val request = DynamicCompilationRequest(
+      workspace = DynamicLanguageWorkspace(listOf(DynamicSourceFile("main.js", "require('x')"))),
+      entry = DynamicProgramEntry("main.js"),
+    )
+
+    session.compile(request)
+    session.run(DynamicProgramRunRequest(request))
+
+    val entry = manager.unsupportedCapabilityStatistics(" JavaScript ").single()
+    assertEquals("2.0.0", entry.npmPackageVersion)
+    assertEquals(2, entry.affectedCompilationCount)
+    assertEquals(4, entry.diagnosticOccurrenceCount)
+    assertTrue(entry.diagnosticCode.endsWith("UNSUPPORTED"))
+    manager.clearUnsupportedCapabilityStatistics("js")
+    assertTrue(manager.unsupportedCapabilityStatistics().isEmpty())
+    session.close()
   }
 
   /** 项目文件列表恢复图标时不能创建 Runtime 或加载语言 npm 包。 */
@@ -253,6 +293,7 @@ class DynamicLanguageManagerTest {
     private val highlightResult: List<DynamicHighlightSpan> = emptyList(),
     private val completionResult: DynamicCompletionResult? = null,
     private val icon: DynamicLanguageIcon = TEST_ICON,
+    private val compilationDiagnostics: List<DynamicCompilationDiagnostic>? = null,
   ) : DynamicLanguageService {
     var closeCount = 0
     var fileIconCallCount = 0
@@ -271,7 +312,7 @@ class DynamicLanguageManagerTest {
     /** 测试替身未提供可执行程序，使用结构化编译诊断验证协议透传。 */
     override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
       return DynamicCompilationResult(
-        diagnostics = listOf(
+        diagnostics = compilationDiagnostics ?: listOf(
           DynamicCompilationDiagnostic(
             code = "TEST_COMPILER_UNAVAILABLE",
             message = "The test language does not provide a compiler.",

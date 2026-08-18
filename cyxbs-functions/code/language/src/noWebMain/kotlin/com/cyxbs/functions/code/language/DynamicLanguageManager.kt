@@ -40,6 +40,8 @@ class DynamicLanguageManager internal constructor(
   private val packageLoader: DynamicLanguagePackageLoader,
   private val json: Json = Json { ignoreUnknownKeys = true },
   private val iconCache: DynamicLanguageIconCache = DynamicLanguageIconCache.inMemory(),
+  private val unsupportedCapabilityStatistics: DynamicLanguageUnsupportedCapabilityStatistics =
+    DynamicLanguageUnsupportedCapabilityStatistics.inMemory(),
   private val runtimeFactoryProvider: () -> JsRuntimeFactory? = { JsRuntimeFactory.implOrNull() },
 ) {
 
@@ -47,6 +49,7 @@ class DynamicLanguageManager internal constructor(
   constructor() : this(
     packageLoader = NpmDynamicLanguagePackageLoader(),
     iconCache = DynamicLanguageIconCache.Default,
+    unsupportedCapabilityStatistics = DynamicLanguageUnsupportedCapabilityStatistics.Default,
   )
 
   private val catalogMutex = Mutex()
@@ -92,6 +95,24 @@ class DynamicLanguageManager internal constructor(
   }
 
   /**
+   * 返回本机按语言、npm 版本和稳定诊断 code 聚合的不支持能力统计。
+   *
+   * @param languageId 可选语言 ID 或别名；为空时返回全部语言。
+   */
+  suspend fun unsupportedCapabilityStatistics(
+    languageId: String? = null,
+  ): List<DynamicLanguageUnsupportedCapabilityStatistic> {
+    val canonicalLanguageId = languageId?.let { resolveLanguage(it).languageId }
+    return unsupportedCapabilityStatistics.snapshot(canonicalLanguageId)
+  }
+
+  /** 清空全部语言或指定语言的不支持能力统计，不影响 npm 包、图标或编译缓存。 */
+  suspend fun clearUnsupportedCapabilityStatistics(languageId: String? = null) {
+    val canonicalLanguageId = languageId?.let { resolveLanguage(it).languageId }
+    unsupportedCapabilityStatistics.clear(canonicalLanguageId)
+  }
+
+  /**
    * 按稳定语言 ID 或别名加载一个独立的动态语言会话。
    *
    * @param languageId Catalog 中的语言 ID 或别名，匹配时忽略首尾空白和大小写。
@@ -116,10 +137,7 @@ class DynamicLanguageManager internal constructor(
     CancellationException::class,
   )
   suspend fun load(languageId: String): DynamicLanguageSession {
-    val lookupKey = languageId.trim().lowercase()
-    val language = supportedLanguages().firstOrNull { candidate ->
-      candidate.languageId == lookupKey || lookupKey in candidate.aliases
-    } ?: throw DynamicLanguageNotFoundException(languageId)
+    val language = resolveLanguage(languageId)
 
     val loaded = packageLoader.loadLanguage(language.npmPackageName)
     return DynamicLanguageSession(
@@ -130,7 +148,22 @@ class DynamicLanguageManager internal constructor(
         iconCache = iconCache,
       ),
       runtimeFactoryProvider = runtimeFactoryProvider,
+      onCompilationDiagnostics = { diagnostics ->
+        unsupportedCapabilityStatistics.record(
+          language = language,
+          npmPackageVersion = loaded.npmPackageVersion,
+          diagnostics = diagnostics,
+        )
+      },
     )
+  }
+
+  /** 把语言 ID 或别名解析为 Catalog 中的规范语言定义。 */
+  private suspend fun resolveLanguage(languageId: String): DynamicLanguageInfo {
+    val lookupKey = languageId.trim().lowercase()
+    return supportedLanguages().firstOrNull { candidate ->
+      candidate.languageId == lookupKey || lookupKey in candidate.aliases
+    } ?: throw DynamicLanguageNotFoundException(languageId)
   }
 
   /** 加载、宽容反序列化并校验静态 Catalog JSON；未知新增字段由 [json] 忽略。 */

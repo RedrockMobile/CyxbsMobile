@@ -5,6 +5,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnostic
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationDiagnosticSeverity
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationMetrics
 import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationRequest
+import com.cyxbs.functions.code.language.js.bridge.DynamicCompilationResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
@@ -148,8 +149,16 @@ data class DynamicProgramRunResult(
 class DynamicLanguageSession internal constructor(
   private val delegate: DynamicLanguageService,
   runtimeFactoryProvider: () -> JsRuntimeFactory?,
+  private val onCompilationDiagnostics: suspend (List<DynamicCompilationDiagnostic>) -> Unit = {},
 ) : DynamicLanguageService by delegate {
   private val programRunner = DynamicExecutableProgramRunner(runtimeFactoryProvider)
+
+  /** 编译后记录匿名化的不支持 code；普通编译错误不会进入能力统计。 */
+  override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
+    val result = delegate.compile(request)
+    onCompilationDiagnostics(result.diagnostics)
+    return result
+  }
 
   /**
    * 编译并运行动态语言程序。
