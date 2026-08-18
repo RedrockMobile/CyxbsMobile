@@ -572,6 +572,11 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   5 秒运行、64 KiB 输入输出等既有边界；
 - 增加固定种子的 200 例畸形源码 corpus，覆盖删除、插入、替换、恢复树和孤立代理字符；任何
   输入都必须得到 AST 或结构化诊断，不能把 parser/adapter 内部异常泄漏给业务；
+- （已完成，2026-08-18）建立可扩展的 javac/java 差分测试体系：语料独立放在
+  `src/javacDifferentialTest/cases`，`generateJavacDifferentialFixtures` 在 jsTest 编译前使用 Gradle
+  当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
+  诊断类别、stdout、stderr 和未捕获异常类型。首批 16 个 case 覆盖 11 条运行链路及 5 类编译
+  失败，新增 case 不需要再手写两套期望；
 - 教学程序仍为每次运行创建并关闭独立 Runtime，明确关闭 QuickJS 跨次字节码缓存；可复用的是
   已校验的编译结果和增量 CST，避免把运行状态或旧版本 bytecode 带入下一次执行；
 - `@cyxbs-mobile/language-java@0.2.0` 已按依赖拓扑生成独立 tgz，压缩 268.3 kB、解压约
@@ -581,9 +586,10 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   iOS Simulator Arm64 语言链以及 Desktop 编辑器均已实际编译通过，真实 QuickJS 测试覆盖源码
   栈映射、Unicode 输入输出和隔离宿主桥。
 
-以下仍是正式公开发布前的产品数据闸门，不影响本次九批工程实现完成：
+以下仍是正式公开发布前的产品数据闸门，不影响现有工程实现完成：
 
-- MVP allowlist 内至少 500～1,000 个语义与类库用例和 javac/参考 JDK 结果一致；
+- 以已经接通的差分体系持续扩充 MVP allowlist，最终至少 500～1,000 个语义与类库 case 和
+  javac/参考 JDK 结果一致；
 - 常用教学样例无 JS 内部名或宿主 stack 泄漏；
 - fuzz 输入不能绕过超时、内存、模块和宿主函数边界；
 - npm 包压缩增量与冷启动仍符合动态语言包预算。
