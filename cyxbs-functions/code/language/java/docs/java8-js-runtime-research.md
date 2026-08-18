@@ -181,11 +181,11 @@ typed IR，不反向读取 CST、源码切片或语义表。这样既保留诊�
 OpenJDK 源码。allowlist 同时作用于“类”和“公开方法”：支持一个 Java 类不代表必须实现它的全部
 public API，首版只承诺目录中明确登记的常用构造器、静态工厂和实例方法。
 
-### 5.5 预留的受限真并行线程方案（本期不实现）
+### 5.5 受限真并行线程方案（Desktop 原型已完成）
 
-线程能力预期采用真正的宿主多线程，而不是单 Runtime 交错执行。该方案用于教学中的共享计数、
-未同步自增丢失、`synchronized` 修复竞态，以及独立 CPU 任务并行后耗时下降；当前只记录方向，
-待 Java 核心编译运行稳定后再做原型，不进入本期实现。
+线程能力采用真正的宿主多线程，而不是单 Runtime 交错执行。该方案用于教学中的共享计数、
+未同步自增丢失、`synchronized` 修复竞态，以及独立 CPU 任务并行后耗时下降。Desktop 技术
+原型已经通过三项闸门，但生产 Java API、Android 与 iOS 验证尚未完成，当前仍不对业务开放。
 
 同一个 QuickJS Runtime 及其对象不能被多个宿主线程同时进入，因此设计方向为：
 
@@ -209,10 +209,11 @@ Kotlin 宿主线程池
 - 暂不支持跨线程共享普通集合、完整对象图、`volatile`、wait/notify、ThreadLocal、原子类、线程池、
   优先级和完整 Java Memory Model。
 
-预计增量为 4k～8k 生产 LOC、3k～6k 测试 LOC 和额外约 1.5～3 人月。正式实现前先用 1～2 周原型
-验证三个闸门：未加锁自增能够观察到丢失更新；加 `synchronized` 后结果稳定；两个独立 CPU 任务
-在多核 Android、iOS 与 Desktop 上确实比串行执行更快。任一平台无法满足时，继续保持不支持，
-不退回到会误称为并行的单 Runtime 交错模型。
+预计生产化增量仍为 4k～8k 生产 LOC、3k～6k 测试 LOC 和额外约 1.5～3 人月。Desktop 原型中，
+未加锁计数由期望 512 稳定丢失为 256，monitor 后 4,000 次更新完整；预热后两个相同 QuickJS
+CPU 任务由串行 364 ms 降为并行 187 ms（约 1.95×），且运行于两个宿主线程。完整方法、限制和
+后续缺口记录在 [java-thread-runtime-prototype.md](java-thread-runtime-prototype.md)。Android
+与 iOS 仍必须通过相同闸门；任一平台无法满足时继续保持不支持，不退回单 Runtime 交错模型。
 
 ## 6. Java 8 语法/API 逐项成本矩阵
 
@@ -593,7 +594,7 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - `@cyxbs-mobile/language-java@0.2.0` 已按依赖拓扑生成独立 tgz，压缩 268.3 kB、解压约
   1.9 MB，仅包含 ESM、类型声明和 package.json，不携带 source map；调试图也已生成到项目根
   `build/npm/debug-source`，版本提升会使桌面与端上缓存自然失效；
-- 完整 Java `jsNodeTest` 共 260 项、通用语言 `desktopTest` 共 33 项通过；Android 语言/编辑器、
+- 完整 Java `jsNodeTest` 共 260 项、通用语言 `desktopTest` 共 40 项通过；Android 语言/编辑器、
   iOS Simulator Arm64 语言链以及 Desktop 编辑器均已实际编译通过，真实 QuickJS 测试覆盖源码
   栈映射、Unicode 输入输出和隔离宿主桥。
 - （已完成，2026-08-18）补齐安全与畸形边界回归：Java Service 在 parser 前拒绝超大源码，
@@ -614,7 +615,8 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - （已完成，2026-08-18）统计真实编译遇到的“不支持”诊断：按语言、npm 版本与稳定 code 聚合
   受影响编译次数和诊断次数，本地最多保存 256 项；不记录源码、消息、路径或符号名，Manager 可按
   语言读取/清空，测试页设置栏展示 top 5。完整口径见 `unsupported-capability-statistics.md`；
-- 为受限真并行线程单独执行 1～2 周原型；只有三项验证闸门全部通过才进入后续实现；
+- （Desktop 已完成，2026-08-18）受限真并行线程原型通过丢失更新、monitor 修复和双 Runtime
+  CPU 加速三项闸门；生产 Thread API、Android/iOS 平台验证和完整资源治理仍需独立实现；
 - 完整 JMM、反射、文件、网络、动态加载和原生序列化保持关闭，不因某个 API 看似简单而顺带开放。
 
 全局停止/转向条件：
