@@ -577,12 +577,16 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
   当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
   诊断类别、stdout、stderr 和未捕获异常类型。首批 16 个 case 覆盖 11 条运行链路及 5 类编译
   失败，新增 case 不需要再手写两套期望；
+- （已完成，2026-08-18）建立 Android、iOS 与 Desktop 共用的五阶段性能基准，统一测量语言包
+  加载、FULL、INCREMENTAL、EXACT 编译及隔离 Runtime 执行，并允许各平台注入内存采样器；
+  Desktop 已使用本地 debug npm 图完成真实 QuickJS 基线，获取命令、报告位置、Android PSS 与
+  iOS Instruments 口径记录在 `java-performance-benchmark.md`；
 - 教学程序仍为每次运行创建并关闭独立 Runtime，明确关闭 QuickJS 跨次字节码缓存；可复用的是
   已校验的编译结果和增量 CST，避免把运行状态或旧版本 bytecode 带入下一次执行；
 - `@cyxbs-mobile/language-java@0.2.0` 已按依赖拓扑生成独立 tgz，压缩 268.3 kB、解压约
   1.9 MB，仅包含 ESM、类型声明和 package.json，不携带 source map；调试图也已生成到项目根
   `build/npm/debug-source`，版本提升会使桌面与端上缓存自然失效；
-- 完整 Java `jsNodeTest` 共 257 项、通用语言 `desktopTest` 共 31 项通过；Android 语言/编辑器、
+- 完整 Java `jsNodeTest` 共 258 项、通用语言 `desktopTest` 共 31 项通过；Android 语言/编辑器、
   iOS Simulator Arm64 语言链以及 Desktop 编辑器均已实际编译通过，真实 QuickJS 测试覆盖源码
   栈映射、Unicode 输入输出和隔离宿主桥。
 

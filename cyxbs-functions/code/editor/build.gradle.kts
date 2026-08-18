@@ -37,6 +37,10 @@ kotlin {
     }
     desktopTest {
       dependsOn(noWebTest)
+      dependencies {
+        implementation(projects.cyxbsComponents.init)
+        implementation(libs.kmp.ktProvider.testing)
+      }
     }
     iosArm64Test {
       dependsOn(noWebTest)
