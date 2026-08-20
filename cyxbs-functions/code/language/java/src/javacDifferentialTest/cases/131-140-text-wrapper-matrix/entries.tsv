@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+text-utf16-length-charat	text-and-wrapper	case131	()V
+text-substring-boundaries	text-and-wrapper	case132	()V
+text-indexof-supplementary	text-and-wrapper	case133	()V
+text-prefix-suffix-contains	text-and-wrapper	case134	()V
+text-builder-append-reverse	text-and-wrapper	case135	()V
+text-builder-set-char	text-and-wrapper	case136	()V
+wrapper-integer-cache	text-and-wrapper	case137	()V
+wrapper-boolean-character-cache	text-and-wrapper	case138	()V
+wrapper-unbox-arithmetic	text-and-wrapper	case139	()V
+text-char-array-output	text-and-wrapper	case140	()V

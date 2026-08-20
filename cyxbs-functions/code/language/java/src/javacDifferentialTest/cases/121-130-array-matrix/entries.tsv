@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+array-primitive-defaults	array	case121	()V
+array-reference-defaults	array	case122	()V
+array-multidimensional-lengths	array	case123	()V
+array-partial-allocation	array	case124	()V
+array-dimension-evaluation-order	array	case125	()V
+array-alias-mutation	array	case126	()V
+array-covariance-valid-store	array	case127	()V
+array-covariance-invalid-store	array	case128	()V
+array-varargs-fixed-and-packed	array	case129	()V
+array-nested-initializer	array	case130	()V

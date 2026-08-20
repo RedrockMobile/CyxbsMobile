@@ -34,6 +34,20 @@ class JavaJavacDifferentialTest {
       generatedJavacDifferentialFixtures.map(JavacDifferentialFixture::id).distinct().size,
       "Differential case ids must remain unique.",
     )
+    val categoryCounts = generatedJavacDifferentialFixtures.groupingBy { fixture ->
+      fixture.category
+    }.eachCount()
+    assertEquals(
+      REQUIRED_REFERENCE_CATEGORIES,
+      categoryCounts.keys,
+      "Every fixture must belong to one known coverage category.",
+    )
+    categoryCounts.forEach { (category, count) ->
+      assertTrue(
+        count >= MINIMUM_CASES_PER_CATEGORY,
+        "Coverage category '$category' must contain at least $MINIMUM_CASES_PER_CATEGORY cases, actual: $count.",
+      )
+    }
     val failures = mutableListOf<String>()
     generatedJavacDifferentialFixtures.forEach { fixture ->
       try {
@@ -172,13 +186,29 @@ class JavaJavacDifferentialTest {
   }
 
   private companion object {
-    const val MINIMUM_REFERENCE_CASES = 100
+    const val MINIMUM_REFERENCE_CASES = 200
+    const val MINIMUM_CASES_PER_CATEGORY = 10
+
+    val REQUIRED_REFERENCE_CATEGORIES = setOf(
+      "control-flow",
+      "numeric",
+      "array",
+      "text-and-wrapper",
+      "collection",
+      "generic-and-overload",
+      "object-model",
+      "exception",
+      "functional-and-enum",
+      "io-and-multi-file",
+      "compiler-diagnostic",
+    )
   }
 }
 
 /** 一项由 javac/java 生成的不可变差分基准。 */
 internal data class JavacDifferentialFixture(
   val id: String,
+  val category: String,
   val entryClass: String,
   val entryMethod: String,
   val descriptor: String,

@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+functional-runnable-block	functional-and-enum	case181	()V
+functional-predicate	functional-and-enum	case182	()V
+functional-generic-function	functional-and-enum	case183	()V
+functional-supplier-capture	functional-and-enum	case184	()V
+functional-bound-method-reference	functional-and-enum	case185	()V
+functional-unbound-method-reference	functional-and-enum	case186	()V
+functional-static-method-reference	functional-and-enum	case187	()V
+functional-constructor-reference	functional-and-enum	case188	()V
+enum-values-order	functional-and-enum	case189	()V
+enum-interface-dispatch	functional-and-enum	case190	()V

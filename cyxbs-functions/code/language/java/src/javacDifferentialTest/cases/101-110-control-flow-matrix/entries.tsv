@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor	standardInputBase64(optional)
+control-while-break-continue	control-flow	case101	()V
+control-do-while-once	control-flow	case102	()V
+control-for-update-order	control-flow	case103	()V
+control-nested-loop-break	control-flow	case104	()V
+control-switch-default-fallthrough	control-flow	case105	()V
+control-string-switch	control-flow	case106	()V
+control-conditional-lazy	control-flow	case107	()V
+control-conditional-nested	control-flow	case108	()V
+control-enhanced-for-array	control-flow	case109	()V
+control-enhanced-for-list	control-flow	case110	()V

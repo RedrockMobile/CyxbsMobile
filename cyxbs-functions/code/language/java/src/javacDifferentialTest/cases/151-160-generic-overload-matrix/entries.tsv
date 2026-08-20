@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+generic-identity-inference	generic-and-overload	case151	()V
+generic-number-bound	generic-and-overload	case152	()V
+generic-wildcard-extends	generic-and-overload	case153	()V
+generic-wildcard-super	generic-and-overload	case154	()V
+generic-inheritance-substitution	generic-and-overload	case155	()V
+overload-strict-before-boxing	generic-and-overload	case156	()V
+overload-null-most-specific	generic-and-overload	case157	()V
+overload-varargs-zero-many	generic-and-overload	case158	()V
+generic-varargs-inference	generic-and-overload	case159	()V
+generic-target-typed-diamond	generic-and-overload	case160	()V

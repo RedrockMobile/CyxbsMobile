@@ -1,0 +1,6 @@
+# id	category	entryMethod	descriptor	standardInputBase64(optional)
+io-scanner-integers	io-and-multi-file	case191	()V	MTIgNQo=
+io-scanner-token-lines	io-and-multi-file	case192	()V	YWxwaGEgYmV0YQpsaW5lCg==
+io-scanner-invalid-int-not-consumed	io-and-multi-file	case193	()V	d29yZA==
+io-stdout-stderr-split	io-and-multi-file	case194	()V
+multi-file-interface-service	io-and-multi-file	case195	()V

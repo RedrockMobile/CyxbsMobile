@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+collection-list-add-get	collection	case141	()V
+collection-list-alias-set	collection	case142	()V
+collection-list-remove-overloads	collection	case143	()V
+collection-set-duplicate-null	collection	case144	()V
+collection-set-iterator	collection	case145	()V
+collection-map-replace	collection	case146	()V
+collection-map-default	collection	case147	()V
+collection-map-null-key	collection	case148	()V
+collection-map-keyset-backed	collection	case149	()V
+collection-user-key-identity	collection	case150	()V

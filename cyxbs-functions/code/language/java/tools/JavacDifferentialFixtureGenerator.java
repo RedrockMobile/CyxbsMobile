@@ -12,8 +12,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,7 +52,7 @@ public final class JavacDifferentialFixtureGenerator {
     List<Path> caseDirectories;
     try (var children = Files.list(casesDirectory)) {
       caseDirectories = children
-          .filter(Files::isDirectory)
+          .filter(path -> Files.isDirectory(path) && Files.isRegularFile(path.resolve("case.properties")))
           .sorted(Comparator.comparing(path -> path.getFileName().toString()))
           .collect(Collectors.toList());
     }
@@ -58,29 +60,32 @@ public final class JavacDifferentialFixtureGenerator {
       throw new IllegalStateException("No javac differential cases found in " + casesDirectory);
     }
 
+    Map<String, String> categories = readCoverageCategories(casesDirectory);
     List<Fixture> fixtures = new ArrayList<>();
     for (Path caseDirectory : caseDirectories) {
-      fixtures.add(createFixture(caseDirectory));
+      fixtures.addAll(createFixtures(caseDirectory, categories));
     }
     Files.createDirectories(outputFile.getParent());
     Files.writeString(outputFile, renderKotlin(fixtures), StandardCharsets.UTF_8);
   }
 
-  /** 编译并按需运行一项语料，得到当前 JDK 的 Java 8 基准。 */
-  private static Fixture createFixture(Path caseDirectory) throws Exception {
+  /**
+   * 编译并按需运行一项普通语料或一组共享源码的矩阵语料。
+   *
+   * <p>普通目录继续读取 {@code entryMethod}；若存在 {@code entries.tsv}，则每行声明一个独立
+   * fixture，多个入口只复用 javac 编译结果，不复用 ClassLoader、静态字段或标准输入输出状态。
+   */
+  private static List<Fixture> createFixtures(
+      Path caseDirectory,
+      Map<String, String> categories
+  ) throws Exception {
     Properties properties = new Properties();
     Path propertiesFile = caseDirectory.resolve("case.properties");
     try (var reader = Files.newBufferedReader(propertiesFile, StandardCharsets.UTF_8)) {
       properties.load(reader);
     }
-    String id = required(properties, "id", propertiesFile);
     String entryClass = required(properties, "entryClass", propertiesFile);
-    String entryMethod = required(properties, "entryMethod", propertiesFile);
-    String descriptor = required(properties, "descriptor", propertiesFile);
-    String standardInput = new String(
-        Base64.getDecoder().decode(properties.getProperty("standardInputBase64", "")),
-        StandardCharsets.UTF_8
-    );
+    List<Entry> entries = readEntries(caseDirectory, properties, propertiesFile, categories);
 
     Path sourcesDirectory = caseDirectory.resolve("src");
     List<Path> sourceFiles;
@@ -91,7 +96,7 @@ public final class JavacDifferentialFixtureGenerator {
           .collect(Collectors.toList());
     }
     if (sourceFiles.isEmpty()) {
-      throw new IllegalStateException("Case '" + id + "' does not contain Java sources.");
+      throw new IllegalStateException("Case directory '" + caseDirectory + "' has no Java sources.");
     }
 
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -125,29 +130,128 @@ public final class JavacDifferentialFixtureGenerator {
         .map(JavacDifferentialFixtureGenerator::diagnosticCategory)
         .collect(Collectors.toCollection(LinkedHashSet::new));
 
-    Execution execution = compiled
-        ? execute(classesDirectory, entryClass, entryMethod, standardInput)
-        : Execution.EMPTY;
     List<Source> sources = sourceFiles.stream()
         .map(path -> new Source(
             sourcesDirectory.relativize(path).toString().replace('\\', '/'),
             readUtf8(path)
         ))
         .collect(Collectors.toList());
-    deleteRecursively(classesDirectory);
-    return new Fixture(
-        id,
-        entryClass,
-        entryMethod,
-        descriptor,
-        standardInput,
-        sources,
-        compiled,
-        execution.stdout,
-        execution.stderr,
-        execution.throwableSimpleName,
-        List.copyOf(diagnosticCategories)
-    );
+    List<Fixture> fixtures = new ArrayList<>();
+    try {
+      for (Entry entry : entries) {
+        Execution execution = compiled
+            ? execute(classesDirectory, entryClass, entry.method, entry.standardInput)
+            : Execution.EMPTY;
+        fixtures.add(new Fixture(
+            entry.id,
+            entry.category,
+            entryClass,
+            entry.method,
+            entry.descriptor,
+            entry.standardInput,
+            sources,
+            compiled,
+            execution.stdout,
+            execution.stderr,
+            execution.throwableSimpleName,
+            List.copyOf(diagnosticCategories)
+        ));
+      }
+      return fixtures;
+    } finally {
+      deleteRecursively(classesDirectory);
+    }
+  }
+
+  /** 读取普通单入口或 entries.tsv 矩阵入口，并确保每项都有唯一覆盖分类。 */
+  private static List<Entry> readEntries(
+      Path caseDirectory,
+      Properties properties,
+      Path propertiesFile,
+      Map<String, String> categories
+  ) throws IOException {
+    Path matrixFile = caseDirectory.resolve("entries.tsv");
+    if (!Files.isRegularFile(matrixFile)) {
+      String directoryName = caseDirectory.getFileName().toString();
+      String category = properties.getProperty("category", categories.get(directoryName));
+      if (category == null || category.isBlank()) {
+        throw new IllegalArgumentException("Missing coverage category for " + directoryName);
+      }
+      return List.of(new Entry(
+          required(properties, "id", propertiesFile),
+          category.trim(),
+          required(properties, "entryMethod", propertiesFile),
+          required(properties, "descriptor", propertiesFile),
+          decodeInput(properties.getProperty("standardInputBase64", ""), propertiesFile)
+      ));
+    }
+
+    List<Entry> entries = new ArrayList<>();
+    int lineNumber = 0;
+    for (String line : Files.readAllLines(matrixFile, StandardCharsets.UTF_8)) {
+      lineNumber++;
+      if (line.isBlank() || line.startsWith("#")) {
+        continue;
+      }
+      String[] columns = line.split("\\t", -1);
+      if (columns.length != 4 && columns.length != 5) {
+        throw new IllegalArgumentException(
+            matrixFile + ":" + lineNumber + " must have 4 or 5 tab-separated columns."
+        );
+      }
+      entries.add(new Entry(
+          requiredColumn(columns[0], "id", matrixFile, lineNumber),
+          requiredColumn(columns[1], "category", matrixFile, lineNumber),
+          requiredColumn(columns[2], "entryMethod", matrixFile, lineNumber),
+          requiredColumn(columns[3], "descriptor", matrixFile, lineNumber),
+          decodeInput(columns.length == 5 ? columns[4] : "", matrixFile)
+      ));
+    }
+    if (entries.isEmpty()) {
+      throw new IllegalArgumentException("No matrix entries found in " + matrixFile);
+    }
+    return entries;
+  }
+
+  /** coverage.properties 以“分类=目录列表”集中维护旧式 case 的分类，避免复制元数据。 */
+  private static Map<String, String> readCoverageCategories(Path casesDirectory) throws IOException {
+    Path coverageFile = casesDirectory.resolve("coverage.properties");
+    Properties properties = new Properties();
+    try (var reader = Files.newBufferedReader(coverageFile, StandardCharsets.UTF_8)) {
+      properties.load(reader);
+    }
+    Map<String, String> categories = new LinkedHashMap<>();
+    for (String category : properties.stringPropertyNames()) {
+      for (String directory : properties.getProperty(category).split(",")) {
+        String normalized = directory.trim();
+        if (normalized.isEmpty()) {
+          continue;
+        }
+        String previous = categories.put(normalized, category.trim());
+        if (previous != null) {
+          throw new IllegalArgumentException(
+              "Case directory '" + normalized + "' belongs to both " + previous + " and " + category
+          );
+        }
+      }
+    }
+    return categories;
+  }
+
+  /** 解码可选标准输入；畸形 Base64 在生成阶段直接失败而不进入 Node 测试。 */
+  private static String decodeInput(String base64, Path source) {
+    try {
+      return new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException("Invalid standardInputBase64 in " + source, exception);
+    }
+  }
+
+  private static String requiredColumn(String value, String name, Path file, int line) {
+    if (value.isBlank()) {
+      throw new IllegalArgumentException("Missing '" + name + "' in " + file + ":" + line);
+    }
+    return value.trim();
   }
 
   /**
@@ -229,6 +333,7 @@ public final class JavacDifferentialFixtureGenerator {
     for (Fixture fixture : fixtures) {
       output.append("  JavacDifferentialFixture(\n");
       output.append("    id = ").append(kotlinString(fixture.id)).append(",\n");
+      output.append("    category = ").append(kotlinString(fixture.category)).append(",\n");
       output.append("    entryClass = ").append(kotlinString(fixture.entryClass)).append(",\n");
       output.append("    entryMethod = ").append(kotlinString(fixture.entryMethod)).append(",\n");
       output.append("    descriptor = ").append(kotlinString(fixture.descriptor)).append(",\n");
@@ -329,8 +434,18 @@ public final class JavacDifferentialFixtureGenerator {
     private static final Execution EMPTY = new Execution("", "", null);
   }
 
+  private record Entry(
+      String id,
+      String category,
+      String method,
+      String descriptor,
+      String standardInput
+  ) {
+  }
+
   private record Fixture(
       String id,
+      String category,
       String entryClass,
       String entryMethod,
       String descriptor,

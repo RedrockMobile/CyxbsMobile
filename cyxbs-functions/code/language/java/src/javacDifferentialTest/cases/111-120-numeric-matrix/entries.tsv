@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+numeric-int-overflow	numeric	case111	()V
+numeric-long-overflow	numeric	case112	()V
+numeric-int-unsigned-shift	numeric	case113	()V
+numeric-long-unsigned-shift	numeric	case114	()V
+numeric-byte-compound-narrowing	numeric	case115	()V
+numeric-char-increment-wrap	numeric	case116	()V
+numeric-float-rounding	numeric	case117	()V
+numeric-nan-comparison	numeric	case118	()V
+numeric-mixed-promotion	numeric	case119	()V
+numeric-double-int-saturation	numeric	case120	()V

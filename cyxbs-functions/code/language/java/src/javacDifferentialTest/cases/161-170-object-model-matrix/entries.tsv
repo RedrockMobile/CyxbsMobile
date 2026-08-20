@@ -1,0 +1,11 @@
+# id	category	entryMethod	descriptor
+object-constructor-this-chain	object-model	case161	()V
+object-constructor-super-chain	object-model	case162	()V
+object-virtual-dispatch	object-model	case163	()V
+object-constructor-virtual-dispatch	object-model	case164	()V
+object-class-init-parent-first	object-model	case165	()V
+object-class-init-once	object-model	case166	()V
+object-field-shadowing	object-model	case167	()V
+object-covariant-return	object-model	case168	()V
+object-interface-default	object-model	case169	()V
+object-interface-static	object-model	case170	()V
