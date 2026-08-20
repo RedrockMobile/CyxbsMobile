@@ -177,6 +177,7 @@ class JavaJavacDifferentialTest {
     "java.semantic.type_mismatch",
     "java.semantic.no_applicable_overload",
     "java.semantic.invalid_return_type",
+    "java.semantic.return_type_mismatch",
       -> "TYPE_MISMATCH"
 
     "java.semantic.ambiguous_overload" -> "AMBIGUOUS_CALL"
@@ -186,8 +187,8 @@ class JavaJavacDifferentialTest {
   }
 
   private companion object {
-    const val MINIMUM_REFERENCE_CASES = 200
-    const val MINIMUM_CASES_PER_CATEGORY = 10
+    const val MINIMUM_REFERENCE_CASES = 300
+    const val MINIMUM_CASES_PER_CATEGORY = 20
 
     val REQUIRED_REFERENCE_CATEGORIES = setOf(
       "control-flow",

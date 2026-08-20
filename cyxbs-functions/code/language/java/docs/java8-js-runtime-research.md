@@ -590,8 +590,8 @@ Java 名称，也不会把 JavaScript 的动态类型行为泄漏为 Java 语义
 - （已完成，2026-08-21）建立可扩展的 javac/java 差分测试体系：语料独立放在
   `src/javacDifferentialTest/cases`，`generateJavacDifferentialFixtures` 在 jsTest 编译前使用 Gradle
   当前 JDK 的 `javac --release 8` 生成不可变 Kotlin 基准；Node 侧对同一源码比较编译结论、归一化
-  诊断类别、stdout、stderr 和未捕获异常类型。语料已从首批 16 项扩展到 200 项，并设置不可静默
-  缩减、ID 唯一性、11 类覆盖集合及每类最少 10 项闸门；新增覆盖控制流组合、数值转换、长整数与浮点边界、多维数组、String、
+  诊断类别、stdout、stderr 和未捕获异常类型。语料已从首批 16 项扩展到 300 项，并设置不可静默
+  缩减、ID 唯一性、11 类覆盖集合及每类最少 20 项闸门；新增覆盖控制流组合、数值转换、长整数与浮点边界、多维数组、String、
   包装类型、集合别名与视图、泛型和重载、接口分派、lambda/方法引用、enum、异常、受控资源、
   Scanner、类初始化、构造器链和多文件调用。相近的成功语料可通过 `entries.tsv` 共享源码与 javac
   编译结果，同时仍以隔离运行环境逐入口比较；完整维护方式见 [java-differential-testing.md](java-differential-testing.md)。语料扩充同时发现并修复三元表达式缺失、

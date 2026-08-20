@@ -315,7 +315,9 @@ public final class JavacDifferentialFixtureGenerator {
     if (code.contains("ref.ambiguous")) {
       return "AMBIGUOUS_CALL";
     }
-    if (code.contains("cant.assign.val.to.final.var") || code.contains("cant.assign.val.to.var")) {
+    if (code.contains("cant.assign.val.to.final.var")
+        || code.contains("cant.assign.val.to.var")
+        || code.contains("final.parameter.may.not.be.assigned")) {
       return "FINAL_ASSIGNMENT";
     }
     if (code.contains("missing.ret.stmt")) {

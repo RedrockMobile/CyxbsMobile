@@ -14,22 +14,23 @@
 
 ## 当前覆盖
 
-当前共 200 个 fixture。测试会强制检查总数不低于 200、ID 唯一、分类集合固定，并要求每个分类
-至少包含 10 项，防止后续删除语料或通过重复同类案例凑数量。
+当前共 300 个 fixture。测试会强制检查总数不低于 300、ID 唯一、分类集合固定，并要求每个分类
+至少包含 20 项，防止后续删除语料或通过重复同类案例凑数量。300 项已经形成覆盖主要教学语法、
+常用类库与关键错误路径的稳定基线；后续优先根据新缺陷定向增加，而不再单纯追求总数。
 
 | 分类 | 数量 | 主要范围 |
 | --- | ---: | --- |
-| `control-flow` | 18 | 循环、break/continue、switch、条件表达式、enhanced-for |
-| `numeric` | 16 | 整数溢出、long、浮点、移位、窄化与数值提升 |
-| `array` | 19 | 默认值、多维/部分分配、协变、越界、varargs |
-| `text-and-wrapper` | 20 | UTF-16 String、StringBuilder、包装缓存与拆装箱 |
-| `collection` | 23 | List/Set/Map/Iterator、别名、视图、null 与对象身份 |
-| `generic-and-overload` | 23 | 泛型推断、边界、通配符、继承代换、重载阶段 |
-| `object-model` | 19 | 构造器链、字段、虚分派、类初始化、接口 default/static |
-| `exception` | 18 | checked/runtime、finally、multi-catch、受控资源 |
+| `control-flow` | 28 | 循环、break/continue、switch、条件表达式、enhanced-for |
+| `numeric` | 26 | 整数溢出、long、浮点、移位、窄化与数值提升 |
+| `array` | 29 | 默认值、多维/部分分配、协变、越界、varargs |
+| `text-and-wrapper` | 30 | UTF-16 String、StringBuilder、包装缓存与拆装箱 |
+| `collection` | 33 | List/Set/Map/Iterator、别名、视图、null 与对象身份 |
+| `generic-and-overload` | 33 | 泛型推断、边界、通配符、继承代换、重载阶段 |
+| `object-model` | 29 | 构造器链、字段、虚分派、类初始化、接口 default/static |
+| `exception` | 28 | checked/runtime、finally、multi-catch、受控资源 |
 | `functional-and-enum` | 22 | lambda、四类方法引用、enum 初始化与接口分派 |
-| `io-and-multi-file` | 12 | Scanner、stdout/stderr、多文件与跨文件泛型调用 |
-| `compiler-diagnostic` | 10 | 未解析符号、类型不匹配、歧义、final、missing return |
+| `io-and-multi-file` | 22 | Scanner、stdout/stderr、多文件与跨文件泛型调用 |
+| `compiler-diagnostic` | 20 | 未解析符号、类型不匹配、歧义、final、missing return |
 
 旧式单入口目录的分类集中维护在
 `src/javacDifferentialTest/cases/coverage.properties`；矩阵 suite 的分类直接写在 `entries.tsv`。
@@ -41,7 +42,7 @@
 适合编译失败、运行时未捕获异常或需要独立多文件布局的语料：
 
 ```text
-201-example/
+301-example/
 ├── case.properties
 └── src/demo/Main.java
 ```
@@ -54,7 +55,7 @@
 适合一组语法结构相近、都能通过 javac 编译的运行结果语料：
 
 ```text
-201-210-example-matrix/
+301-310-example-matrix/
 ├── case.properties
 ├── entries.tsv
 └── src/demo/Main.java

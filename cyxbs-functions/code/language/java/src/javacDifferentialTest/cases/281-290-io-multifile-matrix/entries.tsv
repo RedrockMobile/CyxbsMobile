@@ -1,0 +1,10 @@
+281-scanner-two-tokens	io-and-multi-file	run281	()V	YWxwaGEgYmV0YQ==
+282-scanner-two-integers	io-and-multi-file	run282	()V	MTIgMzA=
+283-scanner-next-line	io-and-multi-file	run283	()V	dGl0bGUKYm9keQo=
+284-scanner-leading-empty-line	io-and-multi-file	run284	()V	Cm5leHQK
+285-scanner-invalid-then-valid-int	io-and-multi-file	run285	()V	eCA3
+286-scanner-has-next	io-and-multi-file	run286	()V	b25l
+287-scanner-shared-cursor	io-and-multi-file	run287	()V	YSBi
+288-scanner-crlf-lines	io-and-multi-file	run288	()V	YQ0KYg0K
+289-multi-file-generic-helper	io-and-multi-file	run289	()V
+290-stdout-stderr-order	io-and-multi-file	run290	()V
