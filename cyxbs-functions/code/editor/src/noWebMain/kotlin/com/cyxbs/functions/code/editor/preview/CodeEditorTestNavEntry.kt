@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.editor.preview
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.DropdownMenu
@@ -23,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.guided.tour.GuidedTourOverlay
+import com.cyxbs.components.guided.tour.GuidedTourTargetRegistry
+import com.cyxbs.components.guided.tour.guidedTourTarget
 import com.cyxbs.functions.code.editor.highlight.CodeEditor
 import com.cyxbs.functions.code.editor.highlight.DEFAULT_HIGHLIGHT_CACHE_CAPACITY
 import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
@@ -30,7 +34,12 @@ import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
+import com.cyxbs.functions.code.editor.preview.workbench.TUTORIAL_TOOL_WINDOW_ID
+import com.cyxbs.functions.code.editor.preview.workbench.ActiveCodeEditorTutorial
+import com.cyxbs.functions.code.editor.preview.workbench.TutorialGuideHint
+import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTutorialToolWindow
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
+import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTutorialSidePanel
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
 import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
 import com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbench
@@ -54,6 +63,14 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
+import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
+import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationRequest
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTargetKind
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
@@ -83,6 +100,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   @Composable
   override fun Content(argument: CodeEditorTestNavArgument) {
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
+    val dynamicTutorialManager = remember { DynamicTutorialManager() }
+    val guidedTourRegistry = remember { GuidedTourTargetRegistry() }
     val coroutineScope = rememberCoroutineScope()
     var isRunning by remember { mutableStateOf(false) }
     var isLoadingLanguage by remember { mutableStateOf(false) }
@@ -94,6 +113,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var unsupportedCapabilityStatistics by remember {
       mutableStateOf<List<DynamicLanguageUnsupportedCapabilityStatistic>>(emptyList())
     }
+    var tutorialSession by remember { mutableStateOf<DynamicTutorialSession?>(null) }
+    var tutorialManifest by remember { mutableStateOf<DynamicTutorialManifest?>(null) }
+    var tutorialStatus by remember { mutableStateOf("正在准备动态教程目录…") }
+    var isLoadingTutorial by remember { mutableStateOf(false) }
+    var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
     val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
       if (supportedLanguages.isEmpty()) {
@@ -179,6 +203,83 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
 
     /**
+     * 进入课程第一课时，并用教程包提供的初始文件替换当前测试工作区。
+     *
+     * 教程源码只在用户明确选择课程后写入内存工作区；下载 Manifest 不会覆盖正在编辑的文件。
+     */
+    fun openTutorialCourse(courseId: String) {
+      coroutineScope.launch {
+        isLoadingTutorial = true
+        try {
+          val session = tutorialSession ?: error("当前语言的教程包尚未加载完成。")
+          val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
+          val lesson = course.lessons.firstOrNull() ?: error("课程 ${course.summary.title} 暂无课时。")
+          require(lesson.steps.isNotEmpty()) { "课时 ${lesson.title} 暂无教程步骤。" }
+          val initialFiles = lesson.initialFiles.associate { file -> file.path to file.source }
+          val activeSource = initialFiles[lesson.activeFilePath]
+            ?: error("教程活动文件不存在：${lesson.activeFilePath}")
+
+          sourceFiles.clear()
+          sourceFiles.putAll(initialFiles)
+          openFilePaths.clear()
+          openFilePaths += lesson.activeFilePath
+          editorState.replaceDocument(lesson.activeFilePath, activeSource)
+          activeFilePath = lesson.activeFilePath
+          activeTutorial = ActiveCodeEditorTutorial(course = course, lesson = lesson)
+          workbenchState.closeSidePanel()
+          workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
+          tutorialStatus = "正在学习 ${course.summary.title} · ${lesson.title}"
+        } catch (throwable: Throwable) {
+          if (throwable is CancellationException) throw throwable
+          tutorialStatus = throwable.toFailureText("课程加载失败")
+        } finally {
+          isLoadingTutorial = false
+        }
+      }
+    }
+
+    /**
+     * 把当前工作区和可选运行结果交回教程 npm 包判定，并在通过后推进稳定步骤 ID。
+     *
+     * 语言相关规则只存在于教程包；客户端不复制输出字符串或源码条件。
+     */
+    suspend fun evaluateTutorialStep(runResult: DynamicProgramRunResult? = null) {
+      val current = activeTutorial ?: return
+      val session = tutorialSession ?: return
+      val result = session.evaluate(
+        DynamicTutorialEvaluationRequest(
+          courseId = current.course.summary.courseId,
+          lessonId = current.lesson.lessonId,
+          stepId = current.step.stepId,
+          workspace = currentWorkspace().files.map { file ->
+            DynamicTutorialSourceFile(path = file.path, source = file.source)
+          },
+          runExecuted = runResult?.executed == true,
+          standardOutput = runResult?.standardOutput.orEmpty(),
+          standardError = runResult?.standardError.orEmpty(),
+        ),
+      )
+      if (!result.completed) {
+        activeTutorial = current.copy(feedback = result.feedback, isCompleted = false)
+        return
+      }
+      activeTutorial = current.advance()
+      workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
+    }
+
+    // 源码区间目标暂由编辑器原生选区呈现；布局锚点交给 guided-tour 按窗口实时测量。
+    LaunchedEffect(activeTutorial?.step?.stepId) {
+      val target = activeTutorial?.step?.guideTarget ?: return@LaunchedEffect
+      if (target.kind != DynamicTutorialGuideTargetKind.EDITOR_RANGE) return@LaunchedEffect
+      val filePath = target.filePath ?: return@LaunchedEffect
+      val from = target.from ?: return@LaunchedEffect
+      val to = target.to ?: return@LaunchedEffect
+      if (filePath in sourceFiles) {
+        openFile(filePath, DynamicTextRange(from = from, to = to))
+      }
+    }
+
+    /**
      * 按语言 ID 创建对应 Service；先构造新实例，成功后再替换，失败时不污染当前语言会话。
      */
     suspend fun loadLanguageService(languageId: String) {
@@ -245,6 +346,40 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
         languageStatus = throwable.toFailureText("动态语言目录加载失败")
+      }
+    }
+
+    // 教程包跟随活动语言独立加载；切换语言或离开页面时取消旧会话并释放对应 JavaScript Runtime。
+    LaunchedEffect(activeLanguageId) {
+      val languageId = activeLanguageId ?: return@LaunchedEffect
+      var loadedSession: DynamicTutorialSession? = null
+      isLoadingTutorial = true
+      tutorialManifest = null
+      activeTutorial = null
+      try {
+        val supportedTutorial = dynamicTutorialManager.supportedTutorials().firstOrNull { tutorial ->
+          tutorial.languageId == languageId || languageId in tutorial.aliases
+        }
+        if (supportedTutorial == null) {
+          tutorialStatus = "当前语言暂未提供动态教程。"
+          return@LaunchedEffect
+        }
+        loadedSession = dynamicTutorialManager.load(languageId)
+        tutorialSession = loadedSession
+        tutorialManifest = loadedSession.manifest()
+        tutorialStatus = buildString {
+          append(tutorialManifest?.courses?.size ?: 0).append(" 门课程")
+          append(" · npm ").append(loadedSession.npmPackageVersion)
+        }
+        isLoadingTutorial = false
+        awaitCancellation()
+      } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+        tutorialStatus = throwable.toFailureText("动态教程加载失败")
+      } finally {
+        isLoadingTutorial = false
+        if (tutorialSession === loadedSession) tutorialSession = null
+        withContext(NonCancellable) { loadedSession?.close() }
       }
     }
 
@@ -357,6 +492,12 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           unsupportedCapabilityStatistics =
             dynamicLanguageManager.unsupportedCapabilityStatistics()
           output = result.toDisplayText(target)
+          val tutorialCompletionKind = activeTutorial?.step?.completion?.kind
+          if (tutorialCompletionKind == DynamicTutorialCompletionKind.RUN_SUCCEEDED ||
+            tutorialCompletionKind == DynamicTutorialCompletionKind.OUTPUT_CONTAINS
+          ) {
+            evaluateTutorialStep(result)
+          }
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           runDiagnostics = emptyList()
@@ -426,6 +567,13 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       .firstOrNull { it.languageId == activeLanguageId }
       ?.displayName
       ?: "代码"
+    val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
+      manifest = tutorialManifest,
+      status = tutorialStatus,
+      isLoading = isLoadingTutorial,
+      activeCourseId = activeTutorial?.course?.summary?.courseId,
+      onOpenCourse = ::openTutorialCourse,
+    )
     val sidePanels = rememberCodeEditorTestSidePanels(
       activeFilePath = activeFilePath,
       sourceFiles = displayedSourceFiles,
@@ -435,7 +583,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isAnalyzingSymbol = isAnalyzingSymbol,
       highlightCacheCapacity = highlightCacheCapacity,
       unsupportedCapabilityStatistics = unsupportedCapabilityStatistics,
-      includeCourse = true,
+      leadingPanels = listOf(tutorialSidePanel),
       fileIcon = dynamicDocumentIcon,
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
@@ -551,77 +699,126 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         }
       },
     )
-    CodeEditorWorkbench(
-      title = "$activeLanguageDisplayName 课程",
-      activeDocumentLabel = activeFilePath,
-      subtitle = "多文件语义分析 · 实验课",
-      openDocumentLabels = openFilePaths.toList(),
-      breadcrumbs = listOf("src", "lesson-03") + activeFilePath.split('/'),
-      onDocumentSelected = ::openFile,
-      documentIcon = dynamicDocumentIcon,
-      sidePanels = sidePanels,
-      toolWindows = codeEditorTestToolWindows(
-        activeFilePath = activeFilePath,
-        output = output,
-        performanceText = autoHighlightReport,
-        diagnostics = runDiagnostics,
-        diagnosticSources = runDiagnosticSources,
-        onDiagnosticSelected = { location ->
-          val source = sourceFiles[location.filePath] ?: return@codeEditorTestToolWindows
-          val from = location.range.from.coerceIn(0, source.length)
-          val to = location.range.to.coerceIn(from, source.length)
-          openFile(location.filePath, DynamicTextRange(from, to))
-        },
-      ),
-      state = workbenchState,
-      isRunning = isRunning,
-      onBack = argument::popBackStack,
-      onRun = ::runWorkspace,
-      runPopupContent = {
-        MaterialTheme(
-          colors = MaterialTheme.colors.copy(
-            surface = EditorWorkbenchColors.PanelBackground,
-            onSurface = EditorWorkbenchColors.PrimaryText,
-          ),
-        ) {
-          DropdownMenu(
-            expanded = showRunTargetPicker,
-            onDismissRequest = { showRunTargetPicker = false },
-            modifier = Modifier.removeDefaultDropdownMenuVerticalPadding(),
-          ) {
-            runTargets.forEach { target ->
-              DropdownMenuItem(
-                modifier = Modifier.height(CompactDropdownMenuItemHeight),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                onClick = {
-                  showRunTargetPicker = false
-                  runTarget(target)
-                },
-              ) {
-                Text(
-                  text = target.displayName,
-                  color = EditorWorkbenchColors.PrimaryText,
-                  fontSize = 12.sp,
-                  maxLines = 1,
+    val runToolWindows = codeEditorTestToolWindows(
+      activeFilePath = activeFilePath,
+      output = output,
+      performanceText = autoHighlightReport,
+      diagnostics = runDiagnostics,
+      diagnosticSources = runDiagnosticSources,
+      onDiagnosticSelected = { location ->
+        val source = sourceFiles[location.filePath] ?: return@codeEditorTestToolWindows
+        val from = location.range.from.coerceIn(0, source.length)
+        val to = location.range.to.coerceIn(from, source.length)
+        openFile(location.filePath, DynamicTextRange(from, to))
+      },
+    )
+    val toolWindows = activeTutorial?.let { tutorial ->
+      listOf(
+        codeEditorTutorialToolWindow(
+          tutorial = tutorial,
+          onPrevious = {
+            activeTutorial = tutorial.previous()
+          },
+          onCheck = {
+            coroutineScope.launch {
+              try {
+                evaluateTutorialStep()
+              } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                activeTutorial = activeTutorial?.copy(
+                  feedback = throwable.toFailureText("教程步骤校验失败"),
                 )
               }
             }
+          },
+        ),
+      ) + runToolWindows
+    } ?: runToolWindows
+    val layoutGuide = activeTutorial
+      ?.takeUnless(ActiveCodeEditorTutorial::isCompleted)
+      ?.step
+      ?.guideTarget
+      ?.takeIf { it.kind == DynamicTutorialGuideTargetKind.LAYOUT_ANCHOR }
+
+    Box(Modifier.fillMaxSize()) {
+      CodeEditorWorkbench(
+        title = activeTutorial?.course?.summary?.title ?: "$activeLanguageDisplayName 课程",
+        activeDocumentLabel = activeFilePath,
+        subtitle = activeTutorial?.lesson?.title ?: "多文件语义分析 · 实验课",
+        openDocumentLabels = openFilePaths.toList(),
+        breadcrumbs = activeFilePath.split('/'),
+        onDocumentSelected = ::openFile,
+        documentIcon = dynamicDocumentIcon,
+        sidePanels = sidePanels,
+        toolWindows = toolWindows,
+        state = workbenchState,
+        modifier = Modifier.fillMaxSize(),
+        isRunning = isRunning,
+        onBack = argument::popBackStack,
+        onRun = ::runWorkspace,
+        runButtonModifier = Modifier.guidedTourTarget(
+          targetId = DynamicTutorialAnchorIds.RUN_BUTTON,
+          registry = guidedTourRegistry,
+        ),
+        runPopupContent = {
+          MaterialTheme(
+            colors = MaterialTheme.colors.copy(
+              surface = EditorWorkbenchColors.PanelBackground,
+              onSurface = EditorWorkbenchColors.PrimaryText,
+            ),
+          ) {
+            DropdownMenu(
+              expanded = showRunTargetPicker,
+              onDismissRequest = { showRunTargetPicker = false },
+              modifier = Modifier.removeDefaultDropdownMenuVerticalPadding(),
+            ) {
+              runTargets.forEach { target ->
+                DropdownMenuItem(
+                  modifier = Modifier.height(CompactDropdownMenuItemHeight),
+                  contentPadding = PaddingValues(horizontal = 12.dp),
+                  onClick = {
+                    showRunTargetPicker = false
+                    runTarget(target)
+                  },
+                ) {
+                  Text(
+                    text = target.displayName,
+                    color = EditorWorkbenchColors.PrimaryText,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                  )
+                }
+              }
+            }
           }
-        }
-      },
-      onUndo = { editorState.undo() },
-      canUndo = editorState.canUndo,
-      onRedo = { editorState.redo() },
-      canRedo = editorState.canRedo,
-      onSearch = { editorState.openSearch() },
-      editorGutterWidth = editorState.editorGutterWidth(),
-      editor = {
-        CodeEditor(
-          state = editorState,
+        },
+        onUndo = { editorState.undo() },
+        canUndo = editorState.canUndo,
+        onRedo = { editorState.redo() },
+        canRedo = editorState.canRedo,
+        onSearch = { editorState.openSearch() },
+        editorGutterWidth = editorState.editorGutterWidth(),
+        editor = {
+          CodeEditor(
+            state = editorState,
+            modifier = Modifier.fillMaxSize(),
+          )
+        },
+      )
+      val anchorId = layoutGuide?.anchorId
+      if (anchorId != null) {
+        GuidedTourOverlay(
+          registry = guidedTourRegistry,
+          targetId = anchorId,
           modifier = Modifier.fillMaxSize(),
-        )
-      },
-    )
+        ) { bounds ->
+          TutorialGuideHint(
+            targetBounds = bounds,
+            text = activeTutorial?.step?.content?.firstOrNull()?.text ?: "完成当前教程步骤。",
+          )
+        }
+      }
+    }
   }
 
   /** 将统一动态语言运行结果整理成输出面板可直接阅读的文本。 */

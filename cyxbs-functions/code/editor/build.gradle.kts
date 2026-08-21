@@ -13,11 +13,13 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.view)
+      implementation(projects.cyxbsComponents.guidedTour)
     }
     noWebMain.dependencies {
       implementation(projects.cyxbsFunctions.code.js)
       implementation(projects.cyxbsFunctions.code.js.quickjs)
       implementation(projects.cyxbsFunctions.code.language)
+      implementation(projects.cyxbsFunctions.code.tutorials)
       implementation(libs.kmp.kodemirror.view)
       implementation(libs.kmp.kodemirror.basicSetup)
       implementation(libs.kmp.kodemirror.autocomplete)

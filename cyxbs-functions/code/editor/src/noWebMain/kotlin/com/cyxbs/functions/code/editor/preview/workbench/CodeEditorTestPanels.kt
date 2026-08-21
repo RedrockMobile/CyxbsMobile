@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -90,9 +89,9 @@ internal const val RUN_TOOL_WINDOW_ID = "run"
 /**
  * 创建仅供编辑器手动测试页使用的侧边能力。
  *
- * [includeCourse] 用于验证教学场景的特殊入口；设为 false 后得到的就是普通代码编辑器侧栏，证明课程
- * 不属于通用工作台的必选依赖。[projectPath] 仅用于文件面板顶部展示，后续可传入真实工程路径；
- * [fileIcon] 与标签栏共享语言图标，避免文件树重新获取或解析动态资源。
+ * [leadingPanels] 用于注入教程等场景能力；为空时得到普通代码编辑器侧栏，证明课程不属于通用
+ * 工作台的必选依赖。[projectPath] 仅用于文件面板顶部展示，后续可传入真实工程路径；[fileIcon]
+ * 与标签栏共享语言图标，避免文件树重新获取或解析动态资源。
  */
 @Composable
 internal fun rememberCodeEditorTestSidePanels(
@@ -104,7 +103,7 @@ internal fun rememberCodeEditorTestSidePanels(
   isAnalyzingSymbol: Boolean,
   highlightCacheCapacity: Int,
   unsupportedCapabilityStatistics: List<DynamicLanguageUnsupportedCapabilityStatistic>,
-  includeCourse: Boolean,
+  leadingPanels: List<CodeEditorSidePanel> = emptyList(),
   projectPath: String = TestProjectPath,
   fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)? = null,
   onOpenFile: (String) -> Unit,
@@ -118,17 +117,7 @@ internal fun rememberCodeEditorTestSidePanels(
 ): List<CodeEditorSidePanel> {
   val createdFolderPaths = remember { mutableStateListOf<String>() }
   val panels = buildList {
-    if (includeCourse) {
-      add(
-        CodeEditorSidePanel(
-          id = "course",
-          title = "课程",
-          icon = Icons.Default.School,
-        ) {
-          CoursePanelContent()
-        },
-      )
-    }
+    addAll(leadingPanels)
     add(
       CodeEditorSidePanel(
         id = FILES_PANEL_ID,
@@ -355,45 +344,6 @@ private fun DynamicCompilationDiagnosticSeverity.backgroundColor(): Color = when
   DynamicCompilationDiagnosticSeverity.ERROR -> Color(0x1FFF7777)
   DynamicCompilationDiagnosticSeverity.WARNING -> Color(0x1FFFC66D)
   DynamicCompilationDiagnosticSeverity.INFO -> Color(0x1F6CB6FF)
-}
-
-/** 教学场景的示例课程入口；正式课程模块后续可用相同模型替换。 */
-@Composable
-private fun CoursePanelContent() {
-  Column(
-    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    Text("JavaScript 入门", color = EditorWorkbenchColors.PrimaryText, fontWeight = FontWeight.Bold)
-    Text(
-      "第 3 课 · 类与模块",
-      color = EditorWorkbenchColors.SecondaryText,
-      fontSize = 12.sp,
-    )
-    listOf(
-      "1. 认识 class 与 constructor" to true,
-      "2. 导出 Student 类" to true,
-      "3. 在 main.js 中导入并运行" to false,
-    ).forEach { (text, completed) ->
-      Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = if (completed) Color(0x2239B982) else Color(0x226CB6FF),
-        shape = RoundedCornerShape(10.dp),
-      ) {
-        Text(
-          text = text,
-          color = EditorWorkbenchColors.PrimaryText,
-          fontSize = 12.sp,
-          modifier = Modifier.padding(10.dp),
-        )
-      }
-    }
-    Text(
-      "课程面板由教学业务注入；普通编辑器不会包含该入口。",
-      color = EditorWorkbenchColors.SecondaryText,
-      fontSize = 10.sp,
-    )
-  }
 }
 
 /** 工作区文件切换与创建。 */
