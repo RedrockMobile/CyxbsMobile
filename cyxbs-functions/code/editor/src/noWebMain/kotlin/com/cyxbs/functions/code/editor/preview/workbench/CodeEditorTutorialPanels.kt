@@ -363,41 +363,47 @@ private fun TutorialCoursePath(
               maxLines = 2,
               overflow = TextOverflow.Ellipsis,
             )
-            Text(
-              text = when (availability.state) {
-                DynamicTutorialCourseState.AVAILABLE -> progress.withLessonCount("可以开始")
-                DynamicTutorialCourseState.IN_PROGRESS -> progress.withLessonCount(
-                  progress.nextLesson?.title?.let { "继续：$it" } ?: "继续学习",
-                )
-                DynamicTutorialCourseState.COMPLETED -> progress.withLessonCount("已完成")
-                DynamicTutorialCourseState.LOCKED -> {
-                  val prerequisiteTitles =
-                    availability.missingPrerequisiteCourseIds.map { prerequisiteId ->
-                      courseTitles[prerequisiteId] ?: prerequisiteId
-                    }
-                  progress.withLessonCount("请先完成：${prerequisiteTitles.joinToString("、")}")
-                }
-              },
-              color = when (availability.state) {
-                DynamicTutorialCourseState.AVAILABLE -> EditorWorkbenchColors.SecondaryText
-                DynamicTutorialCourseState.IN_PROGRESS -> EditorWorkbenchColors.Accent
-                DynamicTutorialCourseState.COMPLETED -> Color(0xFF64C493)
-                DynamicTutorialCourseState.LOCKED -> Color(0xFFFFC66D)
-              },
-              fontSize = 9.sp,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-            )
-            if (course.courseId == activeCourseId) {
+            // 重置入口复用始终存在的状态行，切换活动课程时不增加卡片高度或推动后续课程。
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
               Text(
-                text = "重置本课程",
-                color = EditorWorkbenchColors.SecondaryText,
+                text = when (availability.state) {
+                  DynamicTutorialCourseState.AVAILABLE -> progress.withLessonCount("可以开始")
+                  DynamicTutorialCourseState.IN_PROGRESS -> progress.withLessonCount(
+                    progress.nextLesson?.title?.let { "继续：$it" } ?: "继续学习",
+                  )
+                  DynamicTutorialCourseState.COMPLETED -> progress.withLessonCount("已完成")
+                  DynamicTutorialCourseState.LOCKED -> {
+                    val prerequisiteTitles =
+                      availability.missingPrerequisiteCourseIds.map { prerequisiteId ->
+                        courseTitles[prerequisiteId] ?: prerequisiteId
+                      }
+                    progress.withLessonCount("请先完成：${prerequisiteTitles.joinToString("、")}")
+                  }
+                },
+                color = when (availability.state) {
+                  DynamicTutorialCourseState.AVAILABLE -> EditorWorkbenchColors.SecondaryText
+                  DynamicTutorialCourseState.IN_PROGRESS -> EditorWorkbenchColors.Accent
+                  DynamicTutorialCourseState.COMPLETED -> Color(0xFF64C493)
+                  DynamicTutorialCourseState.LOCKED -> Color(0xFFFFC66D)
+                },
                 fontSize = 9.sp,
-                modifier = Modifier
-                  .align(Alignment.End)
-                  .clickable { onResetCourse(course.courseId) }
-                  .padding(vertical = 2.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1F),
               )
+              if (course.courseId == activeCourseId) {
+                Text(
+                  text = "重置",
+                  color = EditorWorkbenchColors.SecondaryText,
+                  fontSize = 9.sp,
+                  modifier = Modifier
+                    .clickable { onResetCourse(course.courseId) }
+                    .padding(vertical = 2.dp),
+                )
+              }
             }
           }
         }
