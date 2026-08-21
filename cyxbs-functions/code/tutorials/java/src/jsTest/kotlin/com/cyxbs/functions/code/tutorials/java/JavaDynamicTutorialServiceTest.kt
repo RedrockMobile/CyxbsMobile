@@ -72,6 +72,35 @@ class JavaDynamicTutorialServiceTest {
   }
 
   @Test
+  fun acceptsAnyAdditionalCourseName() = runTest {
+    val course = assertNotNull(JavaDynamicTutorialService.course("java-generics-collections"))
+    val lesson = course.lessons.first { it.lessonId == "typed-list" }
+    val request = DynamicTutorialEvaluationRequest(
+      courseId = course.summary.courseId,
+      lessonId = lesson.lessonId,
+      stepId = "add-course",
+      workspace = lesson.initialFiles,
+    )
+
+    assertFalse(JavaDynamicTutorialService.evaluate(request).completed)
+    val customizedWorkspace = lesson.initialFiles.map { file ->
+      if (file.path != lesson.activeFilePath) {
+        file
+      } else {
+        file.copy(
+          source = file.source.replace(
+            "courses.add(\"集合\");",
+            "courses.add(\"集合\");\n        courses.add(\"数据结构\");",
+          ),
+        )
+      }
+    }
+    assertTrue(
+      JavaDynamicTutorialService.evaluate(request.copy(workspace = customizedWorkspace)).completed,
+    )
+  }
+
+  @Test
   fun exposesMultiFileObjectAndInheritanceLessons() = runTest {
     val course = assertNotNull(JavaDynamicTutorialService.course("java-object-oriented"))
 

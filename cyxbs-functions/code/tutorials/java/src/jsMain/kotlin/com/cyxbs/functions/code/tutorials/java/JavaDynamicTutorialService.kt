@@ -49,20 +49,39 @@ object JavaDynamicTutorialService : DynamicTutorialService {
       ?.steps?.firstOrNull { it.stepId == request.stepId }
       ?: return DynamicTutorialEvaluationResult(false, "教程步骤已更新，请重新进入当前课程。")
     val completion = step.completion
-    val completed = when (completion.kind) {
-      DynamicTutorialCompletionKind.MANUAL -> true
-      DynamicTutorialCompletionKind.RUN_SUCCEEDED -> request.runExecuted
-      DynamicTutorialCompletionKind.OUTPUT_CONTAINS ->
-        request.runExecuted && completion.expected.orEmpty() in request.standardOutput
-      DynamicTutorialCompletionKind.SOURCE_CONTAINS -> {
-        val source = request.workspace.firstOrNull { it.path == completion.filePath }?.source
-        source != null && completion.expected.orEmpty() in source
+    val completed = if (request.courseId == COLLECTIONS_COURSE_ID &&
+      request.lessonId == TYPED_LIST_LESSON_ID &&
+      request.stepId == ADD_COURSE_STEP_ID
+    ) {
+      hasAdditionalCourse(request)
+    } else {
+      when (completion.kind) {
+        DynamicTutorialCompletionKind.MANUAL -> true
+        DynamicTutorialCompletionKind.RUN_SUCCEEDED -> request.runExecuted
+        DynamicTutorialCompletionKind.OUTPUT_CONTAINS ->
+          request.runExecuted && completion.expected.orEmpty() in request.standardOutput
+        DynamicTutorialCompletionKind.SOURCE_CONTAINS -> {
+          val source = request.workspace.firstOrNull { it.path == completion.filePath }?.source
+          source != null && completion.expected.orEmpty() in source
+        }
       }
     }
     return DynamicTutorialEvaluationResult(
       completed = completed,
       feedback = if (completed) null else "还没有满足这一步的要求，可以根据提示继续修改或运行。",
     )
+  }
+
+  /**
+   * 校验列表课时是否新增了第三次 `courses.add(...)` 调用。
+   *
+   * 这里只约束教学动作，不限定课程名称；用户可以填写任意字符串。轻量正则允许常见的空格和换行，
+   * 避免教程包为了一个步骤重复引入 Java 语法分析器。
+   */
+  private fun hasAdditionalCourse(request: DynamicTutorialEvaluationRequest): Boolean {
+    val source = request.workspace.firstOrNull { it.path == COURSE_LIST_FILE_PATH }?.source
+      ?: return false
+    return COURSE_ADD_PATTERN.findAll(source).count() >= INITIAL_COURSE_COUNT + 1
   }
 
   /** 构造第一张课程卡片，重点验证 Tutorial 工具窗口与运行按钮引导。 */
@@ -339,7 +358,7 @@ object JavaDynamicTutorialService : DynamicTutorialService {
   /** 构造泛型集合课程，作为后续扩充课程正文和自动校验的基准。 */
   private fun collectionsCourse(): DynamicTutorialCourse {
     val summary = DynamicTutorialCourseSummary(
-      courseId = "java-generics-collections",
+      courseId = COLLECTIONS_COURSE_ID,
       title = "泛型与集合",
       description = "使用 List<String> 和 Map<String, Integer> 组织类型安全的数据。",
       order = 40,
@@ -350,12 +369,12 @@ object JavaDynamicTutorialService : DynamicTutorialService {
       summary = summary,
       lessons = listOf(
         DynamicTutorialLesson(
-          lessonId = "typed-list",
+          lessonId = TYPED_LIST_LESSON_ID,
           title = "类型安全的列表",
           description = "理解泛型如何约束集合元素。",
           initialFiles = listOf(
             DynamicTutorialSourceFile(
-              path = "src/CourseList.java",
+              path = COURSE_LIST_FILE_PATH,
               source = """
                 import java.util.ArrayList;
                 import java.util.List;
@@ -373,21 +392,21 @@ object JavaDynamicTutorialService : DynamicTutorialService {
               """.trimIndent(),
             ),
           ),
-          activeFilePath = "src/CourseList.java",
+          activeFilePath = COURSE_LIST_FILE_PATH,
           steps = listOf(
             DynamicTutorialStep(
-              stepId = "add-course",
+              stepId = ADD_COURSE_STEP_ID,
               title = "添加一个课程",
               content = listOf(
                 DynamicTutorialContentBlock(
                   kind = DynamicTutorialContentKind.PARAGRAPH,
-                  text = "再调用一次 courses.add，并把新课程运行输出。",
+                  text = "再调用一次 courses.add，课程名称可以自行选择，然后点击检查。",
                 ),
               ),
               completion = DynamicTutorialCompletionRule(
                 kind = DynamicTutorialCompletionKind.SOURCE_CONTAINS,
-                filePath = "src/CourseList.java",
-                expected = "courses.add(\"算法\")",
+                filePath = COURSE_LIST_FILE_PATH,
+                expected = "courses.add(",
               ),
             ),
           ),
@@ -437,4 +456,11 @@ object JavaDynamicTutorialService : DynamicTutorialService {
       ),
     )
   }
+
+  private const val COLLECTIONS_COURSE_ID = "java-generics-collections"
+  private const val TYPED_LIST_LESSON_ID = "typed-list"
+  private const val ADD_COURSE_STEP_ID = "add-course"
+  private const val COURSE_LIST_FILE_PATH = "src/CourseList.java"
+  private const val INITIAL_COURSE_COUNT = 2
+  private val COURSE_ADD_PATTERN = Regex("""\bcourses\s*\.\s*add\s*\(""")
 }
