@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -25,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +129,7 @@ fun ScheduleWeekHeader(
           .clip(RoundedCornerShape(50))
           .background(
             Brush.horizontalGradient(
-              listOf(colors.positive, Color(0xFF8686FF)),
+              listOf(colors.positive, MaterialTheme.colors.secondary),
             ),
           )
           .clickableNoIndicator(onClick = onBackToday)
@@ -139,7 +139,7 @@ fun ScheduleWeekHeader(
         Text(
           text = "回到今天",
           fontSize = 13.sp,
-          color = Color.White,
+          color = MaterialTheme.colors.onPrimary,
         )
       }
     }

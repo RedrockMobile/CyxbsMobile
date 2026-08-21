@@ -36,7 +36,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Clock
 
 /**
- * 编辑时间段或者截止时间
+ * 编辑时间段或者时间点。
  *
  * @author 985892345
  * @date 2026/7/5
@@ -49,7 +49,7 @@ internal fun EditScheduleTimeArea(
   val now = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }
   val startMin0 = state.startMinuteOfDay ?: (now.hour * 60 + now.minute)
   val endMin0 = state.endMinuteOfDay ?: ((startMin0 + 60).coerceAtMost(23 * 60 + 59))
-  // 截止型：原本没有开始时间。提供一个开关在「时间段 / 仅截止」之间切换。
+  // 时间点型：底层仍使用 Deadline 原子，但产品文案统一为“时间点”，不再暴露旧“截止”概念。
   var deadlineOnly by remember { mutableStateOf(state.outputStartTime == null && state.outputEndTime != null) }
 
   val startHour = remember { Animatable((startMin0 / 60).toFloat()) }
@@ -60,7 +60,7 @@ internal fun EditScheduleTimeArea(
   val minutes = remember { (0..59).map { it.toString().padStart(2, '0') }.toPersistentList() }
 
   Column(modifier = Modifier.fillMaxWidth()) {
-    // 时间段 / 截止 分段框框切换（沿用 todo cmp 的样式）。
+    // 时间段 / 时间点分段切换，两种选择分别无损映射到 Timed / Deadline。
     ScheduleTimeTypeToggle(isInterval = !deadlineOnly, onChange = { interval ->
       deadlineOnly = !interval
       // 模式切换是显式用户事件：立即提交当前滚轮值；collector 不随模式重启，因而不会吞掉本次切换。
@@ -80,7 +80,7 @@ internal fun EditScheduleTimeArea(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       if (deadlineOnly) {
-        // 截止型只有一个滚轮：居中、占一半宽度，避免背景铺满整行显得太宽。
+        // 时间点只有一个滚轮：居中、占一半宽度，避免背景铺满整行显得太宽。
         WheelPair(hours, minutes, endHour, endMinute, modifier = Modifier.fillMaxWidth(0.5f))
       } else {
         WheelPair(hours, minutes, startHour, startMinute, modifier = Modifier.weight(1f))
@@ -142,13 +142,13 @@ internal fun EditScheduleModelState.applyExplicitTimeModeSelection(
   }
 }
 
-/** 时间段 / 截止 分段框框切换（紧凑胶囊，左对齐）。 */
+/** 时间段 / 时间点分段切换（紧凑胶囊，左对齐）。 */
 @Composable
 private fun ScheduleTimeTypeToggle(isInterval: Boolean, onChange: (Boolean) -> Unit) {
   Row {
     ToggleChip("时间段", selected = isInterval) { onChange(true) }
     Spacer(modifier = Modifier.width(8.dp))
-    ToggleChip("截止", selected = !isInterval) { onChange(false) }
+    ToggleChip("时间点", selected = !isInterval) { onChange(false) }
   }
 }
 

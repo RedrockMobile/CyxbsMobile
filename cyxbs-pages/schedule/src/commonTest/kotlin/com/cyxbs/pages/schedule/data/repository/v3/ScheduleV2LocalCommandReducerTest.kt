@@ -88,6 +88,60 @@ class ScheduleV2LocalCommandReducerTest {
     assertEquals(listOf(ReminderInput(15, "")), resource.reminders.data)
   }
 
+  /** 惰性默认分类与日程必须在同一 localRevision 下形成一个本地原子批次。 */
+  @Test
+  fun saveScheduleWithNewCategoryCreatesOneLocalAtomicBatch() {
+    val category = ScheduleCategory(CategoryId(CATEGORY_ID), 0, "学习", null, 0)
+    val result = reduce(
+      command = ScheduleCommand.SaveScheduleWithNewCategory(category, schedule()),
+      now = 20_000,
+      revision = 7,
+    ).applied()
+
+    val categoryPending = assertIs<PendingUpsert<*, *>>(result.categories.single().pending)
+    val schedulePending = assertIs<PendingUpsert<*, *>>(result.schedules.single().pending)
+    assertEquals(7, categoryPending.localRevision)
+    assertEquals(7, schedulePending.localRevision)
+    assertEquals("category-schedule-7", categoryPending.localBatchId)
+    assertEquals(categoryPending.localBatchId, schedulePending.localBatchId)
+    assertEquals(
+      CategoryIdentity(CATEGORY_ID),
+      assertIs<CategoryResource>(categoryPending.resource).identity,
+    )
+    assertEquals(
+      CATEGORY_ID,
+      assertIs<ScheduleResource>(schedulePending.resource).categoryId.data,
+    )
+  }
+
+  /** 分类创建不能用首尾空白或英文字母大小写绕过同名限制。 */
+  @Test
+  fun createCategoryRejectsDuplicateNormalizedName() {
+    val created = reduce(
+      command = ScheduleCommand.CreateCategory(
+        ScheduleCategory(CategoryId(CATEGORY_ID), 0, "Study", null, 0),
+      ),
+      revision = 1,
+    ).applied()
+
+    assertEquals(
+      ScheduleV2LocalCommandResult.Rejected(ScheduleV2LocalCommandRejectionReason.INVALID_STATE),
+      reduce(
+        categories = created.categories,
+        command = ScheduleCommand.CreateCategory(
+          ScheduleCategory(
+            CategoryId("019d0000-0000-7000-8000-000000000099"),
+            0,
+            " study ",
+            null,
+            1,
+          ),
+        ),
+        revision = 2,
+      ),
+    )
+  }
+
   @Test
   fun updateOnlyChangesTitleTimestampAndOverwritesOlderPendingRevision() {
     val remote = scheduleResource(version = 7, title = "remote", timestamp = 100)

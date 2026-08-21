@@ -60,6 +60,26 @@ class ScheduleV2DailyMutationBridgeTest {
     })
   }
 
+  /** 新分类不应把既有 Schedule PATCH 的日常路由从 PUT 误判为 POST。 */
+  @Test
+  fun scheduleUpdateWithNewCategoryUsesUpdateRoute() {
+    val category = categoryState(revision = 7)
+    val remote = scheduleResource(version = 3, title = "remote")
+    val schedule = ScheduleSyncState(
+      identity = remote.identity,
+      remoteSnapshot = ScheduleRemoteSnapshot(remote, ServerResourceMeta(1, 2)),
+      pending = PendingUpsert(remote.copy(title = AtomicField("updated", 7)), localRevision = 7),
+    )
+
+    val captured = assertIs<ScheduleV2DailyMutationCapture.Batch>(
+      bridge.capture("daily-update-category", 7, listOf(category), listOf(schedule), emptyList()),
+    )
+
+    assertEquals(ScheduleV2DailyMutationMethod.UPDATE, captured.method)
+    assertEquals(listOf(CATEGORY_ID), captured.batch.categories.upserts.map { it.id })
+    assertEquals(listOf(SCHEDULE_ID), captured.batch.schedules.upserts.map { it.id })
+  }
+
   @Test
   fun explicitRejectedClearsMatchingBatchButPreservesNewerU() {
     val category = categoryState(revision = 1)

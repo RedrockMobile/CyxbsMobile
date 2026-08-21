@@ -29,16 +29,19 @@ import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideSyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.PendingChange
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingDelete
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
+import com.cyxbs.pages.schedule.domain.sync.v2.ResourceIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.TimingInput
 import com.cyxbs.pages.schedule.domain.sync.v2.TimingKind
+import com.cyxbs.pages.schedule.domain.sync.v2.SyncResource
 import com.cyxbs.pages.schedule.domain.sync.v2.Weekday
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -46,6 +49,17 @@ import kotlinx.datetime.toInstant
 import kotlin.time.Duration.Companion.minutes
 
 private const val UTC_DAY_MILLIS = 86_400_000L
+
+/** 为组合本地命令附加原子批次键；不改变 payload、revision 或删除时间。 */
+private fun <
+  I : ResourceIdentity,
+  R : SyncResource<I>,
+> PendingChange<I, R>.withLocalBatchId(
+  batchId: String,
+): PendingChange<I, R> = when (this) {
+  is PendingUpsert -> copy(localBatchId = batchId)
+  is PendingDelete -> copy(localBatchId = batchId)
+}
 
 /** 本地命令无法安全投影到当前后端协议时的最小稳定原因。 */
 enum class ScheduleV2LocalCommandRejectionReason {
@@ -151,6 +165,15 @@ class ScheduleV2LocalCommandReducer {
         schedules,
         occurrenceOverrides,
         command.category,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.SaveScheduleWithNewCategory -> saveScheduleWithNewCategory(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.category,
+        command.schedule,
         nowMillis,
         localRevision,
       )
@@ -309,6 +332,9 @@ class ScheduleV2LocalCommandReducer {
     if (categories.any { it.identity == identity }) {
       reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
     }
+    if (hasDuplicateCategoryName(categories, category.name)) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
     val resource = category.toResource(version = 0, old = null, now = now)
     val state = CategorySyncState(
       identity = identity,
@@ -331,10 +357,86 @@ class ScheduleV2LocalCommandReducer {
       ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
     val effective = state.effectiveResource()
       ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    if (hasDuplicateCategoryName(categories, category.name, excluding = identity)) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
     val resource = category.toResource(effective.version, effective, now)
     if (resource == effective) return ScheduleV2LocalCommandResult.NoOp
     val updated = state.replacePending(PendingUpsert(resource, revision))
     return applied(categories.replace(identity) { updated }, schedules, overrides)
+  }
+
+  /**
+   * 分类名按去除首尾空白、忽略大小写比较；pending DELETE 在远端确认前仍占用名称，不能被新分类复用。
+   */
+  private fun hasDuplicateCategoryName(
+    categories: List<CategorySyncState>,
+    name: String,
+    excluding: CategoryIdentity? = null,
+  ): Boolean {
+    val normalizedName = name.trim()
+    if (normalizedName.isEmpty()) return false
+    return categories.any { state ->
+      state.identity != excluding &&
+        (state.effectiveResource() ?: state.remoteSnapshot?.resource)
+          ?.name?.data?.trim()?.equals(normalizedName, ignoreCase = true) == true
+    }
+  }
+
+  /**
+   * 惰性创建固定默认分类并保存引用它的日程；两个 pending 使用同一 revision 和本地批次键。
+   *
+   * 分类必须尚不存在，日程可为 CREATE 或 PATCH。该能力只服务于默认分类首次使用，通用分类管理不走此入口。
+   */
+  private fun saveScheduleWithNewCategory(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    category: ScheduleCategory,
+    schedule: Schedule,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    if (schedule.categoryId != category.id) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val withCategory = createCategory(categories, schedules, overrides, category, now, revision)
+    if (withCategory !is ScheduleV2LocalCommandResult.Applied) return withCategory
+
+    val scheduleIdentity = ScheduleIdentity(schedule.id.value)
+    val saved = if (schedules.any { it.identity == scheduleIdentity }) {
+      updateSchedule(
+        withCategory.categories,
+        withCategory.schedules,
+        withCategory.occurrenceOverrides,
+        schedule,
+        now,
+        revision,
+      )
+    } else {
+      createSchedule(
+        withCategory.categories,
+        withCategory.schedules,
+        withCategory.occurrenceOverrides,
+        schedule,
+        now,
+        revision,
+      )
+    }
+    if (saved !is ScheduleV2LocalCommandResult.Applied) return saved
+
+    val categoryIdentity = CategoryIdentity(category.id.value)
+    val batchId = "category-schedule-$revision"
+    return saved.copy(
+      categories = saved.categories.map { state ->
+        if (state.identity != categoryIdentity) state
+        else state.copy(pending = state.pending?.withLocalBatchId(batchId))
+      },
+      schedules = saved.schedules.map { state ->
+        if (state.identity != scheduleIdentity) state
+        else state.copy(pending = state.pending?.withLocalBatchId(batchId))
+      },
+    )
   }
 
   private fun deleteCategory(
@@ -347,9 +449,9 @@ class ScheduleV2LocalCommandReducer {
   ): ScheduleV2LocalCommandResult {
     val state = categories.firstOrNull { it.identity == identity }
       ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
-    val categoryInUse = schedules.any { schedule ->
-      schedule.remoteSnapshot?.resource?.categoryId?.data == identity.id ||
-        schedule.effectiveResource()?.categoryId?.data == identity.id
+    val categoryInUse = schedules.any {
+      it.remoteSnapshot?.resource?.categoryId?.data == identity.id ||
+        it.effectiveResource()?.categoryId?.data == identity.id
     }
     if (categoryInUse) {
       // remote 即使被本地 pending DELETE 隐藏，确认前仍会让服务端拒绝分类删除，因此本地先拒绝。

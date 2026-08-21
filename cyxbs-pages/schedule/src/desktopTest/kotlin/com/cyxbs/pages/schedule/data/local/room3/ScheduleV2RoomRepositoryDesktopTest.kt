@@ -272,6 +272,27 @@ class ScheduleV2RoomRepositoryDesktopTest {
     }
   }
 
+  /** 分类删除复用既有聚合 DELETE 接口，不为 Category 引入第二套远端协议。 */
+  @Test
+  fun categoryDeleteUsesExistingDailyDeleteEndpoint() = runTest {
+    withRepository { repository, gateway, database ->
+      repository.initialize()
+
+      val result = repository.execute(ScheduleCommand.DeleteCategory(CategoryId(CATEGORY_ID)))
+      val batch = requireNotNull(gateway.lastDeletedBatch)
+
+      assertIs<ScheduleSyncResult.Success>(result)
+      assertEquals(1, gateway.deleteCalls)
+      assertEquals(listOf(CATEGORY_ID), batch.categories.deletes.map { it.id })
+      assertTrue(batch.categories.upserts.isEmpty())
+      assertTrue(batch.schedules.upserts.isEmpty())
+      assertTrue(batch.schedules.deletes.isEmpty())
+      assertTrue(batch.occurrenceOverrides.upserts.isEmpty())
+      assertTrue(batch.occurrenceOverrides.deletes.isEmpty())
+      assertTrue(ScheduleV2RoomStateStore(database).readAccountState(ACCOUNT).categories.isEmpty())
+    }
+  }
+
   @Test
   fun ordinaryDeleteUsesDailyDeleteEndpoint() = runTest {
     withRepository { repository, gateway, database ->

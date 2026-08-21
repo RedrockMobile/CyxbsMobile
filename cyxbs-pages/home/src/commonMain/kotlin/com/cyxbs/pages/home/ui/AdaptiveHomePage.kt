@@ -81,6 +81,19 @@ private val itemList = listOf(
   ActionItem("日程编辑") {
     AppScheme.jump("cyxbs://schedule/edit")
   },
+  ActionItem("日程主页") {
+    AppScheme.jump("cyxbs://schedule")
+  },
+  ActionItem("邮子清单") {
+    AppScheme.jump("cyxbs://schedule/todo")
+  },
+  // Desktop 开发预览：使用 Schedule 模块内的纯内存 mock，不写真实 Room，也不请求后端。
+  ActionItem("日程 Mock") {
+    AppScheme.jump("cyxbs://schedule/desktop-preview")
+  },
+  ActionItem("清单 Mock") {
+    AppScheme.jump("cyxbs://schedule/todo-preview")
+  },
 
 
 

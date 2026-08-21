@@ -50,13 +50,24 @@ class ScheduleMainViewModel(
 
   /**
    * 在 ViewModel scope 中保存编辑状态，并按 [scope]/[recurrenceId] 路由到整系列、单实例或拆分命令。
+   * [newCategory] 仅用于所选固定默认分类尚不存在的情况，并与日程 CREATE/PATCH 放入同一原子命令。
    * 调用立即返回，实际仓库写入异步完成；范围所需实例 ID 缺失时由路由层拒绝执行。
    */
-  fun saveSchedule(state: EditScheduleModelState, scope: EditScope, recurrenceId: RecurrenceId?) =
+  fun saveSchedule(
+    state: EditScheduleModelState,
+    scope: EditScope,
+    recurrenceId: RecurrenceId?,
+    newCategory: ScheduleCategory? = null,
+  ) =
     launchByViewModelScope {
       if (!canSubmitMutation()) return@launchByViewModelScope
       repository.applyScheduleEdit(
-        state, scope, recurrenceId, ScheduleRepositoryProvider.idGenerators, ScheduleRepositoryProvider.clock,
+        state,
+        scope,
+        recurrenceId,
+        ScheduleRepositoryProvider.idGenerators,
+        ScheduleRepositoryProvider.clock,
+        newCategory,
       )
     }
 
@@ -93,17 +104,6 @@ class ScheduleMainViewModel(
       }
     }
 
-  /** 创建分类前复核当前账号可写，避免只读页面先消耗 ID 再下发命令。 */
-  fun addCategory(name: String) = launchByViewModelScope {
-    if (!canSubmitMutation()) return@launchByViewModelScope
-    val id = CategoryId(ScheduleRepositoryProvider.idGenerators.scheduleId().value)
-    repository.execute(ScheduleCommand.CreateCategory(ScheduleCategory(id, 0, name.trim(), null, snapshot.value.categories.size)))
-  }
-
-  /** 删除分类遵循和日程编辑相同的账号编辑门禁。 */
-  fun removeCategory(id: CategoryId) = launchByViewModelScope {
-    if (canSubmitMutation()) repository.execute(ScheduleCommand.DeleteCategory(id))
-  }
   fun enterManageMode() { _isManageMode.value = true; _selectedIds.value = emptySet() }
   fun exitManageMode() { _isManageMode.value = false; _selectedIds.value = emptySet() }
   fun toggleSelect(id: ScheduleId) { _selectedIds.value = _selectedIds.value.toMutableSet().apply { if (!add(id)) remove(id) } }

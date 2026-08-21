@@ -130,13 +130,26 @@ class ScheduleV2DailyMutationBridge(
     occurrenceOverrides = occurrenceOverrides,
   )
 
-  /** 选择聚合请求的 HTTP 方法；混合批次优先使用主 Schedule 删除，其次 CREATE，最后 UPDATE。 */
+  /**
+   * 选择聚合请求的 HTTP 方法。
+   *
+   * 聚合批次只要包含 Schedule，就必须由主 Schedule 的 CREATE/PATCH/DELETE 决定路由；例如“新 Category +
+   * 既有 Schedule PATCH”仍应调用 PUT。没有 Schedule 的兼容调用才退回按其余成员版本选择。
+   */
   private fun selectMethod(
     categories: List<CategorySyncState>,
     schedules: List<ScheduleSyncState>,
     occurrenceOverrides: List<OccurrenceOverrideSyncState>,
   ): ScheduleV2DailyMutationMethod {
     if (schedules.any { it.pending is PendingDelete }) return ScheduleV2DailyMutationMethod.DELETE
+    if (schedules.isNotEmpty()) {
+      val createsSchedule = schedules.any { state ->
+        state.remoteSnapshot == null &&
+          (state.pending as? PendingUpsert<*, *>)?.resource?.version == 0L
+      }
+      return if (createsSchedule) ScheduleV2DailyMutationMethod.CREATE
+      else ScheduleV2DailyMutationMethod.UPDATE
+    }
     val pending = categories.mapNotNull { it.pending } +
       schedules.mapNotNull { it.pending } + occurrenceOverrides.mapNotNull { it.pending }
     if (pending.all { it is PendingDelete }) return ScheduleV2DailyMutationMethod.DELETE

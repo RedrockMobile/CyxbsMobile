@@ -6,12 +6,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppDark
 import com.cyxbs.components.utils.compose.dark
+
+// 信息栏图标统一在 20×20 坐标系内绘制，再以相同倍率缩放到 13dp，保证最终描边一致。
+private val ScheduleInfoIconSize = 13.dp
+private const val ScheduleInfoIconViewport = 20f
+private const val ScheduleInfoIconStrokeWidth = 2f
 
 
 @Preview
@@ -181,77 +187,75 @@ fun rememberIcAddtodoNotice(): ImageVector {
     val brush = SolidColor(color)
     ImageVector.Builder(
       name = "TodoIcAddtodoNotice",
-      defaultWidth = 20.dp,
-      defaultHeight = 21.dp,
-      viewportWidth = 20f,
-      viewportHeight = 21f,
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
     ).apply {
       // 底部长横条（fill，圆角矩形）
       path(fill = brush) {
-        moveTo(0.75f, 16.25f)
-        lineTo(19.25f, 16.25f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, 0.75f)
-        lineTo(20f, 17f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, 0.75f)
-        lineTo(0.75f, 17.75f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, -0.75f)
-        lineTo(0f, 17f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, -0.75f)
+        moveTo(1.18f, 15.48f)
+        lineTo(18.82f, 15.48f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, 0.71f)
+        lineTo(19.53f, 16.19f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, 0.71f)
+        lineTo(1.18f, 16.9f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, -0.71f)
+        lineTo(0.47f, 16.19f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, -0.71f)
         close()
       }
       // 底部短横条（fill，铃铛底座圆角矩形）
       path(fill = brush) {
-        moveTo(5.75f, 19.5f)
-        lineTo(14.25f, 19.5f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, 0.75f)
-        lineTo(15f, 20.25f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, 0.75f)
-        lineTo(5.75f, 21f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, -0.75f)
-        lineTo(5f, 20.25f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, -0.75f)
+        moveTo(5.95f, 18.57f)
+        lineTo(14.05f, 18.57f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, 0.71f)
+        lineTo(14.76f, 19.28f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, 0.71f)
+        lineTo(5.95f, 19.99f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, -0.71f)
+        lineTo(5.24f, 19.28f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, -0.71f)
         close()
       }
       // 铃铛主体轮廓（stroke）
-      path(stroke = brush, strokeLineWidth = 1.5f) {
-        moveTo(3.75f, 8.75f)
-        curveTo(3.75f, 5.298f, 6.548f, 2.5f, 10f, 2.5f)
-        curveTo(13.452f, 2.5f, 16.25f, 5.298f, 16.25f, 8.75f)
-        verticalLineTo(17f)
-        horizontalLineTo(3.75f)
-        verticalLineTo(8.75f)
+      path(stroke = brush, strokeLineWidth = ScheduleInfoIconStrokeWidth) {
+        moveTo(4.05f, 8.34f)
+        curveTo(4.05f, 5.05f, 6.71f, 2.38f, 10f, 2.38f)
+        curveTo(13.29f, 2.38f, 15.95f, 5.05f, 15.95f, 8.34f)
+        verticalLineTo(16.19f)
+        horizontalLineTo(4.05f)
+        verticalLineTo(8.34f)
         close()
       }
       // 顶部小提手（fill，圆角矩形）
       path(fill = brush) {
         moveTo(10f, 0f)
-        lineTo(10f, 0f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, 0.75f)
-        lineTo(10.75f, 2.25f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, 0.75f)
-        lineTo(10f, 3f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, -0.75f)
-        lineTo(9.25f, 0.75f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, -0.75f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, 0.71f)
+        lineTo(10.71f, 2.14f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, 0.71f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, -0.71f, -0.71f)
+        lineTo(9.29f, 0.71f)
+        arcToRelative(0.71f, 0.71f, 0f, false, true, 0.71f, -0.71f)
         close()
       }
       // 右上铃铛内弧（stroke，圆头端点，alpha 0.8）
       path(
         stroke = brush,
-        strokeLineWidth = 1.5f,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
         strokeLineCap = StrokeCap.Round,
         strokeAlpha = 0.8f,
         fillAlpha = 0.8f
       ) {
-        moveTo(14f, 9f)
-        curveTo(14f, 6.791f, 12.209f, 5f, 10f, 5f)
+        moveTo(13.82f, 8.57f)
+        curveTo(13.82f, 6.46f, 12.11f, 4.77f, 10f, 4.77f)
       }
       // 右侧小圆点（fill，alpha 0.8）
       path(fill = brush, fillAlpha = 0.8f, strokeAlpha = 0.8f) {
-        moveTo(14f, 11.25f)
-        moveToRelative(-0.75f, 0f)
-        arcToRelative(0.75f, 0.75f, 0f, true, true, 1.5f, 0f)
-        arcToRelative(0.75f, 0.75f, 0f, true, true, -1.5f, 0f)
+        moveTo(13.82f, 10.71f)
+        moveToRelative(-0.71f, 0f)
+        arcToRelative(0.71f, 0.71f, 0f, true, true, 1.42f, 0f)
+        arcToRelative(0.71f, 0.71f, 0f, true, true, -1.42f, 0f)
       }
     }.build()
   }
@@ -272,35 +276,39 @@ fun rememberIcAddtodoRepeat(): ImageVector {
     val brush = SolidColor(color)
     ImageVector.Builder(
       name = "TodoIcAddtodoRepeat",
-      defaultWidth = 18.dp,
-      defaultHeight = 20.dp,
-      viewportWidth = 18f,
-      viewportHeight = 20f,
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
     ).apply {
       // 外圈循环箭头（stroke，圆头端点）
-      path(stroke = brush, strokeLineWidth = 1.5f, strokeLineCap = StrokeCap.Round) {
-        moveTo(17f, 11f)
-        curveTo(17f, 15.418f, 13.418f, 19f, 9f, 19f)
-        curveTo(4.582f, 19f, 1f, 15.418f, 1f, 11f)
-        curveTo(1f, 6.582f, 4.582f, 3f, 9f, 3f)
-        curveTo(10.457f, 3f, 11.823f, 3.39f, 13f, 4.07f)
-        moveTo(13f, 4.07f)
-        lineTo(12.5f, 1.5f)
-        moveTo(13f, 4.07f)
-        lineTo(11f, 5.5f)
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineCap = StrokeCap.Round,
+      ) {
+        moveTo(18f, 11f)
+        curveTo(18f, 15.42f, 14.42f, 19f, 10f, 19f)
+        curveTo(5.58f, 19f, 2f, 15.42f, 2f, 11f)
+        curveTo(2f, 6.58f, 5.58f, 3f, 10f, 3f)
+        curveTo(11.46f, 3f, 12.82f, 3.39f, 14f, 4.07f)
+        moveTo(14f, 4.07f)
+        lineTo(13.5f, 1.5f)
+        moveTo(14f, 4.07f)
+        lineTo(12f, 5.5f)
       }
       // 中间数字 1（fill，alpha 0.8）
       path(fill = brush, fillAlpha = 0.8f, strokeAlpha = 0.8f) {
-        moveTo(8f, 6f)
-        curveTo(7.586f, 6f, 7.25f, 6.336f, 7.25f, 6.75f)
+        moveTo(9f, 6f)
+        curveTo(8.59f, 6f, 8.25f, 6.34f, 8.25f, 6.75f)
         verticalLineTo(12.25f)
-        curveTo(7.25f, 12.664f, 7.586f, 13f, 8f, 13f)
-        horizontalLineTo(11.5f)
-        curveTo(11.914f, 13f, 12.25f, 12.664f, 12.25f, 12.25f)
-        curveTo(12.25f, 11.836f, 11.914f, 11.5f, 11.5f, 11.5f)
-        horizontalLineTo(8.75f)
+        curveTo(8.25f, 12.66f, 8.59f, 13f, 9f, 13f)
+        horizontalLineTo(12.5f)
+        curveTo(12.91f, 13f, 13.25f, 12.66f, 13.25f, 12.25f)
+        curveTo(13.25f, 11.84f, 12.91f, 11.5f, 12.5f, 11.5f)
+        horizontalLineTo(9.75f)
         verticalLineTo(6.75f)
-        curveTo(8.75f, 6.336f, 8.414f, 6f, 8f, 6f)
+        curveTo(9.75f, 6.34f, 9.41f, 6f, 9f, 6f)
         close()
       }
     }.build()
@@ -322,13 +330,13 @@ fun rememberIcAddtodoCalendar(): ImageVector {
     val brush = SolidColor(color)
     ImageVector.Builder(
       name = "TodoIcAddtodoCalendar",
-      defaultWidth = 20.dp,
-      defaultHeight = 20.dp,
-      viewportWidth = 20f,
-      viewportHeight = 20f,
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
     ).apply {
       // 日历主体轮廓
-      path(stroke = brush, strokeLineWidth = 1.67f) {
+      path(stroke = brush, strokeLineWidth = ScheduleInfoIconStrokeWidth) {
         moveTo(1.95f, 4.87f)
         curveTo(1.95f, 3.49f, 3.07f, 2.38f, 4.45f, 2.38f)
         horizontalLineTo(15.55f)
@@ -341,28 +349,36 @@ fun rememberIcAddtodoCalendar(): ImageVector {
         close()
       }
       // 顶部分隔线
-      path(stroke = brush, strokeLineWidth = 1.67f, strokeLineCap = StrokeCap.Round) {
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineCap = StrokeCap.Round,
+      ) {
         moveTo(2.79f, 7.65f)
         horizontalLineTo(17.21f)
       }
       // 顶部装订点
-      path(stroke = brush, strokeLineWidth = 1.67f, strokeLineCap = StrokeCap.Round) {
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineCap = StrokeCap.Round,
+      ) {
         moveTo(6.12f, 1.27f)
-        verticalLineTo(4.60f)
+        verticalLineTo(4.6f)
         moveTo(13.88f, 1.27f)
-        verticalLineTo(4.60f)
+        verticalLineTo(4.6f)
       }
       // 日期网格点
       path(fill = brush, fillAlpha = 0.85f, strokeAlpha = 0.85f) {
-        moveTo(5.56f, 10.70f)
+        moveTo(5.56f, 10.7f)
         moveToRelative(-0.83f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
-        moveTo(10f, 10.70f)
+        moveTo(10f, 10.7f)
         moveToRelative(-0.83f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
-        moveTo(14.44f, 10.70f)
+        moveTo(14.44f, 10.7f)
         moveToRelative(-0.83f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, 1.67f, 0f)
         arcToRelative(0.83f, 0.83f, 0f, true, true, -1.67f, 0f)
@@ -394,22 +410,26 @@ fun rememberIcAddtodoTime(): ImageVector {
     val brush = SolidColor(color)
     ImageVector.Builder(
       name = "TodoIcAddtodoTimeRange",
-      defaultWidth = 20.dp,
-      defaultHeight = 20.dp,
-      viewportWidth = 20f,
-      viewportHeight = 20f,
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
     ).apply {
       // 时钟外圈
-      path(stroke = brush, strokeLineWidth = 1.51f) {
+      path(stroke = brush, strokeLineWidth = ScheduleInfoIconStrokeWidth) {
         moveTo(10f, 2.18f)
-        curveTo(5.40f, 2.18f, 1.68f, 5.91f, 1.68f, 10.51f)
-        curveTo(1.68f, 15.11f, 5.40f, 18.83f, 10f, 18.83f)
-        curveTo(14.60f, 18.83f, 18.32f, 15.11f, 18.32f, 10.51f)
-        curveTo(18.32f, 5.91f, 14.60f, 2.18f, 10f, 2.18f)
+        curveTo(5.4f, 2.18f, 1.68f, 5.91f, 1.68f, 10.51f)
+        curveTo(1.68f, 15.11f, 5.4f, 18.83f, 10f, 18.83f)
+        curveTo(14.6f, 18.83f, 18.32f, 15.11f, 18.32f, 10.51f)
+        curveTo(18.32f, 5.91f, 14.6f, 2.18f, 10f, 2.18f)
         close()
       }
       // 时针与分针
-      path(stroke = brush, strokeLineWidth = 1.51f, strokeLineCap = StrokeCap.Round) {
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineCap = StrokeCap.Round,
+      ) {
         moveTo(10f, 5.97f)
         verticalLineTo(10.51f)
         lineTo(13.12f, 12.48f)
@@ -419,68 +439,49 @@ fun rememberIcAddtodoTime(): ImageVector {
 }
 
 /**
- * 由 `drawable/todo_ic_addtodo_category.xml` 翻译而来。
+ * 分组标签图标，造型参考 🏷️：用斜向标签轮廓和圆孔与日期、时间等信息图标区分。
  *
- * 卡片轮廓与底部横条用 #546787（category 色），其中卡片描边用 #294169，
- * 卡片填充用界面背景色 config_common_background_color（日间 #FFFFFF / 夜间 #2D2D2D）。
- *
- * 自动根据 [LocalAppDark] 切换日间/夜间颜色，结果通过 `remember` 缓存。
- *
- * @author 985892345
- * @date 2026/6/25
+ * 图标只绘制描边、不填充背景，避免深色模式下在信息栏中形成突兀的色块；
+ * 自动根据 [LocalAppDark] 切换描边颜色，结果通过 `remember` 缓存。
  */
 @Composable
 fun rememberIcAddtodoCategory(): ImageVector {
-  val categoryColor = 0xFF546787.dark(0xFFA1ADBD)
-  val cardStrokeColor = 0xFF294169.dark(0xFFA1ADBD)
-  val backgroundColor = 0xFFFFFFFF.dark(0xFF2D2D2D)
-  return remember(categoryColor, cardStrokeColor, backgroundColor) {
-    val categoryBrush = SolidColor(categoryColor)
-    val cardStrokeBrush = SolidColor(cardStrokeColor)
-    val backgroundBrush = SolidColor(backgroundColor)
+  val color = 0xFF294169.dark(0xFFA1ADBD)
+  return remember(color) {
+    val brush = SolidColor(color)
     ImageVector.Builder(
       name = "TodoIcAddtodoCategory",
-      defaultWidth = 18.dp,
-      defaultHeight = 18.dp,
-      viewportWidth = 18f,
-      viewportHeight = 18f,
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
     ).apply {
-      // 后层卡片右上角折线（stroke，圆头端点）
-      path(stroke = categoryBrush, strokeLineWidth = 1.5f, strokeLineCap = StrokeCap.Round) {
-        moveTo(17f, 13f)
-        verticalLineTo(4f)
-        curveTo(17f, 2.343f, 15.657f, 1f, 14f, 1f)
-        horizontalLineTo(10f)
-      }
-      // 后层卡片顶部小短横（stroke，圆头端点）
-      path(stroke = categoryBrush, strokeLineWidth = 1.5f, strokeLineCap = StrokeCap.Round) {
-        moveTo(7f, 1f)
-        horizontalLineTo(7.5f)
-      }
-      // 前层卡片主体（fill 背景色 + stroke 描边）
-      path(fill = backgroundBrush, stroke = cardStrokeBrush, strokeLineWidth = 1.5f) {
-        moveTo(0.75f, 6f)
-        curveTo(0.75f, 4.757f, 1.757f, 3.75f, 3f, 3.75f)
-        horizontalLineTo(12f)
-        curveTo(13.243f, 3.75f, 14.25f, 4.757f, 14.25f, 6f)
-        verticalLineTo(15f)
-        curveTo(14.25f, 16.243f, 13.243f, 17.25f, 12f, 17.25f)
-        horizontalLineTo(3f)
-        curveTo(1.757f, 17.25f, 0.75f, 16.243f, 0.75f, 15f)
-        verticalLineTo(6f)
+      // 标签主体保持纯描边；圆角连接让小尺寸下仍接近 emoji 标签的柔和轮廓。
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineJoin = StrokeJoin.Round,
+      ) {
+        // 顶部横线从圆角结束点起笔，避免闭合点在左侧形成“T”形出头。
+        moveTo(2f, 1f)
+        horizontalLineTo(9f)
+        curveTo(9.5f, 1f, 9.9f, 1.2f, 10.25f, 1.55f)
+        lineTo(18.4f, 9.7f)
+        curveTo(19.15f, 10.45f, 19.15f, 11.55f, 18.4f, 12.3f)
+        lineTo(12.3f, 18.4f)
+        curveTo(11.55f, 19.15f, 10.45f, 19.15f, 9.7f, 18.4f)
+        lineTo(1.55f, 10.25f)
+        curveTo(1.2f, 9.9f, 1f, 9.5f, 1f, 9f)
+        verticalLineTo(2f)
+        curveTo(1f, 1.45f, 1.45f, 1f, 2f, 1f)
         close()
       }
-      // 卡片内横条（fill，圆角矩形）
-      path(fill = categoryBrush) {
-        moveTo(4.75f, 13f)
-        lineTo(10.25f, 13f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, 0.75f)
-        lineTo(11f, 13.75f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, 0.75f)
-        lineTo(4.75f, 14.5f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, -0.75f, -0.75f)
-        lineTo(4f, 13.75f)
-        arcToRelative(0.75f, 0.75f, 0f, false, true, 0.75f, -0.75f)
+
+      // 标签孔独立描边，缩放后不会与主体轮廓粘连。
+      path(stroke = brush, strokeLineWidth = ScheduleInfoIconStrokeWidth) {
+        moveTo(5.8f, 4.8f)
+        arcToRelative(1f, 1f, 0f, true, true, -2f, 0f)
+        arcToRelative(1f, 1f, 0f, true, true, 2f, 0f)
         close()
       }
     }.build()

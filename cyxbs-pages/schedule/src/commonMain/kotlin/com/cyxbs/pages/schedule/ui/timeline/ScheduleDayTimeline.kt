@@ -13,14 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 
 /** 每小时对应的像素高度，外部计算默认滚动位置时复用。 */
@@ -390,10 +389,14 @@ private fun DeadlineLine(
 }
 
 /** 按稳定分类 identity 选择强调色；是否过期由上层状态样式决定，避免颜色映射混入时间判断。 */
-private fun occurrenceAccent(occurrence: ScheduleUiOccurrence): Color = when (occurrence.categoryId?.value) {
-  "study" -> Color(0xFF4A6FE3)
-  "life" -> Color(0xFF38B6A6)
-  else -> Color(0xFFF2994A)
+@Composable
+private fun occurrenceAccent(occurrence: ScheduleUiOccurrence): Color {
+  val colors = LocalAppColors.current
+  return when (occurrence.categoryId?.value) {
+    "study" -> colors.positive
+    "life" -> MaterialTheme.colors.secondary
+    else -> colors.tvLv4
+  }
 }
 
 private fun minuteToHHmm(min: Int): String {

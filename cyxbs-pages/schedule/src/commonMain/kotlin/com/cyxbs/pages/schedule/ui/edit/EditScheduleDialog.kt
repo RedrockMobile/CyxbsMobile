@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -60,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,10 +77,20 @@ import com.cyxbs.components.utils.compose.bringIntoViewFullBounds
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
-import com.cyxbs.pages.schedule.domain.model.*
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.atTime
-import kotlin.time.Instant
+import com.cyxbs.pages.schedule.domain.model.CategoryId
+import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
+import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceId
+import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
+import com.cyxbs.pages.schedule.domain.model.ReminderChannel
+import com.cyxbs.pages.schedule.domain.model.ReminderId
+import com.cyxbs.pages.schedule.domain.model.Schedule
+import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
+import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
+import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
+import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleCalendarArea
@@ -85,19 +98,23 @@ import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRemindArea
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleTimeArea
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCalendar
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCategory
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
+import kotlin.time.Instant
 
 /**
  * 添加 / 查看 / 编辑日程的统一底部弹窗 —— **邮子清单与课表共用同一套**，外观对齐课表事务(affair)。
  *
- * 形态（见与用户确认的文本草图）：标题行 + **单行信息栏**(日期·第N周·周几·时间段·重复·提醒) + 备注。
+ * 形态（见与用户确认的文本草图）：标题行 + **紧凑信息栏**(日期·第N周·周几·时间段·重复·提醒·分类) + 备注。
  * - 查看态(Show)：只读，右上 ✎ 编辑 / 🗑 删除。
  * - 编辑态(Edit)：标题/备注可输入；信息栏每段可点——下方区域就地切换：日期→日历、时间段→时分滚轮、
- *   重复→[com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea]、提醒→提前分钟选择（均实时写回，← 返回）。
+ *   重复→[com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea]、提醒→提前分钟选择、分类→分类选择
+ *   （均实时写回，← 返回）。
  * - 周数由 commonMain 的 [SchoolCalendar] 推导（学期内显示「第N周」，否则只显示日期），不依赖课表帧，
  *   所以邮子清单与课表能真正共用、长得一样。
  *
@@ -143,6 +160,7 @@ fun EditScheduleDialog(
   editSchedule: Schedule? = null,
   editOccurrence: ScheduleOccurrence? = null,
   recurrenceId: RecurrenceId? = null,
+  categories: List<ScheduleCategory> = emptyList(),
   onDismiss: () -> Unit,
   onConfirm: (EditScheduleModelState, EditScope) -> Unit,
   onDelete: ((EditScope) -> Unit)? = null,
@@ -163,6 +181,7 @@ fun EditScheduleDialog(
     if (needScope) scopeChooser = ScopeAction.SAVE
     else {
       onConfirm(modelState, EditScope.ALL)
+      onDismiss()
     }
   }
   val doDelete = {
@@ -193,6 +212,7 @@ fun EditScheduleDialog(
       ScheduleContent(
         modelState = modelState,
         firstMonday = firstMonday,
+        categories = categories,
         onSave = doSave,
         onCancel = requestDismiss,
         onDelete = doDelete,
@@ -237,7 +257,7 @@ private sealed interface ScheduleUi {
 
   /**
    * 编辑弹窗内部区域的状态机，统一描述标题下方当前展示的子编辑器。
-   * [Note] 为默认备注区，[Date]/[Time]/[Repeat]/[Remind] 分别承载日期、时间、重复与提醒编辑；
+   * [Note] 为默认备注区，[Date]/[Time]/[Repeat]/[Remind]/[Category] 分别承载日期、时间、重复、提醒与分类编辑；
    * 点击信息栏只切换区域，所有改动立即写回同一个 [EditScheduleModelState]，返回 [Note] 不回滚。
    * 作用范围选择是提交/删除前的独立状态，不与本区域状态混用，避免子编辑返回被误判为关闭弹窗。
    */
@@ -247,6 +267,7 @@ private sealed interface ScheduleUi {
     data object Time : ScheduleUi.Edit
     data object Repeat : ScheduleUi.Edit
     data object Remind : ScheduleUi.Edit
+    data object Category : ScheduleUi.Edit
   }
 }
 
@@ -254,12 +275,18 @@ private sealed interface ScheduleUi {
 private fun ScheduleContent(
   modelState: EditScheduleModelState,
   firstMonday: Date?,
+  categories: List<ScheduleCategory>,
   onSave: () -> Unit,
   onCancel: () -> Unit,
   onDelete: () -> Unit,
 ) {
   val colors = LocalAppColors.current
-  var uiState by remember { mutableStateOf<ScheduleUi>(ScheduleUi.Show) }
+  var uiState by remember(modelState.origin) {
+    // 新建没有可供“查看”的既有资源，直接进入表单；已有日程仍先展示只读详情。
+    mutableStateOf<ScheduleUi>(
+      if (modelState.origin == null) ScheduleUi.Edit.Note else ScheduleUi.Show,
+    )
+  }
   Column(modifier = Modifier.bringIntoViewFullBounds()) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Box(modifier = Modifier.weight(1f)) {
@@ -317,29 +344,35 @@ private fun ScheduleContent(
     }
     Spacer(modifier = Modifier.height(10.dp))
     InfoRow(
-      modelState = modelState, firstMonday = firstMonday, editable = uiState is ScheduleUi.Edit,
+      modelState = modelState,
+      firstMonday = firstMonday,
+      categories = categories,
+      editable = uiState is ScheduleUi.Edit,
       onClickDate = { uiState = ScheduleUi.Edit.Date },
       onClickTime = { uiState = ScheduleUi.Edit.Time },
       onClickRepeat = { uiState = ScheduleUi.Edit.Repeat },
       onClickRemind = { uiState = ScheduleUi.Edit.Remind },
+      onClickCategory = { uiState = ScheduleUi.Edit.Category },
     )
     Spacer(modifier = Modifier.height(10.dp))
   }
   when (uiState) {
     // 备注输入
     ScheduleUi.Show, ScheduleUi.Edit.Note -> Box {
-      BasicTextField(
-        state = modelState.detail,
-        enabled = uiState is ScheduleUi.Edit,
-        cursorBrush = SolidColor(colors.positive),
-        textStyle = TextStyle(fontSize = 15.sp, color = colors.tvLv2),
-        modifier = Modifier.fillMaxWidth(),
-      )
-      val isShowHint by rememberDerivedStateOfStructure {
-        uiState is ScheduleUi.Edit && modelState.detail.text.isEmpty()
-      }
-      if (isShowHint) {
-        Text("备注（可选）", fontSize = 15.sp, color = colors.tvLv2.copy(alpha = 0.3f))
+      Box {
+        BasicTextField(
+          state = modelState.detail,
+          enabled = uiState is ScheduleUi.Edit,
+          cursorBrush = SolidColor(colors.positive),
+          textStyle = TextStyle(fontSize = 15.sp, color = colors.tvLv2),
+          modifier = Modifier.fillMaxWidth(),
+        )
+        val isShowHint by rememberDerivedStateOfStructure {
+          uiState is ScheduleUi.Edit && modelState.detail.text.isEmpty()
+        }
+        if (isShowHint) {
+          Text("备注（可选）", fontSize = 15.sp, color = colors.tvLv2.copy(alpha = 0.3f))
+        }
       }
     }
     // 日期：下方就地变日历，点某天实时改写开始/结束的日期（周数随之重算）；← 返回
@@ -360,8 +393,37 @@ private fun ScheduleContent(
       onChoose = { modelState.remindMinutes = it },
       modifier = Modifier,
     )
+    // 分类：由信息栏进入，选择后仍停留在子区域，右上返回按钮回到备注。
+    ScheduleUi.Edit.Category -> CategoryChooser(
+      categories = categories,
+      selected = modelState.categoryId,
+      onSelected = { modelState.categoryId = it },
+    )
   }
   Spacer(modifier = Modifier.height(16.dp))
+}
+
+/**
+ * 共享编辑器中的分类选择器。
+ *
+ * 只写回已有分类 identity，不读取分类自由颜色文本；选中态沿用共享编辑器已有的轻量 ToggleChip。
+ * 分类新增、删除需要处理其他清单引用，暂不放在清单编辑弹窗中，后续由独立设置入口负责。
+ */
+@Composable
+private fun CategoryChooser(
+  categories: List<ScheduleCategory>,
+  selected: CategoryId?,
+  onSelected: (CategoryId?) -> Unit,
+) {
+  FlowRow(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    ToggleChip("未分组", selected = selected == null) { onSelected(null) }
+    categories.sortedBy(ScheduleCategory::sortOrder).forEach { category ->
+      ToggleChip(category.name, selected = selected == category.id) { onSelected(category.id) }
+    }
+  }
 }
 
 @Composable
@@ -423,17 +485,19 @@ private fun TitleRightIcons(
   }
 }
 
-/* ---------------- 单行信息栏 ---------------- */
+/* ---------------- 紧凑信息栏 ---------------- */
 
 @Composable
 private fun InfoRow(
   modelState: EditScheduleModelState,
   firstMonday: Date?,
+  categories: List<ScheduleCategory>,
   editable: Boolean,
   onClickDate: () -> Unit = {},
   onClickTime: () -> Unit = {},
   onClickRepeat: () -> Unit = {},
   onClickRemind: () -> Unit = {},
+  onClickCategory: () -> Unit = {},
 ) {
   val date = modelState.anchorDate
   val colors = LocalAppColors.current
@@ -512,25 +576,165 @@ private fun InfoRow(
         onClick = if (editable) onClickRemind else null,
       )
     }
+  // 🏷分类；使用纯描边标签图标，避免 Material 图标与其余自绘图标的风格不一致。
+  val categoryIcon = rememberIcAddtodoCategory()
+  val categorySegment = remember(
+    colors,
+    editable,
+    categories,
+    modelState.categoryId,
+    categoryIcon,
+    onClickCategory,
+  ) {
+    val selectedName = categories.firstOrNull { it.id == modelState.categoryId }?.name
+    InfoTextSegment(
+      id = "category",
+      text = selectedName ?: "未分组",
+      icon = categoryIcon,
+      color = if (selectedName == null) placeholderColor else colors.tvLv2,
+      onClick = if (editable && categories.isNotEmpty()) onClickCategory else null,
+    )
+  }
 
-  FlowRow(
+  BalancedInfoRow(
     modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalArrangement = Arrangement.spacedBy(4.dp),
+    horizontalSpacing = 10.dp,
+    verticalSpacing = 5.dp,
   ) {
     // 日期和时间仍使用单个富文本，统一字体度量，避免桌面端纯数字/英文文本高度不一致。
     BasicText(
       text = dateSegment.annotatedText + AnnotatedString("  ") + timeSegment.annotatedText,
       style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),
       inlineContent = dateSegment.inlineContent + timeSegment.inlineContent,
+      maxLines = 1,
     )
-    listOf(repeatSegment, remindSegment).forEach {
+    (listOf(repeatSegment, remindSegment) + listOf(categorySegment)).forEach {
       BasicText(
         text = it.annotatedText,
         style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),
         inlineContent = it.inlineContent,
+        maxLines = 1,
       )
     }
+  }
+}
+
+/**
+ * 最多使用两行展示信息项，并在必须换行时选择更均衡的连续切分点。
+ *
+ * 信息项顺序不会改变；优先保证第一行不短于第二行，再让两行宽度差尽可能小。
+ * 这可以避免普通 [FlowRow] 把大多数内容塞进第一行、第二行只留下一个短项。
+ */
+@Composable
+private fun BalancedInfoRow(
+  modifier: Modifier = Modifier,
+  horizontalSpacing: Dp,
+  verticalSpacing: Dp,
+  content: @Composable () -> Unit,
+) {
+  Layout(
+    modifier = modifier,
+    content = content,
+  ) { measurables, constraints ->
+    val itemConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+    val placeables = measurables.map { it.measure(itemConstraints) }
+    if (placeables.isEmpty()) {
+      layout(constraints.minWidth, constraints.minHeight) {}
+    } else {
+      val horizontalSpacingPx = horizontalSpacing.roundToPx()
+      val verticalSpacingPx = verticalSpacing.roundToPx()
+      val splitIndex = chooseBalancedInfoRowSplit(
+        itemWidths = placeables.map { it.width },
+        horizontalSpacing = horizontalSpacingPx,
+        maxWidth = constraints.maxWidth,
+      )
+      val rows = if (splitIndex == null) {
+        listOf(placeables)
+      } else {
+        listOf(placeables.take(splitIndex), placeables.drop(splitIndex))
+      }
+      val rowWidths = rows.map { row ->
+        row.sumOf { it.width } + horizontalSpacingPx * (row.size - 1).coerceAtLeast(0)
+      }
+      val rowHeights = rows.map { row -> row.maxOf { it.height } }
+      val layoutWidth = rowWidths.max().coerceIn(constraints.minWidth, constraints.maxWidth)
+      val contentHeight = rowHeights.sum() +
+        verticalSpacingPx * (rows.size - 1).coerceAtLeast(0)
+      val layoutHeight = contentHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
+
+      layout(layoutWidth, layoutHeight) {
+        var y = 0
+        rows.forEachIndexed { rowIndex, row ->
+          var x = 0
+          val rowHeight = rowHeights[rowIndex]
+          row.forEach { placeable ->
+            placeable.placeRelative(x, y + (rowHeight - placeable.height) / 2)
+            x += placeable.width + horizontalSpacingPx
+          }
+          y += rowHeight + verticalSpacingPx
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 根据各信息项的实测宽度选择两行的连续切分位置；全部内容可放入一行时返回 `null`。
+ *
+ * [horizontalSpacing] 与 [maxWidth] 均为像素值。正常情况下两行都必须放得下；若极窄窗口下
+ * 不存在可行切分，则优先选择总溢出最少的切分，交由父布局裁剪。
+ */
+internal fun chooseBalancedInfoRowSplit(
+  itemWidths: List<Int>,
+  horizontalSpacing: Int,
+  maxWidth: Int,
+): Int? {
+  require(itemWidths.all { it >= 0 }) { "itemWidths must not contain negative values" }
+  require(horizontalSpacing >= 0) { "horizontalSpacing must not be negative" }
+  require(maxWidth >= 0) { "maxWidth must not be negative" }
+  if (itemWidths.size < 2) return null
+
+  fun rowWidth(startIndex: Int, endIndex: Int): Long {
+    val itemCount = endIndex - startIndex
+    return itemWidths.subList(startIndex, endIndex).sumOf { it.toLong() } +
+      horizontalSpacing.toLong() * (itemCount - 1).coerceAtLeast(0)
+  }
+
+  val maxWidthLong = maxWidth.toLong()
+  if (rowWidth(0, itemWidths.size) <= maxWidthLong) return null
+
+  val candidates = (1 until itemWidths.size).map { splitIndex ->
+    Triple(
+      splitIndex,
+      rowWidth(0, splitIndex),
+      rowWidth(splitIndex, itemWidths.size),
+    )
+  }
+  val fitting = candidates.filter { (_, firstWidth, secondWidth) ->
+    firstWidth <= maxWidthLong && secondWidth <= maxWidthLong
+  }
+  val firstRowNotShorter = fitting.filter { (_, firstWidth, secondWidth) ->
+    firstWidth >= secondWidth
+  }
+
+  return when {
+    firstRowNotShorter.isNotEmpty() -> firstRowNotShorter.minBy { (_, firstWidth, secondWidth) ->
+      firstWidth - secondWidth
+    }.first
+
+    fitting.isNotEmpty() -> fitting.minBy { (_, firstWidth, secondWidth) ->
+      abs(firstWidth - secondWidth)
+    }.first
+
+    else -> candidates.minWith(
+      compareBy<Triple<Int, Long, Long>>(
+        { (_, firstWidth, secondWidth) ->
+          (firstWidth - maxWidthLong).coerceAtLeast(0) +
+            (secondWidth - maxWidthLong).coerceAtLeast(0)
+        },
+        { (_, firstWidth, secondWidth) -> abs(firstWidth - secondWidth) },
+      )
+    ).first
   }
 }
 
@@ -603,7 +807,7 @@ internal fun ToggleChip(
         RoundedCornerShape(6.dp)
       )
       .background(
-        if (selected) accent.copy(alpha = 0.1f) else Color.Transparent,
+        if (selected) accent.copy(alpha = 0.1f) else colors.topBg.copy(alpha = 0f),
         RoundedCornerShape(6.dp)
       )
       .clickable(onClick = onClick)
@@ -631,7 +835,6 @@ private fun EditScopeChooserSheet(
         modifier = Modifier.fillMaxWidth().padding(20.dp),
       )
       ScopeRow(if (isDelete) "仅删除此次" else "仅此次") { onChoose(EditScope.THIS_ONLY) }
-      ScopeRow(if (isDelete) "删除此次及后续" else "此次及后续") { onChoose(EditScope.THIS_AND_FOLLOWING) }
       ScopeRow(if (isDelete) "删除整个系列" else "整个系列") { onChoose(EditScope.ALL) }
       Spacer(modifier = Modifier.height(8.dp))
       Text(
@@ -653,4 +856,3 @@ private fun ScopeRow(text: String, onClick: () -> Unit) {
       .padding(horizontal = 20.dp, vertical = 14.dp),
   )
 }
-

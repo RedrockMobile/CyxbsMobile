@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -30,18 +31,19 @@ import kotlinx.coroutines.flow.first
  * @param onDismissRequest 关闭请求拦截：点击 scrim / 按返回键触发关闭前回调，返回 true 放行（执行
  *   收起动画并最终回调 [onDismiss]），返回 false 则拦截本次关闭（弹窗保持展开，由调用方自行处理，
  *   如弹出「未保存确认」）。默认 null 表示不拦截，任何关闭请求都直接放行。
- * @param content 弹窗内容。内部自动包裹一层圆角白色 Column 并挂 [bottomSheetDraggable]。
+ * @param content 弹窗内容。内部自动包裹一层主题背景的圆角 Column 并挂 [bottomSheetDraggable]。
  */
 @Composable
 internal fun ScheduleBottomSheet(
   show: Boolean,
   onDismiss: () -> Unit,
-  scrimColor: Color = Color.Black.copy(alpha = 0.4f),
+  scrimColor: Color? = null,
   onDismissRequest: (() -> Boolean)? = null,
   content: @Composable () -> Unit,
 ) {
   if (!show) return
   val colors = LocalAppColors.current
+  val resolvedScrimColor = scrimColor ?: MaterialTheme.colors.onSurface.copy(alpha = 0.4f)
   // 用 rememberUpdatedState 保证 BottomSheetState 内捕获的始终是最新一帧的拦截回调（避免闭包过期）。
   val dismissGate = rememberUpdatedState(onDismissRequest)
   val state = remember {
@@ -66,7 +68,7 @@ internal fun ScheduleBottomSheet(
   BottomSheetCompose(
     bottomSheetState = state,
     peekHeight = 0.dp,
-    scrimColor = scrimColor,
+    scrimColor = resolvedScrimColor,
     dismissOnBackPress = true,
     dismissOnClickOutside = true,
   ) {

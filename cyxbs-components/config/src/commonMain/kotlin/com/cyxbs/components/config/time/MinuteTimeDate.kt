@@ -47,13 +47,19 @@ value class MinuteTimeDate(val value: Int) : Comparable<MinuteTimeDate> {
     return date.daysUntil(other.date) * 24 * 60 + time.minutesUntil(other.time)
   }
 
+  /**
+   * 增减分钟并自动归一化日期与时刻。
+   *
+   * [minutes] 可为负数，也可跨越一天或多天；结果中的小时和分钟始终保持在合法范围内。
+   */
   fun plusMinutes(minutes: Int): MinuteTimeDate {
-    val hourDiff = (time.minute + minutes) / 60
-    val dateDiff = (time.hour + hourDiff) / 24
+    val totalMinutes = minuteOfDay + minutes
+    val dateDiff = totalMinutes.floorDiv(MINUTES_PER_DAY)
+    val normalizedMinuteOfDay = totalMinutes.mod(MINUTES_PER_DAY)
     return MinuteTimeDate(
       date.plusDays(dateDiff),
-      (time.hour + hourDiff) % 24,
-      (time.minute + minutes) % 60
+      normalizedMinuteOfDay / 60,
+      normalizedMinuteOfDay % 60,
     )
   }
 
@@ -108,6 +114,8 @@ value class MinuteTimeDate(val value: Int) : Comparable<MinuteTimeDate> {
   }
 
   companion object {
+    private const val MINUTES_PER_DAY = 24 * 60
+
     fun now(): MinuteTimeDate {
       val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
       return MinuteTimeDate(now.year, now.month.number, now.day, MinuteTime(now.hour, now.minute))

@@ -19,7 +19,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -88,6 +87,7 @@ private fun OneWheel(
   line: Animatable<Float, AnimationVector1D>,
   modifier: Modifier = Modifier,
 ) {
+  val colors = LocalAppColors.current
   WheelSelectCompose(
     selectedLine = line,
     options = options,
@@ -95,7 +95,7 @@ private fun OneWheel(
     textStyle = TextStyle(
       fontSize = 16.sp,
       textAlign = TextAlign.Center,
-      color = Color.Black,
+      color = colors.tvLv2,
     )
   )
 }

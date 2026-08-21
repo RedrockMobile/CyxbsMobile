@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,15 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
-import com.cyxbs.components.utils.compose.clickableSingle
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_empty_notify
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_loading
@@ -116,18 +116,18 @@ private fun ScheduleFeedItem(
   var checked by remember(item.id) { mutableStateOf(false) }
 
   val titleColor = when {
-    checked -> Color(0xFFB9C2CE) // todo_check_item_color
-    item.isOverTime -> Color(0xFFFF6262) // todo_text_overtime_color
+    checked -> colors.tvLv3.copy(alpha = 0.45f)
+    item.isOverTime -> MaterialTheme.colors.error
     else -> colors.tvLv2
   }
   val timeColor = when {
-    checked -> Color(0xFFB9C2CE)
-    item.isOverTime -> Color(0xFFA19EBB) // todo_textTime_overtime_color
+    checked -> colors.tvLv3.copy(alpha = 0.45f)
+    item.isOverTime -> MaterialTheme.colors.error.copy(alpha = 0.62f)
     else -> colors.tvLv4.copy(alpha = 0.52f) // todo_item_nf_time_color #862A4E84
   }
-  // 勾选圈未选色：超时 todo_check_overtime_color，否则 todo_inner_check_eclipse_color #7515315B
+  // 超时态复用主题错误色，普通态复用正文色，保证深色模式下仍有稳定对比度。
   val circleUncheckedColor =
-    if (item.isOverTime) Color(0xFFFFB7B7) else colors.tvLv3.copy(alpha = 0.46f)
+    if (item.isOverTime) MaterialTheme.colors.error.copy(alpha = 0.36f) else colors.tvLv3.copy(alpha = 0.46f)
 
   Column(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {

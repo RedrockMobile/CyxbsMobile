@@ -102,7 +102,21 @@ sealed interface ScheduleCommand {
   data class CreateCategory(val category: ScheduleCategory) : ScheduleCommand
   /** 更新分类。 */
   data class UpdateCategory(val category: ScheduleCategory) : ScheduleCommand
-  /** 删除分类；关联日程如何解除分类由仓库事务统一保证。 */
+  /**
+   * 在所选分类尚不存在时，将分类 CREATE 与日程 CREATE/PATCH 作为同一次本地原子修改保存。
+   *
+   * [schedule] 必须引用 [category]；该命令只服务于固定默认分类的惰性创建，不承担通用分类管理。
+   */
+  data class SaveScheduleWithNewCategory(
+    val category: ScheduleCategory,
+    val schedule: Schedule,
+  ) : ScheduleCommand
+  /**
+   * 删除未被日程引用的分类。
+   *
+   * 仓库会把该命令编码为仅包含 Category DELETE 的聚合批次并复用日常 DELETE 接口；当前暂不提供 UI 入口。
+   * 仍被日程引用时本地直接拒绝，避免向服务端提交必然无法形成合法最终图的请求。
+   */
   data class DeleteCategory(val categoryId: CategoryId) : ScheduleCommand
   /** 首次进入、网络恢复或用户主动对账时，提交 typed confirmed 与 pending 并合并服务端完整响应。 */
   data object RequestSync : ScheduleCommand

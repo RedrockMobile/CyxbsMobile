@@ -4,7 +4,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.time.toLocalDate
 import com.cyxbs.components.config.time.toLocalDateTime
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
+import com.cyxbs.pages.schedule.api.ScheduleTodoNavArgument
 import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
 import com.cyxbs.pages.schedule.domain.model.*
 import com.cyxbs.pages.schedule.domain.repository.*
@@ -29,9 +29,11 @@ class ScheduleFeedViewModel(
 
   init { launchByViewModelScope { repository.snapshot.collect(::updateList) } }
   fun refresh() = launchByViewModelScope { repository.initialize() }
-  fun onCardClick() { ScheduleMainNavArgument().navigate() }
+  /** 从首页摘要进入独立邮子清单，不再跳转到课表时间轴页面。 */
+  fun onCardClick() { ScheduleTodoNavArgument().navigate() }
+  /** 从摘要打开清单并定位精确实例；清单消费 identity 后展示共享的日程编辑底部弹窗。 */
   fun onItemClick(id: ScheduleId, recurrenceId: RecurrenceId?) {
-    ScheduleMainNavArgument(scheduleId = id, recurrenceId = recurrenceId).navigate()
+    ScheduleTodoNavArgument(scheduleId = id, recurrenceId = recurrenceId).navigate()
   }
 
   /**

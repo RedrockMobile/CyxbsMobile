@@ -8,19 +8,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_feed_check
@@ -31,7 +32,7 @@ import org.jetbrains.compose.resources.painterResource
  * [com.cyxbs.pages.schedule.component.CheckLineView] 的 Compose 复刻版。
  *
  * 行为对齐旧版：
- * - 未勾选时画一个完整圆环（[uncheckedColor]）。
+ * - 未勾选时画一个完整圆环（[uncheckedColor]），完成态颜色来自全局主题正文色。
  * - 点击后立即回调 [onClick]（旧版点击瞬间即把标题/时间置灰），随后播放约 800ms 的
  *   收拢动画（圆弧从 [startAngle] 起收拢成 320° 弧 + 中心浮现对勾），动画结束再回调
  *   [onAnimEnd]（对齐旧版 `setStatusWithAnime` 的 `doOnEnd`，在此触发数据层删除/更新）。
@@ -46,11 +47,11 @@ fun ScheduleCheckCircle(
   onClick: () -> Unit,
   onAnimEnd: () -> Unit,
   modifier: Modifier = Modifier,
-  checkedColor: Color = Color(0xFF8997AD), // todo_inner_checked_line_color
   diameter: Dp = 17.dp,
   lineWidth: Dp = 1.5.dp,
   startAngle: Float = 40f,
 ) {
+  val checkedColor = LocalAppColors.current.tvLv3.copy(alpha = 0.65f)
   // 动画进度为 0..200：0~100 收拢圆弧，100~200 进入完成态，以保持旧 View 的节奏。
   val process = remember { Animatable(200f) }
   val currentOnAnimEnd by rememberUpdatedState(onAnimEnd)

@@ -245,6 +245,33 @@ object fields:
 deeplink: cyxbs://schedule/edit
 ```
 
+### schedule/desktop-preview
+
+- entry: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopPreviewNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopPreviewNavArgument`
+
+```text
+deeplink: cyxbs://schedule/desktop-preview
+```
+
+### schedule/todo-preview/detail
+
+- entry: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopTodoDetailPreviewNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopTodoDetailPreviewNavArgument`
+
+```text
+deeplink: cyxbs://schedule/todo-preview/detail?scheduleId={ScheduleId}&recurrenceId=[RecurrenceId?]
+```
+
+### schedule/todo-preview
+
+- entry: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopTodoPreviewNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.main.ScheduleDesktopTodoPreviewNavArgument`
+
+```text
+deeplink: cyxbs://schedule/todo-preview
+```
+
 ### schedule
 
 - entry: `com.cyxbs.pages.schedule.ui.main.ScheduleMainNavEntry`
@@ -272,6 +299,46 @@ object fields:
 
 ```text
 deeplink: cyxbs://schedule_settings
+```
+
+### schedule/todo
+
+- entry: `com.cyxbs.pages.schedule.ui.todo.ScheduleTodoNavEntry`
+- argument: `com.cyxbs.pages.schedule.api.ScheduleTodoNavArgument`
+
+```text
+deeplink: cyxbs://schedule/todo?scheduleId=[ScheduleId?]&recurrenceId=[RecurrenceId?]
+object fields:
+  [scheduleId]: ScheduleId? {
+    value: String
+  }
+  [recurrenceId]: RecurrenceId? {
+    originalDateTime: MinuteTimeDate {
+      value: Int
+    }
+    timeZoneId: String?
+    allDay: Boolean
+  }
+```
+
+### schedule/todo/detail
+
+- entry: `com.cyxbs.pages.schedule.ui.todo.figma.ScheduleTodoDetailNavEntry`
+- argument: `com.cyxbs.pages.schedule.api.ScheduleTodoDetailNavArgument`
+
+```text
+deeplink: cyxbs://schedule/todo/detail?scheduleId={ScheduleId}&recurrenceId=[RecurrenceId?]
+object fields:
+  scheduleId: ScheduleId {
+    value: String
+  }
+  [recurrenceId]: RecurrenceId? {
+    originalDateTime: MinuteTimeDate {
+      value: Int
+    }
+    timeZoneId: String?
+    allDay: Boolean
+  }
 ```
 
 ## :cyxbs-pages:schoolcar

@@ -15,6 +15,7 @@ import kotlin.time.Instant
  * [EditScope.THIS_AND_FOLLOWING] 必须非空，否则立即失败，避免误改整个系列。
  * @param idGenerators 新建时生成正式 ID；编辑状态中的 draft ID 只是校验占位符。
  * @param clock 为命令及例外提供统一时间戳。
+ * @param newCategory 所选固定默认分类尚不存在时提供完整分类；仅在整系列 CREATE/PATCH 时与日程同批提交。
  *
  * 此函数会挂起并写入仓库；无实际字段变化时不发命令。Compose 层不会接触 record/DTO。
  */
@@ -24,12 +25,18 @@ suspend fun ScheduleRepository.applyScheduleEdit(
   recurrenceId: RecurrenceId?,
   idGenerators: ScheduleIdGenerators,
   clock: Clock,
+  newCategory: ScheduleCategory? = null,
 ) {
   val now = clock.now()
   val origin = state.origin
+
   if (origin == null) {
     val draft = state.toDraft().copy(id = idGenerators.scheduleId())
-    execute(ScheduleCommand.Create(draft.toNewDomain(now)))
+    val created = draft.toNewDomain(now)
+    execute(
+      newCategory?.let { ScheduleCommand.SaveScheduleWithNewCategory(it, created) }
+        ?: ScheduleCommand.Create(created),
+    )
     return
   }
   val editedDraft = state.toDraft()
@@ -62,7 +69,12 @@ suspend fun ScheduleRepository.applyScheduleEdit(
   }
   when (scope) {
     EditScope.ALL -> {
-      if (hasSeriesScopeChanges) execute(ScheduleCommand.Update(seriesEdited))
+      if (hasSeriesScopeChanges) {
+        execute(
+          newCategory?.let { ScheduleCommand.SaveScheduleWithNewCategory(it, seriesEdited) }
+            ?: ScheduleCommand.Update(seriesEdited),
+        )
+      }
     }
     EditScope.THIS_ONLY -> {
       // RRULE 只属于系列；仅修改 recurrence 后选择 THIS_ONLY 按 no-op 处理，不创建空 occurrence exception。

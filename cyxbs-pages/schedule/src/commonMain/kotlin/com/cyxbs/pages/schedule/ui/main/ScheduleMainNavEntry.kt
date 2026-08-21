@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -78,8 +77,8 @@ class ScheduleMainNavEntry : AppNavEntry<ScheduleMainNavArgument>() {
 
   @Composable
   override fun Content(argument: ScheduleMainNavArgument) {
-    viewModel { ScheduleMainViewModel() }
-    SchedulePage(argument = argument)
+    val viewModel = viewModel { ScheduleMainViewModel() }
+    SchedulePage(argument = argument, viewModel = viewModel)
   }
 }
 
@@ -95,12 +94,14 @@ internal fun isScheduleMainEditorEnabled(
 
 /**
  * 日程主页面：周 Header + 可展开折叠日历 + 按天时间轴 三层结构。
+ *
+ * [viewModel] 默认由正式导航入口提供；Desktop 开发预览可注入纯内存仓库，以展示真实页面而不污染账号数据库。
  */
 @Composable
 fun SchedulePage(
   argument: ScheduleMainNavArgument,
+  viewModel: ScheduleMainViewModel,
 ) {
-  val viewModel = viewModel(ScheduleMainViewModel::class)
   val colors = LocalAppColors.current
   val snapshot by viewModel.snapshot.collectAsState()
   val editorEnabled = isScheduleMainEditorEnabled(viewModel.mutationMode)
@@ -237,7 +238,7 @@ fun SchedulePage(
         },
         backgroundColor = colors.positive,
       ) {
-        Icon(Icons.Default.Add, contentDescription = "添加日程", tint = Color.White)
+        Icon(Icons.Default.Add, contentDescription = "添加日程", tint = MaterialTheme.colors.onPrimary)
       }
     }
   }
@@ -253,8 +254,11 @@ fun SchedulePage(
       editSchedule = currentEditing,
       editOccurrence = editingOccurrence,
       recurrenceId = editingRecurrenceId,
+      categories = snapshot.categories,
       onDismiss = { showEdit = false },
-      onConfirm = { state, scope -> viewModel.saveSchedule(state, scope, editingRecurrenceId) },
+      onConfirm = { state, scope ->
+        viewModel.saveSchedule(state, scope, editingRecurrenceId)
+      },
       onDelete = if (currentEditing != null) {
         { scope -> viewModel.deleteScheduleScoped(currentEditing.id, scope, editingRecurrenceId) }
       } else null,
@@ -275,12 +279,12 @@ private fun SyncStateIndicator(
   if (mutationMode == ScheduleRepositoryMutationMode.READ_ONLY) {
     Surface(
       modifier = Modifier.fillMaxWidth(),
-      color = Color(0xFFFFEBEE),
+      color = MaterialTheme.colors.error.copy(alpha = 0.1f),
     ) {
       Text(
         text = "当前没有可编辑的登录账号，仅可查看日程。",
         modifier = Modifier.padding(8.dp),
-        color = Color(0xFFC62828),
+        color = MaterialTheme.colors.error,
         style = MaterialTheme.typography.caption,
       )
     }
@@ -298,12 +302,12 @@ private fun SyncStateIndicator(
     is ScheduleRepositoryStatus.Corrupted -> {
       Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFFFEBEE),
+        color = MaterialTheme.colors.error.copy(alpha = 0.1f),
       ) {
         Text(
           text = "同步失败: ${syncState.cause.message}",
           modifier = Modifier.padding(8.dp),
-          color = Color(0xFFC62828),
+          color = MaterialTheme.colors.error,
           style = MaterialTheme.typography.caption,
         )
       }
