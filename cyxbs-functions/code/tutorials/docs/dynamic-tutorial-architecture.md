@@ -43,7 +43,9 @@ cyxbs-components:guided-tour
 
 ## UI 接入约定
 
-- 课程入口使用 `manifest.courses` 构造带前置关系的卡片式路径。
+- 课程入口使用 `manifest.courses` 构造带前置关系的卡片式路径，并统一解析未开始、进行中、已完成与
+  锁定状态。未完成全部 `prerequisiteCourseIds` 时，侧栏展示缺少的前置课程且加载入口再次拒绝；未知
+  前置 ID 或循环依赖按锁定处理，已完成课程不会因 npm 包后来新增前置关系而重新锁住。
 - 进入课时后，底部工具窗口顺序为 `Tutorial | Run | Performance`，Tutorial 默认展开。
 - 教程正文只包含声明式文本、提示和代码块，npm 包不能返回 Compose 组件。
 - 布局提示使用稳定 `anchorId`；业务控件通过 `Modifier.guidedTourTarget` 注册位置。

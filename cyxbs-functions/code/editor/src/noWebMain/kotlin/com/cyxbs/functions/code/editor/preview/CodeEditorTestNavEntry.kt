@@ -65,9 +65,11 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
 import com.cyxbs.functions.code.tutorials.DynamicTutorialLessonWorkspace
+import com.cyxbs.functions.code.tutorials.DynamicTutorialCourseState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.DynamicTutorialResumeState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
+import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
 import com.cyxbs.functions.code.tutorials.resolveResumeState
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
@@ -245,6 +247,21 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         isLoadingTutorial = true
         try {
           val session = tutorialSession ?: error("当前语言的教程包尚未加载完成。")
+          val completedCourseIds = savedTutorialProgress.values
+            .filter(DynamicTutorialProgress::isCourseCompleted)
+            .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
+          val availability = tutorialManifest
+            ?.resolveCourseAvailability(completedCourseIds, savedTutorialProgress.keys)
+            ?.firstOrNull { it.course.courseId == courseId }
+            ?: error("教程 Manifest 中不存在课程：$courseId")
+          if (availability.state == DynamicTutorialCourseState.LOCKED) {
+            val courseTitles = tutorialManifest?.courses.orEmpty().associate { it.courseId to it.title }
+            val missingTitles = availability.missingPrerequisiteCourseIds.map { prerequisiteId ->
+              courseTitles[prerequisiteId] ?: prerequisiteId
+            }
+            tutorialStatus = "请先完成 ${missingTitles.joinToString("、")}"
+            return@launch
+          }
           val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
           val resumeState = course.resolveResumeState(
             progress = savedTutorialProgress[courseId],
@@ -726,14 +743,16 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       .firstOrNull { it.languageId == activeLanguageId }
       ?.displayName
       ?: "代码"
+    val completedTutorialCourseIds = savedTutorialProgress.values
+      .filter(DynamicTutorialProgress::isCourseCompleted)
+      .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
     val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
       manifest = tutorialManifest,
       status = tutorialStatus,
       isLoading = isLoadingTutorial,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
-      completedCourseIds = savedTutorialProgress.values
-        .filter(DynamicTutorialProgress::isCourseCompleted)
-        .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId),
+      completedCourseIds = completedTutorialCourseIds,
+      startedCourseIds = savedTutorialProgress.keys,
       onOpenCourse = ::openTutorialCourse,
       onResetCourse = ::resetTutorialCourse,
     )

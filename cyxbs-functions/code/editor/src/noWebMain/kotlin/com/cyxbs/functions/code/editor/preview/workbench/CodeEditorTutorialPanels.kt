@@ -26,6 +26,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,6 +44,8 @@ import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
 import com.cyxbs.functions.code.tutorials.DynamicTutorialCompletedStep
+import com.cyxbs.functions.code.tutorials.DynamicTutorialCourseState
+import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentBlock
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentKind
@@ -126,6 +129,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
   isLoading: Boolean,
   activeCourseId: String?,
   completedCourseIds: Set<String>,
+  startedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
@@ -140,6 +144,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
       isLoading = isLoading,
       activeCourseId = activeCourseId,
       completedCourseIds = completedCourseIds,
+      startedCourseIds = startedCourseIds,
       onResetCourse = onResetCourse,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
@@ -159,6 +164,7 @@ private fun TutorialCoursePath(
   isLoading: Boolean,
   activeCourseId: String?,
   completedCourseIds: Set<String>,
+  startedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ) {
@@ -181,106 +187,146 @@ private fun TutorialCoursePath(
     if (isLoading) {
       Text("正在下载教程包…", color = EditorWorkbenchColors.Accent, fontSize = 11.sp)
     }
-    manifest?.courses
-      ?.sortedBy { it.order }
-      ?.forEachIndexed { index, course ->
-        Row(modifier = Modifier.fillMaxWidth()) {
-          Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(24.dp),
+    val courseTitles = manifest?.courses.orEmpty().associate { it.courseId to it.title }
+    manifest?.resolveCourseAvailability(
+      completedCourseIds = completedCourseIds,
+      startedCourseIds = startedCourseIds,
+    )?.forEachIndexed { index, availability ->
+      val course = availability.course
+      val isLocked = availability.state == DynamicTutorialCourseState.LOCKED
+      Row(modifier = Modifier.fillMaxWidth()) {
+        Column(
+          horizontalAlignment = Alignment.CenterHorizontally,
+          modifier = Modifier.width(24.dp),
+        ) {
+          Box(
+            modifier = Modifier
+              .size(20.dp)
+              .background(
+                color = if (course.courseId == activeCourseId) {
+                  EditorWorkbenchColors.Accent
+                } else {
+                  EditorWorkbenchColors.EditorBackground
+                },
+                shape = CircleShape,
+              ),
+            contentAlignment = Alignment.Center,
           ) {
-            Box(
-              modifier = Modifier
-                .size(20.dp)
-                .background(
-                  color = if (course.courseId == activeCourseId) {
-                    EditorWorkbenchColors.Accent
-                  } else {
-                    EditorWorkbenchColors.EditorBackground
-                  },
-                  shape = CircleShape,
-                ),
-              contentAlignment = Alignment.Center,
-            ) {
-              if (course.courseId in completedCourseIds) {
-                Icon(
-                  imageVector = Icons.Default.Check,
-                  contentDescription = "已完成",
-                  tint = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.Accent,
-                  modifier = Modifier.size(12.dp),
-                )
-              } else {
-                Text(
-                  text = (index + 1).toString(),
-                  color = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.SecondaryText,
-                  fontSize = 9.sp,
-                  fontWeight = FontWeight.Bold,
-                )
-              }
-            }
-            if (index != manifest.courses.lastIndex) {
-              Spacer(
-                modifier = Modifier
-                  .width(1.dp)
-                  .height(72.dp)
-                  .background(EditorWorkbenchColors.Divider),
+            if (availability.state == DynamicTutorialCourseState.COMPLETED) {
+              Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "已完成",
+                tint = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.Accent,
+                modifier = Modifier.size(12.dp),
+              )
+            } else if (isLocked) {
+              Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "课程已锁定",
+                tint = EditorWorkbenchColors.SecondaryText,
+                modifier = Modifier.size(11.dp),
+              )
+            } else {
+              Text(
+                text = (index + 1).toString(),
+                color = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.SecondaryText,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
               )
             }
           }
-          Surface(
-            modifier = Modifier
-              .weight(1F)
-              .clickable { onOpenCourse(course.courseId) },
-            color = if (course.courseId == activeCourseId) {
-              Color(0x283F76D3)
-            } else {
-              EditorWorkbenchColors.EditorBackground
-            },
-            shape = RoundedCornerShape(8.dp),
+          if (index != manifest.courses.lastIndex) {
+            Spacer(
+              modifier = Modifier
+                .width(1.dp)
+                .height(72.dp)
+                .background(EditorWorkbenchColors.Divider),
+            )
+          }
+        }
+        Surface(
+          modifier = Modifier
+            .weight(1F)
+            .then(
+              if (isLocked) Modifier else Modifier.clickable { onOpenCourse(course.courseId) },
+            ),
+          color = if (course.courseId == activeCourseId) {
+            Color(0x283F76D3)
+          } else {
+            EditorWorkbenchColors.EditorBackground
+          },
+          shape = RoundedCornerShape(8.dp),
+        ) {
+          Column(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
           ) {
-            Column(
-              modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
-              verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                  text = course.title,
-                  color = EditorWorkbenchColors.PrimaryText,
-                  fontSize = 12.sp,
-                  fontWeight = FontWeight.SemiBold,
-                  maxLines = 1,
-                  overflow = TextOverflow.Ellipsis,
-                  modifier = Modifier.weight(1F),
-                )
-                Text(
-                  text = "${course.estimatedMinutes} 分钟",
-                  color = EditorWorkbenchColors.SecondaryText,
-                  fontSize = 9.sp,
-                )
-              }
+            Row(verticalAlignment = Alignment.CenterVertically) {
               Text(
-                text = course.description,
-                color = EditorWorkbenchColors.SecondaryText,
-                fontSize = 10.sp,
-                lineHeight = 14.sp,
-                maxLines = 2,
+                text = course.title,
+                color = if (isLocked) {
+                  EditorWorkbenchColors.SecondaryText
+                } else {
+                  EditorWorkbenchColors.PrimaryText
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1F),
               )
-              if (course.courseId == activeCourseId) {
-                Text(
-                  text = "重置本课程",
-                  color = EditorWorkbenchColors.SecondaryText,
-                  fontSize = 9.sp,
-                  modifier = Modifier
-                    .align(Alignment.End)
-                    .clickable { onResetCourse(course.courseId) }
-                    .padding(vertical = 2.dp),
-                )
-              }
+              Text(
+                text = "${course.estimatedMinutes} 分钟",
+                color = EditorWorkbenchColors.SecondaryText,
+                fontSize = 9.sp,
+              )
+            }
+            Text(
+              text = course.description,
+              color = EditorWorkbenchColors.SecondaryText,
+              fontSize = 10.sp,
+              lineHeight = 14.sp,
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+              text = when (availability.state) {
+                DynamicTutorialCourseState.AVAILABLE -> "可以开始"
+                DynamicTutorialCourseState.IN_PROGRESS -> "继续学习"
+                DynamicTutorialCourseState.COMPLETED -> "已完成"
+                DynamicTutorialCourseState.LOCKED -> {
+                  val prerequisiteTitles =
+                    availability.missingPrerequisiteCourseIds.map { prerequisiteId ->
+                      courseTitles[prerequisiteId] ?: prerequisiteId
+                    }
+                  "请先完成：${prerequisiteTitles.joinToString("、")}"
+                }
+              },
+              color = when (availability.state) {
+                DynamicTutorialCourseState.AVAILABLE -> EditorWorkbenchColors.SecondaryText
+                DynamicTutorialCourseState.IN_PROGRESS -> EditorWorkbenchColors.Accent
+                DynamicTutorialCourseState.COMPLETED -> Color(0xFF64C493)
+                DynamicTutorialCourseState.LOCKED -> Color(0xFFFFC66D)
+              },
+              fontSize = 9.sp,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+            if (course.courseId == activeCourseId) {
+              Text(
+                text = "重置本课程",
+                color = EditorWorkbenchColors.SecondaryText,
+                fontSize = 9.sp,
+                modifier = Modifier
+                  .align(Alignment.End)
+                  .clickable { onResetCourse(course.courseId) }
+                  .padding(vertical = 2.dp),
+              )
             }
           }
         }
       }
+    }
   }
 }
 
