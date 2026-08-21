@@ -78,3 +78,13 @@ fun DynamicTutorialCourseSummary.resolveProgress(
     nextLesson = lessons.firstOrNull { it !in completedLessons },
   )
 }
+
+/**
+ * 从按更新时间排列的记录中选择续学课程。
+ *
+ * 优先选择最近一门未完成课程；只有全部完成时才返回最近完成项供用户复习。
+ */
+fun List<DynamicTutorialProgress>.preferredResumeCourseId(): String? {
+  return asReversed().firstOrNull { !it.isCourseCompleted }?.courseId
+    ?: lastOrNull()?.courseId
+}

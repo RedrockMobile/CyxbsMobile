@@ -44,6 +44,21 @@ class DynamicTutorialCourseProgressTest {
     assertEquals(0, result.totalLessonCount)
   }
 
+  @Test
+  fun prefersMostRecentIncompleteCourseForResume() {
+    val records = listOf(
+      progress().copy(courseId = "old"),
+      progress(isCourseCompleted = true).copy(courseId = "completed"),
+      progress().copy(courseId = "recent"),
+    )
+
+    assertEquals("recent", records.preferredResumeCourseId())
+    assertEquals(
+      "completed",
+      records.filter(DynamicTutorialProgress::isCourseCompleted).preferredResumeCourseId(),
+    )
+  }
+
   private fun summary() = DynamicTutorialCourseSummary(
     courseId = "course",
     title = "课程",

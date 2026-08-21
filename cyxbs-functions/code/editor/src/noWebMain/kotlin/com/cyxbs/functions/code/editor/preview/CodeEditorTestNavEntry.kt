@@ -70,6 +70,7 @@ import com.cyxbs.functions.code.tutorials.DynamicTutorialCourseState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.DynamicTutorialResumeState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
+import com.cyxbs.functions.code.tutorials.preferredResumeCourseId
 import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
 import com.cyxbs.functions.code.tutorials.resolveResumeState
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
@@ -130,6 +131,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isLoadingTutorial by remember { mutableStateOf(false) }
     var canRetryTutorialLoad by remember { mutableStateOf(false) }
     var tutorialLoadGeneration by remember { mutableStateOf(0) }
+    var resumeTutorialCourseId by remember { mutableStateOf<String?>(null) }
     var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
     var resettingTutorialCourseId by remember { mutableStateOf<String?>(null) }
     val savedTutorialProgress = remember { mutableStateMapOf<String, DynamicTutorialProgress>() }
@@ -370,6 +372,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           if (resettingTutorialCourseId == progress.courseId) return@withLock
           dynamicTutorialManager.saveProgress(progress)
           savedTutorialProgress[progress.courseId] = progress
+          resumeTutorialCourseId = progress.courseId
         }
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
@@ -405,6 +408,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           tutorialProgressWriteMutex.withLock {
             dynamicTutorialManager.clearCourseProgress(session.tutorial.languageId, courseId)
             savedTutorialProgress.remove(courseId)
+            if (resumeTutorialCourseId == courseId) resumeTutorialCourseId = null
           }
           val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
           val resumeState = course.resolveResumeState(null, session.npmPackageVersion)
@@ -532,6 +536,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       canRetryTutorialLoad = false
       tutorialManifest = null
       activeTutorial = null
+      resumeTutorialCourseId = null
       savedTutorialProgress.clear()
       try {
         val supportedTutorial = dynamicTutorialManager.supportedTutorials().firstOrNull { tutorial ->
@@ -544,9 +549,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         loadedSession = dynamicTutorialManager.load(languageId)
         tutorialSession = loadedSession
         tutorialManifest = loadedSession.manifest()
-        savedTutorialProgress.putAll(
-          dynamicTutorialManager.savedProgress(languageId).associateBy { it.courseId },
-        )
+        val storedProgress = dynamicTutorialManager.savedProgress(languageId)
+        savedTutorialProgress.putAll(storedProgress.associateBy { it.courseId })
+        resumeTutorialCourseId = storedProgress.preferredResumeCourseId()
         tutorialStatus = buildString {
           append(tutorialManifest?.courses?.size ?: 0).append(" 门课程")
           append(" · npm ").append(loadedSession.npmPackageVersion)
@@ -781,6 +786,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isLoading = isLoadingTutorial,
       canRetryLoad = canRetryTutorialLoad,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
+      resumeCourseId = resumeTutorialCourseId,
       progressByCourseId = displayedTutorialProgress,
       onRetryLoad = { tutorialLoadGeneration++ },
       onOpenCourse = ::openTutorialCourse,
