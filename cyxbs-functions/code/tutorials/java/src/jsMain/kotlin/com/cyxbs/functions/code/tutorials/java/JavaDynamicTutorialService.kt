@@ -17,9 +17,14 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
 
-/** Java 教程 npm 包入口；首版提供可串联验证完整下载与 UI 链路的三张课程卡片。 */
+/** Java 教程 npm 包入口；课程正文、示例源码与完成规则随 npm 包动态更新。 */
 object JavaDynamicTutorialService : DynamicTutorialService {
-  private val courses = listOf(helloCourse(), controlFlowCourse(), collectionsCourse())
+  private val courses = listOf(
+    helloCourse(),
+    controlFlowCourse(),
+    objectOrientedCourse(),
+    collectionsCourse(),
+  )
 
   /** 返回 Java 课程路径，不传输课时正文与源码。 */
   override suspend fun manifest(): DynamicTutorialManifest {
@@ -186,15 +191,159 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     )
   }
 
+  /** 构造面向对象课程，以多文件工作区演示对象状态、构造器、继承与重写。 */
+  private fun objectOrientedCourse(): DynamicTutorialCourse {
+    val summary = DynamicTutorialCourseSummary(
+      courseId = "java-object-oriented",
+      title = "类、对象与继承",
+      description = "在多文件项目中创建对象，并通过继承和方法重写复用行为。",
+      order = 30,
+      estimatedMinutes = 18,
+      prerequisiteCourseIds = listOf("java-control-flow"),
+    )
+    return DynamicTutorialCourse(
+      summary = summary,
+      lessons = listOf(
+        DynamicTutorialLesson(
+          lessonId = "student-object",
+          title = "创建带状态的对象",
+          description = "使用字段、构造器和实例方法描述一名学生。",
+          initialFiles = listOf(
+            DynamicTutorialSourceFile(
+              path = "src/Student.java",
+              source = """
+                public class Student {
+                    private String name;
+                    private int score;
+
+                    public Student(String name, int score) {
+                        this.name = name;
+                        this.score = score;
+                    }
+
+                    public String report() {
+                        return name + " 的分数：" + score;
+                    }
+                }
+              """.trimIndent(),
+            ),
+            DynamicTutorialSourceFile(
+              path = "src/StudentMain.java",
+              source = """
+                public class StudentMain {
+                    public static void main(String[] args) {
+                        Student student = new Student("小邮", 95);
+                        System.out.println(student.report());
+                    }
+                }
+              """.trimIndent(),
+            ),
+          ),
+          activeFilePath = "src/StudentMain.java",
+          steps = listOf(
+            DynamicTutorialStep(
+              stepId = "run-student",
+              title = "观察对象状态",
+              content = listOf(
+                DynamicTutorialContentBlock(
+                  kind = DynamicTutorialContentKind.PARAGRAPH,
+                  text = "Student 的构造器把姓名和分数保存到字段。运行 StudentMain，观察实例方法如何读取这些状态。",
+                ),
+              ),
+              completion = DynamicTutorialCompletionRule(
+                kind = DynamicTutorialCompletionKind.OUTPUT_CONTAINS,
+                expected = "小邮 的分数：95",
+              ),
+            ),
+          ),
+        ),
+        DynamicTutorialLesson(
+          lessonId = "inheritance-override",
+          title = "继承并重写行为",
+          description = "父类引用仍会调用子类重写后的实例方法。",
+          initialFiles = listOf(
+            DynamicTutorialSourceFile(
+              path = "src/Animal.java",
+              source = """
+                public class Animal {
+                    private String name;
+
+                    public Animal(String name) {
+                        this.name = name;
+                    }
+
+                    public String getName() {
+                        return name;
+                    }
+
+                    public String sound() {
+                        return "未知声音";
+                    }
+                }
+              """.trimIndent(),
+            ),
+            DynamicTutorialSourceFile(
+              path = "src/Dog.java",
+              source = """
+                public class Dog extends Animal {
+                    public Dog(String name) {
+                        super(name);
+                    }
+
+                    @Override
+                    public String sound() {
+                        return "汪";
+                    }
+                }
+              """.trimIndent(),
+            ),
+            DynamicTutorialSourceFile(
+              path = "src/AnimalMain.java",
+              source = """
+                public class AnimalMain {
+                    public static void main(String[] args) {
+                        Animal animal = new Dog("旺财");
+                        System.out.println(animal.getName() + "：" + animal.sound());
+                    }
+                }
+              """.trimIndent(),
+            ),
+          ),
+          activeFilePath = "src/AnimalMain.java",
+          steps = listOf(
+            DynamicTutorialStep(
+              stepId = "run-override",
+              title = "验证动态分派",
+              content = listOf(
+                DynamicTutorialContentBlock(
+                  kind = DynamicTutorialContentKind.PARAGRAPH,
+                  text = "变量类型是 Animal，实际对象是 Dog。运行程序，确认 sound 调用了 Dog 中的重写实现。",
+                ),
+                DynamicTutorialContentBlock(
+                  kind = DynamicTutorialContentKind.TIP,
+                  text = "可以把 new Dog 改成其他子类，继续观察同一个父类引用呈现的不同行为。",
+                ),
+              ),
+              completion = DynamicTutorialCompletionRule(
+                kind = DynamicTutorialCompletionKind.OUTPUT_CONTAINS,
+                expected = "旺财：汪",
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+  }
+
   /** 构造泛型集合课程，作为后续扩充课程正文和自动校验的基准。 */
   private fun collectionsCourse(): DynamicTutorialCourse {
     val summary = DynamicTutorialCourseSummary(
       courseId = "java-generics-collections",
       title = "泛型与集合",
       description = "使用 List<String> 和 Map<String, Integer> 组织类型安全的数据。",
-      order = 30,
+      order = 40,
       estimatedMinutes = 15,
-      prerequisiteCourseIds = listOf("java-control-flow"),
+      prerequisiteCourseIds = listOf("java-object-oriented"),
     )
     return DynamicTutorialCourse(
       summary = summary,

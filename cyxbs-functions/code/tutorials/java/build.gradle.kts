@@ -22,6 +22,8 @@ kotlin {
     }
     jsTest.dependencies {
       implementation(libs.kotlinx.coroutines.test)
+      implementation(projects.cyxbsFunctions.code.language.jsBridge)
+      implementation(projects.cyxbsFunctions.code.language.java)
     }
   }
 }
