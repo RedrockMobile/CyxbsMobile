@@ -271,6 +271,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             progress = savedTutorialProgress[courseId],
             npmPackageVersion = session.npmPackageVersion,
           )
+          // 先更新最近课程再切换活动课程，避免旧课程取消保存时短暂插入“继续上次学习”卡片。
+          resumeTutorialCourseId = courseId
           applyTutorialResumeState(course, resumeState)
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
           tutorialStatus = buildString {
@@ -368,7 +370,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           if (resettingTutorialCourseId == progress.courseId) return@withLock
           dynamicTutorialManager.saveProgress(progress)
           savedTutorialProgress[progress.courseId] = progress
-          resumeTutorialCourseId = progress.courseId
+          // 切课时旧课程仍会冲刷最后一份草稿，但不能覆盖用户刚选择的新课程。
+          if (activeTutorial?.course?.summary?.courseId == progress.courseId) {
+            resumeTutorialCourseId = progress.courseId
+          }
         }
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable

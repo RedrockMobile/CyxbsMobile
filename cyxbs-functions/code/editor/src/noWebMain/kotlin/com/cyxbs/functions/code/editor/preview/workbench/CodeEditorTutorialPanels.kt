@@ -197,6 +197,9 @@ private fun TutorialCoursePath(
       color = EditorWorkbenchColors.SecondaryText,
       fontSize = 10.sp,
       lineHeight = 14.sp,
+      maxLines = 2,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.height(28.dp),
     )
     if (isLoading) {
       Text("正在下载教程包…", color = EditorWorkbenchColors.Accent, fontSize = 11.sp)
