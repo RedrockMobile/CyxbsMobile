@@ -135,8 +135,10 @@ internal fun rememberCodeEditorTutorialSidePanel(
   manifest: DynamicTutorialManifest?,
   status: String,
   isLoading: Boolean,
+  canRetryLoad: Boolean,
   activeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
+  onRetryLoad: () -> Unit,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
@@ -149,8 +151,10 @@ internal fun rememberCodeEditorTutorialSidePanel(
       manifest = manifest,
       status = status,
       isLoading = isLoading,
+      canRetryLoad = canRetryLoad,
       activeCourseId = activeCourseId,
       progressByCourseId = progressByCourseId,
+      onRetryLoad = onRetryLoad,
       onResetCourse = onResetCourse,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
@@ -168,8 +172,10 @@ private fun TutorialCoursePath(
   manifest: DynamicTutorialManifest?,
   status: String,
   isLoading: Boolean,
+  canRetryLoad: Boolean,
   activeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
+  onRetryLoad: () -> Unit,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ) {
@@ -191,6 +197,21 @@ private fun TutorialCoursePath(
     )
     if (isLoading) {
       Text("正在下载教程包…", color = EditorWorkbenchColors.Accent, fontSize = 11.sp)
+    }
+    if (canRetryLoad && !isLoading) {
+      Surface(
+        modifier = Modifier.clickable(onClick = onRetryLoad),
+        color = Color(0x283F76D3),
+        shape = RoundedCornerShape(6.dp),
+      ) {
+        Text(
+          text = "重新加载教程",
+          color = EditorWorkbenchColors.Accent,
+          fontSize = 10.sp,
+          fontWeight = FontWeight.SemiBold,
+          modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
+      }
     }
     val courseTitles = manifest?.courses.orEmpty().associate { it.courseId to it.title }
     val completedCourseIds = progressByCourseId.values

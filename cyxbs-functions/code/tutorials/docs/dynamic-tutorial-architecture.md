@@ -28,7 +28,9 @@ cyxbs-components:guided-tour
 `DynamicTutorialSession` 是 npm 包与编辑器之间的失败关闭边界：Manifest 和课程首次读取后会校验并在
 会话内缓存，语言身份、摘要、稳定 ID、活动文件、引导区间、完成条件、相对路径和文本/源码总量均需
 满足端上限制。重复 ID、缺少正文或超大反馈会抛出 `DynamicTutorialProtocolException`，不会把畸形
-对象交给 Compose；同一 JavaScript Runtime 的调用也会串行执行，关闭后禁止继续读取旧缓存。
+对象交给 Compose；同一 JavaScript Runtime 的调用也会串行执行，关闭后禁止继续读取旧缓存。Catalog、
+npm 包或协议加载失败时，课程侧栏提供显式重试；重试通过新的 Compose effect 代次先取消并释放旧
+Runtime，再创建新会话，不要求用户切换语言。
 
 ## 进度与代码现场
 

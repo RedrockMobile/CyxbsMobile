@@ -128,6 +128,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var tutorialManifest by remember { mutableStateOf<DynamicTutorialManifest?>(null) }
     var tutorialStatus by remember { mutableStateOf("正在准备动态教程目录…") }
     var isLoadingTutorial by remember { mutableStateOf(false) }
+    var canRetryTutorialLoad by remember { mutableStateOf(false) }
+    var tutorialLoadGeneration by remember { mutableStateOf(0) }
     var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
     var resettingTutorialCourseId by remember { mutableStateOf<String?>(null) }
     val savedTutorialProgress = remember { mutableStateMapOf<String, DynamicTutorialProgress>() }
@@ -523,10 +525,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
 
     // 教程包跟随活动语言独立加载；切换语言或离开页面时取消旧会话并释放对应 JavaScript Runtime。
-    LaunchedEffect(activeLanguageId) {
+    LaunchedEffect(activeLanguageId, tutorialLoadGeneration) {
       val languageId = activeLanguageId ?: return@LaunchedEffect
       var loadedSession: DynamicTutorialSession? = null
       isLoadingTutorial = true
+      canRetryTutorialLoad = false
       tutorialManifest = null
       activeTutorial = null
       savedTutorialProgress.clear()
@@ -552,6 +555,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         awaitCancellation()
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
+        canRetryTutorialLoad = true
         tutorialStatus = throwable.toFailureText("动态教程加载失败")
       } finally {
         isLoadingTutorial = false
@@ -775,8 +779,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       manifest = tutorialManifest,
       status = tutorialStatus,
       isLoading = isLoadingTutorial,
+      canRetryLoad = canRetryTutorialLoad,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
       progressByCourseId = displayedTutorialProgress,
+      onRetryLoad = { tutorialLoadGeneration++ },
       onOpenCourse = ::openTutorialCourse,
       onResetCourse = ::resetTutorialCourse,
     )
