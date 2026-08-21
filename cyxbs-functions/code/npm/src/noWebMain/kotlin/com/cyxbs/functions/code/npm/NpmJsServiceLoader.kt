@@ -19,6 +19,7 @@ import com.cyxbs.functions.code.npm.model.NpmPackageId
 import com.cyxbs.functions.code.npm.pool.NpmPreparedEntryLease
 import com.cyxbs.functions.code.npm.service.NpmJsServiceProxyFactory
 import com.cyxbs.functions.code.npm.service.NpmJsServiceSession
+import com.cyxbs.functions.code.npm.storage.NpmStorageHost
 import com.g985892345.provider.manager.KtProvider
 import kotlinx.coroutines.CancellationException
 import kotlin.reflect.KClass
@@ -164,6 +165,26 @@ class NpmJsServiceLoader(
       )
     } catch (throwable: Throwable) {
       lease.releaseAfterFailure(throwable)
+    }
+    try {
+      // Storage 必须先于 npm 入口执行安装，使包级初始化代码也能读取持久状态。
+      NpmStorageHost.Default.install(runtime, packageName)
+    } catch (throwable: Throwable) {
+      try {
+        runtime.close()
+      } catch (cleanupFailure: Throwable) {
+        throwable.addSuppressed(cleanupFailure)
+      }
+      lease.releaseAfterFailure(
+        if (throwable is JsRuntimeException) {
+          NpmJsServiceInvocationException(
+            "Failed to install npm Storage for JavaScript Service '$serviceId'.",
+            throwable,
+          )
+        } else {
+          throwable
+        },
+      )
     }
     val session = NpmJsServiceSession(
       runtime = runtime,

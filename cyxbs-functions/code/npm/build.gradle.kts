@@ -17,6 +17,7 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(libs.kotlinx.coroutines)
       implementation(libs.kotlinx.serialization)
+      implementation(libs.filekit.core)
       implementation(libs.ktor.core)
       implementation(libs.kmp.ktProvider.api)
       implementation(libs.kmp.ktProvider.manager)
