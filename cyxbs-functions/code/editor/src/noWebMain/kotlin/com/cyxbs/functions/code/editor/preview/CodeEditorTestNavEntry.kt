@@ -34,7 +34,6 @@ import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
-import com.cyxbs.functions.code.editor.preview.workbench.TUTORIALS_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.TUTORIAL_TOOL_WINDOW_ID
 import com.cyxbs.functions.code.editor.preview.workbench.ActiveCodeEditorTutorial
 import com.cyxbs.functions.code.editor.preview.workbench.TutorialGuideHint
@@ -774,6 +773,32 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         }
       }
     }
+    // 当前课程完成后按 Manifest 的稳定顺序寻找下一门已解锁课程，避免先退回课程路径再二次选择。
+    val nextTutorialCourse = activeTutorial
+      ?.takeIf(ActiveCodeEditorTutorial::isCompleted)
+      ?.let { active ->
+        val completedCourseIds = displayedTutorialProgress.values
+          .filter(DynamicTutorialProgress::isCourseCompleted)
+          .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
+        val availability = tutorialManifest?.resolveCourseAvailability(
+          completedCourseIds = completedCourseIds,
+          startedCourseIds = displayedTutorialProgress.keys,
+        ).orEmpty()
+        val currentIndex = availability.indexOfFirst { candidate ->
+          candidate.course.courseId == active.course.summary.courseId
+        }
+        if (currentIndex < 0) {
+          null
+        } else {
+          availability
+            .drop(currentIndex + 1)
+            .firstOrNull { candidate ->
+              candidate.state == DynamicTutorialCourseState.AVAILABLE ||
+                candidate.state == DynamicTutorialCourseState.IN_PROGRESS
+            }
+            ?.course
+        }
+      }
     val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
       manifest = tutorialManifest,
       status = tutorialStatus,
@@ -928,8 +953,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         codeEditorTutorialToolWindow(
           tutorial = tutorial,
           onLessonSelected = ::openTutorialLesson,
-          onOpenCoursePath = {
-            workbenchState.selectSidePanel(TUTORIALS_PANEL_ID)
+          onNextCourse = nextTutorialCourse?.let { nextCourse ->
+            {
+              coroutineScope.launch {
+                // 先落盘完成状态，保证下一课程的前置条件与恢复现场使用同一份进度。
+                persistTutorialProgress(currentTutorialDraft(tutorial))
+                openTutorialCourse(nextCourse.courseId)
+              }
+            }
           },
           onPrevious = {
             activeTutorial = tutorial.previous()

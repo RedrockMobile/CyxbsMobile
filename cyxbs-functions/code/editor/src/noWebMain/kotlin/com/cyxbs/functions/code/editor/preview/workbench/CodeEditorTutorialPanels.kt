@@ -382,7 +382,7 @@ private fun com.cyxbs.functions.code.tutorials.DynamicTutorialCourseProgressSumm
 internal fun codeEditorTutorialToolWindow(
   tutorial: ActiveCodeEditorTutorial,
   onLessonSelected: (String) -> Unit,
-  onOpenCoursePath: () -> Unit,
+  onNextCourse: (() -> Unit)?,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ): CodeEditorToolWindow {
@@ -394,7 +394,7 @@ internal fun codeEditorTutorialToolWindow(
     TutorialToolWindowContent(
       tutorial = tutorial,
       onLessonSelected = onLessonSelected,
-      onOpenCoursePath = onOpenCoursePath,
+      onNextCourse = onNextCourse,
       onPrevious = onPrevious,
       onCheck = onCheck,
     )
@@ -406,7 +406,7 @@ internal fun codeEditorTutorialToolWindow(
 private fun TutorialToolWindowContent(
   tutorial: ActiveCodeEditorTutorial,
   onLessonSelected: (String) -> Unit,
-  onOpenCoursePath: () -> Unit,
+  onNextCourse: (() -> Unit)?,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ) {
@@ -515,13 +515,19 @@ private fun TutorialToolWindowContent(
         )
         Spacer(Modifier.width(8.dp))
         val nextLesson = tutorial.nextIncompleteLesson
-        TutorialAction(
-          text = if (nextLesson == null) "课程路径" else "下一课时",
-          emphasized = true,
-          onClick = {
-            if (nextLesson == null) onOpenCoursePath() else onLessonSelected(nextLesson.lessonId)
-          },
-        )
+        when {
+          nextLesson != null -> TutorialAction(
+            text = "下一课时",
+            emphasized = true,
+            onClick = { onLessonSelected(nextLesson.lessonId) },
+          )
+
+          onNextCourse != null -> TutorialAction(
+            text = "下一课程",
+            emphasized = true,
+            onClick = onNextCourse,
+          )
+        }
       }
     }
   }
