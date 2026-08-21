@@ -325,6 +325,7 @@ private fun TutorialCoursePath(
             )
             // 重置入口复用始终存在的状态行，切换活动课程时不增加卡片高度或推动后续课程。
             Row(
+              modifier = Modifier.height(16.dp),
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -359,9 +360,7 @@ private fun TutorialCoursePath(
                   text = "重置",
                   color = EditorWorkbenchColors.SecondaryText,
                   fontSize = 9.sp,
-                  modifier = Modifier
-                    .clickable { onResetCourse(course.courseId) }
-                    .padding(vertical = 2.dp),
+                  modifier = Modifier.clickable { onResetCourse(course.courseId) },
                 )
               }
             }
