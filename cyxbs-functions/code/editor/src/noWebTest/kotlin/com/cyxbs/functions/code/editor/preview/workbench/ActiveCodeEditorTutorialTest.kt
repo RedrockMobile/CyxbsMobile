@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.editor.preview.workbench
 
+import com.cyxbs.functions.code.tutorials.DynamicTutorialCompletedStep
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentBlock
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourse
@@ -26,6 +27,13 @@ class ActiveCodeEditorTutorialTest {
     assertEquals("run", second.step.stepId)
     assertEquals(1, completed.stepIndex)
     assertTrue(completed.isCompleted)
+    assertEquals(
+      setOf(
+        DynamicTutorialCompletedStep("lesson", "read"),
+        DynamicTutorialCompletedStep("lesson", "run"),
+      ),
+      completed.completedSteps,
+    )
     assertEquals("已完成 Hello。", completed.feedback)
   }
 

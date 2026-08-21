@@ -64,7 +64,9 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
+import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
+import com.cyxbs.functions.code.tutorials.resolveResumeState
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationRequest
@@ -118,6 +120,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var tutorialStatus by remember { mutableStateOf("正在准备动态教程目录…") }
     var isLoadingTutorial by remember { mutableStateOf(false) }
     var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
+    val savedTutorialProgress = remember { mutableStateMapOf<String, DynamicTutorialProgress>() }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
     val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
       if (supportedLanguages.isEmpty()) {
@@ -203,7 +206,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
 
     /**
-     * 进入课程第一课时，并用教程包提供的初始文件替换当前测试工作区。
+     * 进入课程上次停留的课时，并按 npm 版本决定恢复代码现场或使用最新初始文件。
      *
      * 教程源码只在用户明确选择课程后写入内存工作区；下载 Manifest 不会覆盖正在编辑的文件。
      */
@@ -213,22 +216,33 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         try {
           val session = tutorialSession ?: error("当前语言的教程包尚未加载完成。")
           val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
-          val lesson = course.lessons.firstOrNull() ?: error("课程 ${course.summary.title} 暂无课时。")
-          require(lesson.steps.isNotEmpty()) { "课时 ${lesson.title} 暂无教程步骤。" }
-          val initialFiles = lesson.initialFiles.associate { file -> file.path to file.source }
-          val activeSource = initialFiles[lesson.activeFilePath]
-            ?: error("教程活动文件不存在：${lesson.activeFilePath}")
+          val resumeState = course.resolveResumeState(
+            progress = savedTutorialProgress[courseId],
+            npmPackageVersion = session.npmPackageVersion,
+          )
+          val restoredFiles = resumeState.workspace.associate { file -> file.path to file.source }
+          val activeSource = restoredFiles[resumeState.activeFilePath]
+            ?: error("教程活动文件不存在：${resumeState.activeFilePath}")
 
           sourceFiles.clear()
-          sourceFiles.putAll(initialFiles)
+          sourceFiles.putAll(restoredFiles)
           openFilePaths.clear()
-          openFilePaths += lesson.activeFilePath
-          editorState.replaceDocument(lesson.activeFilePath, activeSource)
-          activeFilePath = lesson.activeFilePath
-          activeTutorial = ActiveCodeEditorTutorial(course = course, lesson = lesson)
+          openFilePaths += resumeState.activeFilePath
+          editorState.replaceDocument(resumeState.activeFilePath, activeSource)
+          activeFilePath = resumeState.activeFilePath
+          activeTutorial = ActiveCodeEditorTutorial(
+            course = course,
+            lesson = resumeState.lesson,
+            stepIndex = resumeState.stepIndex,
+            completedSteps = resumeState.completedSteps,
+            isCompleted = resumeState.isCourseCompleted,
+          )
           workbenchState.closeSidePanel()
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
-          tutorialStatus = "正在学习 ${course.summary.title} · ${lesson.title}"
+          tutorialStatus = buildString {
+            append("正在学习 ${course.summary.title} · ${resumeState.lesson.title}")
+            if (resumeState.restoredWorkspace) append(" · 已恢复代码")
+          }
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           tutorialStatus = throwable.toFailureText("课程加载失败")
@@ -265,6 +279,59 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
       activeTutorial = current.advance()
       workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
+    }
+
+    /** 将当前步骤和源码快照写入教程模块；业务页面不直接操作文件格式。 */
+    suspend fun persistTutorialProgress(draft: TutorialProgressDraft) {
+      try {
+        val session = tutorialSession ?: return
+        val progress = DynamicTutorialProgress(
+          languageId = session.tutorial.languageId,
+          npmPackageName = session.tutorial.npmPackageName,
+          npmPackageVersion = session.npmPackageVersion,
+          courseId = draft.tutorial.course.summary.courseId,
+          lessonId = draft.tutorial.lesson.lessonId,
+          stepId = draft.tutorial.step.stepId,
+          completedSteps = draft.tutorial.completedSteps.toList(),
+          workspace = draft.workspace,
+          activeFilePath = draft.activeFilePath,
+          isCourseCompleted = draft.tutorial.isCompleted,
+        )
+        dynamicTutorialManager.saveProgress(progress)
+        savedTutorialProgress[progress.courseId] = progress
+      } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+        // 持久化失败不能中止高亮、运行或教程校验，仍在侧栏给出可见反馈。
+        tutorialStatus = throwable.toFailureText("教程进度保存失败")
+      }
+    }
+
+    // 教程内编辑停止后保存现场；切换课程或离开页面时在 NonCancellable 中冲刷最后一次快照。
+    LaunchedEffect(activeTutorial?.course?.summary?.courseId, editorState) {
+      if (activeTutorial == null) return@LaunchedEffect
+      var lastDraft: TutorialProgressDraft? = null
+      try {
+        snapshotFlow {
+          activeTutorial?.let { tutorial ->
+            TutorialProgressDraft(
+              tutorial = tutorial,
+              activeFilePath = activeFilePath,
+              workspace = currentWorkspace().files.map { file ->
+                DynamicTutorialSourceFile(file.path, file.source)
+              },
+            )
+          }
+        }.collectLatest { draft ->
+          if (draft == null) return@collectLatest
+          lastDraft = draft
+          delay(TUTORIAL_PROGRESS_SAVE_DELAY_MILLIS)
+          persistTutorialProgress(draft)
+        }
+      } finally {
+        withContext(NonCancellable) {
+          lastDraft?.let { draft -> persistTutorialProgress(draft) }
+        }
+      }
     }
 
     // 源码区间目标暂由编辑器原生选区呈现；布局锚点交给 guided-tour 按窗口实时测量。
@@ -356,6 +423,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isLoadingTutorial = true
       tutorialManifest = null
       activeTutorial = null
+      savedTutorialProgress.clear()
       try {
         val supportedTutorial = dynamicTutorialManager.supportedTutorials().firstOrNull { tutorial ->
           tutorial.languageId == languageId || languageId in tutorial.aliases
@@ -367,6 +435,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         loadedSession = dynamicTutorialManager.load(languageId)
         tutorialSession = loadedSession
         tutorialManifest = loadedSession.manifest()
+        savedTutorialProgress.putAll(
+          dynamicTutorialManager.savedProgress(languageId).associateBy { it.courseId },
+        )
         tutorialStatus = buildString {
           append(tutorialManifest?.courses?.size ?: 0).append(" 门课程")
           append(" · npm ").append(loadedSession.npmPackageVersion)
@@ -572,6 +643,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       status = tutorialStatus,
       isLoading = isLoadingTutorial,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
+      completedCourseIds = savedTutorialProgress.values
+        .filter(DynamicTutorialProgress::isCourseCompleted)
+        .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId),
       onOpenCourse = ::openTutorialCourse,
     )
     val sidePanels = rememberCodeEditorTestSidePanels(
@@ -922,12 +996,20 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
   }
 
+  /** Compose 快照流中的不可变教程保存草稿，避免延迟写入读取到另一门课程的状态。 */
+  private data class TutorialProgressDraft(
+    val tutorial: ActiveCodeEditorTutorial,
+    val activeFilePath: String,
+    val workspace: List<DynamicTutorialSourceFile>,
+  )
+
   private companion object {
     const val DISPLAY_RESULT_LIMIT = 12
     const val MAX_DISPLAYED_SOURCE_FRAMES = 8
     const val MICROSECONDS_PER_MILLISECOND = 1_000
     const val AUTO_HIGHLIGHT_DELAY_MILLIS = 200L
     const val RUN_TARGET_REFRESH_DELAY_MILLIS = 150L
+    const val TUTORIAL_PROGRESS_SAVE_DELAY_MILLIS = 600L
     const val JAVA_MAIN_FILE_PATH = "java/Main.java"
     const val JAVASCRIPT_MAIN_FILE_PATH = "javascript/main.js"
 

@@ -12,6 +12,7 @@ kotlin {
     noWebMain.dependencies {
       implementation(projects.cyxbsFunctions.code.npm)
       implementation(libs.kotlinx.coroutines)
+      implementation(libs.okio)
     }
 
     val noWebTest = create("noWebTest") {

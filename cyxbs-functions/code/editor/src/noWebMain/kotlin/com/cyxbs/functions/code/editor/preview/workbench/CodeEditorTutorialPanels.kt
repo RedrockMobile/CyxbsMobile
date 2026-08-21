@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
+import com.cyxbs.functions.code.tutorials.DynamicTutorialCompletedStep
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentBlock
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentKind
@@ -64,6 +65,7 @@ internal data class ActiveCodeEditorTutorial(
   val course: DynamicTutorialCourse,
   val lesson: DynamicTutorialLesson,
   val stepIndex: Int = 0,
+  val completedSteps: Set<DynamicTutorialCompletedStep> = emptySet(),
   val feedback: String? = null,
   val isCompleted: Boolean = false,
 ) {
@@ -72,11 +74,26 @@ internal data class ActiveCodeEditorTutorial(
 
   /** 通过当前步骤后进入下一步；最后一步通过后保留正文并标记整课完成。 */
   fun advance(): ActiveCodeEditorTutorial {
+    val completed = completedSteps + DynamicTutorialCompletedStep(lesson.lessonId, step.stepId)
     val nextStepIndex = stepIndex + 1
     return if (nextStepIndex < lesson.steps.size) {
-      copy(stepIndex = nextStepIndex, feedback = null, isCompleted = false)
+      copy(
+        stepIndex = nextStepIndex,
+        completedSteps = completed,
+        feedback = null,
+        isCompleted = false,
+      )
     } else {
-      copy(feedback = "已完成 ${lesson.title}。", isCompleted = true)
+      val allCourseStepsCompleted = course.lessons.all { courseLesson ->
+        courseLesson.steps.all { courseStep ->
+          DynamicTutorialCompletedStep(courseLesson.lessonId, courseStep.stepId) in completed
+        }
+      }
+      copy(
+        completedSteps = completed,
+        feedback = "已完成 ${lesson.title}。",
+        isCompleted = allCourseStepsCompleted,
+      )
     }
   }
 
@@ -97,6 +114,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
   status: String,
   isLoading: Boolean,
   activeCourseId: String?,
+  completedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
   return CodeEditorSidePanel(
@@ -109,6 +127,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
       status = status,
       isLoading = isLoading,
       activeCourseId = activeCourseId,
+      completedCourseIds = completedCourseIds,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
         if (layoutMode != com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbenchLayoutMode.Expanded) {
@@ -126,6 +145,7 @@ private fun TutorialCoursePath(
   status: String,
   isLoading: Boolean,
   activeCourseId: String?,
+  completedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
 ) {
   Column(
@@ -168,12 +188,21 @@ private fun TutorialCoursePath(
                 ),
               contentAlignment = Alignment.Center,
             ) {
-              Text(
-                text = (index + 1).toString(),
-                color = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.SecondaryText,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-              )
+              if (course.courseId in completedCourseIds) {
+                Icon(
+                  imageVector = Icons.Default.Check,
+                  contentDescription = "已完成",
+                  tint = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.Accent,
+                  modifier = Modifier.size(12.dp),
+                )
+              } else {
+                Text(
+                  text = (index + 1).toString(),
+                  color = if (course.courseId == activeCourseId) Color.White else EditorWorkbenchColors.SecondaryText,
+                  fontSize = 9.sp,
+                  fontWeight = FontWeight.Bold,
+                )
+              }
             }
             if (index != manifest.courses.lastIndex) {
               Spacer(

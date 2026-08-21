@@ -24,6 +24,18 @@ cyxbs-components:guided-tour
 4. 客户端保存 course、lesson、step 的稳定 ID 和进度，不修改 npm 包内容。
 5. 编辑或运行后调用 `evaluate()`，语言包根据源码与输出判断当前步骤是否完成。
 
+## 进度与代码现场
+
+- `DynamicTutorialManager` 以 `languageId + courseId` 为键原子保存每门课程的最新进度，不在本地
+  复制课程正文，也不修改 npm 包。
+- 已完成项使用 `lessonId + stepId`，恢复位置使用 course、lesson、step 的稳定 ID。教程包新增、删除或
+  重排步骤后，客户端会过滤失效 ID，并定位到当前版本第一个未完成步骤。
+- 相同 npm 包版本会恢复小型多文件工作区和活动文件；包版本变化时只恢复学习进度，源码回到新包的
+  初始模板，避免旧代码覆盖更新后的教学内容。
+- 进度 JSON 使用临时文件加原子移动写入，并限制课程数、步骤数、文件数和源码总字符数。缓存损坏、
+  schema 不兼容或单条记录越界时按空记录处理，不影响教程 npm 包重新下载与使用。
+- 编辑器在输入停止后保存，在课程切换或页面离开时冲刷最后一份快照；课程路径会直接标记已完成卡片。
+
 新增语言时，在语言教程模块调用 `npmJsTutorial`，再把该 Project 加入 catalog 的
 `generateDynamicTutorialCatalog` 列表即可。npm 包名只在语言模块的 `npmJsPackage` 声明一次。
 
