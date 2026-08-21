@@ -273,7 +273,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             npmPackageVersion = session.npmPackageVersion,
           )
           applyTutorialResumeState(course, resumeState)
-          workbenchState.closeSidePanel()
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
           tutorialStatus = buildString {
             append("正在学习 ${course.summary.title} · ${resumeState.lesson.title}")
