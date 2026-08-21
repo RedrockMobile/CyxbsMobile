@@ -1,6 +1,8 @@
 package com.cyxbs.functions.code.tutorials
 
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourseSummary
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialLessonSummary
 import kotlinx.serialization.Serializable
 
 /** 一个已完成教程步骤的稳定身份。 */
@@ -38,3 +40,41 @@ data class DynamicTutorialProgress(
   val lessonWorkspaces: List<DynamicTutorialLessonWorkspace> = emptyList(),
   val isCourseCompleted: Boolean = false,
 )
+
+/** 课程路径展示使用的轻量进度，不需要再次下载完整课程正文。 */
+data class DynamicTutorialCourseProgressSummary(
+  val completedLessonCount: Int,
+  val totalLessonCount: Int,
+  val nextLesson: DynamicTutorialLessonSummary?,
+) {
+  val isKnown: Boolean
+    get() = totalLessonCount > 0
+}
+
+/**
+ * 依据 Manifest 中的稳定步骤 ID 汇总课时进度。
+ *
+ * 已完成课程优先视为所有课时完成，使教程包增加新步骤后不会把用户已完成的课程倒退为进行中；
+ * 未携带课时目录的旧教程包返回未知进度，由 UI 保留原有状态文本。
+ */
+fun DynamicTutorialCourseSummary.resolveProgress(
+  progress: DynamicTutorialProgress?,
+): DynamicTutorialCourseProgressSummary {
+  if (lessons.isEmpty()) {
+    return DynamicTutorialCourseProgressSummary(0, 0, null)
+  }
+  if (progress?.isCourseCompleted == true) {
+    return DynamicTutorialCourseProgressSummary(lessons.size, lessons.size, null)
+  }
+  val completedSteps = progress?.completedSteps.orEmpty().toSet()
+  val completedLessons = lessons.filter { lesson ->
+    lesson.stepIds.all { stepId ->
+      DynamicTutorialCompletedStep(lesson.lessonId, stepId) in completedSteps
+    }
+  }
+  return DynamicTutorialCourseProgressSummary(
+    completedLessonCount = completedLessons.size,
+    totalLessonCount = lessons.size,
+    nextLesson = lessons.firstOrNull { it !in completedLessons },
+  )
+}

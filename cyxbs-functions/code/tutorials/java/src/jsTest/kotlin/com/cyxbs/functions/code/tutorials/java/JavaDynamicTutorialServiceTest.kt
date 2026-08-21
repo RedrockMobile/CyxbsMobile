@@ -34,6 +34,14 @@ class JavaDynamicTutorialServiceTest {
       listOf("java-object-oriented"),
       manifest.courses.last().prerequisiteCourseIds,
     )
+    manifest.courses.forEach { summary ->
+      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId))
+      assertEquals(course.lessons.map { it.lessonId }, summary.lessons.map { it.lessonId })
+      assertEquals(
+        course.lessons.map { lesson -> lesson.steps.map { it.stepId } },
+        summary.lessons.map { it.stepIds },
+      )
+    }
   }
 
   @Test

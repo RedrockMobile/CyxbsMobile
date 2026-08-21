@@ -744,26 +744,39 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       .firstOrNull { it.languageId == activeLanguageId }
       ?.displayName
       ?: "代码"
-    val completedTutorialCourseIds = savedTutorialProgress.values
-      .filter(DynamicTutorialProgress::isCourseCompleted)
-      .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
-      .apply {
-        activeTutorial
-          ?.takeIf(ActiveCodeEditorTutorial::isCompleted)
-          ?.course
-          ?.summary
-          ?.courseId
-          ?.let(::add)
+    // 即时步骤先覆盖持久化快照，避免异步写盘期间课程卡片的课时数短暂回退。
+    val displayedTutorialProgress = savedTutorialProgress.toMutableMap().apply {
+      activeTutorial?.let { active ->
+        val courseId = active.course.summary.courseId
+        val previous = this[courseId]
+        val session = tutorialSession
+        if (previous != null) {
+          this[courseId] = previous.copy(
+            lessonId = active.lesson.lessonId,
+            stepId = active.step.stepId,
+            completedSteps = active.completedSteps.toList(),
+            isCourseCompleted = active.isCompleted,
+          )
+        } else if (session != null) {
+          this[courseId] = DynamicTutorialProgress(
+            languageId = session.tutorial.languageId,
+            npmPackageName = session.tutorial.npmPackageName,
+            npmPackageVersion = session.npmPackageVersion,
+            courseId = courseId,
+            lessonId = active.lesson.lessonId,
+            stepId = active.step.stepId,
+            completedSteps = active.completedSteps.toList(),
+            isCourseCompleted = active.isCompleted,
+          )
+        }
       }
+    }
     val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
       manifest = tutorialManifest,
       status = tutorialStatus,
       isLoading = isLoadingTutorial,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
-      completedCourseIds = completedTutorialCourseIds,
-      startedCourseIds = savedTutorialProgress.keys + listOfNotNull(
-        activeTutorial?.course?.summary?.courseId,
-      ),
+      progressByCourseId = displayedTutorialProgress,
       onOpenCourse = ::openTutorialCourse,
       onResetCourse = ::resetTutorialCourse,
     )

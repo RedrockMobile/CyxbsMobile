@@ -16,6 +16,7 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
+import com.cyxbs.functions.code.tutorials.js.bridge.withGeneratedLessonSummaries
 
 /** Java 教程 npm 包入口；课程正文、示例源码与完成规则随 npm 包动态更新。 */
 object JavaDynamicTutorialService : DynamicTutorialService {
@@ -24,7 +25,7 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     controlFlowCourse(),
     objectOrientedCourse(),
     collectionsCourse(),
-  )
+  ).map(DynamicTutorialCourse::withGeneratedLessonSummaries)
 
   /** 返回 Java 课程路径，不传输课时正文与源码。 */
   override suspend fun manifest(): DynamicTutorialManifest {

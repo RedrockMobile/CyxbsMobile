@@ -20,7 +20,8 @@ cyxbs-components:guided-tour
 1. `DynamicTutorialManager.supportedTutorials()` 读取
    `@cyxbs-mobile/tutorial-catalog@latest/catalog.json`。
 2. 用户展开某门语言后，Manager 按 Catalog 坐标加载对应 `DynamicTutorialService`。
-3. `manifest()` 只返回侧边栏课程卡片；用户进入卡片后再调用 `course(courseId)` 获取正文与源码。
+3. `manifest()` 只返回侧边栏课程卡片和课时/步骤稳定 ID，不传输正文与源码；用户进入卡片后再调用
+   `course(courseId)` 获取完整内容。
 4. 客户端保存 course、lesson、step 的稳定 ID 和进度，不修改 npm 包内容。
 5. 编辑或运行后调用 `evaluate()`，语言包根据源码与输出判断当前步骤是否完成。
 
@@ -39,7 +40,8 @@ cyxbs-components:guided-tour
   初始模板，避免旧代码覆盖更新后的教学内容。
 - 进度 JSON 使用临时文件加原子移动写入，并限制课程数、步骤数、文件数和源码总字符数。缓存损坏、
   schema 不兼容或单条记录越界时按空记录处理，不影响教程 npm 包重新下载与使用。
-- 编辑器在输入停止后保存，在课程切换或页面离开时冲刷最后一份快照；课程路径会直接标记已完成卡片。
+- 编辑器在输入停止后保存，在课程切换或页面离开时冲刷最后一份快照；课程路径依据 Manifest 的轻量
+  课时目录显示“已完成/总课时”和下一课时，不需要提前下载每门课程正文。
 - 一门课程的多个课时分别保存工作区；Tutorial 工具窗口可直接切换课时并标记完成状态，重置入口只
   删除当前课程记录，不影响同语言的其他课程。
 
@@ -51,6 +53,8 @@ cyxbs-components:guided-tour
 - 课程入口使用 `manifest.courses` 构造带前置关系的卡片式路径，并统一解析未开始、进行中、已完成与
   锁定状态。未完成全部 `prerequisiteCourseIds` 时，侧栏展示缺少的前置课程且加载入口再次拒绝；未知
   前置 ID 或循环依赖按锁定处理，已完成课程不会因 npm 包后来新增前置关系而重新锁住。
+- Manifest 的课时摘要必须与完整课程中的课时标题和步骤 ID 一致；客户端在课程加载时交叉校验，避免
+  包版本错配导致课程路径进度与正文不一致。旧包缺少摘要时仍保留状态文字作为兼容降级。
 - 进入课时后，底部工具窗口顺序为 `Tutorial | Run | Performance`，Tutorial 默认展开。
 - 当前课时完成后 Tutorial 窗口提供“下一课时”；整门课程完成后提供“课程路径”，并在进度异步落盘前
   先用内存完成状态解锁下一门课程，避免连续学习时出现短暂的错误锁定。

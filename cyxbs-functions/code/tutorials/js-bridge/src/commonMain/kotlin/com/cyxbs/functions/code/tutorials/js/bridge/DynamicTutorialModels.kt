@@ -18,6 +18,15 @@ data class DynamicTutorialCourseSummary(
   val order: Int,
   val estimatedMinutes: Int,
   val prerequisiteCourseIds: List<String> = emptyList(),
+  val lessons: List<DynamicTutorialLessonSummary> = emptyList(),
+)
+
+/** 课程路径计算课时进度所需的轻量信息，不包含源码和教程正文。 */
+@Serializable
+data class DynamicTutorialLessonSummary(
+  val lessonId: String,
+  val title: String,
+  val stepIds: List<String>,
 )
 
 /** 包含全部课时与步骤的课程正文。 */
@@ -26,6 +35,25 @@ data class DynamicTutorialCourse(
   val summary: DynamicTutorialCourseSummary,
   val lessons: List<DynamicTutorialLesson>,
 )
+
+/**
+ * 根据课程正文生成轻量课时目录。
+ *
+ * 教程包应在返回 Manifest 和完整课程前调用本方法，避免课时或步骤调整后两份协议数据失配。
+ */
+fun DynamicTutorialCourse.withGeneratedLessonSummaries(): DynamicTutorialCourse {
+  return copy(
+    summary = summary.copy(
+      lessons = lessons.map { lesson ->
+        DynamicTutorialLessonSummary(
+          lessonId = lesson.lessonId,
+          title = lesson.title,
+          stepIds = lesson.steps.map(DynamicTutorialStep::stepId),
+        )
+      },
+    ),
+  )
+}
 
 /** 课程中的一个可独立进入、保存进度的课时。 */
 @Serializable

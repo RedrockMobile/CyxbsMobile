@@ -7,6 +7,7 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourse
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourseSummary
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationResult
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTargetKind
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialLessonSummary
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 
@@ -39,6 +40,18 @@ internal fun DynamicTutorialCourse.validatedAgainst(
   }
   protocolRequire(lessons.map { it.lessonId }.distinct().size == lessons.size) {
     "Tutorial course '${summary.courseId}' contains duplicate lesson IDs."
+  }
+  if (summary.lessons.isNotEmpty()) {
+    val actualLessonSummaries = lessons.map { lesson ->
+      DynamicTutorialLessonSummary(
+        lessonId = lesson.lessonId,
+        title = lesson.title,
+        stepIds = lesson.steps.map { it.stepId },
+      )
+    }
+    protocolRequire(summary.lessons == actualLessonSummaries) {
+      "Tutorial course '${summary.courseId}' lesson summary does not match its content."
+    }
   }
 
   var sourceCharacters = 0L
@@ -151,6 +164,23 @@ private fun DynamicTutorialCourseSummary.validateSummary() {
     "Tutorial course '$courseId' contains invalid prerequisite IDs."
   }
   prerequisiteCourseIds.forEach { validateIdentity(it, "prerequisite course ID") }
+  protocolRequire(lessons.size <= MAX_LESSONS_PER_COURSE) {
+    "Tutorial course '$courseId' contains too many lesson summaries."
+  }
+  protocolRequire(lessons.map { it.lessonId }.distinct().size == lessons.size) {
+    "Tutorial course '$courseId' contains duplicate lesson summary IDs."
+  }
+  lessons.forEach { lesson ->
+    validateIdentity(lesson.lessonId, "lesson summary ID")
+    validateText(lesson.title, "lesson summary title")
+    protocolRequire(
+      lesson.stepIds.isNotEmpty() && lesson.stepIds.size <= MAX_STEPS_PER_LESSON &&
+        lesson.stepIds.distinct().size == lesson.stepIds.size,
+    ) {
+      "Tutorial lesson summary '${lesson.lessonId}' contains invalid step IDs."
+    }
+    lesson.stepIds.forEach { validateIdentity(it, "lesson summary step ID") }
+  }
 }
 
 /** 校验工作区相对路径和单文件源码上限。 */

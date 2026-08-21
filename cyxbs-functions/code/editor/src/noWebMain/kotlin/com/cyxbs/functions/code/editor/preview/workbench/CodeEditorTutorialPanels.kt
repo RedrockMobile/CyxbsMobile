@@ -45,7 +45,9 @@ import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
 import com.cyxbs.functions.code.tutorials.DynamicTutorialCompletedStep
 import com.cyxbs.functions.code.tutorials.DynamicTutorialCourseState
+import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
+import com.cyxbs.functions.code.tutorials.resolveProgress
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentBlock
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentKind
@@ -134,8 +136,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
   status: String,
   isLoading: Boolean,
   activeCourseId: String?,
-  completedCourseIds: Set<String>,
-  startedCourseIds: Set<String>,
+  progressByCourseId: Map<String, DynamicTutorialProgress>,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
@@ -149,8 +150,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
       status = status,
       isLoading = isLoading,
       activeCourseId = activeCourseId,
-      completedCourseIds = completedCourseIds,
-      startedCourseIds = startedCourseIds,
+      progressByCourseId = progressByCourseId,
       onResetCourse = onResetCourse,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
@@ -169,8 +169,7 @@ private fun TutorialCoursePath(
   status: String,
   isLoading: Boolean,
   activeCourseId: String?,
-  completedCourseIds: Set<String>,
-  startedCourseIds: Set<String>,
+  progressByCourseId: Map<String, DynamicTutorialProgress>,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ) {
@@ -194,12 +193,16 @@ private fun TutorialCoursePath(
       Text("正在下载教程包…", color = EditorWorkbenchColors.Accent, fontSize = 11.sp)
     }
     val courseTitles = manifest?.courses.orEmpty().associate { it.courseId to it.title }
+    val completedCourseIds = progressByCourseId.values
+      .filter(DynamicTutorialProgress::isCourseCompleted)
+      .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
     manifest?.resolveCourseAvailability(
       completedCourseIds = completedCourseIds,
-      startedCourseIds = startedCourseIds,
+      startedCourseIds = progressByCourseId.keys,
     )?.forEachIndexed { index, availability ->
       val course = availability.course
       val isLocked = availability.state == DynamicTutorialCourseState.LOCKED
+      val progress = course.resolveProgress(progressByCourseId[course.courseId])
       Row(modifier = Modifier.fillMaxWidth()) {
         Column(
           horizontalAlignment = Alignment.CenterHorizontally,
@@ -297,15 +300,17 @@ private fun TutorialCoursePath(
             )
             Text(
               text = when (availability.state) {
-                DynamicTutorialCourseState.AVAILABLE -> "可以开始"
-                DynamicTutorialCourseState.IN_PROGRESS -> "继续学习"
-                DynamicTutorialCourseState.COMPLETED -> "已完成"
+                DynamicTutorialCourseState.AVAILABLE -> progress.withLessonCount("可以开始")
+                DynamicTutorialCourseState.IN_PROGRESS -> progress.withLessonCount(
+                  progress.nextLesson?.title?.let { "继续：$it" } ?: "继续学习",
+                )
+                DynamicTutorialCourseState.COMPLETED -> progress.withLessonCount("已完成")
                 DynamicTutorialCourseState.LOCKED -> {
                   val prerequisiteTitles =
                     availability.missingPrerequisiteCourseIds.map { prerequisiteId ->
                       courseTitles[prerequisiteId] ?: prerequisiteId
                     }
-                  "请先完成：${prerequisiteTitles.joinToString("、")}"
+                  progress.withLessonCount("请先完成：${prerequisiteTitles.joinToString("、")}")
                 }
               },
               color = when (availability.state) {
@@ -334,6 +339,13 @@ private fun TutorialCoursePath(
       }
     }
   }
+}
+
+/** 在旧教程包缺少课时目录时保留原状态文本，新包则补充明确的完成课时数。 */
+private fun com.cyxbs.functions.code.tutorials.DynamicTutorialCourseProgressSummary.withLessonCount(
+  status: String,
+): String {
+  return if (isKnown) "$completedLessonCount/$totalLessonCount 课时 · $status" else status
 }
 
 /** 把当前步骤放到 Run 之前的 Tutorial 工具窗口中。 */

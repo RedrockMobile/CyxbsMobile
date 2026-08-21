@@ -7,6 +7,7 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourseSummary
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationRequest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationResult
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialLesson
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialLessonSummary
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
@@ -63,6 +64,19 @@ class DynamicTutorialSessionTest {
     assertFailsWith<DynamicTutorialProtocolException> {
       session(FakeService(course = mismatchedSummary)).course("basics")
     }
+  }
+
+  @Test
+  fun rejectsLessonSummaryThatDoesNotMatchCourseContent() = runTest {
+    val summary = validSummary().copy(
+      lessons = listOf(DynamicTutorialLessonSummary("hello", "Hello Java", listOf("other"))),
+    )
+    val service = FakeService(
+      manifest = DynamicTutorialManifest("java", listOf(summary)),
+      course = DynamicTutorialCourse(summary, listOf(validLesson())),
+    )
+
+    assertFailsWith<DynamicTutorialProtocolException> { session(service).course("basics") }
   }
 
   @Test
