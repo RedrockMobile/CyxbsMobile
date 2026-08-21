@@ -249,7 +249,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
      */
     fun openTutorialCourse(courseId: String) {
       coroutineScope.launch {
-        isLoadingTutorial = true
         try {
           val session = tutorialSession ?: error("当前语言的教程包尚未加载完成。")
           val completedCourseIds = savedTutorialProgress.values
@@ -281,8 +280,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           tutorialStatus = throwable.toFailureText("课程加载失败")
-        } finally {
-          isLoadingTutorial = false
         }
       }
     }
