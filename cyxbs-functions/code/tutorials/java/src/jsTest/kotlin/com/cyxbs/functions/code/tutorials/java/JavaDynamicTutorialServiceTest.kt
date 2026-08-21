@@ -98,29 +98,33 @@ class JavaDynamicTutorialServiceTest {
   }
 
   @Test
-  fun objectOrientedExamplesCompileWithThePublishedJavaLanguageService() = runTest {
-    val course = assertNotNull(JavaDynamicTutorialService.course("java-object-oriented"))
-
-    course.lessons.forEach { lesson ->
-      val activeSource = lesson.initialFiles.single { it.path == lesson.activeFilePath }.source
-      val result = JavaDynamicLanguageService.compile(
-        DynamicCompilationRequest(
-          workspace = DynamicLanguageWorkspace(
-            lesson.initialFiles.map { sourceFile ->
-              DynamicSourceFile(sourceFile.path, sourceFile.source)
-            },
+  fun allTutorialExamplesCompileWithThePublishedJavaLanguageService() = runTest {
+    JavaDynamicTutorialService.manifest().courses.forEach { summary ->
+      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId))
+      course.lessons.forEach { lesson ->
+        val activeSource = lesson.initialFiles.single { it.path == lesson.activeFilePath }.source
+        val entryPosition = activeSource.indexOf("public static void main")
+        assertTrue(entryPosition >= 0, "${lesson.lessonId} 缺少 public static void main 入口。")
+        val result = JavaDynamicLanguageService.compile(
+          DynamicCompilationRequest(
+            workspace = DynamicLanguageWorkspace(
+              lesson.initialFiles.map { sourceFile ->
+                DynamicSourceFile(sourceFile.path, sourceFile.source)
+              },
+            ),
+            entry = DynamicProgramEntry(
+              filePath = lesson.activeFilePath,
+              position = entryPosition,
+            ),
           ),
-          entry = DynamicProgramEntry(
-            filePath = lesson.activeFilePath,
-            position = activeSource.indexOf("public static void main"),
-          ),
-        ),
-      )
+        )
 
-      assertNotNull(
-        result.program,
-        "${lesson.lessonId} 编译失败：${result.diagnostics.joinToString { it.message }}",
-      )
+        assertNotNull(
+          result.program,
+          "${summary.courseId}/${lesson.lessonId} 编译失败：" +
+            result.diagnostics.joinToString { it.message },
+        )
+      }
     }
   }
 }
