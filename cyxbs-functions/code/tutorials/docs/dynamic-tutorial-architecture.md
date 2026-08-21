@@ -24,6 +24,11 @@ cyxbs-components:guided-tour
 4. 客户端保存 course、lesson、step 的稳定 ID 和进度，不修改 npm 包内容。
 5. 编辑或运行后调用 `evaluate()`，语言包根据源码与输出判断当前步骤是否完成。
 
+`DynamicTutorialSession` 是 npm 包与编辑器之间的失败关闭边界：Manifest 和课程首次读取后会校验并在
+会话内缓存，语言身份、摘要、稳定 ID、活动文件、引导区间、完成条件、相对路径和文本/源码总量均需
+满足端上限制。重复 ID、缺少正文或超大反馈会抛出 `DynamicTutorialProtocolException`，不会把畸形
+对象交给 Compose；同一 JavaScript Runtime 的调用也会串行执行，关闭后禁止继续读取旧缓存。
+
 ## 进度与代码现场
 
 - `DynamicTutorialManager` 以 `languageId + courseId` 为键原子保存每门课程的最新进度，不在本地
