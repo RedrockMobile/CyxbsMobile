@@ -27,6 +27,7 @@ class ActiveCodeEditorTutorialTest {
     assertEquals("run", second.step.stepId)
     assertEquals(1, completed.stepIndex)
     assertTrue(completed.isCompleted)
+    assertEquals(null, completed.nextIncompleteLesson)
     assertEquals(
       setOf(
         DynamicTutorialCompletedStep("lesson", "read"),
@@ -56,6 +57,7 @@ class ActiveCodeEditorTutorialTest {
 
     assertTrue(completedLesson.isCurrentLessonCompleted)
     assertFalse(completedLesson.isCompleted)
+    assertEquals("lesson-2", completedLesson.nextIncompleteLesson?.lessonId)
   }
 
   /** 构造最小两步课时，避免测试依赖 Java 教程包的具体正文。 */

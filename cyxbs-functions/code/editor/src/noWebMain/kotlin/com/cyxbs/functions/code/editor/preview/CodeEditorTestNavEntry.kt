@@ -34,6 +34,7 @@ import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
 import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
+import com.cyxbs.functions.code.editor.preview.workbench.TUTORIALS_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.TUTORIAL_TOOL_WINDOW_ID
 import com.cyxbs.functions.code.editor.preview.workbench.ActiveCodeEditorTutorial
 import com.cyxbs.functions.code.editor.preview.workbench.TutorialGuideHint
@@ -746,13 +747,23 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val completedTutorialCourseIds = savedTutorialProgress.values
       .filter(DynamicTutorialProgress::isCourseCompleted)
       .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId)
+      .apply {
+        activeTutorial
+          ?.takeIf(ActiveCodeEditorTutorial::isCompleted)
+          ?.course
+          ?.summary
+          ?.courseId
+          ?.let(::add)
+      }
     val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
       manifest = tutorialManifest,
       status = tutorialStatus,
       isLoading = isLoadingTutorial,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
       completedCourseIds = completedTutorialCourseIds,
-      startedCourseIds = savedTutorialProgress.keys,
+      startedCourseIds = savedTutorialProgress.keys + listOfNotNull(
+        activeTutorial?.course?.summary?.courseId,
+      ),
       onOpenCourse = ::openTutorialCourse,
       onResetCourse = ::resetTutorialCourse,
     )
@@ -899,6 +910,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         codeEditorTutorialToolWindow(
           tutorial = tutorial,
           onLessonSelected = ::openTutorialLesson,
+          onOpenCoursePath = {
+            workbenchState.selectSidePanel(TUTORIALS_PANEL_ID)
+          },
           onPrevious = {
             activeTutorial = tutorial.previous()
           },

@@ -79,6 +79,12 @@ internal data class ActiveCodeEditorTutorial(
   val isCurrentLessonCompleted: Boolean
     get() = isLessonCompleted(lesson)
 
+  /** 当前课时完成后返回课程中第一个尚未完成的课时，全部完成时返回 `null`。 */
+  val nextIncompleteLesson: DynamicTutorialLesson?
+    get() = course.lessons.firstOrNull { candidate ->
+      candidate.lessonId != lesson.lessonId && !isLessonCompleted(candidate)
+    }
+
   /** 通过当前步骤后进入下一步；最后一步通过后保留正文并标记整课完成。 */
   fun advance(): ActiveCodeEditorTutorial {
     val completed = completedSteps + DynamicTutorialCompletedStep(lesson.lessonId, step.stepId)
@@ -334,6 +340,7 @@ private fun TutorialCoursePath(
 internal fun codeEditorTutorialToolWindow(
   tutorial: ActiveCodeEditorTutorial,
   onLessonSelected: (String) -> Unit,
+  onOpenCoursePath: () -> Unit,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ): CodeEditorToolWindow {
@@ -345,6 +352,7 @@ internal fun codeEditorTutorialToolWindow(
     TutorialToolWindowContent(
       tutorial = tutorial,
       onLessonSelected = onLessonSelected,
+      onOpenCoursePath = onOpenCoursePath,
       onPrevious = onPrevious,
       onCheck = onCheck,
     )
@@ -356,6 +364,7 @@ internal fun codeEditorTutorialToolWindow(
 private fun TutorialToolWindowContent(
   tutorial: ActiveCodeEditorTutorial,
   onLessonSelected: (String) -> Unit,
+  onOpenCoursePath: () -> Unit,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ) {
@@ -457,7 +466,20 @@ private fun TutorialToolWindowContent(
           modifier = Modifier.size(16.dp),
         )
         Spacer(Modifier.width(4.dp))
-        Text("本课已完成", color = Color(0xFF64C493), fontSize = 11.sp)
+        Text(
+          text = if (tutorial.isCompleted) "课程已完成" else "本课已完成",
+          color = Color(0xFF64C493),
+          fontSize = 11.sp,
+        )
+        Spacer(Modifier.width(8.dp))
+        val nextLesson = tutorial.nextIncompleteLesson
+        TutorialAction(
+          text = if (nextLesson == null) "课程路径" else "下一课时",
+          emphasized = true,
+          onClick = {
+            if (nextLesson == null) onOpenCoursePath() else onLessonSelected(nextLesson.lessonId)
+          },
+        )
       }
     }
   }

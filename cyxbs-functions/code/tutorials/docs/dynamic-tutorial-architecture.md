@@ -52,6 +52,8 @@ cyxbs-components:guided-tour
   锁定状态。未完成全部 `prerequisiteCourseIds` 时，侧栏展示缺少的前置课程且加载入口再次拒绝；未知
   前置 ID 或循环依赖按锁定处理，已完成课程不会因 npm 包后来新增前置关系而重新锁住。
 - 进入课时后，底部工具窗口顺序为 `Tutorial | Run | Performance`，Tutorial 默认展开。
+- 当前课时完成后 Tutorial 窗口提供“下一课时”；整门课程完成后提供“课程路径”，并在进度异步落盘前
+  先用内存完成状态解锁下一门课程，避免连续学习时出现短暂的错误锁定。
 - 教程正文只包含声明式文本、提示和代码块，npm 包不能返回 Compose 组件。
 - 布局提示使用稳定 `anchorId`；业务控件通过 `Modifier.guidedTourTarget` 注册位置。
 - 编辑器源码提示使用文件路径与 UTF-16 区间，由编辑器把区间换算为 `Rect` 后写入
