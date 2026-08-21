@@ -44,4 +44,12 @@ class JavaDynamicTutorialServiceTest {
       JavaDynamicTutorialService.evaluate(request.copy(standardOutput = "")).completed,
     )
   }
+
+  @Test
+  fun exposesMultipleIndependentCollectionLessons() = runTest {
+    val course = assertNotNull(JavaDynamicTutorialService.course("java-generics-collections"))
+
+    assertEquals(listOf("typed-list", "score-map"), course.lessons.map { it.lessonId })
+    assertEquals("src/CourseScores.java", course.lessons.last().activeFilePath)
+  }
 }

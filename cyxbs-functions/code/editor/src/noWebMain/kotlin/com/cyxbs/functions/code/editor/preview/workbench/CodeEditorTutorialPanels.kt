@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,6 +73,9 @@ internal data class ActiveCodeEditorTutorial(
   val step: DynamicTutorialStep
     get() = lesson.steps[stepIndex]
 
+  val isCurrentLessonCompleted: Boolean
+    get() = isLessonCompleted(lesson)
+
   /** 通过当前步骤后进入下一步；最后一步通过后保留正文并标记整课完成。 */
   fun advance(): ActiveCodeEditorTutorial {
     val completed = completedSteps + DynamicTutorialCompletedStep(lesson.lessonId, step.stepId)
@@ -105,6 +109,13 @@ internal data class ActiveCodeEditorTutorial(
       isCompleted = false,
     )
   }
+
+  /** 判断一个课时的全部稳定步骤是否已经完成。 */
+  fun isLessonCompleted(candidate: DynamicTutorialLesson): Boolean {
+    return candidate.steps.all { candidateStep ->
+      DynamicTutorialCompletedStep(candidate.lessonId, candidateStep.stepId) in completedSteps
+    }
+  }
 }
 
 /** 创建由教程业务注入的课程路径侧栏。 */
@@ -116,6 +127,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
   activeCourseId: String?,
   completedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
+  onResetCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
   return CodeEditorSidePanel(
     id = TUTORIALS_PANEL_ID,
@@ -128,6 +140,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
       isLoading = isLoading,
       activeCourseId = activeCourseId,
       completedCourseIds = completedCourseIds,
+      onResetCourse = onResetCourse,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
         if (layoutMode != com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbenchLayoutMode.Expanded) {
@@ -147,6 +160,7 @@ private fun TutorialCoursePath(
   activeCourseId: String?,
   completedCourseIds: Set<String>,
   onOpenCourse: (String) -> Unit,
+  onResetCourse: (String) -> Unit,
 ) {
   Column(
     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -252,6 +266,17 @@ private fun TutorialCoursePath(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
               )
+              if (course.courseId == activeCourseId) {
+                Text(
+                  text = "重置本课程",
+                  color = EditorWorkbenchColors.SecondaryText,
+                  fontSize = 9.sp,
+                  modifier = Modifier
+                    .align(Alignment.End)
+                    .clickable { onResetCourse(course.courseId) }
+                    .padding(vertical = 2.dp),
+                )
+              }
             }
           }
         }
@@ -262,6 +287,7 @@ private fun TutorialCoursePath(
 /** 把当前步骤放到 Run 之前的 Tutorial 工具窗口中。 */
 internal fun codeEditorTutorialToolWindow(
   tutorial: ActiveCodeEditorTutorial,
+  onLessonSelected: (String) -> Unit,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ): CodeEditorToolWindow {
@@ -272,6 +298,7 @@ internal fun codeEditorTutorialToolWindow(
   ) {
     TutorialToolWindowContent(
       tutorial = tutorial,
+      onLessonSelected = onLessonSelected,
       onPrevious = onPrevious,
       onCheck = onCheck,
     )
@@ -282,6 +309,7 @@ internal fun codeEditorTutorialToolWindow(
 @Composable
 private fun TutorialToolWindowContent(
   tutorial: ActiveCodeEditorTutorial,
+  onLessonSelected: (String) -> Unit,
   onPrevious: () -> Unit,
   onCheck: () -> Unit,
 ) {
@@ -311,6 +339,42 @@ private fun TutorialToolWindowContent(
         fontSize = 10.sp,
       )
     }
+    if (tutorial.course.lessons.size > 1) {
+      Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+      ) {
+        tutorial.course.lessons.forEachIndexed { index, lesson ->
+          val selected = lesson.lessonId == tutorial.lesson.lessonId
+          Surface(
+            color = if (selected) Color(0x283F76D3) else EditorWorkbenchColors.EditorBackground,
+            shape = RoundedCornerShape(5.dp),
+            modifier = Modifier.clickable { onLessonSelected(lesson.lessonId) },
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+              if (tutorial.isLessonCompleted(lesson)) {
+                Icon(
+                  imageVector = Icons.Default.Check,
+                  contentDescription = "已完成",
+                  tint = Color(0xFF64C493),
+                  modifier = Modifier.size(10.dp),
+                )
+              }
+              Text(
+                text = "${index + 1}. ${lesson.title}",
+                color = if (selected) EditorWorkbenchColors.PrimaryText else EditorWorkbenchColors.SecondaryText,
+                fontSize = 9.sp,
+                maxLines = 1,
+              )
+            }
+          }
+        }
+      }
+    }
     step.content.forEach { block -> TutorialContentBlock(block) }
     tutorial.feedback?.let { feedback ->
       Text(
@@ -325,11 +389,12 @@ private fun TutorialToolWindowContent(
       horizontalArrangement = Arrangement.End,
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      if (tutorial.stepIndex > 0 && !tutorial.isCompleted) {
+      if (tutorial.stepIndex > 0 && !tutorial.isCurrentLessonCompleted) {
         TutorialAction(text = "上一步", emphasized = false, onClick = onPrevious)
         Spacer(Modifier.width(6.dp))
       }
-      if (!tutorial.isCompleted && step.completion.kind != DynamicTutorialCompletionKind.RUN_SUCCEEDED &&
+      if (!tutorial.isCurrentLessonCompleted &&
+        step.completion.kind != DynamicTutorialCompletionKind.RUN_SUCCEEDED &&
         step.completion.kind != DynamicTutorialCompletionKind.OUTPUT_CONTAINS
       ) {
         TutorialAction(
@@ -338,7 +403,7 @@ private fun TutorialToolWindowContent(
           onClick = onCheck,
         )
       }
-      if (tutorial.isCompleted) {
+      if (tutorial.isCurrentLessonCompleted) {
         Icon(
           imageVector = Icons.Default.Check,
           contentDescription = null,

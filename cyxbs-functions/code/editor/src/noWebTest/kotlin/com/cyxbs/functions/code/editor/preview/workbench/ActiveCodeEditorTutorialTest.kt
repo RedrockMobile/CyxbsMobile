@@ -48,8 +48,18 @@ class ActiveCodeEditorTutorialTest {
     assertEquals(null, previous.feedback)
   }
 
+  @Test
+  fun completingOneLessonDoesNotCompleteAMultiLessonCourse() {
+    val firstLessonState = tutorialState(includeSecondLesson = true)
+
+    val completedLesson = firstLessonState.advance().advance()
+
+    assertTrue(completedLesson.isCurrentLessonCompleted)
+    assertFalse(completedLesson.isCompleted)
+  }
+
   /** 构造最小两步课时，避免测试依赖 Java 教程包的具体正文。 */
-  private fun tutorialState(): ActiveCodeEditorTutorial {
+  private fun tutorialState(includeSecondLesson: Boolean = false): ActiveCodeEditorTutorial {
     val summary = DynamicTutorialCourseSummary(
       courseId = "course",
       title = "Course",
@@ -65,8 +75,20 @@ class ActiveCodeEditorTutorialTest {
       activeFilePath = "Main.java",
       steps = listOf(step("read"), step("run")),
     )
+    val lessons = if (includeSecondLesson) {
+      listOf(
+        lesson,
+        lesson.copy(
+          lessonId = "lesson-2",
+          title = "Second",
+          steps = listOf(step("second")),
+        ),
+      )
+    } else {
+      listOf(lesson)
+    }
     return ActiveCodeEditorTutorial(
-      course = DynamicTutorialCourse(summary = summary, lessons = listOf(lesson)),
+      course = DynamicTutorialCourse(summary = summary, lessons = lessons),
       lesson = lesson,
     )
   }

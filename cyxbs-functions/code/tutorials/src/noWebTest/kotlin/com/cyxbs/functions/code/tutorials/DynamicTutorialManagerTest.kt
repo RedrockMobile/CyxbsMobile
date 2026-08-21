@@ -123,6 +123,50 @@ class DynamicTutorialManagerTest {
     assertEquals(setOf(DynamicTutorialCompletedStep("basics", "edit")), resumed.completedSteps)
   }
 
+  @Test
+  fun restoresIndependentWorkspaceForTheRequestedLesson() {
+    val course = resumableCourse()
+    val progress = progress(
+      stepId = "run",
+      lessonWorkspaces = listOf(
+        DynamicTutorialLessonWorkspace(
+          lessonId = "basics",
+          workspace = listOf(DynamicTutorialSourceFile("Main.java", "edited basics")),
+          activeFilePath = "Main.java",
+        ),
+        DynamicTutorialLessonWorkspace(
+          lessonId = "collections",
+          workspace = listOf(DynamicTutorialSourceFile("ListMain.java", "edited collections")),
+          activeFilePath = "ListMain.java",
+        ),
+      ),
+    )
+
+    val resumed = course.resolveResumeState(
+      progress = progress,
+      npmPackageVersion = "0.1.0",
+      requestedLessonId = "collections",
+    )
+
+    assertEquals("collections", resumed.lesson.lessonId)
+    assertEquals("edited collections", resumed.workspace.single().source)
+    assertEquals("ListMain.java", resumed.activeFilePath)
+  }
+
+  @Test
+  fun clearsOnlyTheRequestedCourse() = runTest {
+    val manager = DynamicTutorialManager(
+      packageLoader = FakeTutorialPackageLoader(),
+      progressStore = InMemoryDynamicTutorialProgressStore(),
+    )
+    manager.saveProgress(progress(courseId = "intro", stepId = "run"))
+    manager.saveProgress(progress(courseId = "collections", stepId = "list"))
+
+    manager.clearCourseProgress("java", "intro")
+
+    assertEquals(listOf("collections"), manager.savedProgress("java").map { it.courseId })
+  }
+
   /** 为 Manager 测试提供可计数的内存加载器。 */
   private class FakeTutorialPackageLoader(
     private val catalogJson: String = Json.encodeToString(validCatalog()),
@@ -183,6 +227,7 @@ class DynamicTutorialManagerTest {
       completedSteps: List<DynamicTutorialCompletedStep> = emptyList(),
       workspace: List<DynamicTutorialSourceFile> = emptyList(),
       activeFilePath: String? = null,
+      lessonWorkspaces: List<DynamicTutorialLessonWorkspace> = emptyList(),
     ) = DynamicTutorialProgress(
       languageId = "java",
       npmPackageName = "@cyxbs-mobile/tutorial-java",
@@ -193,6 +238,7 @@ class DynamicTutorialManagerTest {
       completedSteps = completedSteps,
       workspace = workspace,
       activeFilePath = activeFilePath,
+      lessonWorkspaces = lessonWorkspaces,
     )
 
     /** 提供两个稳定步骤的课程，用于验证版本升级时的恢复策略。 */
@@ -211,6 +257,14 @@ class DynamicTutorialManagerTest {
               DynamicTutorialStep("edit", "编辑", content),
               DynamicTutorialStep("run", "运行", content),
             ),
+          ),
+          DynamicTutorialLesson(
+            lessonId = "collections",
+            title = "集合",
+            description = "",
+            initialFiles = listOf(DynamicTutorialSourceFile("ListMain.java", "initial list")),
+            activeFilePath = "ListMain.java",
+            steps = listOf(DynamicTutorialStep("list", "列表", content)),
           ),
         ),
       )

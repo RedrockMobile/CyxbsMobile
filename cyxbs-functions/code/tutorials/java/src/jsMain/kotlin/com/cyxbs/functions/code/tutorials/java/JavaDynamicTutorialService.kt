@@ -191,7 +191,7 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     val summary = DynamicTutorialCourseSummary(
       courseId = "java-generics-collections",
       title = "泛型与集合",
-      description = "使用 List<String> 保存课程名称并遍历输出。",
+      description = "使用 List<String> 和 Map<String, Integer> 组织类型安全的数据。",
       order = 30,
       estimatedMinutes = 15,
       prerequisiteCourseIds = listOf("java-control-flow"),
@@ -238,6 +238,48 @@ object JavaDynamicTutorialService : DynamicTutorialService {
                 kind = DynamicTutorialCompletionKind.SOURCE_CONTAINS,
                 filePath = "src/CourseList.java",
                 expected = "courses.add(\"算法\")",
+              ),
+            ),
+          ),
+        ),
+        DynamicTutorialLesson(
+          lessonId = "score-map",
+          title = "名称到分数的映射",
+          description = "使用 Map 按名称保存并查询课程分数。",
+          initialFiles = listOf(
+            DynamicTutorialSourceFile(
+              path = "src/CourseScores.java",
+              source = """
+                import java.util.HashMap;
+                import java.util.Map;
+
+                public class CourseScores {
+                    public static void main(String[] args) {
+                        Map<String, Integer> scores = new HashMap<>();
+                        scores.put("Java", 95);
+                        scores.put("算法", 92);
+
+                        System.out.println("Java 分数：" + scores.get("Java"));
+                        System.out.println("课程数量：" + scores.size());
+                    }
+                }
+              """.trimIndent(),
+            ),
+          ),
+          activeFilePath = "src/CourseScores.java",
+          steps = listOf(
+            DynamicTutorialStep(
+              stepId = "run-score-map",
+              title = "查询课程分数",
+              content = listOf(
+                DynamicTutorialContentBlock(
+                  kind = DynamicTutorialContentKind.PARAGRAPH,
+                  text = "运行程序，观察 Map 如何通过课程名称查询对应分数。",
+                ),
+              ),
+              completion = DynamicTutorialCompletionRule(
+                kind = DynamicTutorialCompletionKind.OUTPUT_CONTAINS,
+                expected = "Java 分数：95",
               ),
             ),
           ),

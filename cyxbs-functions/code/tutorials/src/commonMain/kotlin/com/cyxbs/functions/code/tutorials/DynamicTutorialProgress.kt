@@ -10,6 +10,14 @@ data class DynamicTutorialCompletedStep(
   val stepId: String,
 )
 
+/** 一个课时独立保存的多文件代码现场。 */
+@Serializable
+data class DynamicTutorialLessonWorkspace(
+  val lessonId: String,
+  val workspace: List<DynamicTutorialSourceFile>,
+  val activeFilePath: String,
+)
+
 /**
  * 一门课程可跨页面生命周期恢复的学习进度。
  *
@@ -27,5 +35,6 @@ data class DynamicTutorialProgress(
   val completedSteps: List<DynamicTutorialCompletedStep> = emptyList(),
   val workspace: List<DynamicTutorialSourceFile> = emptyList(),
   val activeFilePath: String? = null,
+  val lessonWorkspaces: List<DynamicTutorialLessonWorkspace> = emptyList(),
   val isCourseCompleted: Boolean = false,
 )

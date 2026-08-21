@@ -24,6 +24,7 @@ data class DynamicTutorialResumeState(
 fun DynamicTutorialCourse.resolveResumeState(
   progress: DynamicTutorialProgress?,
   npmPackageVersion: String,
+  requestedLessonId: String? = null,
 ): DynamicTutorialResumeState {
   require(lessons.isNotEmpty()) { "Course '${summary.courseId}' does not contain any lesson." }
   require(lessons.all { it.steps.isNotEmpty() }) {
@@ -37,9 +38,9 @@ fun DynamicTutorialCourse.resolveResumeState(
     ?.completedSteps
     ?.filterTo(linkedSetOf()) { it in validSteps }
     .orEmpty()
-  val requestedLesson = progress
+  val requestedLesson = (requestedLessonId ?: progress
     ?.takeIf { it.courseId == summary.courseId }
-    ?.lessonId
+    ?.lessonId)
     ?.let { lessonId -> lessons.firstOrNull { it.lessonId == lessonId } }
   val lesson = requestedLesson ?: lessons.firstOrNull { candidate ->
     candidate.steps.any { step ->
@@ -55,16 +56,38 @@ fun DynamicTutorialCourse.resolveResumeState(
     DynamicTutorialCompletedStep(lesson.lessonId, step.stepId) !in completedSteps
   }.takeIf { it >= 0 } ?: lesson.steps.lastIndex
 
-  val canRestoreWorkspace = progress != null &&
-    progress.courseId == summary.courseId &&
-    progress.lessonId == lesson.lessonId &&
-    progress.npmPackageVersion == npmPackageVersion &&
-    progress.workspace.isNotEmpty() &&
-    progress.workspace.map { it.path }.distinct().size == progress.workspace.size &&
-    progress.activeFilePath in progress.workspace.map { it.path }
-  val workspace = if (canRestoreWorkspace) progress.workspace else lesson.initialFiles
+  val savedLessonWorkspace = progress
+    ?.takeIf {
+      it.courseId == summary.courseId && it.npmPackageVersion == npmPackageVersion
+    }
+    ?.lessonWorkspaces
+    ?.firstOrNull { it.lessonId == lesson.lessonId }
+    ?: progress
+      ?.takeIf {
+        it.courseId == summary.courseId &&
+          it.lessonId == lesson.lessonId &&
+          it.npmPackageVersion == npmPackageVersion &&
+          it.activeFilePath != null
+      }
+      ?.let { legacy ->
+        DynamicTutorialLessonWorkspace(
+          lessonId = legacy.lessonId,
+          workspace = legacy.workspace,
+          activeFilePath = requireNotNull(legacy.activeFilePath),
+        )
+      }
+  val canRestoreWorkspace = savedLessonWorkspace != null &&
+    savedLessonWorkspace.workspace.isNotEmpty() &&
+    savedLessonWorkspace.workspace.map { it.path }.distinct().size ==
+    savedLessonWorkspace.workspace.size &&
+    savedLessonWorkspace.activeFilePath in savedLessonWorkspace.workspace.map { it.path }
+  val workspace = if (canRestoreWorkspace) {
+    requireNotNull(savedLessonWorkspace).workspace
+  } else {
+    lesson.initialFiles
+  }
   val activeFilePath = if (canRestoreWorkspace) {
-    requireNotNull(progress.activeFilePath)
+    requireNotNull(savedLessonWorkspace).activeFilePath
   } else {
     lesson.activeFilePath
   }

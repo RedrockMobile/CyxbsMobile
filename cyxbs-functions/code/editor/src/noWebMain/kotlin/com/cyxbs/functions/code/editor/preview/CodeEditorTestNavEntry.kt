@@ -64,11 +64,14 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
+import com.cyxbs.functions.code.tutorials.DynamicTutorialLessonWorkspace
 import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
+import com.cyxbs.functions.code.tutorials.DynamicTutorialResumeState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
 import com.cyxbs.functions.code.tutorials.resolveResumeState
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourse
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationRequest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTargetKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
@@ -79,6 +82,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
@@ -103,6 +108,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   override fun Content(argument: CodeEditorTestNavArgument) {
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
     val dynamicTutorialManager = remember { DynamicTutorialManager() }
+    val tutorialProgressWriteMutex = remember { Mutex() }
     val guidedTourRegistry = remember { GuidedTourTargetRegistry() }
     val coroutineScope = rememberCoroutineScope()
     var isRunning by remember { mutableStateOf(false) }
@@ -120,6 +126,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var tutorialStatus by remember { mutableStateOf("正在准备动态教程目录…") }
     var isLoadingTutorial by remember { mutableStateOf(false) }
     var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
+    var resettingTutorialCourseId by remember { mutableStateOf<String?>(null) }
     val savedTutorialProgress = remember { mutableStateMapOf<String, DynamicTutorialProgress>() }
     val languageIconCache = rememberDynamicLanguageFileIconCache()
     val dynamicDocumentIcon: (@Composable (String, Modifier) -> Unit)? =
@@ -205,6 +212,29 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       selection?.let(editorState::selectRange)
     }
 
+    /** 用恢复结果整体替换编辑器工作区，确保课时切换不会混入上一课时文件。 */
+    fun applyTutorialResumeState(
+      course: DynamicTutorialCourse,
+      resumeState: DynamicTutorialResumeState,
+    ) {
+      val restoredFiles = resumeState.workspace.associate { file -> file.path to file.source }
+      val activeSource = restoredFiles[resumeState.activeFilePath]
+        ?: error("教程活动文件不存在：${resumeState.activeFilePath}")
+      sourceFiles.clear()
+      sourceFiles.putAll(restoredFiles)
+      openFilePaths.clear()
+      openFilePaths += resumeState.activeFilePath
+      editorState.replaceDocument(resumeState.activeFilePath, activeSource)
+      activeFilePath = resumeState.activeFilePath
+      activeTutorial = ActiveCodeEditorTutorial(
+        course = course,
+        lesson = resumeState.lesson,
+        stepIndex = resumeState.stepIndex,
+        completedSteps = resumeState.completedSteps,
+        isCompleted = resumeState.isCourseCompleted,
+      )
+    }
+
     /**
      * 进入课程上次停留的课时，并按 npm 版本决定恢复代码现场或使用最新初始文件。
      *
@@ -220,23 +250,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             progress = savedTutorialProgress[courseId],
             npmPackageVersion = session.npmPackageVersion,
           )
-          val restoredFiles = resumeState.workspace.associate { file -> file.path to file.source }
-          val activeSource = restoredFiles[resumeState.activeFilePath]
-            ?: error("教程活动文件不存在：${resumeState.activeFilePath}")
-
-          sourceFiles.clear()
-          sourceFiles.putAll(restoredFiles)
-          openFilePaths.clear()
-          openFilePaths += resumeState.activeFilePath
-          editorState.replaceDocument(resumeState.activeFilePath, activeSource)
-          activeFilePath = resumeState.activeFilePath
-          activeTutorial = ActiveCodeEditorTutorial(
-            course = course,
-            lesson = resumeState.lesson,
-            stepIndex = resumeState.stepIndex,
-            completedSteps = resumeState.completedSteps,
-            isCompleted = resumeState.isCourseCompleted,
-          )
+          applyTutorialResumeState(course, resumeState)
           workbenchState.closeSidePanel()
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
           tutorialStatus = buildString {
@@ -250,6 +264,17 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           isLoadingTutorial = false
         }
       }
+    }
+
+    /** 捕获当前课时的未保存文本，供延迟保存与课时切换共用。 */
+    fun currentTutorialDraft(tutorial: ActiveCodeEditorTutorial): TutorialProgressDraft {
+      return TutorialProgressDraft(
+        tutorial = tutorial,
+        activeFilePath = activeFilePath,
+        workspace = currentWorkspace().files.map { file ->
+          DynamicTutorialSourceFile(file.path, file.source)
+        },
+      )
     }
 
     /**
@@ -284,7 +309,30 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     /** 将当前步骤和源码快照写入教程模块；业务页面不直接操作文件格式。 */
     suspend fun persistTutorialProgress(draft: TutorialProgressDraft) {
       try {
+        if (resettingTutorialCourseId == draft.tutorial.course.summary.courseId) return
         val session = tutorialSession ?: return
+        val previous = savedTutorialProgress[draft.tutorial.course.summary.courseId]
+        val reusableLessonWorkspaces = if (previous?.npmPackageVersion == session.npmPackageVersion) {
+          previous.lessonWorkspaces.toMutableList().apply {
+            if (isEmpty() && previous.workspace.isNotEmpty() && previous.activeFilePath != null) {
+              add(
+                DynamicTutorialLessonWorkspace(
+                  lessonId = previous.lessonId,
+                  workspace = previous.workspace,
+                  activeFilePath = requireNotNull(previous.activeFilePath),
+                ),
+              )
+            }
+          }
+        } else {
+          mutableListOf()
+        }
+        reusableLessonWorkspaces.removeAll { it.lessonId == draft.tutorial.lesson.lessonId }
+        reusableLessonWorkspaces += DynamicTutorialLessonWorkspace(
+          lessonId = draft.tutorial.lesson.lessonId,
+          workspace = draft.workspace,
+          activeFilePath = draft.activeFilePath,
+        )
         val progress = DynamicTutorialProgress(
           languageId = session.tutorial.languageId,
           npmPackageName = session.tutorial.npmPackageName,
@@ -295,14 +343,60 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           completedSteps = draft.tutorial.completedSteps.toList(),
           workspace = draft.workspace,
           activeFilePath = draft.activeFilePath,
+          lessonWorkspaces = reusableLessonWorkspaces,
           isCourseCompleted = draft.tutorial.isCompleted,
         )
-        dynamicTutorialManager.saveProgress(progress)
-        savedTutorialProgress[progress.courseId] = progress
+        tutorialProgressWriteMutex.withLock {
+          if (resettingTutorialCourseId == progress.courseId) return@withLock
+          dynamicTutorialManager.saveProgress(progress)
+          savedTutorialProgress[progress.courseId] = progress
+        }
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
         // 持久化失败不能中止高亮、运行或教程校验，仍在侧栏给出可见反馈。
         tutorialStatus = throwable.toFailureText("教程进度保存失败")
+      }
+    }
+
+    /** 先保存当前课时，再从同一课程恢复目标课时的独立代码现场。 */
+    fun openTutorialLesson(lessonId: String) {
+      val current = activeTutorial ?: return
+      if (current.lesson.lessonId == lessonId) return
+      coroutineScope.launch {
+        persistTutorialProgress(currentTutorialDraft(current))
+        val session = tutorialSession ?: return@launch
+        val resumeState = current.course.resolveResumeState(
+          progress = savedTutorialProgress[current.course.summary.courseId],
+          npmPackageVersion = session.npmPackageVersion,
+          requestedLessonId = lessonId,
+        )
+        applyTutorialResumeState(current.course, resumeState)
+        workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
+        tutorialStatus = "正在学习 ${current.course.summary.title} · ${resumeState.lesson.title}"
+      }
+    }
+
+    /** 清除单门课程进度并立即回到当前 npm 包的第一份模板。 */
+    fun resetTutorialCourse(courseId: String) {
+      coroutineScope.launch {
+        resettingTutorialCourseId = courseId
+        try {
+          val session = tutorialSession ?: return@launch
+          tutorialProgressWriteMutex.withLock {
+            dynamicTutorialManager.clearCourseProgress(session.tutorial.languageId, courseId)
+            savedTutorialProgress.remove(courseId)
+          }
+          val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
+          val resumeState = course.resolveResumeState(null, session.npmPackageVersion)
+          applyTutorialResumeState(course, resumeState)
+          workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
+          tutorialStatus = "已重置 ${course.summary.title} · ${resumeState.lesson.title}"
+        } catch (throwable: Throwable) {
+          if (throwable is CancellationException) throw throwable
+          tutorialStatus = throwable.toFailureText("课程重置失败")
+        } finally {
+          resettingTutorialCourseId = null
+        }
       }
     }
 
@@ -313,13 +407,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       try {
         snapshotFlow {
           activeTutorial?.let { tutorial ->
-            TutorialProgressDraft(
-              tutorial = tutorial,
-              activeFilePath = activeFilePath,
-              workspace = currentWorkspace().files.map { file ->
-                DynamicTutorialSourceFile(file.path, file.source)
-              },
-            )
+            currentTutorialDraft(tutorial)
           }
         }.collectLatest { draft ->
           if (draft == null) return@collectLatest
@@ -647,6 +735,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         .filter(DynamicTutorialProgress::isCourseCompleted)
         .mapTo(linkedSetOf(), DynamicTutorialProgress::courseId),
       onOpenCourse = ::openTutorialCourse,
+      onResetCourse = ::resetTutorialCourse,
     )
     val sidePanels = rememberCodeEditorTestSidePanels(
       activeFilePath = activeFilePath,
@@ -790,6 +879,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       listOf(
         codeEditorTutorialToolWindow(
           tutorial = tutorial,
+          onLessonSelected = ::openTutorialLesson,
           onPrevious = {
             activeTutorial = tutorial.previous()
           },
@@ -809,7 +899,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       ) + runToolWindows
     } ?: runToolWindows
     val layoutGuide = activeTutorial
-      ?.takeUnless(ActiveCodeEditorTutorial::isCompleted)
+      ?.takeUnless(ActiveCodeEditorTutorial::isCurrentLessonCompleted)
       ?.step
       ?.guideTarget
       ?.takeIf { it.kind == DynamicTutorialGuideTargetKind.LAYOUT_ANCHOR }

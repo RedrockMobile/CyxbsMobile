@@ -96,6 +96,21 @@ class DynamicTutorialManager internal constructor(
     }
   }
 
+  /** 只清除一门课程的进度，其他课程路径和代码现场保持不变。 */
+  suspend fun clearCourseProgress(languageId: String, courseId: String) {
+    val normalizedLanguageId = languageId.trim().lowercase()
+    progressMutex.withLock {
+      val oldState = progressState()
+      val newState = oldState.copy(
+        entries = oldState.entries.filterNot {
+          it.languageId == normalizedLanguageId && it.courseId == courseId
+        },
+      )
+      progressStore.write(newState)
+      cachedProgressState = newState
+    }
+  }
+
   /** 宽容解码可追加字段的 Catalog，再严格校验稳定身份。 */
   private suspend fun loadCatalog(): List<DynamicTutorialInfo> {
     val catalog = try {
@@ -135,6 +150,10 @@ class DynamicTutorialManager internal constructor(
       progress.lessonId,
       progress.stepId,
     )
+    val sourceCharacterCount = progress.workspace.sumOf { it.source.length.toLong() } +
+      progress.lessonWorkspaces.sumOf { lessonWorkspace ->
+        lessonWorkspace.workspace.sumOf { it.source.length.toLong() }
+      }
     return identities.all { it.isNotBlank() && it.length <= MAX_IDENTITY_LENGTH } &&
       progress.languageId == progress.languageId.trim().lowercase() &&
       progress.completedSteps.size <= MAX_COMPLETED_STEPS &&
@@ -148,13 +167,27 @@ class DynamicTutorialManager internal constructor(
       progress.workspace.all { file ->
         file.path.isNotBlank() && file.path.length <= MAX_FILE_PATH_LENGTH
       } &&
-      progress.workspace.sumOf { it.source.length.toLong() } <= MAX_WORKSPACE_SOURCE_CHARACTERS
+      progress.lessonWorkspaces.size <= MAX_LESSON_WORKSPACES &&
+      progress.lessonWorkspaces.map { it.lessonId }.distinct().size ==
+        progress.lessonWorkspaces.size &&
+      progress.lessonWorkspaces.all { lessonWorkspace ->
+        lessonWorkspace.lessonId.isNotBlank() &&
+          lessonWorkspace.lessonId.length <= MAX_IDENTITY_LENGTH &&
+          lessonWorkspace.workspace.size <= MAX_WORKSPACE_FILES &&
+          lessonWorkspace.workspace.map { it.path }.distinct().size == lessonWorkspace.workspace.size &&
+          lessonWorkspace.workspace.all { file ->
+            file.path.isNotBlank() && file.path.length <= MAX_FILE_PATH_LENGTH
+          } &&
+          lessonWorkspace.activeFilePath in lessonWorkspace.workspace.map { it.path }
+      } &&
+      sourceCharacterCount <= MAX_WORKSPACE_SOURCE_CHARACTERS
   }
 
   private companion object {
     const val MAX_PROGRESS_ENTRIES = 128
     const val MAX_COMPLETED_STEPS = 2_048
     const val MAX_WORKSPACE_FILES = 128
+    const val MAX_LESSON_WORKSPACES = 64
     const val MAX_IDENTITY_LENGTH = 256
     const val MAX_FILE_PATH_LENGTH = 1_024
     const val MAX_WORKSPACE_SOURCE_CHARACTERS = 2L * 1024L * 1024L

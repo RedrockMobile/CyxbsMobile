@@ -35,6 +35,8 @@ cyxbs-components:guided-tour
 - 进度 JSON 使用临时文件加原子移动写入，并限制课程数、步骤数、文件数和源码总字符数。缓存损坏、
   schema 不兼容或单条记录越界时按空记录处理，不影响教程 npm 包重新下载与使用。
 - 编辑器在输入停止后保存，在课程切换或页面离开时冲刷最后一份快照；课程路径会直接标记已完成卡片。
+- 一门课程的多个课时分别保存工作区；Tutorial 工具窗口可直接切换课时并标记完成状态，重置入口只
+  删除当前课程记录，不影响同语言的其他课程。
 
 新增语言时，在语言教程模块调用 `npmJsTutorial`，再把该 Project 加入 catalog 的
 `generateDynamicTutorialCatalog` 列表即可。npm 包名只在语言模块的 `npmJsPackage` 声明一次。
