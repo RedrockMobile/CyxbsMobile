@@ -131,7 +131,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isLoadingTutorial by remember { mutableStateOf(false) }
     var canRetryTutorialLoad by remember { mutableStateOf(false) }
     var tutorialLoadGeneration by remember { mutableStateOf(0) }
-    var resumeTutorialCourseId by remember { mutableStateOf<String?>(null) }
     var activeTutorial by remember { mutableStateOf<ActiveCodeEditorTutorial?>(null) }
     var resettingTutorialCourseId by remember { mutableStateOf<String?>(null) }
     val savedTutorialProgress = remember { mutableStateMapOf<String, DynamicTutorialProgress>() }
@@ -271,8 +270,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             progress = savedTutorialProgress[courseId],
             npmPackageVersion = session.npmPackageVersion,
           )
-          // 先更新最近课程再切换活动课程，避免旧课程取消保存时短暂插入“继续上次学习”卡片。
-          resumeTutorialCourseId = courseId
           applyTutorialResumeState(course, resumeState)
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
           tutorialStatus = buildString {
@@ -370,10 +367,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           if (resettingTutorialCourseId == progress.courseId) return@withLock
           dynamicTutorialManager.saveProgress(progress)
           savedTutorialProgress[progress.courseId] = progress
-          // 切课时旧课程仍会冲刷最后一份草稿，但不能覆盖用户刚选择的新课程。
-          if (activeTutorial?.course?.summary?.courseId == progress.courseId) {
-            resumeTutorialCourseId = progress.courseId
-          }
         }
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
@@ -409,7 +402,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           tutorialProgressWriteMutex.withLock {
             dynamicTutorialManager.clearCourseProgress(session.tutorial.languageId, courseId)
             savedTutorialProgress.remove(courseId)
-            if (resumeTutorialCourseId == courseId) resumeTutorialCourseId = null
           }
           val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
           val resumeState = course.resolveResumeState(null, session.npmPackageVersion)
@@ -537,7 +529,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       canRetryTutorialLoad = false
       tutorialManifest = null
       activeTutorial = null
-      resumeTutorialCourseId = null
       savedTutorialProgress.clear()
       try {
         val supportedTutorial = dynamicTutorialManager.supportedTutorials().firstOrNull { tutorial ->
@@ -552,12 +543,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         tutorialManifest = loadedSession.manifest()
         val storedProgress = dynamicTutorialManager.savedProgress(languageId)
         savedTutorialProgress.putAll(storedProgress.associateBy { it.courseId })
-        resumeTutorialCourseId = storedProgress.preferredResumeCourseId()
+        val resumeCourseId = storedProgress.preferredResumeCourseId()
         tutorialStatus = buildString {
           append(tutorialManifest?.courses?.size ?: 0).append(" 门课程")
           append(" · npm ").append(loadedSession.npmPackageVersion)
         }
         isLoadingTutorial = false
+        // 有历史记录时直接恢复最近课程，不再要求用户通过额外的“继续学习”卡片二次进入。
+        resumeCourseId?.let(::openTutorialCourse)
         awaitCancellation()
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
@@ -787,7 +780,6 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isLoading = isLoadingTutorial,
       canRetryLoad = canRetryTutorialLoad,
       activeCourseId = activeTutorial?.course?.summary?.courseId,
-      resumeCourseId = resumeTutorialCourseId,
       progressByCourseId = displayedTutorialProgress,
       onRetryLoad = { tutorialLoadGeneration++ },
       onOpenCourse = ::openTutorialCourse,

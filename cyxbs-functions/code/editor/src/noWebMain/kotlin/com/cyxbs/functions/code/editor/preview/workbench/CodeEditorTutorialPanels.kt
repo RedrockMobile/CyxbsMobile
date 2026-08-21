@@ -137,7 +137,6 @@ internal fun rememberCodeEditorTutorialSidePanel(
   isLoading: Boolean,
   canRetryLoad: Boolean,
   activeCourseId: String?,
-  resumeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
   onRetryLoad: () -> Unit,
   onOpenCourse: (String) -> Unit,
@@ -154,7 +153,6 @@ internal fun rememberCodeEditorTutorialSidePanel(
       isLoading = isLoading,
       canRetryLoad = canRetryLoad,
       activeCourseId = activeCourseId,
-      resumeCourseId = resumeCourseId,
       progressByCourseId = progressByCourseId,
       onRetryLoad = onRetryLoad,
       onResetCourse = onResetCourse,
@@ -176,7 +174,6 @@ private fun TutorialCoursePath(
   isLoading: Boolean,
   canRetryLoad: Boolean,
   activeCourseId: String?,
-  resumeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
   onRetryLoad: () -> Unit,
   onOpenCourse: (String) -> Unit,
@@ -227,46 +224,6 @@ private fun TutorialCoursePath(
       completedCourseIds = completedCourseIds,
       startedCourseIds = progressByCourseId.keys,
     ).orEmpty()
-    courseAvailability.firstOrNull { availability ->
-      availability.course.courseId == resumeCourseId &&
-        availability.course.courseId != activeCourseId &&
-        availability.state != DynamicTutorialCourseState.LOCKED
-    }?.let { availability ->
-      val course = availability.course
-      val progress = course.resolveProgress(progressByCourseId[course.courseId])
-      Surface(
-        modifier = Modifier.fillMaxWidth().clickable { onOpenCourse(course.courseId) },
-        color = Color(0x283F76D3),
-        shape = RoundedCornerShape(8.dp),
-      ) {
-        Column(
-          modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
-          verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-          Text(
-            text = if (availability.state == DynamicTutorialCourseState.COMPLETED) {
-              "复习最近课程"
-            } else {
-              "继续上次学习"
-            },
-            color = EditorWorkbenchColors.Accent,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
-          )
-          Text(
-            text = buildString {
-              append(course.title)
-              progress.nextLesson?.title?.let { append(" · ").append(it) }
-            },
-            color = EditorWorkbenchColors.PrimaryText,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-        }
-      }
-    }
     courseAvailability.forEachIndexed { index, availability ->
       val course = availability.course
       val isLocked = availability.state == DynamicTutorialCourseState.LOCKED
