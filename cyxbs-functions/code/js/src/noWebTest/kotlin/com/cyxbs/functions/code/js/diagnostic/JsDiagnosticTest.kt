@@ -5,6 +5,8 @@ import com.cyxbs.functions.code.js.runtime.JsModuleLoader
 import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 import com.cyxbs.functions.code.js.runtime.create
 import com.cyxbs.functions.code.js.runtime.evaluate
 import kotlinx.coroutines.CancellationException
@@ -20,10 +22,12 @@ import kotlin.test.assertNull
 private fun JsRuntime(
   config: JsRuntimeConfig = JsRuntimeConfig(),
   moduleLoader: JsModuleLoader? = null,
+  bridges: List<JsRuntimeBridge> = emptyList(),
 ): JsRuntime = QuickJsRuntimeFactory.create(
   config = config,
   moduleLoader = moduleLoader,
   allowBytecodeCache = false,
+  bridges = bridges,
 )
 
 /**
@@ -106,12 +110,14 @@ class JsDiagnosticTest {
   /** 验证 Kotlin 宿主桥抛出的异常不会被误判为 JavaScript 语法或运行错误。 */
   @Test
   fun mapHostCapabilityError() = runTest {
-    val runtime = JsRuntime()
+    val runtime = JsRuntime(
+      bridges = listOf(
+        JsSyncFunctionBridge("failFromHost") {
+          throw IllegalStateException("Host capability failed.")
+        },
+      ),
+    )
     try {
-      runtime.bindFunction("failFromHost") {
-        throw IllegalStateException("Host capability failed.")
-      }
-
       val error = assertFailsWith<IllegalStateException> {
         runtime.evaluate<Any?>("failFromHost()")
       }

@@ -20,7 +20,7 @@ import kotlinx.coroutines.CancellationException
  *
  * ```
  * 刷新/复用依赖图 -> 下载并校验完整闭包 -> 构建内存 Module 图
- * -> 创建带 Loader 的 Runtime -> 交给业务绑定宿主能力并执行 -> 关闭 Runtime -> 释放入口租约
+ * -> 创建带 Loader 与预声明桥的 Runtime -> 执行业务代码 -> 关闭 Runtime -> 释放入口租约
  * ```
  *
  * Module Loader 必须在 [JsRuntimeFactory.create] 时安装，因此本类接收 Runtime 工厂，而不能接收已经
@@ -71,7 +71,6 @@ class NpmJsExecutor(
    * 执行 npm 包声明的入口 Module，并返回引擎无关的 Kotlin 基础值。
    *
    * @param refreshPolicy 本次执行的远端刷新策略，具体差异见 [NpmRefreshPolicy]。
-   * @param configureRuntime 在入口执行前同步注册宿主函数或对象；不得重入当前 Runtime。
    * @throws NpmException 依赖准备或 Module 图构建失败。
    * @throws JsRuntimeException Runtime 配置、入口编译、执行或关闭失败。
    * @throws CancellationException 调用协程被取消。
@@ -82,7 +81,6 @@ class NpmJsExecutor(
     runtimeFactory: JsRuntimeFactory,
     runtimeOptions: JsRuntimeOptions = JsRuntimeOptions(),
     refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
-    configureRuntime: (JsRuntime) -> Unit = {},
   ): Any? {
     return withRuntimeAndGraph(
       request,
@@ -90,7 +88,6 @@ class NpmJsExecutor(
       runtimeOptions,
       refreshPolicy,
     ) { runtime, graph ->
-      configureRuntime(runtime)
       val source = checkNotNull(graph.load(graph.entryModuleName)) {
         "Prepared npm entry Module is missing from its in-memory graph."
       }
@@ -110,7 +107,6 @@ class NpmJsExecutor(
    * @param code 调用方提供的 ES Module 源码。
    * @param filename 入口逻辑文件名，用于异常堆栈和相对 import。
    * @param refreshPolicy 本次执行的远端刷新策略，具体差异见 [NpmRefreshPolicy]。
-   * @param configureRuntime 在源码执行前同步注册宿主能力；不得重入当前 Runtime。
    * @throws NpmException 依赖准备或 Module 图构建失败。
    * @throws JsRuntimeException Runtime 配置、源码编译、执行或关闭失败。
    * @throws CancellationException 调用协程被取消。
@@ -123,7 +119,6 @@ class NpmJsExecutor(
     filename: String = JsRuntime.DEFAULT_FILENAME,
     runtimeOptions: JsRuntimeOptions = JsRuntimeOptions(),
     refreshPolicy: NpmRefreshPolicy = NpmRefreshPolicy.AUTO,
-    configureRuntime: (JsRuntime) -> Unit = {},
   ): Any? {
     return withRuntimeAndGraph(
       request,
@@ -131,7 +126,6 @@ class NpmJsExecutor(
       runtimeOptions,
       refreshPolicy,
     ) { runtime, _ ->
-      configureRuntime(runtime)
       runtime.evaluateValue(code = code, filename = filename, asModule = true)
     }
   }

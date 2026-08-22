@@ -6,6 +6,9 @@ import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsModuleLoader
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridgeBinding
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsRuntimeCallback
 import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleContent
 import com.cyxbs.functions.code.js.quickjs.internal.QuickJsModuleLoader
 import com.cyxbs.functions.code.js.quickjs.internal.QuickJsTimerBridge
@@ -37,11 +40,13 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
     jobDispatcher: CoroutineDispatcher = Dispatchers.Default,
     config: JsRuntimeConfig = JsRuntimeConfig(),
     moduleLoader: JsModuleLoader? = null,
+    bridges: List<JsRuntimeBridge> = emptyList(),
   ) : this(
     JsRuntimeOptions(
       jobDispatcher = jobDispatcher,
       config = config,
       moduleLoader = moduleLoader,
+      bridges = bridges,
     ),
   )
 
@@ -50,10 +55,12 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
     internalModuleLoader: QuickJsModuleLoader,
     jobDispatcher: CoroutineDispatcher = Dispatchers.Default,
     config: JsRuntimeConfig = JsRuntimeConfig(),
+    bridges: List<JsRuntimeBridge> = emptyList(),
   ) : this(
     options = JsRuntimeOptions(
       jobDispatcher = jobDispatcher,
       config = config,
+      bridges = bridges,
     ),
     internalModuleLoader = internalModuleLoader,
   )
@@ -110,6 +117,24 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
 
   private val timerBridge = QuickJsTimerBridge(engine)
 
+  init {
+    options.bridges.forEach { bridge ->
+      runQuickJsOperation {
+        when (val binding = bridge.binding) {
+          is JsRuntimeBridgeBinding.SyncFunction -> engine.function(bridge.name, binding.block)
+          is JsRuntimeBridgeBinding.AsyncFunction -> engine.asyncFunction(bridge.name, binding.block)
+          is JsRuntimeBridgeBinding.ObjectFunctions -> engine.define(bridge.name) {
+            binding.functions.forEach { (functionName, block) ->
+              function(functionName) { args -> block(args) }
+            }
+          }
+        }
+      }
+    }
+    val callback = JsRuntimeCallback(::evaluateValue)
+    options.bridges.forEach { bridge -> bridge.onRuntimeReady(callback) }
+  }
+
   override val isClosed: Boolean
     get() = engine.isClosed
 
@@ -130,41 +155,6 @@ internal class QuickJsRuntime @Throws(JsRuntimeException::class) constructor(
   @Throws(JsRuntimeException::class)
   override fun interruptEvaluation() {
     runQuickJsOperation { engine.interruptEvaluation() }
-  }
-
-  /** 注册同步顶层函数。 */
-  @Throws(JsRuntimeException::class)
-  override fun bindFunction(name: String, block: (args: Array<Any?>) -> Any?) {
-    runQuickJsOperation { engine.function(name = name, block = block) }
-  }
-
-  /** 注册由同步函数组成的命名空间对象。 */
-  @Throws(IllegalArgumentException::class, JsRuntimeException::class)
-  override fun bindObjectFunctions(
-    name: String,
-    functions: Map<String, (args: Array<Any?>) -> Any?>,
-  ) {
-    require(name.isNotBlank()) { "Object binding name must not be blank." }
-    require(functions.isNotEmpty()) { "Object binding functions must not be empty." }
-    require(functions.keys.all { it.isNotBlank() }) {
-      "Object binding function names must not be blank."
-    }
-    runQuickJsOperation {
-      engine.define(name) {
-        functions.forEach { (functionName, block) ->
-          function(functionName) { args -> block(args) }
-        }
-      }
-    }
-  }
-
-  /** 注册返回 Promise 的异步宿主函数。 */
-  @Throws(JsRuntimeException::class)
-  override fun bindAsyncFunction(
-    name: String,
-    block: suspend (args: Array<Any?>) -> Any?,
-  ) {
-    runQuickJsOperation { engine.asyncFunction(name = name, block = block) }
   }
 
   /** 把源码编译为当前 QuickJS 版本的实现相关字节码。 */

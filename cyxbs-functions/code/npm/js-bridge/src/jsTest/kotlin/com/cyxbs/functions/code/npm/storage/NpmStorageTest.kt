@@ -1,16 +1,19 @@
 package com.cyxbs.functions.code.npm.storage
 
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeHostAbi
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.promise
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -135,22 +138,41 @@ class NpmStorageTest {
     }
   }
 
-  /** 安装临时 Promise 宿主函数，并在测试结束后移除，避免污染其他 jsTest。 */
+  /** 安装临时 Promise 网关，并在测试结束后移除，验证生成代理使用统一 capabilities 协议。 */
   private suspend fun withBridge(
     handler: (JsonObject) -> String,
     block: suspend () -> Unit,
   ) {
     val global: dynamic = js("globalThis")
     val scope = MainScope()
-    global[NpmStorageHostAbi.INVOKE] = { requestJson: String ->
+    global[NpmJsBridgeHostAbi.GATEWAY] = {
+        operation: String,
+        bridgeId: String,
+        methodName: String?,
+        argumentsJson: String?,
+      ->
       scope.promise {
-        handler(Json.parseToJsonElement(requestJson).jsonObject)
+        require(bridgeId == STORAGE_BRIDGE_ID)
+        when (operation) {
+          NpmJsBridgeHostAbi.DESCRIBE ->
+            """{"ok":true,"methods":["invoke"]}"""
+          NpmJsBridgeHostAbi.INVOKE -> {
+            require(methodName == "invoke")
+            val requestJson = Json.parseToJsonElement(requireNotNull(argumentsJson))
+              .jsonArray.single().jsonPrimitive.content
+            buildJsonObject {
+              put("ok", true)
+              put("result", Json.encodeToString(handler(Json.parseToJsonElement(requestJson).jsonObject)))
+            }.toString()
+          }
+          else -> error("Unknown test bridge operation: $operation")
+        }
       }
     }
     try {
       block()
     } finally {
-      global[NpmStorageHostAbi.INVOKE] = undefined
+      global[NpmJsBridgeHostAbi.GATEWAY] = undefined
       scope.cancel()
     }
   }
@@ -172,4 +194,8 @@ class NpmStorageTest {
     val language: String,
     val version: Int,
   )
+
+  private companion object {
+    const val STORAGE_BRIDGE_ID = "com.cyxbs.functions.code.npm.storage.NpmStorageBridge"
+  }
 }

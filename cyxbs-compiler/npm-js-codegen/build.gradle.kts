@@ -7,7 +7,8 @@ kotlin {
   sourceSets {
     jvmMain.dependencies {
       compileOnly(libs.ksp.api)
-      implementation(project(":cyxbs-compiler:npm-js-codegen"))
+      implementation(libs.kotlinpoet)
+      implementation("io.github.985892345:provider-api:${libs.versions.kmp.ktProvider.get()}")
     }
   }
 }

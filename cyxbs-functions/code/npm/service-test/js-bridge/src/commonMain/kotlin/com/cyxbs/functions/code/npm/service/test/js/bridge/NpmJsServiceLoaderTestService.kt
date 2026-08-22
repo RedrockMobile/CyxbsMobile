@@ -44,4 +44,12 @@ interface NpmJsServiceLoaderTestService : NpmJsServiceInstance {
 
   /** 原样返回结构化参数，供测试验证未知字段、默认值和显式 `null` 的桥接行为。 */
   suspend fun echoPayload(payload: NpmJsServiceLoaderTestPayload): NpmJsServiceLoaderTestPayload
+
+  /**
+   * 演示端上调用 JS Service 后，JS 再通过 [NpmJsServiceTestHostBridge] 回调端上。
+   */
+  suspend fun executeBidirectional(
+    input: String,
+    value: Int,
+  ): NpmJsBidirectionalBridgeExampleResult
 }

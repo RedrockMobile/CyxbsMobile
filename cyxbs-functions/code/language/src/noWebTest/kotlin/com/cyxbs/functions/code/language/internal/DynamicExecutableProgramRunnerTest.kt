@@ -12,6 +12,9 @@ import com.cyxbs.functions.code.language.DynamicProgramOutputEvent
 import com.cyxbs.functions.code.language.DynamicProgramRunResult
 import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridgeBinding
+import com.cyxbs.functions.code.js.runtime.JsRuntimeCallback
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
 import com.cyxbs.functions.code.js.runtime.JsRuntimeErrorKind
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
@@ -440,6 +443,7 @@ class DynamicExecutableProgramRunnerTest {
         hostBase64Output = hostBase64Output,
         readStandardInput = readStandardInput,
         runtimeFailure = runtimeFailure,
+        bridges = options.bridges,
       ).also(runtimes::add)
     }
   }
@@ -451,6 +455,7 @@ class DynamicExecutableProgramRunnerTest {
     private val hostBase64Output: List<Pair<String, String>>,
     private val readStandardInput: Boolean,
     private val runtimeFailure: JsRuntimeException?,
+    bridges: List<JsRuntimeBridge>,
   ) : JsRuntime {
     override var isClosed: Boolean = false
       private set
@@ -458,6 +463,21 @@ class DynamicExecutableProgramRunnerTest {
     private var evaluationCount = 0
     var observedStandardInputUtf8Base64: String? = null
       private set
+
+    init {
+      bridges.forEach { bridge ->
+        when (val binding = bridge.binding) {
+          is JsRuntimeBridgeBinding.SyncFunction -> hostFunctions[bridge.name] = binding.block
+          is JsRuntimeBridgeBinding.AsyncFunction ->
+            error("Runner test does not expect asynchronous host bridges.")
+          is JsRuntimeBridgeBinding.ObjectFunctions ->
+            error("Runner must install the JavaScript output wrapper instead of host objects.")
+        }
+        bridge.onRuntimeReady(
+          JsRuntimeCallback { code, filename, asModule -> evaluateValue(code, filename, asModule) },
+        )
+      }
+    }
 
     override suspend fun evaluateValue(
       code: String,
@@ -497,22 +517,6 @@ class DynamicExecutableProgramRunnerTest {
     }
 
     override fun interruptEvaluation() = Unit
-
-    override fun bindFunction(name: String, block: (Array<Any?>) -> Any?) {
-      hostFunctions[name] = block
-    }
-
-    override fun bindObjectFunctions(
-      name: String,
-      functions: Map<String, (Array<Any?>) -> Any?>,
-    ) {
-      error("Runner must install the JavaScript output wrapper instead of binding object functions.")
-    }
-
-    override fun bindAsyncFunction(
-      name: String,
-      block: suspend (Array<Any?>) -> Any?,
-    ) = Unit
 
     override fun close() {
       isClosed = true

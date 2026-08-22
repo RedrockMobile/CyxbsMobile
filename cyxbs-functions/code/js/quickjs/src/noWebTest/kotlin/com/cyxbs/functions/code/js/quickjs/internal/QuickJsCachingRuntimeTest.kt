@@ -6,6 +6,7 @@ import com.cyxbs.functions.code.js.runtime.JsModuleLoader
 import com.cyxbs.functions.code.js.runtime.JsModuleNormalizer
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 import com.cyxbs.functions.code.js.runtime.create
 import com.cyxbs.functions.code.js.runtime.evaluate
 import kotlinx.coroutines.test.runTest
@@ -32,12 +33,10 @@ class QuickJsCachingRuntimeTest {
     QuickJsBytecodeCache.writeEntry(key, invalidBytecode)
 
     var captured: Int? = null
-    val runtime = QuickJsRuntimeFactory.create()
+    val runtime = QuickJsRuntimeFactory.create(
+      bridges = listOf(captureBridge { captured = it }),
+    )
     try {
-      runtime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-        null
-      }
       assertFailsWith<JsRuntimeException> {
         runtime.evaluate<Unit>(code = code, filename = filename, asModule = true)
       }
@@ -103,13 +102,10 @@ class QuickJsCachingRuntimeTest {
         JsRuntimeOptions(
           moduleLoader = loader,
           allowBytecodeCache = allowBytecodeCache,
+          bridges = listOf(captureBridge { captured = it }),
         ),
       )
       try {
-        runtime.bindFunction("capture") { args ->
-          captured = (args.single() as Number).toInt()
-          null
-        }
         runtime.evaluate<Unit>(
           code = "import { value } from 'answer-alias'; capture(value);",
           filename = filename,
@@ -171,12 +167,9 @@ class QuickJsCachingRuntimeTest {
     var captured: Int? = null
     val failedRuntime = QuickJsRuntimeFactory.create(
       moduleLoader = JsModuleLoader { name -> moduleSource.takeIf { name == moduleName } },
+      bridges = listOf(captureBridge { captured = it }),
     )
     try {
-      failedRuntime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-        null
-      }
       assertFailsWith<JsRuntimeException> {
         failedRuntime.evaluate<Unit>(code = code, filename = filename, asModule = true)
       }
@@ -328,12 +321,10 @@ class QuickJsCachingRuntimeTest {
   /** 创建下一次独立 Runtime 执行，用于验证失败缓存不会在当前调用内被自动重试。 */
   private suspend fun evaluateCapturedEntry(code: String, filename: String): Int? {
     var captured: Int? = null
-    val runtime = QuickJsRuntimeFactory.create()
+    val runtime = QuickJsRuntimeFactory.create(
+      bridges = listOf(captureBridge { captured = it }),
+    )
     try {
-      runtime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-        null
-      }
       runtime.evaluate<Unit>(code = code, filename = filename, asModule = true)
     } finally {
       runtime.close()
@@ -364,18 +355,22 @@ class QuickJsCachingRuntimeTest {
     var captured: Int? = null
     val runtime = QuickJsRuntimeFactory.create(
       moduleLoader = JsModuleLoader { name -> moduleSources[name] },
+      bridges = listOf(captureBridge { captured = it }),
     )
     try {
-      runtime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-        null
-      }
       runtime.evaluate<Unit>(code = code, filename = filename, asModule = true)
     } finally {
       runtime.close()
     }
     return captured
   }
+
+  /** 创建测试专用 capture 桥，并在 Runtime 构造前冻结回调。 */
+  private fun captureBridge(onCaptured: (Int) -> Unit): JsSyncFunctionBridge =
+    JsSyncFunctionBridge("capture") { args ->
+      onCaptured((args.single() as Number).toInt())
+      null
+    }
 
   private fun engineVersion(): String {
     val runtime = QuickJsRuntime()

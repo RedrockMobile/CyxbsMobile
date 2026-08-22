@@ -1,9 +1,10 @@
 package com.cyxbs.functions.code.language.internal
 
 import com.cyxbs.functions.code.js.quickjs.QuickJsRuntimeFactory
-import com.cyxbs.functions.code.js.runtime.JsRuntime
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeOptions
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CyclicBarrier
@@ -33,18 +34,18 @@ class JavaThreadRuntimePrototypeTest {
     val readsCompleted = CyclicBarrier(WORKER_COUNT)
     val tasks = List(WORKER_COUNT) {
       pool.submitRuntime(
-        bind = { runtime ->
-          runtime.bindFunction("__shared_read") {
+        bridges = listOf(
+          JsSyncFunctionBridge("__shared_read") {
             val snapshot = sharedCounter.get()
             // 仅用于让原型稳定重现两个线程都读到旧值；生产 ABI 不会在同步回调中等待。
             readsCompleted.await(5, TimeUnit.SECONDS)
             snapshot
-          }
-          runtime.bindFunction("__shared_write") { arguments ->
+          },
+          JsSyncFunctionBridge("__shared_write") { arguments ->
             sharedCounter.set((arguments.single() as Number).toInt())
             null
-          }
-        },
+          },
+        ),
         code = """
           (() => {
             for (let index = 0; index < $iterations; index++) {
@@ -70,13 +71,13 @@ class JavaThreadRuntimePrototypeTest {
     val monitor = Any()
     val tasks = List(WORKER_COUNT) {
       pool.submitRuntime(
-        bind = { runtime ->
-          runtime.bindFunction("__shared_increment_synchronized") {
+        bridges = listOf(
+          JsSyncFunctionBridge("__shared_increment_synchronized") {
             synchronized(monitor) {
               sharedCounter.incrementAndGet()
             }
-          }
-        },
+          },
+        ),
         code = """
           (() => {
             for (let index = 0; index < $iterations; index++) {
@@ -115,12 +116,12 @@ class JavaThreadRuntimePrototypeTest {
     val parallelMillis = measureTimeMillis {
       val parallelTasks = List(WORKER_COUNT) {
         pool.submitRuntime(
-          bind = { runtime ->
-            runtime.bindFunction("__record_worker_thread") {
+          bridges = listOf(
+            JsSyncFunctionBridge("__record_worker_thread") {
               workerThreads += Thread.currentThread().name
               null
-            }
-          },
+            },
+          ),
           code = code.replace("const value = 0;", "__record_worker_thread(); const value = 0;"),
         )
       }
@@ -159,7 +160,7 @@ class JavaThreadRuntimePrototypeTest {
    * 这条线程亲和约束是后续 Thread 实现的硬边界，Runtime 与 JS 对象都不会跨宿主线程传递。
    */
   private fun ExecutorService.submitRuntime(
-    bind: (JsRuntime) -> Unit = {},
+    bridges: List<JsRuntimeBridge> = emptyList(),
     code: String,
   ): Future<Int> = submit<Int> {
     runBlocking {
@@ -171,10 +172,10 @@ class JavaThreadRuntimePrototypeTest {
             evaluationTimeoutMillis = 10_000L,
           ),
           allowBytecodeCache = false,
+          bridges = bridges,
         ),
       )
       try {
-        bind(runtime)
         (runtime.evaluateValue(code = code, filename = "java-thread-prototype.js", asModule = false) as Number)
           .toInt()
       } finally {

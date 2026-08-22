@@ -4,7 +4,7 @@ plugins {
 }
 
 useNavigation()
-useKtProvider()
+useNpmJsHost()
 
 kotlin {
   sourceSets {

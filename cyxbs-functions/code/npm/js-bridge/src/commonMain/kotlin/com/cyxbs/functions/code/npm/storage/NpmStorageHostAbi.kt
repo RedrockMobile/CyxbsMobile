@@ -3,13 +3,10 @@ package com.cyxbs.functions.code.npm.storage
 /**
  * npm Storage 在 JavaScript Runtime 与宿主之间使用的稳定 ABI。
  *
- * 该对象位于 commonMain，使 npm 包和非 Web 宿主共享同一组协议名称。业务代码不应直接调用
- * [INVOKE] 对应的全局函数，而应使用 jsMain 提供的公开 Storage API。
+ * 该对象位于 commonMain，使 npm 包和非 Web 宿主共享同一组 operation 名称。跨 Runtime 调用
+ * 已统一走 KSP 生成的 [NpmStorageBridge]，业务代码只应使用 jsMain 的公开 Storage API。
  */
 object NpmStorageHostAbi {
-  /** 接收单个 JSON 请求并异步返回 JSON 响应的宿主函数名。 */
-  const val INVOKE: String = "__cyxbs_npm_storage_invoke"
-
   const val SCOPE_PACKAGE: String = "package"
   const val SCOPE_GLOBAL: String = "global"
 

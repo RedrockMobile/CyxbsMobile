@@ -149,9 +149,9 @@ class JsProgramClient(
       config = environment.policy.runtimeConfig,
       moduleLoader = JsModuleLoader(moduleSources::get),
       allowBytecodeCache = allowBytecodeCache,
+      bridges = environment.bundle.capabilities.flatMap { it.runtimeBridges },
     )
     try {
-      environment.bundle.capabilities.forEach { capability -> capability.install(runtime) }
       JsExecutionResult(
         value = runtime.evaluateValue(
           code = sourcePackage.entrySource(),

@@ -1,8 +1,11 @@
 package com.cyxbs.functions.code.npm.service.test.js.impl
 
+import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsBidirectionalBridgeExampleResult
+import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsHostBridgeExampleRequest
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestPayload
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestResult
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestService
+import com.cyxbs.functions.code.npm.service.test.js.bridge.npmJsServiceTestHostBridge
 
 /**
  * npm 测试包中的 Kotlin/JS Service 实现。
@@ -25,6 +28,24 @@ object NpmJsServiceLoaderTestServiceJs : NpmJsServiceLoaderTestService {
   override suspend fun echoPayload(
     payload: NpmJsServiceLoaderTestPayload,
   ): NpmJsServiceLoaderTestPayload = payload
+
+  /**
+   * 演示 JS Service 使用 KSP 生成的代理回调端上 Host Bridge。
+   *
+   * 业务实现无需接触 Runtime、JSON 或 bridgeId，只需像调用普通 suspend 接口一样调用代理。
+   */
+  override suspend fun executeBidirectional(
+    input: String,
+    value: Int,
+  ): NpmJsBidirectionalBridgeExampleResult {
+    val hostResponse = npmJsServiceTestHostBridge.execute(
+      NpmJsHostBridgeExampleRequest(input = input, value = value),
+    )
+    return NpmJsBidirectionalBridgeExampleResult(
+      bundleMarker = BUNDLE_MARKER,
+      hostResponse = hostResponse,
+    )
+  }
 
   private const val BUNDLE_MARKER = "local-js-service-v1"
   private const val MULTIPLIER = 7

@@ -1,7 +1,6 @@
 package com.cyxbs.functions.code.npm.storage
 
 import com.cyxbs.components.config.sp.PreferencesSettings
-import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.russhwolf.settings.Settings
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.absolutePath
@@ -43,18 +42,6 @@ internal class NpmStorageHost(
   private val fileSystem: FileSystem = FileSystem.SYSTEM,
 ) {
   private val mutex = Mutex()
-
-  /** 在 Service 初始化前注册唯一异步宿主入口。 */
-  fun install(runtime: JsRuntime, packageName: String) {
-    require(packageName.isNotBlank()) { "npm Storage package name must not be blank." }
-    runtime.bindAsyncFunction(NpmStorageHostAbi.INVOKE) { arguments ->
-      val requestJson = arguments.singleOrNull() as? String
-        ?: return@bindAsyncFunction errorResponse(
-          "npm Storage host expects exactly one JSON string argument.",
-        )
-      handle(packageName, requestJson)
-    }
-  }
 
   /**
    * 处理一项 Storage 请求。
@@ -243,7 +230,8 @@ internal class NpmStorageHost(
 
   /** 每个作用域使用独立 Settings 实例，原始包名和 namespace 不直接成为平台存储名称。 */
   private fun settings(scope: StorageScope): Settings =
-    settingsFactory("NpmJsStorage-${scope.kind}-${scope.digest}")
+    // PreferencesSettings 在部分平台限制节点名长度；保留 128-bit 摘要已足够隔离作用域。
+    settingsFactory("NpmJsStorage-${scope.kind}-${scope.digest.take(SETTINGS_DIGEST_LENGTH)}")
 
   /** 获取当前作用域的持久文件根目录。 */
   private fun fileRoot(scope: StorageScope): Path =
@@ -302,6 +290,7 @@ internal class NpmStorageHost(
 
     private const val MAX_KEY_LENGTH = 256
     private const val MAX_PATH_LENGTH = 1_024
+    private const val SETTINGS_DIGEST_LENGTH = 32
     private val GLOBAL_NAMESPACE = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
     private val JSON = Json {

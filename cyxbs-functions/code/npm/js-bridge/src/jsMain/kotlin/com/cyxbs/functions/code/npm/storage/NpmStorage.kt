@@ -1,10 +1,8 @@
 package com.cyxbs.functions.code.npm.storage
 
-import kotlinx.coroutines.await
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.js.JSON
-import kotlin.js.Promise
 
 /**
  * 当前 npm 包可用的统一持久化入口。
@@ -253,7 +251,7 @@ suspend inline fun <reified T> NpmSettingsStorage.putJson(
   putString(key, json.encodeToString<T>(value))
 }
 
-/** 调用 Runtime 安装的单一宿主函数，并把协议错误收敛为稳定异常。 */
+/** 调用 KSP 生成的强类型桥代理，并把底层桥异常收敛为 Storage 领域异常。 */
 private suspend fun invokeNpmStorage(
   operation: String,
   scopeKind: String,
@@ -274,14 +272,9 @@ private suspend fun invokeNpmStorage(
   if (booleanValue != null) request.booleanValue = booleanValue
   if (recursive) request.recursive = true
 
-  val global: dynamic = js("globalThis")
-  val bridge = global[NpmStorageHostAbi.INVOKE]
-  if (bridge == undefined) {
-    throw NpmStorageException("The npm Storage host bridge is not installed.")
-  }
   val requestJson = JSON.stringify(request)
   val responseJson = try {
-    (bridge(requestJson) as Promise<String>).await()
+    npmStorageBridge.invoke(requestJson)
   } catch (throwable: Throwable) {
     throw NpmStorageException(
       throwable.message ?: "The npm Storage host bridge invocation failed.",

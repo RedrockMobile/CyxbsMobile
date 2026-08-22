@@ -44,6 +44,24 @@ fun Project.useKtProvider(
 }
 
 /**
+ * 为普通 `manager.lib` 模块启用 npm JavaScript Host 侧代码生成。
+ *
+ * 协议模块应直接使用 `manager.npmJsBridge`；只有 Host 实现位于普通业务 lib 的特殊场景才调用
+ * 本函数。它只向非 Web 目标安装 KSP 与 KtProvider，不创建 JS target，也不参与 npm 发布。
+ */
+fun Project.useNpmJsHost() {
+  useKtProvider(
+    isNeedKsp = true,
+    kspTargets = Multiplatform.KspTarget.NON_WEB,
+    dependencySourceSetName = "noWebMain",
+  )
+  kspMultiplatform(
+    dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-host"),
+    targets = Multiplatform.KspTarget.NON_WEB,
+  )
+}
+
+/**
  * 使用 Room，已默认支持与 Kt 协程一起使用
  *
  * @param rxjava 依赖 room-rxjava

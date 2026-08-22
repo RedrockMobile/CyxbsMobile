@@ -2,7 +2,7 @@ plugins {
   id("manager.lib")
 }
 
-useKtProvider()
+useNpmJsHost()
 
 kotlin {
   sourceSets {

@@ -42,24 +42,6 @@ internal class QuickJsCachingRuntime(
     runtime.interruptEvaluation()
   }
 
-  override fun bindFunction(name: String, block: (args: Array<Any?>) -> Any?) {
-    runtime.bindFunction(name, block)
-  }
-
-  override fun bindObjectFunctions(
-    name: String,
-    functions: Map<String, (args: Array<Any?>) -> Any?>,
-  ) {
-    runtime.bindObjectFunctions(name, functions)
-  }
-
-  override fun bindAsyncFunction(
-    name: String,
-    block: suspend (args: Array<Any?>) -> Any?,
-  ) {
-    runtime.bindAsyncFunction(name, block)
-  }
-
   override fun close() {
     if (closed) return
     closed = true

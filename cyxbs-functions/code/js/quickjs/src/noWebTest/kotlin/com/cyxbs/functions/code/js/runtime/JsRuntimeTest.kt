@@ -166,13 +166,15 @@ class JsRuntimeTest {
    */
   @Test
   fun invokeSuspendHostFunction() = runTest {
-    val runtime = JsRuntime()
+    val runtime = JsRuntime(
+      bridges = listOf(
+        JsAsyncFunctionBridge("doubleAsync") { args ->
+          delay(1.milliseconds)
+          (args.single() as Number).toInt() * 2
+        },
+      ),
+    )
     try {
-      runtime.bindAsyncFunction("doubleAsync") { args ->
-        delay(1.milliseconds)
-        (args.single() as Number).toInt() * 2
-      }
-
       assertEquals(42, runtime.evaluate<Int>("await doubleAsync(21)"))
     } finally {
       runtime.close()
@@ -184,6 +186,7 @@ class JsRuntimeTest {
    */
   @Test
   fun loadEsModule() = runTest {
+    var captured: Int? = null
     val runtime = JsRuntime(
       moduleLoader = JsModuleLoader { name ->
         if (name == "answer") {
@@ -192,13 +195,13 @@ class JsRuntimeTest {
           null
         }
       },
+      bridges = listOf(
+        JsSyncFunctionBridge("capture") { args ->
+          captured = (args.single() as Number).toInt()
+        },
+      ),
     )
-    var captured: Int? = null
     try {
-      runtime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-      }
-
       runtime.evaluate<Any?>(
         code = """
           import { value } from "answer";
@@ -278,13 +281,16 @@ class JsRuntimeTest {
         recompiledNames += name
       }
     }
-    val refreshedRuntime = JsRuntime(internalModuleLoader = refreshedLoader)
     var captured: Int? = null
+    val refreshedRuntime = JsRuntime(
+      internalModuleLoader = refreshedLoader,
+      bridges = listOf(
+        JsSyncFunctionBridge("capture") { args ->
+          captured = (args.single() as Number).toInt()
+        },
+      ),
+    )
     try {
-      refreshedRuntime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-      }
-
       assertEquals(
         setOf("entry", "middle", "leaf"),
         refreshedRuntime.resolveModuleGraph(entryBytecode),
@@ -305,6 +311,7 @@ class JsRuntimeTest {
   @Test
   fun collectDynamicImportBytecodeDuringEvaluation() = runTest {
     val compiledModules = mutableMapOf<String, ByteArray>()
+    var captured: Int? = null
     val runtime = JsRuntime(
       internalModuleLoader = object : QuickJsModuleLoader {
         override fun load(name: String): JsModuleContent? {
@@ -320,13 +327,13 @@ class JsRuntimeTest {
           compiledModules[name] = bytecode
         }
       },
+      bridges = listOf(
+        JsSyncFunctionBridge("capture") { args ->
+          captured = (args.single() as Number).toInt()
+        },
+      ),
     )
-    var captured: Int? = null
     try {
-      runtime.bindFunction("capture") { args ->
-        captured = (args.single() as Number).toInt()
-      }
-
       runtime.evaluate<Any?>(
         code = """
           const answer = await import("dynamic-answer");

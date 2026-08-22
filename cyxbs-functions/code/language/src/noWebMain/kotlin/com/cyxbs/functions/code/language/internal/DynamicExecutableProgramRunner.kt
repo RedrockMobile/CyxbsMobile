@@ -14,6 +14,8 @@ import com.cyxbs.functions.code.js.runtime.JsRuntime
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 import com.cyxbs.functions.code.js.runtime.create
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
@@ -67,12 +69,14 @@ internal class DynamicExecutableProgramRunner(
     // 先确认引擎可用；输入已通过配额校验，之后的临时 ByteArray/Base64 才是有界且必要的。
     val standardInputUtf8Base64 = Base64.encode(standardInput.encodeToByteArray())
     val loader = InMemoryProgramModuleLoader(program)
+    val output = DynamicProgramOutputCollector(outputSink, maxOutputBytes)
     val runtime = try {
       runtimeFactory.create(
         config = config,
         moduleLoader = loader,
         // 教学程序每次使用新 Runtime，跨次字节码缓存不会复用运行状态且会增加失效复杂度。
         allowBytecodeCache = false,
+        bridges = programHostBridges(output, standardInputUtf8Base64),
       )
     } catch (exception: JsRuntimeException) {
       throw DynamicLanguageExecutionException(
@@ -87,9 +91,7 @@ internal class DynamicExecutableProgramRunner(
         runtime,
         program,
         arguments,
-        outputSink,
-        maxOutputBytes,
-        standardInputUtf8Base64,
+        output,
       )
     } catch (exception: CancellationException) {
       primaryFailure = exception
@@ -121,30 +123,13 @@ internal class DynamicExecutableProgramRunner(
     }
   }
 
-  /** 在已经创建的 Runtime 中注册最小宿主能力、安装 ASCII 安全桥并调用生成入口。 */
+  /** 在已经安装宿主能力的 Runtime 中加载 ASCII 安全桥并调用生成入口。 */
   private suspend fun execute(
     runtime: JsRuntime,
     program: DynamicExecutableProgram,
     arguments: List<JsonElement>,
-    outputSink: DynamicProgramOutputSink?,
-    maxOutputBytes: Long,
-    standardInputUtf8Base64: String,
+    output: DynamicProgramOutputCollector,
   ): DynamicProgramExecution {
-    val output = DynamicProgramOutputCollector(outputSink, maxOutputBytes)
-    runtime.bindFunction(DynamicProgramHostAbi.WRITE_STANDARD_OUTPUT_UTF8_BASE64_CHUNK) { args ->
-      output.appendUtf8Base64Chunk(DynamicProgramOutputChannel.STANDARD_OUTPUT, args)
-      null
-    }
-    runtime.bindFunction(DynamicProgramHostAbi.WRITE_STANDARD_ERROR_UTF8_BASE64_CHUNK) { args ->
-      output.appendUtf8Base64Chunk(DynamicProgramOutputChannel.STANDARD_ERROR, args)
-      null
-    }
-    runtime.bindFunction(DynamicProgramHostAbi.READ_STANDARD_INPUT_UTF8_BASE64) { args ->
-      require(args.isEmpty()) {
-        "Dynamic program standard input bridge does not accept arguments."
-      }
-      standardInputUtf8Base64
-    }
     // 原始 Unicode 只在 JS 内分块编码，宿主 binding 永远只接收受控大小的 ASCII Base64。
     runtime.evaluateValue(
       code = DynamicProgramHostAbi.OUTPUT_BRIDGE_SOURCE,
@@ -178,6 +163,31 @@ internal class DynamicExecutableProgramRunner(
       droppedOutputBytes = output.droppedBytes,
     )
   }
+
+  /**
+   * 创建本次程序唯一的一组宿主桥。
+   *
+   * 输出 collector 与输入快照在 Runtime 创建前冻结，避免业务执行过程中追加或替换 binding。
+   */
+  private fun programHostBridges(
+    output: DynamicProgramOutputCollector,
+    standardInputUtf8Base64: String,
+  ): List<JsRuntimeBridge> = listOf(
+    JsSyncFunctionBridge(DynamicProgramHostAbi.WRITE_STANDARD_OUTPUT_UTF8_BASE64_CHUNK) { args ->
+      output.appendUtf8Base64Chunk(DynamicProgramOutputChannel.STANDARD_OUTPUT, args)
+      null
+    },
+    JsSyncFunctionBridge(DynamicProgramHostAbi.WRITE_STANDARD_ERROR_UTF8_BASE64_CHUNK) { args ->
+      output.appendUtf8Base64Chunk(DynamicProgramOutputChannel.STANDARD_ERROR, args)
+      null
+    },
+    JsSyncFunctionBridge(DynamicProgramHostAbi.READ_STANDARD_INPUT_UTF8_BASE64) { args ->
+      require(args.isEmpty()) {
+        "Dynamic program standard input bridge does not accept arguments."
+      }
+      standardInputUtf8Base64
+    },
+  )
 
   /** 在进入具体引擎前拒绝损坏或带注入风险的语言包产物。 */
   private fun validateProgram(program: DynamicExecutableProgram, maxProgramSourceBytes: Long) {

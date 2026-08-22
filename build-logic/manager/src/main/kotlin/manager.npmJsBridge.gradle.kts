@@ -24,6 +24,7 @@ listOf("kmp.compose", "manager.lib").forEach { incompatiblePluginId ->
 
 val npmJsPackage = createNpmJsPackageExtension()
 val hostKspTargets = Multiplatform.KspTarget.NON_WEB
+val serviceKspTargets = setOf(Multiplatform.KspTarget.JS)
 
 /**
  * npm JavaScript 动态实现与端上 Kotlin 调用方共同依赖的跨平台协议桥约定。
@@ -114,12 +115,23 @@ if (path != ":cyxbs-functions:code:npm:js-bridge") {
   }
   kspMultiplatform(
     dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
+    targets = serviceKspTargets,
+  )
+  kspMultiplatform(
+    dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-host"),
     targets = hostKspTargets,
   )
   extensions.configure<KspExtension> {
     // Provider 延迟到模块 build.gradle 完成配置后读取，保证显式稳定包名同时进入 KSP 协议。
     arg("npmJsService.packageName", npmJsPackage.packageName)
   }
+} else {
+  // 基础模块只声明跨端协议；JS 目标生成 Service 侧代码，不能反向依赖 Host 实现。
+  apply(plugin = libsEx.plugins.ksp)
+  kspMultiplatform(
+    dependencyNotation = project(":cyxbs-compiler:ksp-npm-js-service"),
+    targets = serviceKspTargets,
+  )
 }
 
 afterEvaluate {

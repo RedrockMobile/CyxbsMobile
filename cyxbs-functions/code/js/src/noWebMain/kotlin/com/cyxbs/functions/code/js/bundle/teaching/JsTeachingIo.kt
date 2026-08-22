@@ -1,7 +1,10 @@
 package com.cyxbs.functions.code.js.bundle.teaching
 
 import com.cyxbs.functions.code.js.bundle.JsHostCapability
-import com.cyxbs.functions.code.js.runtime.JsRuntime
+import com.cyxbs.functions.code.js.runtime.JsAsyncFunctionBridge
+import com.cyxbs.functions.code.js.runtime.JsObjectFunctionsBridge
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 
 /**
  * 教学控制台消息级别。
@@ -56,9 +59,8 @@ class JsTeachingConsoleCapability(
   private val sink: JsConsoleSink,
   override val id: String = ID,
 ) : JsHostCapability {
-
-  override fun install(runtime: JsRuntime) {
-    runtime.bindObjectFunctions(
+  override val runtimeBridges: List<JsRuntimeBridge> = listOf(
+    JsObjectFunctionsBridge(
       name = "console",
       functions = linkedMapOf(
         "log" to outputFunction(JsConsoleLevel.LOG),
@@ -66,9 +68,9 @@ class JsTeachingConsoleCapability(
         "warn" to outputFunction(JsConsoleLevel.WARN),
         "error" to outputFunction(JsConsoleLevel.ERROR),
       ),
-    )
-    runtime.bindFunction("print", outputFunction(JsConsoleLevel.LOG))
-  }
+    ),
+    JsSyncFunctionBridge("print", outputFunction(JsConsoleLevel.LOG)),
+  )
 
   /**
    * 创建一个只在当前 binding 调用期间读取参数的输出函数。
@@ -178,13 +180,12 @@ class JsTeachingInputCapability(
   private val input: JsLineInput,
   override val id: String = ID,
 ) : JsHostCapability {
-
-  override fun install(runtime: JsRuntime) {
-    runtime.bindAsyncFunction("readLine") { args ->
+  override val runtimeBridges: List<JsRuntimeBridge> = listOf(
+    JsAsyncFunctionBridge("readLine") { args ->
       require(args.size <= 1) { "readLine accepts at most one prompt argument." }
       input.readLine(args.firstOrNull()?.toString())
-    }
-  }
+    },
+  )
 
   companion object {
     const val ID: String = "teaching.input"

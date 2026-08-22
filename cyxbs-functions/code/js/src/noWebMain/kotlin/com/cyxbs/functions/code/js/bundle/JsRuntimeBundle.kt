@@ -1,6 +1,8 @@
 package com.cyxbs.functions.code.js.bundle
 
-import com.cyxbs.functions.code.js.runtime.JsRuntime
+import com.cyxbs.functions.code.js.runtime.JsAsyncFunctionBridge
+import com.cyxbs.functions.code.js.runtime.JsRuntimeBridge
+import com.cyxbs.functions.code.js.runtime.JsSyncFunctionBridge
 
 /**
  * 可安装到 JavaScript Runtime 的单项宿主能力。
@@ -11,12 +13,8 @@ import com.cyxbs.functions.code.js.runtime.JsRuntime
 interface JsHostCapability {
   val id: String
 
-  /**
-   * 将能力注册到 [runtime]。
-   *
-   * 该方法每次执行脚本都会在新的 Runtime 上调用，不能假设多个脚本共享全局 JS 状态。
-   */
-  fun install(runtime: JsRuntime)
+  /** 当前能力需要在 Runtime 创建时安装的全部桥。 */
+  val runtimeBridges: List<JsRuntimeBridge>
 }
 
 /**
@@ -31,10 +29,8 @@ class JsSyncFunctionCapability(
   val functionName: String,
   private val block: (args: Array<Any?>) -> Any?,
 ) : JsHostCapability {
-
-  override fun install(runtime: JsRuntime) {
-    runtime.bindFunction(name = functionName, block = block)
-  }
+  override val runtimeBridges: List<JsRuntimeBridge> =
+    listOf(JsSyncFunctionBridge(functionName, block))
 }
 
 /**
@@ -49,10 +45,8 @@ class JsAsyncFunctionCapability(
   val functionName: String,
   private val block: suspend (args: Array<Any?>) -> Any?,
 ) : JsHostCapability {
-
-  override fun install(runtime: JsRuntime) {
-    runtime.bindAsyncFunction(name = functionName, block = block)
-  }
+  override val runtimeBridges: List<JsRuntimeBridge> =
+    listOf(JsAsyncFunctionBridge(functionName, block))
 }
 
 /**

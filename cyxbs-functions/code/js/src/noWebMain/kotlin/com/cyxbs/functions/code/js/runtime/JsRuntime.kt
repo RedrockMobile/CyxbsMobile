@@ -49,12 +49,14 @@ fun JsRuntimeFactory.create(
   config: JsRuntimeConfig = JsRuntimeConfig(),
   moduleLoader: JsModuleLoader? = null,
   allowBytecodeCache: Boolean = true,
+  bridges: List<JsRuntimeBridge> = emptyList(),
 ): JsRuntime = create(
   JsRuntimeOptions(
     jobDispatcher = jobDispatcher,
     config = config,
     moduleLoader = moduleLoader,
     allowBytecodeCache = allowBytecodeCache,
+    bridges = bridges,
   ),
 )
 
@@ -62,7 +64,8 @@ fun JsRuntimeFactory.create(
  * 面向 Android、iOS 与 Desktop 的最小 JavaScript Runtime 契约。
  *
  * Runtime 维护长生命周期的 JavaScript 上下文。实例不得并发调用；使用完必须调用 [close]，
- * 关闭后不可继续执行或注册宿主能力。具体引擎、字节码格式和 native 类型不会出现在该接口中。
+ * 关闭后不可继续执行。宿主能力只能通过 [JsRuntimeOptions.bridges] 在创建时安装，具体引擎、
+ * 字节码格式和 native 类型不会出现在该接口中。
  */
 interface JsRuntime {
 
@@ -97,34 +100,6 @@ interface JsRuntime {
    */
   @Throws(JsRuntimeException::class)
   fun interruptEvaluation()
-
-  /**
-   * 注册同步宿主函数。回调必须快速返回，且不得同步重入当前 Runtime。
-   *
-   * @throws JsRuntimeException 宿主函数注册失败。
-   */
-  @Throws(JsRuntimeException::class)
-  fun bindFunction(name: String, block: (args: Array<Any?>) -> Any?)
-
-  /**
-   * 注册只包含同步函数的宿主对象。
-   *
-   * @throws IllegalArgumentException 名称为空或未提供函数。
-   * @throws JsRuntimeException 宿主对象注册失败。
-   */
-  @Throws(IllegalArgumentException::class, JsRuntimeException::class)
-  fun bindObjectFunctions(
-    name: String,
-    functions: Map<String, (args: Array<Any?>) -> Any?>,
-  )
-
-  /**
-   * 注册异步宿主函数；JavaScript 调用方通过 Promise 接收结果。
-   *
-   * @throws JsRuntimeException 异步宿主函数注册失败。
-   */
-  @Throws(JsRuntimeException::class)
-  fun bindAsyncFunction(name: String, block: suspend (args: Array<Any?>) -> Any?)
 
   /**
    * 释放 Runtime 和未完成任务。重复调用必须安全。
@@ -212,10 +187,18 @@ data class JsRuntimeConfig(
  * @param config 资源和执行限制。
  * @param moduleLoader 当前 Runtime 的 ES Module 加载器。
  * @param allowBytecodeCache 是否允许引擎实现读写字节码缓存，不保证具体实现一定支持。
+ * @param bridges 创建时安装的受控宿主桥；名称必须唯一，创建完成后不可追加。
  */
 data class JsRuntimeOptions(
   val jobDispatcher: CoroutineDispatcher = Dispatchers.Default,
   val config: JsRuntimeConfig = JsRuntimeConfig(),
   val moduleLoader: JsModuleLoader? = null,
   val allowBytecodeCache: Boolean = true,
-)
+  val bridges: List<JsRuntimeBridge> = emptyList(),
+) {
+  init {
+    require(bridges.map(JsRuntimeBridge::name).distinct().size == bridges.size) {
+      "JavaScript Runtime bridge names must be unique."
+    }
+  }
+}

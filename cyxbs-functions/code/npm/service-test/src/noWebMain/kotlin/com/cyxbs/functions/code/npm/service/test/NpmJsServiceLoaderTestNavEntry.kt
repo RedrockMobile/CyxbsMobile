@@ -118,12 +118,21 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
                 val result = stageTimings.measureStage("首次 JS Service 调用") {
                   loadedService.execute(TEST_INPUT, TEST_VALUE)
                 }
+                val bridgeResult = stageTimings.measureStage("JS 回调 Host Bridge") {
+                  loadedService.executeBidirectional(TEST_INPUT, TEST_VALUE)
+                }
                 resultText = buildString {
                   appendLine("调用成功")
                   appendLine("bundleMarker：${result.bundleMarker}")
                   appendLine("input：${result.input}")
                   appendLine("inputLength：${result.inputLength}")
-                  append("multipliedValue：${result.multipliedValue}")
+                  appendLine("multipliedValue：${result.multipliedValue}")
+                  appendLine()
+                  appendLine("双向桥调用成功")
+                  appendLine("JS bundleMarker：${bridgeResult.bundleMarker}")
+                  appendLine("Host 识别的入口包：${bridgeResult.hostResponse.entryPackageName}")
+                  appendLine("Host 消息：${bridgeResult.hostResponse.hostMessage}")
+                  append("Host 计算结果：${bridgeResult.hostResponse.hostCalculatedValue}")
                 }
               } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
@@ -170,7 +179,7 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
       }
 
       Text("包坐标：$PACKAGE_NAME@$PACKAGE_VERSION")
-      Text("预期结果：$TEST_INPUT 长度 5，$TEST_VALUE × 7 = 42")
+      Text("预期结果：JS 侧 $TEST_VALUE × 7 = 42，Host 侧 $TEST_VALUE × 11 = 66")
       Text(
         text = output,
         modifier = Modifier
