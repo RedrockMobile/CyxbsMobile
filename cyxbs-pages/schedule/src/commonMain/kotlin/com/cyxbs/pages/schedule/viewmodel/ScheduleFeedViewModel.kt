@@ -1,15 +1,16 @@
 package com.cyxbs.pages.schedule.viewmodel
 
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.config.time.toLocalDate
-import com.cyxbs.components.config.time.toLocalDateTime
-import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.pages.schedule.api.ScheduleTodoNavArgument
 import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
 import com.cyxbs.pages.schedule.domain.model.*
 import com.cyxbs.pages.schedule.domain.repository.*
+import com.cyxbs.pages.schedule.ui.edit.EditScope
+import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.feed.*
-import com.cyxbs.pages.schedule.ui.model.*
+import com.cyxbs.pages.schedule.ui.todo.loadScheduleTodoPinnedIds
+import com.cyxbs.pages.schedule.ui.todo.saveScheduleTodoPinnedIds
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,7 @@ import kotlin.time.Clock
 
 /**
  * Feed 卡片的状态与命令持有者，与主页面、课表观察同一个 Schedule v2 快照。
- * 只展开从当前时刻起一年的有限窗口并最多展示三项，避免 Feed 为摘要场景进行无界重复展开。
+ * 复用邮子清单的有限窗口投影并最多展示三项，保证重复实例、临期与超期口径在两个入口一致。
  */
 class ScheduleFeedViewModel(
   private val repository: ScheduleRepository = ScheduleRepositoryProvider.repository,
@@ -26,14 +27,52 @@ class ScheduleFeedViewModel(
 ) : BaseViewModel() {
   private val _uiState = MutableStateFlow<ScheduleFeedUiState>(ScheduleFeedUiState.Loading)
   val uiState: StateFlow<ScheduleFeedUiState> = _uiState.asStateFlow()
+  private var pinnedSettingsAccountId: String? = null
+  private var pinnedIds: List<ScheduleId> = emptyList()
 
   init { launchByViewModelScope { repository.snapshot.collect(::updateList) } }
   fun refresh() = launchByViewModelScope { repository.initialize() }
   /** 从首页摘要进入独立邮子清单，不再跳转到课表时间轴页面。 */
   fun onCardClick() { ScheduleTodoNavArgument().navigate() }
-  /** 从摘要打开清单并定位精确实例；清单消费 identity 后展示共享的日程编辑底部弹窗。 */
+  /** 从摘要打开清单并定位精确实例；清单消费 identity 后滚动并短暂高亮对应卡片。 */
   fun onItemClick(id: ScheduleId, recurrenceId: RecurrenceId?) {
     ScheduleTodoNavArgument(scheduleId = id, recurrenceId = recurrenceId).navigate()
+  }
+
+  /**
+   * 切换首页事项的端上置顶状态并立即刷新 Feed 排序。
+   *
+   * 置顶顺序只写当前精确账号的 Settings，不进入仓库或网络请求；账号快照与 Settings 不一致时拒绝写入。
+   */
+  fun onTogglePin(id: ScheduleId) {
+    val snapshot = repository.snapshot.value
+    val settings = accountSettings
+    if (snapshot.accountId == null || snapshot.accountId != settings.stuNum) return
+    if (pinnedSettingsAccountId != settings.stuNum) {
+      pinnedSettingsAccountId = settings.stuNum
+      pinnedIds = loadScheduleTodoPinnedIds(settings)
+    }
+    pinnedIds = if (id in pinnedIds) {
+      pinnedIds.filterNot { it == id }
+    } else {
+      listOf(id) + pinnedIds
+    }
+    saveScheduleTodoPinnedIds(settings, pinnedIds)
+    updateList(snapshot)
+  }
+
+  /**
+   * 删除 Feed 中的精确事项。
+   *
+   * 非重复事项删除整条日程；重复事项只删除当前 recurrence 实例，沿用清单详情页的范围路由与本地优先语义。
+   */
+  fun onDelete(id: ScheduleId, recurrenceId: RecurrenceId?) = launchByViewModelScope {
+    repository.applyScheduleDelete(
+      scheduleId = id,
+      scope = if (recurrenceId == null) EditScope.ALL else EditScope.THIS_ONLY,
+      recurrenceId = recurrenceId,
+      clock = clock,
+    )
   }
 
   /**
@@ -57,49 +96,30 @@ class ScheduleFeedViewModel(
   }
 
   /**
-   * 把仓库快照映射为 Feed：先展开当前至一年后目标日期次日零点的本地半开窗口，仅保留 ACTIVE，再按
-   * 可执行时间排序。该结束边界保留“直到一年后完整自然日”的既有语义；有明确时间的排在未排期之前，
-   * 最后截取三项并一次性发布状态。
+   * 把仓库快照映射为 Feed。这里直接复用清单页投影，避免旧实现从“当前时刻”开始展开后遗漏已经
+   * 超期但仍未完成的事项；横条计数基于完整未完成集合，卡片列表才截取前三项。
    */
   private fun updateList(snapshot: ScheduleSnapshot) {
+    val settings = accountSettings
+    if (snapshot.accountId != null && snapshot.accountId == settings.stuNum) {
+      if (pinnedSettingsAccountId != settings.stuNum) {
+        pinnedSettingsAccountId = settings.stuNum
+        pinnedIds = loadScheduleTodoPinnedIds(settings)
+      }
+      if (snapshot.status !is ScheduleRepositoryStatus.Loading &&
+        snapshot.status !is ScheduleRepositoryStatus.Corrupted
+      ) {
+        // 删除系列后同步清掉失效置顶项；重复实例删除仍保留该系列的置顶偏好。
+        val existingIds = snapshot.schedules.mapTo(hashSetOf()) { it.id }
+        val retainedIds = pinnedIds.filter { it in existingIds }
+        if (retainedIds != pinnedIds) {
+          pinnedIds = retainedIds
+          saveScheduleTodoPinnedIds(settings, retainedIds)
+        }
+      }
+    }
     val zone = TimeZone.currentSystemDefault()
     val now = clock.now()
-    val start = now.toLocalDateTime(zone).toMinuteTimeDate()
-    val endExclusive = com.cyxbs.components.config.time.MinuteTimeDate(
-      start.date.plusYears(1).plusDays(1),
-      0,
-      0,
-    )
-    val visible = snapshot.occurrencesInRange(start, endExclusive, includeUnscheduled = true)
-      .asSequence()
-      .filter { it.status == OccurrenceStatus.ACTIVE }
-      .sortedWith(compareBy<ScheduleUiOccurrence> { it.sortInstant(zone) == null }
-        .thenBy { it.sortInstant(zone) }.thenBy { it.scheduleId.value }.thenBy { it.recurrenceId?.originalDateTime })
-      .take(3)
-      .map { it.toFeedItem(now, zone) }
-      .toList()
-    _uiState.value = if (visible.isEmpty()) ScheduleFeedUiState.Empty else ScheduleFeedUiState.Data(visible)
+    _uiState.value = projectScheduleFeed(snapshot, now, zone, pinnedIds)
   }
 }
-
-/** 将四态 timing 转为排序 Instant；全天按查看者时区零点，未排期返回 null 并由调用方排到末尾。 */
-private fun ScheduleUiOccurrence.sortInstant(viewerZone: TimeZone) = when (val value = timing) {
-  is ScheduleTiming.Timed -> value.start.toLocalDateTime().toInstant(TimeZone.of(value.timeZoneId))
-  is ScheduleTiming.Deadline -> value.due.toLocalDateTime().toInstant(TimeZone.of(value.timeZoneId))
-  is ScheduleTiming.AllDay -> value.startDate.toLocalDate().atStartOfDayIn(viewerZone)
-  ScheduleTiming.Unscheduled -> null
-}
-
-/** 映射 Feed 轻量模型；保留系列与实例双重 identity，过期样式复用统一四态边界判断。 */
-private fun ScheduleUiOccurrence.toFeedItem(now: kotlin.time.Instant, zone: TimeZone) = ScheduleFeedItemUi(
-  id = scheduleId,
-  recurrenceId = recurrenceId,
-  title = title,
-  timeText = when (val value = timing) {
-    is ScheduleTiming.Timed -> value.start.toString()
-    is ScheduleTiming.Deadline -> value.due.toString()
-    is ScheduleTiming.AllDay -> value.startDate.toString()
-    ScheduleTiming.Unscheduled -> null
-  },
-  isOverTime = isExpired(now, zone),
-)

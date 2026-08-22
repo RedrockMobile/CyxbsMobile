@@ -10,21 +10,24 @@ import com.cyxbs.pages.schedule.data.local.room3.ScheduleV2RepositoryGateway
 import com.cyxbs.pages.schedule.data.local.room3.buildScheduleRoomDatabase
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleV2ApiService
 import com.cyxbs.pages.schedule.data.remote.v3.KtorScheduleV2Gateway
+import com.cyxbs.pages.schedule.ui.main.createScheduleTodoPreviewRepository
 import kotlin.time.Clock
 
 /**
- * 创建 Android 生产环境的 Schedule v2 Room 仓库工厂。
+ * Android 验收阶段临时使用邮子清单内存 mock。
  *
- * 工厂复用进程唯一数据库，并在每次 [ScheduleRepositoryFactory.create] 时把同一个不可变账号会话绑定到 Ktor
- * gateway。构造工厂或 repository 只组装依赖，不发起网络请求，也不再注册冲突、旧 semantic runner 或日历
- * initialized hook；单向日历初始化由 common 账号切换层统一负责。
+ * 同一登录会话只创建一份账号绑定仓库，因此首页 Feed、邮子清单页和课表页观察并修改的是同一份数据。
+ * mock 不读写 Room、不请求后端，应用进程或登录会话重建后会恢复初始样例。
  */
 actual fun createProductionScheduleRepositoryFactory(
   clock: Clock,
-): ScheduleRepositoryFactory = createAndroidRoomScheduleRepositoryFactory(
-  database = AndroidScheduleRoomDatabaseOwner.database,
-  clock = clock,
-)
+): ScheduleRepositoryFactory = ScheduleRepositoryFactory { session ->
+  createScheduleTodoPreviewRepository(
+    accountId = checkNotNull(session.accountId) {
+      "Schedule preview requires an authenticated account"
+    },
+  )
+}
 
 /**
  * 从指定数据库与墙钟组装 Android Schedule v2 Room 工厂。

@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * 邮子清单独立页面的导航契约。
  *
  * 清单页与课表页共用 Schedule 仓库，但使用独立导航入口和列表交互；可选 identity 用于从首页 Feed
- * 直接打开某条日程或重复实例详情。实例 identity 存在时必须同时提供所属系列 identity。
+ * 滚动并高亮某条日程或重复实例，不会直接打开编辑弹窗。实例 identity 存在时必须同时提供所属系列 identity。
  */
 @Serializable
 data class ScheduleTodoNavArgument(

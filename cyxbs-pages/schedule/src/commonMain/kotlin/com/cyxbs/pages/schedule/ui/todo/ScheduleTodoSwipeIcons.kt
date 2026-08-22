@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.color
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -85,6 +86,39 @@ private fun ScheduleTodoSwipeIconPreview(
           .size(28.dp)
           .scheduleTodoCancelPinMark(showCancelMark, tint),
         tint = tint,
+      )
+    }
+  }
+}
+
+/**
+ * 清单页与首页 Feed 共用的 28dp 左滑动作按钮。
+ *
+ * [icon] 来自 ConfigRes 的设计稿矢量资源；[backgroundColor] 已包含目标透明度，不再二次覆盖 alpha。
+ * [showCancelMark] 仅用于“取消置顶”，会在 pin 图标上叠加斜线。
+ */
+@Composable
+internal fun ScheduleTodoSwipeAction(
+  icon: DrawableResource,
+  contentDescription: String,
+  backgroundColor: Color,
+  tint: Color,
+  showCancelMark: Boolean = false,
+  onClick: () -> Unit,
+) {
+  Surface(
+    color = backgroundColor,
+    shape = RoundedCornerShape(5.dp),
+    modifier = Modifier.size(28.dp).clickableNoIndicator(onClick = onClick),
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      Icon(
+        painter = painterResource(icon),
+        contentDescription = contentDescription,
+        tint = tint,
+        modifier = Modifier
+          .size(28.dp)
+          .scheduleTodoCancelPinMark(showCancelMark, tint),
       )
     }
   }

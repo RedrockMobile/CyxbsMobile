@@ -15,6 +15,14 @@ import androidx.compose.ui.Modifier
 interface IScheduleService {
 
   /**
+   * 发现页整个 Feed 区域上方的临期/超期提醒横幅。
+   *
+   * 没有符合条件的未完成事项时不占据布局空间；具体统计口径由 schedule 模块统一维护。
+   */
+  @Composable
+  fun ScheduleUrgentBanner(modifier: Modifier)
+
+  /**
    * 日程卡片（用于发现页 feed 区）
    *
    * 展示前若干条未完成日程，点击卡片跳转日程主页、点击单项跳转编辑（跳转由平台实现）。

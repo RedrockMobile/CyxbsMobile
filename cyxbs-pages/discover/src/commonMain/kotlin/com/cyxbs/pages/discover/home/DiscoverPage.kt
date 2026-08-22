@@ -60,10 +60,10 @@ import com.cyxbs.pages.discover.home.viewmodel.DiscoverComposeViewModel
 import com.cyxbs.pages.discover.home.widget.BannerConfig
 import com.cyxbs.pages.discover.home.widget.CheckInImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionIndicator
+import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.InfiniteBanner
 import com.cyxbs.pages.discover.home.widget.JwNewsFlipper
 import com.cyxbs.pages.discover.home.widget.MsgImageVector
-import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
 import com.cyxbs.pages.electricity.api.IElectricityService
 import com.cyxbs.pages.schedule.api.IScheduleService
@@ -77,8 +77,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 
 /* ---------------- 颜色（对齐 discover 模块原 light/dark） ---------------- */
 private val JwLabelBgColor @Composable get() = 0xFFAFD2FB.dark(0xFF5A5A5A) // discover_academic_online_colors_background
@@ -186,6 +186,7 @@ private fun greetingText(): String {
       val dayText = if (dow == 7) "日" else Num2CN.number2ChineseNumber(dow)
       "第${Num2CN.number2ChineseNumber(nowWeek)}周 周$dayText"
     }
+
     monthNumber == 8 || monthNumber == 9 -> "欢迎新同学～"
     nowWeek !in 1..21 && isSummerVacationMonth -> "暑假快乐鸭"
     nowWeek !in 1..21 && !isSummerVacationMonth -> "寒假快乐鸭"
@@ -389,32 +390,41 @@ private fun FunctionsSection(
 private fun FeedSection() {
   val cornerShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
   val containerColor = LocalAppColors.current.middleBg
+  val scheduleService = remember { IScheduleService::class.impl() }
 
   Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(top = 18.dp)
-      .clip(cornerShape)
-      .background(color = containerColor),
+    modifier = Modifier.fillMaxWidth(),
   ) {
-    // 体育打卡
-    ISportService::class.impl().SportFeed(Modifier.fillMaxWidth())
-    Spacer(
-      modifier = Modifier.fillMaxWidth().height(1.dp)
-        .alpha(0.1F)
-        .background(color = LocalAppColors.current.tvLv4)
+    scheduleService.ScheduleUrgentBanner(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(start = 16.dp, top = 18.dp, end = 16.dp),
     )
-    // 邮子清单
-    IScheduleService::class.impl().ScheduleFeed(Modifier.fillMaxWidth())
-    Spacer(
-      modifier = Modifier.fillMaxWidth().height(1.dp)
-        .alpha(0.1F)
-        .background(color = LocalAppColors.current.tvLv4)
-    )
-    // 电费查询
-    IElectricityService::class.impl().ElectricityFeed(Modifier.fillMaxWidth())
-    // 80dp 顶起来课表与底部按钮
-    Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 8.dp)
+        .clip(cornerShape)
+        .background(color = containerColor),
+    ) {
+      // 体育打卡
+      ISportService::class.impl().SportFeed(Modifier.fillMaxWidth())
+      Spacer(
+        modifier = Modifier.fillMaxWidth().height(1.dp)
+          .alpha(0.1F)
+          .background(color = LocalAppColors.current.tvLv4)
+      )
+      // 邮子清单
+      scheduleService.ScheduleFeed(Modifier.fillMaxWidth())
+      Spacer(
+        modifier = Modifier.fillMaxWidth().height(1.dp)
+          .alpha(0.1F)
+          .background(color = LocalAppColors.current.tvLv4)
+      )
+      // 电费查询
+      IElectricityService::class.impl().ElectricityFeed(Modifier.fillMaxWidth())
+      // 80dp 顶起来课表与底部按钮
+      Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))
+    }
   }
 }
-

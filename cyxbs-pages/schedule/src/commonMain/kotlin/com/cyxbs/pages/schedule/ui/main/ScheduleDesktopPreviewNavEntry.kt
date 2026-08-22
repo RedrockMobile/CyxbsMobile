@@ -160,8 +160,17 @@ class ScheduleDesktopTodoDetailPreviewNavEntry :
  */
 private val DesktopSchedulePreviewRepository = DesktopPreviewRepository(createDesktopPreviewSnapshot())
 
-/** 邮子清单与其详情页共享的单例 mock 仓库，保证跳转后仍读取同一份内存数据。 */
-private val DesktopScheduleTodoPreviewRepository = DesktopPreviewRepository(createDesktopTodoPreviewSnapshot())
+/** Desktop 邮子清单与其详情页共享的单例 mock，所有编辑只在当前进程内生效。 */
+private val DesktopScheduleTodoPreviewRepository: ScheduleRepository =
+  DesktopPreviewRepository(createDesktopTodoPreviewSnapshot())
+
+/**
+ * 为 Android 临时验收创建账号绑定的邮子清单 mock 仓库。
+ *
+ * [accountId] 只用于满足账号 façade 的快照隔离校验；数据仍完全位于内存，不会持久化或请求后端。
+ */
+internal fun createScheduleTodoPreviewRepository(accountId: String): ScheduleRepository =
+  DesktopPreviewRepository(createDesktopTodoPreviewSnapshot().copy(accountId = accountId))
 
 /** 接收不同初始快照的轻量内存仓库，供两个 Desktop 预览入口隔离演示数据。 */
 private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : ScheduleRepository {

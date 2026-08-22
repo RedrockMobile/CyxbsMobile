@@ -1,13 +1,14 @@
 package com.cyxbs.pages.schedule.ui.todo
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +65,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -78,11 +80,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cyxbs.components.config.serializable.defaultJson
-import com.cyxbs.components.config.sp.AccountSettings
-import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.config.sp.accountSettings
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_SCHEDULE_TODO
@@ -92,24 +92,24 @@ import com.cyxbs.pages.schedule.api.ScheduleTodoNavArgument
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
-import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
-import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
+import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryMutationMode
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.canSubmitScheduleMutation
-import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
-import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
+import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_todo_empty_completed
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_todo_empty_pending
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_todo_urgency_flag
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 import kotlin.time.Clock
@@ -175,6 +175,9 @@ fun ScheduleTodoPage(
   var deepLinkConsumed by remember(argument.scheduleId, argument.recurrenceId) {
     mutableStateOf(false)
   }
+  var highlightedItemKey by remember(argument.scheduleId, argument.recurrenceId) {
+    mutableStateOf<String?>(null)
+  }
 
   LaunchedEffect(Unit) {
     viewModel.initialize()
@@ -211,21 +214,6 @@ fun ScheduleTodoPage(
       selectedCategoryId = null
     }
   }
-  LaunchedEffect(argument.scheduleId, argument.recurrenceId, projection, editorEnabled) {
-    if (!editorEnabled || deepLinkConsumed) return@LaunchedEffect
-    val scheduleId = argument.scheduleId ?: return@LaunchedEffect
-    val item = (projection.pending + projection.completed).firstOrNull {
-      it.schedule.id == scheduleId &&
-          (argument.recurrenceId == null || it.occurrence.recurrenceId == argument.recurrenceId)
-    }
-    if (item != null) {
-      editingIdentity = item.schedule.id to item.occurrence.recurrenceId
-      deepLinkConsumed = true
-    } else if (snapshot.schedules.any { it.id == scheduleId }) {
-      deepLinkConsumed = true
-    }
-  }
-
   val editingItem = remember(projection, editingIdentity) {
     val identity = editingIdentity
     if (identity == null) null else (projection.pending + projection.completed).firstOrNull {
@@ -247,6 +235,46 @@ fun ScheduleTodoPage(
   }
   // 已完成列表按完成事实排序，不再让端上置顶干预历史顺序。
   val completed = filteredCompleted
+  LaunchedEffect(
+    argument.scheduleId,
+    argument.recurrenceId,
+    selectedCategoryId,
+    pending,
+    completed,
+    snapshot.schedules,
+  ) {
+    if (deepLinkConsumed) return@LaunchedEffect
+    val scheduleId = argument.scheduleId ?: return@LaunchedEffect
+    if (selectedCategoryId != null) {
+      // Feed 入口必须能看到目标；先回到“全部”，下一次组合再按最终排序计算列表索引。
+      selectedCategoryId = null
+      return@LaunchedEffect
+    }
+    fun ScheduleTodoItemUi.matchesTarget(): Boolean =
+      schedule.id == scheduleId &&
+          (argument.recurrenceId == null || occurrence.recurrenceId == argument.recurrenceId)
+
+    val pendingIndex = pending.indexOfFirst(ScheduleTodoItemUi::matchesTarget)
+    val completedIndex = completed.indexOfFirst(ScheduleTodoItemUi::matchesTarget)
+    val pendingEntryCount = if (pending.isEmpty()) 1 else pending.size
+    val target = when {
+      pendingIndex >= 0 -> pending[pendingIndex] to (1 + pendingIndex)
+      completedIndex >= 0 -> completed[completedIndex] to (pendingEntryCount + 2 + completedIndex)
+      else -> null
+    }
+    if (target != null) {
+      val (item, absoluteIndex) = target
+      highlightedItemKey = item.key
+      deepLinkConsumed = true
+      // 保留目标前一行作为分区上下文；首张未完成事项同时保留“未完成”标题。
+      listState.scrollToItem((absoluteIndex - 1).coerceAtLeast(0))
+      delay(730)
+      if (highlightedItemKey == item.key) highlightedItemKey = null
+    } else if (snapshot.schedules.any { it.id == scheduleId }) {
+      // 系列存在但该 occurrence 不在当前展示窗口时不循环尝试，保持普通清单页。
+      deepLinkConsumed = true
+    }
+  }
   val visibleUrgentCount = remember(filteredPending) {
     filteredPending.count { it.isDueSoon || it.isOverdue }
   }
@@ -365,6 +393,7 @@ fun ScheduleTodoPage(
                 fadeOutSpec = tween(durationMillis = 160),
               ),
               item = item,
+              highlighted = item.key == highlightedItemKey,
               isPinned = item.schedule.id in pinnedIds,
               manageMode = manageMode,
               selected = item.schedule.id in selectedIds,
@@ -412,6 +441,7 @@ fun ScheduleTodoPage(
                 fadeOutSpec = tween(durationMillis = 160),
               ),
               item = item,
+              highlighted = item.key == highlightedItemKey,
               isPinned = item.schedule.id in pinnedIds,
               manageMode = manageMode,
               selected = item.schedule.id in selectedIds,
@@ -609,36 +639,6 @@ private fun ScheduleTodoCategoryFilterBar(
   }
 }
 
-private const val SCHEDULE_TODO_PINNED_IDS_KEY = "schedule_todo_pinned_ids"
-
-/**
- * 从当前账号 Settings 恢复清单置顶顺序。
- *
- * 旧值损坏时直接移除并回到空列表，不能让非核心的展示偏好阻断清单页面启动。
- */
-private fun loadScheduleTodoPinnedIds(settings: AccountSettings): List<ScheduleId> {
-  val json = settings.getStringOrNull(SCHEDULE_TODO_PINNED_IDS_KEY) ?: return emptyList()
-  return runCatching {
-    defaultJson.decodeFromString<List<String>>(json)
-      .map { requireNotNull(ScheduleId.parseOrNull(it)) }
-      .distinct()
-  }.onFailure {
-    settings.remove(SCHEDULE_TODO_PINNED_IDS_KEY)
-  }.getOrDefault(emptyList())
-}
-
-/** 将清单置顶顺序立即写入当前账号 Settings；该字段只用于端上排序，不参与任何网络请求。 */
-private fun saveScheduleTodoPinnedIds(settings: AccountSettings, pinnedIds: List<ScheduleId>) {
-  if (pinnedIds.isEmpty()) {
-    settings.remove(SCHEDULE_TODO_PINNED_IDS_KEY)
-    return
-  }
-  settings.putString(
-    SCHEDULE_TODO_PINNED_IDS_KEY,
-    defaultJson.encodeToString<List<String>>(pinnedIds.map { it.value }),
-  )
-}
-
 /** 将清单投影恢复成编辑弹窗需要的实例值；所有字段均来自同一有效 occurrence。 */
 internal fun com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence.toDomainOccurrence(): ScheduleOccurrence =
   ScheduleOccurrence(
@@ -829,8 +829,8 @@ private fun ScheduleTodoEmptyCard(completed: Boolean) {
   }
 }
 
-/** 将提醒偏移量转换为清单卡片使用的完整提示语。 */
-private fun formatTodoReminder(offsetMinutes: Int): String? = when {
+/** 将提醒偏移量转换为清单页与主页 Feed 共用的完整提示语。 */
+internal fun formatScheduleTodoReminder(offsetMinutes: Int): String? = when {
   offsetMinutes < 0 -> null
   offsetMinutes == 0 -> "准时提醒"
   offsetMinutes % 60 == 0 -> "提前${offsetMinutes / 60}小时提醒"
@@ -842,6 +842,7 @@ private fun formatTodoReminder(offsetMinutes: Int): String? = when {
 private fun ScheduleTodoCard(
   modifier: Modifier = Modifier,
   item: ScheduleTodoItemUi,
+  highlighted: Boolean,
   isPinned: Boolean,
   manageMode: Boolean,
   selected: Boolean,
@@ -860,7 +861,7 @@ private fun ScheduleTodoCard(
   val restoreIcon = ConfigRes.configIcRestore()
   val hasUrgencyBadge = item.isOverdue || item.isDueSoon
   val reminderText = item.occurrence.reminders
-    .mapNotNull { reminder -> formatTodoReminder(reminder.offsetMinutes) }
+    .mapNotNull { reminder -> formatScheduleTodoReminder(reminder.offsetMinutes) }
     .joinToString(separator = "、")
     .takeIf(String::isNotEmpty)
   val timeIcon = rememberIcAddtodoTime()
@@ -870,6 +871,25 @@ private fun ScheduleTodoCard(
   var dragOffsetPx by remember(item.key) { mutableFloatStateOf(0f) }
   var settleAnimation by remember(item.key) { mutableStateOf<Job?>(null) }
   val cardCoroutineScope = rememberCoroutineScope()
+  val isLightTheme = MaterialTheme.colors.isLight
+  val baseCardColor = if (isLightTheme) ScheduleTodoCardContainerColor else colors.middleBg
+  val highlightAlpha = remember(item.key) { Animatable(0f) }
+  LaunchedEffect(highlighted) {
+    if (highlighted) {
+      // 卡片本体保持不透明，仅让顶层色片快速淡入淡出，避免透出背后的侧滑操作区。
+      highlightAlpha.snapTo(0f)
+      highlightAlpha.animateTo(
+        targetValue = if (isLightTheme) 0.12f else 0.20f,
+        animationSpec = tween(durationMillis = 220),
+      )
+      highlightAlpha.animateTo(
+        targetValue = 0f,
+        animationSpec = tween(durationMillis = 460),
+      )
+    } else {
+      highlightAlpha.snapTo(0f)
+    }
+  }
 
   /** 松手后把卡片平滑吸附到收起或完全展开位置；新拖动会取消尚未结束的旧动画。 */
   fun settleSwipe(targetOffsetPx: Float) {
@@ -935,7 +955,7 @@ private fun ScheduleTodoCard(
     }
 
     Surface(
-      color = if (MaterialTheme.colors.isLight) ScheduleTodoCardContainerColor else colors.middleBg,
+      color = baseCardColor,
       shape = cardShape,
       modifier = Modifier
         .fillMaxWidth()
@@ -1092,6 +1112,15 @@ private fun ScheduleTodoCard(
           item = item,
           modifier = Modifier.align(Alignment.TopEnd),
         )
+        if (highlighted) {
+          // 只为当前目标创建覆盖层；graphicsLayer 逐帧更新透明度，不驱动整张复杂卡片重组。
+          Box(
+            modifier = Modifier
+              .matchParentSize()
+              .graphicsLayer { alpha = highlightAlpha.value }
+              .background(ScheduleTodoAccentColor),
+          )
+        }
       }
     }
   }
@@ -1132,39 +1161,6 @@ private fun ScheduleTodoCheckedBox() {
       strokeWidth = strokeWidth,
       cap = StrokeCap.Round,
     )
-  }
-}
-
-/**
- * 左滑操作使用 Figma 的 28dp 小按钮。
- *
- * [icon] 是由设计稿原始路径转换的 Vector Drawable；[backgroundColor] 已包含设计稿要求的透明度，
- * 这里不再二次覆盖 alpha。[showCancelMark] 会在 pin 上叠加反向斜线，明确表示取消置顶。
- */
-@Composable
-private fun ScheduleTodoSwipeAction(
-  icon: DrawableResource,
-  contentDescription: String,
-  backgroundColor: Color,
-  tint: Color,
-  showCancelMark: Boolean = false,
-  onClick: () -> Unit,
-) {
-  Surface(
-    color = backgroundColor,
-    shape = RoundedCornerShape(5.dp),
-    modifier = Modifier.size(28.dp).clickableNoIndicator(onClick = onClick),
-  ) {
-    Box(contentAlignment = Alignment.Center) {
-      Icon(
-        painter = painterResource(icon),
-        contentDescription = contentDescription,
-        tint = tint,
-        modifier = Modifier
-          .size(28.dp)
-          .scheduleTodoCancelPinMark(showCancelMark, tint),
-      )
-    }
   }
 }
 
