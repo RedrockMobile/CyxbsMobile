@@ -1,9 +1,11 @@
 package com.cyxbs.functions.code.npm.service.test.js.impl
 
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.decodeNpmJsResult
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceLoaderTestPayload
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,7 +30,13 @@ class NpmJsServiceJsonCompatibilityTest {
       """.trimIndent(),
     )
 
-    val result = Json.decodeFromString<NpmJsServiceLoaderTestPayload>(resultJson)
+    val result = decodeNpmJsResult(
+      envelopeJson = resultJson,
+      decodeValue = { element ->
+        Json.decodeFromJsonElement<NpmJsServiceLoaderTestPayload>(element)
+      },
+      failureFactory = { message -> NpmJsServiceInvocationException(message) },
+    ).getOrThrow()
     assertEquals("forward-compatible", result.value)
     assertEquals(null, result.nullableValue)
     assertEquals(null, result.optionalValue)

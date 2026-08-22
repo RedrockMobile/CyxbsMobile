@@ -264,7 +264,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             tutorialStatus = "请先完成 ${missingTitles.joinToString("、")}"
             return@launch
           }
-          val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
+          val course = session.course(courseId).getOrThrow()
+            ?: error("教程包中不存在课程：$courseId")
           val resumeState = course.resolveResumeState(
             progress = savedTutorialProgress[courseId],
             npmPackageVersion = session.npmPackageVersion,
@@ -313,7 +314,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           standardOutput = runResult?.standardOutput.orEmpty(),
           standardError = runResult?.standardError.orEmpty(),
         ),
-      )
+      ).getOrThrow()
       if (!result.completed) {
         activeTutorial = current.copy(feedback = result.feedback, isCompleted = false)
         return
@@ -402,7 +403,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             dynamicTutorialManager.clearCourseProgress(session.tutorial.languageId, courseId)
             savedTutorialProgress.remove(courseId)
           }
-          val course = session.course(courseId) ?: error("教程包中不存在课程：$courseId")
+          val course = session.course(courseId).getOrThrow()
+            ?: error("教程包中不存在课程：$courseId")
           val resumeState = course.resolveResumeState(null, session.npmPackageVersion)
           applyTutorialResumeState(course, resumeState)
           workbenchState.showToolWindow(TUTORIAL_TOOL_WINDOW_ID)
@@ -472,7 +474,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         val loadedService = dynamicLanguageManager.load(language.languageId)
         newService = loadedService
         // Service 代理只在业务读取图标时校验 npm 版本，并透明复用或更新持久缓存。
-        languageIconCache.update(language.languageId, loadedService.fileIcon())
+        languageIconCache.update(language.languageId, loadedService.fileIcon().getOrThrow())
         val serviceDuration = serviceMark.elapsedNow()
         editorState.clearHighlightCache()
         dynamicLanguageService = loadedService
@@ -539,7 +541,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         }
         loadedSession = dynamicTutorialManager.load(languageId)
         tutorialSession = loadedSession
-        tutorialManifest = loadedSession.manifest()
+        tutorialManifest = loadedSession.manifest().getOrThrow()
         val storedProgress = dynamicTutorialManager.savedProgress(languageId)
         savedTutorialProgress.putAll(storedProgress.associateBy { it.courseId })
         val resumeCourseId = storedProgress.preferredResumeCourseId()
@@ -587,7 +589,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           val result = service.highlight(
             workspace = currentWorkspace(requestedFilePath, source),
             filePath = requestedFilePath,
-          )
+          ).getOrThrow()
           val roundTripDuration = roundTripMark.elapsedNow()
           if (activeFilePath == requestedFilePath && editorState.code == source) {
             val applyMark = TimeSource.Monotonic.markNow()
@@ -619,7 +621,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           val targets = service.runTargets(
             workspace = currentWorkspace(requestedFilePath, source),
             activeFilePath = requestedFilePath,
-          )
+          ).getOrThrow()
           if (activeFilePath == requestedFilePath && editorState.code == source) {
             runTargets = targets
           }
@@ -649,7 +651,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         try {
           val service = activeLanguageService ?: error("当前语言服务尚未加载完成。")
           val requestedWorkspace = currentWorkspace()
-          val refreshedTargets = service.runTargets(requestedWorkspace, activeFilePath)
+          val refreshedTargets = service.runTargets(requestedWorkspace, activeFilePath).getOrThrow()
           runTargets = refreshedTargets
           val target = refreshedTargets.firstOrNull { candidate ->
             candidate.displayName == requestedTarget.displayName &&
@@ -693,7 +695,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       coroutineScope.launch {
         try {
           val service = activeLanguageService ?: error("当前语言服务尚未加载完成。")
-          val targets = service.runTargets(currentWorkspace(), activeFilePath)
+          val targets = service.runTargets(currentWorkspace(), activeFilePath).getOrThrow()
           runTargets = targets
           when (targets.size) {
             0 -> {

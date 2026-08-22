@@ -79,6 +79,12 @@ class KspNpmJsBridgeProcessor(
       Modifier.INTERNAL in modifiers
     ) invalid("@NpmJsBridge interface must be public: $id", this)
     if (typeParameters.isNotEmpty()) invalid("@NpmJsBridge cannot declare type parameters: $id", this)
+    val directSuperTypes = superTypes.map { it.resolve() }.toList()
+    if (directSuperTypes.size != 1 ||
+      directSuperTypes.single().declaration.qualifiedName?.asString() != BRIDGE_INSTANCE
+    ) {
+      invalid("@NpmJsBridge interface must directly extend NpmJsBridgeInstance: $id", this)
+    }
     if (getDeclaredProperties().any()) invalid("@NpmJsBridge does not support properties: $id", this)
     val allMethods = getDeclaredFunctions().map { it.methodModel(id) }.toList()
     val duplicate = allMethods.groupBy(MethodModel::name).entries.firstOrNull { it.value.size > 1 }
@@ -108,11 +114,19 @@ class KspNpmJsBridgeProcessor(
         parameter.type.resolve(),
       )
     }
+    val resolvedReturnType = returnType?.resolve()
+      ?: invalid("@NpmJsBridge method requires a return type: $bridgeId.$name", this)
+    if (resolvedReturnType.isMarkedNullable ||
+      resolvedReturnType.declaration.qualifiedName?.asString() != NPM_JS_RESULT_TYPE
+    ) {
+      invalid("@NpmJsBridge method must return NpmJsResult<T>: $bridgeId.$name", this)
+    }
+    val resultType = resolvedReturnType.arguments.singleOrNull()?.type?.resolve()
+      ?: invalid("@NpmJsBridge NpmJsResult requires one concrete value type: $bridgeId.$name", this)
     return MethodModel(
       name = name,
       parameters = parameters,
-      returnType = returnType?.resolve()
-        ?: invalid("@NpmJsBridge method requires a return type: $bridgeId.$name", this),
+      resultType = resultType,
       // modifiers 只包含源码显式写出的修饰符；接口中省略 abstract 的方法必须读取语义属性，
       // 否则 JS 目标会把所有必需能力误当成默认回退方法。
       requiresHost = isAbstract,
@@ -275,21 +289,65 @@ class KspNpmJsBridgeProcessor(
       .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
       .apply {
         this@proxyFunction.parameters.forEach { addParameter(it.name, it.type.toTypeName()) }
-        returns(returnType.toTypeName())
+        returns(NPM_JS_RESULT.parameterizedBy(resultType.toTypeName()))
+        addCode(
+          "return %M(\n" +
+            "  exceptionMapper = { throwable ->\n" +
+            "    if (throwable is %T) throwable\n" +
+            "    else %T(%S, throwable)\n" +
+            "  },\n" +
+            ") {\n",
+          NPM_JS_RESULT_CATCHING,
+          BRIDGE_EXCEPTION,
+          BRIDGE_INVOCATION_EXCEPTION,
+          "npm JavaScript Host Bridge method '$name' invocation failed.",
+        )
         addCode(argumentsJson(this@proxyFunction.parameters))
         addStatement("val resultJson = %T.invoke(%S, %S, argumentsJson)", JS_CLIENT, bridgeId, name)
-        if (!returnType.isUnit()) {
-          addStatement("return %N.%M(resultJson)", JSON_PROPERTY, DECODE_FROM_STRING)
+        if (resultType.isUnit()) {
+          addStatement(
+            "%M(resultJson, decodeValue = { %T }, failureFactory = { message -> %T(%S + message) })",
+            DECODE_NPM_JS_RESULT,
+            UNIT,
+            BRIDGE_INVOCATION_EXCEPTION,
+            "npm JavaScript Host Bridge method '$name' failed: ",
+          )
+        } else {
+          addStatement(
+            "%M(resultJson, decodeValue = { element -> %N.%M<%T>(element) }, failureFactory = { message -> %T(%S + message) })",
+            DECODE_NPM_JS_RESULT,
+            JSON_PROPERTY,
+            DECODE_FROM_JSON_ELEMENT,
+            resultType.toTypeName(),
+            BRIDGE_INVOCATION_EXCEPTION,
+            "npm JavaScript Host Bridge method '$name' failed: ",
+          )
         }
+        addCode("}\n")
       }
       .build()
 
   private fun BridgeModel.hostInvokeFunction(): FunSpec {
-    val code = CodeBlock.builder()
-      .addStatement("val arguments = %N.parseToJsonElement(argumentsJson).%M", JSON_PROPERTY, JSON_ARRAY)
-      .beginControlFlow("return when (methodName)")
+    val code = CodeBlock.builder().beginControlFlow("return when (methodName)")
     methods.forEach { method ->
       code.beginControlFlow("%S ->", method.name)
+      if (method.resultType.isUnit()) {
+        code.add("%M(encodeValue = { %T }) {\n", ENCODE_NPM_JS_RESULT_CATCHING, JSON_NULL)
+      } else {
+        code.add(
+          "%M(encodeValue = { value -> %N.%M<%T>(value) }) {\n",
+          ENCODE_NPM_JS_RESULT_CATCHING,
+          JSON_PROPERTY,
+          ENCODE_TO_JSON_ELEMENT,
+          method.resultType.toTypeName(),
+        )
+      }
+      code.indent()
+        .addStatement(
+          "val arguments = %N.parseToJsonElement(argumentsJson).%M",
+          JSON_PROPERTY,
+          JSON_ARRAY,
+        )
         .addStatement(
           "require(arguments.size == %L) { %S }",
           method.parameters.size,
@@ -306,12 +364,9 @@ class KspNpmJsBridgeProcessor(
         )
       }
       val arguments = method.parameters.joinToString(", ") { it.name }
-      if (method.returnType.isUnit()) {
-        code.addStatement("implementation.%N($arguments)", method.name).addStatement("%S", "null")
-      } else {
-        code.addStatement("val result = implementation.%N($arguments)", method.name)
-          .addStatement("%N.%M(result)", JSON_PROPERTY, ENCODE_TO_STRING)
-      }
+      code.addStatement("implementation.%N($arguments)", method.name)
+        .unindent()
+        .add("}\n")
       code.endControlFlow()
     }
     code.addStatement("else -> error(%S + methodName)", "Unknown npm JavaScript bridge method: ")
@@ -427,7 +482,7 @@ class KspNpmJsBridgeProcessor(
   private data class MethodModel(
     val name: String,
     val parameters: List<ParameterModel>,
-    val returnType: KSType,
+    val resultType: KSType,
     val requiresHost: Boolean,
   )
 
@@ -459,7 +514,10 @@ class KspNpmJsBridgeProcessor(
 
   private companion object {
     const val BRIDGE_ANNOTATION = "com.cyxbs.functions.code.npm.js.bridge.NpmJsBridge"
+    const val BRIDGE_INSTANCE = "com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeInstance"
     const val IMPL_ANNOTATION = "com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeImpl"
+    const val NPM_JS_RESULT_TYPE =
+      "com.cyxbs.functions.code.npm.js.bridge.NpmJsResult"
     const val JSON_PROPERTY = "bridgeJson"
     val NPM_PACKAGE = Regex("(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*")
     val HOST_FACTORY = ClassName("com.cyxbs.functions.code.npm.bridge", "NpmJsBridgeHostFactory")
@@ -477,6 +535,19 @@ class KspNpmJsBridgeProcessor(
       "NpmJsBridgeJsClient",
     )
     val JSON = ClassName("kotlinx.serialization.json", "Json")
+    val JSON_NULL = ClassName("kotlinx.serialization.json", "JsonNull")
+    val NPM_JS_RESULT = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsResult",
+    )
+    val BRIDGE_INVOCATION_EXCEPTION = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsBridgeInvocationException",
+    )
+    val BRIDGE_EXCEPTION = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsBridgeException",
+    )
     val EXPERIMENTAL_SERIALIZATION_API = ClassName(
       "kotlinx.serialization",
       "ExperimentalSerializationApi",
@@ -491,8 +562,18 @@ class KspNpmJsBridgeProcessor(
       "kotlinx.serialization.json",
       "decodeFromJsonElement",
     )
-    val ENCODE_TO_STRING = MemberName("kotlinx.serialization", "encodeToString")
-    val DECODE_FROM_STRING = MemberName("kotlinx.serialization", "decodeFromString")
+    val NPM_JS_RESULT_CATCHING = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "npmJsResultCatching",
+    )
+    val ENCODE_NPM_JS_RESULT_CATCHING = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "encodeNpmJsResultCatching",
+    )
+    val DECODE_NPM_JS_RESULT = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "decodeNpmJsResult",
+    )
     val SET_OF = MemberName("kotlin.collections", "setOf")
     val OPT_IN = ClassName("kotlin", "OptIn")
   }

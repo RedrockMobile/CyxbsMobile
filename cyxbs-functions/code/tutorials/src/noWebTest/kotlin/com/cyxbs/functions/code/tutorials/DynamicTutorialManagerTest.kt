@@ -13,6 +13,7 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -46,7 +47,7 @@ class DynamicTutorialManagerTest {
 
     assertEquals("java", session.tutorial.languageId)
     assertEquals("0.1.0", session.npmPackageVersion)
-    assertEquals("java", session.manifest().languageId)
+    assertEquals("java", session.manifest().getOrThrow().languageId)
     session.close()
     assertEquals(1, loader.service.closeCount)
   }
@@ -189,21 +190,22 @@ class DynamicTutorialManagerTest {
   private class FakeTutorialService : DynamicTutorialService {
     var closeCount = 0
 
-    override suspend fun manifest(): DynamicTutorialManifest {
-      return DynamicTutorialManifest(
+    override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> {
+      return NpmJsResult.success(DynamicTutorialManifest(
         languageId = "java",
         courses = listOf(DynamicTutorialCourseSummary("intro", "入门", "", 0, 1)),
-      )
+      ))
     }
 
-    override suspend fun course(courseId: String): DynamicTutorialCourse? = null
+    override suspend fun course(courseId: String): NpmJsResult<DynamicTutorialCourse?> = NpmJsResult.success(null)
 
     override suspend fun evaluate(
       request: DynamicTutorialEvaluationRequest,
-    ): DynamicTutorialEvaluationResult = DynamicTutorialEvaluationResult(false)
+    ): NpmJsResult<DynamicTutorialEvaluationResult> = NpmJsResult.success(DynamicTutorialEvaluationResult(false))
 
-    override suspend fun close() {
+    override suspend fun close(): NpmJsResult<Unit> {
       closeCount++
+      return NpmJsResult.success(Unit)
     }
   }
 

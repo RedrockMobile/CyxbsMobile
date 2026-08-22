@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.npm.storage
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.js.JSON
@@ -274,7 +275,9 @@ private suspend fun invokeNpmStorage(
 
   val requestJson = JSON.stringify(request)
   val responseJson = try {
-    npmStorageBridge.invoke(requestJson)
+    npmStorageBridge.invoke(requestJson).getOrThrow()
+  } catch (exception: CancellationException) {
+    throw exception
   } catch (throwable: Throwable) {
     throw NpmStorageException(
       throwable.message ?: "The npm Storage host bridge invocation failed.",

@@ -1,7 +1,10 @@
 package com.cyxbs.functions.code.npm.service.test.js.bridge
 
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridge
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeInstance
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import kotlinx.serialization.Serializable
+import kotlin.coroutines.cancellation.CancellationException
 
 /** JS Service 发给端上 Host Bridge 的示例请求。 */
 @Serializable
@@ -38,9 +41,16 @@ data class NpmJsBidirectionalBridgeExampleResult(
  * `npmJsServiceTestHostBridge` 强类型代理，并在端上为实现类生成 dispatcher。
  */
 @NpmJsBridge
-interface NpmJsServiceTestHostBridge {
-  /** 将 JS Service 发出的结构化请求交给端上处理。 */
+interface NpmJsServiceTestHostBridge : NpmJsBridgeInstance {
+  /**
+   * 将 JS Service 发出的结构化请求交给端上处理。
+   *
+   * 桥未安装或入口包无权限时返回 `NpmJsBridgeNotInstalledException`；旧宿主没有本方法时返回
+   * `NpmJsBridgeMethodNotImplementedException`；参数协议、宿主实现或返回值编码失败时返回
+   * `NpmJsBridgeInvocationException`。协程取消继续抛出，不会包装进 [NpmJsResult]。
+   */
+  @Throws(CancellationException::class)
   suspend fun execute(
     request: NpmJsHostBridgeExampleRequest,
-  ): NpmJsHostBridgeExampleResponse
+  ): NpmJsResult<NpmJsHostBridgeExampleResponse>
 }

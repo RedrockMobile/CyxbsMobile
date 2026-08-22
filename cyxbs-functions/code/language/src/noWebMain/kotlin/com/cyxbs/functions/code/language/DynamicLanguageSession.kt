@@ -11,8 +11,10 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 import com.cyxbs.functions.code.js.runtime.JsRuntimeConfig
 import com.cyxbs.functions.code.js.runtime.JsRuntimeException
 import com.cyxbs.functions.code.js.runtime.JsRuntimeFactory
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -154,10 +156,12 @@ class DynamicLanguageSession internal constructor(
   private val programRunner = DynamicExecutableProgramRunner(runtimeFactoryProvider)
 
   /** 编译后记录匿名化的不支持 code；普通编译错误不会进入能力统计。 */
-  override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
-    val result = delegate.compile(request)
+  override suspend fun compile(
+    request: DynamicCompilationRequest,
+  ): NpmJsResult<DynamicCompilationResult> = npmJsCatching {
+    val result = delegate.compile(request).getOrThrow()
     onCompilationDiagnostics(result.diagnostics)
-    return result
+    result
   }
 
   /**
@@ -169,19 +173,19 @@ class DynamicLanguageSession internal constructor(
    * @param request 工作区、入口、JSON 参数和运行前预加载的标准输入。
    * @param options 当前执行专属的内存、栈、超时及输入输出大小限制。
    * @throws DynamicLanguageExecutionException Runtime 不可用、Module 图无效或执行失败。
-   * @throws SerializationException npm 语言 Service 的编译协议不匹配。
+   * @throws NpmJsServiceInvocationException npm 语言 Service 的编译、结果信封或 JSON 协议失败。
    * @throws CancellationException 调用协程被取消。
    */
   @Throws(
     DynamicLanguageExecutionException::class,
-    SerializationException::class,
+    NpmJsServiceInvocationException::class,
     CancellationException::class,
   )
   suspend fun run(
     request: DynamicProgramRunRequest,
     options: DynamicProgramRunOptions = DynamicProgramRunOptions(),
   ): DynamicProgramRunResult {
-    val compilation = compile(request.compilation)
+    val compilation = compile(request.compilation).getOrThrow()
     val hasErrors = compilation.diagnostics.any { diagnostic ->
       diagnostic.severity == DynamicCompilationDiagnosticSeverity.ERROR
     }

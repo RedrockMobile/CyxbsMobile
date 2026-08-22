@@ -33,6 +33,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolReferencesResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceLocation
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 import kotlin.time.TimeSource
 
 /**
@@ -55,7 +57,7 @@ object JavaDynamicLanguageService : DynamicLanguageService {
   private var previousCompilationPaths: List<String>? = null
 
   /** 返回不依赖平台资源的 Java 咖啡杯矢量图标。 */
-  override suspend fun fileIcon(): DynamicLanguageIcon = JavaLanguageIcon
+  override suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon> = NpmJsResult.success(JavaLanguageIcon)
 
   /**
    * 发现工作区中的 Java `main`，供顶部运行选择器和行号运行标记共同使用。
@@ -66,12 +68,12 @@ object JavaDynamicLanguageService : DynamicLanguageService {
   override suspend fun runTargets(
     workspace: DynamicLanguageWorkspace,
     activeFilePath: String,
-  ): List<DynamicRunTarget> {
+  ): NpmJsResult<List<DynamicRunTarget>> = npmJsCatching {
     require(workspace.files.any { file -> file.path == activeFilePath }) {
       "Workspace does not contain '$activeFilePath'."
     }
     retainWorkspace(workspace)
-    return semanticSession.runTargets(workspace)
+    semanticSession.runTargets(workspace)
   }
 
   /**
@@ -80,7 +82,14 @@ object JavaDynamicLanguageService : DynamicLanguageService {
    * 编译只生成代码，不在当前语言分析 Runtime 中执行用户程序。缺少入口、源码错误和当前
    * Stage1 子集尚未支持的 Java 特性都会通过结构化诊断返回。
    */
-  override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
+  override suspend fun compile(
+    request: DynamicCompilationRequest,
+  ): NpmJsResult<DynamicCompilationResult> = npmJsCatching {
+    compileProgram(request)
+  }
+
+  /** 执行 Java 编译流水线；协议层由 [compile] 统一捕获取消之外的异常。 */
+  private fun compileProgram(request: DynamicCompilationRequest): DynamicCompilationResult {
     retainWorkspace(request.workspace)
     validateCompilationLimits(request)?.let { return it }
     val sourceLength = request.workspace.files.sumOf { file -> file.source.length }
@@ -218,9 +227,9 @@ object JavaDynamicLanguageService : DynamicLanguageService {
   override suspend fun highlight(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
-  ): DynamicHighlightResult {
+  ): NpmJsResult<DynamicHighlightResult> = npmJsCatching {
     retainWorkspace(workspace)
-    return highlighterSession(filePath).highlight(workspace.requireSource(filePath))
+    highlighterSession(filePath).highlight(workspace.requireSource(filePath))
   }
 
   /** 返回当前词法作用域、工作区类型和可确定 receiver 的补全候选。 */
@@ -229,9 +238,9 @@ object JavaDynamicLanguageService : DynamicLanguageService {
     filePath: String,
     position: Int,
     explicit: Boolean,
-  ): DynamicCompletionResult? {
+  ): NpmJsResult<DynamicCompletionResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.complete(workspace, filePath, position, explicit)
+    semanticSession.complete(workspace, filePath, position, explicit)
   }
 
   /** 返回工作区中可唯一解析的定义，外部 classpath 和歧义符号返回 null。 */
@@ -239,9 +248,9 @@ object JavaDynamicLanguageService : DynamicLanguageService {
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolDefinition? {
+  ): NpmJsResult<DynamicSymbolDefinition?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.definition(workspace, filePath, position)
+    semanticSession.definition(workspace, filePath, position)
   }
 
   /** 返回工作区中静态确认的引用，不包含定义区间。 */
@@ -249,9 +258,9 @@ object JavaDynamicLanguageService : DynamicLanguageService {
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolReferencesResult? {
+  ): NpmJsResult<DynamicSymbolReferencesResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.references(workspace, filePath, position)
+    semanticSession.references(workspace, filePath, position)
   }
 
   /** 校验标识符、遮蔽、重载及文件重命名边界后生成一次性修改。 */
@@ -260,9 +269,9 @@ object JavaDynamicLanguageService : DynamicLanguageService {
     filePath: String,
     position: Int,
     newName: String,
-  ): DynamicRenameResult? {
+  ): NpmJsResult<DynamicRenameResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.rename(workspace, filePath, position, newName)
+    semanticSession.rename(workspace, filePath, position, newName)
   }
 
   /** 校验工作区路径唯一，并释放已经删除文件的树和语义索引。 */
@@ -350,4 +359,7 @@ object JavaDynamicLanguageService : DynamicLanguageService {
   private const val UTF_16_BYTES_PER_CODE_UNIT = 2L
   private const val MAX_WORKSPACE_FILES = 128
   private const val MAX_WORKSPACE_SOURCE_LENGTH = 1_000_000L
+
+  /** 当前实现不持有独立资源；Runtime 仍由宿主代理在本方法返回后统一释放。 */
+  override suspend fun close(): NpmJsResult<Unit> = NpmJsResult.success(Unit)
 }

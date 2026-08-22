@@ -116,10 +116,10 @@ class NpmJsServiceLoaderTestNavEntry : AppNavEntry<NpmJsServiceLoaderTestNavArgu
                 }
                 service = loadedService
                 val result = stageTimings.measureStage("首次 JS Service 调用") {
-                  loadedService.execute(TEST_INPUT, TEST_VALUE)
+                  loadedService.execute(TEST_INPUT, TEST_VALUE).getOrThrow()
                 }
                 val bridgeResult = stageTimings.measureStage("JS 回调 Host Bridge") {
-                  loadedService.executeBidirectional(TEST_INPUT, TEST_VALUE)
+                  loadedService.executeBidirectional(TEST_INPUT, TEST_VALUE).getOrThrow()
                 }
                 resultText = buildString {
                   appendLine("调用成功")

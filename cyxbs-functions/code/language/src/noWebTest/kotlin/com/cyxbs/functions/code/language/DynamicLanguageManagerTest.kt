@@ -21,6 +21,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolReferencesResult
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -79,12 +80,12 @@ class DynamicLanguageManagerTest {
 
     assertEquals(1, loader.languageLoadCount)
     assertEquals(0, languageService.fileIconCallCount)
-    assertEquals(TEST_ICON, service.fileIcon())
-    assertEquals(TEST_ICON, service.fileIcon())
+    assertEquals(TEST_ICON, service.fileIcon().getOrThrow())
+    assertEquals(TEST_ICON, service.fileIcon().getOrThrow())
     assertEquals(1, languageService.fileIconCallCount)
     assertEquals(
       listOf("keyword"),
-      service.highlight(workspace, "main.js").spans.single().styleIds,
+      service.highlight(workspace, "main.js").getOrThrow().spans.single().styleIds,
     )
     assertEquals(
       "const",
@@ -93,7 +94,7 @@ class DynamicLanguageManagerTest {
         "main.js",
         3,
         false,
-      )?.options?.single()?.label,
+      ).getOrThrow()?.options?.single()?.label,
     )
     val runResult = service.run(
       DynamicProgramRunRequest(
@@ -182,8 +183,8 @@ class DynamicLanguageManagerTest {
     val unchangedProxy = unchangedManager.load("javascript")
 
     assertEquals(0, unchangedService.fileIconCallCount)
-    assertEquals(TEST_ICON, unchangedProxy.fileIcon())
-    assertEquals(TEST_ICON, unchangedProxy.fileIcon())
+    assertEquals(TEST_ICON, unchangedProxy.fileIcon().getOrThrow())
+    assertEquals(TEST_ICON, unchangedProxy.fileIcon().getOrThrow())
     unchangedProxy.close()
     assertEquals(TEST_ICON, unchangedManager.cachedIcons()[language])
 
@@ -200,8 +201,8 @@ class DynamicLanguageManagerTest {
     val updatedProxy = updatedManager.load("javascript")
 
     assertEquals(0, updatedService.fileIconCallCount)
-    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon())
-    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon())
+    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon().getOrThrow())
+    assertEquals(UPDATED_TEST_ICON, updatedProxy.fileIcon().getOrThrow())
     updatedProxy.close()
     assertEquals(1, updatedService.fileIconCallCount)
     assertEquals(UPDATED_TEST_ICON, updatedManager.cachedIcons()[language])
@@ -298,20 +299,20 @@ class DynamicLanguageManagerTest {
     var closeCount = 0
     var fileIconCallCount = 0
 
-    override suspend fun fileIcon(): DynamicLanguageIcon {
+    override suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon> {
       fileIconCallCount += 1
-      return icon
+      return NpmJsResult.success(icon)
     }
 
     /** 测试替身不暴露运行入口。 */
     override suspend fun runTargets(
       workspace: DynamicLanguageWorkspace,
       activeFilePath: String,
-    ) = emptyList<com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget>()
+    ) = NpmJsResult.success(emptyList<com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget>())
 
     /** 测试替身未提供可执行程序，使用结构化编译诊断验证协议透传。 */
-    override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
-      return DynamicCompilationResult(
+    override suspend fun compile(request: DynamicCompilationRequest): NpmJsResult<DynamicCompilationResult> {
+      return NpmJsResult.success(DynamicCompilationResult(
         diagnostics = compilationDiagnostics ?: listOf(
           DynamicCompilationDiagnostic(
             code = "TEST_COMPILER_UNAVAILABLE",
@@ -319,16 +320,16 @@ class DynamicLanguageManagerTest {
             severity = DynamicCompilationDiagnosticSeverity.ERROR,
           ),
         ),
-      )
+      ))
     }
 
     /** 测试替身不维护语法树，仅返回可预测的完整解析指标。 */
     override suspend fun highlight(
       workspace: DynamicLanguageWorkspace,
       filePath: String,
-    ): DynamicHighlightResult {
+    ): NpmJsResult<DynamicHighlightResult> {
       val source = workspace.files.first { file -> file.path == filePath }.source
-      return DynamicHighlightResult(
+      return NpmJsResult.success(DynamicHighlightResult(
         spans = highlightResult,
         metrics = DynamicHighlightMetrics(
           cacheMode = DynamicHighlightCacheMode.FULL,
@@ -336,7 +337,7 @@ class DynamicLanguageManagerTest {
           parseMicroseconds = 0,
           collectMicroseconds = 0,
         ),
-      )
+      ))
     }
 
     override suspend fun complete(
@@ -344,29 +345,30 @@ class DynamicLanguageManagerTest {
       filePath: String,
       position: Int,
       explicit: Boolean,
-    ): DynamicCompletionResult? = completionResult
+    ): NpmJsResult<DynamicCompletionResult?> = NpmJsResult.success(completionResult)
 
     override suspend fun definition(
       workspace: DynamicLanguageWorkspace,
       filePath: String,
       position: Int,
-    ): DynamicSymbolDefinition? = null
+    ): NpmJsResult<DynamicSymbolDefinition?> = NpmJsResult.success(null)
 
     override suspend fun references(
       workspace: DynamicLanguageWorkspace,
       filePath: String,
       position: Int,
-    ): DynamicSymbolReferencesResult? = null
+    ): NpmJsResult<DynamicSymbolReferencesResult?> = NpmJsResult.success(null)
 
     override suspend fun rename(
       workspace: DynamicLanguageWorkspace,
       filePath: String,
       position: Int,
       newName: String,
-    ): DynamicRenameResult? = null
+    ): NpmJsResult<DynamicRenameResult?> = NpmJsResult.success(null)
 
-    override suspend fun close() {
+    override suspend fun close(): NpmJsResult<Unit> {
       closeCount += 1
+      return NpmJsResult.success(Unit)
     }
   }
 

@@ -174,7 +174,20 @@ class KspNpmJsServiceProcessor(
     }
     val resolvedReturnType = returnType?.resolve()
       ?: invalid("@NpmJsService method must declare a return type: $serviceId.$methodName", this)
-    return MethodModel(methodName, methodParameters, resolvedReturnType)
+    if (resolvedReturnType.isMarkedNullable ||
+      resolvedReturnType.declaration.qualifiedName?.asString() != NPM_JS_RESULT_TYPE
+    ) {
+      invalid(
+        "@NpmJsService method must return NpmJsResult<T>: $serviceId.$methodName",
+        this,
+      )
+    }
+    val resultType = resolvedReturnType.arguments.singleOrNull()?.type?.resolve()
+      ?: invalid(
+        "@NpmJsService NpmJsResult must declare one concrete value type: $serviceId.$methodName",
+        this,
+      )
+    return MethodModel(methodName, methodParameters, resultType)
   }
 
   /** 生成 internal `_Proxy` 与通过 KtProvider 发现的 internal `_Factory`。 */
@@ -199,7 +212,8 @@ class KspNpmJsServiceProcessor(
         addFunction(
           FunSpec.builder(CLOSE_METHOD)
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addStatement("session.close()")
+            .returns(NPM_JS_RESULT.parameterizedBy(UNIT))
+            .addStatement("return %M { session.close() }", NPM_JS_CATCHING)
             .build(),
         )
       }
@@ -256,7 +270,7 @@ class KspNpmJsServiceProcessor(
       .addFunction(
         FunSpec.builder(CLOSE_METHOD)
           .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-          .addStatement("%T.close()", implementationType)
+          .addStatement("%T.close().getOrThrow()", implementationType)
           .build(),
       )
       .build()
@@ -312,7 +326,7 @@ class KspNpmJsServiceProcessor(
       )
   }
 
-  /** 生成端上代理方法：参数编码为 JSON 数组，结果按声明返回类型解码。 */
+  /** 生成端上代理方法：捕获取消之外的边界异常，并解码稳定结果信封。 */
   private fun MethodModel.hostProxyFunction(): FunSpec {
     return FunSpec.builder(name)
       .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
@@ -320,27 +334,68 @@ class KspNpmJsServiceProcessor(
         this@hostProxyFunction.parameters.forEach { parameter ->
           addParameter(parameter.name, parameter.type.toTypeName())
         }
-        returns(returnType.toTypeName())
+        returns(NPM_JS_RESULT.parameterizedBy(resultType.toTypeName()))
+        addCode(
+          "return %M(\n" +
+            "  exceptionMapper = { throwable ->\n" +
+            "    if (throwable is %T || throwable is %T) throwable\n" +
+            "    else %T(%S, throwable)\n" +
+            "  },\n" +
+            ") {\n",
+          NPM_JS_RESULT_CATCHING,
+          SERVICE_METHOD_NOT_IMPLEMENTED_EXCEPTION,
+          SERVICE_INVOCATION_EXCEPTION,
+          SERVICE_INVOCATION_EXCEPTION,
+          "npm JavaScript Service method '$name' invocation failed.",
+        )
         addCode(buildArgumentsJson(this@hostProxyFunction.parameters))
         addStatement("val resultJson = session.invoke(%S, argumentsJson)", name)
-        if (!returnType.isUnit()) {
-          addStatement("return %N.%M(resultJson)", SERVICE_JSON_PROPERTY, DECODE_FROM_STRING)
+        if (resultType.isUnit()) {
+          addStatement(
+            "%M(resultJson, decodeValue = { %T }, failureFactory = { message -> %T(%S + message) })",
+            DECODE_NPM_JS_RESULT,
+            UNIT,
+            SERVICE_INVOCATION_EXCEPTION,
+            "npm JavaScript Service method '$name' failed: ",
+          )
+        } else {
+          addStatement(
+            "%M(resultJson, decodeValue = { element -> %N.%M<%T>(element) }, failureFactory = { message -> %T(%S + message) })",
+            DECODE_NPM_JS_RESULT,
+            SERVICE_JSON_PROPERTY,
+            DECODE_FROM_JSON_ELEMENT,
+            resultType.toTypeName(),
+            SERVICE_INVOCATION_EXCEPTION,
+            "npm JavaScript Service method '$name' failed: ",
+          )
         }
+        addCode("}\n")
       }
       .build()
   }
 
   /** 生成 Kotlin/JS 分发入口，根据稳定方法名解码、调用 object 并重新编码。 */
   private fun ServiceModel.jsInvokeFunction(implementationType: ClassName): FunSpec {
-    val code = CodeBlock.builder()
-      .addStatement(
-        "val arguments = %N.parseToJsonElement(argumentsJson).%M",
-        SERVICE_JSON_PROPERTY,
-        JSON_ARRAY,
-      )
-      .beginControlFlow("return when (method)")
+    val code = CodeBlock.builder().beginControlFlow("return when (method)")
     methods.forEach { method ->
       code.beginControlFlow("%S ->", method.name)
+      if (method.resultType.isUnit()) {
+        code.add("%M(encodeValue = { %T }) {\n", ENCODE_NPM_JS_RESULT_CATCHING, JSON_NULL)
+      } else {
+        code.add(
+          "%M(encodeValue = { value -> %N.%M<%T>(value) }) {\n",
+          ENCODE_NPM_JS_RESULT_CATCHING,
+          SERVICE_JSON_PROPERTY,
+          ENCODE_TO_JSON_ELEMENT,
+          method.resultType.toTypeName(),
+        )
+      }
+      code.indent()
+        .addStatement(
+          "val arguments = %N.parseToJsonElement(argumentsJson).%M",
+          SERVICE_JSON_PROPERTY,
+          JSON_ARRAY,
+        )
         .addStatement(
           "require(arguments.size == %L) { %S }",
           method.parameters.size,
@@ -357,13 +412,9 @@ class KspNpmJsServiceProcessor(
         )
       }
       val arguments = method.parameters.joinToString(", ") { it.name }
-      if (method.returnType.isUnit()) {
-        code.addStatement("%T.%N($arguments)", implementationType, method.name)
-          .addStatement("%S", NULL_JSON)
-      } else {
-        code.addStatement("val result = %T.%N($arguments)", implementationType, method.name)
-          .addStatement("%N.%M(result)", SERVICE_JSON_PROPERTY, ENCODE_TO_STRING)
-      }
+      code.addStatement("%T.%N($arguments)", implementationType, method.name)
+        .unindent()
+        .add("}\n")
       code.endControlFlow()
     }
     code.addStatement("else -> error(%S + method)", "Unknown npm JavaScript Service method: ")
@@ -396,7 +447,8 @@ class KspNpmJsServiceProcessor(
   /**
    * 为 Host 与 JS Dispatcher 生成完全相同的私有 JSON 协议配置。
    *
-   * 未知字段允许新旧动态包进行增量式数据模型演进；默认值不编码以减少桥接文本，`null` 则保持
+     * 未知字段只用于同一协议基线下的数据模型增量扩展，不承担旧版原始返回格式兼容；
+     * 默认值不编码以减少桥接文本，`null` 则保持
    * 显式传输，避免“字段缺失”和“明确为空”在跨版本解码时产生歧义。
    */
   private fun serviceJsonProperty(): PropertySpec {
@@ -530,7 +582,7 @@ class KspNpmJsServiceProcessor(
   private data class MethodModel(
     val name: String,
     val parameters: List<MethodParameter>,
-    val returnType: KSType,
+    val resultType: KSType,
   )
 
   private data class MethodParameter(
@@ -557,8 +609,9 @@ class KspNpmJsServiceProcessor(
       "com.cyxbs.functions.code.npm.js.bridge.NpmJsService"
     const val SERVICE_INSTANCE =
       "com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance"
+    const val NPM_JS_RESULT_TYPE =
+      "com.cyxbs.functions.code.npm.js.bridge.NpmJsResult"
     const val CLOSE_METHOD = "close"
-    const val NULL_JSON = "null"
     const val JS_INITIALIZER_PREFIX = "__cyxbsNpmJsServiceInitialize_"
     const val JS_INITIALIZER_PACKAGE = "com.cyxbs.generated.npmjs"
     const val JS_INITIALIZER_FILE = "_NpmJsServiceInitializer"
@@ -578,6 +631,19 @@ class KspNpmJsServiceProcessor(
       "NpmJsServiceJsRegistry",
     )
     val JSON = ClassName("kotlinx.serialization.json", "Json")
+    val JSON_NULL = ClassName("kotlinx.serialization.json", "JsonNull")
+    val NPM_JS_RESULT = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsResult",
+    )
+    val SERVICE_INVOCATION_EXCEPTION = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsServiceInvocationException",
+    )
+    val SERVICE_METHOD_NOT_IMPLEMENTED_EXCEPTION = ClassName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "NpmJsServiceMethodNotImplementedException",
+    )
     val EXPERIMENTAL_SERIALIZATION_API = ClassName(
       "kotlinx.serialization",
       "ExperimentalSerializationApi",
@@ -592,8 +658,22 @@ class KspNpmJsServiceProcessor(
       "kotlinx.serialization.json",
       "decodeFromJsonElement",
     )
-    val ENCODE_TO_STRING = MemberName("kotlinx.serialization", "encodeToString")
-    val DECODE_FROM_STRING = MemberName("kotlinx.serialization", "decodeFromString")
+    val NPM_JS_CATCHING = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "npmJsCatching",
+    )
+    val NPM_JS_RESULT_CATCHING = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "npmJsResultCatching",
+    )
+    val ENCODE_NPM_JS_RESULT_CATCHING = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "encodeNpmJsResultCatching",
+    )
+    val DECODE_NPM_JS_RESULT = MemberName(
+      "com.cyxbs.functions.code.npm.js.bridge",
+      "decodeNpmJsResult",
+    )
     val SET_OF = MemberName("kotlin.collections", "setOf")
     val JS_EXPORT = ClassName("kotlin.js", "JsExport")
     val EXPERIMENTAL_JS_EXPORT = ClassName("kotlin.js", "ExperimentalJsExport")

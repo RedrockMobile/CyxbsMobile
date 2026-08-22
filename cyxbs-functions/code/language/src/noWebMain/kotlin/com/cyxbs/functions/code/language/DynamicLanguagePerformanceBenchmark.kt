@@ -99,13 +99,13 @@ suspend fun DynamicLanguageManager.measurePerformance(
   lateinit var measurements: List<DynamicLanguagePerformanceMeasurement>
   try {
     val (fullCompilation, fullWall) = measureWall {
-      session.compile(scenario.initialCompilation)
+      session.compile(scenario.initialCompilation).getOrThrow()
     }
     fullCompilation.requireSuccessful("FULL compilation")
     sampleMemory()
 
     val (incrementalCompilation, incrementalWall) = measureWall {
-      session.compile(scenario.incrementalCompilation)
+      session.compile(scenario.incrementalCompilation).getOrThrow()
     }
     incrementalCompilation.requireSuccessful("INCREMENTAL compilation")
     sampleMemory()
@@ -114,7 +114,7 @@ suspend fun DynamicLanguageManager.measurePerformance(
     val exactMetrics = mutableListOf<DynamicCompilationMetrics>()
     repeat(scenario.measuredIterations) {
       val (compilation, wall) = measureWall {
-        session.compile(scenario.incrementalCompilation)
+        session.compile(scenario.incrementalCompilation).getOrThrow()
       }
       compilation.requireSuccessful("EXACT compilation")
       exactWalls += wall

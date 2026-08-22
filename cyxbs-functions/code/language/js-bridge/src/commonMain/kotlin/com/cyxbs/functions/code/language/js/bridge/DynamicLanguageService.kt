@@ -2,10 +2,8 @@ package com.cyxbs.functions.code.language.js.bridge
 
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsService
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInstance
-import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
-import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceMethodNotImplementedException
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -96,6 +94,12 @@ data class DynamicCompletionResult(
  * 业务将 `DynamicLanguageService::class`、npm 包名和版本传给 `NpmJsServiceLoader.load` 获取端上
  * 代理，不直接访问生成类或 JavaScript Runtime。Kotlin/JS 发布模块只需提供一个实现本接口的
  * object，KSP 会生成分发器。
+ *
+ * 所有业务方法都返回 [NpmJsResult]：当前语言包缺少接口方法时失败值为
+ * `NpmJsServiceMethodNotImplementedException`；参数或返回值不符合 JSON 协议、Runtime 不可用、
+ * JavaScript 实现抛错或显式返回失败时，失败值为 `NpmJsServiceInvocationException`。bundle
+ * 不存在、下载失败或入口初始化失败发生在实例创建之前，仍由
+ * `NpmJsServiceLoader.load` 直接报告。只有 [CancellationException] 会绕过结果对象继续抛出。
  */
 @NpmJsService
 interface DynamicLanguageService : NpmJsServiceInstance {
@@ -107,18 +111,10 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * 时可以回退到通用文件标记，但缺少实现不属于正常业务状态。
    *
    * @return 与具体平台资源无关的 SVG 填充路径模型。
-   * @throws NpmJsServiceMethodNotImplementedException 当前语言包缺少本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
-  suspend fun fileIcon(): DynamicLanguageIcon
+  @Throws(CancellationException::class)
+  suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon>
 
   /**
    * 发现当前工作区可由编辑器直接启动的入口。
@@ -133,21 +129,13 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param workspace 包含未保存文本的完整同语言工作区。
    * @param activeFilePath 当前编辑器文件，用于按文件执行的语言选择默认目标。
    * @return 按语言定义排序的可运行入口；为空表示当前工作区没有可运行目标。
-   * @throws NpmJsServiceMethodNotImplementedException 当前语言包尚未提供入口发现能力。
-   * @throws NpmJsServiceInvocationException JavaScript 分析 Service 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun runTargets(
     workspace: DynamicLanguageWorkspace,
     activeFilePath: String,
-  ): List<DynamicRunTarget>
+  ): NpmJsResult<List<DynamicRunTarget>>
 
   /**
    * 把当前语言工作区编译为端上统一执行器可加载的 ES Module 图。
@@ -158,18 +146,10 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    *
    * @param request 完整工作区快照及语言无关入口位置。
    * @return 成功时包含可执行 Module 图；源码错误通过结构化诊断返回，不以异常表示。
-   * @throws NpmJsServiceMethodNotImplementedException 当前语言包尚未提供编译能力。
-   * @throws NpmJsServiceInvocationException JavaScript 编译 Service 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
-  suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult
+  @Throws(CancellationException::class)
+  suspend fun compile(request: DynamicCompilationRequest): NpmJsResult<DynamicCompilationResult>
 
   /**
    * 分析工作区中的指定文件，返回按 UTF-16 偏移排序的高亮区间、增量缓存路径及语言包内部耗时。
@@ -179,21 +159,13 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    *
    * @param workspace 包含未保存内容的完整工作区快照。
    * @param filePath 本次需要高亮的工作区相对路径。
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun highlight(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
-  ): DynamicHighlightResult
+  ): NpmJsResult<DynamicHighlightResult>
 
   /**
    * 查询指定光标位置的补全候选。
@@ -202,23 +174,15 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param filePath 光标所在文件的工作区相对路径。
    * @param position 光标 UTF-16 偏移。
    * @param explicit 是否由用户主动触发补全。
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun complete(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
     explicit: Boolean,
-  ): DynamicCompletionResult?
+  ): NpmJsResult<DynamicCompletionResult?>
 
   /**
    * 查询光标所在词法符号的定义。
@@ -227,22 +191,14 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param filePath 光标所在文件的工作区相对路径。
    * @param position 光标 UTF-16 偏移；可位于标识符内部或紧邻标识符末尾。
    * @return 工作区中的符号定义；光标不在可索引符号上时返回 null。
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun definition(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolDefinition?
+  ): NpmJsResult<DynamicSymbolDefinition?>
 
   /**
    * 查询光标所在词法符号在工作区中的引用。
@@ -253,22 +209,14 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param filePath 光标所在文件的工作区相对路径。
    * @param position 光标 UTF-16 偏移。
    * @return 符号及非定义引用；光标不在可索引符号上时返回 null。
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun references(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolReferencesResult?
+  ): NpmJsResult<DynamicSymbolReferencesResult?>
 
   /**
    * 为光标所在词法符号生成工作区安全重命名修改。
@@ -281,21 +229,13 @@ interface DynamicLanguageService : NpmJsServiceInstance {
    * @param position 光标 UTF-16 偏移。
    * @param newName 调用方期望的新标识符。
    * @return 可应用或带拒绝原因的结果；光标不在可重命名符号上时返回 null。
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包尚未实现本方法。
-   * @throws NpmJsServiceInvocationException JavaScript 执行失败。
-   * @throws SerializationException 参数编码或返回值解码不符合接口协议。
    * @throws CancellationException 调用协程被取消。
    */
-  @Throws(
-    NpmJsServiceMethodNotImplementedException::class,
-    NpmJsServiceInvocationException::class,
-    SerializationException::class,
-    CancellationException::class,
-  )
+  @Throws(CancellationException::class)
   suspend fun rename(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
     newName: String,
-  ): DynamicRenameResult?
+  ): NpmJsResult<DynamicRenameResult?>
 }

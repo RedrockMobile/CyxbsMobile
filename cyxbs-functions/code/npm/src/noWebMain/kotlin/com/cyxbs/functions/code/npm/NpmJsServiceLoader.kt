@@ -29,7 +29,7 @@ import kotlin.time.TimeSource
  * 以 commonMain Service 接口为入口，准备 npm 依赖并返回对应 Kotlin 代理。
  *
  * 调用方传入带 `@NpmJsService` 的接口、npm 包名和版本；方法清单、JSON 编解码与代理创建由
- * KSP 生成代码提供。接口可以只追加方法，旧包缺少的新方法会在调用时明确标记为未实现。每个
+ * KSP 生成代码提供。接口方法与当前包能力不一致时，会在调用时明确标记为未实现。每个
  * 成功加载的实例独占一个 JavaScript Runtime，使用完必须调用
  * [NpmJsServiceInstance.close]。工厂使用真实 [KClass] 建立索引，不依赖可能被混淆的运行时类名。
  *
@@ -75,7 +75,8 @@ class NpmJsServiceLoader(
    * @return 由 KSP 生成且由独立 Runtime 支撑的业务接口代理。
    * @throws NpmJsServiceProtocolException 接口没有生成工厂、工厂身份不一致或远端协议不匹配。
    * @throws NpmJsServiceInvocationException Runtime 创建或 npm 入口初始化失败。
-   * @throws NpmException npm 解析、下载、校验或存储失败。
+   * @throws NpmException bundle 或指定版本不存在、metadata/依赖解析失败、下载失败、完整性校验
+   * 失败，或本地归档与存储不可用。此时 Service 实例尚未创建，因此不会返回 Result.failure。
    * @throws CancellationException 调用协程被取消。
    */
   @Throws(

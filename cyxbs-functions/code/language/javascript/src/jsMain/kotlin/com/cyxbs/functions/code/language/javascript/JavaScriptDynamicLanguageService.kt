@@ -18,6 +18,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolReferencesResult
 import com.cyxbs.functions.code.language.javascript.completion.JavaScriptSemanticSession
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -33,7 +35,7 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
   }
 
   /** 返回不依赖平台资源的 JavaScript 文件矢量图标。 */
-  override suspend fun fileIcon(): DynamicLanguageIcon = JavaScriptLanguageIcon
+  override suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon> = NpmJsResult.success(JavaScriptLanguageIcon)
 
   /**
    * JavaScript 按当前文件执行，不把工作区中的所有依赖模块都展示为独立运行入口。
@@ -41,6 +43,14 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
    * `.cjs` 仍由 [compile] 返回明确的不支持诊断，因此这里不提供会必然失败的运行目标。
    */
   override suspend fun runTargets(
+    workspace: DynamicLanguageWorkspace,
+    activeFilePath: String,
+  ): NpmJsResult<List<DynamicRunTarget>> = npmJsCatching {
+    findRunTargets(workspace, activeFilePath)
+  }
+
+  /** 执行不涉及桥协议的 JavaScript 入口发现，便于 Result 边界统一捕获异常。 */
+  private fun findRunTargets(
     workspace: DynamicLanguageWorkspace,
     activeFilePath: String,
   ): List<DynamicRunTarget> {
@@ -61,7 +71,14 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
    * 原始模块不会在语言分析 Runtime 中执行。生成的轻量入口适配器会在独立执行 Runtime 中先
    * 加载入口文件，再调用其 `default` 或 `main` 导出；没有这两个导出时仅执行模块顶层代码。
    */
-  override suspend fun compile(request: DynamicCompilationRequest): DynamicCompilationResult {
+  override suspend fun compile(
+    request: DynamicCompilationRequest,
+  ): NpmJsResult<DynamicCompilationResult> = npmJsCatching {
+    compileProgram(request)
+  }
+
+  /** 构建 JavaScript 可执行模块图；协议层由 [compile] 负责转为 Result。 */
+  private fun compileProgram(request: DynamicCompilationRequest): DynamicCompilationResult {
     val paths = request.workspace.files.map { file -> file.path }
     if (paths.distinct().size != paths.size) {
       return compilationFailure(
@@ -116,9 +133,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
   override suspend fun highlight(
     workspace: DynamicLanguageWorkspace,
     filePath: String,
-  ): DynamicHighlightResult {
+  ): NpmJsResult<DynamicHighlightResult> = npmJsCatching {
     retainWorkspace(workspace)
-    return highlighterSession(filePath).highlight(workspace.requireSource(filePath))
+    highlighterSession(filePath).highlight(workspace.requireSource(filePath))
   }
 
   override suspend fun complete(
@@ -126,9 +143,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     filePath: String,
     position: Int,
     explicit: Boolean,
-  ): DynamicCompletionResult? {
+  ): NpmJsResult<DynamicCompletionResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.complete(workspace, filePath, position, explicit)
+    semanticSession.complete(workspace, filePath, position, explicit)
   }
 
   /** 从当前词法索引解析光标符号的定义区间。 */
@@ -136,9 +153,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolDefinition? {
+  ): NpmJsResult<DynamicSymbolDefinition?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.definition(workspace, filePath, position)
+    semanticSession.definition(workspace, filePath, position)
   }
 
   /** 返回光标符号在工作区中的非定义引用。 */
@@ -146,9 +163,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     workspace: DynamicLanguageWorkspace,
     filePath: String,
     position: Int,
-  ): DynamicSymbolReferencesResult? {
+  ): NpmJsResult<DynamicSymbolReferencesResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.references(workspace, filePath, position)
+    semanticSession.references(workspace, filePath, position)
   }
 
   /** 校验词法绑定与模块公开名语义后，生成工作区重命名修改。 */
@@ -157,9 +174,9 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     filePath: String,
     position: Int,
     newName: String,
-  ): DynamicRenameResult? {
+  ): NpmJsResult<DynamicRenameResult?> = npmJsCatching {
     retainWorkspace(workspace)
-    return semanticSession.rename(workspace, filePath, position, newName)
+    semanticSession.rename(workspace, filePath, position, newName)
   }
 
   /** 移除已从工作区删除文件的语法树，避免长时间创建临时文件无界增长。 */
@@ -202,4 +219,7 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
     if (isEmpty() || startsWith('/') || contains('\\')) return false
     return split('/').all { segment -> segment.isNotEmpty() && segment != "." && segment != ".." }
   }
+
+  /** 当前实现不持有独立资源；Runtime 仍由宿主代理在本方法返回后统一释放。 */
+  override suspend fun close(): NpmJsResult<Unit> = NpmJsResult.success(Unit)
 }

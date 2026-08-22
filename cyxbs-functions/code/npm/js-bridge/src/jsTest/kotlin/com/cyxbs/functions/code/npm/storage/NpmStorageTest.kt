@@ -1,12 +1,13 @@
 package com.cyxbs.functions.code.npm.storage
 
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeHostAbi
+import com.cyxbs.functions.code.npm.js.bridge.encodeNpmJsResult
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.promise
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -162,7 +163,13 @@ class NpmStorageTest {
               .jsonArray.single().jsonPrimitive.content
             buildJsonObject {
               put("ok", true)
-              put("result", Json.encodeToString(handler(Json.parseToJsonElement(requestJson).jsonObject)))
+              put(
+                "result",
+                encodeNpmJsResult(
+                  NpmJsResult.success(handler(Json.parseToJsonElement(requestJson).jsonObject)),
+                  ::JsonPrimitive,
+                ),
+              )
             }.toString()
           }
           else -> error("Unknown test bridge operation: $operation")

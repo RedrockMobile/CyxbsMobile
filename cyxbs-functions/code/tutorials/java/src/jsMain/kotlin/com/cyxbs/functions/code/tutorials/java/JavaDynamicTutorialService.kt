@@ -17,6 +17,8 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
 import com.cyxbs.functions.code.tutorials.js.bridge.withGeneratedLessonSummaries
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 
 /** Java 教程 npm 包入口；课程正文、示例源码与完成规则随 npm 包动态更新。 */
 object JavaDynamicTutorialService : DynamicTutorialService {
@@ -28,20 +30,27 @@ object JavaDynamicTutorialService : DynamicTutorialService {
   ).map(DynamicTutorialCourse::withGeneratedLessonSummaries)
 
   /** 返回 Java 课程路径，不传输课时正文与源码。 */
-  override suspend fun manifest(): DynamicTutorialManifest {
-    return DynamicTutorialManifest(
+  override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> = npmJsCatching {
+    DynamicTutorialManifest(
       languageId = "java",
       courses = courses.map(DynamicTutorialCourse::summary),
     )
   }
 
   /** 按稳定 ID 查找课程，未知 ID 保持为空以兼容 Catalog 与包更新的短暂差异。 */
-  override suspend fun course(courseId: String): DynamicTutorialCourse? {
-    return courses.firstOrNull { it.summary.courseId == courseId }
+  override suspend fun course(courseId: String): NpmJsResult<DynamicTutorialCourse?> = npmJsCatching {
+    courses.firstOrNull { it.summary.courseId == courseId }
   }
 
   /** 使用步骤自身的声明式规则判断源码或运行结果，避免客户端复制语言相关字符串。 */
   override suspend fun evaluate(
+    request: DynamicTutorialEvaluationRequest,
+  ): NpmJsResult<DynamicTutorialEvaluationResult> = npmJsCatching {
+    evaluateStep(request)
+  }
+
+  /** 执行教程包内声明式检查，协议层由 [evaluate] 统一捕获异常。 */
+  private fun evaluateStep(
     request: DynamicTutorialEvaluationRequest,
   ): DynamicTutorialEvaluationResult {
     val step = courses.firstOrNull { it.summary.courseId == request.courseId }
@@ -463,4 +472,7 @@ object JavaDynamicTutorialService : DynamicTutorialService {
   private const val COURSE_LIST_FILE_PATH = "src/CourseList.java"
   private const val INITIAL_COURSE_COUNT = 2
   private val COURSE_ADD_PATTERN = Regex("""\bcourses\s*\.\s*add\s*\(""")
+
+  /** 当前实现不持有独立资源；Runtime 仍由宿主代理在本方法返回后统一释放。 */
+  override suspend fun close(): NpmJsResult<Unit> = NpmJsResult.success(Unit)
 }

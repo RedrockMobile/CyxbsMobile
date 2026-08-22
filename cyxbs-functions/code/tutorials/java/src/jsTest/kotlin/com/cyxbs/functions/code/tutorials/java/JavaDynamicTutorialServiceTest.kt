@@ -18,7 +18,7 @@ class JavaDynamicTutorialServiceTest {
 
   @Test
   fun exposesOrderedCoursePath() = runTest {
-    val manifest = JavaDynamicTutorialService.manifest()
+    val manifest = JavaDynamicTutorialService.manifest().getOrThrow()
 
     assertEquals("java", manifest.languageId)
     assertEquals(
@@ -35,7 +35,7 @@ class JavaDynamicTutorialServiceTest {
       manifest.courses.last().prerequisiteCourseIds,
     )
     manifest.courses.forEach { summary ->
-      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId))
+      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId).getOrThrow())
       assertEquals(course.lessons.map { it.lessonId }, summary.lessons.map { it.lessonId })
       assertEquals(
         course.lessons.map { lesson -> lesson.steps.map { it.stepId } },
@@ -46,7 +46,7 @@ class JavaDynamicTutorialServiceTest {
 
   @Test
   fun evaluatesHelloWorldOutput() = runTest {
-    val course = assertNotNull(JavaDynamicTutorialService.course("java-getting-started"))
+    val course = assertNotNull(JavaDynamicTutorialService.course("java-getting-started").getOrThrow())
     val lesson = course.lessons.single()
     val request = DynamicTutorialEvaluationRequest(
       courseId = course.summary.courseId,
@@ -57,15 +57,17 @@ class JavaDynamicTutorialServiceTest {
       standardOutput = "Hello, Java!\n",
     )
 
-    assertTrue(JavaDynamicTutorialService.evaluate(request).completed)
+    assertTrue(JavaDynamicTutorialService.evaluate(request).getOrThrow().completed)
     assertFalse(
-      JavaDynamicTutorialService.evaluate(request.copy(standardOutput = "")).completed,
+      JavaDynamicTutorialService.evaluate(request.copy(standardOutput = "")).getOrThrow().completed,
     )
   }
 
   @Test
   fun exposesMultipleIndependentCollectionLessons() = runTest {
-    val course = assertNotNull(JavaDynamicTutorialService.course("java-generics-collections"))
+    val course = assertNotNull(
+      JavaDynamicTutorialService.course("java-generics-collections").getOrThrow(),
+    )
 
     assertEquals(listOf("typed-list", "score-map"), course.lessons.map { it.lessonId })
     assertEquals("src/CourseScores.java", course.lessons.last().activeFilePath)
@@ -73,7 +75,9 @@ class JavaDynamicTutorialServiceTest {
 
   @Test
   fun acceptsAnyAdditionalCourseName() = runTest {
-    val course = assertNotNull(JavaDynamicTutorialService.course("java-generics-collections"))
+    val course = assertNotNull(
+      JavaDynamicTutorialService.course("java-generics-collections").getOrThrow(),
+    )
     val lesson = course.lessons.first { it.lessonId == "typed-list" }
     val request = DynamicTutorialEvaluationRequest(
       courseId = course.summary.courseId,
@@ -82,7 +86,7 @@ class JavaDynamicTutorialServiceTest {
       workspace = lesson.initialFiles,
     )
 
-    assertFalse(JavaDynamicTutorialService.evaluate(request).completed)
+    assertFalse(JavaDynamicTutorialService.evaluate(request).getOrThrow().completed)
     val customizedWorkspace = lesson.initialFiles.map { file ->
       if (file.path != lesson.activeFilePath) {
         file
@@ -96,13 +100,15 @@ class JavaDynamicTutorialServiceTest {
       }
     }
     assertTrue(
-      JavaDynamicTutorialService.evaluate(request.copy(workspace = customizedWorkspace)).completed,
+      JavaDynamicTutorialService.evaluate(request.copy(workspace = customizedWorkspace))
+        .getOrThrow()
+        .completed,
     )
   }
 
   @Test
   fun exposesMultiFileObjectAndInheritanceLessons() = runTest {
-    val course = assertNotNull(JavaDynamicTutorialService.course("java-object-oriented"))
+    val course = assertNotNull(JavaDynamicTutorialService.course("java-object-oriented").getOrThrow())
 
     assertEquals(
       listOf("student-object", "inheritance-override"),
@@ -122,14 +128,14 @@ class JavaDynamicTutorialServiceTest {
           runExecuted = true,
           standardOutput = "旺财：汪\n",
         ),
-      ).completed,
+      ).getOrThrow().completed,
     )
   }
 
   @Test
   fun allTutorialExamplesCompileWithThePublishedJavaLanguageService() = runTest {
-    JavaDynamicTutorialService.manifest().courses.forEach { summary ->
-      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId))
+    JavaDynamicTutorialService.manifest().getOrThrow().courses.forEach { summary ->
+      val course = assertNotNull(JavaDynamicTutorialService.course(summary.courseId).getOrThrow())
       course.lessons.forEach { lesson ->
         val activeSource = lesson.initialFiles.single { it.path == lesson.activeFilePath }.source
         val entryPosition = activeSource.indexOf("public static void main")
@@ -146,7 +152,7 @@ class JavaDynamicTutorialServiceTest {
               position = entryPosition,
             ),
           ),
-        )
+        ).getOrThrow()
 
         assertNotNull(
           result.program,

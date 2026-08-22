@@ -12,9 +12,12 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicSymbolDefinition
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.decodeNpmJsResult
 import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_javascript
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -357,7 +360,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       workspace,
       MAIN_FILE_PATH,
       mainSource.lastIndexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val location = assertNotNull(definition).definition
     assertEquals("models/student.js", location.filePath)
@@ -387,7 +390,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       mainSource.length,
       explicit = false,
-    )
+    ).getOrThrow()
 
     assertTrue(assertNotNull(completion).options.any { item -> item.label == "average" })
   }
@@ -410,7 +413,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       workspace,
       "models/student.js",
       modelSource.indexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val locations = assertNotNull(result).references
     assertEquals(3, locations.size)
@@ -444,7 +447,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
         "models/student.js",
         modelSource.indexOf("Student") + 2,
         "Learner",
-      ),
+      ).getOrThrow(),
     )
 
     assertTrue(result.isSuccess)
@@ -480,7 +483,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
         "models/student.js",
         modelSource.indexOf("Student") + 2,
         "Person",
-      ),
+      ).getOrThrow(),
     )
 
     assertTrue(result.isSuccess)
@@ -512,7 +515,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
         MAIN_FILE_PATH,
         mainSource.lastIndexOf("Learner") + 2,
         "Person",
-      ),
+      ).getOrThrow(),
     )
 
     assertTrue(result.isSuccess)
@@ -540,7 +543,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       workspace,
       MAIN_FILE_PATH,
       mainSource.indexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val location = assertNotNull(definition).definition
     assertEquals("models/student.js", location.filePath)
@@ -559,7 +562,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       workspaceOf(MAIN_FILE_PATH to source),
       MAIN_FILE_PATH,
       source.lastIndexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val location = assertNotNull(definition).definition
     assertEquals(MAIN_FILE_PATH, location.filePath)
@@ -582,7 +585,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
         workspace = workspace,
         entry = DynamicProgramEntry(MAIN_FILE_PATH),
       ),
-    )
+    ).getOrThrow()
 
     val program = assertNotNull(result.program)
     assertEquals(3, program.modules.size)
@@ -612,7 +615,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       workspace,
       MAIN_FILE_PATH,
       mainSource.lastIndexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val location = assertNotNull(definition).definition
     assertEquals(MAIN_FILE_PATH, location.filePath)
@@ -629,7 +632,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       ),
     )
 
-    val targets = JavaScriptDynamicLanguageService.runTargets(workspace, "main.js")
+    val targets = JavaScriptDynamicLanguageService.runTargets(workspace, "main.js").getOrThrow()
 
     assertEquals(1, targets.size)
     assertEquals("main.js", targets.single().entry.filePath)
@@ -655,7 +658,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       describedMethods.toSet(),
     )
 
-    val fileIcon = Json.decodeFromString<DynamicLanguageIcon>(
+    val fileIcon = decodeDispatcherResult<DynamicLanguageIcon>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
         method = "fileIcon",
         argumentsJson = "[]",
@@ -666,7 +669,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(3, fileIcon.paths.size)
     assertTrue(fileIcon.paths.all { path -> path.pathData.isNotBlank() })
 
-    val highlightResult = Json.decodeFromString<DynamicHighlightResult>(
+    val highlightResult = decodeDispatcherResult<DynamicHighlightResult>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
         method = "highlight",
         argumentsJson =
@@ -675,7 +678,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     )
     assertTrue(highlightResult.spans.stylesFor("const answer = 42", "42").contains("tok-number"))
 
-    val completion = Json.decodeFromString<DynamicCompletionResult?>(
+    val completion = decodeDispatcherResult<DynamicCompletionResult?>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
         method = "complete",
         argumentsJson = """[{"files":[{"path":"main.js","source":"co"}]},"main.js",2,false]""",
@@ -686,7 +689,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertTrue(completion.options.any { it.label == "const" })
 
     val definitionSource = "const value = 1; console.log(value)"
-    val definition = Json.decodeFromString<DynamicSymbolDefinition?>(
+    val definition = decodeDispatcherResult<DynamicSymbolDefinition?>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
         method = "definition",
         argumentsJson = """[{"files":[{"path":"main.js","source":"$definitionSource"}]},"main.js",${definitionSource.lastIndexOf("value") + 2}]""",
@@ -701,6 +704,15 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     const val MAIN_FILE_PATH = "main.js"
     const val SERVICE_ID =
       "com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService"
+  }
+
+  /** 将生成分发器的稳定 NpmJsResult 信封还原为测试关注的业务值。 */
+  private inline fun <reified T> decodeDispatcherResult(envelopeJson: String): T {
+    return decodeNpmJsResult(
+      envelopeJson = envelopeJson,
+      decodeValue = { element -> Json.decodeFromJsonElement<T>(element) },
+      failureFactory = { message -> NpmJsServiceInvocationException(message) },
+    ).getOrThrow()
   }
 
   /** 把既有单文件断言包装为新的工作区协议，测试关注点仍保持在原语义能力。 */
@@ -718,6 +730,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
   /** 调用工作区高亮协议。 */
   private suspend fun highlight(source: String): DynamicHighlightResult {
     return JavaScriptDynamicLanguageService.highlight(singleFileWorkspace(source), MAIN_FILE_PATH)
+      .getOrThrow()
   }
 
   /** 调用工作区补全协议。 */
@@ -731,7 +744,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       position,
       explicit,
-    )
+    ).getOrThrow()
   }
 
   /** 调用工作区定义查询协议。 */
@@ -740,7 +753,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       singleFileWorkspace(source),
       MAIN_FILE_PATH,
       position,
-    )
+    ).getOrThrow()
   }
 
   /** 调用工作区引用查询协议。 */
@@ -749,7 +762,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       singleFileWorkspace(source),
       MAIN_FILE_PATH,
       position,
-    )
+    ).getOrThrow()
 
   /** 调用工作区重命名协议。 */
   private suspend fun rename(source: String, position: Int, newName: String) =
@@ -758,7 +771,7 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       position,
       newName,
-    )
+    ).getOrThrow()
 
   /** 返回与指定源码片段完全重合的样式集合，避免测试依赖整棵语法树的节点数量。 */
   private fun List<DynamicHighlightSpan>.stylesFor(

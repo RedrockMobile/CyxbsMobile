@@ -1,5 +1,7 @@
 package com.cyxbs.functions.code.tutorials
 
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 import com.cyxbs.functions.code.tutorials.internal.validated
 import com.cyxbs.functions.code.tutorials.internal.validatedAgainst
 import com.cyxbs.functions.code.tutorials.internal.validatedFor
@@ -27,10 +29,11 @@ class DynamicTutorialSession internal constructor(
   private var isClosed = false
 
   /** 首次读取并验证侧边栏课程路径目录，后续调用复用不可变缓存。 */
-  override suspend fun manifest(): DynamicTutorialManifest {
-    return serviceMutex.withLock {
+  override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> = npmJsCatching {
+    serviceMutex.withLock {
       ensureOpen()
-      cachedManifest ?: service.manifest().validatedFor(tutorial).also { cachedManifest = it }
+      cachedManifest ?: service.manifest().getOrThrow().validatedFor(tutorial)
+        .also { cachedManifest = it }
     }
   }
 
@@ -39,12 +42,13 @@ class DynamicTutorialSession internal constructor(
    *
    * Manifest 未声明的 ID 直接返回 `null`；已声明课程若缺少正文或返回了不同摘要，则视为 npm 包协议损坏。
    */
-  override suspend fun course(courseId: String): DynamicTutorialCourse? {
-    val expectedSummary = manifest().courses.firstOrNull { it.courseId == courseId } ?: return null
-    return serviceMutex.withLock {
+  override suspend fun course(courseId: String): NpmJsResult<DynamicTutorialCourse?> = npmJsCatching {
+    val expectedSummary = manifest().getOrThrow().courses
+      .firstOrNull { it.courseId == courseId } ?: return@npmJsCatching null
+    serviceMutex.withLock {
       ensureOpen()
       cachedCourses[courseId] ?: run {
-        val loaded = service.course(courseId) ?: throw DynamicTutorialProtocolException(
+        val loaded = service.course(courseId).getOrThrow() ?: throw DynamicTutorialProtocolException(
           "Tutorial package does not contain declared course '$courseId'.",
         )
         loaded.validatedAgainst(expectedSummary).also { cachedCourses[courseId] = it }
@@ -55,21 +59,21 @@ class DynamicTutorialSession internal constructor(
   /** 串行调用教程 Runtime，并限制动态反馈大小。 */
   override suspend fun evaluate(
     request: DynamicTutorialEvaluationRequest,
-  ): DynamicTutorialEvaluationResult {
-    return serviceMutex.withLock {
+  ): NpmJsResult<DynamicTutorialEvaluationResult> = npmJsCatching {
+    serviceMutex.withLock {
       ensureOpen()
-      service.evaluate(request).validated()
+      service.evaluate(request).getOrThrow().validated()
     }
   }
 
   /** 幂等释放教程 JavaScript Runtime 与 npm 入口租约；释放后不再允许读取缓存。 */
-  override suspend fun close() {
+  override suspend fun close(): NpmJsResult<Unit> = npmJsCatching {
     serviceMutex.withLock {
-      if (isClosed) return
+      if (isClosed) return@withLock
       isClosed = true
       cachedManifest = null
       cachedCourses.clear()
-      service.close()
+      service.close().getOrThrow()
     }
   }
 

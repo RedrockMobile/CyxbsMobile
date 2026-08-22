@@ -3,6 +3,8 @@ package com.cyxbs.functions.code.npm.service.test
 import com.cyxbs.functions.code.npm.bridge.NpmJsBridgeContext
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeImpl
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgePackageScope
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsHostBridgeExampleRequest
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsHostBridgeExampleResponse
 import com.cyxbs.functions.code.npm.service.test.js.bridge.NpmJsServiceTestHostBridge
@@ -24,11 +26,13 @@ internal class NpmJsServiceTestHostBridgeImpl(
   /** 处理 JS 回调，并把宿主上下文与计算结果返回给 JS Service。 */
   override suspend fun execute(
     request: NpmJsHostBridgeExampleRequest,
-  ): NpmJsHostBridgeExampleResponse = NpmJsHostBridgeExampleResponse(
-    entryPackageName = context.entryPackageName,
-    hostMessage = "Host 已收到 JS 消息：${request.input}",
-    hostCalculatedValue = request.value * HOST_MULTIPLIER,
-  )
+  ): NpmJsResult<NpmJsHostBridgeExampleResponse> = npmJsCatching {
+    NpmJsHostBridgeExampleResponse(
+      entryPackageName = context.entryPackageName,
+      hostMessage = "Host 已收到 JS 消息：${request.input}",
+      hostCalculatedValue = request.value * HOST_MULTIPLIER,
+    )
+  }
 
   private companion object {
     const val HOST_MULTIPLIER = 11

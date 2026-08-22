@@ -3,6 +3,8 @@ package com.cyxbs.functions.code.npm.storage
 import com.cyxbs.functions.code.npm.bridge.NpmJsBridgeContext
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgeImpl
 import com.cyxbs.functions.code.npm.js.bridge.NpmJsBridgePackageScope
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
 
 /**
  * npm Storage 的端上桥实现。
@@ -17,6 +19,7 @@ internal class NpmStorageBridgeImpl(
   private val host: NpmStorageHost = NpmStorageHost.Default
 
   /** 将生成 dispatcher 解码后的请求转交共享宿主。 */
-  override suspend fun invoke(requestJson: String): String =
+  override suspend fun invoke(requestJson: String): NpmJsResult<String> = npmJsCatching {
     host.handle(context.entryPackageName, requestJson)
+  }
 }

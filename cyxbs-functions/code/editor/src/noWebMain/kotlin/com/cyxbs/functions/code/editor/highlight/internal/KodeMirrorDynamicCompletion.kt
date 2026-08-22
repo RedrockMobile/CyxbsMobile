@@ -39,9 +39,9 @@ internal fun kodeMirrorDynamicCompletionExtension(
           filePath = currentFilePath,
           position = context.pos.value,
           explicit = context.explicit,
-        )?.toKodeMirrorResult()
+        ).getOrThrow()?.toKodeMirrorResult()
       } catch (_: NpmJsServiceMethodNotImplementedException) {
-        // 旧动态包缺少 complete 时保留基础编辑能力，升级包后即可自动获得补全。
+        // 当前动态包缺少 complete 时保留基础编辑能力，切换到提供该能力的包后即可获得补全。
         null
       }
     },

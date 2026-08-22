@@ -12,6 +12,7 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,9 +27,9 @@ class DynamicTutorialSessionTest {
     val service = FakeService()
     val session = session(service)
 
-    repeat(2) { session.manifest() }
-    repeat(2) { session.course("basics") }
-    assertNull(session.course("unknown"))
+    repeat(2) { session.manifest().getOrThrow() }
+    repeat(2) { session.course("basics").getOrThrow() }
+    assertNull(session.course("unknown").getOrThrow())
 
     assertEquals(1, service.manifestCalls)
     assertEquals(1, service.courseCalls)
@@ -40,13 +41,13 @@ class DynamicTutorialSessionTest {
   @Test
   fun rejectsManifestWithMismatchedLanguageOrDuplicateCourse() = runTest {
     val mismatched = FakeService(manifest = validManifest().copy(languageId = "kotlin"))
-    assertFailsWith<DynamicTutorialProtocolException> { session(mismatched).manifest() }
+    assertFailsWith<DynamicTutorialProtocolException> { session(mismatched).manifest().getOrThrow() }
 
     val summary = validSummary()
     val duplicate = FakeService(
       manifest = DynamicTutorialManifest("java", listOf(summary, summary)),
     )
-    assertFailsWith<DynamicTutorialProtocolException> { session(duplicate).manifest() }
+    assertFailsWith<DynamicTutorialProtocolException> { session(duplicate).manifest().getOrThrow() }
   }
 
   @Test
@@ -55,14 +56,14 @@ class DynamicTutorialSessionTest {
       lessons = listOf(validLesson().copy(activeFilePath = "Missing.java")),
     )
     assertFailsWith<DynamicTutorialProtocolException> {
-      session(FakeService(course = missingActiveFile)).course("basics")
+      session(FakeService(course = missingActiveFile)).course("basics").getOrThrow()
     }
 
     val mismatchedSummary = validCourse().copy(
       summary = validSummary().copy(title = "不同标题"),
     )
     assertFailsWith<DynamicTutorialProtocolException> {
-      session(FakeService(course = mismatchedSummary)).course("basics")
+      session(FakeService(course = mismatchedSummary)).course("basics").getOrThrow()
     }
   }
 
@@ -76,7 +77,7 @@ class DynamicTutorialSessionTest {
       course = DynamicTutorialCourse(summary, listOf(validLesson())),
     )
 
-    assertFailsWith<DynamicTutorialProtocolException> { session(service).course("basics") }
+    assertFailsWith<DynamicTutorialProtocolException> { session(service).course("basics").getOrThrow() }
   }
 
   @Test
@@ -90,14 +91,14 @@ class DynamicTutorialSessionTest {
       ),
     )
     assertFailsWith<DynamicTutorialProtocolException> {
-      session(FakeService(course = unsafeCourse)).course("basics")
+      session(FakeService(course = unsafeCourse)).course("basics").getOrThrow()
     }
 
     val oversizedFeedback = FakeService(
       evaluation = DynamicTutorialEvaluationResult(false, "x".repeat(64 * 1024 + 1)),
     )
     assertFailsWith<DynamicTutorialProtocolException> {
-      session(oversizedFeedback).evaluate(evaluationRequest())
+      session(oversizedFeedback).evaluate(evaluationRequest()).getOrThrow()
     }
   }
 
@@ -106,8 +107,8 @@ class DynamicTutorialSessionTest {
     val session = session(FakeService())
     session.close()
 
-    assertFailsWith<IllegalStateException> { session.manifest() }
-    assertFailsWith<IllegalStateException> { session.evaluate(evaluationRequest()) }
+    assertFailsWith<IllegalStateException> { session.manifest().getOrThrow() }
+    assertFailsWith<IllegalStateException> { session.evaluate(evaluationRequest()).getOrThrow() }
   }
 
   /** 可计数的最小动态教程服务。 */
@@ -120,22 +121,23 @@ class DynamicTutorialSessionTest {
     var courseCalls = 0
     var closeCalls = 0
 
-    override suspend fun manifest(): DynamicTutorialManifest {
+    override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> {
       manifestCalls++
-      return manifest
+      return NpmJsResult.success(manifest)
     }
 
-    override suspend fun course(courseId: String): DynamicTutorialCourse? {
+    override suspend fun course(courseId: String): NpmJsResult<DynamicTutorialCourse?> {
       courseCalls++
-      return course
+      return NpmJsResult.success(course)
     }
 
     override suspend fun evaluate(
       request: DynamicTutorialEvaluationRequest,
-    ): DynamicTutorialEvaluationResult = evaluation
+    ): NpmJsResult<DynamicTutorialEvaluationResult> = NpmJsResult.success(evaluation)
 
-    override suspend fun close() {
+    override suspend fun close(): NpmJsResult<Unit> {
       closeCalls++
+      return NpmJsResult.success(Unit)
     }
   }
 

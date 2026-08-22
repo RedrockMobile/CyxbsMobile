@@ -12,9 +12,12 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.lezer.LezerSyntaxHighlighterSession
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsServiceInvocationException
+import com.cyxbs.functions.code.npm.js.bridge.decodeNpmJsResult
 import com.cyxbs.generated.npmjs.__cyxbsNpmJsServiceInitialize__cyxbs_mobile_language_java
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -272,7 +275,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       workspaceOf(MAIN_FILE_PATH to source),
       MAIN_FILE_PATH,
       source.lastIndexOf("error") + 2,
-    )
+    ).getOrThrow()
 
     assertNull(definition)
   }
@@ -302,7 +305,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       workspace,
       MAIN_FILE_PATH,
       mainSource.lastIndexOf("Student") + 2,
-    )
+    ).getOrThrow()
 
     val location = assertNotNull(definition).definition
     assertEquals("school/model/Student.java", location.filePath)
@@ -337,7 +340,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       mainSource.indexOf("student.av") + "student.av".length,
       explicit = false,
-    )
+    ).getOrThrow()
 
     assertTrue(assertNotNull(completion).options.any { item -> item.label == "average" })
   }
@@ -368,12 +371,12 @@ class JavaDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       completionPosition,
       explicit = false,
-    )
+    ).getOrThrow()
     val definition = JavaDynamicLanguageService.definition(
       workspace,
       MAIN_FILE_PATH,
       mainSource.indexOf("study") + 2,
-    )
+    ).getOrThrow()
 
     assertTrue(assertNotNull(completion).options.any { item -> item.label == "study" })
     assertEquals("school/model/Person.java", assertNotNull(definition).definition.filePath)
@@ -536,7 +539,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       workspace,
       MAIN_FILE_PATH,
       mainSource.lastIndexOf("score") + 2,
-    )
+    ).getOrThrow()
 
     assertEquals(studentSource.indexOf("score()"), assertNotNull(definition).definition.range.from)
   }
@@ -577,7 +580,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       mainSource.indexOf("outer.ba") + "outer.ba".length,
       explicit = false,
-    )
+    ).getOrThrow()
 
     assertNull(completion)
   }
@@ -603,13 +606,13 @@ class JavaDynamicLanguageServiceDispatcherTest {
       workspace,
       "school/model/Student.java",
       studentSource.indexOf("Student") + 2,
-    )
+    ).getOrThrow()
     val renamed = JavaDynamicLanguageService.rename(
       workspace,
       "school/model/Student.java",
       studentSource.indexOf("Student") + 2,
       "Learner",
-    )
+    ).getOrThrow()
 
     assertEquals(3, assertNotNull(references).references.size)
     assertTrue(assertNotNull(renamed).isSuccess)
@@ -633,7 +636,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       source.indexOf("Student") + 2,
       "Learner",
-    )
+    ).getOrThrow()
     val edits = assertNotNull(renamed).edits
 
     assertEquals(4, edits.size)
@@ -651,7 +654,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       filePath,
       source.indexOf("Student") + 2,
       "Learner",
-    )
+    ).getOrThrow()
 
     val renamed = assertNotNull(result)
     assertTrue(renamed.isSuccess)
@@ -713,7 +716,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
       ),
     )
 
-    val targets = JavaDynamicLanguageService.runTargets(workspace, "Main.java")
+    val targets = JavaDynamicLanguageService.runTargets(workspace, "Main.java").getOrThrow()
 
     assertEquals(listOf("lesson.Counter.main", "lesson.Main.main"), targets.map { it.displayName }.sorted())
     assertTrue(targets.all { target -> target.location != null && target.entry.position != null })
@@ -734,9 +737,9 @@ class JavaDynamicLanguageServiceDispatcherTest {
       entry = DynamicProgramEntry("CacheMetrics.java", position = 32),
     )
 
-    val first = JavaDynamicLanguageService.compile(request(1))
-    val exact = JavaDynamicLanguageService.compile(request(1))
-    val changed = JavaDynamicLanguageService.compile(request(2))
+    val first = JavaDynamicLanguageService.compile(request(1)).getOrThrow()
+    val exact = JavaDynamicLanguageService.compile(request(1)).getOrThrow()
+    val changed = JavaDynamicLanguageService.compile(request(2)).getOrThrow()
 
     assertNotNull(first.program)
     assertTrue(first.metrics?.cacheMode != DynamicCompilationCacheMode.EXACT)
@@ -757,7 +760,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
         workspace = DynamicLanguageWorkspace(files),
         entry = DynamicProgramEntry(files.first().path),
       ),
-    )
+    ).getOrThrow()
 
     assertNull(result.program)
     assertEquals("java.compilation.too_many_files", result.diagnostics.single().code)
@@ -774,7 +777,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
         ),
         entry = DynamicProgramEntry("Oversized.java"),
       ),
-    )
+    ).getOrThrow()
 
     assertNull(result.program)
     assertEquals("java.compilation.source_too_large", result.diagnostics.single().code)
@@ -797,13 +800,13 @@ class JavaDynamicLanguageServiceDispatcherTest {
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
     assertEquals(_JavaDynamicLanguageServiceNpmJsDispatcher.methodNames, describedMethods.toSet())
 
-    val icon = Json.decodeFromString<DynamicLanguageIcon>(
+    val icon = decodeDispatcherResult<DynamicLanguageIcon>(
       _JavaDynamicLanguageServiceNpmJsDispatcher.invoke("fileIcon", "[]"),
     )
     assertEquals(24F, icon.viewportWidth)
     assertTrue(icon.paths.all { path -> path.pathData.isNotBlank() })
 
-    val highlighted = Json.decodeFromString<DynamicHighlightResult>(
+    val highlighted = decodeDispatcherResult<DynamicHighlightResult>(
       _JavaDynamicLanguageServiceNpmJsDispatcher.invoke(
         "highlight",
         """[{"files":[{"path":"Main.java","source":"class Main { int answer = 42; }"}]},"Main.java"]""",
@@ -811,7 +814,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
     )
     assertTrue(highlighted.spans.stylesFor("class Main { int answer = 42; }", "42").contains("tok-number"))
 
-    val completed = Json.decodeFromString<DynamicCompletionResult?>(
+    val completed = decodeDispatcherResult<DynamicCompletionResult?>(
       _JavaDynamicLanguageServiceNpmJsDispatcher.invoke(
         "complete",
         """[{"files":[{"path":"Main.java","source":"ret"}]},"Main.java",3,false]""",
@@ -823,6 +826,15 @@ class JavaDynamicLanguageServiceDispatcherTest {
   private companion object {
     const val MAIN_FILE_PATH = "Main.java"
     const val SERVICE_ID = "com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService"
+  }
+
+  /** 将生成分发器的稳定 NpmJsResult 信封还原为测试关注的业务值。 */
+  private inline fun <reified T> decodeDispatcherResult(envelopeJson: String): T {
+    return decodeNpmJsResult(
+      envelopeJson = envelopeJson,
+      decodeValue = { element -> Json.decodeFromJsonElement<T>(element) },
+      failureFactory = { message -> NpmJsServiceInvocationException(message) },
+    ).getOrThrow()
   }
 
   /** 构造单文件工作区。 */
@@ -839,7 +851,7 @@ class JavaDynamicLanguageServiceDispatcherTest {
 
   /** 调用单文件高亮。 */
   private suspend fun highlight(source: String): DynamicHighlightResult {
-    return JavaDynamicLanguageService.highlight(singleFileWorkspace(source), MAIN_FILE_PATH)
+    return JavaDynamicLanguageService.highlight(singleFileWorkspace(source), MAIN_FILE_PATH).getOrThrow()
   }
 
   /** 调用单文件补全。 */
@@ -853,20 +865,21 @@ class JavaDynamicLanguageServiceDispatcherTest {
       MAIN_FILE_PATH,
       position,
       explicit,
-    )
+    ).getOrThrow()
   }
 
   /** 调用单文件定义查询。 */
   private suspend fun definition(source: String, position: Int) =
-    JavaDynamicLanguageService.definition(singleFileWorkspace(source), MAIN_FILE_PATH, position)
+    JavaDynamicLanguageService.definition(singleFileWorkspace(source), MAIN_FILE_PATH, position).getOrThrow()
 
   /** 调用单文件引用查询。 */
   private suspend fun references(source: String, position: Int) =
-    JavaDynamicLanguageService.references(singleFileWorkspace(source), MAIN_FILE_PATH, position)
+    JavaDynamicLanguageService.references(singleFileWorkspace(source), MAIN_FILE_PATH, position).getOrThrow()
 
   /** 调用单文件安全重命名。 */
   private suspend fun rename(source: String, position: Int, newName: String) =
     JavaDynamicLanguageService.rename(singleFileWorkspace(source), MAIN_FILE_PATH, position, newName)
+      .getOrThrow()
 
   /** 返回与指定源码文本完全重合的高亮样式。 */
   private fun List<DynamicHighlightSpan>.stylesFor(source: String, text: String): List<String> {

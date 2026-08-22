@@ -12,9 +12,9 @@ npmJsPackage {
 
 kotlin {
   sourceSets {
-    jsMain.dependencies {
+    commonMain.dependencies {
       implementation(libs.kotlinx.coroutines)
-      // JSON 扩展的公开签名包含 Json，必须向动态业务包暴露编译依赖。
+      // 结果信封与 JSON 扩展的公开签名包含序列化类型，所有目标都需要该协议依赖。
       api(libs.kotlinx.serialization)
     }
     jsTest.dependencies {

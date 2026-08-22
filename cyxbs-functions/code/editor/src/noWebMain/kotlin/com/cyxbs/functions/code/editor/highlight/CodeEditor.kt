@@ -78,7 +78,6 @@ import com.monkopedia.kodemirror.view.editorContentStyle
 import com.monkopedia.kodemirror.view.editorTheme
 import com.monkopedia.kodemirror.view.gutters
 import com.monkopedia.kodemirror.view.rememberEditorSession
-import kotlinx.serialization.SerializationException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -199,9 +198,8 @@ class CodeEditorState internal constructor(
    * 返回值可以指向其他文件；调用方应先切换文档，再调用 [selectRange] 选中定义。
    * 动态服务尚未加载或光标不在可索引符号上时返回 null。
    *
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包不支持定义查询。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包不支持定义查询。
    * @throws NpmJsServiceInvocationException JavaScript 服务执行失败。
-   * @throws SerializationException 动态协议编码或解码失败。
    * @throws CancellationException 调用协程被取消。
    * @throws IllegalStateException 请求期间编辑器源码发生变化。
    * @throws IllegalArgumentException 动态包返回了越界定义区间。
@@ -209,7 +207,6 @@ class CodeEditorState internal constructor(
   @Throws(
     NpmJsServiceMethodNotImplementedException::class,
     NpmJsServiceInvocationException::class,
-    SerializationException::class,
     CancellationException::class,
     IllegalStateException::class,
     IllegalArgumentException::class,
@@ -223,7 +220,7 @@ class CodeEditorState internal constructor(
       workspace = requestedWorkspace,
       filePath = requestedFilePath,
       position = cursorPosition,
-    ) ?: return null
+    ).getOrThrow() ?: return null
     checkContextUnchanged(requestedFilePath, source)
     definition.definition.requireValidFor(requestedWorkspace)
     return definition
@@ -232,9 +229,8 @@ class CodeEditorState internal constructor(
   /**
    * 查询主光标所在符号在工作区中的全部引用，结果不包含定义本身。
    *
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包不支持引用查询。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包不支持引用查询。
    * @throws NpmJsServiceInvocationException JavaScript 服务执行失败。
-   * @throws SerializationException 动态协议编码或解码失败。
    * @throws CancellationException 调用协程被取消。
    * @throws IllegalStateException 请求期间编辑器源码发生变化。
    * @throws IllegalArgumentException 动态包返回了越界引用区间。
@@ -242,7 +238,6 @@ class CodeEditorState internal constructor(
   @Throws(
     NpmJsServiceMethodNotImplementedException::class,
     NpmJsServiceInvocationException::class,
-    SerializationException::class,
     CancellationException::class,
     IllegalStateException::class,
     IllegalArgumentException::class,
@@ -256,7 +251,7 @@ class CodeEditorState internal constructor(
       workspace = requestedWorkspace,
       filePath = requestedFilePath,
       position = cursorPosition,
-    ) ?: return null
+    ).getOrThrow() ?: return null
     checkContextUnchanged(requestedFilePath, source)
     references.symbol.definition.requireValidFor(requestedWorkspace)
     references.references.forEach { location -> location.requireValidFor(requestedWorkspace) }
@@ -269,9 +264,8 @@ class CodeEditorState internal constructor(
    * 本方法不直接修改任何文件。调用方应将 [DynamicRenameResult.edits] 与文件路径修改原子应用；
    * 当前文档的文本部分可用 [applyTextEdits] 更新，其他文件与路径则更新自身的工作区存储。
    *
-   * @throws NpmJsServiceMethodNotImplementedException 旧语言包不支持重命名。
+   * @throws NpmJsServiceMethodNotImplementedException 当前语言包不支持重命名。
    * @throws NpmJsServiceInvocationException JavaScript 服务执行失败。
-   * @throws SerializationException 动态协议编码或解码失败。
    * @throws CancellationException 调用协程被取消。
    * @throws IllegalStateException 请求期间编辑器源码发生变化。
    * @throws IllegalArgumentException 动态包返回了越界、重叠或乱序文本修改。
@@ -279,7 +273,6 @@ class CodeEditorState internal constructor(
   @Throws(
     NpmJsServiceMethodNotImplementedException::class,
     NpmJsServiceInvocationException::class,
-    SerializationException::class,
     CancellationException::class,
     IllegalStateException::class,
     IllegalArgumentException::class,
@@ -294,7 +287,7 @@ class CodeEditorState internal constructor(
       filePath = requestedFilePath,
       position = cursorPosition,
       newName = newName,
-    ) ?: return null
+    ).getOrThrow() ?: return null
     checkContextUnchanged(requestedFilePath, source)
     result.symbol.definition.requireValidFor(requestedWorkspace)
     if (result.isSuccess) {
