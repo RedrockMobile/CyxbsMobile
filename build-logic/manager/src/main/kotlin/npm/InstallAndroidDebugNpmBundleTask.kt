@@ -21,8 +21,8 @@ import javax.inject.Inject
  * 把 [PrepareDebugNpmBundleTask] 生成的统一本地 npm 依赖图安装到 Android 调试应用。
  *
  * 本任务不重新打包、不访问 Registry，也不自行解析项目依赖。它会先完整校验入口清单与共享源，
- * 再停止应用，并把清单中的全部 tgz 原子覆盖到 App 私有 debug 目录。稳定包也必须安装，用于在
- * 本地改动被撤销后覆盖设备上残留的旧 debug 包。安装完成后通过 launcher intent 重启应用。
+ * 再停止应用，并把清单中的全部精确版本 tgz 原子写入 App 私有 debug 目录。不同入口所需的共同
+ * 依赖版本可以并存，安装完成后通过 launcher intent 重启应用。
  */
 @DisableCachingByDefault(because = "任务会修改已连接 Android 设备的 App 私有目录")
 abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
@@ -74,7 +74,7 @@ abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
     val deviceArguments = selectedDeviceArguments()
     runAdb(adb, deviceArguments, "shell", "am", "force-stop", appId)
     archives.forEach { (packageInfo, archive) ->
-      installArchive(adb, deviceArguments, appId, packageInfo.name, archive)
+      installArchive(adb, deviceArguments, appId, packageInfo, archive)
     }
     runAdb(
       adb,
@@ -121,17 +121,9 @@ abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
     }
   }
 
-  /** 包名、版本与固定相对路径必须一致，避免手工清单把任意文件推入应用目录。 */
+  /** 包名、版本与版本化相对路径必须一致，避免手工清单把任意文件推入应用目录。 */
   private fun validatePackage(packageInfo: DebugNpmBundlePackage) {
-    if (!PACKAGE_NAME.matches(packageInfo.name)) {
-      throw GradleException("Invalid npm package name '${packageInfo.name}' in debug manifest.")
-    }
-    if (!LOCAL_VERSION.matches(packageInfo.version)) {
-      throw GradleException(
-        "Invalid npm package version '${packageInfo.version}' for '${packageInfo.name}'.",
-      )
-    }
-    val expectedPath = archiveRelativePath(packageInfo.name)
+    val expectedPath = debugNpmArchiveRelativePath(packageInfo.name, packageInfo.version)
     if (packageInfo.relativeArchivePath != expectedPath) {
       throw GradleException(
         "Unexpected debug archive path '${packageInfo.relativeArchivePath}' for '${packageInfo.name}'.",
@@ -144,12 +136,12 @@ abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
     adb: File,
     deviceArguments: List<String>,
     applicationId: String,
-    packageName: String,
+    packageInfo: DebugNpmBundlePackage,
     archive: File,
   ) {
-    val safeName = packageName.replace('@', '_').replace('/', '_')
+    val safeName = packageInfo.name.replace('@', '_').replace('/', '_')
     val temporary = "/data/local/tmp/cyxbs-npm-$safeName-${archive.lastModified()}.tgz"
-    val destination = "$DEVICE_DEBUG_DIRECTORY/${archiveRelativePath(packageName)}"
+    val destination = "$DEVICE_DEBUG_DIRECTORY/${packageInfo.relativeArchivePath}"
     val destinationParent = destination.substringBeforeLast('/')
     runAdb(adb, deviceArguments, "push", archive.absolutePath, temporary)
     try {
@@ -186,16 +178,6 @@ abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
       )
     } finally {
       runAdbIgnoringFailure(adb, deviceArguments, "shell", "rm", "-f", temporary)
-    }
-  }
-
-  /** npm 包名对应设备与共享源中的唯一固定相对路径。 */
-  private fun archiveRelativePath(packageName: String): String {
-    val segments = packageName.split('/')
-    return if (segments.size == 1) {
-      "${segments[0]}.tgz"
-    } else {
-      "${segments[0]}/${segments[1]}.tgz"
     }
   }
 
@@ -249,10 +231,6 @@ abstract class InstallAndroidDebugNpmBundleTask : DefaultTask() {
 
   private companion object {
     const val DEVICE_DEBUG_DIRECTORY = "cache/cyxbs-code/npm/debug"
-    val PACKAGE_NAME = Regex("""(?:@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*""")
-    val LOCAL_VERSION = Regex(
-      """(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-debug\.\d{14})?""",
-    )
     val APPLICATION_ID = Regex("""[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+""")
   }
 }

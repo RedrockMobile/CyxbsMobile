@@ -26,9 +26,11 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Base64
 import javax.inject.Inject
 
 /**
@@ -45,10 +47,13 @@ import javax.inject.Inject
  *                    │
  *          与 registry 稳定版逐包比较 SRI
  *                    │
- *                    ├── 不同：生成 debug 坐标 tgz
- *                    └── 一致：生成稳定坐标 tgz
+ *                    ├── 一致：生成稳定坐标 tgz
+ *                    └── 不同：与本地最新 debug tgz 比较
+ *                                  │
+ *                                  ├── 一致：复用已有 debug 坐标
+ *                                  └── 不同：生成新时间戳 debug 坐标
  *                              │
- *        按 npm 包名原子汇总到 root/build/npm/debug-source
+ *      按 npm 包名与精确版本原子汇总到 root/build/npm/debug-source
  *                              │
  *              ├── Desktop：直接读取，不复制
  *              └── Android 安装任务：按入口清单注入同一批包并重启 App
@@ -56,11 +61,12 @@ import javax.inject.Inject
  *
  * debug 版本格式为 `<下一稳定补丁版本>-debug.<yyyyMMddHHmmss>`，时间固定使用上海时区。同次任务
  * 的入口包、依赖包与可选 Runtime 共用一个时间戳。变化检测始终使用稳定版本号和已经解析的下级
- * 精确坐标计算候选 tgz 的 SRI，时间戳只在已确认内容或依赖坐标变化后写入。这样依赖代码变化会先
+ * 精确坐标计算候选 tgz 的 SRI；Registry 不一致时还会以本地最新 debug 版本重新计算并比较实际
+ * 归档 SRI，时间戳只在内容或依赖坐标相对本地最新版本也发生变化后写入。这样依赖代码变化会先
  * 生成新依赖版本，再自然推动上层包生成引用该版本的新产物。静态 npm 包不配置 Runtime 输入，仍
  * 复用相同的版本比较链路。根项目调试源会包含入口可达的全部本地包；其中内容与 Registry 一致的
- * 包保留稳定坐标，发生变化的包才使用 debug 坐标。Android 设备旧源不参与检测，有变化时直接
- * 原子覆盖固定路径；进入正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
+ * 包保留稳定坐标，发生变化的包才使用 debug 坐标。共享源和 Android 设备都按精确版本保存，
+ * 不同入口需要的历史版本可以并存；进入正常 npm 包池后的归档仍遵循包池 14 天可达性 GC。
  */
 @DisableCachingByDefault(because = "任务需要查询 Registry，并修改多个入口共享的本地调试源")
 abstract class PrepareDebugNpmBundleTask : DefaultTask() {
@@ -217,6 +223,15 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
       )
     }
 
+    findReusableLocalDebugArchive(
+      packageName = runtimeName,
+      stableVersion = stableVersion,
+      candidateDirectory = stableDirectory,
+    )?.let { existing ->
+      logger.lifecycle("Reuse local debug npm Runtime {}@{}.", runtimeName, existing.version)
+      return RuntimeResolution(existing.version, existing.archive, changed = true)
+    }
+
     val debugVersion = debugVersionAfter(stableVersion, buildTimestamp)
     val debugDirectory = copyPackage(runtimeSource, outputRoot.resolve("runtime-debug"))
     updatePackageVersion(debugDirectory, debugVersion)
@@ -269,6 +284,20 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
         version = source.stableVersion,
         archive = pack(directory, outputRoot.resolve("business-$outputIndex-tarball")),
         changed = false,
+      )
+    }
+
+    findReusableLocalDebugArchive(
+      packageName = source.name,
+      stableVersion = source.stableVersion,
+      candidateDirectory = directory,
+    )?.let { existing ->
+      logger.lifecycle("Reuse local debug npm business package {}@{}.", source.name, existing.version)
+      return BusinessPackageResolution(
+        name = source.name,
+        version = existing.version,
+        archive = existing.archive,
+        changed = true,
       )
     }
 
@@ -364,6 +393,61 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
     return "$major.$minor.$patch-debug.$timestamp"
   }
 
+  /**
+   * 将当前候选改为本地最新 debug 版本后重新计算 npm pack SRI；归档字节完全一致时复用旧坐标。
+   *
+   * 候选最初使用稳定版本完成 Registry 比较，而 npm 归档的 package.json 包含自身版本，不能把稳定
+   * 候选 SRI 直接与 debug tgz 比较。这里临时写入现有 debug 版本后再 dry-run，既排除了时间戳差异，
+   * 又保留源码、文件列表、Runtime 以及全部精确依赖版本的变化。只比较最新版本符合本地调试的线性
+   * 演进模型；代码回退到更早状态时会生成新坐标，不会意外复活旧依赖图。
+   *
+   * @return 内容一致的最新本地归档；不存在或内容不同则返回 null。
+   */
+  private fun findReusableLocalDebugArchive(
+    packageName: String,
+    stableVersion: String,
+    candidateDirectory: File,
+  ): ExistingDebugArchive? {
+    val versionPrefix = debugVersionAfter(stableVersion, timestamp = "")
+    val packageDirectory = debugSourceDirectory.get().asFile
+      .resolve(debugNpmArchiveRelativePath(packageName, stableVersion))
+      .parentFile
+    val latest = packageDirectory.listFiles { file ->
+      file.isFile && file.extension == "tgz" &&
+        file.nameWithoutExtension.startsWith(versionPrefix) &&
+        DEBUG_TIMESTAMP.matches(file.nameWithoutExtension.removePrefix(versionPrefix))
+    }
+      ?.maxByOrNull(File::getName)
+      ?: return null
+    val version = latest.nameWithoutExtension
+
+    updatePackageVersion(candidateDirectory, version)
+    val candidateIntegrity = readPackIntegrity(candidateDirectory)
+    return if (candidateIntegrity == readArchiveIntegrity(latest)) {
+      ExistingDebugArchive(version = version, archive = latest)
+    } else {
+      null
+    }
+  }
+
+  /** 计算现有 tgz 的 npm SRI；使用流式摘要避免大包产生额外完整字节副本。 */
+  private fun readArchiveIntegrity(archive: File): String {
+    return try {
+      val digest = MessageDigest.getInstance("SHA-512")
+      archive.inputStream().buffered().use { input ->
+        val buffer = ByteArray(16 * 1024)
+        while (true) {
+          val count = input.read(buffer)
+          if (count < 0) break
+          digest.update(buffer, 0, count)
+        }
+      }
+      "sha512-${Base64.getEncoder().encodeToString(digest.digest())}"
+    } catch (throwable: Throwable) {
+      throw GradleException("Failed to calculate local debug npm archive integrity.", throwable)
+    }
+  }
+
   /** npm dry-run integrity 与真实 pack 使用同一 CLI 算法，可直接和 registry 的 SRI 比较。 */
   private fun readPackIntegrity(directory: File): String {
     val result = execute(npmExecutable.get(), directory, "pack", "--dry-run", "--json")
@@ -414,8 +498,8 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
   /**
    * 将当前入口可达的全部本地包原子写入共享调试源，并返回 Android 安装所需的精确清单。
    *
-   * 稳定包也会写入固定包名路径。这样某个包从 debug 内容恢复为 Registry 稳定内容时，Desktop
-   * 与 Android 都会用稳定 tgz 覆盖旧 debug tgz，而不会继续命中上一次的本地修改。
+   * 每个包按精确版本写入独立路径。多个入口即使在不同时间生成共同依赖，也不会互相覆盖；
+   * Registry 稳定版本与本地 debug 版本同样可以并存，由 npm metadata 的 semver 规则选择 latest。
    */
   private fun synchronizeDebugSource(
     runtimeResolution: RuntimeResolution?,
@@ -446,7 +530,7 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
     val sourceRoot = debugSourceDirectory.get().asFile.canonicalFile
     sourceRoot.mkdirs()
     val packages = artifacts.map { artifact ->
-      val relativePath = archiveRelativePath(artifact.name)
+      val relativePath = debugNpmArchiveRelativePath(artifact.name, artifact.version)
       val destination = sourceRoot.resolve(relativePath).canonicalFile
       requireInsideRoot(sourceRoot, destination, artifact.name)
       copyAtomically(artifact.archive, destination)
@@ -472,28 +556,29 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
     moveAtomically(temporary, target)
   }
 
-  /** npm 包名映射到共享源中的固定 tgz 路径；固定路径便于直接覆盖旧调试内容。 */
-  private fun archiveRelativePath(packageName: String): String {
-    val segments = packageName.split('/')
-    if (segments.size !in 1..2 || segments.any { !PACKAGE_SEGMENT.matches(it) }) {
-      throw GradleException("Invalid npm package name '$packageName'.")
-    }
-    return if (segments.size == 1) {
-      "${segments[0]}.tgz"
-    } else {
-      "${segments[0]}/${segments[1]}.tgz"
-    }
-  }
-
-  /** 先复制到同目录临时文件再替换，防止 Desktop 在任务执行中读取到半个 tgz。 */
+  /**
+   * 先复制到同目录临时文件再替换，防止 Desktop 在任务执行中读取到半个 tgz。
+   *
+   * 同一版本已经存在时只允许内容完全一致；不同内容复用相同版本会破坏 npm 的不可变版本语义，
+   * 因此直接终止构建，而不是让后执行的入口静默覆盖先前依赖图。
+   */
   private fun copyAtomically(source: File, destination: File) {
     destination.parentFile.mkdirs()
-    val temporary = destination.resolveSibling("${destination.name}.tmp")
-    try {
-      Files.copy(source.toPath(), temporary.toPath(), StandardCopyOption.REPLACE_EXISTING)
-      moveAtomically(temporary, destination)
-    } finally {
-      Files.deleteIfExists(temporary.toPath())
+    // 多个入口任务可并行写共同依赖；同一 Gradle 进程内串行完成“比较或创建”，避免检查后覆盖竞态。
+    synchronized(DEBUG_SOURCE_WRITE_LOCK) {
+      if (destination.isFile) {
+        if (Files.mismatch(source.toPath(), destination.toPath()) == -1L) return
+        throw GradleException(
+          "Local debug npm archive version collision at '$destination': contents differ.",
+        )
+      }
+      val temporary = destination.resolveSibling("${destination.name}.tmp")
+      try {
+        Files.copy(source.toPath(), temporary.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        moveAtomically(temporary, destination)
+      } finally {
+        Files.deleteIfExists(temporary.toPath())
+      }
     }
   }
 
@@ -603,6 +688,12 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
     val changed: Boolean,
   )
 
+  /** 已存在于共享调试源、可被新入口依赖图继续复用的精确 debug 归档。 */
+  private data class ExistingDebugArchive(
+    val version: String,
+    val archive: File,
+  )
+
   private data class CommandResult(
     val exitCode: Int,
     val standardOutput: String,
@@ -616,8 +707,9 @@ abstract class PrepareDebugNpmBundleTask : DefaultTask() {
     const val MAX_ERROR_OUTPUT_LENGTH = 4_000
     val DEBUG_ZONE_ID: ZoneId = ZoneId.of("Asia/Shanghai")
     val DEBUG_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+    val DEBUG_TIMESTAMP = Regex("""\d{14}""")
     val STABLE_VERSION = Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""")
-    val PACKAGE_SEGMENT = Regex("""@?[a-z0-9][a-z0-9._~-]*""")
+    val DEBUG_SOURCE_WRITE_LOCK = Any()
   }
 }
 

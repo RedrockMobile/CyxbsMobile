@@ -23,7 +23,7 @@ class DebugNpmPackageSourceTest {
     withSource { source, root, fileSystem ->
       val packageName = "@cyxbs-mobile/language-javascript"
       val debugVersion = "0.1.1-debug.20260809153042"
-      val archivePath = root / "@cyxbs-mobile" / "language-javascript.tgz"
+      val archivePath = archivePath(root, packageName, debugVersion)
       fileSystem.createDirectories(requireNotNull(archivePath.parent))
       val archiveBytes = writeArchive(
         fileSystem = fileSystem,
@@ -35,9 +35,9 @@ class DebugNpmPackageSourceTest {
         }""".trimIndent(),
       )
 
-      val localPackage = assertNotNull(source.read(packageName))
+      val localPackage = assertNotNull(source.read(packageName, debugVersion))
       val mergedWithOlderRemote = source.mergeMetadata(
-        localPackage,
+        listOf(localPackage),
         registryMetadata(packageName, "0.1.0"),
       ).decodeToString().let(Json::parseToJsonElement).jsonObject
       assertEquals(
@@ -49,12 +49,15 @@ class DebugNpmPackageSourceTest {
         .getValue(debugVersion).jsonObject
       val localTarball = localMetadata.getValue("dist").jsonObject
         .getValue("tarball").jsonPrimitive.content
-      assertEquals(packageName, source.packageNameFromLocalTarballUrl(localTarball))
-      assertContentEquals(archiveBytes, source.read(packageName)?.archiveBytes)
+      assertEquals(
+        DebugNpmPackageCoordinate(packageName, debugVersion),
+        source.packageFromLocalTarballUrl(localTarball),
+      )
+      assertContentEquals(archiveBytes, source.read(packageName, debugVersion)?.archiveBytes)
 
       // 同基线正式版高于 debug 预发布版，下一次 latest 刷新会自然回到正式版本。
       val mergedWithStable = source.mergeMetadata(
-        localPackage,
+        listOf(localPackage),
         registryMetadata(packageName, "0.1.1"),
       ).decodeToString().let(Json::parseToJsonElement).jsonObject
       assertEquals(
@@ -73,12 +76,12 @@ class DebugNpmPackageSourceTest {
       fileSystem.createDirectories(root)
       writeArchive(
         fileSystem,
-        root / "lesson-runtime.tgz",
+        archivePath(root, packageName, debugVersion),
         """{"name":"$packageName","version":"$debugVersion"}""",
       )
 
-      val localPackage = assertNotNull(source.read(packageName))
-      val metadata = source.mergeMetadata(localPackage, null)
+      val localPackage = assertNotNull(source.read(packageName, debugVersion))
+      val metadata = source.mergeMetadata(listOf(localPackage), null)
         .decodeToString()
         .let(Json::parseToJsonElement)
         .jsonObject
@@ -96,21 +99,38 @@ class DebugNpmPackageSourceTest {
     }
   }
 
-  /** 稳定 tgz 也属于统一调试源，用来覆盖同包名路径中已经撤销的旧 debug 内容。 */
+  /** 稳定版与历史 debug 版本使用独立路径，并会同时出现在本地 metadata 中。 */
   @Test
-  fun stablePackageCanReplacePreviousDebugArchive() {
+  fun stableAndDebugVersionsCanCoexist() {
     withSource { source, root, fileSystem ->
       val packageName = "@cyxbs-mobile/kotlin-js-runtime"
-      val archivePath = root / "@cyxbs-mobile" / "kotlin-js-runtime.tgz"
-      fileSystem.createDirectories(requireNotNull(archivePath.parent))
+      val debugVersion = "0.2.0-debug.20260822123045"
       writeArchive(
         fileSystem,
-        archivePath,
+        archivePath(root, packageName, debugVersion),
+        """{"name":"$packageName","version":"$debugVersion"}""",
+      )
+      writeArchive(
+        fileSystem,
+        archivePath(root, packageName, "0.2.0"),
         """{"name":"$packageName","version":"0.2.0"}""",
       )
 
-      val localPackage = assertNotNull(source.read(packageName))
-      assertEquals("0.2.0", localPackage.version)
+      val localPackages = source.readAll(packageName)
+      assertEquals(setOf("0.2.0", debugVersion), localPackages.map(DebugNpmPackage::version).toSet())
+      val metadata = source.mergeMetadata(localPackages, null)
+        .decodeToString()
+        .let(Json::parseToJsonElement)
+        .jsonObject
+      assertEquals(
+        setOf("0.2.0", debugVersion),
+        metadata.getValue("versions").jsonObject.keys,
+      )
+      // 同基线正式版本高于预发布版本，不因目录枚举顺序改变 latest。
+      assertEquals(
+        "0.2.0",
+        metadata.getValue("dist-tags").jsonObject.getValue("latest").jsonPrimitive.content,
+      )
     }
   }
 
@@ -142,6 +162,18 @@ class DebugNpmPackageSourceTest {
         }
       }
     }""".trimIndent().encodeToByteArray()
+  }
+
+  /** 与 Gradle debug 源保持一致：包名是目录，版本号是目录中的 tgz 文件名。 */
+  private fun archivePath(root: Path, packageName: String, version: String): Path {
+    val segments = packageName.split('/')
+    val directory = when (segments.size) {
+      1 -> root / segments[0]
+      2 -> root / segments[0] / segments[1]
+      else -> error("Invalid test npm package name: $packageName")
+    }
+    FileSystem.SYSTEM.createDirectories(directory)
+    return directory / "$version.tgz"
   }
 
   /** 写入足以覆盖 package.json 读取链路的最小 npm ustar+gzip 归档。 */

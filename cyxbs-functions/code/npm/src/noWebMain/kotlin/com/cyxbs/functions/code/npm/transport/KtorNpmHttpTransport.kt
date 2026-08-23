@@ -15,8 +15,8 @@ import kotlinx.coroutines.CancellationException
  *
  * 调用方负责在 HttpClient 中配置平台 engine、超时、代理和证书策略；该实现只统一检查状态码并
  * 将响应读取为字节数组，包体大小由 npm 包发布流程保证。Debug 构建会在 metadata 与 tgz 请求
- * 进入网络前按需检查 App 私有固定目录；本地包仍通过 metadata、SRI 和依赖图的完整链路进入包池，
- * Release 构建完全不访问该目录。
+ * 进入网络前按需检查 App 私有版本目录；本地包仍通过 metadata、SRI 和依赖图的完整链路进入包池，
+ * 同一包的多个 debug 版本可以并存，Release 构建完全不访问该目录。
  */
 class KtorNpmHttpTransport private constructor(
   httpClientProvider: () -> HttpClient,
@@ -36,15 +36,17 @@ class KtorNpmHttpTransport private constructor(
   /** 将调用方声明的元数据协议请求头转发给 npm registry。 */
   override suspend fun get(url: String, headers: Map<String, String>): ByteArray {
     if (debugEnabled()) {
-      debugPackageSource.packageNameFromLocalTarballUrl(url)?.let { packageName ->
-        return debugPackageSource.read(packageName)?.archiveBytes
-          ?: throw NpmDownloadException("Local debug npm package '$packageName' is missing.")
+      debugPackageSource.packageFromLocalTarballUrl(url)?.let { coordinate ->
+        return debugPackageSource.read(coordinate.name, coordinate.version)?.archiveBytes
+          ?: throw NpmDownloadException(
+            "Local debug npm package '${coordinate.name}@${coordinate.version}' is missing.",
+          )
       }
       if (debugPackageSource.isMetadataRequest(headers)) {
         val packageName = debugPackageSource.packageNameFromMetadataUrl(url)
-        val localPackage = packageName?.let(debugPackageSource::read)
-        if (localPackage != null) {
-          // 本地 debug 包存在时仍尝试读取线上 metadata，让更高的正式版本自然覆盖 debug 预发布版。
+        val localPackages = packageName?.let(debugPackageSource::readAll).orEmpty()
+        if (localPackages.isNotEmpty()) {
+          // 本地版本存在时仍尝试读取线上 metadata，让更高的正式版本自然覆盖 debug 预发布版。
           val remoteMetadata = try {
             getFromNetwork(url, headers)
           } catch (exception: CancellationException) {
@@ -52,7 +54,7 @@ class KtorNpmHttpTransport private constructor(
           } catch (_: NpmDownloadException) {
             null
           }
-          return debugPackageSource.mergeMetadata(localPackage, remoteMetadata)
+          return debugPackageSource.mergeMetadata(localPackages, remoteMetadata)
         }
       }
     }
