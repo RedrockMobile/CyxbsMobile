@@ -1,6 +1,13 @@
 package com.cyxbs.functions.code.tutorials.java
 
+import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
+import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
+import com.cyxbs.functions.code.npm.storage.NpmStorage
+import com.cyxbs.functions.code.npm.storage.NpmStorageJson
+import com.cyxbs.functions.code.npm.storage.getJsonOrNull
+import com.cyxbs.functions.code.npm.storage.putJson
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletedStep
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionRule
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialContentBlock
@@ -13,12 +20,12 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTarget
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTargetKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialLesson
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
+import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialService
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialStep
 import com.cyxbs.functions.code.tutorials.js.bridge.withGeneratedLessonSummaries
-import com.cyxbs.functions.code.npm.js.bridge.NpmJsResult
-import com.cyxbs.functions.code.npm.js.bridge.npmJsCatching
+import kotlinx.serialization.Serializable
 
 /** Java 教程 npm 包入口；课程正文、示例源码与完成规则随 npm 包动态更新。 */
 object JavaDynamicTutorialService : DynamicTutorialService {
@@ -28,6 +35,8 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     objectOrientedCourse(),
     collectionsCourse(),
   ).map(DynamicTutorialCourse::withGeneratedLessonSummaries)
+
+  private val progressSettings = NpmStorage.packageScope.settings
 
   /** 返回 Java 课程路径，不传输课时正文与源码。 */
   override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> = npmJsCatching {
@@ -47,6 +56,118 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     request: DynamicTutorialEvaluationRequest,
   ): NpmJsResult<DynamicTutorialEvaluationResult> = npmJsCatching {
     evaluateStep(request)
+  }
+
+  /**
+   * 读取包级 Settings，并在返回客户端前由当前 npm 版本迁移课程、课时和步骤 ID。
+   *
+   * 私有 schema 只属于 `tutorial-java`，以后发布新课程时可以继续在 [migrateProgressState] 增加旧
+   * 版本分支，而无需要求客户端理解教程内容变更。
+   */
+  override suspend fun savedProgress(): NpmJsResult<List<DynamicTutorialProgress>> = npmJsCatching {
+    val stored = readProgressState()
+    val migrated = migrateProgressState(stored)
+    if (migrated != stored) writeProgressState(migrated)
+    migrated.entries
+  }
+
+  /** 每门课程只保留最新快照，避免连续编辑形成无上限历史。 */
+  override suspend fun saveProgress(
+    progress: DynamicTutorialProgress,
+  ): NpmJsResult<Unit> = npmJsCatching {
+    require(progress.languageId == JAVA_LANGUAGE_ID && progress.npmPackageName == JAVA_PACKAGE_NAME) {
+      "Java tutorial progress identity does not match this npm package."
+    }
+    val migrated = requireNotNull(migrateProgress(progress)) {
+      "Java tutorial course '${progress.courseId}' no longer exists."
+    }
+    val state = migrateProgressState(readProgressState())
+    writeProgressState(
+      state.copy(
+        entries = state.entries
+          .filterNot { it.courseId == migrated.courseId }
+          .plus(migrated)
+          .takeLast(MAX_PROGRESS_ENTRIES),
+      ),
+    )
+  }
+
+  /** 清除当前 npm 包作用域中的教程进度键，不影响该包未来的其他 Settings。 */
+  override suspend fun clearProgress(): NpmJsResult<Unit> = npmJsCatching {
+    progressSettings.remove(PROGRESS_SETTINGS_KEY)
+  }
+
+  /** 删除单门课程并保留其他课程顺序；空状态直接移除 Settings 键。 */
+  override suspend fun clearCourseProgress(courseId: String): NpmJsResult<Unit> = npmJsCatching {
+    val state = migrateProgressState(readProgressState())
+    writeProgressState(state.copy(entries = state.entries.filterNot { it.courseId == courseId }))
+  }
+
+  /** 解码当前私有 schema；未知 schema 明确失败，避免旧包静默覆盖新包写入的数据。 */
+  private suspend fun readProgressState(): JavaTutorialProgressState {
+    return progressSettings.getJsonOrNull<JavaTutorialProgressState>(
+      PROGRESS_SETTINGS_KEY,
+      NpmStorageJson,
+    ) ?: JavaTutorialProgressState()
+  }
+
+  /** 空进度删除键，其余状态通过统一 JSON 配置写入 Settings。 */
+  private suspend fun writeProgressState(state: JavaTutorialProgressState) {
+    if (state.entries.isEmpty()) {
+      progressSettings.remove(PROGRESS_SETTINGS_KEY)
+    } else {
+      progressSettings.putJson(PROGRESS_SETTINGS_KEY, state, NpmStorageJson)
+    }
+  }
+
+  /**
+   * 当前 schema 的迁移入口。
+   *
+   * 新 npm 版本可以在这里先解析旧 schema DTO，再映射为 [CURRENT_PROGRESS_SCHEMA_VERSION]。当前版本
+   * 会清理已移除的课程/步骤和重复记录，但保留已完成课程，防止新增步骤让完成状态倒退。
+   */
+  private fun migrateProgressState(state: JavaTutorialProgressState): JavaTutorialProgressState {
+    require(state.schemaVersion == CURRENT_PROGRESS_SCHEMA_VERSION) {
+      "Unsupported Java tutorial progress schema ${state.schemaVersion}."
+    }
+    val migratedByCourse = linkedMapOf<String, DynamicTutorialProgress>()
+    state.entries.forEach { progress ->
+      migrateProgress(progress)?.let { migratedByCourse[it.courseId] = it }
+    }
+    return JavaTutorialProgressState(
+      entries = migratedByCourse.values.toList().takeLast(MAX_PROGRESS_ENTRIES),
+    )
+  }
+
+  /** 按当前课程目录修剪失效 ID，并把当前位置迁移到第一项仍可学习的步骤。 */
+  private fun migrateProgress(progress: DynamicTutorialProgress): DynamicTutorialProgress? {
+    if (progress.languageId != JAVA_LANGUAGE_ID || progress.npmPackageName != JAVA_PACKAGE_NAME) {
+      return null
+    }
+    val course = courses.firstOrNull { it.summary.courseId == progress.courseId } ?: return null
+    val validSteps = course.lessons.flatMap { lesson ->
+      lesson.steps.map { step -> DynamicTutorialCompletedStep(lesson.lessonId, step.stepId) }
+    }.toSet()
+    val completed = progress.completedSteps.distinct().filter(validSteps::contains)
+    val requestedLesson = course.lessons.firstOrNull { it.lessonId == progress.lessonId }
+    val lesson = requestedLesson ?: course.lessons.firstOrNull { candidate ->
+      candidate.steps.any { step ->
+        DynamicTutorialCompletedStep(candidate.lessonId, step.stepId) !in completed
+      }
+    } ?: course.lessons.first()
+    val step = lesson.steps.firstOrNull { it.stepId == progress.stepId }
+      ?: lesson.steps.firstOrNull { candidate ->
+        DynamicTutorialCompletedStep(lesson.lessonId, candidate.stepId) !in completed
+      }
+      ?: lesson.steps.first()
+    return progress.copy(
+      lessonId = lesson.lessonId,
+      stepId = step.stepId,
+      completedSteps = completed,
+      lessonWorkspaces = progress.lessonWorkspaces.filter { workspace ->
+        course.lessons.any { it.lessonId == workspace.lessonId }
+      },
+    )
   }
 
   /** 执行教程包内声明式检查，协议层由 [evaluate] 统一捕获异常。 */
@@ -466,6 +587,18 @@ object JavaDynamicTutorialService : DynamicTutorialService {
     )
   }
 
+  /** Java 教程包私有的持久化 envelope；仅 npm 包自身负责版本演进。 */
+  @Serializable
+  private data class JavaTutorialProgressState(
+    val schemaVersion: Int = CURRENT_PROGRESS_SCHEMA_VERSION,
+    val entries: List<DynamicTutorialProgress> = emptyList(),
+  )
+
+  private const val JAVA_LANGUAGE_ID = "java"
+  private const val JAVA_PACKAGE_NAME = "@cyxbs-mobile/tutorial-java"
+  private const val PROGRESS_SETTINGS_KEY = "tutorial.progress"
+  private const val CURRENT_PROGRESS_SCHEMA_VERSION = 1
+  private const val MAX_PROGRESS_ENTRIES = 128
   private const val COLLECTIONS_COURSE_ID = "java-generics-collections"
   private const val TYPED_LIST_LESSON_ID = "typed-list"
   private const val ADD_COURSE_STEP_ID = "add-course"

@@ -365,7 +365,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         )
         tutorialProgressWriteMutex.withLock {
           if (resettingTutorialCourseId == progress.courseId) return@withLock
-          dynamicTutorialManager.saveProgress(progress)
+          session.saveProgress(progress).getOrThrow()
           savedTutorialProgress[progress.courseId] = progress
         }
       } catch (throwable: Throwable) {
@@ -400,7 +400,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         try {
           val session = tutorialSession ?: return@launch
           tutorialProgressWriteMutex.withLock {
-            dynamicTutorialManager.clearCourseProgress(session.tutorial.languageId, courseId)
+            session.clearCourseProgress(courseId).getOrThrow()
             savedTutorialProgress.remove(courseId)
           }
           val course = session.course(courseId).getOrThrow()
@@ -542,7 +542,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         loadedSession = dynamicTutorialManager.load(languageId)
         tutorialSession = loadedSession
         tutorialManifest = loadedSession.manifest().getOrThrow()
-        val storedProgress = dynamicTutorialManager.savedProgress(languageId)
+        val storedProgress = loadedSession.savedProgress().getOrThrow()
         savedTutorialProgress.putAll(storedProgress.associateBy { it.courseId })
         val resumeCourseId = storedProgress.preferredResumeCourseId()
         tutorialStatus = buildString {

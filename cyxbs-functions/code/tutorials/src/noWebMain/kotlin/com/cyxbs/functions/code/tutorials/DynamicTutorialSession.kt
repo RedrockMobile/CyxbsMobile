@@ -66,6 +66,50 @@ class DynamicTutorialSession internal constructor(
     }
   }
 
+  /**
+   * 每次从 npm 包读取最新进度，使包升级后的迁移结果立即对客户端生效。
+   *
+   * `savedProgress()` 成功即表示当前包已完成自己的 schema 和源码迁移，因此会话会把返回快照标记为
+   * 当前实际加载版本；若旧源码不能复用，npm 实现必须在返回前清空或替换对应 workspace。
+   */
+  override suspend fun savedProgress(): NpmJsResult<List<DynamicTutorialProgress>> = npmJsCatching {
+    serviceMutex.withLock {
+      ensureOpen()
+      service.savedProgress().getOrThrow()
+        .validatedFor(tutorial)
+        .map { progress -> progress.copy(npmPackageVersion = npmPackageVersion) }
+    }
+  }
+
+  /** 校验动态数据边界后，把进度持久化完全委托给当前教程 npm 包。 */
+  override suspend fun saveProgress(
+    progress: DynamicTutorialProgress,
+  ): NpmJsResult<Unit> = npmJsCatching {
+    serviceMutex.withLock {
+      ensureOpen()
+      service.saveProgress(progress.validatedFor(tutorial)).getOrThrow()
+    }
+  }
+
+  /** 清除当前教程包的全部进度，不再访问客户端私有文件。 */
+  override suspend fun clearProgress(): NpmJsResult<Unit> = npmJsCatching {
+    serviceMutex.withLock {
+      ensureOpen()
+      service.clearProgress().getOrThrow()
+    }
+  }
+
+  /** 清除一门课程的包内进度；课程 ID 的存在性由可动态更新的 npm 包决定。 */
+  override suspend fun clearCourseProgress(courseId: String): NpmJsResult<Unit> = npmJsCatching {
+    serviceMutex.withLock {
+      ensureOpen()
+      require(courseId.isNotBlank() && courseId == courseId.trim() && courseId.length <= 256) {
+        "Tutorial course ID is invalid."
+      }
+      service.clearCourseProgress(courseId).getOrThrow()
+    }
+  }
+
   /** 幂等释放教程 JavaScript Runtime 与 npm 入口租约；释放后不再允许读取缓存。 */
   override suspend fun close(): NpmJsResult<Unit> = npmJsCatching {
     serviceMutex.withLock {

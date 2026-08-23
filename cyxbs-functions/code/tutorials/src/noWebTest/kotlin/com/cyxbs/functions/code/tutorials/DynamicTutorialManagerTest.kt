@@ -69,24 +69,6 @@ class DynamicTutorialManagerTest {
   }
 
   @Test
-  fun replacesProgressForTheSameCourseAndKeepsOtherCourses() = runTest {
-    val store = InMemoryDynamicTutorialProgressStore()
-    val manager = DynamicTutorialManager(
-      packageLoader = FakeTutorialPackageLoader(),
-      progressStore = store,
-    )
-    manager.saveProgress(progress(courseId = "intro", stepId = "edit"))
-    manager.saveProgress(progress(courseId = "collections", stepId = "list"))
-    manager.saveProgress(progress(courseId = "intro", stepId = "run"))
-
-    val saved = manager.savedProgress(" JAVA ")
-
-    assertEquals(2, saved.size)
-    assertEquals("run", saved.single { it.courseId == "intro" }.stepId)
-    assertEquals(2, store.state.entries.size)
-  }
-
-  @Test
   fun restoresWorkspaceOnlyForTheSamePackageVersion() {
     val course = resumableCourse()
     val progress = progress(
@@ -154,20 +136,6 @@ class DynamicTutorialManagerTest {
     assertEquals("ListMain.java", resumed.activeFilePath)
   }
 
-  @Test
-  fun clearsOnlyTheRequestedCourse() = runTest {
-    val manager = DynamicTutorialManager(
-      packageLoader = FakeTutorialPackageLoader(),
-      progressStore = InMemoryDynamicTutorialProgressStore(),
-    )
-    manager.saveProgress(progress(courseId = "intro", stepId = "run"))
-    manager.saveProgress(progress(courseId = "collections", stepId = "list"))
-
-    manager.clearCourseProgress("java", "intro")
-
-    assertEquals(listOf("collections"), manager.savedProgress("java").map { it.courseId })
-  }
-
   /** 为 Manager 测试提供可计数的内存加载器。 */
   private class FakeTutorialPackageLoader(
     private val catalogJson: String = Json.encodeToString(validCatalog()),
@@ -189,6 +157,7 @@ class DynamicTutorialManagerTest {
   /** 最小教程 Service，用于验证 Manager 不改写业务调用。 */
   private class FakeTutorialService : DynamicTutorialService {
     var closeCount = 0
+    private val progress = mutableListOf<DynamicTutorialProgress>()
 
     override suspend fun manifest(): NpmJsResult<DynamicTutorialManifest> {
       return NpmJsResult.success(DynamicTutorialManifest(
@@ -202,6 +171,25 @@ class DynamicTutorialManagerTest {
     override suspend fun evaluate(
       request: DynamicTutorialEvaluationRequest,
     ): NpmJsResult<DynamicTutorialEvaluationResult> = NpmJsResult.success(DynamicTutorialEvaluationResult(false))
+
+    override suspend fun savedProgress(): NpmJsResult<List<DynamicTutorialProgress>> =
+      NpmJsResult.success(progress.toList())
+
+    override suspend fun saveProgress(progress: DynamicTutorialProgress): NpmJsResult<Unit> {
+      this.progress.removeAll { it.courseId == progress.courseId }
+      this.progress += progress
+      return NpmJsResult.success(Unit)
+    }
+
+    override suspend fun clearProgress(): NpmJsResult<Unit> {
+      progress.clear()
+      return NpmJsResult.success(Unit)
+    }
+
+    override suspend fun clearCourseProgress(courseId: String): NpmJsResult<Unit> {
+      progress.removeAll { it.courseId == courseId }
+      return NpmJsResult.success(Unit)
+    }
 
     override suspend fun close(): NpmJsResult<Unit> {
       closeCount++
