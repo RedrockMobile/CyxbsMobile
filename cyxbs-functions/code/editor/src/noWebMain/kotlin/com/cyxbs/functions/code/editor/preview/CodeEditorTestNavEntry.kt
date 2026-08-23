@@ -1,7 +1,7 @@
 package com.cyxbs.functions.code.editor.preview
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.DropdownMenu
@@ -21,27 +21,32 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cyxbs.components.navigation.AppNav
-import com.cyxbs.components.navigation.AppNavArgument
-import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.guided.tour.GuidedTourOverlay
 import com.cyxbs.components.guided.tour.GuidedTourTargetRegistry
 import com.cyxbs.components.guided.tour.guidedTourTarget
+import com.cyxbs.components.navigation.AppNav
+import com.cyxbs.components.navigation.AppNavArgument
+import com.cyxbs.components.navigation.AppNavEntry
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.functions.code.editor.highlight.CodeEditor
 import com.cyxbs.functions.code.editor.highlight.DEFAULT_HIGHLIGHT_CACHE_CAPACITY
 import com.cyxbs.functions.code.editor.highlight.editorGutterWidth
 import com.cyxbs.functions.code.editor.highlight.rememberCodeEditorState
+import com.cyxbs.functions.code.editor.preview.workbench.ActiveCodeEditorTutorial
 import com.cyxbs.functions.code.editor.preview.workbench.CompactDropdownMenuItemHeight
 import com.cyxbs.functions.code.editor.preview.workbench.FILES_PANEL_ID
 import com.cyxbs.functions.code.editor.preview.workbench.RUN_TOOL_WINDOW_ID
 import com.cyxbs.functions.code.editor.preview.workbench.TUTORIAL_TOOL_WINDOW_ID
-import com.cyxbs.functions.code.editor.preview.workbench.ActiveCodeEditorTutorial
 import com.cyxbs.functions.code.editor.preview.workbench.TutorialGuideHint
-import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTutorialToolWindow
 import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTestToolWindows
-import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTutorialSidePanel
+import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTutorialToolWindow
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
+import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTutorialSidePanel
 import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
+import com.cyxbs.functions.code.editor.project.CodeProjectRepository
+import com.cyxbs.functions.code.editor.project.CodeProjectTemplates
+import com.cyxbs.functions.code.editor.project.CodeProjectWorkspace
+import com.cyxbs.functions.code.editor.project.openProjectDirectory
 import com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbench
 import com.cyxbs.functions.code.editor.workbench.DynamicLanguageFileIcon
 import com.cyxbs.functions.code.editor.workbench.EditorWorkbenchColors
@@ -63,15 +68,13 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicRunTarget
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceFile
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextEdit
 import com.cyxbs.functions.code.language.js.bridge.DynamicTextRange
-import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
-import com.cyxbs.functions.code.tutorials.DynamicTutorialLessonWorkspace
 import com.cyxbs.functions.code.tutorials.DynamicTutorialCourseState
+import com.cyxbs.functions.code.tutorials.DynamicTutorialInfo
+import com.cyxbs.functions.code.tutorials.DynamicTutorialLessonWorkspace
+import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
 import com.cyxbs.functions.code.tutorials.DynamicTutorialProgress
 import com.cyxbs.functions.code.tutorials.DynamicTutorialResumeState
 import com.cyxbs.functions.code.tutorials.DynamicTutorialSession
-import com.cyxbs.functions.code.tutorials.preferredResumeCourseId
-import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
-import com.cyxbs.functions.code.tutorials.resolveResumeState
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialAnchorIds
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCompletionKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialCourse
@@ -79,6 +82,9 @@ import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialEvaluationReq
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialGuideTargetKind
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialManifest
 import com.cyxbs.functions.code.tutorials.js.bridge.DynamicTutorialSourceFile
+import com.cyxbs.functions.code.tutorials.preferredResumeCourseId
+import com.cyxbs.functions.code.tutorials.resolveCourseAvailability
+import com.cyxbs.functions.code.tutorials.resolveResumeState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
@@ -92,9 +98,16 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-/** 无参数的代码编辑器手动测试页面路由。 */
+/**
+ * 具体代码工作区路由。
+ *
+ * [projectId] 与 [tutorialLanguageId] 二选一；都为空只用于兼容开发期直接打开工作区的旧调用。
+ */
 @Serializable
-data object CodeEditorTestNavArgument : AppNavArgument
+data class CodeEditorTestNavArgument(
+  val projectId: String? = null,
+  val tutorialLanguageId: String? = null,
+) : AppNavArgument
 
 /**
  * 多语言、多文件编辑、动态语言分析和本地 QuickJS 运行的手动测试页面。
@@ -102,13 +115,43 @@ data object CodeEditorTestNavArgument : AppNavArgument
  * 路由只维护文件、Service 与运行状态，具体布局交给可复用工作台组件；该页面只编译进
  * `noWebMain`，用于 Android、iOS 与 Desktop 的功能体验，不作为最终教学业务页面。
  */
-@AppNav(route = "code/editor-test")
+@AppNav(route = "code/editor/workspace")
 class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
   override fun isNeedLogin(argument: CodeEditorTestNavArgument): Boolean = false
 
   @Composable
   override fun Content(argument: CodeEditorTestNavArgument) {
+    val projectRepository = remember { CodeProjectRepository() }
+    var loadedProjectWorkspace by remember(argument.projectId) {
+      mutableStateOf<CodeProjectWorkspace?>(null)
+    }
+    var projectLoadError by remember(argument.projectId) { mutableStateOf<String?>(null) }
+    var projectLoadGeneration by remember(argument.projectId) { mutableStateOf(0) }
+
+    // 真实项目完成读取前不创建编辑器，避免旧 mock 源码和错误活动文件短暂闪现。
+    LaunchedEffect(argument.projectId, projectLoadGeneration) {
+      val projectId = argument.projectId ?: return@LaunchedEffect
+      projectLoadError = null
+      runCatching { projectRepository.openProject(projectId) }
+        .onSuccess { loadedProjectWorkspace = it }
+        .onFailure { projectLoadError = it.message ?: "本地项目读取失败。" }
+    }
+    if (argument.projectId != null && loadedProjectWorkspace == null) {
+      WorkspaceProjectLoading(
+        errorMessage = projectLoadError,
+        onRetry = { projectLoadGeneration++ },
+        onBack = argument::popBackStack,
+      )
+      return
+    }
+
+    val initialTemplate = CodeProjectTemplates.find(argument.tutorialLanguageId.orEmpty())
+      ?: CodeProjectTemplates.all.first()
+    val initialSourceFiles = loadedProjectWorkspace?.sourceFiles ?: initialTemplate.sourceFiles
+    val initialActiveFilePath = loadedProjectWorkspace?.activeFilePath ?: initialTemplate.activeFilePath
+    // 真实项目只提供项目工具；教程目录、进度和引导仅属于教程或原实验工作区。
+    val isTutorialWorkspace = argument.projectId == null
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
     val dynamicTutorialManager = remember { DynamicTutorialManager() }
     val tutorialProgressWriteMutex = remember { Mutex() }
@@ -126,6 +169,10 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
     var tutorialSession by remember { mutableStateOf<DynamicTutorialSession?>(null) }
     var tutorialManifest by remember { mutableStateOf<DynamicTutorialManifest?>(null) }
+    var tutorialLanguageChoices by remember { mutableStateOf<List<DynamicTutorialInfo>?>(null) }
+    var showTutorialLanguagePicker by remember { mutableStateOf(false) }
+    var isLoadingTutorialLanguages by remember { mutableStateOf(false) }
+    var tutorialLanguageLoadError by remember { mutableStateOf<String?>(null) }
     var tutorialStatus by remember { mutableStateOf("正在准备动态教程目录…") }
     var isLoadingTutorial by remember { mutableStateOf(false) }
     var canRetryTutorialLoad by remember { mutableStateOf(false) }
@@ -147,17 +194,23 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           )
         }
       }
-    val sourceFiles = remember {
-      mutableStateMapOf<String, String>().apply { putAll(DEFAULT_SOURCE_FILES) }
+    val sourceFiles = remember(argument.projectId, argument.tutorialLanguageId) {
+      mutableStateMapOf<String, String>().apply { putAll(initialSourceFiles) }
     }
-    val openFilePaths = remember { mutableStateListOf(JAVA_MAIN_FILE_PATH) }
-    var activeFilePath by remember { mutableStateOf(JAVA_MAIN_FILE_PATH) }
+    val openFilePaths = remember(argument.projectId, argument.tutorialLanguageId) {
+      mutableStateListOf(initialActiveFilePath)
+    }
+    var activeFilePath by remember(argument.projectId, argument.tutorialLanguageId) {
+      mutableStateOf(initialActiveFilePath)
+    }
     var runTargets by remember { mutableStateOf<List<DynamicRunTarget>>(emptyList()) }
     var runDiagnostics by remember { mutableStateOf<List<DynamicCompilationDiagnostic>>(emptyList()) }
     var runDiagnosticSources by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingLineRunTarget by remember { mutableStateOf<DynamicRunTarget?>(null) }
     var showRunTargetPicker by remember { mutableStateOf(false) }
-    val activeLanguageId = resolveDynamicLanguageIdForFile(activeFilePath, supportedLanguages)
+    // 教程路由先以用户选择的稳定语言 ID 启动，避免未来新增语言时依赖客户端内置文件扩展名猜测。
+    val activeLanguageId = argument.tutorialLanguageId
+      ?: resolveDynamicLanguageIdForFile(activeFilePath, supportedLanguages)
     val activeLanguageService = dynamicLanguageService.takeIf {
       loadedLanguageId == activeLanguageId
     }
@@ -172,7 +225,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     )
     val workbenchState = rememberCodeEditorWorkbenchState(initialSidePanelId = FILES_PANEL_ID)
     val editorState = rememberCodeEditorState(
-      initialCode = DEFAULT_MAIN_CODE,
+      initialCode = initialSourceFiles.getValue(initialActiveFilePath),
       activeFilePath = activeFilePath,
       workspace = workspace,
       languageService = activeLanguageService,
@@ -209,12 +262,24 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
     /** 保存当前文本后切换独立文件会话；普通切换保留光标，跨文件定义则定位到指定区间。 */
     fun openFile(filePath: String, selection: DynamicTextRange? = null) {
-      sourceFiles[activeFilePath] = editorState.code
+      val previousFilePath = activeFilePath
+      val previousSource = editorState.code
+      sourceFiles[previousFilePath] = previousSource
       val targetSource = sourceFiles[filePath] ?: error("文件不存在：$filePath")
       if (filePath !in openFilePaths) openFilePaths += filePath
       editorState.replaceDocument(filePath, targetSource, selection?.from)
       activeFilePath = filePath
       selection?.let(editorState::selectRange)
+      argument.projectId?.let { projectId ->
+        coroutineScope.launch {
+          runCatching {
+            projectRepository.saveSource(projectId, previousFilePath, previousSource)
+            projectRepository.updateActiveFile(projectId, filePath)
+          }.onFailure { throwable ->
+            output = throwable.toFailureText("项目文件保存失败")
+          }
+        }
+      }
     }
 
     /** 用恢复结果整体替换编辑器工作区，确保课时切换不会混入上一课时文件。 */
@@ -440,6 +505,22 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     }
 
+    // 普通项目输入停止后写回真实文件；切换文件时 openFile 还会立即冲刷旧文件，避免丢失尾部编辑。
+    LaunchedEffect(argument.projectId, editorState, activeFilePath) {
+      val projectId = argument.projectId ?: return@LaunchedEffect
+      val requestedFilePath = activeFilePath
+      snapshotFlow { editorState.code }.collectLatest { source ->
+        delay(PROJECT_SOURCE_SAVE_DELAY_MILLIS)
+        try {
+          projectRepository.saveSource(projectId, requestedFilePath, source)
+          if (activeFilePath == requestedFilePath) sourceFiles[requestedFilePath] = source
+        } catch (throwable: Throwable) {
+          if (throwable is CancellationException) throw throwable
+          output = throwable.toFailureText("项目文件自动保存失败")
+        }
+      }
+    }
+
     // 源码区间目标暂由编辑器原生选区呈现；布局锚点交给 guided-tour 按窗口实时测量。
     LaunchedEffect(activeTutorial?.step?.stepId) {
       val target = activeTutorial?.step?.guideTarget ?: return@LaunchedEffect
@@ -523,7 +604,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     }
 
     // 教程包跟随活动语言独立加载；切换语言或离开页面时取消旧会话并释放对应 JavaScript Runtime。
-    LaunchedEffect(activeLanguageId, tutorialLoadGeneration) {
+    LaunchedEffect(isTutorialWorkspace, activeLanguageId, tutorialLoadGeneration) {
+      if (!isTutorialWorkspace) return@LaunchedEffect
       val languageId = activeLanguageId ?: return@LaunchedEffect
       var loadedSession: DynamicTutorialSession? = null
       isLoadingTutorial = true
@@ -736,9 +818,46 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       } else {
         sourceFiles[normalizedPath] = DEFAULT_NEW_FILE_CODE
         openFile(normalizedPath)
+        argument.projectId?.let { projectId ->
+          coroutineScope.launch {
+            runCatching {
+              check(projectRepository.createFile(projectId, normalizedPath)) {
+                "文件已存在：$normalizedPath"
+              }
+              projectRepository.saveSource(projectId, normalizedPath, DEFAULT_NEW_FILE_CODE)
+            }.onFailure { throwable ->
+              output = throwable.toFailureText("创建项目文件失败")
+            }
+          }
+        }
         output = "已创建并打开 $normalizedPath"
         true
       }
+    }
+
+    /** 校验并在真实项目目录中创建文件夹；教程工作区只维护当前会话的虚拟目录。 */
+    fun createWorkspaceDirectory(requestedPath: String): Boolean {
+      val normalizedPath = requestedPath.trim().replace('\\', '/')
+      val error = when {
+        normalizedPath.isEmpty() -> "文件夹路径不能为空。"
+        normalizedPath.startsWith('/') || normalizedPath.split('/').any { it == ".." } ->
+          "文件夹必须使用工作区内的相对路径。"
+        sourceFiles.keys.any { it == normalizedPath || it.startsWith("$normalizedPath/") } ->
+          "文件夹已存在：$normalizedPath"
+        else -> null
+      }
+      if (error != null) {
+        output = error
+        return false
+      }
+      argument.projectId?.let { projectId ->
+        coroutineScope.launch {
+          runCatching { projectRepository.createDirectory(projectId, normalizedPath) }
+            .onFailure { throwable -> output = throwable.toFailureText("创建项目文件夹失败") }
+        }
+      }
+      output = "已创建文件夹 $normalizedPath"
+      return true
     }
 
     val displayedSourceFiles = sourceFiles.toMutableMap().apply {
@@ -801,17 +920,36 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
             ?.course
         }
       }
-    val tutorialSidePanel = rememberCodeEditorTutorialSidePanel(
-      manifest = tutorialManifest,
-      status = tutorialStatus,
-      isLoading = isLoadingTutorial,
-      canRetryLoad = canRetryTutorialLoad,
-      activeCourseId = activeTutorial?.course?.summary?.courseId,
-      progressByCourseId = displayedTutorialProgress,
-      onRetryLoad = { tutorialLoadGeneration++ },
-      onOpenCourse = ::openTutorialCourse,
-      onResetCourse = ::resetTutorialCourse,
-    )
+    val tutorialSidePanel = if (isTutorialWorkspace) {
+      rememberCodeEditorTutorialSidePanel(
+        manifest = tutorialManifest,
+        status = tutorialStatus,
+        isLoading = isLoadingTutorial,
+        canRetryLoad = canRetryTutorialLoad,
+        activeCourseId = activeTutorial?.course?.summary?.courseId,
+        progressByCourseId = displayedTutorialProgress,
+        onRetryLoad = { tutorialLoadGeneration++ },
+        onSwitchLanguage = {
+          showTutorialLanguagePicker = true
+          if (tutorialLanguageChoices == null && !isLoadingTutorialLanguages) {
+            isLoadingTutorialLanguages = true
+            tutorialLanguageLoadError = null
+            coroutineScope.launch {
+              runCatching { dynamicTutorialManager.supportedTutorials() }
+                .onSuccess { tutorialLanguageChoices = it }
+                .onFailure {
+                  tutorialLanguageLoadError = it.message ?: "读取教程语言失败。"
+                }
+              isLoadingTutorialLanguages = false
+            }
+          }
+        },
+        onOpenCourse = ::openTutorialCourse,
+        onResetCourse = ::resetTutorialCourse,
+      )
+    } else {
+      null
+    }
     val sidePanels = rememberCodeEditorTestSidePanels(
       activeFilePath = activeFilePath,
       sourceFiles = displayedSourceFiles,
@@ -821,10 +959,28 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       isAnalyzingSymbol = isAnalyzingSymbol,
       highlightCacheCapacity = highlightCacheCapacity,
       unsupportedCapabilityStatistics = unsupportedCapabilityStatistics,
-      leadingPanels = listOf(tutorialSidePanel),
+      leadingPanels = listOfNotNull(tutorialSidePanel),
+      projectPath = loadedProjectWorkspace?.directoryDisplayPath
+        ?: "/${initialTemplate.defaultProjectName}",
       fileIcon = dynamicDocumentIcon,
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
+      onCreateFolder = ::createWorkspaceDirectory,
+      onSwitchProject = {
+        // 入口页已经在进入工作区时出栈；切换项目需要显式重建入口，再移除当前工作区。
+        CodeWorkspaceHomeNavArgument.navigate()
+        argument.popBackStack()
+      },
+      onOpenProjectDirectory = {
+        val directory = loadedProjectWorkspace?.directory
+        if (directory == null) {
+          toast("教程工作区没有可在文件管理器中打开的本地目录。")
+        } else {
+          openProjectDirectory(directory).onFailure {
+            toast(it.message ?: "无法打开项目目录。")
+          }
+        }
+      },
       onLoadLanguage = {
         activeLanguageId?.let { languageId ->
           coroutineScope.launch { loadLanguageService(languageId) }
@@ -1066,6 +1222,27 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           )
         }
       }
+      if (showTutorialLanguagePicker) {
+        WorkspaceLanguageDialog(
+          title = "切换教程",
+          subtitle = "选择另一门语言的学习路径",
+          choices = tutorialLanguageChoices.orEmpty().map { tutorial ->
+            WorkspaceLanguageChoice(
+              languageId = tutorial.languageId,
+              displayName = tutorial.displayName,
+              description = "打开 ${tutorial.displayName} 学习路径",
+            )
+          },
+          isLoading = isLoadingTutorialLanguages,
+          emptyMessage = tutorialLanguageLoadError,
+          onDismiss = { showTutorialLanguagePicker = false },
+          onSelect = { choice ->
+            showTutorialLanguagePicker = false
+            argument.popBackStack()
+            CodeEditorTestNavArgument(tutorialLanguageId = choice.languageId).navigate()
+          },
+        )
+      }
     }
   }
 
@@ -1184,173 +1361,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     const val AUTO_HIGHLIGHT_DELAY_MILLIS = 200L
     const val RUN_TARGET_REFRESH_DELAY_MILLIS = 150L
     const val TUTORIAL_PROGRESS_SAVE_DELAY_MILLIS = 600L
-    const val JAVA_MAIN_FILE_PATH = "java/Main.java"
-    const val JAVASCRIPT_MAIN_FILE_PATH = "javascript/main.js"
+    const val PROJECT_SOURCE_SAVE_DELAY_MILLIS = 500L
 
-    val DEFAULT_MAIN_CODE = """
-      package course;
-
-      public class Main {
-        public static void main(String[] args) {
-          int total = ScoreMath.sumTo(10);
-          System.out.println("1 到 10 的和：" + total);
-
-          System.out.print("偶数：");
-          for (int value = 2; value <= 10; value += 2) {
-            System.out.print(value);
-            System.out.print(" ");
-          }
-          System.out.println();
-        }
-      }
-    """.trimIndent()
-
-    val DEFAULT_SOURCE_FILES = mapOf(
-      JAVA_MAIN_FILE_PATH to DEFAULT_MAIN_CODE,
-      "java/basics/ScoreMath.java" to """
-        package course;
-
-        public class ScoreMath {
-          public static int sumTo(int limit) {
-            int total = 0;
-            for (int value = 1; value <= limit; value++) {
-              total += value;
-            }
-            return total;
-          }
-        }
-      """.trimIndent(),
-      "java/basics/CounterMain.java" to """
-        package course.basics;
-
-        public class CounterMain {
-          public static void main(String[] args) {
-            int counter = 0;
-            int remaining = 5;
-            while (remaining > 0) {
-              counter++;
-              remaining--;
-              System.out.println("第 " + counter + " 次计数");
-            }
-            System.out.println("最终结果：" + counter);
-          }
-        }
-      """.trimIndent(),
-      "java/generics/GenericBoxMain.java" to """
-        package course.generics;
-
-        public class GenericBoxMain {
-          public static void main(String[] args) {
-            Box<String> message = new Box<String>("泛型可以复用类型安全的容器");
-            Box<Integer> score = new Box<Integer>(95);
-
-            System.out.println(message.get());
-            System.out.println("课程分数：" + score.get());
-          }
-        }
-
-        class Box<T> {
-          private T value;
-
-          Box(T value) {
-            this.value = value;
-          }
-
-          T get() {
-            return value;
-          }
-        }
-      """.trimIndent(),
-      "java/generics/GenericMethodMain.java" to """
-        package course.generics;
-
-        public class GenericMethodMain {
-          public static <T> T chooseFirst(T first, T second) {
-            return first;
-          }
-
-          public static void main(String[] args) {
-            String course = chooseFirst("Java", "Kotlin");
-            Integer score = chooseFirst(92, 88);
-
-            System.out.println("选择的课程：" + course);
-            System.out.println("选择的分数：" + score);
-          }
-        }
-      """.trimIndent(),
-      "java/collections/ListMain.java" to """
-        package course.collections;
-
-        import java.util.ArrayList;
-        import java.util.Iterator;
-        import java.util.List;
-
-        public class ListMain {
-          public static void main(String[] args) {
-            List<String> courses = new ArrayList<>();
-            courses.add("Java 基础");
-            courses.add("泛型");
-            courses.add("集合");
-
-            System.out.println("课程数量：" + courses.size());
-            Iterator<String> iterator = courses.iterator();
-            while (iterator.hasNext()) {
-              System.out.println("- " + iterator.next());
-            }
-          }
-        }
-      """.trimIndent(),
-      "java/collections/SetMapMain.java" to """
-        package course.collections;
-
-        import java.util.HashMap;
-        import java.util.HashSet;
-        import java.util.Map;
-        import java.util.Set;
-
-        public class SetMapMain {
-          public static void main(String[] args) {
-            Set<String> tags = new HashSet<>();
-            tags.add("Java");
-            tags.add("集合");
-            boolean duplicated = tags.add("Java");
-
-            Map<String, Integer> scores = new HashMap<>();
-            scores.put("小邮", 96);
-            scores.put("小掌", 91);
-
-            System.out.println("标签数量：" + tags.size());
-            System.out.println("重复添加成功：" + duplicated);
-            System.out.println("小邮的分数：" + scores.get("小邮"));
-            System.out.println("是否包含小掌：" + scores.containsKey("小掌"));
-          }
-        }
-      """.trimIndent(),
-      JAVASCRIPT_MAIN_FILE_PATH to """
-        import { Student } from "./models/student.js";
-
-        const student = new Student("小邮", [88, 92, 95]);
-        console.log(student.name, "平均分", student.average());
-        student.average();
-      """.trimIndent(),
-      "javascript/models/student.js" to """
-        export class Student {
-          constructor(name, scores) {
-            this.name = name;
-            this.scores = scores;
-          }
-
-          average() {
-            return this.scores.reduce((sum, score) => sum + score, 0) / this.scores.length;
-          }
-        }
-      """.trimIndent(),
-    )
-
+    /** 新建文件在识别具体语言前使用的最小占位内容。 */
     val DEFAULT_NEW_FILE_CODE = """
       // 在这里编写新模块
-      export const value = 1;
     """.trimIndent()
-
   }
 }

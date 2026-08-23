@@ -25,6 +25,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.School
@@ -139,6 +140,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
   activeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
   onRetryLoad: () -> Unit,
+  onSwitchLanguage: () -> Unit,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ): CodeEditorSidePanel {
@@ -155,6 +157,7 @@ internal fun rememberCodeEditorTutorialSidePanel(
       activeCourseId = activeCourseId,
       progressByCourseId = progressByCourseId,
       onRetryLoad = onRetryLoad,
+      onSwitchLanguage = onSwitchLanguage,
       onResetCourse = onResetCourse,
       onOpenCourse = { courseId ->
         onOpenCourse(courseId)
@@ -176,6 +179,7 @@ private fun TutorialCoursePath(
   activeCourseId: String?,
   progressByCourseId: Map<String, DynamicTutorialProgress>,
   onRetryLoad: () -> Unit,
+  onSwitchLanguage: () -> Unit,
   onOpenCourse: (String) -> Unit,
   onResetCourse: (String) -> Unit,
 ) {
@@ -183,12 +187,27 @@ private fun TutorialCoursePath(
     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
     verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    Text(
-      text = manifest?.languageId?.uppercase()?.plus(" 学习路径") ?: "教程",
-      color = EditorWorkbenchColors.PrimaryText,
-      fontSize = 14.sp,
-      fontWeight = FontWeight.Bold,
-    )
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .clickable(onClick = onSwitchLanguage)
+        .padding(vertical = 2.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+        text = manifest?.languageId?.uppercase()?.plus(" 学习路径") ?: "教程",
+        modifier = Modifier.weight(1F),
+        color = EditorWorkbenchColors.PrimaryText,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+      )
+      Icon(
+        imageVector = Icons.Default.ArrowDropDown,
+        contentDescription = "切换教程语言",
+        modifier = Modifier.size(20.dp),
+        tint = EditorWorkbenchColors.SecondaryText,
+      )
+    }
     Text(
       text = status,
       color = EditorWorkbenchColors.SecondaryText,

@@ -35,4 +35,6 @@
 
     <string name="discover_title_sport">体育打卡</string>
     <string name="discover_detail_sport">记录查询</string>
+
+    <string name="discover_title_code_editor">代码编辑器</string>
 </resources>

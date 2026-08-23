@@ -20,6 +20,8 @@ kotlin {
       implementation(projects.cyxbsFunctions.code.js.quickjs)
       implementation(projects.cyxbsFunctions.code.language)
       implementation(projects.cyxbsFunctions.code.tutorials)
+      implementation(libs.filekit.core)
+      implementation(libs.filekit.dialogs)
       implementation(libs.kmp.kodemirror.view)
       implementation(libs.kmp.kodemirror.basicSetup)
       implementation(libs.kmp.kodemirror.autocomplete)

@@ -71,6 +71,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cyxbs.functions.code.editor.project.projectDirectoryLabel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanel
 import com.cyxbs.functions.code.editor.workbench.CodeEditorSidePanelGroup
 import com.cyxbs.functions.code.editor.workbench.CodeEditorToolWindow
@@ -90,7 +91,7 @@ internal const val RUN_TOOL_WINDOW_ID = "run"
  * 创建仅供编辑器手动测试页使用的侧边能力。
  *
  * [leadingPanels] 用于注入教程等场景能力；为空时得到普通代码编辑器侧栏，证明课程不属于通用
- * 工作台的必选依赖。[projectPath] 仅用于文件面板顶部展示，后续可传入真实工程路径；[fileIcon]
+ * 工作台的必选依赖。[projectPath] 用于文件面板顶部展示和打开系统文件管理器；[fileIcon]
  * 与标签栏共享语言图标，避免文件树重新获取或解析动态资源。
  */
 @Composable
@@ -108,6 +109,9 @@ internal fun rememberCodeEditorTestSidePanels(
   fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)? = null,
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
+  onCreateFolder: (String) -> Boolean,
+  onSwitchProject: () -> Unit,
+  onOpenProjectDirectory: () -> Unit,
   onLoadLanguage: () -> Unit,
   onHighlightCacheCapacityChange: (Int) -> Unit,
   onClearUnsupportedCapabilityStatistics: () -> Unit,
@@ -138,12 +142,15 @@ internal fun rememberCodeEditorTestSidePanels(
           },
           onCreateFile = onCreateFile,
           onCreateFolder = { requestedPath ->
-            createTestFolder(
+            val created = createTestFolder(
               requestedPath = requestedPath,
               filePaths = sourceFiles.keys,
               folderPaths = createdFolderPaths,
             )
+            created && onCreateFolder(requestedPath)
           },
+          onSwitchProject = onSwitchProject,
+          onOpenProjectDirectory = onOpenProjectDirectory,
         )
       },
     )
@@ -357,6 +364,8 @@ private fun FilePanelContent(
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
+  onSwitchProject: () -> Unit,
+  onOpenProjectDirectory: () -> Unit,
 ) {
   var pendingCreation by remember { mutableStateOf<FileTreeCreation?>(null) }
   var creationName by remember { mutableStateOf("") }
@@ -374,6 +383,8 @@ private fun FilePanelContent(
         creationName = creation.defaultName
         creationError = null
       },
+      onSwitchProject = onSwitchProject,
+      onOpenProjectDirectory = onOpenProjectDirectory,
     )
     BoxWithConstraints(Modifier.weight(1F)) {
       val verticalScrollState = rememberScrollState()
@@ -423,15 +434,17 @@ private fun FilePanelContent(
 }
 
 /**
- * 文件树顶部的虚拟项目路径栏。
+ * 文件树顶部的项目路径栏。
  *
- * 三点菜单只负责发起创建意图；实际文件和目录的创建策略由上层回调决定，后续可直接替换为真实
- * 文件系统实现。
+ * 长路径只展示末尾目录，点击后由上层使用系统文件管理器打开完整路径；三点菜单继续负责文件、
+ * 目录和项目切换意图。
  */
 @Composable
 private fun FilePanelToolbar(
   projectPath: String,
   onRequestCreation: (FileTreeCreation) -> Unit,
+  onSwitchProject: () -> Unit,
+  onOpenProjectDirectory: () -> Unit,
 ) {
   var menuExpanded by remember { mutableStateOf(false) }
   Column {
@@ -449,13 +462,16 @@ private fun FilePanelToolbar(
         modifier = Modifier.size(16.dp),
       )
       Text(
-        text = projectPath,
+        text = projectDirectoryLabel(projectPath),
         color = EditorWorkbenchColors.PrimaryText,
         fontFamily = FontFamily.Monospace,
         fontSize = 11.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1F).padding(start = 6.dp),
+        modifier = Modifier
+          .weight(1F)
+          .clickable(onClick = onOpenProjectDirectory)
+          .padding(start = 6.dp, top = 8.dp, bottom = 8.dp),
       )
       Box(
         modifier = Modifier.size(30.dp).clickable { menuExpanded = true },
@@ -478,6 +494,16 @@ private fun FilePanelToolbar(
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier.removeDefaultDropdownMenuVerticalPadding(),
           ) {
+            DropdownMenuItem(
+              modifier = Modifier.height(CompactDropdownMenuItemHeight),
+              contentPadding = PaddingValues(horizontal = 12.dp),
+              onClick = {
+                menuExpanded = false
+                onSwitchProject()
+              },
+            ) {
+              Text("切换 / 新建项目", color = EditorWorkbenchColors.PrimaryText, fontSize = 12.sp)
+            }
             DropdownMenuItem(
               modifier = Modifier.height(CompactDropdownMenuItemHeight),
               contentPadding = PaddingValues(horizontal = 12.dp),

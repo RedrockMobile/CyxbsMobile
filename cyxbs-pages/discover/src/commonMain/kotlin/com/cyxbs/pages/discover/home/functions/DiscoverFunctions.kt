@@ -3,6 +3,7 @@ package com.cyxbs.pages.discover.home.functions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.painter.Painter
+import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
@@ -10,6 +11,7 @@ import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_bus_track
+import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_code_editor
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_empty_classroom
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_map
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_more_function
@@ -21,6 +23,7 @@ import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_sport
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_todo
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_more_function_notice_text
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_title_bus_track
+import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_title_code_editor
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_title_empty_classroom
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_title_map
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_title_more_function
@@ -105,6 +108,12 @@ abstract class DiscoverFunctions {
         onClick = { clickExam() },
       ),
       DiscoverFunctionItem(
+        id = "code_editor",
+        title = stringResource(Res.string.discover_title_code_editor),
+        painter = painterResource(Res.drawable.discover_ic_code_editor),
+        onClick = { clickCodeEditor() },
+      ),
+      DiscoverFunctionItem(
         id = "more_function",
         title = stringResource(Res.string.discover_title_more_function),
         painter = painterResource(Res.drawable.discover_ic_more_function),
@@ -149,6 +158,11 @@ abstract class DiscoverFunctions {
 
   open fun clickExam() {
     toast("该平台未实现")
+  }
+
+  /** 通过稳定 deeplink 打开代码工作区，避免发现模块反向依赖完整编辑器实现。 */
+  open fun clickCodeEditor() {
+    AppScheme.jump("cyxbs://code/editor-test")
   }
 }
 

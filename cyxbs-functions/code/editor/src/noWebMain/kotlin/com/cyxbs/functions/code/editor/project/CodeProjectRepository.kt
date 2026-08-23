@@ -1,0 +1,475 @@
+package com.cyxbs.functions.code.editor.project
+
+import com.cyxbs.components.config.sp.defaultSettings
+import com.russhwolf.settings.Settings
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.absolutePath
+import io.github.vinceglb.filekit.createDirectories
+import io.github.vinceglb.filekit.div
+import io.github.vinceglb.filekit.exists
+import io.github.vinceglb.filekit.isDirectory
+import io.github.vinceglb.filekit.isRegularFile
+import io.github.vinceglb.filekit.list
+import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.readString
+import io.github.vinceglb.filekit.size
+import io.github.vinceglb.filekit.writeString
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlin.time.Clock
+
+/**
+ * 用户项目目录、项目 manifest 与历史项目索引的唯一入口。
+ *
+ * Settings 只缓存最近顺序和移动端目录 bookmark；每个项目自身都保存一份
+ * [.cyxbs-project.json][PROJECT_MANIFEST_FILE_NAME]。应用卸载不会删除用户选择目录中的源码，重装后
+ * 重新选择原目录即可从 manifest 恢复项目。所有写操作通过同一 [Mutex] 串行，避免自动保存和目录
+ * 扫描相互覆盖。
+ */
+class CodeProjectRepository(
+  private val settings: Settings = defaultSettings,
+  private val projectsRoot: PlatformFile? = null,
+  private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+  private val json: Json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+  },
+) {
+  private val mutex = Mutex()
+
+  /**
+   * 确保已经取得项目根目录。
+   *
+   * 移动端首次调用会打开系统目录选择器；取消时返回 false。成功后同步磁盘 manifest，使重装后的
+   * 项目立即重新出现在首页。
+   */
+  suspend fun prepareProjectRoot(): Boolean = mutex.withLock {
+    val root = resolveStorageRoot(requestIfMissing = true) ?: return@withLock false
+    saveProjects(loadProjects(root))
+    true
+  }
+
+  /** 返回置顶优先、其余按最近点击时间倒序排列的历史项目。 */
+  suspend fun historicalProjects(): List<HistoricalCodeProject> = mutex.withLock {
+    val root = resolveStorageRoot(requestIfMissing = false)
+    val projects = loadProjects(root).sortedForHistory()
+    if (root != null) saveProjects(projects)
+    projects.map { project ->
+      val directory = root?.directoryFor(project)?.takeIf {
+        it.exists() && it.isDirectory()
+      }
+      HistoricalCodeProject(
+        project = project,
+        directory = directory,
+        directoryDisplayPath = root?.displayPathFor(project)
+          ?: project.storageDirectoryName,
+      )
+    }
+  }
+
+  /**
+   * 依据语言模板在用户项目根目录创建项目，并写入可跨安装恢复的 manifest。
+   *
+   * [projectName] 由创建弹窗显式提供；展示名称不参与磁盘路径拼接，目录仍使用稳定 projectId。
+   */
+  suspend fun createProject(
+    template: CodeProjectTemplate,
+    projectName: String,
+  ): CodeProjectWorkspace = mutex.withLock {
+    val root = resolveStorageRoot(requestIfMissing = true)
+      ?: throw CodeProjectException("未选择项目保存目录。")
+    val projects = loadProjects(root)
+    val normalizedProjectName = normalizeProjectName(projectName)
+    if (projects.any { it.name.equals(normalizedProjectName, ignoreCase = true) }) {
+      throw CodeProjectException("项目名称已存在：$normalizedProjectName")
+    }
+    val projectId = uniqueProjectId(template.languageId, projects)
+    val project = CodeProject(
+      projectId = projectId,
+      name = normalizedProjectName,
+      languageId = template.languageId,
+      storageDirectoryName = projectId,
+      lastOpenedAtEpochMilliseconds = clock(),
+      activeFilePath = template.activeFilePath,
+    )
+    val directory = root.directoryFor(project)
+    directory.createDirectories(mustCreate = true)
+    template.sourceFiles.forEach { (path, source) ->
+      requireSafeRelativePath(path)
+      resolveFile(directory, path, createParents = true).writeString(source)
+    }
+    writeProjectManifest(directory, project)
+    saveProjects(projects.filterNot { it.projectId == projectId } + project)
+    removeIgnoredProject(projectId)
+    CodeProjectWorkspace(
+      project = project,
+      sourceFiles = template.sourceFiles,
+      activeFilePath = template.activeFilePath,
+      directory = directory,
+      directoryDisplayPath = root.displayPathFor(project),
+    )
+  }
+
+  /** 从最近项目 ID 重新解析授权目录并读取全部受支持源码。 */
+  suspend fun openProject(projectId: String): CodeProjectWorkspace = mutex.withLock {
+    val root = resolveStorageRoot(requestIfMissing = false)
+      ?: throw CodeProjectException("项目目录授权已失效，请重新选择项目根目录。")
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val directory = root.directoryFor(project)
+    if (!directory.exists() || !directory.isDirectory()) {
+      throw CodeProjectException("项目目录已不可访问：${project.name}")
+    }
+    val sourceFiles = readWorkspace(directory)
+    val activeFilePath = project.activeFilePath
+      ?.takeIf(sourceFiles::containsKey)
+      ?: sourceFiles.keys.firstOrNull()
+      ?: throw CodeProjectException("项目中没有可编辑的源码文件：${project.name}")
+    val openedProject = project.copy(
+      lastOpenedAtEpochMilliseconds = clock(),
+      activeFilePath = activeFilePath,
+    )
+    writeProjectManifest(directory, openedProject)
+    saveProjects(projects.replace(openedProject))
+    CodeProjectWorkspace(
+      project = openedProject,
+      sourceFiles = sourceFiles,
+      activeFilePath = activeFilePath,
+      directory = directory,
+      directoryDisplayPath = root.displayPathFor(openedProject),
+    )
+  }
+
+  /** 将当前活动文件同时写回 Settings 索引和项目 manifest，用于卸载后恢复。 */
+  suspend fun updateActiveFile(projectId: String, activeFilePath: String) = mutex.withLock {
+    requireSafeRelativePath(activeFilePath)
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val updated = project.copy(activeFilePath = activeFilePath)
+    writeProjectManifest(root.directoryFor(updated), updated)
+    saveProjects(projects.replace(updated))
+  }
+
+  /** 把编辑器文本覆盖写入用户项目目录；调用方应在输入停止后触发。 */
+  suspend fun saveSource(projectId: String, relativePath: String, source: String) = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    resolveFile(root.directoryFor(project), relativePath, createParents = true).writeString(source)
+  }
+
+  /** 创建空源码文件并返回是否成功；已存在时返回 false。 */
+  suspend fun createFile(projectId: String, relativePath: String): Boolean = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    val file = resolveFile(root.directoryFor(project), relativePath, createParents = true)
+    if (file.exists()) return@withLock false
+    file.writeString("")
+    true
+  }
+
+  /** 在用户项目目录中创建文件夹；已存在时返回 false。 */
+  suspend fun createDirectory(projectId: String, relativePath: String): Boolean = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    val directory = resolveDirectory(root.directoryFor(project), relativePath, create = false)
+    if (directory.exists()) return@withLock false
+    resolveDirectory(root.directoryFor(project), relativePath, create = true)
+    true
+  }
+
+  /**
+   * 修改项目置顶状态，并同时写回 Settings 与项目 manifest。
+   *
+   * 置顶只改变历史列表分组，不覆盖最近点击时间；取消置顶后会自动回到正常时间顺序。
+   */
+  suspend fun setProjectPinned(projectId: String, isPinned: Boolean) = mutex.withLock {
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    if (project.isPinned == isPinned) return@withLock
+    val updated = project.copy(isPinned = isPinned)
+    writeProjectManifest(root.directoryFor(updated), updated)
+    saveProjects(projects.replace(updated))
+  }
+
+  /** 从历史列表中移除入口，但不删除用户源码和 manifest。 */
+  suspend fun forgetProject(projectId: String) = mutex.withLock {
+    saveProjects(loadIndexedProjects().filterNot { it.projectId == projectId })
+    val ignored = loadIgnoredProjectIds() + projectId
+    saveIgnoredProjectIds(ignored.toList().takeLast(MAX_IGNORED_PROJECTS))
+  }
+
+  /** 返回当前已授权的项目目录，供系统文件管理器打开。 */
+  suspend fun projectDirectory(projectId: String): PlatformFile = mutex.withLock {
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    root.directoryFor(project).takeIf { it.exists() && it.isDirectory() }
+      ?: throw CodeProjectException("项目目录已不可访问：${project.name}")
+  }
+
+  /** 恢复固定测试目录或平台 bookmark；只在显式创建流程中允许弹出选择器。 */
+  private suspend fun resolveStorageRoot(requestIfMissing: Boolean): CodeProjectStorageRoot? {
+    projectsRoot?.let { root ->
+      root.createDirectories()
+      return CodeProjectStorageRoot(root, root.absolutePath())
+    }
+    return resolveDefaultCodeProjectStorageRoot(settings, requestIfMissing)
+  }
+
+  private suspend fun requireStorageRoot(): CodeProjectStorageRoot =
+    resolveStorageRoot(requestIfMissing = false)
+      ?: throw CodeProjectException("项目目录授权已失效，请重新选择项目根目录。")
+
+  /** 合并 Settings 索引与磁盘 manifest；manifest 让项目可在应用重装后恢复。 */
+  private suspend fun loadProjects(root: CodeProjectStorageRoot?): List<CodeProject> {
+    val ignored = loadIgnoredProjectIds()
+    val discoveredProjects = root?.let { discoverProjects(it.directory) }.orEmpty()
+    val merged = (loadIndexedProjects() + discoveredProjects)
+      .filterNot { it.projectId in ignored }
+      .groupBy(CodeProject::projectId)
+      .mapNotNull { (_, versions) ->
+        versions.maxByOrNull(CodeProject::lastOpenedAtEpochMilliseconds)
+      }
+    return merged.sortedForHistory().take(MAX_PROJECTS)
+  }
+
+  /** 扫描根目录下受控数量的直接子目录，只接受格式正确且 ID 匹配的 manifest。 */
+  private suspend fun discoverProjects(root: PlatformFile): List<CodeProject> {
+    val projects = mutableListOf<CodeProject>()
+    val directories = runCatching { root.list() }.getOrElse { return emptyList() }
+    for (directory in directories) {
+      if (projects.size >= MAX_DISCOVERED_DIRECTORIES) break
+      if (!directory.isDirectory()) continue
+      val manifest = directory / PROJECT_MANIFEST_FILE_NAME
+      if (!manifest.isRegularFile() || manifest.size() > MAX_MANIFEST_BYTES) continue
+      val project = runCatching {
+        json.decodeFromString(
+          CodeProjectManifest.serializer(),
+          manifest.readString(),
+        ).project.copy(storageDirectoryName = directory.name)
+      }.getOrNull() ?: continue
+      if (project.projectId.isNotBlank() && project.languageId.isNotBlank()) {
+        projects += project
+      }
+    }
+    return projects
+  }
+
+  /** 递归读取受支持的文本源码，并限制目录深度、文件数量和总源码体积。 */
+  private suspend fun readWorkspace(root: PlatformFile): Map<String, String> {
+    val result = linkedMapOf<String, String>()
+    var totalCharacters = 0L
+
+    suspend fun visit(directory: PlatformFile, prefix: String, depth: Int) {
+      if (depth > MAX_DIRECTORY_DEPTH) throw CodeProjectException("项目目录层级超过限制。")
+      directory.list().sortedBy(PlatformFile::name).forEach { child ->
+        if (child.name == PROJECT_MANIFEST_FILE_NAME) return@forEach
+        if (child.name in IGNORED_DIRECTORY_NAMES && child.isDirectory()) return@forEach
+        val relativePath = if (prefix.isEmpty()) child.name else "$prefix/${child.name}"
+        when {
+          child.isDirectory() -> visit(child, relativePath, depth + 1)
+          child.isRegularFile() && child.isSupportedSourceFile() -> {
+            if (result.size >= MAX_SOURCE_FILES) {
+              throw CodeProjectException("项目源码文件数量超过限制。")
+            }
+            if (child.size() > MAX_SINGLE_SOURCE_BYTES) {
+              throw CodeProjectException("源码文件过大：$relativePath")
+            }
+            val source = child.readString()
+            totalCharacters += source.length
+            if (totalCharacters > MAX_TOTAL_SOURCE_CHARACTERS) {
+              throw CodeProjectException("项目源码总量超过限制。")
+            }
+            result[relativePath] = source
+          }
+        }
+      }
+    }
+
+    visit(root, prefix = "", depth = 0)
+    return result
+  }
+
+  /** 按相对路径逐级创建父目录，兼容 Android SAF URI 与普通文件路径。 */
+  private fun resolveFile(root: PlatformFile, path: String, createParents: Boolean): PlatformFile {
+    val segments = path.split('/')
+    var parent = root
+    segments.dropLast(1).forEach { segment ->
+      parent = parent / segment
+      if (createParents) parent.createDirectories()
+    }
+    return parent / segments.last()
+  }
+
+  /** 按相对路径解析目录；[create] 为 true 时逐级创建缺失目录。 */
+  private fun resolveDirectory(root: PlatformFile, path: String, create: Boolean): PlatformFile {
+    var directory = root
+    path.split('/').forEach { segment ->
+      directory = directory / segment
+      if (create) directory.createDirectories()
+    }
+    return directory
+  }
+
+  /** 项目 manifest 与源码同目录保存，是跨卸载恢复的唯一事实来源。 */
+  private suspend fun writeProjectManifest(directory: PlatformFile, project: CodeProject) {
+    (directory / PROJECT_MANIFEST_FILE_NAME).writeString(
+      json.encodeToString(
+        CodeProjectManifest.serializer(),
+        CodeProjectManifest(project = project),
+      ),
+    )
+  }
+
+  /** 从 Settings 读取项目索引；损坏数据按空索引处理，真实项目目录不会被删除。 */
+  private fun loadIndexedProjects(): List<CodeProject> {
+    val raw = settings.getStringOrNull(PROJECTS_SETTINGS_KEY) ?: return emptyList()
+    return runCatching { json.decodeFromString(CodeProjectState.serializer(), raw).projects }
+      .getOrElse { emptyList() }
+      .distinctBy(CodeProject::projectId)
+      .take(MAX_PROJECTS)
+  }
+
+  /** 原子更新 Settings 中的轻量历史项目索引，并冻结为与界面一致的排序。 */
+  private fun saveProjects(projects: List<CodeProject>) {
+    settings.putString(
+      PROJECTS_SETTINGS_KEY,
+      json.encodeToString(
+        CodeProjectState.serializer(),
+        CodeProjectState(projects = projects.sortedForHistory().take(MAX_PROJECTS)),
+      ),
+    )
+  }
+
+  private fun loadIgnoredProjectIds(): Set<String> {
+    val raw = settings.getStringOrNull(IGNORED_PROJECTS_SETTINGS_KEY) ?: return emptySet()
+    return runCatching {
+      json.decodeFromString(IgnoredCodeProjectState.serializer(), raw).projectIds.toSet()
+    }.getOrElse { emptySet() }
+  }
+
+  private fun saveIgnoredProjectIds(projectIds: List<String>) {
+    settings.putString(
+      IGNORED_PROJECTS_SETTINGS_KEY,
+      json.encodeToString(
+        IgnoredCodeProjectState.serializer(),
+        IgnoredCodeProjectState(projectIds = projectIds.distinct()),
+      ),
+    )
+  }
+
+  private fun removeIgnoredProject(projectId: String) {
+    saveIgnoredProjectIds(loadIgnoredProjectIds().filterNot { it == projectId })
+  }
+
+  /** 返回指定项目；不存在时拒绝写入，避免意外创建游离目录。 */
+  private suspend fun requireProject(projectId: String, root: CodeProjectStorageRoot): CodeProject =
+    loadProjects(root).firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+
+  private fun CodeProjectStorageRoot.directoryFor(project: CodeProject): PlatformFile =
+    directory / project.storageDirectoryName
+
+  private fun CodeProjectStorageRoot.displayPathFor(project: CodeProject): String =
+    "${displayPath.trimEnd('/', '\\')}/${project.storageDirectoryName}"
+
+  /** 校验用户输入的展示名称；名称不会直接作为文件路径，但仍拒绝控制字符和异常长度。 */
+  private fun normalizeProjectName(projectName: String): String {
+    val normalized = projectName.trim()
+    if (normalized.isEmpty()) throw CodeProjectException("项目名称不能为空。")
+    if (normalized.length > MAX_PROJECT_NAME_LENGTH) {
+      throw CodeProjectException("项目名称不能超过 $MAX_PROJECT_NAME_LENGTH 个字符。")
+    }
+    if (normalized.any(Char::isISOControl)) {
+      throw CodeProjectException("项目名称不能包含控制字符。")
+    }
+    return normalized
+  }
+
+  /** 生成仅由安全路径字符组成的稳定 ID；同毫秒创建时继续增加后缀。 */
+  private fun uniqueProjectId(languageId: String, projects: List<CodeProject>): String {
+    val existingIds = projects.mapTo(hashSetOf(), CodeProject::projectId)
+    val base = "${languageId.filter { it.isLetterOrDigit() || it == '-' }}-${clock()}"
+    if (base !in existingIds) return base
+    var suffix = 2
+    while ("$base-$suffix" in existingIds) suffix++
+    return "$base-$suffix"
+  }
+
+  private fun List<CodeProject>.replace(project: CodeProject): List<CodeProject> =
+    filterNot { it.projectId == project.projectId } + project
+
+  /** 置顶项目始终在前；同一分组内按最后一次成功打开的时间倒序。 */
+  private fun List<CodeProject>.sortedForHistory(): List<CodeProject> = sortedWith(
+    compareByDescending<CodeProject>(CodeProject::isPinned)
+      .thenByDescending(CodeProject::lastOpenedAtEpochMilliseconds),
+  )
+
+  /** 拒绝绝对路径、反斜杠和目录穿越，保证所有文件操作停留在项目根目录。 */
+  private fun requireSafeRelativePath(path: String) {
+    val segments = path.split('/')
+    require(
+      path.isNotBlank() &&
+        path == path.trim() &&
+        !path.startsWith('/') &&
+        '\\' !in path &&
+        segments.none { it.isEmpty() || it == "." || it == ".." },
+    ) { "非法项目相对路径：$path" }
+  }
+
+  private fun PlatformFile.isSupportedSourceFile(): Boolean {
+    val extension = name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    return extension in SUPPORTED_SOURCE_EXTENSIONS
+  }
+
+  @Serializable
+  private data class CodeProjectState(
+    val schemaVersion: Int = PROJECTS_SCHEMA_VERSION,
+    val projects: List<CodeProject> = emptyList(),
+  )
+
+  @Serializable
+  private data class CodeProjectManifest(
+    val schemaVersion: Int = PROJECT_MANIFEST_SCHEMA_VERSION,
+    val project: CodeProject,
+  )
+
+  @Serializable
+  private data class IgnoredCodeProjectState(
+    val projectIds: List<String> = emptyList(),
+  )
+
+  private companion object {
+    const val PROJECTS_SETTINGS_KEY = "code.editor.recent-projects"
+    const val IGNORED_PROJECTS_SETTINGS_KEY = "code.editor.ignored-projects"
+    const val PROJECTS_SCHEMA_VERSION = 3
+    const val PROJECT_MANIFEST_SCHEMA_VERSION = 1
+    const val PROJECT_MANIFEST_FILE_NAME = ".cyxbs-project.json"
+    const val MAX_PROJECTS = 20
+    const val MAX_IGNORED_PROJECTS = 100
+    const val MAX_PROJECT_NAME_LENGTH = 64
+    const val MAX_DISCOVERED_DIRECTORIES = 200
+    const val MAX_MANIFEST_BYTES = 64L * 1024L
+    const val MAX_DIRECTORY_DEPTH = 16
+    const val MAX_SOURCE_FILES = 1_000
+    const val MAX_SINGLE_SOURCE_BYTES = 2L * 1024L * 1024L
+    const val MAX_TOTAL_SOURCE_CHARACTERS = 8L * 1024L * 1024L
+
+    val IGNORED_DIRECTORY_NAMES = setOf(".git", ".gradle", "build", "node_modules")
+    val SUPPORTED_SOURCE_EXTENSIONS = setOf(
+      "java", "js", "mjs", "cjs", "ts", "tsx", "py", "kt", "kts", "json", "md", "txt",
+    )
+  }
+}
+
+/** 项目目录缺失、授权失效或超过客户端资源边界。 */
+class CodeProjectException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
