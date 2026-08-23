@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.language.java.compiler.semantic.impl
 
 import com.cyxbs.functions.code.language.java.compiler.semantic.*
+import com.cyxbs.functions.code.language.java.compiler.ast.JavaAstPrimitiveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -17,6 +18,20 @@ class JavaGenericInferenceTest {
         listOf(OBJECT_TYPE_PARAMETER),
         listOf(JavaSemanticType.TypeVariable(OBJECT_TYPE_PARAMETER)),
         listOf(fixture.stringType),
+      ),
+    )
+  }
+
+  /** primitive 实参约束泛型变量时必须先装箱，不能产生非法的 T=int。 */
+  @Test
+  fun boxesPrimitiveConstraintForTypeVariable() {
+    val fixture = fixture()
+    assertEquals(
+      mapOf(OBJECT_TYPE_PARAMETER to fixture.integerType),
+      fixture.inference.infer(
+        listOf(OBJECT_TYPE_PARAMETER),
+        listOf(JavaSemanticType.TypeVariable(OBJECT_TYPE_PARAMETER)),
+        listOf(JavaSemanticType.Primitive(JavaAstPrimitiveType.INT)),
       ),
     )
   }
@@ -117,6 +132,11 @@ class JavaGenericInferenceTest {
         "demo.Other",
         JavaSemanticType.Declared(OBJECT, emptyList()),
       ),
+      INTEGER to declaration(
+        INTEGER,
+        "java.lang.Integer",
+        JavaSemanticType.Declared(OBJECT, emptyList()),
+      ),
     )
     val typeParameters = mapOf(
       OBJECT_TYPE_PARAMETER to JavaSemanticTypeParameterDeclaration(
@@ -140,11 +160,17 @@ class JavaGenericInferenceTest {
         listOf(JavaSemanticType.TypeVariable(OWNER_TYPE_PARAMETER)),
       ),
     )
-    val relations = JavaTypeRelations(declarations, typeParameters, OBJECT)
+    val relations = JavaTypeRelations(
+      declarations,
+      typeParameters,
+      OBJECT,
+      mapOf(INTEGER to JavaAstPrimitiveType.INT),
+    )
     return Fixture(
       JavaGenericInference(relations, typeParameters),
       JavaSemanticType.Declared(OBJECT, emptyList()),
       JavaSemanticType.Declared(STRING, emptyList()),
+      JavaSemanticType.Declared(INTEGER, emptyList()),
       JavaSemanticType.Declared(CHILD, emptyList()),
       JavaSemanticType.Declared(OTHER, emptyList()),
     )
@@ -171,6 +197,7 @@ class JavaGenericInferenceTest {
     val inference: JavaGenericInference,
     val objectType: JavaSemanticType.Declared,
     val stringType: JavaSemanticType.Declared,
+    val integerType: JavaSemanticType.Declared,
     val childType: JavaSemanticType.Declared,
     val otherType: JavaSemanticType.Declared,
   )
@@ -181,6 +208,7 @@ class JavaGenericInferenceTest {
     val BASE = JavaSymbolId(3)
     val CHILD = JavaSymbolId(4)
     val OTHER = JavaSymbolId(5)
+    val INTEGER = JavaSymbolId(11)
     val METHOD_OWNER = JavaSymbolId(6)
     val CLASS_OWNER = JavaSymbolId(20)
     val OBJECT_TYPE_PARAMETER = JavaSymbolId(7)

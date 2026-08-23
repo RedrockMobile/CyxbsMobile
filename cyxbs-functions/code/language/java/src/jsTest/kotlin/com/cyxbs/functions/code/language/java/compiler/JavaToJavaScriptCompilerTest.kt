@@ -313,6 +313,31 @@ class JavaToJavaScriptCompilerTest {
     assertEquals(true, executeEntryValue(artifact, null) as Boolean)
   }
 
+  /** primitive 实参推断为 wrapper 后，返回值仍应按 Java 规则拆箱并执行。 */
+  @Test
+  fun compilesGenericMethodWithPrimitiveArguments() {
+    val result = compile(
+      entryClass = "demo.GenericMethodMain",
+      entryMethod = "run",
+      descriptor = "()I",
+      "demo/GenericMethodMain.java" to """
+        package demo;
+
+        class GenericMethodMain {
+          static <T> T chooseFirst(T first, T second) { return first; }
+
+          static int run() {
+            Integer score = chooseFirst(92, 88);
+            return score;
+          }
+        }
+      """.trimIndent(),
+    )
+
+    val artifact = assertNotNull(result.value, result.diagnostics.toString())
+    assertEquals(92, executeEntry(artifact, 0))
+  }
+
   /** 泛型父类的方法代换后仍应被子类协变返回的 override 复用同一虚槽。 */
   @Test
   fun compilesGenericOverrideWithCovariantReturn() {

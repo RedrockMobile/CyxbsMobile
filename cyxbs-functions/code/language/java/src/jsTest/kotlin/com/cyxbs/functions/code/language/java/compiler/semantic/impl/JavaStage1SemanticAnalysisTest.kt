@@ -273,6 +273,33 @@ class JavaStage1SemanticAnalysisTest {
     assertTrue(model.valueAccesses.values.any { it.symbol in model.fieldDeclarations })
   }
 
+  /** primitive 实参应先装箱为 Integer，再作为方法类型变量 T 的推断结果。 */
+  @Test
+  fun infersBoxedTypeFromPrimitiveGenericArguments() {
+    val result = analyze(
+      "GenericMethodMain.java" to """
+        class GenericMethodMain {
+          static <T> T chooseFirst(T first, T second) { return first; }
+          static Integer run() { return chooseFirst(92, 88); }
+        }
+      """.trimIndent(),
+    )
+
+    assertTrue(result.isSuccess, result.diagnostics.toString())
+    val model = assertNotNull(result.value)
+    val integerSymbol = model.wrapperPrimitiveTypes.entries
+      .single { it.value == JavaAstPrimitiveType.INT }
+      .key
+    val integerType = JavaSemanticType.Declared(integerSymbol, emptyList())
+    assertTrue(model.selectedCallables.values.any { integerType in it.substitutions.values })
+    assertEquals(
+      2,
+      model.conversions.values.count {
+        it == JavaSemanticConversion.Boxing(JavaAstPrimitiveType.INT, integerSymbol)
+      },
+    )
+  }
+
   /** Java 8 允许只从赋值/return 目标推断无实参泛型方法的类型变量。 */
   @Test
   fun infersGenericMethodFromTargetType() {

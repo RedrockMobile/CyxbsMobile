@@ -104,7 +104,12 @@ internal class JavaGenericInference(
     )
   }
 
-  /** 递归收集 invariant 参数位置约束；通配符只使用明确的 extends/super 边界。 */
+  /**
+   * 递归收集 invariant 参数位置约束；通配符只使用明确的 extends/super 边界。
+   *
+   * 方法或类类型变量只能绑定引用类型，因此 primitive 实参先通过 catalog 的精确映射装箱。
+   * 这一步只改变推断约束，最终实参上的 Boxing 仍由调用转换阶段登记并交给 lowering 执行。
+   */
   private fun collect(
     formal: JavaSemanticType,
     actual: JavaSemanticType,
@@ -112,8 +117,14 @@ internal class JavaGenericInference(
     candidates: MutableMap<JavaSymbolId, JavaSemanticType>,
   ): Boolean {
     return when {
-      formal is JavaSemanticType.TypeVariable && formal.symbol in inferable ->
-        merge(formal.symbol, actual, candidates)
+      formal is JavaSemanticType.TypeVariable && formal.symbol in inferable -> {
+        val inferenceType = if (actual is JavaSemanticType.Primitive) {
+          relations.boxedType(actual) ?: return false
+        } else {
+          actual
+        }
+        merge(formal.symbol, inferenceType, candidates)
+      }
       formal is JavaSemanticType.Array && actual is JavaSemanticType.Array ->
         collect(formal.componentType, actual.componentType, inferable, candidates)
       formal is JavaSemanticType.Declared && actual is JavaSemanticType.Declared -> {

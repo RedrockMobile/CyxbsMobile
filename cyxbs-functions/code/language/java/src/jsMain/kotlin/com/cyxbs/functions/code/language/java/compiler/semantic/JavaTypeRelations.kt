@@ -176,6 +176,17 @@ internal class JavaTypeRelations(
   fun unboxedPrimitive(type: JavaSemanticType): JavaAstPrimitiveType? =
     (type as? JavaSemanticType.Declared)?.symbol?.let(::primitiveForWrapper)
 
+  /**
+   * 返回 primitive 在当前 builtin catalog 中对应的 wrapper 类型。
+   *
+   * 泛型实参不能是 primitive；调用推断遇到 `<T> T choose(T)` 与 `choose(1)` 时，必须先把
+   * `int` 约束转换成 `Integer` 再绑定 T。未登记的 primitive 保守返回 null，调用方不得按类名猜测。
+   */
+  fun boxedType(type: JavaSemanticType): JavaSemanticType.Declared? {
+    val primitive = type as? JavaSemanticType.Primitive ?: return null
+    return wrapperSymbol(primitive.kind)?.let { JavaSemanticType.Declared(it, emptyList()) }
+  }
+
   /** 判断赋值上下文是否存在当前阶段支持的转换。 */
   fun isAssignmentCompatible(
     source: JavaSemanticType,
