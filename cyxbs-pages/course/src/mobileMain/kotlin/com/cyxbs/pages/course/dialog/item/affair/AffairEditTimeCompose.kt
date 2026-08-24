@@ -56,8 +56,8 @@ import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager

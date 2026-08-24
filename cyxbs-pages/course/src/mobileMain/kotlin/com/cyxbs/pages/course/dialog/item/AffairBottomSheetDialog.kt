@@ -14,7 +14,7 @@ import com.cyxbs.pages.affair.api.AffairDateModel
 import com.cyxbs.pages.affair.api.AffairDateModelEditor
 import com.cyxbs.pages.affair.api.AffairIdModelEditor.EditResult
 import com.cyxbs.pages.affair.api.AffairWhatTimeModelEditor
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
 import com.cyxbs.pages.course.dialog.item.affair.AffairEditCompose
 import com.cyxbs.pages.course.dialog.item.affair.AffairShowCompose

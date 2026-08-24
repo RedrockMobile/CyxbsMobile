@@ -2,6 +2,7 @@ package com.cyxbs.pages.schedule.ui.main
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.config.time.toMinuteTimeDate
@@ -36,6 +37,7 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSyncResult
+import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoPage
 import com.cyxbs.pages.schedule.ui.todo.figma.ScheduleTodoDetailRoute
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
@@ -169,8 +171,22 @@ private val DesktopScheduleTodoPreviewRepository: ScheduleRepository =
  *
  * [accountId] 只用于满足账号 façade 的快照隔离校验；数据仍完全位于内存，不会持久化或请求后端。
  */
-internal fun createScheduleTodoPreviewRepository(accountId: String): ScheduleRepository =
-  DesktopPreviewRepository(createDesktopTodoPreviewSnapshot().copy(accountId = accountId))
+internal fun createScheduleTodoPreviewRepository(accountId: String): ScheduleRepository {
+  val snapshot = createDesktopTodoPreviewSnapshot().copy(accountId = accountId)
+  // Android 验收 mock 启动时直接关联三条重叠日程，避免每次重启都要逐条点击“同步到课表”。
+  // toggle 前先核对当前状态，确保同一登录会话重复创建 factory 时不会反向取消关联。
+  snapshot.schedules
+    .filter { it.title.startsWith(COURSE_OVERLAP_MOCK_TITLE_PREFIX) }
+    .forEach { schedule ->
+      val projection = ScheduleCourseProjectionMemory.state.value
+      val selectedIds =
+        projection.scheduleIds.takeIf { projection.accountId == accountId }.orEmpty()
+      if (schedule.id !in selectedIds) {
+        ScheduleCourseProjectionMemory.toggle(accountId, schedule.id)
+      }
+    }
+  return DesktopPreviewRepository(snapshot)
+}
 
 /** 接收不同初始快照的轻量内存仓库，供两个 Desktop 预览入口隔离演示数据。 */
 private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : ScheduleRepository {
@@ -613,8 +629,8 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
 /**
  * 创建邮子清单专用 mock。
  *
- * 数据只覆盖普通、已到期、临期、单个时间段、周重复、月重复与近期完成这些核心状态；所有时间都由
- * 打开预览时的当前上海时间换算，避免固定日期逐渐失去临期语义。课表的复杂重叠样例仍不混入清单。
+ * 数据覆盖普通、已到期、临期、时间段、三条下午重叠日程、全天、周重复、月重复与近期完成。
+ * 已到期和临期仍按当前上海时间换算；用于课表投影的数据固定在 2026 年 3 月开学周，方便课表联调。
  */
 private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
   val now = Clock.System.now()
@@ -622,9 +638,13 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
   val nowLocal = now.toLocalDateTime(zone).toMinuteTimeDate()
   val overdueDue = nowLocal.minusMinutes(2 * 60)
   val dueSoonDue = nowLocal.plusMinutes(24 * 60)
-  val intervalStart = MinuteTimeDate(nowLocal.date.plusDays(2), 14, 0)
-  val weeklyDue = nowLocal.plusDays(2)
-  val monthlyDue = nowLocal.plusDays(3)
+  val courseWeekStart = Date(2026, 3, 2)
+  val pointDue = MinuteTimeDate(courseWeekStart, 10, 30)
+  val intervalStart = MinuteTimeDate(courseWeekStart.plusDays(1), 14, 0)
+  val overlapAfternoonDate = courseWeekStart.plusDays(1)
+  val weeklyDue = MinuteTimeDate(courseWeekStart.plusDays(2), 15, 30)
+  val monthlyDue = MinuteTimeDate(courseWeekStart.plusDays(3), 18, 0)
+  val allDayDate = courseWeekStart.plusDays(4)
   val studyCategory = ScheduleCategory(
     id = CategoryId("desktop-todo-study"),
     revision = 1,
@@ -707,6 +727,46 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
         ),
       ),
       todo(
+        suffix = "010",
+        title = "${COURSE_OVERLAP_MOCK_TITLE_PREFIX}项目联调",
+        description = "3 月 3 日 14:00—17:00，作为三重叠的长时间段",
+        categoryId = studyCategory.id,
+        timing = ScheduleTiming.Timed(
+          start = MinuteTimeDate(overlapAfternoonDate, 14, 0),
+          durationMinutes = 180,
+          timeZoneId = SHANGHAI_TIME_ZONE,
+        ),
+      ),
+      todo(
+        suffix = "011",
+        title = "${COURSE_OVERLAP_MOCK_TITLE_PREFIX}UI 走查",
+        description = "3 月 3 日 14:30—16:30，用于左右切换详情",
+        categoryId = studyCategory.id,
+        timing = ScheduleTiming.Timed(
+          start = MinuteTimeDate(overlapAfternoonDate, 14, 30),
+          durationMinutes = 120,
+          timeZoneId = SHANGHAI_TIME_ZONE,
+        ),
+      ),
+      todo(
+        suffix = "012",
+        title = "${COURSE_OVERLAP_MOCK_TITLE_PREFIX}接口验收",
+        description = "3 月 3 日 15:00—17:30，与前两条形成三重叠",
+        categoryId = studyCategory.id,
+        timing = ScheduleTiming.Timed(
+          start = MinuteTimeDate(overlapAfternoonDate, 15, 0),
+          durationMinutes = 150,
+          timeZoneId = SHANGHAI_TIME_ZONE,
+        ),
+      ),
+      todo(
+        suffix = "009",
+        title = "时间点：领取实验材料",
+        description = "3 月 2 日的普通时间点，用于检查课表最小高度和显示优先级",
+        categoryId = studyCategory.id,
+        timing = ScheduleTiming.Deadline(pointDue, SHANGHAI_TIME_ZONE),
+      ),
+      todo(
         suffix = "005",
         title = "每周复盘",
         description = "每周重复的时间点待办",
@@ -729,6 +789,13 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
         ),
       ),
       todo(
+        suffix = "008",
+        title = "全天：项目验收日",
+        description = "3 月开学周的全天事项，用于检查课表整列背景",
+        categoryId = studyCategory.id,
+        timing = ScheduleTiming.AllDay(allDayDate),
+      ),
+      todo(
         suffix = "007",
         title = "已完成：整理资料",
         description = "两天前完成，仍在七天展示窗口内",
@@ -744,3 +811,6 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
     accountId = PREVIEW_ACCOUNT_ID,
   )
 }
+
+/** Android 课表验收时需要自动关联的下午重叠日程标题前缀。 */
+private const val COURSE_OVERLAP_MOCK_TITLE_PREFIX = "课表重叠："

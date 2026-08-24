@@ -12,6 +12,7 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -103,6 +104,29 @@ class ScheduleFeedUiStateTest {
     )
 
     assertEquals("提前10分钟提醒", state.items.single().reminderText)
+  }
+
+  /** Feed 仅给有时间的事项展示关联入口，并复用课表投射的进程内选择结果。 */
+  @Test
+  fun courseProjectionStateOnlyAppliesToScheduledItem() {
+    val scheduled = schedule("040", "有时间", MinuteTimeDate(2026, 8, 21, 10, 0))
+    val unscheduled = schedule("041", "无时间", MinuteTimeDate(2026, 8, 21, 11, 0))
+      .copy(timing = ScheduleTiming.Unscheduled)
+
+    val state = assertIs<ScheduleFeedUiState.Data>(
+      projectScheduleFeed(
+        snapshot = ScheduleSnapshot(schedules = listOf(scheduled, unscheduled)),
+        now = Instant.parse("2026-08-21T08:00:00Z"),
+        viewerTimeZone = TimeZone.UTC,
+        projectedScheduleIds = setOf(scheduled.id, unscheduled.id),
+      ),
+    )
+
+    val scheduledItem = state.items.first { it.id == scheduled.id }
+    val unscheduledItem = state.items.first { it.id == unscheduled.id }
+    assertTrue(scheduledItem.canProjectToCourse)
+    assertTrue(scheduledItem.isProjectedToCourse)
+    assertFalse(unscheduledItem.canProjectToCourse)
   }
 
   /** 构造满足领域 identity 的最小 Deadline 日程。 */

@@ -8,9 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
-import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialog
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension

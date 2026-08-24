@@ -1,5 +1,6 @@
-package com.cyxbs.pages.course.dialog
+package com.cyxbs.pages.course.view.item.extension
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -26,9 +28,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -44,7 +48,6 @@ import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -57,7 +60,6 @@ import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.extension.CourseItemExtension
 import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.modifier.observeItemRectInWindow
 import com.cyxbs.pages.course.view.overlay.OverlapResult
@@ -77,6 +79,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import kotlin.collections.mapNotNull
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -94,6 +97,8 @@ interface CourseItemBottomSheetDialogExtension : CourseItemExtension {
   @Composable
   fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState)
 }
+
+private val DefaultCourseBottomSheetHeight = 280.dp
 
 val LocalCourseItemBottomSheetDialog =
   staticCompositionLocalOf<CourseItemBottomSheetDialogState> { error("未初始化") }
@@ -119,6 +124,9 @@ class CourseItemBottomSheetDialogState {
   // 当前选中的 item
   val currentPageItemFlow: MutableStateFlow<CourseItemBottomSheetDialogExtension?> =
     MutableStateFlow(null)
+
+  // 编辑当前 item 时锁定 Pager；保留原内容列表以避免切换布局分支后重建并丢失表单状态。
+  internal val currentPageLockedFlow = MutableStateFlow(false)
 
   // 键盘弹出时需要漏出的位置，0 的话视为完全顶起
   val imePeekLayoutInWindowBottomFlow = MutableStateFlow(0F)
@@ -146,9 +154,20 @@ class CourseItemBottomSheetDialogState {
     dialogContents.value = emptyList()
   }
 
+  /**
+   * 将重叠项 Pager 锁定在当前页。
+   *
+   * 编辑期间禁止切换对象并隐藏分页提示，但不改写 [dialogContents]，从而保留当前表单的 Compose 状态。
+   * 弹窗关闭时会由 [clear] 统一解除锁定。
+   */
+  fun lockCurrentPage() {
+    if (currentPageItemFlow.value != null) currentPageLockedFlow.value = true
+  }
+
   private fun clear() {
     bottomSheetState.userScrollEnabled.value = true
     currentPageItemFlow.value = null
+    currentPageLockedFlow.value = false
     imePeekLayoutInWindowBottomFlow.value = 0F
   }
 
@@ -191,14 +210,13 @@ private fun MobileCourseBottomSheetDialog(
       state.dismissDialog()
     }
   ) {
-    val height = 280.dp
     val imeOverlapHeight = remember { mutableIntStateOf(0) }
     Box(
       modifier = Modifier.imePaddingWithHeight(imeOverlapHeight.intValue)
     ) {
       ShowBeginFinalTime(state)
       CurrentItemShowTop(state)
-      BottomSheet(state, height, imeOverlapHeight)
+      BottomSheet(state, imeOverlapHeight)
     }
   }
 }
@@ -272,9 +290,9 @@ private fun OffsetScroll(
 @Composable
 private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
-  height: Dp,
   imeOverlapHeight: MutableIntState,
 ) {
+  val currentPageLocked by state.currentPageLockedFlow.collectAsState()
   val layoutCoordinatesFlow = remember {
     MutableSharedFlow<LayoutCoordinates>(
       replay = 1,
@@ -296,7 +314,13 @@ private fun BottomSheet(
     Box(
       modifier = Modifier.navigationBarsPadding()
         .fillMaxWidth()
-        .height(height)
+        .then(
+          if (currentPageLocked) Modifier.heightIn(min = DefaultCourseBottomSheetHeight)
+          else Modifier.height(DefaultCourseBottomSheetHeight)
+        )
+        // 编辑态由当前内容的实测高度撑开；尺寸变化由宿主统一做平滑过渡。
+        .animateContentSize()
+        .then(bottomSheetDraggable())
         .onGloballyPositioned {
           layoutCoordinatesFlow.tryEmit(it)
         }.onFocusChanged {
@@ -310,12 +334,18 @@ private fun BottomSheet(
           )
         )
       )
-      Box(
-        modifier = Modifier.padding(top = 20.dp)
-          .fillMaxSize()
-          .then(bottomSheetDraggable())
+      // 背景匹配 BottomSheet 的最终测量高度，但不参与父布局测量；内容较短时也不会透出课表。
+      Spacer(
+        modifier = Modifier.matchParentSize()
+          .padding(top = 20.dp)
           .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
           .background(LocalAppColors.current.whiteBlack)
+      )
+      Box(
+        modifier = Modifier.padding(top = 20.dp)
+          .fillMaxWidth()
+          .then(if (currentPageLocked) Modifier else Modifier.fillMaxSize())
+          .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
       ) {
         CourseBottomSheetDialogContent(state)
       }
@@ -432,7 +462,20 @@ private fun CourseBottomSheetDialogContent(
   state: CourseItemBottomSheetDialogState,
 ) {
   val itemDialogContents by state.dialogContents.collectAsState()
+  val currentPageLocked by state.currentPageLockedFlow.collectAsState()
+  val currentPageItem by state.currentPageItemFlow.collectAsState()
   if (itemDialogContents.isEmpty()) return
+  // 同一 movable content 可从 Pager 移到单项容器而不重建，编辑表单及焦点状态因此得以保留。
+  val movableContents = remember(state) {
+    mutableMapOf<Pair<Int, CourseItemBottomSheetDialogExtension>, @Composable () -> Unit>()
+  }
+  fun movableContent(
+    page: Int,
+    extension: CourseItemBottomSheetDialogExtension,
+  ): @Composable () -> Unit =
+    movableContents.getOrPut(page to extension) {
+      movableContentOf { extension.CourseBottomSheetDialogContent(state) }
+    }
   val pagerState = rememberPagerState(
     initialPage = if (itemDialogContents.size == 1) 0 else itemDialogContents.size * 1000,
   ) {
@@ -444,27 +487,37 @@ private fun CourseBottomSheetDialogContent(
         itemDialogContents[pagerState.currentPage % itemDialogContents.size]
     }
   }
-  Column(modifier = Modifier.fillMaxSize()) {
-    if (itemDialogContents.size > 1) {
+  Column(
+    modifier = if (currentPageLocked) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
+  ) {
+    if (currentPageLocked) {
+      val extension = currentPageItem ?: itemDialogContents.first()
+      val contentPage = if (itemDialogContents.size == 1) 0 else pagerState.currentPage
+      movableContent(contentPage, extension).invoke()
+    } else if (itemDialogContents.size > 1) {
       HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxWidth().weight(1F),
+        // Pager 默认垂直居中；短内容（例如日程详情）会因此在顶部留下大块空白。
+        verticalAlignment = Alignment.Top,
       ) { page ->
         val itemDialogContent = if (itemDialogContents.isEmpty()) null
         else itemDialogContents[page % itemDialogContents.size]
-        itemDialogContent?.CourseBottomSheetDialogContent(state)
+        itemDialogContent?.let { movableContent(page, it).invoke() }
       }
     } else {
       val itemDialogContent = itemDialogContents.firstOrNull()
       if (itemDialogContent != null) {
         key(itemDialogContent.hashCode()) {
-          itemDialogContent.CourseBottomSheetDialogContent(state)
+          movableContent(0, itemDialogContent).invoke()
         }
       }
     }
     // 底部的圆点指示器
-    Spacer(modifier = Modifier.fillMaxWidth().height(24.dp).plusDsl {
-      if (itemDialogContents.size > 1) {
+    Spacer(modifier = Modifier.fillMaxWidth()
+      .height(if (currentPageLocked) 0.dp else 24.dp)
+      .plusDsl {
+      if (itemDialogContents.size > 1 && !currentPageLocked) {
         drawWithCache {
           val radius = 4.dp.toPx()
           val interval = 16.dp.toPx()

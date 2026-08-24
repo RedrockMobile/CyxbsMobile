@@ -15,7 +15,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.view.ui.BottomSheetValueState
-import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
+import com.cyxbs.pages.course.home.HomeCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.CourseFrameHeader
@@ -38,7 +38,7 @@ import kotlin.math.max
 @Composable
 fun MobileHomeCourseHeader(
   modifier: Modifier,
-  frame: MobileHomeCourseFrame,
+  frame: HomeCourseFrame,
 ) {
   Box(modifier = modifier) {
     val headerVisibility by remember(frame) {
@@ -94,7 +94,7 @@ private val HolidayHeader = HintCourseBottomSheetHeader("享受假期吧～")
 @Composable
 private fun MobileHomeCourseOuterHeader(
   modifier: Modifier,
-  frame: MobileHomeCourseFrame,
+  frame: HomeCourseFrame,
 ) {
   val headerState = remember(frame) { mutableStateOf<CourseBottomSheetHeaderExtension>(EmptyHeader) }
   key(headerState.value) {

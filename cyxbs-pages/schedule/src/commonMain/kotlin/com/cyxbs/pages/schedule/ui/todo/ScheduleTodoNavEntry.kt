@@ -95,11 +95,13 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
+import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryMutationMode
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.canSubmitScheduleMutation
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.EditScope
+import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
@@ -149,6 +151,7 @@ fun ScheduleTodoPage(
   val snapshot by viewModel.snapshot.collectAsState()
   val manageMode by viewModel.isManageMode.collectAsState()
   val selectedIds by viewModel.selectedIds.collectAsState()
+  val courseProjectionState by ScheduleCourseProjectionMemory.state.collectAsState()
   val editorEnabled = viewModel.mutationMode.canSubmitScheduleMutation()
   val viewerTimeZone = remember { TimeZone.currentSystemDefault() }
   val projection = remember(snapshot, viewerTimeZone) {
@@ -170,8 +173,9 @@ fun ScheduleTodoPage(
   var pinnedIds by remember(currentAccountSettings.stuNum) {
     mutableStateOf(loadScheduleTodoPinnedIds(currentAccountSettings))
   }
-  // 真实关联链路尚未实现；当前只保留页面会话内的视觉选择，不能写入 Schedule 或误当作同步事实。
-  var calendarLinkedKeys by remember(snapshot.accountId) { mutableStateOf<Set<String>>(emptySet()) }
+  val calendarLinkedScheduleIds = remember(snapshot.accountId, courseProjectionState) {
+    courseProjectionState.takeIf { it.accountId == snapshot.accountId }?.scheduleIds.orEmpty()
+  }
   var deepLinkConsumed by remember(argument.scheduleId, argument.recurrenceId) {
     mutableStateOf(false)
   }
@@ -316,18 +320,11 @@ fun ScheduleTodoPage(
     }
   }
 
-  /** 切换尚未接入业务链路的课表关联视觉状态，并明确告知用户当前只是功能预览。 */
-  fun toggleCalendarLink(itemKey: String) {
-    val shouldLink = itemKey !in calendarLinkedKeys
-    calendarLinkedKeys = if (shouldLink) {
-      calendarLinkedKeys + itemKey
-    } else {
-      calendarLinkedKeys - itemKey
-    }
-    toast(
-      if (shouldLink) "已标记关联到课表，功能将在后续开放"
-      else "已取消关联标记"
-    )
+  /** 按系列切换进程内课表投射；重复系列的所有实例共用一次选择，且不会写入远端。 */
+  fun toggleCalendarLink(scheduleId: ScheduleId) {
+    val accountId = snapshot.accountId ?: return
+    val selected = ScheduleCourseProjectionMemory.toggle(accountId, scheduleId)
+    toast(if (selected) "已关联到课表" else "已取消关联到课表")
   }
 
   Box(
@@ -412,8 +409,8 @@ fun ScheduleTodoPage(
               onTogglePin = {
                 togglePinnedSchedule(item.schedule.id, revealPendingTop = true)
               },
-              isLinkedToCalendar = item.key in calendarLinkedKeys,
-              onToggleCalendarLink = { toggleCalendarLink(item.key) },
+              isLinkedToCalendar = item.schedule.id in calendarLinkedScheduleIds,
+              onToggleCalendarLink = { toggleCalendarLink(item.schedule.id) },
               onDelete = {
                 viewModel.deleteScheduleScoped(
                   item.schedule.id,
@@ -460,8 +457,8 @@ fun ScheduleTodoPage(
               onTogglePin = {
                 togglePinnedSchedule(item.schedule.id, revealPendingTop = false)
               },
-              isLinkedToCalendar = item.key in calendarLinkedKeys,
-              onToggleCalendarLink = { toggleCalendarLink(item.key) },
+              isLinkedToCalendar = item.schedule.id in calendarLinkedScheduleIds,
+              onToggleCalendarLink = { toggleCalendarLink(item.schedule.id) },
               onDelete = {
                 viewModel.deleteScheduleScoped(
                   item.schedule.id,
@@ -1098,10 +1095,12 @@ private fun ScheduleTodoCard(
             reminderText?.let { text ->
               ScheduleTodoInfoPill(text = text)
             }
-            ScheduleTodoCalendarLinkButton(
-              selected = isLinkedToCalendar,
-              onClick = onToggleCalendarLink,
-            )
+            if (item.occurrence.timing != ScheduleTiming.Unscheduled) {
+              ScheduleTodoCalendarLinkButton(
+                selected = isLinkedToCalendar,
+                onClick = onToggleCalendarLink,
+              )
+            }
           }
           if (item.occurrence.description.isNotBlank()) {
             Spacer(modifier = Modifier.size(7.dp))

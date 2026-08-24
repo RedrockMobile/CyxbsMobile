@@ -2,6 +2,7 @@ package com.cyxbs.pages.schedule.ui.feed
 
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoItemUi
 import com.cyxbs.pages.schedule.ui.todo.formatScheduleTodoReminder
@@ -44,6 +45,8 @@ sealed interface ScheduleFeedUiState {
  * @param isOverTime 是否已超时（决定红色样式与超时铃铛）
  * @param isDueSoon 是否会在未来 24 小时内到期；已超期时恒为 false
  * @param isPinned 是否已保存在当前账号的端上置顶顺序中；该字段不会上传服务端
+ * @param canProjectToCourse 是否具备可投射时间；无时间清单不展示关联课表入口
+ * @param isProjectedToCourse 是否已在当前进程中选择投射到课表
  */
 data class ScheduleFeedItemUi(
   val id: ScheduleId,
@@ -54,6 +57,8 @@ data class ScheduleFeedItemUi(
   val isOverTime: Boolean,
   val isDueSoon: Boolean,
   val isPinned: Boolean,
+  val canProjectToCourse: Boolean,
+  val isProjectedToCourse: Boolean,
 )
 
 /**
@@ -66,11 +71,17 @@ internal fun projectScheduleFeed(
   now: Instant,
   viewerTimeZone: TimeZone,
   pinnedIds: List<ScheduleId> = emptyList(),
+  projectedScheduleIds: Set<ScheduleId> = emptySet(),
 ): ScheduleFeedUiState {
   val projection = projectScheduleTodo(snapshot, now, viewerTimeZone)
   val items = sortScheduleTodoPending(projection.pending, pinnedIds)
     .take(3)
-    .map { item -> item.toFeedItem(isPinned = item.schedule.id in pinnedIds) }
+    .map { item ->
+      item.toFeedItem(
+        isPinned = item.schedule.id in pinnedIds,
+        isProjectedToCourse = item.schedule.id in projectedScheduleIds,
+      )
+    }
   return if (items.isEmpty()) {
     ScheduleFeedUiState.Empty
   } else {
@@ -79,7 +90,10 @@ internal fun projectScheduleFeed(
 }
 
 /** 映射 Feed 轻量模型；时间文案和临期状态均沿用清单页已经计算完成的结果。 */
-private fun ScheduleTodoItemUi.toFeedItem(isPinned: Boolean) = ScheduleFeedItemUi(
+private fun ScheduleTodoItemUi.toFeedItem(
+  isPinned: Boolean,
+  isProjectedToCourse: Boolean,
+) = ScheduleFeedItemUi(
   id = schedule.id,
   recurrenceId = occurrence.recurrenceId,
   title = occurrence.title,
@@ -91,4 +105,6 @@ private fun ScheduleTodoItemUi.toFeedItem(isPinned: Boolean) = ScheduleFeedItemU
   isOverTime = isOverdue,
   isDueSoon = isDueSoon,
   isPinned = isPinned,
+  canProjectToCourse = occurrence.timing !is ScheduleTiming.Unscheduled,
+  isProjectedToCourse = isProjectedToCourse,
 )

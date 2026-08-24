@@ -54,6 +54,7 @@ object ScheduleService : IScheduleService {
       onItemCheck = viewModel::onItemCheck,
       onTogglePin = viewModel::onTogglePin,
       onDelete = viewModel::onDelete,
+      onToggleCourseProjection = viewModel::onToggleCourseProjection,
       modifier = modifier,
     )
   }

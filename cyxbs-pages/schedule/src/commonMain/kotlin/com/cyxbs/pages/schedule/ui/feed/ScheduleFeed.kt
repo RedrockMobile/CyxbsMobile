@@ -85,6 +85,7 @@ import kotlin.math.roundToInt
  * @param onItemCheck 勾选动画结束后完成精确实例，参数 identity 与 [onItemClick] 一致。
  * @param onTogglePin 左滑后切换系列的端上置顶状态，不会发起网络请求。
  * @param onDelete 左滑后删除精确事项；重复实例与普通事项的范围由 ViewModel 路由。
+ * @param onToggleCourseProjection 切换系列在课表中的进程内投射状态。
  */
 @Composable
 fun ScheduleFeed(
@@ -94,6 +95,7 @@ fun ScheduleFeed(
   onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
   onTogglePin: (ScheduleId) -> Unit,
   onDelete: (ScheduleId, RecurrenceId?) -> Unit,
+  onToggleCourseProjection: (ScheduleId) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -122,6 +124,7 @@ fun ScheduleFeed(
             onItemCheck = onItemCheck,
             onTogglePin = onTogglePin,
             onDelete = onDelete,
+            onToggleCourseProjection = onToggleCourseProjection,
           )
         }
       }
@@ -206,12 +209,11 @@ private fun ScheduleFeedItem(
   onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
   onTogglePin: (ScheduleId) -> Unit,
   onDelete: (ScheduleId, RecurrenceId?) -> Unit,
+  onToggleCourseProjection: (ScheduleId) -> Unit,
 ) {
   val colors = LocalAppColors.current
   // 本地完成态：点击勾选圈后立即置灰（对齐旧版点击瞬间变色），动画结束再触发 onItemCheck
   var checked by remember(item.id, item.recurrenceId) { mutableStateOf(false) }
-  // “关联课表”真实链路尚未开放；当前只保留与设计稿一致的页面会话内选中反馈。
-  var calendarLinked by remember(item.id, item.recurrenceId) { mutableStateOf(false) }
   val actionWidth = 110.dp
   val actionWidthPx = with(LocalDensity.current) { actionWidth.toPx() }
   var dragOffsetPx by remember(item.id, item.recurrenceId) { mutableFloatStateOf(0f) }
@@ -351,32 +353,31 @@ private fun ScheduleFeedItem(
             }
           }
         }
-        Box(
-          modifier = Modifier
-            .align(Alignment.CenterEnd)
-            .padding(end = 28.dp)
-            .size(34.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-              if (calendarLinked) ScheduleTodoCalendarLinkSelectedColor
-              else if (MaterialTheme.colors.isLight) ScheduleTodoInfoContainerColor
-              else colors.tvLv4.copy(alpha = 0.2f)
-            )
-            .clickableNoIndicator {
-              calendarLinked = !calendarLinked
-              toast(
-                if (calendarLinked) "已标记关联到课表，功能将在后续开放"
-                else "已取消关联标记"
+        if (item.canProjectToCourse) {
+          Box(
+            modifier = Modifier
+              .align(Alignment.CenterEnd)
+              .padding(end = 28.dp)
+              .size(34.dp)
+              .clip(RoundedCornerShape(10.dp))
+              .background(
+                if (item.isProjectedToCourse) ScheduleTodoCalendarLinkSelectedColor
+                else if (MaterialTheme.colors.isLight) ScheduleTodoInfoContainerColor
+                else colors.tvLv4.copy(alpha = 0.2f)
               )
-            },
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            painter = painterResource(ConfigRes.configIcCalendarSync()),
-            contentDescription = "关联到课表",
-            tint = if (calendarLinked) ScheduleTodoOnAccentColor else Color.White,
-            modifier = Modifier.size(18.dp),
-          )
+              .clickableNoIndicator {
+                onToggleCourseProjection(item.id)
+                toast(if (item.isProjectedToCourse) "已取消关联到课表" else "已关联到课表")
+              },
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              painter = painterResource(ConfigRes.configIcCalendarSync()),
+              contentDescription = "关联到课表",
+              tint = if (item.isProjectedToCourse) ScheduleTodoOnAccentColor else Color.White,
+              modifier = Modifier.size(18.dp),
+            )
+          }
         }
       }
     }

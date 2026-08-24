@@ -379,6 +379,9 @@ abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime {
     }.compareBy(other) {
       it.now.value.beginTime.value // beginTime 越大越在上
     }.compareBy(other) {
+      // 开始时间相同时，零时长时间点必须位于时间段上层，才能作为锚点切割下层时间段。
+      if (it.now.value.beginTime == it.now.value.finalTime) 1 else 0
+    }.compareBy(other) {
       it.now.value.finalTime.value // finalTime 越大越在上
     }
   }

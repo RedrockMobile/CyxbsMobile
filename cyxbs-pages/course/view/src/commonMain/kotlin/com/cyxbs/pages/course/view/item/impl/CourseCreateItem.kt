@@ -22,7 +22,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.course.view.decoration.impl.CreateAffairPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemTopBottomText
@@ -46,12 +46,12 @@ import kotlin.math.roundToInt
  * @author 985892345
  * @date 2026/3/7
  */
-class CourseCreateAffairItem(
+class CourseCreateItem(
   whatTime: CourseItemWhatTime,
   coroutineScope: CoroutineScope,
-  val viewModel: CreateAffairPageDecoration,
+  val decoration: CreateItemPageDecoration,
   // 根据不同平台对 item 进行定制化操作
-  platformItemFactory: PlatformCourseCreateAffairItemFactory,
+  platformItemFactory: PlatformCourseCreateItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 
   // 下层到每个平台的课程配置
@@ -64,12 +64,12 @@ class CourseCreateAffairItem(
     this.dateModelFlow.value = dateModel
     extensions.add(CourseCreateAffairMovableItemExtension(this))
     combine(
-      viewModel.courseFrame.beginDate.filterNotNull(),
+      decoration.courseFrame.beginDate.filterNotNull(),
       dateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
       dateModel.date.mergeFlow
     ) { beginDate, timePair, date ->
       whatTime.now.value = CourseItemWhatTime.Fixed(
-        page = viewModel.courseFrame.getPage(date) ?: -1,
+        page = decoration.courseFrame.getPage(date) ?: -1,
         dayOfWeek = date.dayOfWeek,
         beginTime = timePair.first,
         finalTime = timePair.second,
@@ -86,7 +86,7 @@ class CourseCreateAffairItem(
 }
 
 @Composable
-private fun CourseCreateAffairItem.Content(
+private fun CourseCreateItem.Content(
   onClick: (MinuteTimePair) -> Unit,
 ) {
   if (itemState.realShowRange.isEmpty()) return
@@ -146,7 +146,7 @@ private fun CourseCreateAffairItem.Content(
 
 // 事务支持长按移动
 private class CourseCreateAffairMovableItemExtension(
-  val item: CourseCreateAffairItem,
+  val item: CourseCreateItem,
 ) : IMovableItemExtension {
   override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
     return true
@@ -195,11 +195,11 @@ private class CourseCreateAffairMovableItemExtension(
 }
 
 // 下层到每个平台的事务配置
-interface PlatformCourseCreateAffairItemFactory {
-  fun create(item: CourseCreateAffairItem): PlatformCourseCreateAffairItem
+interface PlatformCourseCreateItemFactory {
+  fun create(item: CourseCreateItem): PlatformCourseCreateItem
 }
 
-interface PlatformCourseCreateAffairItem {
+interface PlatformCourseCreateItem {
   @Composable
   fun CourseItemContentWrapper(content: @Composable (onClick: (MinuteTimePair) -> Unit) -> Unit)
 }

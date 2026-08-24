@@ -25,12 +25,12 @@ import com.cyxbs.pages.affair.api.AffairIdModel
 import com.cyxbs.pages.affair.api.IAffairService2
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
-import com.cyxbs.pages.course.view.decoration.impl.CreateAffairPageDecoration.Companion.MIN_MINUTE_INTERVAL
+import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration.Companion.MIN_MINUTE_INTERVAL
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
-import com.cyxbs.pages.course.view.item.impl.CourseCreateAffairItem
-import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateAffairItemFactory
+import com.cyxbs.pages.course.view.item.impl.CourseCreateItem
+import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItemFactory
 import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
 import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.course.view.item.touch.LongPressCreateItem
@@ -53,11 +53,11 @@ import kotlin.time.Duration.Companion.minutes
  * @date 2025/5/17
  */
 @Stable
-class CreateAffairPageDecoration(
+class CreateItemPageDecoration(
   val courseFrame: AbstractCourseFrame,
   // 根据不同平台对 item 进行定制化操作
-  val platformItemFactory: PlatformCourseCreateAffairItemFactory,
-) : CoursePageDecoration<CourseCreateAffairItem>() {
+  val platformItemFactory: PlatformCourseCreateItemFactory,
+) : CoursePageDecoration<CourseCreateItem>() {
 
   companion object {
     const val MIN_MINUTE_INTERVAL = 30 // 最小分钟间隔
@@ -128,11 +128,11 @@ class CreateAffairPageDecoration(
         dateModels.forEach { dateModel ->
           if (whatTimeByDateModel.containsKey(dateModel)) return@forEach
           val touchedItem = TouchedItem(
-            viewModel = this@CreateAffairPageDecoration,
+            viewModel = this@CreateItemPageDecoration,
             dateModel = dateModel,
           )
           val whatTime = CreateAffairTouchItemWhatTime(
-            viewModel = this@CreateAffairPageDecoration,
+            viewModel = this@CreateItemPageDecoration,
             item = touchedItem
           )
           whatTimeByDateModel[dateModel] = whatTime
@@ -144,11 +144,11 @@ class CreateAffairPageDecoration(
           idModel.addedDateModel.collect { dateModel ->
             if (whatTimeByDateModel.containsKey(dateModel)) return@collect
             val touchedItem = TouchedItem(
-              viewModel = this@CreateAffairPageDecoration,
+              viewModel = this@CreateItemPageDecoration,
               dateModel = dateModel,
             )
             val whatTime = CreateAffairTouchItemWhatTime(
-              viewModel = this@CreateAffairPageDecoration,
+              viewModel = this@CreateItemPageDecoration,
               item = touchedItem
             )
             whatTimeByDateModel[dateModel] = whatTime
@@ -168,7 +168,7 @@ class CreateAffairPageDecoration(
 }
 
 @Composable
-private fun LongPressCreateCoursePageWrapper(decoration: CreateAffairPageDecoration) {
+private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoration) {
   val coursePage = decoration.coursePage
   val courseFrame = AbstractCourseFrame.current
   courseFrame.beginDate.collectAsState().value ?: return
@@ -239,9 +239,9 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateAffairPageDecorat
 }
 
 internal data class CreateAffairTouchItemWhatTime(
-  val viewModel: CreateAffairPageDecoration,
+  val viewModel: CreateItemPageDecoration,
   val item: TouchItem,
-) : ItemHierarchyWhatTime<CourseCreateAffairItem>() {
+) : ItemHierarchyWhatTime<CourseCreateItem>() {
 
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed>
     get() = item.now
@@ -254,11 +254,11 @@ internal data class CreateAffairTouchItemWhatTime(
       }
     }
 
-  override fun createItem(coroutineScope: CoroutineScope): CourseCreateAffairItem {
-    return CourseCreateAffairItem(
+  override fun createItem(coroutineScope: CoroutineScope): CourseCreateItem {
+    return CourseCreateItem(
       whatTime = this,
       coroutineScope = coroutineScope,
-      viewModel = viewModel,
+      decoration = viewModel,
       platformItemFactory = viewModel.platformItemFactory,
     )
   }
@@ -288,7 +288,7 @@ internal interface TouchItem {
 }
 
 internal class TouchingItem(
-  val viewModel: CreateAffairPageDecoration,
+  val viewModel: CreateItemPageDecoration,
   val page: Int,
   val dayOfWeek: DayOfWeek,
   val initMinuteTime: MinuteTime,
@@ -358,7 +358,7 @@ internal class TouchingItem(
           whatTime.cancel()
         } else {
           // 创建成功后则设置 dateModel
-          (itemState.item as CourseCreateAffairItem).setDateModel(dateModelEditor.dateModel)
+          (itemState.item as CourseCreateItem).setDateModel(dateModelEditor.dateModel)
         }
       }
     }
@@ -386,7 +386,7 @@ internal class TouchingItem(
 }
 
 internal class TouchedItem(
-  val viewModel: CreateAffairPageDecoration,
+  val viewModel: CreateItemPageDecoration,
   val dateModel: AffairDateModel,
 ) : TouchItem {
 
@@ -404,6 +404,6 @@ internal class TouchedItem(
 
   override fun initCourseItemState(itemState: CourseItemState) {
     BeginFinalTimeShowModifier.showLock.get(itemState).lock() // 默认显示开始结束时间
-    (itemState.item as CourseCreateAffairItem).setDateModel(dateModel) // 设置 dateModel
+    (itemState.item as CourseCreateItem).setDateModel(dateModel) // 设置 dateModel
   }
 }

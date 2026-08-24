@@ -9,6 +9,7 @@ import com.cyxbs.pages.schedule.domain.repository.*
 import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.feed.*
+import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.ui.todo.loadScheduleTodoPinnedIds
 import com.cyxbs.pages.schedule.ui.todo.saveScheduleTodoPinnedIds
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,11 @@ class ScheduleFeedViewModel(
   private var pinnedSettingsAccountId: String? = null
   private var pinnedIds: List<ScheduleId> = emptyList()
 
-  init { launchByViewModelScope { repository.snapshot.collect(::updateList) } }
+  init {
+    launchByViewModelScope { repository.snapshot.collect(::updateList) }
+    // 课表关联仅存在内存中，独立收集以便清单页切换后首页 Feed 立即同步图标状态。
+    launchByViewModelScope { ScheduleCourseProjectionMemory.state.collect { updateList(repository.snapshot.value) } }
+  }
   fun refresh() = launchByViewModelScope { repository.initialize() }
   /** 从首页摘要进入独立邮子清单，不再跳转到课表时间轴页面。 */
   fun onCardClick() { ScheduleTodoNavArgument().navigate() }
@@ -59,6 +64,19 @@ class ScheduleFeedViewModel(
     }
     saveScheduleTodoPinnedIds(settings, pinnedIds)
     updateList(snapshot)
+  }
+
+  /**
+   * 切换 Feed 事项的课表投射状态。
+   *
+   * 该选择仅写进程内存；无时间事项在 UI 中不会暴露入口，此处仍再次校验以防过期回调误写。
+   */
+  fun onToggleCourseProjection(id: ScheduleId) {
+    val snapshot = repository.snapshot.value
+    val accountId = snapshot.accountId ?: return
+    val schedule = snapshot.schedules.firstOrNull { it.id == id } ?: return
+    if (schedule.timing is ScheduleTiming.Unscheduled) return
+    ScheduleCourseProjectionMemory.toggle(accountId, id)
   }
 
   /**
@@ -120,6 +138,8 @@ class ScheduleFeedViewModel(
     }
     val zone = TimeZone.currentSystemDefault()
     val now = clock.now()
-    _uiState.value = projectScheduleFeed(snapshot, now, zone, pinnedIds)
+    val projection = ScheduleCourseProjectionMemory.state.value
+    val projectedIds = projection.scheduleIds.takeIf { projection.accountId == snapshot.accountId }.orEmpty()
+    _uiState.value = projectScheduleFeed(snapshot, now, zone, pinnedIds, projectedIds)
   }
 }

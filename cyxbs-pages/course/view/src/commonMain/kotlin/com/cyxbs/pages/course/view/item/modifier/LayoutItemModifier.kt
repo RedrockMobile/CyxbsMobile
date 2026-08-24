@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
@@ -38,6 +40,23 @@ object LayoutItemModifier : CourseItemModifier {
 
   // 是否启动时间信息改变后的动画，默认开启
   val animLock = CourseItemState.ValueKey { Lock() }
+
+  /**
+   * item 的最小视觉高度，默认不限制。
+   *
+   * 它以业务区间中心向上下两侧扩展绘制区域，不修改
+   * [com.cyxbs.pages.course.view.item.CourseItemWhatTime] 的业务时间范围；适用于截止时间点等需要
+   * 容纳一行文字、但不应伪造成长时间段的装饰项。
+   */
+  val minimumVisualHeight = CourseItemState.ValueKey<Dp> { 0.dp }
+
+  /**
+   * item 的固定视觉优先级，最终会与 [CourseItemState.zIndexState] 的临时层级相加。
+   *
+   * 默认值为 0，不改变现有课程与事务；需要始终浮在普通时段之上的时间点可设置更高值，且不会覆盖
+   * 长按、弹窗等交互对临时 zIndex 的增减。
+   */
+  val visualPriority = CourseItemState.ValueKey { 0F }
 
   @Composable
   override fun createModifier(): Modifier {
@@ -126,13 +145,21 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     val beginWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(beginTimeAnimatable.value))
     val finalWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(finalTimeAnimatable.value))
     val width = constraints.maxWidth / 7
-    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(1)
+    val naturalHeight =
+      (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(0)
+    val height = maxOf(naturalHeight, LayoutItemModifier.minimumVisualHeight.get(itemState).roundToPx())
+      .coerceAtLeast(1)
+      .coerceAtMost(constraints.maxHeight)
     val placeable = measurable.measure(Constraints.fixed(width, height))
+    val naturalY = (beginWeightRatio * constraints.maxHeight).roundToInt()
+    val extraVisualHeight = height - naturalHeight
+    val y = (naturalY - extraVisualHeight / 2)
+      .coerceIn(0, (constraints.maxHeight - height).coerceAtLeast(0))
     layout(width, height) {
       placeable.placeRelative(
         x = (indexAnimatable.value * constraints.maxWidth / 7 + (width - placeable.width) / 2F).roundToInt(),
-        y = (beginWeightRatio * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
-        zIndex = itemState.zIndexState.floatValue,
+        y = y,
+        zIndex = itemState.zIndexState.floatValue + LayoutItemModifier.visualPriority.get(itemState),
       )
     }
   }

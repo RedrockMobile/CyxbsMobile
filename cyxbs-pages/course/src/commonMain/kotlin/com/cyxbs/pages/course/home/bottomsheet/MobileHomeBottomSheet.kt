@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.bottomsheet
+package com.cyxbs.pages.course.home.bottomsheet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -22,7 +22,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetValueState
-import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
+import com.cyxbs.pages.course.home.HomeCourseFrame
 
 /**
  * .
@@ -34,7 +34,7 @@ import com.cyxbs.pages.course.frame.MobileHomeCourseFrame
 @Composable
 fun MobileHomeBottomSheet(
   modifier: Modifier,
-  frame: MobileHomeCourseFrame,
+  frame: HomeCourseFrame,
   peekHeightExtra: Dp,
   header: @Composable () -> Unit,
   content: @Composable () -> Unit,

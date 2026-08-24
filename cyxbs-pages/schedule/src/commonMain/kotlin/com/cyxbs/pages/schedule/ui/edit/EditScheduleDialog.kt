@@ -24,7 +24,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -33,6 +32,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -161,9 +161,15 @@ fun EditScheduleDialog(
   editOccurrence: ScheduleOccurrence? = null,
   recurrenceId: RecurrenceId? = null,
   categories: List<ScheduleCategory> = emptyList(),
+  /** 弹窗外背景色；外部宿主可传透明，普通入口继续使用 Schedule 默认遮罩。 */
+  scrimColor: Color? = null,
+  /** true 时只绘制业务内容，由调用方提供外层 BottomSheet。 */
+  embeddedInExternalHost: Boolean = false,
   onDismiss: () -> Unit,
   onConfirm: (EditScheduleModelState, EditScope) -> Unit,
   onDelete: ((EditScope) -> Unit)? = null,
+  /** 嵌入外部宿主时报告查看/编辑模式；普通 ScheduleBottomSheet 可忽略。 */
+  onEditModeChanged: (Boolean) -> Unit = {},
 ) {
   if (!show) return
 
@@ -193,19 +199,14 @@ fun EditScheduleDialog(
     }
   }
 
-  ScheduleBottomSheet(
-    show = true,
-    onDismiss = onDismiss,
-    onDismissRequest = {
-      if (modelState.isChanged) {
-        showUnsavedExit = true; false
-      } else true
-    },
-  ) {
+  val sheetContent: @Composable () -> Unit = {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .heightIn(min = EditSheetHeight)
+        .then(
+          if (embeddedInExternalHost) Modifier
+          else Modifier.heightIn(min = EditSheetHeight)
+        )
         .animateContentSize()
         .padding(top = 16.dp, start = 16.dp, end = 16.dp),
     ) {
@@ -216,8 +217,24 @@ fun EditScheduleDialog(
         onSave = doSave,
         onCancel = requestDismiss,
         onDelete = doDelete,
+        onEditModeChanged = onEditModeChanged,
       )
     }
+  }
+  if (embeddedInExternalHost) {
+    sheetContent()
+  } else {
+    ScheduleBottomSheet(
+      show = true,
+      onDismiss = onDismiss,
+      scrimColor = scrimColor,
+      onDismissRequest = {
+        if (modelState.isChanged) {
+          showUnsavedExit = true; false
+        } else true
+      },
+      content = sheetContent,
+    )
   }
 
   // 三态选择
@@ -279,6 +296,7 @@ private fun ScheduleContent(
   onSave: () -> Unit,
   onCancel: () -> Unit,
   onDelete: () -> Unit,
+  onEditModeChanged: (Boolean) -> Unit,
 ) {
   val colors = LocalAppColors.current
   var uiState by remember(modelState.origin) {
@@ -286,6 +304,12 @@ private fun ScheduleContent(
     mutableStateOf<ScheduleUi>(
       if (modelState.origin == null) ScheduleUi.Edit.Note else ScheduleUi.Show,
     )
+  }
+  LaunchedEffect(uiState is ScheduleUi.Edit) {
+    onEditModeChanged(uiState is ScheduleUi.Edit)
+  }
+  DisposableEffect(Unit) {
+    onDispose { onEditModeChanged(false) }
   }
   Column(modifier = Modifier.bringIntoViewFullBounds()) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

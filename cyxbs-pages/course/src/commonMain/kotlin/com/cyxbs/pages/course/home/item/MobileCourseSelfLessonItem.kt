@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.frame.item
+package com.cyxbs.pages.course.home.item
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -7,13 +7,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.config.time.toMinuteTimeDate
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.dialog.CourseItemBottomSheetDialogState
-import com.cyxbs.pages.course.dialog.LocalCourseItemBottomSheetDialog
-import com.cyxbs.pages.course.dialog.item.LessonBottomSheetDialog
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
+import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
+import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
+import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory

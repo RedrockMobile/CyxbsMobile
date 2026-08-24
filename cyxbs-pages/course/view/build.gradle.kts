@@ -13,6 +13,7 @@ kotlin {
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.affair.api)
+      implementation(projects.cyxbsPages.schedule.api)
     }
   }
 }

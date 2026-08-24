@@ -1,4 +1,4 @@
-package com.cyxbs.pages.course.dialog.item
+package com.cyxbs.pages.course.home.dialog
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee

@@ -41,8 +41,26 @@ fun CourseItemState.createOverlapResult(
   val itemFinalTime = itemState.item.whatTime.now.value.finalTime
   val itemOverlap = OverlapResult(itemState)
   val showRangeList = itemOverlap.showRangeList
+  if (itemBeginTime == itemFinalTime) {
+    // 时间点保持零分钟业务语义，但作为有序切割锚点进入 coveredList。后续时间段遇到该锚点时，
+    // 会自然拆成锚点前后两个 showRange，让两段内容分别在各自真实高度内完成自适应布局。
+    val pointRange = MinuteTimePair(itemBeginTime, itemFinalTime)
+    showRangeList.add(pointRange)
+    // coveredList 已按时间有序，只定位插入点；相同区间放在已有项之后，保持原有顺序稳定。
+    val insertIndex = coveredList.indexOfFirst { cover ->
+      cover.range.first > pointRange.first ||
+          cover.range.first == pointRange.first && cover.range.second > pointRange.second
+    }.takeIf { it >= 0 } ?: coveredList.size
+    coveredList.add(insertIndex, OverlapCover(pointRange, itemOverlap))
+    return itemOverlap
+  }
   var index = 0
-  while (index < coveredList.size && coveredList[index].range.second <= itemBeginTime) {
+  while (
+    index < coveredList.size &&
+    coveredList[index].range.second <= itemBeginTime &&
+    // 普通半开区间在 item.begin 结束时不相交；零长度锚点恰好位于 begin 时仍要留下顶部避让。
+    !(coveredList[index].range.isPoint() && coveredList[index].range.first == itemBeginTime)
+  ) {
     index++ // 找到第一个 [index].final > item.begin 的位置
   }
   if (index == coveredList.size) {
@@ -57,7 +75,10 @@ fun CourseItemState.createOverlapResult(
     var prevBegin = itemBeginTime
     while (true) {
       val now = coveredList[index]
-      if (now.range.first >= itemFinalTime) {
+      if (
+        now.range.first > itemFinalTime ||
+        now.range.first == itemFinalTime && !now.range.isPoint()
+      ) {
         // 完全不相交
         //       ------
         // ======
@@ -222,6 +243,9 @@ fun CourseItemState.createOverlapResult(
   }
   return itemOverlap
 }
+
+/** 零长度区间只作为视觉切割锚点，不改变任何业务时间范围。 */
+private fun MinuteTimePair.isPoint(): Boolean = first == second
 
 // 合并区间
 internal fun List<MinuteTimePair>.mergeOverlapRange(): List<MinuteTimePair> {
