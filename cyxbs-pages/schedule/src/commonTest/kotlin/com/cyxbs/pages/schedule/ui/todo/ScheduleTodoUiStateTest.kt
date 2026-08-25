@@ -8,7 +8,7 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
@@ -76,14 +76,14 @@ class ScheduleTodoUiStateTest {
           suffix = "003",
           title = "已完成事项",
           timing = ScheduleTiming.Unscheduled,
-          completion = ScheduleCompletion.COMPLETED,
+          todoState = ScheduleTodoState.COMPLETED,
           updatedAt = now - 2.days,
         ),
         schedule(
           suffix = "005",
           title = "八天前完成事项",
           timing = ScheduleTiming.Unscheduled,
-          completion = ScheduleCompletion.COMPLETED,
+          todoState = ScheduleTodoState.COMPLETED,
           updatedAt = now - 8.days,
         ),
       ),
@@ -187,7 +187,7 @@ class ScheduleTodoUiStateTest {
     suffix: String,
     title: String,
     timing: ScheduleTiming,
-    completion: ScheduleCompletion = ScheduleCompletion.PENDING,
+    todoState: ScheduleTodoState = ScheduleTodoState.PENDING,
     recurrence: RecurrenceRule? = null,
     updatedAt: Instant = Instant.parse("2026-08-17T00:00:00Z"),
   ): Schedule = Schedule(
@@ -199,7 +199,7 @@ class ScheduleTodoUiStateTest {
     timing = timing,
     recurrence = recurrence,
     reminders = emptyList(),
-    completion = completion,
+    todoState = todoState,
     createdAt = Instant.parse("2026-08-17T00:00:00Z"),
     updatedAt = updatedAt,
   )

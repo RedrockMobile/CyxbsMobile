@@ -3,7 +3,8 @@ package com.cyxbs.pages.schedule.data.repository.v3
 import com.cyxbs.pages.schedule.data.remote.v3.AtomicField as WireAtomicField
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryInput
-import com.cyxbs.pages.schedule.data.remote.v3.CompletionStatus as WireCompletionStatus
+import com.cyxbs.pages.schedule.data.remote.v3.TodoState as WireTodoState
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleKind as WireScheduleKind
 import com.cyxbs.pages.schedule.data.remote.v3.FieldPatch as WireFieldPatch
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideInput
@@ -22,7 +23,8 @@ import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField as DomainAtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus as DomainCompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState as DomainTodoState
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind as DomainScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch as DomainFieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideRemoteSnapshot
@@ -57,30 +59,34 @@ internal fun CategoryInput.toDomain(): CategoryResource = CategoryResource(
   sortOrder = DomainAtomicField(sortOrder.data, sortOrder.modifiedAt),
 )
 
-/** Schedule 七个原子字段到 wire payload 的显式映射。 */
+/** Schedule 的不可变来源与八个原子字段到 wire payload 的显式映射。 */
 internal fun ScheduleResource.toWire(): ScheduleInput = ScheduleInput(
   id = identity.id,
   version = version.toULong(),
+  kind = kind.toWire(),
   title = WireAtomicField(title.data, title.modifiedAt),
   description = WireAtomicField(description.data, description.modifiedAt),
   categoryId = WireAtomicField(categoryId.data, categoryId.modifiedAt),
   timing = WireAtomicField(timing.data.toWire(), timing.modifiedAt),
   recurrence = WireAtomicField(recurrence.data?.toWire(), recurrence.modifiedAt),
   reminders = WireAtomicField(reminders.data.map { it.toWire() }, reminders.modifiedAt),
-  completion = WireAtomicField(completion.data.toWire(), completion.modifiedAt),
+  todoState = WireAtomicField(todoState.data?.toWire(), todoState.modifiedAt),
+  linkedToCourse = WireAtomicField(linkedToCourse.data, linkedToCourse.modifiedAt),
 )
 
-/** wire Schedule 完整 payload 到领域七原子资源的无损映射。 */
+/** wire Schedule 完整 payload 到领域来源与八原子资源的无损映射。 */
 internal fun ScheduleInput.toDomain(): ScheduleResource = ScheduleResource(
   identity = ScheduleIdentity(id),
   version = version.toDomainVersion(),
+  kind = kind.toDomain(),
   title = DomainAtomicField(title.data, title.modifiedAt),
   description = DomainAtomicField(description.data, description.modifiedAt),
   categoryId = DomainAtomicField(categoryId.data, categoryId.modifiedAt),
   timing = DomainAtomicField(timing.data.toDomain(), timing.modifiedAt),
   recurrence = DomainAtomicField(recurrence.data?.toDomain(), recurrence.modifiedAt),
   reminders = DomainAtomicField(reminders.data.map { it.toDomain() }, reminders.modifiedAt),
-  completion = DomainAtomicField(completion.data.toDomain(), completion.modifiedAt),
+  todoState = DomainAtomicField(todoState.data?.toDomain(), todoState.modifiedAt),
+  linkedToCourse = DomainAtomicField(linkedToCourse.data, linkedToCourse.modifiedAt),
 )
 
 /** OccurrenceOverride 只映射协议允许的状态、标题、详情和提醒四个原子。 */
@@ -199,14 +205,24 @@ private fun DomainReminderInput.toWire(): WireReminderInput =
 private fun WireReminderInput.toDomain(): DomainReminderInput =
   DomainReminderInput(minutesBefore = minutesBefore, message = message)
 
-private fun DomainCompletionStatus.toWire(): WireCompletionStatus = when (this) {
-  DomainCompletionStatus.OPEN -> WireCompletionStatus.OPEN
-  DomainCompletionStatus.COMPLETED -> WireCompletionStatus.COMPLETED
+private fun DomainTodoState.toWire(): WireTodoState = when (this) {
+  DomainTodoState.OPEN -> WireTodoState.OPEN
+  DomainTodoState.COMPLETED -> WireTodoState.COMPLETED
 }
 
-private fun WireCompletionStatus.toDomain(): DomainCompletionStatus = when (this) {
-  WireCompletionStatus.OPEN -> DomainCompletionStatus.OPEN
-  WireCompletionStatus.COMPLETED -> DomainCompletionStatus.COMPLETED
+private fun WireTodoState.toDomain(): DomainTodoState = when (this) {
+  WireTodoState.OPEN -> DomainTodoState.OPEN
+  WireTodoState.COMPLETED -> DomainTodoState.COMPLETED
+}
+
+private fun DomainScheduleKind.toWire(): WireScheduleKind = when (this) {
+  DomainScheduleKind.TODO -> WireScheduleKind.TODO
+  DomainScheduleKind.AFFAIR -> WireScheduleKind.AFFAIR
+}
+
+private fun WireScheduleKind.toDomain(): DomainScheduleKind = when (this) {
+  WireScheduleKind.TODO -> DomainScheduleKind.TODO
+  WireScheduleKind.AFFAIR -> DomainScheduleKind.AFFAIR
 }
 
 private fun DomainOccurrenceStatus.toWire(): WireOccurrenceStatus = when (this) {

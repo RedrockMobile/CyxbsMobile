@@ -250,13 +250,15 @@ Category:
   sortOrder
 
 Schedule:
+  kind（不可变，不参与 LWW）
   title
   description
   categoryId
   timing
   recurrence
   reminders
-  completion
+  todoState
+  linkedToCourse
 
 OccurrenceOverride:
   status

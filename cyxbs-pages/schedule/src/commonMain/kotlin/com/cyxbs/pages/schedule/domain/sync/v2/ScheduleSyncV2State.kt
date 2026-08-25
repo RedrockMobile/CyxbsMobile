@@ -36,9 +36,15 @@ enum class TimingKind {
   UNSCHEDULED,
 }
 
-enum class CompletionStatus {
+enum class TodoState {
   OPEN,
   COMPLETED,
+}
+
+/** 日程的不可变创建来源；服务端 PATCH 不允许改变。 */
+enum class ScheduleKind {
+  TODO,
+  AFFAIR,
 }
 
 enum class OccurrenceStatus {
@@ -157,17 +163,19 @@ data class CategoryResource(
   }
 }
 
-/** ScheduleInput：version 与七个业务原子字段直接属于日程。 */
+/** ScheduleInput：kind 为不可变来源，其余八个业务原子字段直接属于日程。 */
 data class ScheduleResource(
   override val identity: ScheduleIdentity,
   override val version: Long,
+  val kind: ScheduleKind,
   val title: AtomicField<String>,
   val description: AtomicField<String>,
   val categoryId: AtomicField<String>,
   val timing: AtomicField<TimingInput>,
   val recurrence: AtomicField<RecurrenceInput?>,
   val reminders: AtomicField<List<ReminderInput>>,
-  val completion: AtomicField<CompletionStatus>,
+  val todoState: AtomicField<TodoState?>,
+  val linkedToCourse: AtomicField<Boolean>,
 ) : SyncResource<ScheduleIdentity> {
   init {
     require(version >= 0) { "schedule version must not be negative" }

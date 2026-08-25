@@ -11,7 +11,7 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -123,7 +123,7 @@ class ScheduleCalendarProjectionTest {
 
   @Test
   fun completedAndUnscheduledNonRepeatingSchedulesAreOmitted() {
-    val completed = schedule(completion = ScheduleCompletion.COMPLETED)
+    val completed = schedule(todoState = ScheduleTodoState.COMPLETED)
     val unscheduled = schedule(
       id = ScheduleId("018f0f7c-6000-7000-8000-000000000002"),
       timing = ScheduleTiming.Unscheduled,
@@ -464,7 +464,7 @@ class ScheduleCalendarProjectionTest {
     ),
     recurrence: RecurrenceRule? = null,
     reminders: List<ScheduleReminder> = emptyList(),
-    completion: ScheduleCompletion = ScheduleCompletion.PENDING,
+    todoState: ScheduleTodoState = ScheduleTodoState.PENDING,
   ) = Schedule(
     id = id,
     revision = 0,
@@ -474,7 +474,7 @@ class ScheduleCalendarProjectionTest {
     timing = timing,
     recurrence = recurrence,
     reminders = reminders,
-    completion = completion,
+    todoState = todoState,
     createdAt = now,
     updatedAt = now,
   )

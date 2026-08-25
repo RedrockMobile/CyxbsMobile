@@ -9,7 +9,8 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -42,8 +43,20 @@ object ScheduleValidator {
       issue("recurrence", "unscheduled schedules cannot have recurrence")
     }
     addAll(validateReminders(schedule.reminders, schedule.timing, pushSupported))
-    if (schedule.recurrence != null && schedule.completion != ScheduleCompletion.PENDING) {
-      issue("completion", "a recurring schedule must remain PENDING")
+    when (schedule.kind) {
+      ScheduleKind.TODO -> {
+        if (schedule.todoState == null) issue("todoState", "a TODO schedule must belong to todo")
+        if (schedule.linkedToCourse && schedule.timing == ScheduleTiming.Unscheduled) {
+          issue("linkedToCourse", "an unscheduled TODO cannot be linked to course")
+        }
+      }
+      ScheduleKind.AFFAIR -> {
+        if (!schedule.linkedToCourse) issue("linkedToCourse", "an AFFAIR must be linked to course")
+        if (schedule.timing !is ScheduleTiming.Timed) issue("timing", "an AFFAIR must use TIMED timing")
+      }
+    }
+    if (schedule.recurrence != null && schedule.todoState == ScheduleTodoState.COMPLETED) {
+      issue("todoState", "a recurring schedule must not be completed at series level")
     }
   }
 

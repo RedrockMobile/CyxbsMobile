@@ -19,10 +19,26 @@ data class Schedule(
   val timing: ScheduleTiming,
   val recurrence: RecurrenceRule?,
   val reminders: List<ScheduleReminder>,
-  val completion: ScheduleCompletion,
+  val todoState: ScheduleTodoState?,
   val createdAt: Instant,
   val updatedAt: Instant,
+  /** 日程的创建来源；用于区分原生清单与原生事务，创建后不可修改。 */
+  val kind: ScheduleKind = ScheduleKind.TODO,
+  /** 用户是否要求把该日程投射到课表；最终可见性仍需结合 [kind] 与完成态判断。 */
+  val linkedToCourse: Boolean = false,
 )
+
+/**
+ * 日程的不可变来源类型。
+ *
+ * TODO 完成后会暂时从课表隐藏；AFFAIR 即使后来关联到清单并完成，仍保留事务的课表展示语义。
+ */
+enum class ScheduleKind {
+  /** 从清单创建。 */
+  TODO,
+  /** 从课表事务创建。 */
+  AFFAIR,
+}
 
 /**
  * Schedule v2 支持的四种互斥时间语义。
@@ -54,8 +70,11 @@ sealed interface ScheduleTiming {
   data object Unscheduled : ScheduleTiming
 }
 
-/** 非重复日程的完成状态；重复系列中某次完成必须记录为 occurrence 例外。 */
-enum class ScheduleCompletion {
+/**
+ * 日程进入清单后的完成状态；`null` 表示该日程当前不属于清单。
+ * 重复系列中某次完成必须记录为 occurrence 例外。
+ */
+enum class ScheduleTodoState {
   /** 尚未完成。 */
   PENDING,
   /** 已完成整个非重复日程。 */

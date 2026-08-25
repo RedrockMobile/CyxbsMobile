@@ -1,6 +1,6 @@
 # Schedule v2 Codex 交接
 
-> 更新时间：2026-08-17。后端接口已基本定型，客户端按最终 typed 协议完成主体重写；尚未部署，也未进行真实账号、生产数据库或跨端网络验收。
+> 更新时间：2026-08-24。后端接口已基本定型，客户端按最终 typed 协议完成主体重写；尚未部署，也未进行真实账号、生产数据库或跨端网络验收。
 
 ## 1. 当前结论
 
@@ -45,6 +45,12 @@ DELETE /v2/schedules
 - OccurrenceOverride identity 是 `scheduleId + occurrenceDate`，只有 status/title/description/reminders 四个原子；
 - Category color 可为 `null`，表示没有自定义颜色；
 - DAILY/WEEKLY 是当前支持的 recurrence；MONTHLY/YEARLY 不支持。
+- Schedule 的 `kind=TODO|AFFAIR` 是创建来源且不可修改，不参与字段级 LWW；`todoState` 与
+  `linkedToCourse` 是可合并原子并随 Schedule 一起增改。
+- `todoState=null` 表示当前不进入清单；TODO 必须非空，AFFAIR 关联清单后才改为 `OPEN`。
+- AFFAIR 必须是 TIMED 且 `linkedToCourse=true`。关联清单的 AFFAIR 完成后仍展示在课表；TODO 完成后
+  暂时从课表隐藏，重新打开后恢复。
+- `COMPLETED` occurrence 只允许出现在 `todoState` 非空的父日程下。
 
 所有 HTTP 响应使用：
 
@@ -78,6 +84,7 @@ HTTP 200 的 `status=10000` 和 `status=20101` 都必须解码 `data`。`20101` 
 
 - domain/wire mapper；
 - local command reducer；
+- Schedule 的 `kind/todoState/linkedToCourse` 映射、校验与持久化；
 - Sync capture/planner；
 - response applier；
 - daily mutation bridge；

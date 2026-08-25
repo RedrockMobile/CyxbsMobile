@@ -10,7 +10,7 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -137,6 +137,9 @@ object RecurrenceEngine {
   ) {
     require(exception.scheduleId == schedule.id) { "exception belongs to another schedule" }
     require(ScheduleValidator.validate(exception).isEmpty()) { "exception is invalid" }
+    require(exception.status != OccurrenceStatus.COMPLETED || schedule.todoState != null) {
+      "an occurrence can be completed only when its parent belongs to todo"
+    }
     require(exception.recurrenceId.allDay == (schedule.timing is ScheduleTiming.AllDay)) {
       "recurrence identity kind does not match parent timing"
     }
@@ -183,7 +186,7 @@ object RecurrenceEngine {
       description = schedule.description,
       categoryId = schedule.categoryId,
       reminders = schedule.reminders,
-      status = if (schedule.completion == ScheduleCompletion.COMPLETED) {
+      status = if (schedule.todoState == ScheduleTodoState.COMPLETED) {
         OccurrenceStatus.COMPLETED
       } else {
         OccurrenceStatus.ACTIVE

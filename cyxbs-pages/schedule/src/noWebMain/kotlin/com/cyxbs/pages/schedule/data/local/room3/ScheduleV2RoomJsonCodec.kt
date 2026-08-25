@@ -2,7 +2,7 @@ package com.cyxbs.pages.schedule.data.local.room3
 
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.CategoryInput
-import com.cyxbs.pages.schedule.data.remote.v3.CompletionStatus
+import com.cyxbs.pages.schedule.data.remote.v3.TodoState
 import com.cyxbs.pages.schedule.data.remote.v3.FieldPatch
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideInput
@@ -11,6 +11,7 @@ import com.cyxbs.pages.schedule.data.remote.v3.RecurrenceFrequency
 import com.cyxbs.pages.schedule.data.remote.v3.RecurrenceInput
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleCurrent
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleKind
 import com.cyxbs.pages.schedule.data.remote.v3.TimingInput
 import com.cyxbs.pages.schedule.data.remote.v3.TimingKind
 import kotlinx.serialization.KSerializer
@@ -125,7 +126,18 @@ private fun ScheduleInput.validateForRoom() {
   require(id.validId() && categoryId.data.validId() && reminders.data.all { it.minutesBefore >= 0 })
   timing.data.validateForRoom()
   recurrence.data?.validateForRoom()
-  require(recurrence.data == null || (timing.data.kind != TimingKind.UNSCHEDULED && completion.data == CompletionStatus.OPEN))
+  require(recurrence.data == null ||
+    (timing.data.kind != TimingKind.UNSCHEDULED && todoState.data != TodoState.COMPLETED))
+  when (kind) {
+    ScheduleKind.TODO -> {
+      require(todoState.data != null)
+      require(!linkedToCourse.data || timing.data.kind != TimingKind.UNSCHEDULED)
+    }
+    ScheduleKind.AFFAIR -> {
+      require(linkedToCourse.data)
+      require(timing.data.kind == TimingKind.TIMED)
+    }
+  }
 }
 
 /** Room 中 occurrence override snapshot 的最低可恢复约束。 */

@@ -5,7 +5,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideRemoteSnapshot
@@ -15,6 +15,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ServerResourceMeta
@@ -230,6 +231,7 @@ class ScheduleV2RoomStateMapperTest {
   private fun scheduleResource(id: String, title: String) = ScheduleResource(
     identity = ScheduleIdentity(id),
     version = 2,
+    kind = ScheduleKind.TODO,
     title = AtomicField(title, 10),
     description = AtomicField("说明", 11),
     categoryId = AtomicField("category-1", 12),
@@ -244,7 +246,8 @@ class ScheduleV2RoomStateMapperTest {
       14,
     ),
     reminders = AtomicField(listOf(ReminderInput(15, "reminder-1")), 15),
-    completion = AtomicField(CompletionStatus.OPEN, 16),
+    todoState = AtomicField(TodoState.OPEN, 16),
+    linkedToCourse = AtomicField(false, 17),
   )
 
   private fun overrideResource(

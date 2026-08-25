@@ -25,7 +25,7 @@ data class ScheduleDraft(
   val timing: ScheduleTiming = ScheduleTiming.Unscheduled,
   val recurrence: RecurrenceRule? = null,
   val reminders: List<ScheduleReminder> = emptyList(),
-  val completion: ScheduleCompletion = ScheduleCompletion.PENDING,
+  val todoState: ScheduleTodoState? = ScheduleTodoState.PENDING,
 )
 
 /** 使用完整领域校验器检查新建草稿；[now] 与 [revision] 仅用于补齐临时领域对象，不产生写入副作用。 */
@@ -37,7 +37,7 @@ fun ScheduleDraft.validate(now: Instant, revision: Long = 0): List<ScheduleValid
  */
 fun ScheduleDraft.toNewDomain(now: Instant, revision: Long = 0): Schedule = Schedule(
   id, revision, title.trim(), description.trim(), categoryId, timing, recurrence,
-  reminders, completion, now, now,
+  reminders, todoState, now, now,
 )
 
 /**
@@ -51,7 +51,7 @@ fun ScheduleDraft.toUpdatedDomain(origin: Schedule, now: Instant): Schedule = or
   timing = timing,
   recurrence = recurrence,
   reminders = reminders,
-  completion = if (recurrence == null) completion else ScheduleCompletion.PENDING,
+  todoState = if (recurrence == null) todoState else todoState?.let { ScheduleTodoState.PENDING },
   updatedAt = now,
 )
 
@@ -112,7 +112,7 @@ fun ScheduleSnapshot.occurrencesInRange(
     if (!includeUnscheduled) emptyList() else listOf(ScheduleOccurrence(
       schedule.id, null, schedule.timing, schedule.title, schedule.description, schedule.categoryId,
       schedule.reminders,
-      if (schedule.completion == ScheduleCompletion.COMPLETED) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
+      if (schedule.todoState == ScheduleTodoState.COMPLETED) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
       false,
     ))
   } else {

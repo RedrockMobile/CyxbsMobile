@@ -8,7 +8,7 @@ import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -76,6 +76,8 @@ internal fun projectScheduleTodo(
   val windowEnd = MinuteTimeDate(today.plusYears(1).plusDays(1), 0, 0)
 
   val items = snapshot.schedules.mapNotNull { schedule ->
+    // 原生事务只有在 todoState 非空、即显式关联清单后才进入邮子清单。
+    if (schedule.todoState == null) return@mapNotNull null
     val occurrence = schedule.todoOccurrence(snapshot, windowStart, windowEnd, viewerTimeZone)
       ?: return@mapNotNull null
     occurrence.toTodoItem(schedule, now, viewerTimeZone)
@@ -157,7 +159,7 @@ private fun Schedule.todoOccurrence(
       description = description,
       categoryId = categoryId,
       reminders = reminders,
-      status = if (completion == ScheduleCompletion.COMPLETED) {
+      status = if (todoState == ScheduleTodoState.COMPLETED) {
         OccurrenceStatus.COMPLETED
       } else {
         OccurrenceStatus.ACTIVE

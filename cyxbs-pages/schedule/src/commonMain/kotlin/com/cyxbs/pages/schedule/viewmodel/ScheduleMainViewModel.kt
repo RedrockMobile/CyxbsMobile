@@ -104,6 +104,30 @@ class ScheduleMainViewModel(
       }
     }
 
+  /**
+   * 切换日程的课表投射状态，并沿用普通 Update 的 local-first 保存与远端重试链路。
+   *
+   * 无时间日程不能投射；[onChanged] 只在本地命令完成后回调，远端失败不会撤销已经保存的 pending。
+   */
+  fun toggleCourseProjection(id: ScheduleId, onChanged: (Boolean) -> Unit = {}) =
+    launchByViewModelScope {
+      if (!canSubmitMutation()) return@launchByViewModelScope
+      val schedule = snapshot.value.schedules.firstOrNull { it.id == id } ?: return@launchByViewModelScope
+      // 原生事务的课表身份不可取消；关联清单只改变 todoState，不改变其事务来源。
+      if (schedule.kind == ScheduleKind.AFFAIR) return@launchByViewModelScope
+      if (schedule.timing == ScheduleTiming.Unscheduled) return@launchByViewModelScope
+      val linked = !schedule.linkedToCourse
+      repository.execute(
+        ScheduleCommand.Update(
+          schedule.copy(
+            linkedToCourse = linked,
+            updatedAt = ScheduleRepositoryProvider.clock.now(),
+          ),
+        ),
+      )
+      onChanged(linked)
+    }
+
   fun enterManageMode() { _isManageMode.value = true; _selectedIds.value = emptySet() }
   fun exitManageMode() { _isManageMode.value = false; _selectedIds.value = emptySet() }
   fun toggleSelect(id: ScheduleId) { _selectedIds.value = _selectedIds.value.toMutableSet().apply { if (!add(id)) remove(id) } }

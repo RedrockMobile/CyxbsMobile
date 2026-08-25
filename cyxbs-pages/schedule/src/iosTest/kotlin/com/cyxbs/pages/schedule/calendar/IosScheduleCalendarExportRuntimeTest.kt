@@ -12,7 +12,7 @@ import com.cyxbs.pages.schedule.domain.calendar.PlatformCalendarEventRef
 import com.cyxbs.pages.schedule.domain.calendar.ScheduleCalendarProjectionFactory
 import com.cyxbs.pages.schedule.domain.calendar.ScheduleCalendarSource
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCalendarChange
@@ -1810,7 +1810,7 @@ class IosScheduleCalendarExportRuntimeTest {
     timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 8, 1, 9, 30), 60, "Asia/Shanghai"),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = kotlin.time.Instant.parse("2026-08-01T00:00:00Z"),
     updatedAt = kotlin.time.Instant.parse("2026-08-01T00:00:00Z"),
   )

@@ -8,7 +8,7 @@ typealias UnixMillis = Long
 /** 可独立 LWW 合并的业务字段；data 与 modifiedAt 都是 required。 */
 @Serializable
 data class AtomicField<T>(
-  val data: T, // 当前业务值；只有 Category.color 与 Schedule.recurrence 的 data 允许显式为 null。
+  val data: T, // 当前业务值；Category.color、Schedule.recurrence 与 Schedule.todoState 可显式为 null。
   val modifiedAt: UnixMillis, // 客户端最后修改此原子的时刻；零值合法但字段不可缺失。
 )
 
@@ -20,9 +20,13 @@ enum class PatchMode { INHERIT, CLEAR, REPLACE }
 @Serializable
 enum class OccurrenceStatus { ACTIVE, COMPLETED, CANCELLED }
 
-/** 非重复 Schedule 的完成状态。 */
+/** 日程进入清单后的完成状态；原子 data 为 null 时表示不属于清单。 */
 @Serializable
-enum class CompletionStatus { OPEN, COMPLETED }
+enum class TodoState { OPEN, COMPLETED }
+
+/** 日程的不可变创建来源。 */
+@Serializable
+enum class ScheduleKind { TODO, AFFAIR }
 
 /** Schedule 时间联合类型；kind 决定哪些 nullable 时间字段可以出现。 */
 @Serializable
@@ -98,18 +102,20 @@ data class CategoryInput(
   val sortOrder: AtomicField<Long>, // required，排序原子。
 )
 
-/** Schedule 的完整 live 快照；新增和修改都上传全部七个业务原子。 */
+/** Schedule 的完整 live 快照；kind 不可变，其余八个业务字段按原子合并。 */
 @Serializable
 data class ScheduleInput(
   val id: String, // required，owner 范围内稳定 identity。
   val version: ULong, // required；0 表示 CREATE，正数表示 PATCH。
+  val kind: ScheduleKind, // required，创建来源；PATCH 不允许改变。
   val title: AtomicField<String>, // required，标题原子。
   val description: AtomicField<String>, // required，详情原子。
   val categoryId: AtomicField<String>, // required，Category 引用原子。
   val timing: AtomicField<TimingInput>, // required，完整时间联合值。
   val recurrence: AtomicField<RecurrenceInput?>, // required；data=null 明确表示非重复。
   val reminders: AtomicField<List<ReminderInput>>, // required，空列表合法。
-  val completion: AtomicField<CompletionStatus>, // required；重复日程必须保持 OPEN。
+  val todoState: AtomicField<TodoState?>, // required；data=null 表示当前不属于清单。
+  val linkedToCourse: AtomicField<Boolean>, // required，是否请求投射到课表。
 )
 
 /** identity 固定为 scheduleId + occurrenceDate，仅提供四个覆盖原子。 */

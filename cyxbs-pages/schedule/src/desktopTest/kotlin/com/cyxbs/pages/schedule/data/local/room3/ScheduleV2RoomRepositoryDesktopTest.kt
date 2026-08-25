@@ -33,7 +33,7 @@ import com.cyxbs.pages.schedule.data.remote.v3.RecurrenceInput
 import com.cyxbs.pages.schedule.data.remote.v3.ReminderInput
 import com.cyxbs.pages.schedule.data.remote.v3.ResultReason
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleCurrent
-import com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput
+import com.cyxbs.pages.schedule.data.remote.v3.ScheduleKind
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleTombstone
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleSyncResponse
 import com.cyxbs.pages.schedule.data.remote.v3.ScheduleV2CallResult
@@ -41,13 +41,13 @@ import com.cyxbs.pages.schedule.data.remote.v3.ServerResourceMeta
 import com.cyxbs.pages.schedule.data.remote.v3.SyncRequest
 import com.cyxbs.pages.schedule.data.remote.v3.SyncResponse
 import com.cyxbs.pages.schedule.data.remote.v3.OccurrenceOverrideSyncResponse
-import com.cyxbs.pages.schedule.data.remote.v3.CompletionStatus
+import com.cyxbs.pages.schedule.data.remote.v3.TodoState
 import com.cyxbs.pages.schedule.data.remote.v3.TimingInput
 import com.cyxbs.pages.schedule.data.remote.v3.TimingKind
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCommand
@@ -484,7 +484,7 @@ class ScheduleV2RoomRepositoryDesktopTest {
     timing = ScheduleTiming.Unscheduled,
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = Instant.fromEpochMilliseconds(1),
     updatedAt = Instant.fromEpochMilliseconds(1),
   )
@@ -493,6 +493,7 @@ class ScheduleV2RoomRepositoryDesktopTest {
   private fun scheduleInput(title: String) = com.cyxbs.pages.schedule.data.remote.v3.ScheduleInput(
     id = SCHEDULE_ID,
     version = 0u,
+    kind = ScheduleKind.TODO,
     title = com.cyxbs.pages.schedule.data.remote.v3.AtomicField(title, 100),
     description = com.cyxbs.pages.schedule.data.remote.v3.AtomicField("", 100),
     categoryId = AtomicField(CATEGORY_ID, 100),
@@ -502,10 +503,11 @@ class ScheduleV2RoomRepositoryDesktopTest {
     ),
     recurrence = AtomicField(null, 100),
     reminders = AtomicField(emptyList(), 100),
-    completion = AtomicField(
-      CompletionStatus.OPEN,
+    todoState = AtomicField(
+      TodoState.OPEN,
       100,
     ),
+    linkedToCourse = AtomicField(false, 100),
   )
 
   /** 预置服务端已确认分类，保持 reducer 的“每条日程必须归类”业务约束。 */
@@ -544,7 +546,7 @@ class ScheduleV2RoomRepositoryDesktopTest {
       version = 1u,
       timing = AtomicField(TimingInput(TimingKind.ALL_DAY, startAt = OCCURRENCE_DATE, endAt = OCCURRENCE_DATE + DAY_MILLIS), 1),
       recurrence = AtomicField(RecurrenceInput(RecurrenceFrequency.DAILY, 1, OCCURRENCE_DATE, weekdays = emptyList()), 1),
-      completion = AtomicField(CompletionStatus.OPEN, 1),
+      todoState = AtomicField(TodoState.OPEN, 1),
     )
     ScheduleV2RoomStateStore(database).replaceAccountState(
       ACCOUNT,

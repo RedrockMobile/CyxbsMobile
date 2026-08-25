@@ -4,6 +4,7 @@ import com.cyxbs.pages.schedule.domain.model.FieldPatch
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
+import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.recurrence.RecurrenceEngine
 
 /**
@@ -25,6 +26,9 @@ object ScheduleOccurrenceRelationValidator {
   ) {
     require(parent.id == exception.scheduleId) { "occurrence exception parent does not match scheduleId" }
     require(parent.recurrence != null) { "occurrence exception requires recurring schedule" }
+    require(exception.status != OccurrenceStatus.COMPLETED || parent.todoState != null) {
+      "an occurrence can be completed only when its parent belongs to todo"
+    }
     require(parent.categoryId == null || parent.categoryId.value in categoryIds) { "schedule category not found" }
     if (exception.patch?.categoryId is FieldPatch.Replace) {
       require(exception.patch.categoryId.value.value in categoryIds) { "patch category not found" }

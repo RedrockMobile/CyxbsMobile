@@ -193,13 +193,15 @@ class EditScheduleModelState(
     timing = effectiveTiming,
     recurrence = effectiveRecurrence,
     reminders = effectiveReminders,
-    completion = origin?.completion ?: ScheduleCompletion.PENDING,
+    todoState = origin?.todoState ?: if (origin == null) ScheduleTodoState.PENDING else null,
   )
 
   /** 仅为运行完整领域校验补齐非编辑字段；占位时间与 revision 绝不会进入仓库。 */
   private fun ScheduleDraft.toNewDomainForValidation() = Schedule(
-    id, 0, title, description, categoryId, timing, recurrence, reminders, completion,
+    id, 0, title, description, categoryId, timing, recurrence, reminders, todoState,
     Instant.DISTANT_PAST, Instant.DISTANT_PAST,
+    kind = origin?.kind ?: ScheduleKind.TODO,
+    linkedToCourse = origin?.linkedToCourse ?: false,
   )
 }
 

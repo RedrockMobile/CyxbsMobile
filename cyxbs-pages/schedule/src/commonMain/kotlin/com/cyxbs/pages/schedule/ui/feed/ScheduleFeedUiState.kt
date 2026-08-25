@@ -2,6 +2,7 @@ package com.cyxbs.pages.schedule.ui.feed
 
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoItemUi
@@ -45,8 +46,8 @@ sealed interface ScheduleFeedUiState {
  * @param isOverTime 是否已超时（决定红色样式与超时铃铛）
  * @param isDueSoon 是否会在未来 24 小时内到期；已超期时恒为 false
  * @param isPinned 是否已保存在当前账号的端上置顶顺序中；该字段不会上传服务端
- * @param canProjectToCourse 是否具备可投射时间；无时间清单不展示关联课表入口
- * @param isProjectedToCourse 是否已在当前进程中选择投射到课表
+ * @param canToggleCourseProjection 是否允许用户切换课表投射；原生事务固定属于课表，无时间清单也不能切换
+ * @param isProjectedToCourse 是否已持久化为投射到课表
  */
 data class ScheduleFeedItemUi(
   val id: ScheduleId,
@@ -57,7 +58,7 @@ data class ScheduleFeedItemUi(
   val isOverTime: Boolean,
   val isDueSoon: Boolean,
   val isPinned: Boolean,
-  val canProjectToCourse: Boolean,
+  val canToggleCourseProjection: Boolean,
   val isProjectedToCourse: Boolean,
 )
 
@@ -71,7 +72,6 @@ internal fun projectScheduleFeed(
   now: Instant,
   viewerTimeZone: TimeZone,
   pinnedIds: List<ScheduleId> = emptyList(),
-  projectedScheduleIds: Set<ScheduleId> = emptySet(),
 ): ScheduleFeedUiState {
   val projection = projectScheduleTodo(snapshot, now, viewerTimeZone)
   val items = sortScheduleTodoPending(projection.pending, pinnedIds)
@@ -79,7 +79,7 @@ internal fun projectScheduleFeed(
     .map { item ->
       item.toFeedItem(
         isPinned = item.schedule.id in pinnedIds,
-        isProjectedToCourse = item.schedule.id in projectedScheduleIds,
+        isProjectedToCourse = item.schedule.linkedToCourse,
       )
     }
   return if (items.isEmpty()) {
@@ -105,6 +105,7 @@ private fun ScheduleTodoItemUi.toFeedItem(
   isOverTime = isOverdue,
   isDueSoon = isDueSoon,
   isPinned = isPinned,
-  canProjectToCourse = occurrence.timing !is ScheduleTiming.Unscheduled,
+  canToggleCourseProjection = schedule.kind == ScheduleKind.TODO &&
+    occurrence.timing !is ScheduleTiming.Unscheduled,
   isProjectedToCourse = isProjectedToCourse,
 )

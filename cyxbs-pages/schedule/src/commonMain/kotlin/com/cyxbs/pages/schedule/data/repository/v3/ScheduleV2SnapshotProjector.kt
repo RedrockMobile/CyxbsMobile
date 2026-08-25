@@ -18,7 +18,8 @@ import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind as UiScheduleKind
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -27,7 +28,8 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideSyncState
@@ -149,7 +151,8 @@ class ScheduleV2SnapshotProjector {
       resource.timing.modifiedAt,
       resource.recurrence.modifiedAt,
       resource.reminders.modifiedAt,
-      resource.completion.modifiedAt,
+      resource.todoState.modifiedAt,
+      resource.linkedToCourse.modifiedAt,
     )
     val (createdAt, updatedAt) = timestamps(remoteSnapshot?.meta, atomTimes)
     val timing = resource.timing.data.toUi(timeZone)
@@ -162,9 +165,11 @@ class ScheduleV2SnapshotProjector {
       timing = timing,
       recurrence = resource.recurrence.data?.toUi(timing),
       reminders = resource.reminders.data.toUiReminders(resource.identity.id),
-      completion = resource.completion.data.toUi(),
+      todoState = resource.todoState.data?.toUi(),
       createdAt = createdAt,
       updatedAt = updatedAt,
+      kind = resource.kind.toUi(),
+      linkedToCourse = resource.linkedToCourse.data,
     )
   }
 
@@ -333,9 +338,14 @@ class ScheduleV2SnapshotProjector {
     is FieldPatch.Replace -> UiFieldPatch.Replace(value.toUiReminders(identity))
   }
 
-  private fun CompletionStatus.toUi(): ScheduleCompletion = when (this) {
-    CompletionStatus.OPEN -> ScheduleCompletion.PENDING
-    CompletionStatus.COMPLETED -> ScheduleCompletion.COMPLETED
+  private fun TodoState.toUi(): ScheduleTodoState = when (this) {
+    TodoState.OPEN -> ScheduleTodoState.PENDING
+    TodoState.COMPLETED -> ScheduleTodoState.COMPLETED
+  }
+
+  private fun ScheduleKind.toUi(): UiScheduleKind = when (this) {
+    ScheduleKind.TODO -> UiScheduleKind.TODO
+    ScheduleKind.AFFAIR -> UiScheduleKind.AFFAIR
   }
 
   private fun OccurrenceStatus.toUi(): UiOccurrenceStatus = when (this) {

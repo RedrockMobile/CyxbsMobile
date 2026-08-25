@@ -13,12 +13,14 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.validation.ScheduleValidator
+import com.cyxbs.pages.schedule.domain.validation.ScheduleOccurrenceRelationValidator
 import com.cyxbs.pages.schedule.domain.validation.canonicalized
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTimeDate
@@ -58,7 +60,7 @@ class ScheduleDomainTest {
         ScheduleReminder(ReminderId("same"), -1, ReminderChannel.DEVICE),
         ScheduleReminder(ReminderId("same"), 0, ReminderChannel.PUSH),
       ),
-      completion = ScheduleCompletion.COMPLETED,
+      todoState = ScheduleTodoState.COMPLETED,
     )
 
     val fields = ScheduleValidator.validate(schedule).map { it.field }.toSet()
@@ -71,7 +73,62 @@ class ScheduleDomainTest {
     assertTrue("reminders.id" in fields)
     assertTrue("reminders[0].offsetMinutes" in fields)
     assertTrue("reminders[1].channel" in fields)
-    assertTrue("completion" in fields)
+    assertTrue("todoState" in fields)
+  }
+
+  /** TODO/AFFAIR 的来源、清单成员与课表投射组合必须在客户端边界和后端保持同义。 */
+  @Test
+  fun validatorEnforcesTodoAndAffairMembershipMatrix() {
+    val timed = ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 12, 9, 0), 60, "Asia/Shanghai")
+    val affair = validSchedule().copy(
+      timing = timed,
+      kind = ScheduleKind.AFFAIR,
+      todoState = null,
+      linkedToCourse = true,
+    )
+
+    assertTrue(ScheduleValidator.validate(affair).isEmpty())
+    assertTrue(ScheduleValidator.validate(affair.copy(todoState = ScheduleTodoState.COMPLETED)).isEmpty())
+    assertTrue(ScheduleValidator.validate(validSchedule().copy(todoState = null)).any { it.field == "todoState" })
+    assertTrue(
+      ScheduleValidator.validate(
+        validSchedule().copy(timing = ScheduleTiming.Unscheduled, linkedToCourse = true),
+      ).any { it.field == "linkedToCourse" },
+    )
+    assertTrue(ScheduleValidator.validate(affair.copy(linkedToCourse = false)).any { it.field == "linkedToCourse" })
+    assertTrue(ScheduleValidator.validate(affair.copy(timing = ScheduleTiming.AllDay(Date(2026, 7, 12)))).any {
+      it.field == "timing"
+    })
+  }
+
+  /** 纯事务没有完成态，因此不能伪造 COMPLETED occurrence；关联清单后才允许。 */
+  @Test
+  fun completedOccurrenceRequiresParentTodoMembership() {
+    val parent = validSchedule().copy(
+      timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 12, 9, 0), 60, "Asia/Shanghai"),
+      recurrence = RecurrenceRule(RecurrenceFrequency.DAILY),
+      kind = ScheduleKind.AFFAIR,
+      todoState = null,
+      linkedToCourse = true,
+    )
+    val exception = ScheduleOccurrenceException(
+      scheduleId = parent.id,
+      recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 12, 9, 0), "Asia/Shanghai", false),
+      revision = 0,
+      status = OccurrenceStatus.COMPLETED,
+      patch = null,
+      createdAt = Instant.fromEpochMilliseconds(1),
+      updatedAt = Instant.fromEpochMilliseconds(2),
+    )
+
+    assertFailsWith<IllegalArgumentException> {
+      ScheduleOccurrenceRelationValidator.requireValid(parent, exception, setOf("work"))
+    }
+    ScheduleOccurrenceRelationValidator.requireValid(
+      parent.copy(todoState = ScheduleTodoState.PENDING),
+      exception,
+      setOf("work"),
+    )
   }
 
   @Test
@@ -223,7 +280,7 @@ class ScheduleDomainTest {
     timing = ScheduleTiming.AllDay(Date(2026, 7, 12)),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = Instant.fromEpochMilliseconds(1),
     updatedAt = Instant.fromEpochMilliseconds(2),
   )

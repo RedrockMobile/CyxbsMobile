@@ -24,7 +24,7 @@ import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -37,7 +37,6 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSyncResult
-import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoPage
 import com.cyxbs.pages.schedule.ui.todo.figma.ScheduleTodoDetailRoute
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
@@ -172,19 +171,18 @@ private val DesktopScheduleTodoPreviewRepository: ScheduleRepository =
  * [accountId] 只用于满足账号 façade 的快照隔离校验；数据仍完全位于内存，不会持久化或请求后端。
  */
 internal fun createScheduleTodoPreviewRepository(accountId: String): ScheduleRepository {
-  val snapshot = createDesktopTodoPreviewSnapshot().copy(accountId = accountId)
-  // Android 验收 mock 启动时直接关联三条重叠日程，避免每次重启都要逐条点击“同步到课表”。
-  // toggle 前先核对当前状态，确保同一登录会话重复创建 factory 时不会反向取消关联。
-  snapshot.schedules
-    .filter { it.title.startsWith(COURSE_OVERLAP_MOCK_TITLE_PREFIX) }
-    .forEach { schedule ->
-      val projection = ScheduleCourseProjectionMemory.state.value
-      val selectedIds =
-        projection.scheduleIds.takeIf { projection.accountId == accountId }.orEmpty()
-      if (schedule.id !in selectedIds) {
-        ScheduleCourseProjectionMemory.toggle(accountId, schedule.id)
+  val original = createDesktopTodoPreviewSnapshot()
+  // Android 验收 mock 直接在权威日程字段中关联三条重叠数据，不再依赖额外的进程内选择表。
+  val snapshot = original.copy(
+    accountId = accountId,
+    schedules = original.schedules.map { schedule ->
+      if (schedule.title.startsWith(COURSE_OVERLAP_MOCK_TITLE_PREFIX)) {
+        schedule.copy(linkedToCourse = true)
+      } else {
+        schedule
       }
-    }
+    },
+  )
   return DesktopPreviewRepository(snapshot)
 }
 
@@ -220,7 +218,7 @@ private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : Sche
         schedules = current.schedules.map { schedule ->
           if (schedule.id != command.scheduleId) schedule
           else schedule.copy(
-            completion = if (command.completed) ScheduleCompletion.COMPLETED else ScheduleCompletion.PENDING,
+            todoState = if (command.completed) ScheduleTodoState.COMPLETED else ScheduleTodoState.PENDING,
             updatedAt = Clock.System.now(),
           )
         },
@@ -305,7 +303,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = listOf(ScheduleReminder(ReminderId("review-reminder"), 15, ReminderChannel.DEVICE)),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -323,7 +321,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -340,7 +338,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -358,7 +356,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -384,7 +382,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
       end = RecurrenceEnd.Never,
     ),
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -397,7 +395,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     timing = ScheduleTiming.Deadline(MinuteTimeDate(today, 18, 30), SHANGHAI_TIME_ZONE),
     recurrence = null,
     reminders = listOf(ScheduleReminder(ReminderId("deadline-reminder"), 30, ReminderChannel.DEVICE)),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -414,7 +412,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = listOf(ScheduleReminder(ReminderId("due-soon-reminder"), 30, ReminderChannel.DEVICE)),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -431,7 +429,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -449,7 +447,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -466,7 +464,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -484,7 +482,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -501,7 +499,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -518,7 +516,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -536,7 +534,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.COMPLETED,
+    todoState = ScheduleTodoState.COMPLETED,
     createdAt = now,
     updatedAt = now,
   )
@@ -553,7 +551,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -570,7 +568,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     ),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = now,
     updatedAt = now,
   )
@@ -583,7 +581,7 @@ private fun createDesktopPreviewSnapshot(): ScheduleSnapshot {
     timing = ScheduleTiming.AllDay(today),
     recurrence = null,
     reminders = emptyList(),
-    completion = ScheduleCompletion.COMPLETED,
+    todoState = ScheduleTodoState.COMPLETED,
     createdAt = now,
     updatedAt = now,
   )
@@ -669,7 +667,7 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
     timing: ScheduleTiming,
     recurrence: RecurrenceRule? = null,
     reminders: List<ScheduleReminder> = emptyList(),
-    completion: ScheduleCompletion = ScheduleCompletion.PENDING,
+    todoState: ScheduleTodoState = ScheduleTodoState.PENDING,
     updatedAt: Instant = now,
   ): Schedule = Schedule(
     id = ScheduleId("019c7f00-0000-7000-8000-000000000$suffix"),
@@ -680,7 +678,7 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
     timing = timing,
     recurrence = recurrence,
     reminders = reminders,
-    completion = completion,
+    todoState = todoState,
     createdAt = now - 10.days,
     updatedAt = updatedAt,
   )
@@ -801,7 +799,7 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
         description = "两天前完成，仍在七天展示窗口内",
         categoryId = lifeCategory.id,
         timing = ScheduleTiming.Unscheduled,
-        completion = ScheduleCompletion.COMPLETED,
+        todoState = ScheduleTodoState.COMPLETED,
         updatedAt = now - 2.days,
       ),
     ),

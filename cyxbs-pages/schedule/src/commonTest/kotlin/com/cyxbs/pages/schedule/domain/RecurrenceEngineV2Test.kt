@@ -337,7 +337,7 @@ class RecurrenceEngineV2Test {
     RecurrenceEngine.expandInRange(schedule(rule, start, duration, zone), emptyList(), start, end)
   private fun assertDates(values: List<ScheduleOccurrence>, vararg dates: String) = assertEquals(dates.toList(), values.map { (it.timing as ScheduleTiming.Timed).start.date.toString() })
   private fun rule(freq: RecurrenceFrequency, count: Int? = null, end: RecurrenceEnd = count?.let { RecurrenceEnd.Count(it) } ?: RecurrenceEnd.Never, days: Set<IsoWeekDay> = emptySet(), monthDays: Set<Int> = emptySet()) = RecurrenceRule(freq, byWeekDays = days, byMonthDays = monthDays, end = end)
-  private fun schedule(rule: RecurrenceRule, start: MinuteTimeDate = dt(31), duration: Int = 60, zone: String = "Asia/Shanghai") = Schedule(ID, 1, "Title", "Body", null, ScheduleTiming.Timed(start, duration, zone), rule, emptyList(), ScheduleCompletion.PENDING, NOW, NOW)
+  private fun schedule(rule: RecurrenceRule, start: MinuteTimeDate = dt(31), duration: Int = 60, zone: String = "Asia/Shanghai") = Schedule(ID, 1, "Title", "Body", null, ScheduleTiming.Timed(start, duration, zone), rule, emptyList(), ScheduleTodoState.PENDING, NOW, NOW)
   private fun exception(schedule: Schedule, id: RecurrenceId, status: OccurrenceStatus, patch: OccurrencePatch? = null) = ScheduleOccurrenceException(schedule.id, id, 1, status, patch, NOW, NOW)
   private fun dt(day: Int) = MinuteTimeDate(2024, 1, day, 9, 0)
   private companion object {

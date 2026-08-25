@@ -14,7 +14,8 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind as UiScheduleKind
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -23,7 +24,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
@@ -37,6 +38,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ResourceIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
 import com.cyxbs.pages.schedule.domain.sync.v2.TimingInput
@@ -313,9 +315,12 @@ class ScheduleV2LocalCommandReducer {
     if (effective.recurrence.data != null) {
       reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     }
-    val completion = if (completed) CompletionStatus.COMPLETED else CompletionStatus.OPEN
-    if (effective.completion.data == completion) return ScheduleV2LocalCommandResult.NoOp
-    val resource = effective.copy(completion = AtomicField(completion, now))
+    if (effective.todoState.data == null) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val todoState = if (completed) TodoState.COMPLETED else TodoState.OPEN
+    if (effective.todoState.data == todoState) return ScheduleV2LocalCommandResult.NoOp
+    val resource = effective.copy(todoState = AtomicField(todoState, now))
     val updated = state.replacePending(PendingUpsert(resource, revision))
     return applied(categories, schedules.replace(identity) { updated }, overrides)
   }
@@ -519,16 +524,21 @@ class ScheduleV2LocalCommandReducer {
     val timingValue = timing.toWireTiming()
     val recurrenceValue = recurrence?.toWireRecurrence(timing)
     val reminderValues = reminders.toWireReminders()
+    if (old != null && old.kind != kind.toWire()) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
     return ScheduleResource(
       identity = ScheduleIdentity(id.value),
       version = version,
+      kind = kind.toWire(),
       title = atomic(title, old?.title, now),
       description = atomic(description, old?.description, now),
       categoryId = atomic(category.value, old?.categoryId, now),
       timing = atomic(timingValue, old?.timing, now),
       recurrence = atomic(recurrenceValue, old?.recurrence, now),
       reminders = atomic(reminderValues, old?.reminders, now),
-      completion = atomic(completion.toWire(), old?.completion, now),
+      todoState = atomic(todoState?.toWire(), old?.todoState, now),
+      linkedToCourse = atomic(linkedToCourse, old?.linkedToCourse, now),
     )
   }
 
@@ -703,9 +713,14 @@ class ScheduleV2LocalCommandReducer {
   private fun Date.toUtcDaySlot(): Long =
     toLocalDate().atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
 
-  private fun ScheduleCompletion.toWire(): CompletionStatus = when (this) {
-    ScheduleCompletion.PENDING -> CompletionStatus.OPEN
-    ScheduleCompletion.COMPLETED -> CompletionStatus.COMPLETED
+  private fun ScheduleTodoState.toWire(): TodoState = when (this) {
+    ScheduleTodoState.PENDING -> TodoState.OPEN
+    ScheduleTodoState.COMPLETED -> TodoState.COMPLETED
+  }
+
+  private fun UiScheduleKind.toWire(): ScheduleKind = when (this) {
+    UiScheduleKind.TODO -> ScheduleKind.TODO
+    UiScheduleKind.AFFAIR -> ScheduleKind.AFFAIR
   }
 
   private fun UiOccurrenceStatus.toWire(): OccurrenceStatus = when (this) {

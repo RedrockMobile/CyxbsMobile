@@ -11,19 +11,19 @@ import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
 import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.model.Schedule
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
-import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 import com.cyxbs.pages.schedule.ui.model.occurrencesInRange
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,25 +57,13 @@ object ScheduleService2Impl : IScheduleService2 {
   override fun observeLinkedOccurrencesInRange(
     startInclusive: com.cyxbs.components.config.time.MinuteTimeDate,
     endExclusive: com.cyxbs.components.config.time.MinuteTimeDate,
-  ): Flow<List<ScheduleOccurrenceView>> = combine(
-    repository.snapshot,
-    ScheduleCourseProjectionMemory.state,
-  ) { snapshot, selection ->
-    val linkedIds =
-      selection.takeIf { it.accountId == snapshot.accountId }?.scheduleIds.orEmpty()
-    if (linkedIds.isEmpty()) return@combine emptyList()
-
+  ): Flow<List<ScheduleOccurrenceView>> = repository.snapshot.map { snapshot ->
+    val schedulesById = snapshot.schedules.associateBy(Schedule::id)
     val details = linkedMapOf<String, Detail>()
     val result = snapshot.occurrencesInRange(startInclusive, endExclusive)
       .mapNotNull { occurrence ->
-        if (
-          occurrence.status != OccurrenceStatus.ACTIVE ||
-          occurrence.scheduleId !in linkedIds
-        ) {
-          return@mapNotNull null
-        }
-        val schedule = snapshot.schedules.firstOrNull { it.id == occurrence.scheduleId }
-          ?: return@mapNotNull null
+        val schedule = schedulesById[occurrence.scheduleId] ?: return@mapNotNull null
+        if (!schedule.isVisibleInCourse(occurrence.status)) return@mapNotNull null
         val identity = occurrenceIdentity(occurrence)
         details[identity] = Detail(occurrence, schedule)
         occurrence.toApiModel(identity)
@@ -150,6 +138,16 @@ object ScheduleService2Impl : IScheduleService2 {
       },
     )
   }
+}
+
+/**
+ * 计算一次 occurrence 是否应投射到课表。
+ *
+ * 原生事务的课表身份不因后来关联清单并完成而丢失；原生清单完成后暂时隐藏，重新打开后自动恢复。
+ */
+internal fun Schedule.isVisibleInCourse(status: OccurrenceStatus): Boolean {
+  if (!linkedToCourse || status == OccurrenceStatus.CANCELLED) return false
+  return kind == ScheduleKind.AFFAIR || status == OccurrenceStatus.ACTIVE
 }
 
 /** 使用 Schedule/recurrence identity 定位 occurrence；移动实例不会因当前展示时间变化而换 key。 */

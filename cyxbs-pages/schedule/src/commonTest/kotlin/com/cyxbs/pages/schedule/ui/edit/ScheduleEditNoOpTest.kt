@@ -369,7 +369,7 @@ class ScheduleEditNoOpTest {
     ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 1, 9, 0), 60, "Asia/Shanghai"),
     RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.WEDNESDAY)),
     listOf(ScheduleReminder(ReminderId("r1"), 10, ReminderChannel.DEVICE)),
-    ScheduleCompletion.PENDING,
+    ScheduleTodoState.PENDING,
     Instant.parse("2026-07-01T00:00:00Z"), Instant.parse("2026-07-02T00:00:00Z"),
   )
 

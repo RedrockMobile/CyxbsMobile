@@ -4,8 +4,9 @@ import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
@@ -49,7 +50,7 @@ class ScheduleFeedUiStateTest {
       suffix = "010",
       title = "已完成",
       due = MinuteTimeDate(2026, 8, 21, 10, 0),
-      completion = ScheduleCompletion.COMPLETED,
+      todoState = ScheduleTodoState.COMPLETED,
     )
 
     assertEquals(
@@ -106,27 +107,40 @@ class ScheduleFeedUiStateTest {
     assertEquals("提前10分钟提醒", state.items.single().reminderText)
   }
 
-  /** Feed 仅给有时间的事项展示关联入口，并复用课表投射的进程内选择结果。 */
+  /** Feed 仅允许有时间的原生清单切换课表投射；原生事务即使关联清单也不能取消课表身份。 */
   @Test
-  fun courseProjectionStateOnlyAppliesToScheduledItem() {
+  fun courseProjectionToggleOnlyAppliesToScheduledTodo() {
     val scheduled = schedule("040", "有时间", MinuteTimeDate(2026, 8, 21, 10, 0))
+      .copy(linkedToCourse = true)
     val unscheduled = schedule("041", "无时间", MinuteTimeDate(2026, 8, 21, 11, 0))
       .copy(timing = ScheduleTiming.Unscheduled)
+    val affair = schedule("042", "关联清单的事务", MinuteTimeDate(2026, 8, 21, 12, 0)).copy(
+      kind = ScheduleKind.AFFAIR,
+      timing = ScheduleTiming.Timed(
+        start = MinuteTimeDate(2026, 8, 21, 12, 0),
+        durationMinutes = 60,
+        timeZoneId = "UTC",
+      ),
+      linkedToCourse = true,
+    )
 
     val state = assertIs<ScheduleFeedUiState.Data>(
       projectScheduleFeed(
-        snapshot = ScheduleSnapshot(schedules = listOf(scheduled, unscheduled)),
+        snapshot = ScheduleSnapshot(schedules = listOf(scheduled, unscheduled, affair)),
         now = Instant.parse("2026-08-21T08:00:00Z"),
         viewerTimeZone = TimeZone.UTC,
-        projectedScheduleIds = setOf(scheduled.id, unscheduled.id),
       ),
     )
 
     val scheduledItem = state.items.first { it.id == scheduled.id }
     val unscheduledItem = state.items.first { it.id == unscheduled.id }
-    assertTrue(scheduledItem.canProjectToCourse)
+    val affairItem = state.items.first { it.id == affair.id }
+    assertTrue(scheduledItem.canToggleCourseProjection)
     assertTrue(scheduledItem.isProjectedToCourse)
-    assertFalse(unscheduledItem.canProjectToCourse)
+    assertFalse(unscheduledItem.canToggleCourseProjection)
+    assertFalse(unscheduledItem.isProjectedToCourse)
+    assertFalse(affairItem.canToggleCourseProjection)
+    assertTrue(affairItem.isProjectedToCourse)
   }
 
   /** 构造满足领域 identity 的最小 Deadline 日程。 */
@@ -134,7 +148,7 @@ class ScheduleFeedUiStateTest {
     suffix: String,
     title: String,
     due: MinuteTimeDate,
-    completion: ScheduleCompletion = ScheduleCompletion.PENDING,
+    todoState: ScheduleTodoState = ScheduleTodoState.PENDING,
     reminders: List<ScheduleReminder> = emptyList(),
   ): Schedule = Schedule(
     id = ScheduleId("019c6f00-0000-7000-8000-000000000$suffix"),
@@ -145,7 +159,7 @@ class ScheduleFeedUiStateTest {
     timing = ScheduleTiming.Deadline(due = due, timeZoneId = "UTC"),
     recurrence = null,
     reminders = reminders,
-    completion = completion,
+    todoState = todoState,
     createdAt = Instant.parse("2026-08-21T00:00:00Z"),
     updatedAt = Instant.parse("2026-08-21T00:00:00Z"),
   )

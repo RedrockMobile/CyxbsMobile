@@ -16,7 +16,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
@@ -26,6 +26,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.PendingChange
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingDelete
 import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
@@ -209,13 +210,15 @@ class ScheduleV2DailyMutationBridgeTest {
   private fun scheduleResource(version: Long, title: String = "日程"): ScheduleResource = ScheduleResource(
     identity = ScheduleIdentity(SCHEDULE_ID),
     version = version,
+    kind = ScheduleKind.TODO,
     title = AtomicField(title, 1),
     description = AtomicField("", 1),
     categoryId = AtomicField(CATEGORY_ID, 1),
     timing = AtomicField(TimingInput(TimingKind.UNSCHEDULED), 1),
     recurrence = AtomicField(null, 1),
     reminders = AtomicField(emptyList(), 1),
-    completion = AtomicField(CompletionStatus.OPEN, 1),
+    todoState = AtomicField(TodoState.OPEN, 1),
+    linkedToCourse = AtomicField(false, 1),
   )
 
   private companion object {

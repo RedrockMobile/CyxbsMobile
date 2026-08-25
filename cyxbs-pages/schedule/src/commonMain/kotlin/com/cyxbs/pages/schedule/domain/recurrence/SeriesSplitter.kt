@@ -4,7 +4,7 @@ import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -60,13 +60,16 @@ object SeriesSplitter {
       else -> end
     }
     val newTiming = moveTiming(schedule.timing, boundary.originalDateTime)
-    val previousSchedule = schedule.copy(recurrence = oldRule, completion = ScheduleCompletion.PENDING)
+    val previousSchedule = schedule.copy(
+      recurrence = oldRule,
+      todoState = schedule.todoState?.let { ScheduleTodoState.PENDING },
+    )
     val followingSchedule = schedule.copy(
       id = followingId,
       revision = 0,
       timing = newTiming,
       recurrence = schedule.recurrence.copy(end = newEnd),
-      completion = ScheduleCompletion.PENDING,
+      todoState = schedule.todoState?.let { ScheduleTodoState.PENDING },
     )
 
     val (before, after) = exceptions.partition {

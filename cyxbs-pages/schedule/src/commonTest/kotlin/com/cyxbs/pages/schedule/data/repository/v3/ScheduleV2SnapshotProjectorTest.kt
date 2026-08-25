@@ -17,7 +17,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideRemoteSnapshot
@@ -30,6 +30,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
@@ -118,7 +119,7 @@ class ScheduleV2SnapshotProjectorTest {
       timestamp = 20,
     ).copy(
       title = AtomicField("create", 10),
-      completion = AtomicField(CompletionStatus.OPEN, 70),
+      todoState = AtomicField(TodoState.OPEN, 70),
     )
     val state = ScheduleSyncState(
       create.identity,
@@ -426,13 +427,15 @@ class ScheduleV2SnapshotProjectorTest {
   ): ScheduleResource = ScheduleResource(
     identity = ScheduleIdentity(id),
     version = version,
+    kind = ScheduleKind.TODO,
     title = AtomicField(title, timestamp),
     description = AtomicField("描述", timestamp),
     categoryId = AtomicField(CATEGORY_ID, timestamp),
     timing = AtomicField(timing, timestamp),
     recurrence = AtomicField(recurrence, timestamp),
     reminders = AtomicField(listOf(ReminderInput(15, "")), timestamp),
-    completion = AtomicField(CompletionStatus.OPEN, timestamp),
+    todoState = AtomicField(TodoState.OPEN, timestamp),
+    linkedToCourse = AtomicField(false, timestamp),
   )
 
   private fun overrideState(

@@ -4,7 +4,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideIdentity
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideRemoteSnapshot
@@ -14,6 +14,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ServerResourceMeta
@@ -46,6 +47,7 @@ class ScheduleV2DomainWireMapperTest {
     val resource = ScheduleResource(
       identity = ScheduleIdentity("schedule-1"),
       version = 8,
+      kind = ScheduleKind.AFFAIR,
       title = AtomicField("高数", 31),
       description = AtomicField("第三章", 32),
       categoryId = AtomicField("category-1", 33),
@@ -61,7 +63,8 @@ class ScheduleV2DomainWireMapperTest {
         35,
       ),
       reminders = AtomicField(listOf(ReminderInput(15, "reminder-1")), 36),
-      completion = AtomicField(CompletionStatus.OPEN, 37),
+      todoState = AtomicField(TodoState.OPEN, 37),
+      linkedToCourse = AtomicField(true, 38),
     )
     val snapshot = ScheduleRemoteSnapshot(
       resource = resource,

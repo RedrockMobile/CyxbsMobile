@@ -353,7 +353,7 @@ private fun ScheduleFeedItem(
             }
           }
         }
-        if (item.canProjectToCourse) {
+        if (item.canToggleCourseProjection) {
           Box(
             modifier = Modifier
               .align(Alignment.CenterEnd)

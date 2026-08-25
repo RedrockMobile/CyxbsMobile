@@ -8,7 +8,8 @@ import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
 import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.Schedule
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -184,7 +185,10 @@ object ScheduleCalendarProjectionFactory {
         return@mapNotNull null
       }
       if (schedule.timing == ScheduleTiming.Unscheduled) return@mapNotNull null
-      if (schedule.recurrence == null && schedule.completion == ScheduleCompletion.COMPLETED) {
+      if (schedule.kind == ScheduleKind.TODO &&
+        schedule.recurrence == null &&
+        schedule.todoState == ScheduleTodoState.COMPLETED
+      ) {
         return@mapNotNull null
       }
       val nativeExceptions = runCatching {

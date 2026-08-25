@@ -86,7 +86,7 @@ import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -150,7 +150,7 @@ class EditScheduleDialogPreview : AppNavEntry<EditScheduleDialogNavArgument>() {
     timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 4, 10, 0), 90, "Asia/Shanghai"),
     recurrence = RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.SATURDAY)),
     reminders = listOf(ScheduleReminder(ReminderId("preview-reminder"), 10, ReminderChannel.DEVICE)),
-    completion = ScheduleCompletion.PENDING, createdAt = Instant.DISTANT_PAST, updatedAt = Instant.DISTANT_PAST,
+    todoState = ScheduleTodoState.PENDING, createdAt = Instant.DISTANT_PAST, updatedAt = Instant.DISTANT_PAST,
   )
 }
 

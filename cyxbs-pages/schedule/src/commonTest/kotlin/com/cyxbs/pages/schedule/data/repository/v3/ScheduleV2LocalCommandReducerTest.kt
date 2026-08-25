@@ -17,7 +17,7 @@ import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleCompletion
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
@@ -25,10 +25,9 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCommand
 import com.cyxbs.pages.schedule.domain.sync.v2.AtomicField
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryIdentity
-import com.cyxbs.pages.schedule.domain.sync.v2.CategoryRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.CategoryResource
 import com.cyxbs.pages.schedule.domain.sync.v2.CategorySyncState
-import com.cyxbs.pages.schedule.domain.sync.v2.CompletionStatus
+import com.cyxbs.pages.schedule.domain.sync.v2.TodoState
 import com.cyxbs.pages.schedule.domain.sync.v2.FieldPatch
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.OccurrenceOverrideResource
@@ -39,6 +38,7 @@ import com.cyxbs.pages.schedule.domain.sync.v2.PendingUpsert
 import com.cyxbs.pages.schedule.domain.sync.v2.RecurrenceFrequency
 import com.cyxbs.pages.schedule.domain.sync.v2.ReminderInput
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleIdentity
+import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleKind
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleRemoteSnapshot
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleResource
 import com.cyxbs.pages.schedule.domain.sync.v2.ScheduleSyncState
@@ -72,7 +72,7 @@ class ScheduleV2LocalCommandReducerTest {
     assertEquals(0, resource.version)
     assertEquals(1, pending.localRevision)
     assertEquals(
-      List(7) { now },
+      List(8) { now },
       listOf(
         resource.title.modifiedAt,
         resource.description.modifiedAt,
@@ -80,7 +80,8 @@ class ScheduleV2LocalCommandReducerTest {
         resource.timing.modifiedAt,
         resource.recurrence.modifiedAt,
         resource.reminders.modifiedAt,
-        resource.completion.modifiedAt,
+        resource.todoState.modifiedAt,
+        resource.linkedToCourse.modifiedAt,
       ),
     )
     assertEquals(TimingKind.TIMED, resource.timing.data.kind)
@@ -170,7 +171,8 @@ class ScheduleV2LocalCommandReducerTest {
     assertEquals(currentR.timing, resource.timing)
     assertEquals(currentR.recurrence, resource.recurrence)
     assertEquals(currentR.reminders, resource.reminders)
-    assertEquals(currentR.completion, resource.completion)
+    assertEquals(currentR.todoState, resource.todoState)
+    assertEquals(currentR.linkedToCourse, resource.linkedToCourse)
   }
 
   @Test
@@ -453,7 +455,7 @@ class ScheduleV2LocalCommandReducerTest {
       now = 601,
       revision = 4,
     ).applied().schedules.single().pendingResource()
-    assertEquals(AtomicField(CompletionStatus.COMPLETED, 601), completed.completion)
+    assertEquals(AtomicField<TodoState?>(TodoState.COMPLETED, 601), completed.todoState)
     assertEquals(600, completed.title.modifiedAt)
   }
 
@@ -597,7 +599,7 @@ class ScheduleV2LocalCommandReducerTest {
     timing = timing,
     recurrence = recurrence,
     reminders = reminders,
-    completion = ScheduleCompletion.PENDING,
+    todoState = ScheduleTodoState.PENDING,
     createdAt = Instant.fromEpochMilliseconds(1),
     updatedAt = Instant.fromEpochMilliseconds(2),
   )
@@ -614,6 +616,7 @@ class ScheduleV2LocalCommandReducerTest {
     return ScheduleResource(
       identity = ScheduleIdentity(SCHEDULE_ID),
       version = version,
+      kind = ScheduleKind.TODO,
       title = AtomicField(title, timestamp),
       description = AtomicField("第三章", timestamp),
       categoryId = AtomicField(CATEGORY_ID, timestamp),
@@ -623,7 +626,8 @@ class ScheduleV2LocalCommandReducerTest {
       ),
       recurrence = AtomicField(null, timestamp),
       reminders = AtomicField(listOf(ReminderInput(15, "")), timestamp),
-      completion = AtomicField(CompletionStatus.OPEN, timestamp),
+      todoState = AtomicField(TodoState.OPEN, timestamp),
+      linkedToCourse = AtomicField(false, timestamp),
     )
   }
 

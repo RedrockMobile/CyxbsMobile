@@ -17,7 +17,7 @@ class EditScheduleScopeTest {
     val origin = Schedule(
       ScheduleId("019b76e0-0000-7000-8000-000000000001"), 7, "old", "", null,
       ScheduleTiming.Deadline(MinuteTimeDate(2026, 7, 7, 10, 0), "Asia/Shanghai"), null,
-      emptyList(), ScheduleCompletion.PENDING, created, created,
+      emptyList(), ScheduleTodoState.PENDING, created, created,
     )
     val updated = ScheduleDraft(origin.id, title = "new", timing = origin.timing)
       .toUpdatedDomain(origin, Instant.parse("2026-01-02T00:00:00Z"))

@@ -94,6 +94,7 @@ import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryMutationMode
@@ -101,7 +102,6 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.canSubmitScheduleMutation
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.EditScope
-import com.cyxbs.pages.schedule.ui.course.ScheduleCourseProjectionMemory
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
@@ -151,7 +151,6 @@ fun ScheduleTodoPage(
   val snapshot by viewModel.snapshot.collectAsState()
   val manageMode by viewModel.isManageMode.collectAsState()
   val selectedIds by viewModel.selectedIds.collectAsState()
-  val courseProjectionState by ScheduleCourseProjectionMemory.state.collectAsState()
   val editorEnabled = viewModel.mutationMode.canSubmitScheduleMutation()
   val viewerTimeZone = remember { TimeZone.currentSystemDefault() }
   val projection = remember(snapshot, viewerTimeZone) {
@@ -173,8 +172,8 @@ fun ScheduleTodoPage(
   var pinnedIds by remember(currentAccountSettings.stuNum) {
     mutableStateOf(loadScheduleTodoPinnedIds(currentAccountSettings))
   }
-  val calendarLinkedScheduleIds = remember(snapshot.accountId, courseProjectionState) {
-    courseProjectionState.takeIf { it.accountId == snapshot.accountId }?.scheduleIds.orEmpty()
+  val calendarLinkedScheduleIds = remember(snapshot.schedules) {
+    snapshot.schedules.filter { it.linkedToCourse }.mapTo(mutableSetOf()) { it.id }
   }
   var deepLinkConsumed by remember(argument.scheduleId, argument.recurrenceId) {
     mutableStateOf(false)
@@ -320,11 +319,11 @@ fun ScheduleTodoPage(
     }
   }
 
-  /** 按系列切换进程内课表投射；重复系列的所有实例共用一次选择，且不会写入远端。 */
+  /** 按系列切换持久化课表投射；重复系列的所有实例共用一次选择。 */
   fun toggleCalendarLink(scheduleId: ScheduleId) {
-    val accountId = snapshot.accountId ?: return
-    val selected = ScheduleCourseProjectionMemory.toggle(accountId, scheduleId)
-    toast(if (selected) "已关联到课表" else "已取消关联到课表")
+    viewModel.toggleCourseProjection(scheduleId) { selected ->
+      toast(if (selected) "已关联到课表" else "已取消关联到课表")
+    }
   }
 
   Box(
@@ -1095,7 +1094,9 @@ private fun ScheduleTodoCard(
             reminderText?.let { text ->
               ScheduleTodoInfoPill(text = text)
             }
-            if (item.occurrence.timing != ScheduleTiming.Unscheduled) {
+            if (item.schedule.kind == ScheduleKind.TODO &&
+              item.occurrence.timing != ScheduleTiming.Unscheduled
+            ) {
               ScheduleTodoCalendarLinkButton(
                 selected = isLinkedToCalendar,
                 onClick = onToggleCalendarLink,
@@ -1263,9 +1264,9 @@ private fun ScheduleTodoInfoPill(
 }
 
 /**
- * “关联到课表”临时视觉开关。
+ * “关联到课表”状态按钮。
  *
- * 选中态只改变页面内存状态，尚不写仓库或请求后端；真实关联能力接入后应由权威数据替换 [selected]。
+ * [selected] 来自 Schedule 快照中的持久化原子；点击事件由页面交给 ViewModel，沿用 local-first 更新与远端重试链路。
  */
 @Composable
 private fun ScheduleTodoCalendarLinkButton(

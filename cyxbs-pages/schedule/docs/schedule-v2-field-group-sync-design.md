@@ -1,6 +1,6 @@
 # Schedule v2 完整资源 AtomicField 合并与原子批次设计
 
-> **状态：本文是最新 canonical 目标；后端 `guoxiangrui/schedule` 已提交 typed Sync、日常 Schedule 接口和本文 version 合同，但尚未部署；Android、iOS 与 Web 客户端尚未迁移。**
+> **状态：本文是最新 canonical 目标；后端与客户端已按 typed Sync、日常 Schedule 接口和本文 version 合同完成实现，但尚未部署或进行真实账号验收。**
 >
 > 本文是客户端接入目标，不表示生产远端同步已经启用，也不授权本次修改客户端代码、UI、部署或远端开关。
 
@@ -225,7 +225,12 @@ Category 示例：
 | `timing` | `kind/startAt/endAt/dueAt` 合法完整组合 |
 | `recurrence` | 完整规则；`data: null` 表示非重复 |
 | `reminders` | 完整提醒列表 |
-| `completion` | `OPEN / COMPLETED` |
+| `todoState` | `OPEN / COMPLETED / null`；null 表示当前不进入清单 |
+| `linkedToCourse` | 是否请求投射到课表 |
+
+`kind=TODO|AFFAIR` 是 Schedule 的 required、不可变创建来源，不是 AtomicField，也不参与 LWW 合并。
+TODO 必须拥有非空 `todoState`；AFFAIR 必须使用 TIMED 且 `linkedToCourse=true`，只有关联清单后才拥有
+非空 `todoState`。
 
 重要拆分：
 
@@ -240,6 +245,7 @@ Schedule 示例：
 ```json
 {
   "id": "schedule-42",
+  "kind": "TODO",
   "title": { "data": "高等数学", "modifiedAt": 1786669323000 },
   "description": { "data": "第三章", "modifiedAt": 1786669323001 },
   "categoryId": { "data": "category-course", "modifiedAt": 1786669323002 },
@@ -264,11 +270,16 @@ Schedule 示例：
     "data": [{ "minutesBefore": 10, "message": "" }],
     "modifiedAt": 1786669323005
   },
-  "completion": { "data": "OPEN", "modifiedAt": 1786669323006 }
+  "todoState": { "data": "OPEN", "modifiedAt": 1786669323006 },
+  "linkedToCourse": { "data": true, "modifiedAt": 1786669323007 }
 }
 ```
 
-`ScheduleInput` 仍只有上述七个客户端原子。服务端下发的 `ScheduleCurrent` 另外携带可选 `firstRecurrenceAnchorDate`：它是首次启用 recurrence 后固定的 UTC 日期槽，不参与 LWW 合并；规则清除后仍下发，客户端再次启用同一 identity 时必须把它作为新的 `recurrence.data.anchorDate`。
+`ScheduleInput` 包含不可变 `kind` 与上述八个客户端原子。服务端下发的 `ScheduleCurrent` 另外携带可选 `firstRecurrenceAnchorDate`：它是首次启用 recurrence 后固定的 UTC 日期槽，不参与 LWW 合并；规则清除后仍下发，客户端再次启用同一 identity 时必须把它作为新的 `recurrence.data.anchorDate`。
+
+课表可见性不是简单等于 `linkedToCourse`：CANCELLED occurrence 永不展示；AFFAIR 在关联课表后不受
+完成态影响；TODO 只有在关联课表且 occurrence 为 ACTIVE 时展示。这样事务关联清单并完成后不会丢失
+事务身份，而普通清单完成后会暂时退出课表。
 
 非重复 Schedule 仍必须携带 recurrence 原子：
 
@@ -634,7 +645,7 @@ Category payload:
   name / color / sortOrder
 
 Schedule payload:
-  title / description / categoryId / timing / recurrence / reminders / completion
+  kind / title / description / categoryId / timing / recurrence / reminders / todoState / linkedToCourse
 
 Override payload:
   status / title / description / reminders
