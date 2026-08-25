@@ -5,6 +5,7 @@ import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleCourseDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleItemWhatTime
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
@@ -37,6 +38,7 @@ class ScheduleDeadlinePageDecoration(
   private fun projectDeadlineRange(
     range: ScheduleRange,
   ): List<ScheduleCourseDecorationItem> = range.occurrences.mapNotNull { occurrence ->
+    if (occurrence.kind != ScheduleOccurrenceKind.TODO) return@mapNotNull null
     val timing = occurrence.timing as? ScheduleOccurrenceTiming.Deadline ?: return@mapNotNull null
     val date = timing.due.date
     if (date < range.startDate || date >= range.endDateExclusive) {

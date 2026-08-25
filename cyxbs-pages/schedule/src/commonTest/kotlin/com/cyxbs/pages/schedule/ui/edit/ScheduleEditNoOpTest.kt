@@ -21,6 +21,27 @@ import kotlin.time.Instant
 class ScheduleEditNoOpTest {
 
   @Test
+  fun affairCreationUsesInitialTimingWithoutTodoState() {
+    val timing = ScheduleTiming.Timed(
+      MinuteTimeDate(2026, 8, 25, 14, 30),
+      90,
+      "Asia/Shanghai",
+    )
+    val state = EditScheduleModelState(
+      origin = null,
+      creationKind = ScheduleKind.AFFAIR,
+      creationTiming = timing,
+    )
+    state.title.setTextAndPlaceCursorAtEnd("课表事务")
+
+    val draft = state.toDraft()
+    assertEquals(ScheduleKind.AFFAIR, draft.kind)
+    assertEquals(timing, draft.timing)
+    assertEquals(null, draft.todoState)
+    assertTrue(draft.linkedToCourse)
+  }
+
+  @Test
   fun unchangedOccurrenceKeepsExistingReplaceAndClearPatchWhenParentNowMatchesProjection() = runTest {
     val parent = parentSchedule()
     val recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 8, 9, 0), "Asia/Shanghai", false)

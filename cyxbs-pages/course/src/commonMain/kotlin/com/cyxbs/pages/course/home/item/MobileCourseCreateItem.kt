@@ -2,6 +2,7 @@ package com.cyxbs.pages.course.home.item
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
@@ -10,9 +11,10 @@ import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDial
 import com.cyxbs.pages.course.view.item.impl.CourseCreateItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItemFactory
+import com.cyxbs.pages.schedule.api.IScheduleService2
 
 /**
- * .
+ * 移动端课表长按创建 Item 的交互配置。
  *
  * @author 985892345
  * @date 2026/3/7
@@ -25,9 +27,10 @@ object MobileCourseCreateItemFactory : PlatformCourseCreateItemFactory {
 
 class MobileCourseCreateItem(
   val item: CourseCreateItem,
+  scheduleService: IScheduleService2 = IScheduleService2::class.impl(),
 ) : PlatformCourseCreateItem {
 
-  private val bottomSheetExtension = MobileCreateBottomSheetExtension(item)
+  private val bottomSheetExtension = MobileCreateBottomSheetExtension(item, scheduleService)
 
   init {
     item.extensions.add(bottomSheetExtension)
@@ -45,7 +48,8 @@ class MobileCourseCreateItem(
 
 
 private class MobileCreateBottomSheetExtension(
-  val item: CourseCreateItem
+  private val item: CourseCreateItem,
+  private val scheduleService: IScheduleService2,
 ) : CourseItemBottomSheetDialogExtension {
 
   override val itemState: CourseItemState
@@ -53,7 +57,15 @@ private class MobileCreateBottomSheetExtension(
 
   @Composable
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
-    val dateModel = item.dateModelFlow.collectAsState().value ?: return
-
+    val initialTiming = item.initialTimingFlow.collectAsState().value ?: return
+    scheduleService.ScheduleCreateAffairContent(
+      initialTiming = initialTiming,
+      embeddedInHost = true,
+      onDismiss = state::dismissDialog,
+      onCreated = item::removeDraft,
+      onEditModeChanged = { isEditing ->
+        if (isEditing) state.lockCurrentPage()
+      },
+    )
   }
 }

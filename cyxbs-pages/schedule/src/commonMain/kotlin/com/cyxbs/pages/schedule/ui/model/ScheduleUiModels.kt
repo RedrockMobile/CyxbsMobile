@@ -26,6 +26,9 @@ data class ScheduleDraft(
   val recurrence: RecurrenceRule? = null,
   val reminders: List<ScheduleReminder> = emptyList(),
   val todoState: ScheduleTodoState? = ScheduleTodoState.PENDING,
+  /** 创建来源和课表投射意图由入口决定，不属于弹窗中的可编辑字段。 */
+  val kind: ScheduleKind = ScheduleKind.TODO,
+  val linkedToCourse: Boolean = false,
 )
 
 /** 使用完整领域校验器检查新建草稿；[now] 与 [revision] 仅用于补齐临时领域对象，不产生写入副作用。 */
@@ -36,8 +39,19 @@ fun ScheduleDraft.validate(now: Instant, revision: Long = 0): List<ScheduleValid
  * 构造新日程领域对象，并在边界处裁剪文本。调用方负责传入正式 identity、revision 与时间戳；本函数不写仓库。
  */
 fun ScheduleDraft.toNewDomain(now: Instant, revision: Long = 0): Schedule = Schedule(
-  id, revision, title.trim(), description.trim(), categoryId, timing, recurrence,
-  reminders, todoState, now, now,
+  id = id,
+  revision = revision,
+  title = title.trim(),
+  description = description.trim(),
+  categoryId = categoryId,
+  timing = timing,
+  recurrence = recurrence,
+  reminders = reminders,
+  todoState = todoState,
+  createdAt = now,
+  updatedAt = now,
+  kind = kind,
+  linkedToCourse = linkedToCourse,
 )
 
 /**

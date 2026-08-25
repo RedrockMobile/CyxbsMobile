@@ -88,6 +88,7 @@ import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
 import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
+import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
@@ -159,6 +160,10 @@ fun EditScheduleDialog(
   show: Boolean,
   editSchedule: Schedule? = null,
   editOccurrence: ScheduleOccurrence? = null,
+  /** 新建入口的不可变来源；编辑既有日程时该参数不生效。 */
+  creationKind: ScheduleKind = ScheduleKind.TODO,
+  /** 新建入口预填的时间；用于课表长按草稿，不会在打开弹窗时提前写仓库。 */
+  creationTiming: ScheduleTiming? = null,
   recurrenceId: RecurrenceId? = null,
   categories: List<ScheduleCategory> = emptyList(),
   /** 弹窗外背景色；外部宿主可传透明，普通入口继续使用 Schedule 默认遮罩。 */
@@ -173,7 +178,12 @@ fun EditScheduleDialog(
 ) {
   if (!show) return
 
-  val modelState = rememberEditScheduleModelState(editSchedule, editOccurrence)
+  val modelState = rememberEditScheduleModelState(
+    editSchedule,
+    editOccurrence,
+    creationKind,
+    creationTiming,
+  )
 
   var showUnsavedExit by remember { mutableStateOf(false) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }

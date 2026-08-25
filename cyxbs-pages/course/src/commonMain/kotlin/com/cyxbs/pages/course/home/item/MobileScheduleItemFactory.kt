@@ -23,6 +23,7 @@ import com.cyxbs.pages.course.view.item.impl.PlatformScheduleCourseItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayItem
 import com.cyxbs.pages.schedule.api.IScheduleService2
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.TimeZone
@@ -127,7 +128,11 @@ private class MobileScheduleBottomSheetExtension(
         val now = localDateTime.toMinuteTimeDate()
         if (now.date.dayOfWeek == current.dayOfWeek) {
           if (now.time < current.beginTime) {
-            state.value = "下个日程"
+            state.value = if (item.occurrence.kind == ScheduleOccurrenceKind.AFFAIR) {
+              "下个事务"
+            } else {
+              "下个日程"
+            }
             delay(
               (current.beginTime.minuteOfDay - now.minuteOfDay).minutes +
                   localDateTime.second.seconds,

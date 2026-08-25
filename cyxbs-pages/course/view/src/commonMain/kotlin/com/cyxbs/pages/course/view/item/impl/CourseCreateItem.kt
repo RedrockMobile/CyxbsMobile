@@ -4,47 +4,37 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.zIndex
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.res.ConfigRes
-import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.plusDsl
-import com.cyxbs.pages.affair.api.AffairDateModel
+import com.cyxbs.pages.course.view.decoration.impl.CreateScheduleTouchItemWhatTime
 import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
-import com.cyxbs.pages.course.view.item.CourseItemTopBottomText
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.CourseShowRange
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
-import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.datetime.DayOfWeek
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.roundToInt
 
 /**
- * .
+ * 长按创建 Schedule 前的内存占位 Item。
  *
- * @author 985892345
- * @date 2026/3/7
+ * 手指抬起后只保存初始时间段；标题等业务字段由 Schedule 编辑弹窗持有，确认保存前不写数据库。
  */
 class CourseCreateItem(
   whatTime: CourseItemWhatTime,
@@ -54,27 +44,23 @@ class CourseCreateItem(
   platformItemFactory: PlatformCourseCreateItemFactory,
 ) : CourseItem(whatTime, coroutineScope) {
 
-  // 下层到每个平台的课程配置
+  // 下沉到各平台决定点击后使用何种弹窗宿主。
   private val platform = platformItemFactory.create(this)
 
-  val dateModelFlow = MutableStateFlow<AffairDateModel?>(null)
+  private val mutableInitialTiming = MutableStateFlow<ScheduleOccurrenceTiming.Timed?>(null)
+  val initialTimingFlow = mutableInitialTiming.asStateFlow()
 
-  fun setDateModel(dateModel: AffairDateModel) {
-    require(this.dateModelFlow.value == null) { "dateModel 不能重复设置"}
-    this.dateModelFlow.value = dateModel
-    extensions.add(CourseCreateAffairMovableItemExtension(this))
-    combine(
-      decoration.courseFrame.beginDate.filterNotNull(),
-      dateModel.whatTime.mergeFlow.flatMapLatest { it.timePair.mergeFlow },
-      dateModel.date.mergeFlow
-    ) { beginDate, timePair, date ->
-      whatTime.now.value = CourseItemWhatTime.Fixed(
-        page = decoration.courseFrame.getPage(date) ?: -1,
-        dayOfWeek = date.dayOfWeek,
-        beginTime = timePair.first,
-        finalTime = timePair.second,
-      )
-    }.launchIn(coroutineScope)
+  /** 设置长按计算出的初始时间；同一个占位 Item 只允许初始化一次。 */
+  fun setInitialTiming(timing: ScheduleOccurrenceTiming.Timed) {
+    require(mutableInitialTiming.value == null) { "initialTiming 不能重复设置" }
+    mutableInitialTiming.value = timing
+  }
+
+  /** Schedule 本地创建成功后移除占位 Item；真实日程随后由 Schedule Decoration 观察并展示。 */
+  fun removeDraft() {
+    coroutineScope.launch {
+      (whatTime as? CreateScheduleTouchItemWhatTime)?.cancel()
+    }
   }
 
   @Composable
@@ -113,29 +99,15 @@ private fun CourseCreateItem.Content(
         coverTipColor = if (itemState.overlap?.coveredItemList?.isNotEmpty() == true) textColor else Color.Transparent,
         enableAnim = false,
       ) {
-        val idModel = dateModelFlow.collectAsState().value?.idModel
-        val title = idModel?.title?.mergeFlow?.collectAsState("")?.value
-        val content = idModel?.content?.mergeFlow?.collectAsState("")?.value
-        if (title.isNullOrEmpty() && content.isNullOrEmpty()) {
-          Box(
-            contentAlignment = Alignment.Center,
-            modifier = it.clickableNoIndicator {
-              onClick.invoke(range)
-            },
-          ) {
-            Image(
-              painter = painterResource(ConfigRes.configIcCircleAdd()),
-              contentDescription = "点击添加事务"
-            )
-          }
-        } else {
-          CourseItemTopBottomText(
-            modifier = it.clickableNoIndicator {
-              onClick.invoke(range)
-            },
-            topText = title ?: "",
-            bottomText = content ?: "",
-            textColor = textColor,
+        Box(
+          contentAlignment = Alignment.Center,
+          modifier = it.clickableNoIndicator {
+            onClick.invoke(range)
+          },
+        ) {
+          Image(
+            painter = painterResource(ConfigRes.configIcCircleAdd()),
+            contentDescription = "点击添加事务"
           )
         }
       }
@@ -144,57 +116,7 @@ private fun CourseCreateItem.Content(
 }
 
 
-// 事务支持长按移动
-private class CourseCreateAffairMovableItemExtension(
-  val item: CourseCreateItem,
-) : IMovableItemExtension {
-  override fun enableExpandTimelineWhenMove(itemState: CourseItemState): Boolean {
-    return true
-  }
-
-  override fun getMoveDestinationOffset(
-    upOrCancel: Boolean,
-    itemState: CourseItemState,
-    transition: MutableState<Offset>,
-    screenTopLeft: Offset,
-    size: IntSize,
-    newBeginTime: MinuteTime
-  ): Offset {
-    if (item.dateModelFlow.value == null) return Offset.Zero
-    val itemWidth = size.width
-    // 一小段距离都会被算成同一分钟，为了让最后修改时间后不会因此而抖动
-    // 需要计算出最终 newBeginTime 真正的高度，这才是最终展示的位置
-    val newBeginTimeWeightRatio = itemState.coursePage.timeline.calculateWeightRatio(newBeginTime)
-    val newBeginTimeHeight =
-      newBeginTimeWeightRatio * itemState.coursePage.layoutCoordinates.size.height
-    val newBeginTimeScreenTop =
-      itemState.coursePage.layoutCoordinates.localToScreen(Offset(0F, newBeginTimeHeight))
-    return transition.value.copy(
-      x = ((transition.value.x / itemWidth).roundToInt() * itemWidth).toFloat(),
-      y = transition.value.y + (newBeginTimeScreenTop.y - screenTopLeft.y)
-    )
-  }
-
-  override suspend fun changeWhatTime(
-    itemState: CourseItemState,
-    newBeginTime: MinuteTime,
-    newDayOfWeek: DayOfWeek
-  ) {
-    val dateModel = item.dateModelFlow.value ?: return
-    // 修改 dateModelEditor 来触发 whatTime 的更新
-    val dateModelEditor = dateModel.idModel.createEditorSuspend().findDateModelEditor(dateModel)!!
-    dateModelEditor.setDate(dateModelEditor.date.weekBeginDate.plusDays(newDayOfWeek.ordinal))
-    dateModelEditor.whatTimeEditor?.setTimePair(
-      MinuteTimePair(
-        first = newBeginTime,
-        second = newBeginTime + (item.whatTime.finalTime - item.whatTime.beginTime)
-      )
-    )
-    dateModelEditor.idModelEditor.commit(needUpload = false, needAdd = false)
-  }
-}
-
-// 下层到每个平台的事务配置
+/** 下沉到具体平台的长按创建 Item 配置。 */
 interface PlatformCourseCreateItemFactory {
   fun create(item: CourseCreateItem): PlatformCourseCreateItem
 }
@@ -203,4 +125,3 @@ interface PlatformCourseCreateItem {
   @Composable
   fun CourseItemContentWrapper(content: @Composable (onClick: (MinuteTimePair) -> Unit) -> Unit)
 }
-

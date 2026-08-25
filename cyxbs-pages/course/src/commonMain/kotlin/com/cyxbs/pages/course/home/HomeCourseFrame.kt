@@ -32,9 +32,10 @@ import com.cyxbs.pages.course.view.HomeCoursePageContent
 import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.ScheduleAffairPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.ScheduleAllDayPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.ScheduleDeadlinePageDecoration
-import com.cyxbs.pages.course.view.decoration.impl.ScheduleTimedPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.ScheduleTodoTimedPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.extension.rememberCourseItemBottomSheetDialogState
@@ -136,12 +137,17 @@ private fun createCoursePageDecorationManager(
       ), // 截止时间点始终位于课表最上层
       CreateItemPageDecoration(courseFrame = frame, platformItemFactory = MobileCourseCreateItemFactory), // 长按创建事务
       SelfLessonPageDecoration(platformItemFactory = MobileCourseSelfLessonItemFactory), // 自己的课程
-      ScheduleTimedPageDecoration(
+      ScheduleTodoTimedPageDecoration(
         frame,
         coroutineScope,
         MobileScheduleItemFactory,
-      ), // 时间段与事务相邻，初始位于事务上方
-      // TODO 时间段日程完成事务能力迁移后删除旧 Affair；过渡期间移动端暂不注册 AffairPageDecoration。
+      ), // TODO 时间段独立位于事务上方
+      ScheduleAffairPageDecoration(
+        frame,
+        coroutineScope,
+        MobileScheduleItemFactory,
+      ), // Schedule 原生事务使用独立层级
+      // TODO Schedule 事务验收完成后删除旧 Affair；过渡期间不再注册 AffairPageDecoration。
       // AffairPageDecoration(courseFrame = frame, platformItemFactory = MobileCourseAffairItemFactory),
       LinkLessonPageDecoration(platformItemFactory = MobileCourseLinkLessonItemFactory), // 关联人的课程
       ScheduleAllDayPageDecoration(

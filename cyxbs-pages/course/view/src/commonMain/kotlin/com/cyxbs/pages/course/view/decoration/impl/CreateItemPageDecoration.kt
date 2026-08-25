@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
@@ -12,17 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.zIndex
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.time.MinuteTime
-import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.components.config.time.add
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.toastLong
-import com.cyxbs.pages.affair.api.AffairDateModel
-import com.cyxbs.pages.affair.api.AffairDateModelEditor
-import com.cyxbs.pages.affair.api.AffairIdModel
-import com.cyxbs.pages.affair.api.IAffairService2
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration.Companion.MIN_MINUTE_INTERVAL
@@ -37,13 +31,14 @@ import com.cyxbs.pages.course.view.item.touch.LongPressCreateItem
 import com.cyxbs.pages.course.view.item.touch.LongPressCreateItemCompose
 import com.cyxbs.pages.course.view.page.LocalCoursePageContext
 import com.cyxbs.pages.course.view.timeline.data.MutableTimelineData
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.TimeZone
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -63,107 +58,46 @@ class CreateItemPageDecoration(
     const val MIN_MINUTE_INTERVAL = 30 // 最小分钟间隔
   }
 
-  private var mockIdModel = MutableStateFlow<AffairIdModel?>(null)
-  private val whatTimeByDateModel = hashMapOf<AffairDateModel, CreateAffairTouchItemWhatTime>()
-
   @Composable
   override fun CoursePageContent() {
     super.CoursePageContent()
     LongPressCreateCoursePageWrapper(this)
-    LaunchedEffect(Unit) {
-      observeTouchItem()
-    }
   }
 
-  // 删除所有触摸后的 item
-  // 注意该协程需要使用 Compose 函数内的作用域
+  /** 删除当前页所有尚未保存的长按创建草稿；调用方应使用 Compose 生命周期内的协程。 */
   suspend fun cancelAllTouchedItem() {
-    mockIdModel.value = null
-    whatTimeByDateModel.clear()
     supervisorScope {
       itemHierarchy.getAllWhatTime().forEach {
-        launch { (it as CreateAffairTouchItemWhatTime).cancel() }
+        launch { (it as CreateScheduleTouchItemWhatTime).cancel() }
       }
     }
     itemHierarchy.reset(emptyList())
   }
 
+  /** 页面重建时直接丢弃内存草稿，不触发仓库或网络操作。 */
   fun resetTouchedItem() {
-    mockIdModel.value = null
-    whatTimeByDateModel.clear()
     itemHierarchy.reset(emptyList())
   }
 
-  internal suspend fun addTouchedItem(
-    whatTime: CreateAffairTouchItemWhatTime,
-  ): AffairDateModelEditor? {
-    val timePair = MinuteTimePair(whatTime.beginTime, whatTime.finalTime)
-    val idModel = mockIdModel.value ?: run {
-      IAffairService2::class.impl().observeAffairGroupModel().value!!.createAffairIdModel(
-        title = "",
-        content = "",
-      ).also { mockIdModel.value = it }
-    }
-    val idModelEditor = idModel.createEditorSuspend()
-    var timeModelEditor = idModelEditor.whatTimeDate.keys.firstOrNull { it.timePair == timePair }
-    if (timeModelEditor == null) {
-      timeModelEditor = idModelEditor.add(timePair) ?: return null
-    }
+  /**
+   * 将课表页码和星期换算为 Schedule 的本地时间段草稿。
+   *
+   * 返回 null 表示学期起点尚未就绪；该方法只做日期换算，不创建 Affair 或 Schedule 记录。
+   */
+  internal fun createInitialTiming(
+    whatTime: CreateScheduleTouchItemWhatTime,
+  ): ScheduleOccurrenceTiming.Timed? {
     val weekNum = courseFrame.getWeekNumByPage(whatTime.now.value.page) ?: return null
     val date = courseFrame.beginDate.value
       ?.plusWeeks(weekNum - 1)
       ?.weekBeginDate
       ?.plusDays(whatTime.now.value.dayOfWeek.ordinal)
       ?: return null
-    val dateModelEditor = timeModelEditor.add(date) ?: return null
-    whatTimeByDateModel[dateModelEditor.dateModel] = whatTime // 保存到已添加列表中，防止 observeTouchItem() 回调重复添加
-    idModelEditor.commit(needUpload = false, needAdd = false)
-    return dateModelEditor
-  }
-
-  private suspend fun observeTouchItem() {
-    mockIdModel.collectLatest { idModel ->
-      if (idModel == null) return@collectLatest
-      idModel.whatTimeDate.value.forEach { (whatTimeModel, dateModels) ->
-        dateModels.forEach { dateModel ->
-          if (whatTimeByDateModel.containsKey(dateModel)) return@forEach
-          val touchedItem = TouchedItem(
-            viewModel = this@CreateItemPageDecoration,
-            dateModel = dateModel,
-          )
-          val whatTime = CreateAffairTouchItemWhatTime(
-            viewModel = this@CreateItemPageDecoration,
-            item = touchedItem
-          )
-          whatTimeByDateModel[dateModel] = whatTime
-          itemHierarchy.add(whatTime)
-        }
-      }
-      supervisorScope {
-        launch {
-          idModel.addedDateModel.collect { dateModel ->
-            if (whatTimeByDateModel.containsKey(dateModel)) return@collect
-            val touchedItem = TouchedItem(
-              viewModel = this@CreateItemPageDecoration,
-              dateModel = dateModel,
-            )
-            val whatTime = CreateAffairTouchItemWhatTime(
-              viewModel = this@CreateItemPageDecoration,
-              item = touchedItem
-            )
-            whatTimeByDateModel[dateModel] = whatTime
-            itemHierarchy.add(whatTime)
-          }
-        }
-        launch {
-          idModel.removedDateModel.collect { dateModel ->
-            whatTimeByDateModel[dateModel]?.let {
-              itemHierarchy.remove(it)
-            }
-          }
-        }
-      }
-    }
+    return ScheduleOccurrenceTiming.Timed(
+      start = MinuteTimeDate(date, whatTime.beginTime.hour, whatTime.beginTime.minute),
+      durationMinutes = (whatTime.finalTime - whatTime.beginTime).inWholeMinutes.toInt(),
+      timeZoneId = TimeZone.currentSystemDefault().id,
+    )
   }
 }
 
@@ -192,7 +126,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
         initPosition = beginPosition,
       )
       decoration.itemHierarchy.add(
-        CreateAffairTouchItemWhatTime(
+        CreateScheduleTouchItemWhatTime(
           viewModel = decoration,
           item = touchingItem
         )
@@ -220,7 +154,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
           initPosition = position,
         )
         decoration.itemHierarchy.add(
-          CreateAffairTouchItemWhatTime(
+          CreateScheduleTouchItemWhatTime(
             viewModel = decoration,
             item = touchingItem
           )
@@ -238,7 +172,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
   )
 }
 
-internal data class CreateAffairTouchItemWhatTime(
+internal data class CreateScheduleTouchItemWhatTime(
   val viewModel: CreateItemPageDecoration,
   val item: TouchItem,
 ) : ItemHierarchyWhatTime<CourseCreateItem>() {
@@ -275,7 +209,7 @@ internal data class CreateAffairTouchItemWhatTime(
       }
     } finally {
       itemState.alphaState.value = 0F
-      viewModel.itemHierarchy.remove(this@CreateAffairTouchItemWhatTime)
+      viewModel.itemHierarchy.remove(this@CreateScheduleTouchItemWhatTime)
     }
   }
 }
@@ -343,7 +277,7 @@ internal class TouchingItem(
     clickLock.clear()
     layoutAnimUnlock?.run()
     val coroutineScope = itemState.item.coroutineScope
-    val whatTime = itemState.item.whatTime as CreateAffairTouchItemWhatTime
+    val whatTime = itemState.item.whatTime as CreateScheduleTouchItemWhatTime
     if (now.value.finalTime - now.value.beginTime < MIN_MINUTE_INTERVAL.minutes) {
       // 暂定小于 MIN_MINUTE_INTERVAL 分钟的事务不支持
       toast("不支持创建小于 $MIN_MINUTE_INTERVAL 分钟的事务")
@@ -351,15 +285,13 @@ internal class TouchingItem(
         whatTime.cancel()
       }
     } else {
-      coroutineScope.launch {
-        val dateModelEditor = viewModel.addTouchedItem(whatTime)
-        if (dateModelEditor == null) {
-          toast("AffairDateModel 创建失败")
-          whatTime.cancel()
-        } else {
-          // 创建成功后则设置 dateModel
-          (itemState.item as CourseCreateItem).setDateModel(dateModelEditor.dateModel)
-        }
+      val initialTiming = viewModel.createInitialTiming(whatTime)
+      if (initialTiming == null) {
+        toast("事务时间初始化失败")
+        coroutineScope.launch { whatTime.cancel() }
+      } else {
+        // 保存前只把时间草稿交给临时 Item，真正的 Schedule 由点击后的编辑弹窗创建。
+        (itemState.item as CourseCreateItem).setInitialTiming(initialTiming)
       }
     }
   }
@@ -382,28 +314,5 @@ internal class TouchingItem(
         it.click()
         clickLock.add(it.lockClick()) // 展开后就给点击上锁，直到结束解锁后才允许点击
       }
-  }
-}
-
-internal class TouchedItem(
-  val viewModel: CreateItemPageDecoration,
-  val dateModel: AffairDateModel,
-) : TouchItem {
-
-  override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
-    CourseItemWhatTime.Fixed(
-      page = viewModel.courseFrame.beginDate.value.let {
-        if (it == null) -1
-        else viewModel.courseFrame.getPage(dateModel.date.value) ?: -1
-      },
-      dayOfWeek = dateModel.date.value.dayOfWeek,
-      beginTime = dateModel.whatTime.value.timePair.value.first,
-      finalTime = dateModel.whatTime.value.timePair.value.second,
-    )
-  )
-
-  override fun initCourseItemState(itemState: CourseItemState) {
-    BeginFinalTimeShowModifier.showLock.get(itemState).lock() // 默认显示开始结束时间
-    (itemState.item as CourseCreateItem).setDateModel(dateModel) // 设置 dateModel
   }
 }

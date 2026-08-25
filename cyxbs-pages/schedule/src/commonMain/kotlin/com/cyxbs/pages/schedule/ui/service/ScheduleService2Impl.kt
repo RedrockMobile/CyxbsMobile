@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import com.cyxbs.pages.schedule.api.IScheduleService2
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
 import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
@@ -66,7 +67,7 @@ object ScheduleService2Impl : IScheduleService2 {
         if (!schedule.isVisibleInCourse(occurrence.status)) return@mapNotNull null
         val identity = occurrenceIdentity(occurrence)
         details[identity] = Detail(occurrence, schedule)
-        occurrence.toApiModel(identity)
+        occurrence.toApiModel(identity, schedule.kind)
       }
     if (details.isNotEmpty()) {
       // 可能同时有多个课表框架观察不同周，采用增量合并避免一个窗口清掉另一个窗口的点击详情。
@@ -138,6 +139,43 @@ object ScheduleService2Impl : IScheduleService2 {
       },
     )
   }
+
+  /**
+   * 使用 Schedule 的统一编辑弹窗创建原生事务。
+   *
+   * 课表传入的时间段只作为表单初值；确认后才执行本地优先命令，并在命令完成后通知课表移除临时 Item。
+   */
+  @Composable
+  override fun ScheduleCreateAffairContent(
+    initialTiming: ScheduleOccurrenceTiming.Timed,
+    embeddedInHost: Boolean,
+    onDismiss: () -> Unit,
+    onCreated: () -> Unit,
+    onEditModeChanged: (Boolean) -> Unit,
+  ) {
+    val scope = rememberCoroutineScope()
+    EditScheduleDialog(
+      show = true,
+      creationKind = ScheduleKind.AFFAIR,
+      creationTiming = initialTiming.toDomainModel(),
+      scrimColor = Color.Transparent,
+      embeddedInExternalHost = embeddedInHost,
+      onEditModeChanged = onEditModeChanged,
+      onDismiss = onDismiss,
+      onConfirm = { state, editScope ->
+        scope.launch {
+          repository.applyScheduleEdit(
+            state,
+            editScope,
+            recurrenceId = null,
+            idGenerators = ScheduleRepositoryProvider.idGenerators,
+            clock = ScheduleRepositoryProvider.clock,
+          )
+          onCreated()
+        }
+      },
+    )
+  }
 }
 
 /**
@@ -159,11 +197,18 @@ private fun occurrenceIdentity(occurrence: ScheduleUiOccurrence): String =
   }
 
 /** 将领域 occurrence 映射为不包含仓库实现和课表 UI 类型的 API 数据。 */
-private fun ScheduleUiOccurrence.toApiModel(identity: String): ScheduleOccurrenceView =
+private fun ScheduleUiOccurrence.toApiModel(
+  identity: String,
+  kind: ScheduleKind,
+): ScheduleOccurrenceView =
   ScheduleOccurrenceView(
     identity = identity,
     scheduleId = scheduleId,
     recurrenceId = recurrenceId,
+    kind = when (kind) {
+      ScheduleKind.TODO -> ScheduleOccurrenceKind.TODO
+      ScheduleKind.AFFAIR -> ScheduleOccurrenceKind.AFFAIR
+    },
     title = title,
     description = description,
     timing = when (val value = timing) {
@@ -182,4 +227,12 @@ private fun ScheduleUiOccurrence.toApiModel(identity: String): ScheduleOccurrenc
       )
       ScheduleTiming.Unscheduled -> ScheduleOccurrenceTiming.Unscheduled
     },
+  )
+
+/** API 时间模型只在服务边界转换，Course 模块无需依赖 Schedule 领域层。 */
+private fun ScheduleOccurrenceTiming.Timed.toDomainModel(): ScheduleTiming.Timed =
+  ScheduleTiming.Timed(
+    start = start,
+    durationMinutes = durationMinutes,
+    timeZoneId = timeZoneId,
   )

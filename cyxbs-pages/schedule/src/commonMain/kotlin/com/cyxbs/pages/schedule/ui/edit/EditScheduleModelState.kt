@@ -36,8 +36,12 @@ import kotlin.time.Instant
 class EditScheduleModelState(
   val origin: Schedule?,
   val initialOccurrence: ScheduleOccurrence? = null,
+  /** 新建入口指定的不可变来源；编辑既有日程时始终以 [origin] 为准。 */
+  private val creationKind: ScheduleKind = ScheduleKind.TODO,
+  /** 课表长按创建时传入的初始时间段，保存前不会写入仓库。 */
+  creationTiming: ScheduleTiming? = null,
 ) {
-  private val initialTiming = initialOccurrence?.timing ?: origin?.timing
+  private val initialTiming = initialOccurrence?.timing ?: origin?.timing ?: creationTiming
   private val initialStartText = initialTiming?.toStartEditText().orEmpty()
   private val initialEndText = initialTiming?.toEndEditText().orEmpty()
   private val initialIsInterval = initialTiming is ScheduleTiming.Timed || origin == null
@@ -95,7 +99,7 @@ class EditScheduleModelState(
    * 非整分钟 gap 或无法消歧会降为非法时长并由 validator 阻止保存。未编辑路径不进入这里，而是保留 [initialTiming]。
    */
   private val parsedTiming: ScheduleTiming get() {
-    val zone = when (val timing = origin?.timing) {
+    val zone = when (val timing = initialTiming) {
       is ScheduleTiming.Timed -> timing.timeZoneId
       is ScheduleTiming.Deadline -> timing.timeZoneId
       else -> TimeZone.currentSystemDefault().id
@@ -193,15 +197,21 @@ class EditScheduleModelState(
     timing = effectiveTiming,
     recurrence = effectiveRecurrence,
     reminders = effectiveReminders,
-    todoState = origin?.todoState ?: if (origin == null) ScheduleTodoState.PENDING else null,
+    todoState = origin?.todoState ?: if (origin == null && creationKind == ScheduleKind.TODO) {
+      ScheduleTodoState.PENDING
+    } else {
+      null
+    },
+    kind = origin?.kind ?: creationKind,
+    linkedToCourse = origin?.linkedToCourse ?: (creationKind == ScheduleKind.AFFAIR),
   )
 
   /** 仅为运行完整领域校验补齐非编辑字段；占位时间与 revision 绝不会进入仓库。 */
   private fun ScheduleDraft.toNewDomainForValidation() = Schedule(
     id, 0, title, description, categoryId, timing, recurrence, reminders, todoState,
     Instant.DISTANT_PAST, Instant.DISTANT_PAST,
-    kind = origin?.kind ?: ScheduleKind.TODO,
-    linkedToCourse = origin?.linkedToCourse ?: false,
+    kind = kind,
+    linkedToCourse = linkedToCourse,
   )
 }
 
@@ -209,8 +219,10 @@ class EditScheduleModelState(
 internal fun rememberEditScheduleModelState(
   editSchedule: Schedule?,
   occurrence: ScheduleOccurrence? = null,
-): EditScheduleModelState = remember(editSchedule, occurrence) {
-  EditScheduleModelState(editSchedule, occurrence)
+  creationKind: ScheduleKind = ScheduleKind.TODO,
+  creationTiming: ScheduleTiming? = null,
+): EditScheduleModelState = remember(editSchedule, occurrence, creationKind, creationTiming) {
+  EditScheduleModelState(editSchedule, occurrence, creationKind, creationTiming)
 }
 
 private fun timingAnchorDate(timing: ScheduleTiming): Date = when (timing) {

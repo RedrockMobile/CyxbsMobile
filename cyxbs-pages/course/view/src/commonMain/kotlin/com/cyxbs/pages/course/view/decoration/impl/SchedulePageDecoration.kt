@@ -7,7 +7,13 @@ import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
+import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
+import com.cyxbs.pages.course.view.item.impl.ScheduleCourseDecorationItem
+import com.cyxbs.pages.course.view.item.impl.ScheduleItemWhatTime
 import com.cyxbs.pages.schedule.api.IScheduleService2
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,11 +21,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 三种 Schedule 课表 Decoration 的公共基类。
+ * Schedule 课表 Decoration 的公共基类。
  *
  * 基类统一观察整个课表学期并直接从 Schedule API 获取全部 occurrence。ItemHierarchy 会按 page
  * 自行分桶，因此切换当前页面不重建数据；子类只负责筛选自己的排期类型并生成对应 Item。
@@ -88,5 +96,70 @@ abstract class SchedulePageDecoration<Item : CourseItem>(
   protected companion object {
     const val DAYS_PER_WEEK = 7
     const val MINUTES_PER_DAY = 24 * 60
+  }
+}
+
+/**
+ * TODO 时间段与事务时间段共用的切片基类。
+ *
+ * 具体子类在构造时固定 [kind]，因此每个 Decoration 只拥有一种来源的 ItemHierarchy；切片结果保持
+ * module-internal，不会通过公共或 protected API 暴露给其他模块。
+ */
+abstract class ScheduleTimedKindPageDecoration protected constructor(
+  courseFrame: AbstractCourseFrame,
+  coroutineScope: CoroutineScope,
+  platformItemFactory: PlatformScheduleItemFactory,
+  private val kind: ScheduleOccurrenceKind,
+  private val segmentType: String,
+) : SchedulePageDecoration<CourseScheduleItem>(courseFrame, coroutineScope) {
+
+  init {
+    scheduleRangeFlow.onEach { range ->
+      itemHierarchy.reset(
+        range?.projectTimedOccurrences().orEmpty().map { item ->
+          ScheduleItemWhatTime(item, isDeadline = false, platformItemFactory)
+        },
+      )
+    }.launchIn(coroutineScope)
+  }
+
+  /** 过滤固定来源并把整个学期内的跨日时间段切成逐日课表 Item。 */
+  private fun ScheduleRange.projectTimedOccurrences(): List<ScheduleCourseDecorationItem> = buildList {
+    val dayCount = startDate.daysUntil(endDateExclusive)
+    occurrences.forEach { occurrence ->
+      if (occurrence.kind != kind) return@forEach
+      val timing = occurrence.timing as? ScheduleOccurrenceTiming.Timed ?: return@forEach
+      val endExclusive = timing.start.plusMinutes(timing.durationMinutes)
+      repeat(dayCount) { dayIndex ->
+        val date = startDate.plusDays(dayIndex)
+        val dayStart = MinuteTimeDate(date, 0, 0)
+        val dayEnd = MinuteTimeDate(date.plusDays(1), 0, 0)
+        if (timing.start >= dayEnd || endExclusive <= dayStart) return@repeat
+        val startMinute = if (timing.start > dayStart) timing.start.minuteOfDay else 0
+        val endMinute = if (endExclusive < dayEnd) endExclusive.minuteOfDay else MINUTES_PER_DAY
+        if (endMinute <= startMinute) return@repeat
+        val page = courseFrame.getPage(date) ?: return@repeat
+        val beginTime = minuteTimeForCourse(startMinute, isEnd = false)
+        val finalTime = minuteTimeForCourse(endMinute, isEnd = true)
+        add(
+          ScheduleCourseDecorationItem(
+            stableId = occurrence.courseSegmentIdentity(
+              date,
+              beginTime,
+              finalTime,
+              page,
+              segmentType,
+            ),
+            occurrence = occurrence,
+            page = page,
+            dayOfWeek = date.dayOfWeek,
+            beginTime = beginTime,
+            finalTime = finalTime,
+            title = occurrence.title,
+            description = occurrence.description,
+          ),
+        )
+      }
+    }
   }
 }

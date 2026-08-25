@@ -22,19 +22,18 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.extension.rememberCourseItemBottomSheetDialogState
-import com.cyxbs.pages.course.frame.item.DefaultCourseAffairItemFactory
 import com.cyxbs.pages.course.frame.item.DefaultCourseLessonItemFactory
 import com.cyxbs.pages.course.frame.item.DefaultCourseLinkLessonItemFactory
 import com.cyxbs.pages.course.frame.item.DefaultScheduleItemFactory
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.HomeCoursePageContent
 import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
-import com.cyxbs.pages.course.view.decoration.impl.AffairPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.CourseLessonPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.ScheduleAffairPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.ScheduleAllDayPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.ScheduleDeadlinePageDecoration
-import com.cyxbs.pages.course.view.decoration.impl.ScheduleTimedPageDecoration
+import com.cyxbs.pages.course.view.decoration.impl.ScheduleTodoTimedPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
 import com.cyxbs.pages.course.view.page.CourseFrameHeader
 
@@ -130,15 +129,17 @@ private fun createCoursePageDecorationManager(
           platformItemFactory = DefaultScheduleItemFactory,
         ), // 截止时间点始终位于课表最上层
         SelfLessonPageDecoration(platformItemFactory = DefaultCourseLessonItemFactory), // 自己的课程
-        ScheduleTimedPageDecoration(
+        ScheduleTodoTimedPageDecoration(
           courseFrame = frame,
           coroutineScope = coroutineScope,
           platformItemFactory = DefaultScheduleItemFactory,
-        ), // 时间段与事务相邻，初始位于事务上方
-        AffairPageDecoration(
+        ), // TODO 时间段独立位于事务上方
+        ScheduleAffairPageDecoration(
           courseFrame = frame,
-          platformItemFactory = DefaultCourseAffairItemFactory
-        ), // 自己的事务
+          coroutineScope = coroutineScope,
+          platformItemFactory = DefaultScheduleItemFactory,
+        ), // Schedule 原生事务使用独立层级
+        // TODO 旧 Affair 仅保留代码等待后续迁移清理。
         LinkLessonPageDecoration(platformItemFactory = DefaultCourseLinkLessonItemFactory), // 关联人的课程
         ScheduleAllDayPageDecoration(
           courseFrame = frame,

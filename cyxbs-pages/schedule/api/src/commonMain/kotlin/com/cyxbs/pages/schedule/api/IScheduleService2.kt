@@ -14,10 +14,18 @@ data class ScheduleOccurrenceView(
   val identity: String,
   val scheduleId: ScheduleId,
   val recurrenceId: RecurrenceId?,
+  /** 创建来源决定课表上的视觉语义；该字段不会随清单关联状态变化。 */
+  val kind: ScheduleOccurrenceKind,
   val title: String,
   val description: String,
   val timing: ScheduleOccurrenceTiming,
 )
+
+/** 供外部只读判断日程来源，避免暴露 Schedule 模块内部领域类型。 */
+enum class ScheduleOccurrenceKind {
+  TODO,
+  AFFAIR,
+}
 
 /** Schedule occurrence 的四种排期语义，不包含任何课表布局或 Decoration 信息。 */
 sealed interface ScheduleOccurrenceTiming {
@@ -46,7 +54,7 @@ sealed interface ScheduleOccurrenceTiming {
 }
 
 /**
- * Schedule 向其他功能模块公开的只读服务。
+ * Schedule 向其他功能模块公开的服务。
  *
  * API 只暴露日程数据和 Schedule 自己的详情内容，不感知 CoursePageDecoration、CourseItem、课表页码或
  * 重叠层级。调用方负责把 occurrence 映射为自己的 UI。
@@ -74,6 +82,22 @@ interface IScheduleService2 {
     embeddedInHost: Boolean,
     onDismiss: () -> Unit,
     /** 内容进入或退出编辑态时通知外层宿主，用于锁定当前正在编辑的日程。 */
+    onEditModeChanged: (Boolean) -> Unit = {},
+  )
+
+  /**
+   * 展示“从课表创建事务”的 Schedule 编辑内容。
+   *
+   * 保存前只持有 [initialTiming] 草稿；确认后由 Schedule 模块创建原生事务日程，调用方无需接触仓库命令。
+   * [onCreated] 在本地命令完成后调用，即使远端暂时不可用，本地待同步数据也已经可被课表观察到。
+   */
+  @Composable
+  fun ScheduleCreateAffairContent(
+    initialTiming: ScheduleOccurrenceTiming.Timed,
+    embeddedInHost: Boolean,
+    onDismiss: () -> Unit,
+    onCreated: () -> Unit,
+    /** 创建表单始终处于编辑态，外层重叠宿主可据此只保留当前页。 */
     onEditModeChanged: (Boolean) -> Unit = {},
   )
 }

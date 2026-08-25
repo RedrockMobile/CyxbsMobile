@@ -35,6 +35,7 @@ import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayItem
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -81,6 +82,7 @@ class ScheduleAllDayPageDecoration(
   ): List<ScheduleAllDayDecorationItem> = buildList {
     val dayCount = range.startDate.daysUntil(range.endDateExclusive)
     range.occurrences.forEach { occurrence ->
+      if (occurrence.kind != ScheduleOccurrenceKind.TODO) return@forEach
       val timing = occurrence.timing as? ScheduleOccurrenceTiming.AllDay ?: return@forEach
       repeat(dayCount) { dayIndex ->
         val date = range.startDate.plusDays(dayIndex)

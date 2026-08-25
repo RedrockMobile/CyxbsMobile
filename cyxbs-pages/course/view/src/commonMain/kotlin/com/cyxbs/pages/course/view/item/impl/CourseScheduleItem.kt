@@ -1,7 +1,10 @@
 package com.cyxbs.pages.course.view.item.impl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
@@ -10,9 +13,11 @@ import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
+import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.DayOfWeek
@@ -58,6 +63,7 @@ class CourseScheduleItem internal constructor(
   @Composable
   private fun Content(onClick: ((MinuteTimePair) -> Unit)?) {
     val accentColor = 0xFF7654C7.dark(0xFFD3C4FF)
+    val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
     LayoutItemModifier.minimumVisualHeight.set(
       itemState,
       if (isDeadline) DEADLINE_VISUAL_HEIGHT else 0.dp,
@@ -66,8 +72,13 @@ class CourseScheduleItem internal constructor(
       itemState = itemState,
       topText = data.title,
       bottomText = data.description,
-      textColor = accentColor,
-      backgroundColor = accentColor.copy(alpha = 0.12f),
+      textColor = if (isAffair) LocalAppColors.current.tvLv2 else accentColor,
+      backgroundColor = if (isAffair) Color.Transparent else accentColor.copy(alpha = 0.12f),
+      modifierList = if (isAffair) {
+        remember { createCourseDefaultModifierList().add(AffairBackgroundItemModifier) }
+      } else {
+        remember { createCourseDefaultModifierList() }
+      },
       onClick = onClick,
     )
   }
