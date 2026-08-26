@@ -20,14 +20,13 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -36,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -45,23 +43,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTimePair
-import com.cyxbs.components.utils.compose.Wrapper
-import com.cyxbs.components.utils.compose.imePaddingWithHeight
+import com.cyxbs.components.utils.compose.LocalImePaddingTargetState
+import com.cyxbs.components.utils.compose.imePaddingWithTarget
 import com.cyxbs.components.utils.compose.plusDsl
+import com.cyxbs.components.utils.compose.rememberImePaddingTargetState
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.modifier.BeginFinalTimeShowModifier
-import com.cyxbs.pages.course.view.item.modifier.observeItemRectInWindow
+import com.cyxbs.pages.course.view.item.modifier.observeItemRectOnScreen
 import com.cyxbs.pages.course.view.overlay.OverlapResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Runnable
@@ -71,15 +69,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
-import kotlin.collections.mapNotNull
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -128,9 +122,6 @@ class CourseItemBottomSheetDialogState {
   // 编辑当前 item 时锁定 Pager；保留原内容列表以避免切换布局分支后重建并丢失表单状态。
   internal val currentPageLockedFlow = MutableStateFlow(false)
 
-  // 键盘弹出时需要漏出的位置，0 的话视为完全顶起
-  val imePeekLayoutInWindowBottomFlow = MutableStateFlow(0F)
-
   fun showDialog(extension: CourseItemBottomSheetDialogExtension) {
     clear()
     dialogContents.value = listOf(extension)
@@ -168,13 +159,6 @@ class CourseItemBottomSheetDialogState {
     bottomSheetState.userScrollEnabled.value = true
     currentPageItemFlow.value = null
     currentPageLockedFlow.value = false
-    imePeekLayoutInWindowBottomFlow.value = 0F
-  }
-
-  // 键盘弹出时需要漏出的位置
-  // 设置后键盘弹出时仅遮挡该位置下面的区域，而暴露 bottom 之前的部分
-  fun setImePeekBottomInWindow(bottomInWindow: Float) {
-    imePeekLayoutInWindowBottomFlow.value = bottomInWindow
   }
 
   private fun collectCoveredItems(
@@ -210,13 +194,14 @@ private fun MobileCourseBottomSheetDialog(
       state.dismissDialog()
     }
   ) {
-    val imeOverlapHeight = remember { mutableIntStateOf(0) }
-    Box(
-      modifier = Modifier.imePaddingWithHeight(imeOverlapHeight.intValue)
-    ) {
-      ShowBeginFinalTime(state)
-      CurrentItemShowTop(state)
-      BottomSheet(state, imeOverlapHeight)
+    val imePaddingTargetState = rememberImePaddingTargetState()
+    CompositionLocalProvider(LocalImePaddingTargetState provides imePaddingTargetState) {
+      // 只上移到目标编辑区域完整可见，弹窗其余部分仍允许被键盘覆盖。
+      Box(modifier = Modifier.imePaddingWithTarget(imePaddingTargetState)) {
+        ShowBeginFinalTime(state)
+        CurrentItemShowTop(state)
+        BottomSheet(state)
+      }
     }
   }
 }
@@ -225,7 +210,7 @@ private fun MobileCourseBottomSheetDialog(
 @Composable
 private fun OffsetScroll(
   state: CourseItemBottomSheetDialogState,
-  layoutCoordinatesFlow: SharedFlow<LayoutCoordinates>
+  layoutTopOnScreenFlow: SharedFlow<Float>,
 ) {
   val marginBottomKey = "MobileCourseBottomSheetDialog#OffsetScroll"
   val scrollContext = remember {
@@ -238,23 +223,24 @@ private fun OffsetScroll(
   LaunchedEffect(Unit) {
     val initScrollValue = scrollContext.scrollState.value
     var prevItem = state.currentPageItemFlow.value
-    layoutCoordinatesFlow.filterNotNull().map {
-      it.positionInWindow().y
-    }.combine(
+    layoutTopOnScreenFlow.combine(
       state.currentPageItemFlow.filterNotNull()
         .map {
-          it.itemState.observeItemRectInWindow(true).first() // 这里只获取一次，调用 refreshScrollOffset 以触发刷新
+          it.itemState.observeItemRectOnScreen(true).first() // 这里只获取一次，调用 refreshScrollOffset 以触发刷新
             // 这里需要减去 margin 转换为初始坐标，在被重叠的 item 显示时有用
             .translate(0F, marginBottomState.getOrElse(marginBottomKey) { 0 }.toFloat())
         }
-    ) { layoutOffsetInWindow, itemRectInWindow ->
-      itemRectInWindow.bottom - layoutOffsetInWindow
+    ) { layoutOffsetOnScreen, itemRectOnScreen ->
+      // 课表位于 Activity Window，弹窗位于 Dialog Window，必须统一为屏幕坐标后才能计算遮挡。
+      itemRectOnScreen.bottom - layoutOffsetOnScreen
     }.collectLatest {
       val total = it.coerceAtLeast(0F)
       val newScrollValue = initScrollValue + total
       val nowScrollValue = scrollContext.scrollState.value
-      if (newScrollValue > nowScrollValue) {
-        scrollContext.scrollState.scrollBy(newScrollValue - nowScrollValue)
+      val scrollDelta = newScrollValue - nowScrollValue
+      if (scrollDelta != 0F) {
+        // 键盘顶起与收回时都跟随目标遮挡量调整，避免只上移而无法恢复。
+        scrollContext.scrollState.scrollBy(scrollDelta)
       }
       val oldMarginBottom = marginBottomState.getOrElse(marginBottomKey) { 0 }
       val newMarginBottom = (total - (scrollContext.scrollState.value - initScrollValue))
@@ -290,27 +276,21 @@ private fun OffsetScroll(
 @Composable
 private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
-  imeOverlapHeight: MutableIntState,
 ) {
   val currentPageLocked by state.currentPageLockedFlow.collectAsState()
-  val layoutCoordinatesFlow = remember {
-    MutableSharedFlow<LayoutCoordinates>(
+  val layoutTopOnScreenFlow = remember {
+    MutableSharedFlow<Float>(
       replay = 1,
       extraBufferCapacity = 1,
       onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
   }
-  val hasFocusFlow = remember { MutableStateFlow(false) }
-  val outerLayoutCoordinates = remember { Wrapper<LayoutCoordinates?>(null) }
   BottomSheetCompose(
     bottomSheetState = state.bottomSheetState,
     dismissOnClickOutside = true,
     scrimColor = Color.Transparent,
-    modifier = Modifier.onGloballyPositioned {
-      outerLayoutCoordinates.value = it
-    }
   ) {
-    OffsetScroll(state, layoutCoordinatesFlow)
+    OffsetScroll(state, layoutTopOnScreenFlow)
     Box(
       modifier = Modifier.navigationBarsPadding()
         .fillMaxWidth()
@@ -322,9 +302,8 @@ private fun BottomSheet(
         .animateContentSize()
         .then(bottomSheetDraggable())
         .onGloballyPositioned {
-          layoutCoordinatesFlow.tryEmit(it)
-        }.onFocusChanged {
-          hasFocusFlow.value = it.hasFocus
+          // IME 位移由 Compose 布局完成，因此普通布局回调即可同步课表滚轴。
+          layoutTopOnScreenFlow.tryEmit(it.positionOnScreen().y)
         }
     ) {
       Spacer(
@@ -359,19 +338,6 @@ private fun BottomSheet(
     }
     state.bottomSheetState.stateFlow.first { it == BottomSheetValueState.Collapsed }
     state.dismissDialog()
-  }
-  LaunchedEffect(Unit) {
-    hasFocusFlow.filter { it }.mapNotNull {
-      outerLayoutCoordinates.value
-    }.flatMapLatest { outerLayoutCoordinates ->
-      // 使用 layoutCoordinatesFlow 会少一个导航栏的高度
-      state.imePeekLayoutInWindowBottomFlow.map {
-        if (it == 0F) 0F // 对于 0 我们特殊处理，认为 ime 应该完全顶起，重叠高度为 0
-        else outerLayoutCoordinates.positionInWindow().y + outerLayoutCoordinates.size.height - it
-      }
-    }.collect {
-      imeOverlapHeight.intValue = it.roundToInt()
-    }
   }
 }
 

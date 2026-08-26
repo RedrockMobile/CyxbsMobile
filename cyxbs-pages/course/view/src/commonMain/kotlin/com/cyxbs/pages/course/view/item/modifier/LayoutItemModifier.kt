@@ -9,7 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -176,10 +176,10 @@ private fun calculateIndex(itemState: CourseItemState,): Int {
  * 会跟随 item 的位置移动而实时改变
  * @param forceCalculate 是否强制实时计算 item 的坐标位置，一般用于当前 item 还未完全变成对应时间的情况
  */
-fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Flow<Rect> {
+fun CourseItemState.observeItemRectOnScreen(forceCalculate: Boolean = false): Flow<Rect> {
   return layoutCoordinatesFlow.flatMapLatest { itemCoordinates ->
     if (itemCoordinates != null && itemCoordinates.isAttached && !forceCalculate) {
-      flowOf(Rect(itemCoordinates.positionInWindow(), itemCoordinates.size.toSize()))
+      flowOf(Rect(itemCoordinates.positionOnScreen(), itemCoordinates.size.toSize()))
     } else {
       // 此时 item 可能已经不可见，比如被上方重叠的 item 遮挡完了
       // 使用 coursePage.layoutCoordinatesFlow 进行计算
@@ -195,12 +195,12 @@ fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Fl
             (pageCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt()
           val x = calculateIndex(this) * pageCoordinates.size.width / 7F
           val y = beginWeightRatio * pageCoordinates.size.height
-          val offsetInWindow = pageCoordinates.positionInWindow()
+          val offsetOnScreen = pageCoordinates.positionOnScreen()
           Rect(
-            left = x + offsetInWindow.x,
-            top = y + offsetInWindow.y,
-            right = x + width + offsetInWindow.x,
-            bottom = y + height + offsetInWindow.y,
+            left = x + offsetOnScreen.x,
+            top = y + offsetOnScreen.y,
+            right = x + width + offsetOnScreen.x,
+            bottom = y + height + offsetOnScreen.y,
           )
         }
     }

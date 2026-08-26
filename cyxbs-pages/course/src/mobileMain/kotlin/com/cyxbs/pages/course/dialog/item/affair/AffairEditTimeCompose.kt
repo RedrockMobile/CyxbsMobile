@@ -41,8 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -259,9 +257,6 @@ private fun DateFlowRow(
     }.toMutableStateList()
   }
   FlowRow(
-    modifier = Modifier.onGloballyPositioned {
-      courseState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
-    },
     itemVerticalAlignment = Alignment.CenterVertically
   ) {
     dateList.fastForEach { item ->

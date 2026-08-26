@@ -73,8 +73,8 @@ import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
-import com.cyxbs.components.utils.compose.bringIntoViewFullBounds
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.imePaddingTarget
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.pages.schedule.domain.model.CategoryId
@@ -321,7 +321,8 @@ private fun ScheduleContent(
   DisposableEffect(Unit) {
     onDispose { onEditModeChanged(false) }
   }
-  Column(modifier = Modifier.bringIntoViewFullBounds()) {
+  // 标题或备注获得焦点时，标题、信息栏和备注作为一个整体露出到键盘上方。
+  Column(modifier = Modifier.imePaddingTarget()) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Box(modifier = Modifier.weight(1f)) {
         val focusRequester = remember { FocusRequester() }
@@ -389,10 +390,7 @@ private fun ScheduleContent(
       onClickCategory = { uiState = ScheduleUi.Edit.Category },
     )
     Spacer(modifier = Modifier.height(10.dp))
-  }
-  when (uiState) {
-    // 备注输入
-    ScheduleUi.Show, ScheduleUi.Edit.Note -> Box {
+    if (uiState is ScheduleUi.Show || uiState is ScheduleUi.Edit.Note) {
       Box {
         BasicTextField(
           state = modelState.detail,
@@ -409,6 +407,10 @@ private fun ScheduleContent(
         }
       }
     }
+  }
+  when (uiState) {
+    // 备注已包含在上方 IME 目标区域中。
+    ScheduleUi.Show, ScheduleUi.Edit.Note -> Unit
     // 日期：下方就地变日历，点某天实时改写开始/结束的日期（周数随之重算）；← 返回
     ScheduleUi.Edit.Date -> EditScheduleCalendarArea(state = modelState)
     // 时间段：下方变时分滚轮

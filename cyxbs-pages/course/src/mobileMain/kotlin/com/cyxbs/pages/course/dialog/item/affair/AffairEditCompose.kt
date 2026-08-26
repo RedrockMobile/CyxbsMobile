@@ -69,7 +69,6 @@ fun AffairEditCompose(
       when (currentForm.editState.value) {
         CurrentForm.EditState.EditBasic -> AffairEditBasicCompose(
           currentForm = currentForm,
-          courseState = courseState,
         )
         CurrentForm.EditState.EditTime -> AffairEditTimeCompose(
           currentForm = currentForm,

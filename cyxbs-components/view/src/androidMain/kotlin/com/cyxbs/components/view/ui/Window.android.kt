@@ -11,7 +11,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 /**
  * 窗口组件，类似于 Dialog，但全屏展示
  *
- * - 安卓基于自定义 Dialog 实现，Compose 自带的 Dialog 组件有默认蒙层
+ * - 安卓基于官方 Compose Dialog 实现，并移除平台默认蒙层
  *
  * @author 985892345
  * @date 2025/3/24
@@ -24,7 +24,9 @@ actual fun Window(
   Dialog(
     onDismissRequest = { dismissOnBackPress?.invoke() },
     properties = DialogProperties(
+      dismissOnClickOutside = false,
       usePlatformDefaultWidth = false,
+      // IME 位移由 commonMain 统一处理，避免 Android adjustPan 与其他平台行为不一致。
       decorFitsSystemWindows = false,
     )
   ) {

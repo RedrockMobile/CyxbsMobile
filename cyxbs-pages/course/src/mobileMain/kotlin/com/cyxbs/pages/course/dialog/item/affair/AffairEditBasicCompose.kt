@@ -20,8 +20,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -30,7 +28,6 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentForm
 
 /**
@@ -42,15 +39,11 @@ import com.cyxbs.pages.course.dialog.item.AffairBottomSheetDialogState.CurrentFo
 @Composable
 fun AffairEditBasicCompose(
   currentForm: CurrentForm.Edit,
-  courseState: CourseItemBottomSheetDialogState,
 ) {
   Column {
     EditWeekWithTimePair(currentForm = currentForm)
     EditContent(
-      modifier = Modifier.padding(top = 8.dp).onGloballyPositioned {
-        // 设置 ime 的遮挡高度
-        courseState.setImePeekBottomInWindow(it.positionInWindow().y + it.size.height + 10)
-      },
+      modifier = Modifier.padding(top = 8.dp),
       currentForm = currentForm
     )
   }
