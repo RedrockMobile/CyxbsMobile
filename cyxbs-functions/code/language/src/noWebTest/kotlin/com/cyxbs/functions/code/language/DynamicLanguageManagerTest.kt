@@ -15,6 +15,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIconPath
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectFile
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
@@ -303,6 +305,16 @@ class DynamicLanguageManagerTest {
       fileIconCallCount += 1
       return NpmJsResult.success(icon)
     }
+
+    /** 测试替身提供最小模板，使协议新增方法保持显式实现。 */
+    override suspend fun projectTemplate(): NpmJsResult<DynamicLanguageProjectTemplate> =
+      NpmJsResult.success(
+        DynamicLanguageProjectTemplate(
+          defaultProjectName = "TestProject",
+          activeFilePath = "main.test",
+          sourceFiles = listOf(DynamicLanguageProjectFile("main.test", "test")),
+        ),
+      )
 
     /** 测试替身不暴露运行入口。 */
     override suspend fun runTargets(

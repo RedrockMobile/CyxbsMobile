@@ -117,6 +117,18 @@ interface DynamicLanguageService : NpmJsServiceInstance {
   suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon>
 
   /**
+   * 返回当前语言用于“新建项目”的默认模板。
+   *
+   * 模板随语言 npm 包一起发布，客户端不得再内置语言源码。实现必须返回一个可直接创建且能够被
+   * 当前语言运行能力识别的最小项目；路径合法性和重复文件仍由客户端在写盘前复核。
+   *
+   * @return 当前语言的默认项目名、活动文件和初始源码。
+   * @throws CancellationException 调用协程被取消。
+   */
+  @Throws(CancellationException::class)
+  suspend fun projectTemplate(): NpmJsResult<DynamicLanguageProjectTemplate>
+
+  /**
    * 发现当前工作区可由编辑器直接启动的入口。
    *
    * Java 等语言可以返回工作区中的多个 `main`，客户端会在顶部运行按钮中提供选择，并在

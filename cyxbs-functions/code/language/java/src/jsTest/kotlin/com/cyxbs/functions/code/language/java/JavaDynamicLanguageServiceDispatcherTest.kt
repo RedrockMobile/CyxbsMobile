@@ -7,6 +7,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
@@ -794,7 +795,10 @@ class JavaDynamicLanguageServiceDispatcherTest {
     assertTrue(bridge != undefined)
     assertEquals(SERVICE_ID, _JavaDynamicLanguageServiceNpmJsDispatcher.serviceId)
     assertEquals(
-      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
+      setOf(
+        "compile", "complete", "definition", "fileIcon", "highlight", "projectTemplate",
+        "references", "rename", "runTargets",
+      ),
       _JavaDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
@@ -805,6 +809,12 @@ class JavaDynamicLanguageServiceDispatcherTest {
     )
     assertEquals(24F, icon.viewportWidth)
     assertTrue(icon.paths.all { path -> path.pathData.isNotBlank() })
+
+    val projectTemplate = decodeDispatcherResult<DynamicLanguageProjectTemplate>(
+      _JavaDynamicLanguageServiceNpmJsDispatcher.invoke("projectTemplate", "[]"),
+    )
+    assertEquals("src/Main.java", projectTemplate.activeFilePath)
+    assertTrue(projectTemplate.sourceFiles.single().source.contains("public static void main"))
 
     val highlighted = decodeDispatcherResult<DynamicHighlightResult>(
       _JavaDynamicLanguageServiceNpmJsDispatcher.invoke(

@@ -9,6 +9,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableModule
 import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectFile
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
@@ -36,6 +38,24 @@ object JavaScriptDynamicLanguageService : DynamicLanguageService {
 
   /** 返回不依赖平台资源的 JavaScript 文件矢量图标。 */
   override suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon> = NpmJsResult.success(JavaScriptLanguageIcon)
+
+  /** 提供无需构建工具即可直接运行的最小 ES Module 项目。 */
+  override suspend fun projectTemplate(): NpmJsResult<DynamicLanguageProjectTemplate> =
+    NpmJsResult.success(
+      DynamicLanguageProjectTemplate(
+        defaultProjectName = "JavaScriptProject",
+        activeFilePath = "src/main.js",
+        sourceFiles = listOf(
+          DynamicLanguageProjectFile(
+            path = "src/main.js",
+            source = """
+              const message = "Hello, JavaScript!";
+              console.log(message);
+            """.trimIndent(),
+          ),
+        ),
+      ),
+    )
 
   /**
    * JavaScript 按当前文件执行，不把工作区中的所有依赖模块都展示为独立运行入口。

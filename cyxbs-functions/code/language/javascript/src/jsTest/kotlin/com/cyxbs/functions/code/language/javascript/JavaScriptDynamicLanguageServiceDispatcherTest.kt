@@ -6,6 +6,7 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightCacheMode
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightSpan
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicProgramEntry
 import com.cyxbs.functions.code.language.js.bridge.DynamicSourceEdit
@@ -650,11 +651,17 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(SERVICE_ID, _JavaScriptDynamicLanguageServiceNpmJsDispatcher.serviceId)
     val describedMethods = Json.decodeFromString<List<String>>(bridge.describe(SERVICE_ID) as String)
     assertEquals(
-      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
+      setOf(
+        "compile", "complete", "definition", "fileIcon", "highlight", "projectTemplate",
+        "references", "rename", "runTargets",
+      ),
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.methodNames,
     )
     assertEquals(
-      setOf("compile", "complete", "definition", "fileIcon", "highlight", "references", "rename", "runTargets"),
+      setOf(
+        "compile", "complete", "definition", "fileIcon", "highlight", "projectTemplate",
+        "references", "rename", "runTargets",
+      ),
       describedMethods.toSet(),
     )
 
@@ -668,6 +675,15 @@ class JavaScriptDynamicLanguageServiceDispatcherTest {
     assertEquals(24F, fileIcon.viewportHeight)
     assertEquals(3, fileIcon.paths.size)
     assertTrue(fileIcon.paths.all { path -> path.pathData.isNotBlank() })
+
+    val projectTemplate = decodeDispatcherResult<DynamicLanguageProjectTemplate>(
+      _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(
+        method = "projectTemplate",
+        argumentsJson = "[]",
+      ),
+    )
+    assertEquals("src/main.js", projectTemplate.activeFilePath)
+    assertEquals(listOf("src/main.js"), projectTemplate.sourceFiles.map { file -> file.path })
 
     val highlightResult = decodeDispatcherResult<DynamicHighlightResult>(
       _JavaScriptDynamicLanguageServiceNpmJsDispatcher.invoke(

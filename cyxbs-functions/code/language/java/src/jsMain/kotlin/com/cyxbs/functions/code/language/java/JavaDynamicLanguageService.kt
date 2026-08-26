@@ -24,6 +24,8 @@ import com.cyxbs.functions.code.language.js.bridge.DynamicExecutableProgram
 import com.cyxbs.functions.code.language.js.bridge.DynamicGeneratedSourceMapping
 import com.cyxbs.functions.code.language.js.bridge.DynamicHighlightResult
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageIcon
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectFile
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageService
 import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageWorkspace
 import com.cyxbs.functions.code.language.js.bridge.DynamicRenameResult
@@ -58,6 +60,27 @@ object JavaDynamicLanguageService : DynamicLanguageService {
 
   /** 返回不依赖平台资源的 Java 咖啡杯矢量图标。 */
   override suspend fun fileIcon(): NpmJsResult<DynamicLanguageIcon> = NpmJsResult.success(JavaLanguageIcon)
+
+  /** 提供与轻量编译运行链路一致的 Java 控制台项目。 */
+  override suspend fun projectTemplate(): NpmJsResult<DynamicLanguageProjectTemplate> =
+    NpmJsResult.success(
+      DynamicLanguageProjectTemplate(
+        defaultProjectName = "JavaProject",
+        activeFilePath = "src/Main.java",
+        sourceFiles = listOf(
+          DynamicLanguageProjectFile(
+            path = "src/Main.java",
+            source = """
+              public class Main {
+                public static void main(String[] args) {
+                  System.out.println("Hello, Java!");
+                }
+              }
+            """.trimIndent(),
+          ),
+        ),
+      ),
+    )
 
   /**
    * 发现工作区中的 Java `main`，供顶部运行选择器和行号运行标记共同使用。
