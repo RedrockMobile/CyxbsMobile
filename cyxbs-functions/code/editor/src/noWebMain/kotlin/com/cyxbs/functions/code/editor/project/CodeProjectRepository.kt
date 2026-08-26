@@ -1,6 +1,7 @@
 package com.cyxbs.functions.code.editor.project
 
 import com.cyxbs.components.config.sp.defaultSettings
+import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.russhwolf.settings.Settings
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.absolutePath
@@ -83,6 +84,7 @@ class CodeProjectRepository(
   suspend fun createProject(
     template: CodeProjectTemplate,
     projectName: String,
+    supportedLanguages: List<DynamicLanguageInfo> = emptyList(),
   ): CodeProjectWorkspace = mutex.withLock {
     val root = resolveStorageRoot(requestIfMissing = true)
       ?: throw CodeProjectException("未选择项目保存目录。")
@@ -99,6 +101,9 @@ class CodeProjectRepository(
       storageDirectoryName = projectId,
       lastOpenedAtEpochMilliseconds = clock(),
       activeFilePath = template.activeFilePath,
+      sourceFileExtensions = supportedLanguages.catalogSourceExtensions()
+        .ifEmpty { template.sourceFiles.keys.mapNotNullTo(linkedSetOf()) { it.fileExtension() } }
+        .plus(GENERIC_TEXT_EXTENSIONS),
     )
     val directory = root.directoryFor(project)
     directory.createDirectories(mustCreate = true)
@@ -125,12 +130,18 @@ class CodeProjectRepository(
    * 目录中已有 manifest 时复用稳定项目 ID；没有 manifest 时根据源码扩展名推断主要语言并创建。
    * 取消系统目录选择器返回 null，调用方无需把它当作错误提示。
    */
-  suspend fun importProject(): CodeProjectWorkspace? = mutex.withLock {
+  suspend fun importProject(
+    supportedLanguages: List<DynamicLanguageInfo>,
+  ): CodeProjectWorkspace? = mutex.withLock {
+    val sourceExtensions = supportedLanguages.catalogSourceExtensions() + GENERIC_TEXT_EXTENSIONS
+    if (supportedLanguages.isEmpty() || sourceExtensions == GENERIC_TEXT_EXTENSIONS) {
+      throw CodeProjectException("动态语言目录中没有可用于导入项目的源码扩展名。")
+    }
     val directory = externalProjectDirectoryPicker() ?: return@withLock null
     if (!directory.exists() || !directory.isDirectory()) {
       throw CodeProjectException("选择的项目目录不可访问。")
     }
-    val snapshot = readWorkspace(directory)
+    val snapshot = readWorkspace(directory, sourceExtensions)
     if (snapshot.sourceFiles.isEmpty()) {
       throw CodeProjectException("所选目录中没有可编辑的源码文件。")
     }
@@ -138,7 +149,7 @@ class CodeProjectRepository(
     val root = resolveStorageRoot(requestIfMissing = false)
     val projects = loadProjects(root)
     val manifestProject = readProjectManifest(directory)
-    val detectedLanguageId = detectPrimaryLanguage(snapshot.sourceFiles.keys)
+    val detectedLanguageId = detectPrimaryLanguage(snapshot.sourceFiles.keys, supportedLanguages)
     val projectId = manifestProject?.projectId?.takeIf(String::isNotBlank)?.also(::requireSafeProjectId)
       ?: uniqueProjectId(detectedLanguageId, projects)
     val existingProject = projects.firstOrNull { it.projectId == projectId }
@@ -160,7 +171,11 @@ class CodeProjectRepository(
     }
     val activeFilePath = manifestProject?.activeFilePath
       ?.takeIf(snapshot.sourceFiles::containsKey)
-      ?: chooseInitialActiveFile(snapshot.sourceFiles.keys)
+      ?: chooseInitialActiveFile(
+        sourcePaths = snapshot.sourceFiles.keys,
+        languageId = detectedLanguageId,
+        supportedLanguages = supportedLanguages,
+      )
     val importedProject = CodeProject(
       projectId = projectId,
       name = projectName,
@@ -172,6 +187,7 @@ class CodeProjectRepository(
       lastOpenedAtEpochMilliseconds = clock(),
       isPinned = manifestProject?.isPinned ?: existingProject?.isPinned ?: false,
       activeFilePath = activeFilePath,
+      sourceFileExtensions = sourceExtensions,
     )
     val previousBookmark = existingProject
       ?.takeIf { it.storageKind == CodeProjectStorageKind.EXTERNAL_BOOKMARK }
@@ -211,7 +227,8 @@ class CodeProjectRepository(
     if (!directory.exists() || !directory.isDirectory()) {
       throw CodeProjectException("项目目录已不可访问：${project.name}")
     }
-    val snapshot = readWorkspace(directory)
+    val sourceExtensions = project.effectiveSourceFileExtensions()
+    val snapshot = readWorkspace(directory, sourceExtensions)
     val sourceFiles = snapshot.sourceFiles
     val activeFilePath = project.activeFilePath
       ?.takeIf(sourceFiles::containsKey)
@@ -220,6 +237,8 @@ class CodeProjectRepository(
     val openedProject = project.copy(
       lastOpenedAtEpochMilliseconds = clock(),
       activeFilePath = activeFilePath,
+      // 旧 manifest 首次打开后写回兼容扩展集合，后续不再依赖客户端隐式回退。
+      sourceFileExtensions = sourceExtensions,
     )
     writeProjectManifest(directory, openedProject)
     saveProjects(projects.replace(openedProject))
@@ -382,7 +401,7 @@ class CodeProjectRepository(
     copyFile.writeString(source)
     val updatedProject = project.copy(activeFilePath = copyPath)
     try {
-      val snapshot = readWorkspace(projectDirectory)
+      val snapshot = readWorkspace(projectDirectory, project.effectiveSourceFileExtensions())
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
       workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
@@ -560,7 +579,7 @@ class CodeProjectRepository(
       activeFilePath = project.activeFilePath?.remapPath(oldPath, newPath),
     )
     try {
-      val snapshot = readWorkspace(projectDirectory)
+      val snapshot = readWorkspace(projectDirectory, updatedProject.effectiveSourceFileExtensions())
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
       workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
@@ -587,7 +606,7 @@ class CodeProjectRepository(
     val source = resolveFile(projectDirectory, relativePath, createParents = false)
     if (!source.exists()) throw CodeProjectException("待删除路径不存在：$relativePath")
 
-    val beforeSnapshot = readWorkspace(projectDirectory)
+    val beforeSnapshot = readWorkspace(projectDirectory, project.effectiveSourceFileExtensions())
     val remainingSourcePaths = beforeSnapshot.sourceFiles.keys.filterNot { path ->
       path == relativePath || path.startsWith("$relativePath/")
     }
@@ -605,7 +624,7 @@ class CodeProjectRepository(
         ?: remainingSourcePaths.first(),
     )
     val workspace = try {
-      val snapshot = readWorkspace(projectDirectory)
+      val snapshot = readWorkspace(projectDirectory, updatedProject.effectiveSourceFileExtensions())
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
       workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
@@ -801,7 +820,10 @@ class CodeProjectRepository(
   }
 
   /** 递归读取显式目录与受支持文本源码，并限制目录深度、文件数量和总源码体积。 */
-  private suspend fun readWorkspace(root: PlatformFile): WorkspaceSnapshot {
+  private suspend fun readWorkspace(
+    root: PlatformFile,
+    sourceExtensions: Set<String>,
+  ): WorkspaceSnapshot {
     val result = linkedMapOf<String, String>()
     val directoryPaths = linkedSetOf<String>()
     var totalCharacters = 0L
@@ -817,7 +839,7 @@ class CodeProjectRepository(
             directoryPaths += relativePath
             visit(child, relativePath, depth + 1)
           }
-          child.isRegularFile() && child.isSupportedSourceFile() -> {
+          child.isRegularFile() && child.hasSourceExtension(sourceExtensions) -> {
             if (result.size >= MAX_SOURCE_FILES) {
               throw CodeProjectException("项目源码文件数量超过限制。")
             }
@@ -1016,16 +1038,14 @@ class CodeProjectRepository(
     absolutePath().trimEnd('/', '\\') == other.absolutePath().trimEnd('/', '\\')
   }.getOrDefault(false)
 
-  /** 按常见源码扩展名数量选择项目主语言；并列时按最先出现的源码保持稳定。 */
-  private fun detectPrimaryLanguage(sourcePaths: Collection<String>): String {
+  /** 按 Catalog 扩展名数量选择项目主语言；并列时保持 Catalog 与源码扫描顺序稳定。 */
+  private fun detectPrimaryLanguage(
+    sourcePaths: Collection<String>,
+    supportedLanguages: List<DynamicLanguageInfo>,
+  ): String {
+    val languageByExtension = supportedLanguages.extensionLanguageMap()
     val languageIds = sourcePaths.mapNotNull { path ->
-      when (path.substringAfterLast('.', missingDelimiterValue = "").lowercase()) {
-        "java" -> "java"
-        "js", "mjs", "cjs", "ts", "tsx" -> "javascript"
-        "py" -> "python"
-        "kt", "kts" -> "kotlin"
-        else -> null
-      }
+      path.fileExtension()?.let(languageByExtension::get)
     }
     return languageIds.groupingBy(String::lowercase).eachCount()
       .maxByOrNull(Map.Entry<String, Int>::value)
@@ -1033,11 +1053,17 @@ class CodeProjectRepository(
       ?: throw CodeProjectException("所选目录中没有可识别语言的源码文件。")
   }
 
-  /** 优先选择各语言惯用入口文件，找不到时使用扫描顺序中的第一个源码。 */
-  private fun chooseInitialActiveFile(sourcePaths: Collection<String>): String =
-    sourcePaths.firstOrNull { path ->
-      path.substringAfterLast('/') in PREFERRED_ENTRY_FILE_NAMES
+  /** 新导入目录尚无运行目标信息时，优先打开主语言源码而不是 README 等通用文本。 */
+  private fun chooseInitialActiveFile(
+    sourcePaths: Collection<String>,
+    languageId: String,
+    supportedLanguages: List<DynamicLanguageInfo>,
+  ): String {
+    val languageByExtension = supportedLanguages.extensionLanguageMap()
+    return sourcePaths.firstOrNull { path ->
+      path.fileExtension()?.let(languageByExtension::get) == languageId
     } ?: sourcePaths.first()
+  }
 
   /** 一次文件操作所需的完整项目定位信息。 */
   private data class ProjectContext(
@@ -1120,10 +1146,31 @@ class CodeProjectRepository(
     ) { "非法项目相对路径：$path" }
   }
 
-  private fun PlatformFile.isSupportedSourceFile(): Boolean {
-    val extension = name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
-    return extension in SUPPORTED_SOURCE_EXTENSIONS
+  /** 只读取当前项目 manifest 已登记的 Catalog/通用文本扩展名。 */
+  private fun PlatformFile.hasSourceExtension(sourceExtensions: Set<String>): Boolean =
+    name.fileExtension() in sourceExtensions
+
+  /** 旧 manifest 缺少扩展名字段时先沿用上一版能力，并在成功打开后自动写回。 */
+  private fun CodeProject.effectiveSourceFileExtensions(): Set<String> =
+    sourceFileExtensions.ifEmpty { LEGACY_SOURCE_EXTENSIONS }
+
+  /** 收集当前 Catalog 的规范扩展名，Catalog 自身已经负责格式和重复项校验。 */
+  private fun List<DynamicLanguageInfo>.catalogSourceExtensions(): Set<String> =
+    flatMapTo(linkedSetOf()) { language -> language.fileExtensions }
+
+  /** 扩展名冲突时保持 Catalog 首项，避免一次扫描中同一文件被随机判给不同语言。 */
+  private fun List<DynamicLanguageInfo>.extensionLanguageMap(): Map<String, String> = buildMap {
+    this@extensionLanguageMap.forEach { language ->
+      language.fileExtensions.forEach { extension ->
+        if (extension !in this) put(extension, language.languageId)
+      }
+    }
   }
+
+  /** 返回小写且不带点的文件扩展名；无扩展名路径不进入源码扫描。 */
+  private fun String.fileExtension(): String? = substringAfterLast('.', missingDelimiterValue = "")
+    .lowercase()
+    .takeIf(String::isNotEmpty)
 
   /** 从模板文件路径推导首次创建项目时已经存在的父目录。 */
   private fun Collection<String>.parentDirectoryPaths(): Set<String> = buildSet {
@@ -1181,12 +1228,10 @@ class CodeProjectRepository(
       ".git", ".gradle", PROJECT_TRASH_DIRECTORY_NAME, "build", "node_modules",
     )
     val RESERVED_PROJECT_PATHS = setOf(PROJECT_MANIFEST_FILE_NAME, PROJECT_TRASH_DIRECTORY_NAME)
-    val SUPPORTED_SOURCE_EXTENSIONS = setOf(
+    val LEGACY_SOURCE_EXTENSIONS = setOf(
       "java", "js", "mjs", "cjs", "ts", "tsx", "py", "kt", "kts", "json", "md", "txt",
     )
-    val PREFERRED_ENTRY_FILE_NAMES = setOf(
-      "Main.java", "main.js", "main.mjs", "main.cjs", "main.ts", "main.py", "Main.kt", "main.kts",
-    )
+    val GENERIC_TEXT_EXTENSIONS = setOf("json", "md", "txt")
   }
 }
 

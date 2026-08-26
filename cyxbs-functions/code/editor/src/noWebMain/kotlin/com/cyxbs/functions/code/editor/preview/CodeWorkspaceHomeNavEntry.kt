@@ -157,7 +157,10 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
         errorMessage = null
         isWorking = true
         coroutineScope.launch {
-          runCatching { projectRepository.importProject() }
+          runCatching {
+            val languages = dynamicLanguageManager.supportedLanguages()
+            projectRepository.importProject(languages)
+          }
             .onSuccess { workspace ->
               if (workspace != null) {
                 historicalProjects = projectRepository.historicalProjects()
@@ -311,7 +314,13 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
           isWorking = true
           projectNameError = null
           coroutineScope.launch {
-            runCatching { projectRepository.createProject(template, projectName) }
+            runCatching {
+              projectRepository.createProject(
+                template = template,
+                projectName = projectName,
+                supportedLanguages = projectLanguages.orEmpty(),
+              )
+            }
               .onSuccess { workspace ->
                 historicalProjects = projectRepository.historicalProjects()
                 projectTemplateForNaming = null

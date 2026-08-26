@@ -1,5 +1,6 @@
 package com.cyxbs.functions.code.editor.project
 
+import com.cyxbs.functions.code.language.DynamicLanguageInfo
 import com.russhwolf.settings.ExperimentalSettingsImplementation
 import com.russhwolf.settings.PreferencesSettings
 import io.github.vinceglb.filekit.PlatformFile
@@ -57,7 +58,7 @@ class CodeProjectRepositoryTest {
     externalRoot.resolve("src/Main.java").writeText("public class Main {}")
     repository = repositoryWithPicker(externalRoot)
 
-    val imported = requireNotNull(repository.importProject())
+    val imported = requireNotNull(repository.importProject(TEST_LANGUAGES))
 
     assertEquals(CodeProjectStorageKind.EXTERNAL_BOOKMARK, imported.project.storageKind)
     assertEquals("java", imported.project.languageId)
@@ -73,7 +74,7 @@ class CodeProjectRepositoryTest {
     val externalRoot = createExternalProject("bookmark-project")
     externalRoot.resolve("main.js").writeText("console.log('first')")
     repository = repositoryWithPicker(externalRoot)
-    val imported = requireNotNull(repository.importProject())
+    val imported = requireNotNull(repository.importProject(TEST_LANGUAGES))
 
     val restoredRepository = CodeProjectRepository(
       settings = PreferencesSettings(preferences),
@@ -100,8 +101,8 @@ class CodeProjectRepositoryTest {
     externalRoot.resolve("src/App.kt").writeText("fun main() = Unit")
     repository = repositoryWithPicker(externalRoot)
 
-    val first = requireNotNull(repository.importProject())
-    val second = requireNotNull(repository.importProject())
+    val first = requireNotNull(repository.importProject(TEST_LANGUAGES))
+    val second = requireNotNull(repository.importProject(TEST_LANGUAGES))
 
     assertEquals(first.project.projectId, second.project.projectId)
     assertEquals("kotlin", second.project.languageId)
@@ -114,8 +115,23 @@ class CodeProjectRepositoryTest {
     externalRoot.resolve("README.md").writeText("documentation")
     repository = repositoryWithPicker(externalRoot)
 
-    assertFailsWith<CodeProjectException> { repository.importProject() }
+    assertFailsWith<CodeProjectException> { repository.importProject(TEST_LANGUAGES) }
     assertFalse(Files.exists(externalRoot.resolve(".cyxbs-project.json")))
+  }
+
+  @Test
+  fun importsCatalogLanguageWithoutClientExtensionChanges() = runBlocking {
+    val externalRoot = createExternalProject("catalog-language-project")
+    externalRoot.resolve("src").let(Files::createDirectories)
+    externalRoot.resolve("src/Main.demo").writeText("demo source")
+    repository = repositoryWithPicker(externalRoot)
+
+    val imported = requireNotNull(repository.importProject(TEST_LANGUAGES))
+    val reopened = repository.openProject(imported.project.projectId)
+
+    assertEquals("demo", imported.project.languageId)
+    assertTrue("demo" in imported.project.sourceFileExtensions)
+    assertEquals("demo source", reopened.sourceFiles.getValue("src/Main.demo"))
   }
 
   @Test
@@ -559,3 +575,31 @@ private object CodeProjectTemplates {
   fun find(languageId: String): CodeProjectTemplate? =
     templates.firstOrNull { it.languageId == languageId }
 }
+
+/** 模拟动态 Catalog；`demo` 用于证明新增语言不需要修改项目仓库扩展名分支。 */
+private val TEST_LANGUAGES = listOf(
+  DynamicLanguageInfo(
+    languageId = "java",
+    displayName = "Java",
+    npmPackageName = "@cyxbs-mobile/language-java",
+    fileExtensions = listOf("java"),
+  ),
+  DynamicLanguageInfo(
+    languageId = "javascript",
+    displayName = "JavaScript",
+    npmPackageName = "@cyxbs-mobile/language-javascript",
+    fileExtensions = listOf("js", "mjs", "cjs"),
+  ),
+  DynamicLanguageInfo(
+    languageId = "kotlin",
+    displayName = "Kotlin",
+    npmPackageName = "@cyxbs-mobile/language-kotlin",
+    fileExtensions = listOf("kt", "kts"),
+  ),
+  DynamicLanguageInfo(
+    languageId = "demo",
+    displayName = "Demo",
+    npmPackageName = "@cyxbs-mobile/language-demo",
+    fileExtensions = listOf("demo"),
+  ),
+)

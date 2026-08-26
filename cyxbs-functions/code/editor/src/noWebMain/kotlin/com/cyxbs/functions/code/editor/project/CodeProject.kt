@@ -22,6 +22,8 @@ data class CodeProject(
   val lastOpenedAtEpochMilliseconds: Long,
   val isPinned: Boolean = false,
   val activeFilePath: String? = null,
+  /** 创建或导入时由动态 Catalog 记录；用于离线重开时决定哪些文本文件进入工作区。 */
+  val sourceFileExtensions: Set<String> = emptySet(),
 )
 
 /** 项目目录定位方式；外部目录依赖 Settings 中按项目保存的 bookmark。 */
