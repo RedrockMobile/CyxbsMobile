@@ -135,6 +135,53 @@ class CodeProjectRepositoryTest {
   }
 
   @Test
+  fun relinksUnavailableExternalProjectByStableManifestIdentity() = runBlocking {
+    val originalRoot = createExternalProject("relink-original")
+    originalRoot.resolve("Main.java").writeText("class Main {}")
+    repository = repositoryWithPicker(originalRoot)
+    val imported = requireNotNull(repository.importProject(TEST_LANGUAGES))
+    val manifestText = originalRoot.resolve(".cyxbs-project.json").readText()
+
+    originalRoot.deleteRecursively()
+    externalRoots.remove(originalRoot)
+    val relocatedRoot = createExternalProject("relink-target")
+    relocatedRoot.resolve("Main.java").writeText("class Main { int value; }")
+    relocatedRoot.resolve(".cyxbs-project.json").writeText(manifestText)
+    repository = repositoryWithPicker(relocatedRoot)
+
+    assertFalse(repository.historicalProjects().single().isAvailable)
+    val relinked = requireNotNull(repository.relinkExternalProject(imported.project.projectId))
+
+    assertEquals("class Main { int value; }", relinked.sourceFiles.getValue("Main.java"))
+    assertEquals(relocatedRoot.toString(), relinked.directoryDisplayPath)
+    assertTrue(repository.historicalProjects().single().isAvailable)
+  }
+
+  @Test
+  fun rejectsRelinkToDifferentProjectWithoutReplacingHistory() = runBlocking {
+    val originalRoot = createExternalProject("relink-wrong-original")
+    originalRoot.resolve("Main.java").writeText("class Main {}")
+    repository = repositoryWithPicker(originalRoot)
+    val imported = requireNotNull(repository.importProject(TEST_LANGUAGES))
+    val wrongManifest = originalRoot.resolve(".cyxbs-project.json").readText()
+      .replace(imported.project.projectId, "different-project-id")
+
+    originalRoot.deleteRecursively()
+    externalRoots.remove(originalRoot)
+    val wrongRoot = createExternalProject("relink-wrong-target")
+    wrongRoot.resolve("Main.java").writeText("class Wrong {}")
+    wrongRoot.resolve(".cyxbs-project.json").writeText(wrongManifest)
+    repository = repositoryWithPicker(wrongRoot)
+
+    assertFailsWith<CodeProjectException> {
+      repository.relinkExternalProject(imported.project.projectId)
+    }
+    val historical = repository.historicalProjects().single()
+    assertEquals(imported.project.projectId, historical.project.projectId)
+    assertFalse(historical.isAvailable)
+  }
+
+  @Test
   fun createsRealFilesAndReopensExternalChanges() = runBlocking {
     val created = repository.createProject(
       requireNotNull(CodeProjectTemplates.find("java")),

@@ -59,6 +59,7 @@ import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.functions.code.editor.project.CodeProjectTemplate
 import com.cyxbs.functions.code.editor.project.CodeProjectRepository
+import com.cyxbs.functions.code.editor.project.CodeProjectStorageKind
 import com.cyxbs.functions.code.editor.project.HistoricalCodeProject
 import com.cyxbs.functions.code.editor.project.openProjectDirectory
 import com.cyxbs.functions.code.editor.project.toCodeProjectTemplate
@@ -193,6 +194,35 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
         val directory = historical.directory ?: return@WorkspaceHomeScreen
         openProjectDirectory(directory).onFailure {
           errorMessage = it.message ?: "无法打开项目目录。"
+        }
+      },
+      onRestoreHistoricalProject = { historical ->
+        if (historical.isAvailable || isWorking) return@WorkspaceHomeScreen
+        errorMessage = null
+        isWorking = true
+        coroutineScope.launch {
+          runCatching {
+            when (historical.project.storageKind) {
+              CodeProjectStorageKind.EXTERNAL_BOOKMARK ->
+                projectRepository.relinkExternalProject(historical.project.projectId)
+              CodeProjectStorageKind.MANAGED_ROOT -> {
+                if (projectRepository.prepareProjectRoot()) {
+                  projectRepository.openProject(historical.project.projectId)
+                } else {
+                  null
+                }
+              }
+            }
+          }.onSuccess { workspace ->
+            historicalProjects = projectRepository.historicalProjects()
+            workspace?.let {
+              CodeEditorTestNavArgument(projectId = it.project.projectId)
+                .navigateFromWorkspaceHome()
+            }
+          }.onFailure {
+            errorMessage = it.message ?: "重新授权项目目录失败。"
+          }
+          isWorking = false
         }
       },
       onToggleProjectPinned = { historical ->
@@ -347,6 +377,7 @@ private fun WorkspaceHomeScreen(
   onOpenTutorial: () -> Unit,
   onOpenHistoricalProject: (HistoricalCodeProject) -> Unit,
   onOpenHistoricalProjectDirectory: (HistoricalCodeProject) -> Unit,
+  onRestoreHistoricalProject: (HistoricalCodeProject) -> Unit,
   onToggleProjectPinned: (HistoricalCodeProject) -> Unit,
   onRemoveHistoricalProject: (HistoricalCodeProject) -> Unit,
 ) {
@@ -422,6 +453,7 @@ private fun WorkspaceHomeScreen(
                 enabled = !isWorking,
                 onClick = { onOpenHistoricalProject(historical) },
                 onOpenDirectory = { onOpenHistoricalProjectDirectory(historical) },
+                onRestore = { onRestoreHistoricalProject(historical) },
                 onTogglePinned = { onToggleProjectPinned(historical) },
                 onRemove = { onRemoveHistoricalProject(historical) },
               )
@@ -593,6 +625,7 @@ private fun HistoricalProjectRow(
   enabled: Boolean,
   onClick: () -> Unit,
   onOpenDirectory: () -> Unit,
+  onRestore: () -> Unit,
   onTogglePinned: () -> Unit,
   onRemove: () -> Unit,
 ) {
@@ -644,12 +677,21 @@ private fun HistoricalProjectRow(
           text = if (historical.isAvailable) {
             historical.directoryDisplayPath
           } else {
-            "项目目录不可访问"
+            when (historical.project.storageKind) {
+              CodeProjectStorageKind.EXTERNAL_BOOKMARK -> "项目目录不可访问 · 重新定位"
+              CodeProjectStorageKind.MANAGED_ROOT -> "项目根目录不可访问 · 重新授权"
+            }
           },
           modifier = Modifier
             .padding(top = 3.dp)
-            .clickable(enabled = enabled && historical.isAvailable, onClick = onOpenDirectory),
-          color = WorkspaceHomeColors.secondaryText.copy(alpha = contentAlpha),
+            .clickable(enabled = enabled) {
+              if (historical.isAvailable) onOpenDirectory() else onRestore()
+            },
+          color = if (historical.isAvailable) {
+            WorkspaceHomeColors.secondaryText.copy(alpha = contentAlpha)
+          } else {
+            WorkspaceHomeColors.accent
+          },
           fontSize = 9.sp,
         )
       }

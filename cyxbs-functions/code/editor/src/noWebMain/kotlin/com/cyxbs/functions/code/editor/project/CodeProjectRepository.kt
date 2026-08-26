@@ -252,6 +252,65 @@ class CodeProjectRepository(
     )
   }
 
+  /**
+   * 为 bookmark 已失效的外部历史项目重新选择目录。
+   *
+   * 所选目录必须包含同一 [projectId] 和语言 ID 的 manifest；取消选择返回 null。身份校验、源码
+   * 扫描全部成功后才替换 bookmark 和历史索引，选错目录或写入失败不会把历史项目指向其他工程。
+   */
+  suspend fun relinkExternalProject(projectId: String): CodeProjectWorkspace? = mutex.withLock {
+    val root = resolveStorageRoot(requestIfMissing = false)
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    if (project.storageKind != CodeProjectStorageKind.EXTERNAL_BOOKMARK) {
+      throw CodeProjectException("受管项目应重新授权项目根目录，而不是单独定位项目。")
+    }
+
+    val directory = externalProjectDirectoryPicker() ?: return@withLock null
+    if (!directory.exists() || !directory.isDirectory()) {
+      throw CodeProjectException("选择的项目目录不可访问。")
+    }
+    val selectedManifest = readProjectManifest(directory)
+      ?: throw CodeProjectException("所选目录缺少 Cyxbs 项目 manifest。")
+    if (selectedManifest.projectId != projectId || selectedManifest.languageId != project.languageId) {
+      throw CodeProjectException("所选目录不是历史项目“${project.name}”。")
+    }
+    val snapshot = readWorkspace(directory, project.effectiveSourceFileExtensions())
+    val activeFilePath = project.activeFilePath
+      ?.takeIf(snapshot.sourceFiles::containsKey)
+      ?: snapshot.sourceFiles.keys.firstOrNull()
+      ?: throw CodeProjectException("所选项目中没有可编辑的源码文件。")
+    val updatedProject = project.copy(
+      storageDirectoryName = directory.name.ifBlank { project.storageDirectoryName },
+      directoryDisplayPathHint = directory.name.ifBlank { project.name },
+      lastOpenedAtEpochMilliseconds = clock(),
+      activeFilePath = activeFilePath,
+    )
+    val previousBookmark = restoreExternalCodeProjectDirectory(settings, projectId)
+    val previousManifest = readProjectManifestText(directory)
+    try {
+      saveExternalCodeProjectDirectory(settings, projectId, directory)
+      writeProjectManifest(directory, updatedProject)
+      saveProjects(projects.replace(updatedProject))
+      workspaceOf(
+        project = updatedProject,
+        directory = directory,
+        displayPath = directory.externalCodeProjectDisplayPath(),
+        snapshot = snapshot,
+      )
+    } catch (throwable: Throwable) {
+      restoreProjectManifest(directory, previousManifest)
+      if (previousBookmark == null) {
+        removeExternalCodeProjectDirectory(settings, projectId)
+      } else {
+        runCatching { saveExternalCodeProjectDirectory(settings, projectId, previousBookmark) }
+      }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
+  }
+
   /** 将当前活动文件同时写回 Settings 索引和项目 manifest，用于卸载后恢复。 */
   suspend fun updateActiveFile(projectId: String, activeFilePath: String) = mutex.withLock {
     requireSafeRelativePath(activeFilePath)
