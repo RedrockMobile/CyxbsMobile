@@ -16,6 +16,8 @@ data class ScheduleOccurrenceView(
   val recurrenceId: RecurrenceId?,
   /** 创建来源决定课表上的视觉语义；该字段不会随清单关联状态变化。 */
   val kind: ScheduleOccurrenceKind,
+  /** 当前是否属于清单；事务关联清单后为 true，但 [kind] 仍保持 [ScheduleOccurrenceKind.AFFAIR]。 */
+  val isInTodoList: Boolean,
   val title: String,
   val description: String,
   val timing: ScheduleOccurrenceTiming,

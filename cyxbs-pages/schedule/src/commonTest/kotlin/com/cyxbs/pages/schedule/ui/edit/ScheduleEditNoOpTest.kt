@@ -41,6 +41,27 @@ class ScheduleEditNoOpTest {
     assertTrue(draft.linkedToCourse)
   }
 
+  /** 从单次详情关联清单时仍更新事务所属系列，不生成伪造的 occurrence 关联字段。 */
+  @Test
+  fun affairTodoRelationFromThisOnlyDetailUpdatesSeries() = runTest {
+    val parent = parentSchedule().copy(
+      kind = ScheduleKind.AFFAIR,
+      todoState = null,
+      linkedToCourse = true,
+    )
+    val recurrenceId = recurrenceId()
+    val repository = RecordingRepository(snapshot(parent))
+    val state = EditScheduleModelState(parent, occurrence(parent, recurrenceId))
+
+    state.toggleCourseRelation()
+    repository.applyScheduleEdit(state, EditScope.THIS_ONLY, recurrenceId, FakeIds, Clock.System)
+
+    val updated = (repository.commands.single() as ScheduleCommand.Update).schedule
+    assertEquals(ScheduleKind.AFFAIR, updated.kind)
+    assertEquals(ScheduleTodoState.PENDING, updated.todoState)
+    assertTrue(updated.linkedToCourse)
+  }
+
   @Test
   fun unchangedOccurrenceKeepsExistingReplaceAndClearPatchWhenParentNowMatchesProjection() = runTest {
     val parent = parentSchedule()

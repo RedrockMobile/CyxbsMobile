@@ -16,6 +16,7 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
+import com.cyxbs.pages.schedule.ui.edit.applyScheduleCompletion
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
 import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
@@ -67,7 +68,7 @@ object ScheduleService2Impl : IScheduleService2 {
         if (!schedule.isVisibleInCourse(occurrence.status)) return@mapNotNull null
         val identity = occurrenceIdentity(occurrence)
         details[identity] = Detail(occurrence, schedule)
-        occurrence.toApiModel(identity, schedule.kind)
+        occurrence.toApiModel(identity, schedule)
       }
     if (details.isNotEmpty()) {
       // 可能同时有多个课表框架观察不同周，采用增量合并避免一个窗口清掉另一个窗口的点击详情。
@@ -114,9 +115,10 @@ object ScheduleService2Impl : IScheduleService2 {
       recurrenceId = detail.occurrence.recurrenceId,
       scrimColor = Color.Transparent,
       embeddedInExternalHost = embeddedInHost,
+      showCourseRelation = true,
       onEditModeChanged = onEditModeChanged,
       onDismiss = onDismiss,
-      onConfirm = { state, editScope ->
+      onConfirm = { state, editScope, newCategory ->
         scope.launch {
           repository.applyScheduleEdit(
             state,
@@ -124,6 +126,7 @@ object ScheduleService2Impl : IScheduleService2 {
             detail.occurrence.recurrenceId,
             ScheduleRepositoryProvider.idGenerators,
             ScheduleRepositoryProvider.clock,
+            newCategory,
           )
         }
       },
@@ -135,6 +138,18 @@ object ScheduleService2Impl : IScheduleService2 {
             detail.occurrence.recurrenceId,
             ScheduleRepositoryProvider.clock,
           )
+        }
+      },
+      onToggleCompleted = { completed ->
+        scope.launch {
+          repository.applyScheduleCompletion(
+            scheduleId = detail.schedule.id,
+            recurrenceId = detail.occurrence.recurrenceId,
+            completed = completed,
+            clock = ScheduleRepositoryProvider.clock,
+          )
+          // 原生清单完成后会从课表投影消失；事务即使关联清单并完成也继续保留详情。
+          if (detail.schedule.kind == ScheduleKind.TODO && completed) onDismiss()
         }
       },
     )
@@ -160,9 +175,10 @@ object ScheduleService2Impl : IScheduleService2 {
       creationTiming = initialTiming.toDomainModel(),
       scrimColor = Color.Transparent,
       embeddedInExternalHost = embeddedInHost,
+      showCourseRelation = true,
       onEditModeChanged = onEditModeChanged,
       onDismiss = onDismiss,
-      onConfirm = { state, editScope ->
+      onConfirm = { state, editScope, newCategory ->
         scope.launch {
           repository.applyScheduleEdit(
             state,
@@ -170,6 +186,7 @@ object ScheduleService2Impl : IScheduleService2 {
             recurrenceId = null,
             idGenerators = ScheduleRepositoryProvider.idGenerators,
             clock = ScheduleRepositoryProvider.clock,
+            newCategory = newCategory,
           )
           onCreated()
         }
@@ -199,16 +216,17 @@ private fun occurrenceIdentity(occurrence: ScheduleUiOccurrence): String =
 /** 将领域 occurrence 映射为不包含仓库实现和课表 UI 类型的 API 数据。 */
 private fun ScheduleUiOccurrence.toApiModel(
   identity: String,
-  kind: ScheduleKind,
+  schedule: Schedule,
 ): ScheduleOccurrenceView =
   ScheduleOccurrenceView(
     identity = identity,
     scheduleId = scheduleId,
     recurrenceId = recurrenceId,
-    kind = when (kind) {
+    kind = when (schedule.kind) {
       ScheduleKind.TODO -> ScheduleOccurrenceKind.TODO
       ScheduleKind.AFFAIR -> ScheduleOccurrenceKind.AFFAIR
     },
+    isInTodoList = schedule.todoState != null,
     title = title,
     description = description,
     timing = when (val value = timing) {

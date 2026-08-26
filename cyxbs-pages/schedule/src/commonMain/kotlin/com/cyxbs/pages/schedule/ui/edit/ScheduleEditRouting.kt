@@ -59,14 +59,22 @@ suspend fun ScheduleRepository.applyScheduleEdit(
     reminders = if (state.isOccurrenceRemindersChanged ||
       (state.isOccurrenceTimingChanged && edited.timing == ScheduleTiming.Unscheduled)
     ) edited.reminders else origin.reminders,
+    todoState = if (state.isSeriesRelationChanged) edited.todoState else origin.todoState,
+    linkedToCourse = if (state.isSeriesRelationChanged) edited.linkedToCourse else origin.linkedToCourse,
+    updatedAt = now,
+  )
+  val relationEdited = origin.copy(
+    todoState = edited.todoState,
+    linkedToCourse = edited.linkedToCourse,
     updatedAt = now,
   )
   // 从 occurrence 打开的表单分别追踪实例字段和 RRULE；系列 payload 只合并实际 dirty 字段，禁止提升其他单例覆盖。
-  val hasSeriesScopeChanges = if (state.initialOccurrence != null) {
+  val hasSeriesContentChanges = if (state.initialOccurrence != null) {
     state.isOccurrenceFieldsChanged || state.isSeriesRecurrenceChanged
   } else {
-    edited != origin
+    edited.copy(todoState = origin.todoState, linkedToCourse = origin.linkedToCourse) != origin
   }
+  val hasSeriesScopeChanges = hasSeriesContentChanges || state.isSeriesRelationChanged
   when (scope) {
     EditScope.ALL -> {
       if (hasSeriesScopeChanges) {
@@ -77,6 +85,8 @@ suspend fun ScheduleRepository.applyScheduleEdit(
       }
     }
     EditScope.THIS_ONLY -> {
+      // 关联关系属于整个系列；“仅本次”只约束标题、时间等 occurrence 字段，不能生成单次关联例外。
+      if (state.isSeriesRelationChanged) execute(ScheduleCommand.Update(relationEdited))
       // RRULE 只属于系列；仅修改 recurrence 后选择 THIS_ONLY 按 no-op 处理，不创建空 occurrence exception。
       if (!state.isOccurrenceFieldsChanged) return
       require(!(state.isOccurrenceTimingChanged && edited.timing == ScheduleTiming.Unscheduled)) {
@@ -106,7 +116,9 @@ suspend fun ScheduleRepository.applyScheduleEdit(
       }
     }
     EditScope.THIS_AND_FOLLOWING -> {
-      if (!hasSeriesScopeChanges) return
+      // 关联关系不随系列拆分；先更新原系列，再把其余内容字段交给后续系列命令。
+      if (state.isSeriesRelationChanged) execute(ScheduleCommand.Update(relationEdited))
+      if (!hasSeriesContentChanges) return
       execute(ScheduleCommand.SplitSeries(
         origin.id,
         requireNotNull(recurrenceId),
@@ -117,6 +129,44 @@ suspend fun ScheduleRepository.applyScheduleEdit(
       ))
     }
   }
+}
+
+/**
+ * 切换某次日程的完成态。
+ *
+ * 非重复日程直接更新系列完成态；重复日程使用稳定 [recurrenceId] 写 occurrence 例外，并保留已有例外中的
+ * 内容覆盖、revision 与创建时间。该操作会立即写入本地优先仓库，不经过编辑表单的范围选择。
+ */
+suspend fun ScheduleRepository.applyScheduleCompletion(
+  scheduleId: ScheduleId,
+  recurrenceId: RecurrenceId?,
+  completed: Boolean,
+  clock: Clock,
+) {
+  if (recurrenceId == null) {
+    execute(ScheduleCommand.CompleteNonRepeating(scheduleId, completed))
+    return
+  }
+  val now = clock.now()
+  val existing = snapshot.value.exceptions.firstOrNull {
+    it.scheduleId == scheduleId && it.recurrenceId == recurrenceId
+  }
+  execute(
+    ScheduleCommand.UpsertOccurrenceException(
+      existing?.copy(
+        status = if (completed) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
+        updatedAt = now,
+      ) ?: ScheduleOccurrenceException(
+        scheduleId = scheduleId,
+        recurrenceId = recurrenceId,
+        revision = 0,
+        status = if (completed) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
+        patch = null,
+        createdAt = now,
+        updatedAt = now,
+      ),
+    ),
+  )
 }
 
 /**

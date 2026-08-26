@@ -254,14 +254,17 @@ fun SchedulePage(
       editSchedule = currentEditing,
       editOccurrence = editingOccurrence,
       recurrenceId = editingRecurrenceId,
-      categories = snapshot.categories,
+      categoryRepository = viewModel.repository,
       onDismiss = { showEdit = false },
-      onConfirm = { state, scope ->
-        viewModel.saveSchedule(state, scope, editingRecurrenceId)
+      onConfirm = { state, scope, newCategory ->
+        viewModel.saveSchedule(state, scope, editingRecurrenceId, newCategory)
       },
       onDelete = if (currentEditing != null) {
         { scope -> viewModel.deleteScheduleScoped(currentEditing.id, scope, editingRecurrenceId) }
       } else null,
+      onToggleCompleted = currentEditing?.takeIf { it.todoState != null }?.let { schedule ->
+        { completed -> viewModel.completeSchedule(schedule.id, editingRecurrenceId, completed) }
+      },
     )
   }
 }

@@ -58,6 +58,36 @@ class EditScheduleModelState(
   var recurrence by mutableStateOf(initialRecurrenceDraft)
   private val initialReminderMinutes = initialReminders.firstOrNull()?.offsetMinutes ?: -1
   var remindMinutes by mutableStateOf(initialReminderMinutes)
+  /** 创建来源不可修改；关联设置只改变清单归属和课表投射状态。 */
+  val kind: ScheduleKind = origin?.kind ?: creationKind
+  private val initialTodoState = origin?.todoState ?: if (origin == null && kind == ScheduleKind.TODO) {
+    ScheduleTodoState.PENDING
+  } else {
+    null
+  }
+  private val initialLinkedToCourse = origin?.linkedToCourse ?: (kind == ScheduleKind.AFFAIR)
+  var todoState by mutableStateOf(initialTodoState)
+  var linkedToCourse by mutableStateOf(initialLinkedToCourse)
+
+  /** 当前日程是否属于清单；原生清单与关联清单后的事务都返回 true。 */
+  val isInTodoList: Boolean get() = todoState != null
+
+  /** 当前弹窗所展示 occurrence 的完成态；重复项优先读取实例状态。 */
+  val isOccurrenceCompleted: Boolean get() = initialOccurrence?.status == OccurrenceStatus.COMPLETED ||
+    (initialOccurrence == null && todoState == ScheduleTodoState.COMPLETED)
+
+  /**
+   * 切换课表页中的关联关系。
+   *
+   * 原生事务固定展示在课表，只切换清单归属；原生清单固定属于清单，只切换课表投射。
+   * 事务重新关联清单时从未完成开始，避免恢复已经解除关联的旧完成态。
+   */
+  fun toggleCourseRelation() {
+    when (kind) {
+      ScheduleKind.TODO -> linkedToCourse = !linkedToCourse
+      ScheduleKind.AFFAIR -> todoState = if (todoState == null) ScheduleTodoState.PENDING else null
+    }
+  }
 
   /** RRULE 编辑预览必须以父系列起点为 anchor，不能使用 moved occurrence 的展示日期。 */
   val recurrenceAnchorDate: Date get() = origin?.timing?.let(::timingAnchorDate) ?: anchorDate
@@ -150,6 +180,10 @@ class EditScheduleModelState(
   /** RRULE 是否相对父系列发生变化，供 ALL 与 THIS_AND_FOLLOWING 独立判断系列编辑。 */
   internal val isSeriesRecurrenceChanged: Boolean get() = isRecurrenceInputChanged
 
+  /** 清单归属和课表投射都是系列级属性，不允许写入单次 occurrence patch。 */
+  internal val isSeriesRelationChanged: Boolean get() =
+    todoState != initialTodoState || linkedToCourse != initialLinkedToCourse
+
   /**
    * 判断弹窗是否有任意未保存输入，用于关闭确认；scope 路由会进一步区分 occurrence 字段与系列 RRULE。
    *
@@ -157,11 +191,13 @@ class EditScheduleModelState(
    * 只改重复规则也会提示未保存，但 THIS_ONLY 保存时不会把 RRULE 写进单次 patch。
    */
   val isChanged: Boolean get() {
-    if (initialOccurrence != null) return isOccurrenceFieldsChanged || isSeriesRecurrenceChanged
+    if (initialOccurrence != null) {
+      return isOccurrenceFieldsChanged || isSeriesRecurrenceChanged || isSeriesRelationChanged
+    }
     return origin == null || toDraft().let { draft ->
       draft.title.trim() != origin.title || draft.description.trim() != origin.description ||
         draft.categoryId != origin.categoryId || draft.timing != origin.timing ||
-        isRecurrenceInputChanged || draft.reminders != origin.reminders
+        isRecurrenceInputChanged || draft.reminders != origin.reminders || isSeriesRelationChanged
     }
   }
 
@@ -197,13 +233,9 @@ class EditScheduleModelState(
     timing = effectiveTiming,
     recurrence = effectiveRecurrence,
     reminders = effectiveReminders,
-    todoState = origin?.todoState ?: if (origin == null && creationKind == ScheduleKind.TODO) {
-      ScheduleTodoState.PENDING
-    } else {
-      null
-    },
-    kind = origin?.kind ?: creationKind,
-    linkedToCourse = origin?.linkedToCourse ?: (creationKind == ScheduleKind.AFFAIR),
+    todoState = todoState,
+    kind = kind,
+    linkedToCourse = linkedToCourse,
   )
 
   /** 仅为运行完整领域校验补齐非编辑字段；占位时间与 revision 绝不会进入仓库。 */

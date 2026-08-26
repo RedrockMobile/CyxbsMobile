@@ -26,7 +26,7 @@ data class ScheduleDraft(
   val recurrence: RecurrenceRule? = null,
   val reminders: List<ScheduleReminder> = emptyList(),
   val todoState: ScheduleTodoState? = ScheduleTodoState.PENDING,
-  /** 创建来源和课表投射意图由入口决定，不属于弹窗中的可编辑字段。 */
+  /** 创建来源不可修改；清单归属和课表投射可由课表详情中的关联设置更新。 */
   val kind: ScheduleKind = ScheduleKind.TODO,
   val linkedToCourse: Boolean = false,
 )
@@ -66,6 +66,7 @@ fun ScheduleDraft.toUpdatedDomain(origin: Schedule, now: Instant): Schedule = or
   recurrence = recurrence,
   reminders = reminders,
   todoState = if (recurrence == null) todoState else todoState?.let { ScheduleTodoState.PENDING },
+  linkedToCourse = linkedToCourse,
   updatedAt = now,
 )
 

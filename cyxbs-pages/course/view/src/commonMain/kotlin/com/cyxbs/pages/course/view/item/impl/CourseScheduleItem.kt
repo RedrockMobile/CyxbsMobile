@@ -64,6 +64,7 @@ class CourseScheduleItem internal constructor(
   private fun Content(onClick: ((MinuteTimePair) -> Unit)?) {
     val accentColor = 0xFF7654C7.dark(0xFFD3C4FF)
     val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
+    val useTodoColors = occurrence.isInTodoList
     LayoutItemModifier.minimumVisualHeight.set(
       itemState,
       if (isDeadline) DEADLINE_VISUAL_HEIGHT else 0.dp,
@@ -72,8 +73,9 @@ class CourseScheduleItem internal constructor(
       itemState = itemState,
       topText = data.title,
       bottomText = data.description,
-      textColor = if (isAffair) LocalAppColors.current.tvLv2 else accentColor,
-      backgroundColor = if (isAffair) Color.Transparent else accentColor.copy(alpha = 0.12f),
+      // 清单归属决定配色，创建来源只决定是否保留事务条纹；两种视觉语义可以独立组合。
+      textColor = if (useTodoColors) accentColor else LocalAppColors.current.tvLv2,
+      backgroundColor = if (useTodoColors) accentColor.copy(alpha = 0.12f) else Color.Transparent,
       modifierList = if (isAffair) {
         remember { createCourseDefaultModifierList().add(AffairBackgroundItemModifier) }
       } else {
@@ -140,9 +142,12 @@ internal class ScheduleItemWhatTime(
     )
 
   override fun equals(other: Any?): Boolean =
-    other is ScheduleItemWhatTime && other.data.stableId == data.stableId
+    other is ScheduleItemWhatTime &&
+      other.data.stableId == data.stableId &&
+      // identity 相同时仍需比较展示数据，否则 reset 会沿用旧 Item，标题或关联配色无法即时刷新。
+      other.data.occurrence == data.occurrence
 
-  override fun hashCode(): Int = data.stableId.hashCode()
+  override fun hashCode(): Int = 31 * data.stableId.hashCode() + data.occurrence.hashCode()
 }
 
 /** 全天背景中的单条日程；平台包装决定点击后的详情容器。 */

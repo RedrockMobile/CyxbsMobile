@@ -53,6 +53,10 @@ private fun PreviewCompose() {
       contentDescription = null,
     )
     Image(
+      imageVector = rememberIcAddtodoRelation(),
+      contentDescription = null,
+    )
+    Image(
       imageVector = rememberIcDetailClassifyMore(),
       contentDescription = null,
     )
@@ -483,6 +487,48 @@ fun rememberIcAddtodoCategory(): ImageVector {
         arcToRelative(1f, 1f, 0f, true, true, -2f, 0f)
         arcToRelative(1f, 1f, 0f, true, true, 2f, 0f)
         close()
+      }
+    }.build()
+  }
+}
+
+/**
+ * 清单与课表关联图标，复用设计稿中蓝色方块内部的开口链节线稿。
+ *
+ * 与其余信息栏图标共用 20×20 坐标系和 2px 描边，避免小尺寸下出现线宽或视觉重心不一致。
+ */
+@Composable
+fun rememberIcAddtodoRelation(): ImageVector {
+  val color = 0xFF294169.dark(0xFFA1ADBD)
+  return remember(color) {
+    val brush = SolidColor(color)
+    ImageVector.Builder(
+      name = "TodoIcAddtodoRelation",
+      defaultWidth = ScheduleInfoIconSize,
+      defaultHeight = ScheduleInfoIconSize,
+      viewportWidth = ScheduleInfoIconViewport,
+      viewportHeight = ScheduleInfoIconViewport,
+    ).apply {
+      // 仅保留设计稿方块内部的链条，不绘制其蓝色圆角背景。
+      path(
+        stroke = brush,
+        strokeLineWidth = ScheduleInfoIconStrokeWidth,
+        strokeLineCap = StrokeCap.Round,
+        strokeLineJoin = StrokeJoin.Round,
+      ) {
+        // 左上链节。
+        moveTo(11.67f, 10.83f)
+        arcToRelative(4.17f, 4.17f, 0f, false, true, -6.28f, 0.45f)
+        lineToRelative(-2.5f, -2.5f)
+        arcToRelative(4.17f, 4.17f, 0f, false, true, 5.89f, -5.89f)
+        lineToRelative(1.43f, 1.43f)
+
+        // 右下链节。
+        moveTo(8.33f, 9.17f)
+        arcToRelative(4.17f, 4.17f, 0f, false, true, 6.28f, -0.45f)
+        lineToRelative(2.5f, 2.5f)
+        arcToRelative(4.17f, 4.17f, 0f, false, true, -5.89f, 5.89f)
+        lineToRelative(-1.43f, -1.43f)
       }
     }.build()
   }

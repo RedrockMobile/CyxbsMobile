@@ -100,6 +100,7 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryMutationMode
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.canSubmitScheduleMutation
+import com.cyxbs.pages.schedule.ui.category.mergeScheduleCategories
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
@@ -160,7 +161,7 @@ fun ScheduleTodoPage(
   val listState = rememberLazyListState()
   val coroutineScope = rememberCoroutineScope()
   val visibleCategories = remember(snapshot.categories) {
-    mergeScheduleTodoCategories(snapshot.categories)
+    mergeScheduleCategories(snapshot.categories)
   }
 
   var showCreateEditor by remember { mutableStateOf(false) }
@@ -530,14 +531,14 @@ fun ScheduleTodoPage(
   if (editorEnabled) {
     EditScheduleDialog(
       show = showCreateEditor,
-      categories = visibleCategories,
+      categoryRepository = viewModel.repository,
       onDismiss = { showCreateEditor = false },
-      onConfirm = { state, _ ->
+      onConfirm = { state, _, newCategory ->
         viewModel.saveSchedule(
           state,
           EditScope.ALL,
           null,
-          findMissingScheduleTodoDefaultCategory(state.categoryId, snapshot.categories),
+          newCategory,
         )
         showCreateEditor = false
       },
@@ -548,14 +549,14 @@ fun ScheduleTodoPage(
         editSchedule = item.schedule,
         editOccurrence = item.occurrence.toDomainOccurrence(),
         recurrenceId = item.occurrence.recurrenceId,
-        categories = visibleCategories,
+        categoryRepository = viewModel.repository,
         onDismiss = { editingIdentity = null },
-        onConfirm = { state, scope ->
+        onConfirm = { state, scope, newCategory ->
           viewModel.saveSchedule(
             state,
             scope,
             item.occurrence.recurrenceId,
-            findMissingScheduleTodoDefaultCategory(state.categoryId, snapshot.categories),
+            newCategory,
           )
           editingIdentity = null
         },
@@ -566,6 +567,13 @@ fun ScheduleTodoPage(
             item.occurrence.recurrenceId,
           )
           editingIdentity = null
+        },
+        onToggleCompleted = { completed ->
+          viewModel.completeSchedule(
+            item.schedule.id,
+            item.occurrence.recurrenceId,
+            completed,
+          )
         },
       )
     }

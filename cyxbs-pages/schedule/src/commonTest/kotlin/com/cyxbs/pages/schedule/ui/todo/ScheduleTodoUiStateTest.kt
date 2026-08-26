@@ -12,6 +12,10 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
+import com.cyxbs.pages.schedule.ui.category.ScheduleDefaultCategories
+import com.cyxbs.pages.schedule.ui.category.findMissingDefaultScheduleCategory
+import com.cyxbs.pages.schedule.ui.category.isFixedScheduleCategory
+import com.cyxbs.pages.schedule.ui.category.mergeScheduleCategories
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,24 +33,24 @@ class ScheduleTodoUiStateTest {
     val actualStudy = ScheduleCategory(CategoryId("actual-study"), 3, "学习", null, 9)
     val custom = ScheduleCategory(CategoryId("custom"), 2, "项目", null, 4)
 
-    val merged = mergeScheduleTodoCategories(listOf(custom, actualStudy))
+    val merged = mergeScheduleCategories(listOf(custom, actualStudy))
 
     assertEquals(listOf("学习", "生活", "其他", "项目"), merged.map { it.name })
     assertEquals(actualStudy.id, merged.first().id)
     assertEquals(
-      ScheduleTodoDefaultCategories[1],
-      findMissingScheduleTodoDefaultCategory(
-        ScheduleTodoDefaultCategories[1].id,
+      ScheduleDefaultCategories[1],
+      findMissingDefaultScheduleCategory(
+        ScheduleDefaultCategories[1].id,
         actual = listOf(custom, actualStudy),
       ),
     )
     assertEquals(
       null,
-      findMissingScheduleTodoDefaultCategory(actualStudy.id, listOf(custom, actualStudy)),
+      findMissingDefaultScheduleCategory(actualStudy.id, listOf(custom, actualStudy)),
     )
-    assertTrue(isScheduleTodoFixedCategory(actualStudy))
-    assertTrue(isScheduleTodoFixedCategory(ScheduleTodoDefaultCategories[1]))
-    assertFalse(isScheduleTodoFixedCategory(custom))
+    assertTrue(isFixedScheduleCategory(actualStudy))
+    assertTrue(isFixedScheduleCategory(ScheduleDefaultCategories[1]))
+    assertFalse(isFixedScheduleCategory(custom))
   }
 
   /** Deadline 展示时间点，Timed 保留完整起止区间，完成态仍进入独立分区。 */

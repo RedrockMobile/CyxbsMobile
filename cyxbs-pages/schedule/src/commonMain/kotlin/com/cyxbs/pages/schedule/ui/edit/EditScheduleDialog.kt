@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -24,11 +25,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
@@ -77,6 +81,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.imePaddingTarget
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
 import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
@@ -86,21 +91,26 @@ import com.cyxbs.pages.schedule.domain.model.ReminderChannel
 import com.cyxbs.pages.schedule.domain.model.ReminderId
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
-import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.model.ScheduleKind
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
+import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
+import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
+import com.cyxbs.pages.schedule.ui.category.rememberScheduleCategoryCatalog
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleConfirmDialog
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleCalendarArea
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRemindArea
 import com.cyxbs.pages.schedule.ui.edit.area.EditScheduleTimeArea
+import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoCompletedIndicatorColor
+import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoPendingIndicatorColor
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCalendar
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoCategory
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRelation
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import kotlinx.coroutines.flow.first
@@ -111,7 +121,7 @@ import kotlin.time.Instant
 /**
  * 添加 / 查看 / 编辑日程的统一底部弹窗 —— **邮子清单与课表共用同一套**，外观对齐课表事务(affair)。
  *
- * 形态（见与用户确认的文本草图）：标题行 + **紧凑信息栏**(日期·第N周·周几·时间段·重复·提醒·分类) + 备注。
+ * 形态（见与用户确认的文本草图）：标题行 + **紧凑信息栏**(日期·第N周·周几·时间段·重复·提醒·分类·关联) + 备注。
  * - 查看态(Show)：只读，右上 ✎ 编辑 / 🗑 删除。
  * - 编辑态(Edit)：标题/备注可输入；信息栏每段可点——下方区域就地切换：日期→日历、时间段→时分滚轮、
  *   重复→[com.cyxbs.pages.schedule.ui.edit.area.EditScheduleRecurrenceArea]、提醒→提前分钟选择、分类→分类选择
@@ -141,7 +151,7 @@ class EditScheduleDialogPreview : AppNavEntry<EditScheduleDialogNavArgument>() {
       editSchedule = previewSampleSchedule(),
       recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 4, 10, 0), "Asia/Shanghai", false),
       onDismiss = {},
-      onConfirm = { _, _ -> }
+      onConfirm = { _, _, _ -> }
     )
   }
 
@@ -165,14 +175,20 @@ fun EditScheduleDialog(
   /** 新建入口预填的时间；用于课表长按草稿，不会在打开弹窗时提前写仓库。 */
   creationTiming: ScheduleTiming? = null,
   recurrenceId: RecurrenceId? = null,
-  categories: List<ScheduleCategory> = emptyList(),
+  /** 默认使用进程共享仓库；Preview/mock 可注入其页面 ViewModel 使用的同一仓库。 */
+  categoryRepository: ScheduleRepository = ScheduleRepositoryProvider.repository,
   /** 弹窗外背景色；外部宿主可传透明，普通入口继续使用 Schedule 默认遮罩。 */
   scrimColor: Color? = null,
   /** true 时只绘制业务内容，由调用方提供外层 BottomSheet。 */
   embeddedInExternalHost: Boolean = false,
+  /** 是否展示课表专用的“关联清单/关联课表”设置入口。 */
+  showCourseRelation: Boolean = false,
   onDismiss: () -> Unit,
-  onConfirm: (EditScheduleModelState, EditScope) -> Unit,
+  /** 第三个参数仅在所选固定默认分类尚未落库时非空，调用方需沿用原子保存命令。 */
+  onConfirm: (EditScheduleModelState, EditScope, ScheduleCategory?) -> Unit,
   onDelete: ((EditScope) -> Unit)? = null,
+  /** 已保存清单的快速完成操作；重复项由调用方按当前 occurrence identity 更新。 */
+  onToggleCompleted: ((Boolean) -> Unit)? = null,
   /** 嵌入外部宿主时报告查看/编辑模式；普通 ScheduleBottomSheet 可忽略。 */
   onEditModeChanged: (Boolean) -> Unit = {},
 ) {
@@ -184,6 +200,7 @@ fun EditScheduleDialog(
     creationKind,
     creationTiming,
   )
+  val categoryCatalog = rememberScheduleCategoryCatalog(categoryRepository)
 
   var showUnsavedExit by remember { mutableStateOf(false) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }
@@ -191,12 +208,19 @@ fun EditScheduleDialog(
   // 开学第一天（周一）：用于推导第N周，一次会话读一次即可。
   val firstMonday = remember { SchoolCalendar.getFirstMonDay() }
   val needScope = editSchedule?.recurrence != null && recurrenceId != null
+  val confirm: (EditScope) -> Unit = { scope ->
+    onConfirm(
+      modelState,
+      scope,
+      categoryCatalog.findMissingDefaultCategory(modelState.categoryId),
+    )
+  }
 
   val requestDismiss = { if (modelState.isChanged) showUnsavedExit = true else onDismiss() }
   val doSave = {
     if (needScope) scopeChooser = ScopeAction.SAVE
     else {
-      onConfirm(modelState, EditScope.ALL)
+      confirm(EditScope.ALL)
       onDismiss()
     }
   }
@@ -223,10 +247,12 @@ fun EditScheduleDialog(
       ScheduleContent(
         modelState = modelState,
         firstMonday = firstMonday,
-        categories = categories,
+        categories = categoryCatalog.selectableCategories,
+        showCourseRelation = showCourseRelation,
         onSave = doSave,
         onCancel = requestDismiss,
         onDelete = doDelete,
+        onToggleCompleted = onToggleCompleted,
         onEditModeChanged = onEditModeChanged,
       )
     }
@@ -254,7 +280,7 @@ fun EditScheduleDialog(
     onDismiss = { scopeChooser = null },
     onChoose = { scope ->
       when (scopeChooser) {
-        ScopeAction.SAVE -> onConfirm(modelState, scope)
+        ScopeAction.SAVE -> confirm(scope)
         ScopeAction.DELETE -> onDelete?.invoke(scope)
         null -> {}
       }
@@ -285,7 +311,8 @@ private sealed interface ScheduleUi {
   /**
    * 编辑弹窗内部区域的状态机，统一描述标题下方当前展示的子编辑器。
    * [Note] 为默认备注区，[Date]/[Time]/[Repeat]/[Remind]/[Category] 分别承载日期、时间、重复、提醒与分类编辑；
-   * 点击信息栏只切换区域，所有改动立即写回同一个 [EditScheduleModelState]，返回 [Note] 不回滚。
+   * 课表关联是信息栏中的直接开关，不需要额外子区域。
+   * 除关联开关外，点击信息栏会切换子区域；所有改动都立即写回同一个 [EditScheduleModelState]，返回 [Note] 不回滚。
    * 作用范围选择是提交/删除前的独立状态，不与本区域状态混用，避免子编辑返回被误判为关闭弹窗。
    */
   sealed interface Edit : ScheduleUi {
@@ -303,9 +330,11 @@ private fun ScheduleContent(
   modelState: EditScheduleModelState,
   firstMonday: Date?,
   categories: List<ScheduleCategory>,
+  showCourseRelation: Boolean,
   onSave: () -> Unit,
   onCancel: () -> Unit,
   onDelete: () -> Unit,
+  onToggleCompleted: ((Boolean) -> Unit)?,
   onEditModeChanged: (Boolean) -> Unit,
 ) {
   val colors = LocalAppColors.current
@@ -324,6 +353,14 @@ private fun ScheduleContent(
   // 标题或备注获得焦点时，标题、信息栏和备注作为一个整体露出到键盘上方。
   Column(modifier = Modifier.imePaddingTarget()) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      if (modelState.origin?.todoState != null && onToggleCompleted != null) {
+        ScheduleCompletionCircle(
+          completed = modelState.isOccurrenceCompleted,
+          enabled = uiState is ScheduleUi.Show,
+          onClick = { onToggleCompleted(!modelState.isOccurrenceCompleted) },
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+      }
       Box(modifier = Modifier.weight(1f)) {
         val focusRequester = remember { FocusRequester() }
         BasicTextField(
@@ -382,12 +419,14 @@ private fun ScheduleContent(
       modelState = modelState,
       firstMonday = firstMonday,
       categories = categories,
+      showCourseRelation = showCourseRelation,
       editable = uiState is ScheduleUi.Edit,
       onClickDate = { uiState = ScheduleUi.Edit.Date },
       onClickTime = { uiState = ScheduleUi.Edit.Time },
       onClickRepeat = { uiState = ScheduleUi.Edit.Repeat },
       onClickRemind = { uiState = ScheduleUi.Edit.Remind },
       onClickCategory = { uiState = ScheduleUi.Edit.Category },
+      onClickRelation = modelState::toggleCourseRelation,
     )
     Spacer(modifier = Modifier.height(10.dp))
     if (uiState is ScheduleUi.Show || uiState is ScheduleUi.Edit.Note) {
@@ -437,6 +476,37 @@ private fun ScheduleContent(
     )
   }
   Spacer(modifier = Modifier.height(16.dp))
+}
+
+/**
+ * 标题左侧的清单完成按钮。
+ *
+ * 查看态直接执行快速完成命令；编辑态只保留视觉状态并禁用点击，避免日程从当前列表消失时丢失未保存输入。
+ */
+@Composable
+private fun ScheduleCompletionCircle(
+  completed: Boolean,
+  enabled: Boolean,
+  onClick: () -> Unit,
+) {
+  val colors = LocalAppColors.current
+  Box(
+    modifier = Modifier
+      .size(24.dp)
+      .then(if (enabled) Modifier.clickableNoIndicator(onClick = onClick) else Modifier),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+      imageVector = if (completed) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+      contentDescription = if (completed) "恢复未完成" else "标记完成",
+      tint = when {
+        !MaterialTheme.colors.isLight -> colors.tvLv3.copy(alpha = 0.46f)
+        completed -> ScheduleTodoCompletedIndicatorColor
+        else -> ScheduleTodoPendingIndicatorColor
+      },
+      modifier = Modifier.size(if (completed) 22.dp else 24.dp),
+    )
+  }
 }
 
 /**
@@ -528,12 +598,14 @@ private fun InfoRow(
   modelState: EditScheduleModelState,
   firstMonday: Date?,
   categories: List<ScheduleCategory>,
+  showCourseRelation: Boolean,
   editable: Boolean,
   onClickDate: () -> Unit = {},
   onClickTime: () -> Unit = {},
   onClickRepeat: () -> Unit = {},
   onClickRemind: () -> Unit = {},
   onClickCategory: () -> Unit = {},
+  onClickRelation: () -> Unit = {},
 ) {
   val date = modelState.anchorDate
   val colors = LocalAppColors.current
@@ -631,6 +703,33 @@ private fun InfoRow(
       onClick = if (editable && categories.isNotEmpty()) onClickCategory else null,
     )
   }
+  // 🔗课表/清单关联；来源类型固定，只展示当前关系，不把领域枚举泄漏到课表模块。
+  val relationIcon = rememberIcAddtodoRelation()
+  val relationSegment = remember(
+    colors,
+    editable,
+    modelState.kind,
+    modelState.isInTodoList,
+    modelState.linkedToCourse,
+    relationIcon,
+    onClickRelation,
+  ) {
+    val linked = when (modelState.kind) {
+      ScheduleKind.TODO -> modelState.linkedToCourse
+      ScheduleKind.AFFAIR -> modelState.isInTodoList
+    }
+    val text = when (modelState.kind) {
+      ScheduleKind.TODO -> if (linked) "已关联课表" else "未关联课表"
+      ScheduleKind.AFFAIR -> if (linked) "已关联清单" else "未关联清单"
+    }
+    InfoTextSegment(
+      id = "relation",
+      text = text,
+      icon = relationIcon,
+      color = if (linked) colors.tvLv2 else placeholderColor,
+      onClick = if (editable) onClickRelation else null,
+    )
+  }
 
   BalancedInfoRow(
     modifier = Modifier.fillMaxWidth(),
@@ -644,7 +743,12 @@ private fun InfoRow(
       inlineContent = dateSegment.inlineContent + timeSegment.inlineContent,
       maxLines = 1,
     )
-    (listOf(repeatSegment, remindSegment) + listOf(categorySegment)).forEach {
+    buildList {
+      add(repeatSegment)
+      add(remindSegment)
+      add(categorySegment)
+      if (showCourseRelation) add(relationSegment)
+    }.forEach {
       BasicText(
         text = it.annotatedText,
         style = TextStyle(fontSize = 13.sp, lineHeight = 13.sp, color = colors.tvLv2),

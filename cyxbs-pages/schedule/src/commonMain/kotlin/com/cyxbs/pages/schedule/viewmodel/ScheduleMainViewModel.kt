@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
  * 是否允许编辑只取决于当前账号是否存在 local-first delegate，不能由一次同步状态动态改变。
  */
 class ScheduleMainViewModel(
-  private val repository: ScheduleRepository = ScheduleRepositoryProvider.repository,
+  /** 页面与其共享编辑弹窗必须使用同一仓库；internal 仅用于同模块 UI 依赖注入，不暴露存储实现。 */
+  internal val repository: ScheduleRepository = ScheduleRepositoryProvider.repository,
 ) : BaseViewModel() {
   val snapshot: StateFlow<ScheduleSnapshot> = repository.snapshot
 
@@ -85,23 +86,12 @@ class ScheduleMainViewModel(
   fun completeSchedule(id: ScheduleId, recurrenceId: RecurrenceId?, completed: Boolean = true) =
     launchByViewModelScope {
       if (!canSubmitMutation()) return@launchByViewModelScope
-      if (recurrenceId == null) repository.execute(ScheduleCommand.CompleteNonRepeating(id, completed))
-      else {
-        val now = ScheduleRepositoryProvider.clock.now()
-        val existing = snapshot.value.exceptions.firstOrNull {
-          it.scheduleId == id && it.recurrenceId == recurrenceId
-        }
-        repository.execute(ScheduleCommand.UpsertOccurrenceException(
-          existing?.copy(
-            status = if (completed) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
-            updatedAt = now,
-          ) ?: ScheduleOccurrenceException(
-            id, recurrenceId, 0,
-            if (completed) OccurrenceStatus.COMPLETED else OccurrenceStatus.ACTIVE,
-            null, now, now,
-          )
-        ))
-      }
+      repository.applyScheduleCompletion(
+        scheduleId = id,
+        recurrenceId = recurrenceId,
+        completed = completed,
+        clock = ScheduleRepositoryProvider.clock,
+      )
     }
 
   /**
