@@ -20,6 +20,7 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)
+      implementation(libs.filekit.dialogs)
       implementation(libs.photoView)
       implementation(libs.slideShow)
       implementation(libs.glide)

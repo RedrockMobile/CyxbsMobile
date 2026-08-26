@@ -5,16 +5,18 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -268,7 +270,6 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WorkspaceHomeScreen(
   historicalProjects: List<HistoricalCodeProject>?,
@@ -289,6 +290,7 @@ private fun WorkspaceHomeScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .windowInsetsPadding(WindowInsets.safeDrawing)
         .padding(horizontal = 24.dp, vertical = 20.dp),
     ) {
       Text(
@@ -429,7 +431,9 @@ internal fun WorkspaceProjectLoading(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * 入口操作始终保持单行双列；外层限制桌面最大宽度，卡片在手机上平分剩余空间而不会换行。
+ */
 @Composable
 private fun WorkspaceActions(
   enabled: Boolean,
@@ -437,25 +441,33 @@ private fun WorkspaceActions(
   onOpenTutorial: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  FlowRow(
+  Box(
     modifier = modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-    verticalArrangement = Arrangement.spacedBy(12.dp),
+    contentAlignment = Alignment.Center,
   ) {
-    WorkspaceActionCard(
-      title = "创建项目",
-      description = "选择语言并创建本地项目目录",
-      icon = { Icon(Icons.Default.Add, contentDescription = null) },
-      enabled = enabled,
-      onClick = onCreateProject,
-    )
-    WorkspaceActionCard(
-      title = "打开教程",
-      description = "选择语言并继续课程进度",
-      icon = { Icon(Icons.Default.School, contentDescription = null) },
-      enabled = enabled,
-      onClick = onOpenTutorial,
-    )
+    Row(
+      modifier = Modifier
+        .widthIn(max = 512.dp)
+        .fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      WorkspaceActionCard(
+        title = "创建项目",
+        description = "选择语言并创建本地项目目录",
+        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+        enabled = enabled,
+        onClick = onCreateProject,
+        modifier = Modifier.weight(1f),
+      )
+      WorkspaceActionCard(
+        title = "打开教程",
+        description = "选择语言并继续课程进度",
+        icon = { Icon(Icons.Default.School, contentDescription = null) },
+        enabled = enabled,
+        onClick = onOpenTutorial,
+        modifier = Modifier.weight(1f),
+      )
+    }
   }
 }
 
@@ -466,21 +478,21 @@ private fun WorkspaceActionCard(
   icon: @Composable () -> Unit,
   enabled: Boolean,
   onClick: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   Surface(
-    modifier = Modifier
-      .width(250.dp)
+    modifier = modifier
       .height(82.dp)
       .clickable(enabled = enabled, onClick = onClick),
     shape = RoundedCornerShape(12.dp),
     color = WorkspaceHomeColors.panel,
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 16.dp),
+      modifier = Modifier.padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Surface(
-        modifier = Modifier.size(38.dp),
+        modifier = Modifier.size(34.dp),
         shape = RoundedCornerShape(10.dp),
         color = WorkspaceHomeColors.accent.copy(alpha = 0.16f),
         contentColor = WorkspaceHomeColors.accent,
@@ -489,7 +501,7 @@ private fun WorkspaceActionCard(
           icon()
         }
       }
-      Spacer(Modifier.width(12.dp))
+      Spacer(Modifier.width(8.dp))
       Column {
         Text(
           text = title,

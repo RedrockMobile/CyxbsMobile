@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import androidx.activity.ComponentActivity
 import androidx.annotation.CallSuper
 import com.cyxbs.components.base.crash.CrashMonitor
 import com.cyxbs.components.config.init.InitialManager
@@ -15,6 +16,8 @@ import com.cyxbs.components.init.appApplication
 import com.cyxbs.components.init.appCurrentProcessName
 import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.utils.utils.impl.ActivityLifecycleCallbacksImpl
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.init
 import java.lang.ref.WeakReference
 
 /**
@@ -74,6 +77,10 @@ abstract class BaseApp : Application() {
     registerActivityLifecycleCallbacks(
       object : ActivityLifecycleCallbacksImpl {
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+          // FileKit 的目录选择器依赖 ActivityResultRegistry；在宿主 Activity 创建后统一完成注册。
+          if (activity is ComponentActivity) {
+            FileKit.init(activity)
+          }
           appTopActivity = WeakReference(activity)
           appActivities[activity] = Unit
         }

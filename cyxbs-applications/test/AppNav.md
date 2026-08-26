@@ -78,10 +78,19 @@ object fields:
 
 ## :cyxbs-functions:code:editor
 
-### code/editor-test
+### code/editor/workspace
 
 - entry: `com.cyxbs.functions.code.editor.preview.CodeEditorTestNavEntry`
 - argument: `com.cyxbs.functions.code.editor.preview.CodeEditorTestNavArgument`
+
+```text
+deeplink: cyxbs://code/editor/workspace?projectId=[String?]&tutorialLanguageId=[String?]
+```
+
+### code/editor-test
+
+- entry: `com.cyxbs.functions.code.editor.preview.CodeWorkspaceHomeNavEntry`
+- argument: `com.cyxbs.functions.code.editor.preview.CodeWorkspaceHomeNavArgument`
 
 ```text
 deeplink: cyxbs://code/editor-test
