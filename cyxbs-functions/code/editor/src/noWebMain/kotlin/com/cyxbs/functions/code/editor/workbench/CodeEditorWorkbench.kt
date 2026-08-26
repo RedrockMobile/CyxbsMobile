@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -72,6 +73,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -127,6 +130,7 @@ import kotlin.math.roundToInt
  * @param dirtyDocumentLabels 尚未成功持久化的文档标识；对应标签会显示小圆点提示。
  * @param breadcrumbs 当前文档的路径导航；为空时根据 [activeDocumentLabel] 生成。
  * @param onDocumentSelected 点击标签后的切换回调；为空时标签仅用于展示。
+ * @param onDocumentCloseRequested 点击标签关闭图标后的回调；为空时不展示关闭入口。
  * @param documentIcon 文档标签图标槽位；调用方可按文件路径提供语言图标，为空时使用通用圆点。
  * @param sidePanels 可用侧边能力，顺序决定活动栏顺序。
  * @param toolWindows 可用底部工具窗口，顺序决定底部按钮顺序。
@@ -155,6 +159,7 @@ fun CodeEditorWorkbench(
   dirtyDocumentLabels: Set<String> = emptySet(),
   breadcrumbs: List<String> = emptyList(),
   onDocumentSelected: ((String) -> Unit)? = null,
+  onDocumentCloseRequested: ((String) -> Unit)? = null,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)? = null,
   layoutPolicy: CodeEditorWorkbenchLayoutPolicy = DefaultCodeEditorWorkbenchLayoutPolicy,
   isRunning: Boolean = false,
@@ -271,6 +276,7 @@ fun CodeEditorWorkbench(
           dirtyDocumentLabels = dirtyDocumentLabels,
           breadcrumbs = breadcrumbs,
           onDocumentSelected = onDocumentSelected,
+          onDocumentCloseRequested = onDocumentCloseRequested,
           documentIcon = documentIcon,
           toolWindows = toolWindows,
           selectedToolWindow = selectedToolWindow,
@@ -342,6 +348,7 @@ private fun EditorAndToolWindow(
   dirtyDocumentLabels: Set<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
+  onDocumentCloseRequested: ((String) -> Unit)?,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
   toolWindows: List<CodeEditorToolWindow>,
   selectedToolWindow: CodeEditorToolWindow?,
@@ -384,6 +391,7 @@ private fun EditorAndToolWindow(
         dirtyDocumentLabels = dirtyDocumentLabels,
         breadcrumbs = breadcrumbs,
         onDocumentSelected = onDocumentSelected,
+        onDocumentCloseRequested = onDocumentCloseRequested,
         documentIcon = documentIcon,
       )
       Box(
@@ -670,6 +678,7 @@ private fun EditorDocumentBar(
   dirtyDocumentLabels: Set<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
+  onDocumentCloseRequested: ((String) -> Unit)?,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
 ) {
   val documents = openDocumentLabels.distinct().ifEmpty { listOf(activeDocumentLabel) }
@@ -717,6 +726,8 @@ private fun EditorDocumentBar(
       documents.forEach { document ->
         val selected = document == activeDocumentLabel
         val isDirty = document in dirtyDocumentLabels
+        val closeDocument = onDocumentCloseRequested
+        val canClose = closeDocument != null && documents.size > 1
         val bringIntoViewRequester = remember(document) { BringIntoViewRequester() }
         // 文件切换可能来自侧栏、定义跳转或标签点击，统一确保新标签完整进入横向可视区域。
         LaunchedEffect(selected) {
@@ -729,6 +740,24 @@ private fun EditorDocumentBar(
               if (tabWidthsPx[document] != size.width) tabWidthsPx[document] = size.width
             }
             .bringIntoViewRequester(bringIntoViewRequester)
+            .then(
+              if (!canClose) {
+                Modifier
+              } else {
+                Modifier.pointerInput(document, closeDocument) {
+                  awaitPointerEventScope {
+                    while (true) {
+                      val event = awaitPointerEvent()
+                      if (event.type == PointerEventType.Press && event.buttons.isTertiaryPressed) {
+                        // 中键只关闭标签，不再让同一次按下触发父级文件切换。
+                        event.changes.forEach { change -> change.consume() }
+                        closeDocument(document)
+                      }
+                    }
+                  }
+                }
+              },
+            )
             .then(
               if (selected) {
                 Modifier.background(
@@ -769,6 +798,26 @@ private fun EditorDocumentBar(
                 .size(5.dp)
                 .background(EditorWorkbenchColors.FileIndicator, CircleShape),
             )
+          }
+          if (canClose) {
+            Box(
+              modifier = Modifier
+                .padding(start = 3.dp)
+                .size(18.dp)
+                .clickable { closeDocument(document) },
+              contentAlignment = Alignment.Center,
+            ) {
+              Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "关闭 ${document.substringAfterLast('/')}",
+                tint = if (selected) {
+                  EditorWorkbenchColors.SecondaryText
+                } else {
+                  EditorWorkbenchColors.MutedText
+                },
+                modifier = Modifier.size(12.dp),
+              )
+            }
           }
         }
       }

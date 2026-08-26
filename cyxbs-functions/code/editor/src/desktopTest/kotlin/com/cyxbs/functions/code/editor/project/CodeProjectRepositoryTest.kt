@@ -68,6 +68,59 @@ class CodeProjectRepositoryTest {
   }
 
   @Test
+  fun restoresEditorSessionAndRemovesStaleFiles() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "恢复标签",
+    )
+    val projectId = workspace.project.projectId
+    assertTrue(repository.createFile(projectId, "src/Second.java", "class Second {}"))
+    repository.saveEditorSession(
+      CodeProjectEditorSession(
+        projectId = projectId,
+        openFilePaths = listOf("src/Main.java", "src/Second.java", "src/Removed.java"),
+        activeFilePath = "src/Second.java",
+        cursorPositions = mapOf(
+          "src/Main.java" to 10_000,
+          "src/Second.java" to 6,
+          "src/Removed.java" to 3,
+        ),
+      ),
+    )
+    Files.delete(root.resolve(projectId).resolve("src/Second.java"))
+    val reopened = repository.openProject(projectId)
+
+    val session = requireNotNull(repository.loadEditorSession(projectId, reopened.sourceFiles))
+
+    assertEquals(listOf("src/Main.java"), session.openFilePaths)
+    assertEquals("src/Main.java", session.activeFilePath)
+    assertEquals(reopened.sourceFiles.getValue("src/Main.java").length, session.cursorPositions["src/Main.java"])
+    assertFalse(session.cursorPositions.containsKey("src/Removed.java"))
+  }
+
+  @Test
+  fun forgettingProjectAlsoRemovesEditorSession() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "清理标签",
+    )
+    repository.saveEditorSession(
+      CodeProjectEditorSession(
+        projectId = workspace.project.projectId,
+        openFilePaths = listOf(workspace.activeFilePath),
+        activeFilePath = workspace.activeFilePath,
+      ),
+    )
+
+    repository.forgetProject(workspace.project.projectId)
+
+    assertEquals(
+      null,
+      repository.loadEditorSession(workspace.project.projectId, workspace.sourceFiles),
+    )
+  }
+
+  @Test
   fun restoresProjectFromManifestAfterApplicationSettingsAreLost() = runBlocking {
     val created = repository.createProject(
       requireNotNull(CodeProjectTemplates.find("java")),

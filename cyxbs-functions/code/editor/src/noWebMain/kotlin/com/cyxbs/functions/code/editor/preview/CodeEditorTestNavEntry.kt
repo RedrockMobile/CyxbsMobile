@@ -51,6 +51,7 @@ import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestS
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTutorialSidePanel
 import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
 import com.cyxbs.functions.code.editor.project.CodeProjectFileRename
+import com.cyxbs.functions.code.editor.project.CodeProjectEditorSession
 import com.cyxbs.functions.code.editor.project.CodeProjectRepository
 import com.cyxbs.functions.code.editor.project.CodeProjectSourceConflictException
 import com.cyxbs.functions.code.editor.project.CodeProjectTemplates
@@ -135,6 +136,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var loadedProjectWorkspace by remember(argument.projectId) {
       mutableStateOf<CodeProjectWorkspace?>(null)
     }
+    var loadedProjectSession by remember(argument.projectId) {
+      mutableStateOf<CodeProjectEditorSession?>(null)
+    }
     var projectLoadError by remember(argument.projectId) { mutableStateOf<String?>(null) }
     var projectLoadGeneration by remember(argument.projectId) { mutableStateOf(0) }
 
@@ -142,8 +146,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     LaunchedEffect(argument.projectId, projectLoadGeneration) {
       val projectId = argument.projectId ?: return@LaunchedEffect
       projectLoadError = null
-      runCatching { projectRepository.openProject(projectId) }
-        .onSuccess { loadedProjectWorkspace = it }
+      runCatching {
+        val workspace = projectRepository.openProject(projectId)
+        workspace to projectRepository.loadEditorSession(projectId, workspace.sourceFiles)
+      }
+        .onSuccess { (workspace, session) ->
+          loadedProjectSession = session
+          loadedProjectWorkspace = workspace
+        }
         .onFailure { projectLoadError = it.message ?: "本地项目读取失败。" }
     }
     if (argument.projectId != null && loadedProjectWorkspace == null) {
@@ -158,7 +168,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val initialTemplate = CodeProjectTemplates.find(argument.tutorialLanguageId.orEmpty())
       ?: CodeProjectTemplates.all.first()
     val initialSourceFiles = loadedProjectWorkspace?.sourceFiles ?: initialTemplate.sourceFiles
-    val initialActiveFilePath = loadedProjectWorkspace?.activeFilePath ?: initialTemplate.activeFilePath
+    val initialActiveFilePath = loadedProjectSession?.activeFilePath
+      ?: loadedProjectWorkspace?.activeFilePath
+      ?: initialTemplate.activeFilePath
     // 真实项目只提供项目工具；教程目录、进度和引导仅属于教程或原实验工作区。
     val isTutorialWorkspace = argument.projectId == null
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
@@ -216,7 +228,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     }
     val openFilePaths = remember(argument.projectId, argument.tutorialLanguageId) {
-      mutableStateListOf(initialActiveFilePath)
+      mutableStateListOf<String>().apply {
+        addAll(loadedProjectSession?.openFilePaths.orEmpty().ifEmpty { listOf(initialActiveFilePath) })
+      }
+    }
+    val cursorPositions = remember(argument.projectId, argument.tutorialLanguageId) {
+      mutableStateMapOf<String, Int>().apply {
+        putAll(loadedProjectSession?.cursorPositions.orEmpty())
+      }
     }
     var activeFilePath by remember(argument.projectId, argument.tutorialLanguageId) {
       mutableStateOf(initialActiveFilePath)
@@ -245,6 +264,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val editorState = rememberCodeEditorState(
       initialCode = initialSourceFiles.getValue(initialActiveFilePath),
       activeFilePath = activeFilePath,
+      initialCursorPosition = cursorPositions[initialActiveFilePath],
       workspace = workspace,
       languageService = activeLanguageService,
       highlightCacheCapacity = highlightCacheCapacity,
@@ -264,9 +284,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     var isResolvingSourceConflict by remember(argument.projectId) { mutableStateOf(false) }
 
     /** 将普通保存冲突提升为显式选择，其他异常仍写入 Run 输出区。 */
-    fun reportProjectSaveFailure(filePath: String, title: String, throwable: Throwable) {
+    fun reportProjectSaveFailure(
+      filePath: String,
+      title: String,
+      throwable: Throwable,
+      onConflictResolved: (() -> Unit)? = null,
+    ) {
       if (throwable is CodeProjectSourceConflictException && pendingSourceConflict == null) {
-        pendingSourceConflict = ProjectSourceConflict(filePath)
+        pendingSourceConflict = ProjectSourceConflict(filePath, onConflictResolved)
       }
       output = throwable.toFailureText(title)
     }
@@ -292,12 +317,21 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
     /** 保存当前文本后切换独立文件会话；普通切换保留光标，跨文件定义则定位到指定区间。 */
     fun openFile(filePath: String, selection: DynamicTextRange? = null) {
+      if (filePath == activeFilePath) {
+        selection?.let(editorState::selectRange)
+        return
+      }
       val previousFilePath = activeFilePath
       val previousSource = editorState.code
+      cursorPositions[previousFilePath] = editorState.cursorPosition
       sourceFiles[previousFilePath] = previousSource
       val targetSource = sourceFiles[filePath] ?: error("文件不存在：$filePath")
       if (filePath !in openFilePaths) openFilePaths += filePath
-      editorState.replaceDocument(filePath, targetSource, selection?.from)
+      editorState.replaceDocument(
+        filePath = filePath,
+        source = targetSource,
+        cursorPosition = selection?.from ?: cursorPositions[filePath],
+      )
       activeFilePath = filePath
       selection?.let(editorState::selectRange)
       argument.projectId?.let { projectId ->
@@ -318,6 +352,39 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     }
 
+    /** 构造可写入 Settings 的当前项目会话，并把活动光标合并进文件级缓存。 */
+    fun currentProjectEditorSession(projectId: String): CodeProjectEditorSession {
+      val currentCursorPositions = cursorPositions.toMutableMap().apply {
+        this[activeFilePath] = editorState.cursorPosition
+      }
+      return CodeProjectEditorSession(
+        projectId = projectId,
+        openFilePaths = openFilePaths.toList(),
+        activeFilePath = activeFilePath,
+        cursorPositions = currentCursorPositions,
+      )
+    }
+
+    /**
+     * 冲刷活动源码和编辑会话；返回、切换项目等会离开页面的操作必须等待它成功。
+     * 外部修改冲突由调用方转交统一冲突对话框，不能在这里强制覆盖。
+     */
+    suspend fun flushActiveProjectState(projectId: String) {
+      val filePath = activeFilePath
+      val source = editorState.code
+      cursorPositions[filePath] = editorState.cursorPosition
+      projectRepository.saveSource(
+        projectId = projectId,
+        relativePath = filePath,
+        source = source,
+        expectedSource = persistedSourceFiles[filePath],
+      )
+      sourceFiles[filePath] = source
+      persistedSourceFiles[filePath] = source
+      projectRepository.updateActiveFile(projectId, filePath)
+      projectRepository.saveEditorSession(currentProjectEditorSession(projectId))
+    }
+
     /** 用恢复结果整体替换编辑器工作区，确保课时切换不会混入上一课时文件。 */
     fun applyTutorialResumeState(
       course: DynamicTutorialCourse,
@@ -333,6 +400,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       directoryPaths.clear()
       openFilePaths.clear()
       openFilePaths += resumeState.activeFilePath
+      cursorPositions.clear()
       editorState.replaceDocument(resumeState.activeFilePath, activeSource)
       activeFilePath = resumeState.activeFilePath
       activeTutorial = ActiveCodeEditorTutorial(
@@ -548,20 +616,54 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     LaunchedEffect(argument.projectId, editorState, activeFilePath) {
       val projectId = argument.projectId ?: return@LaunchedEffect
       val requestedFilePath = activeFilePath
-      snapshotFlow { editorState.code }.collectLatest { source ->
-        delay(PROJECT_SOURCE_SAVE_DELAY_MILLIS)
-        try {
-          projectRepository.saveSource(
-            projectId = projectId,
-            relativePath = requestedFilePath,
-            source = source,
-            expectedSource = persistedSourceFiles[requestedFilePath],
-          )
-          persistedSourceFiles[requestedFilePath] = source
-          if (activeFilePath == requestedFilePath) sourceFiles[requestedFilePath] = source
-        } catch (throwable: Throwable) {
-          if (throwable is CancellationException) throw throwable
-          reportProjectSaveFailure(requestedFilePath, "项目文件自动保存失败", throwable)
+      var lastSource: String? = null
+      try {
+        snapshotFlow { editorState.code }.collectLatest { source ->
+          lastSource = source
+          delay(PROJECT_SOURCE_SAVE_DELAY_MILLIS)
+          try {
+            projectRepository.saveSource(
+              projectId = projectId,
+              relativePath = requestedFilePath,
+              source = source,
+              expectedSource = persistedSourceFiles[requestedFilePath],
+            )
+            persistedSourceFiles[requestedFilePath] = source
+            if (activeFilePath == requestedFilePath) sourceFiles[requestedFilePath] = source
+          } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            reportProjectSaveFailure(requestedFilePath, "项目文件自动保存失败", throwable)
+          }
+        }
+      } finally {
+        withContext(NonCancellable) {
+          lastSource?.let { source ->
+            runCatching {
+              projectRepository.saveSource(
+                projectId = projectId,
+                relativePath = requestedFilePath,
+                source = source,
+                expectedSource = persistedSourceFiles[requestedFilePath],
+              )
+            }
+          }
+        }
+      }
+    }
+
+    // 项目标签、活动文件和光标独立于源码自动保存；离开页面时在 NonCancellable 中冲刷最后快照。
+    LaunchedEffect(argument.projectId, editorState) {
+      val projectId = argument.projectId ?: return@LaunchedEffect
+      var lastSession: CodeProjectEditorSession? = null
+      try {
+        snapshotFlow { currentProjectEditorSession(projectId) }.collectLatest { session ->
+          lastSession = session
+          delay(PROJECT_SESSION_SAVE_DELAY_MILLIS)
+          projectRepository.saveEditorSession(session)
+        }
+      } finally {
+        withContext(NonCancellable) {
+          lastSession?.let { session -> runCatching { projectRepository.saveEditorSession(session) } }
         }
       }
     }
@@ -856,6 +958,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         .mapNotNull(openPathMapper)
         .filter(refreshed.sourceFiles::containsKey)
         .distinct()
+      val mappedCursorPositions = cursorPositions.mapNotNull { (path, position) ->
+        val mappedPath = openPathMapper(path) ?: return@mapNotNull null
+        val source = refreshed.sourceFiles[mappedPath] ?: return@mapNotNull null
+        mappedPath to position.coerceIn(0, source.length)
+      }.toMap()
       sourceFiles.clear()
       sourceFiles.putAll(refreshed.sourceFiles)
       persistedSourceFiles.clear()
@@ -865,9 +972,12 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       openFilePaths.clear()
       openFilePaths.addAll(mappedOpenPaths)
       if (refreshed.activeFilePath !in openFilePaths) openFilePaths += refreshed.activeFilePath
+      cursorPositions.clear()
+      cursorPositions.putAll(mappedCursorPositions)
       editorState.replaceDocument(
         refreshed.activeFilePath,
         refreshed.sourceFiles.getValue(refreshed.activeFilePath),
+        cursorPositions[refreshed.activeFilePath],
       )
       activeFilePath = refreshed.activeFilePath
       loadedProjectWorkspace = refreshed
@@ -892,6 +1002,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           }
           pendingSourceConflict = null
           output = "已重新加载磁盘版本：${conflict.filePath}"
+          conflict.onResolved?.invoke()
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           output = throwable.toFailureText("重新加载磁盘文件失败")
@@ -913,6 +1024,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           persistedSourceFiles[conflict.filePath] = editorSource
           pendingSourceConflict = null
           output = "已用编辑器内容覆盖磁盘版本：${conflict.filePath}"
+          conflict.onResolved?.invoke()
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           output = throwable.toFailureText("覆盖磁盘文件失败")
@@ -937,12 +1049,102 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           applyProjectWorkspaceSnapshot(refreshed)
           pendingSourceConflict = null
           output = "已另存冲突副本：${refreshed.activeFilePath}"
+          conflict.onResolved?.invoke()
         } catch (throwable: Throwable) {
           if (throwable is CancellationException) throw throwable
           output = throwable.toFailureText("另存冲突副本失败")
         } finally {
           isResolvingSourceConflict = false
         }
+      }
+    }
+
+    /** 从标签栏移除文件；关闭活动标签时选择右侧优先、左侧兜底的相邻文件。 */
+    fun closeDocumentWithoutSaving(filePath: String) {
+      if (openFilePaths.size <= 1) {
+        output = "至少需要保留一个打开的文件标签。"
+        return
+      }
+      val closingIndex = openFilePaths.indexOf(filePath)
+      if (closingIndex < 0) return
+      if (filePath != activeFilePath) {
+        openFilePaths.removeAt(closingIndex)
+        cursorPositions.remove(filePath)
+        return
+      }
+
+      cursorPositions[filePath] = editorState.cursorPosition
+      val nextFilePath = openFilePaths.getOrNull(closingIndex + 1)
+        ?: openFilePaths.getOrNull(closingIndex - 1)
+        ?: return
+      openFilePaths.removeAt(closingIndex)
+      cursorPositions.remove(filePath)
+      val nextSource = sourceFiles.getValue(nextFilePath)
+      editorState.replaceDocument(nextFilePath, nextSource, cursorPositions[nextFilePath])
+      activeFilePath = nextFilePath
+      argument.projectId?.let { projectId ->
+        coroutineScope.launch {
+          runCatching { projectRepository.updateActiveFile(projectId, nextFilePath) }
+            .onFailure { throwable -> output = throwable.toFailureText("活动文件更新失败") }
+        }
+      }
+    }
+
+    /** 关闭标签前保存活动文件；发生外部冲突时，解决后自动重试关闭。 */
+    fun closeDocument(filePath: String) {
+      if (filePath !in openFilePaths || openFilePaths.size <= 1) {
+        closeDocumentWithoutSaving(filePath)
+        return
+      }
+      if (filePath != activeFilePath || argument.projectId == null) {
+        if (filePath == activeFilePath) sourceFiles[filePath] = editorState.code
+        closeDocumentWithoutSaving(filePath)
+        return
+      }
+      val projectId = argument.projectId
+      val source = editorState.code
+      sourceFiles[filePath] = source
+      coroutineScope.launch {
+        runCatching {
+          projectRepository.saveSource(
+            projectId = projectId,
+            relativePath = filePath,
+            source = source,
+            expectedSource = persistedSourceFiles[filePath],
+          )
+        }.onSuccess {
+          persistedSourceFiles[filePath] = source
+          closeDocumentWithoutSaving(filePath)
+        }.onFailure { throwable ->
+          reportProjectSaveFailure(
+            filePath = filePath,
+            title = "关闭文件前保存失败",
+            throwable = throwable,
+            onConflictResolved = { closeDocument(filePath) },
+          )
+        }
+      }
+    }
+
+    /** 离开真实项目之前等待源码与会话落盘；冲突解决后自动重试原导航。 */
+    fun leaveWorkspace(onLeave: () -> Unit) {
+      val projectId = argument.projectId
+      if (projectId == null) {
+        onLeave()
+        return
+      }
+      val savingFilePath = activeFilePath
+      coroutineScope.launch {
+        runCatching { flushActiveProjectState(projectId) }
+          .onSuccess { onLeave() }
+          .onFailure { throwable ->
+            reportProjectSaveFailure(
+              filePath = savingFilePath,
+              title = "离开项目前保存失败",
+              throwable = throwable,
+              onConflictResolved = { leaveWorkspace(onLeave) },
+            )
+          }
       }
     }
 
@@ -1006,6 +1208,9 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         val remappedDirectories = directoryPaths.map { path ->
           path.remapWorkspacePath(oldPath, newPath)
         }
+        val remappedCursorPositions = cursorPositions.mapKeys { (path, _) ->
+          path.remapWorkspacePath(oldPath, newPath)
+        }
         val remappedActivePath = activeFilePath.remapWorkspacePath(oldPath, newPath)
         sourceFiles.clear()
         sourceFiles.putAll(remappedSources)
@@ -1013,6 +1218,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         persistedSourceFiles.putAll(remappedPersistedSources)
         directoryPaths.clear()
         directoryPaths.addAll(remappedDirectories.distinct().sorted())
+        cursorPositions.clear()
+        cursorPositions.putAll(remappedCursorPositions)
         openFilePaths.indices.forEach { index ->
           openFilePaths[index] = openFilePaths[index].remapWorkspacePath(oldPath, newPath)
         }
@@ -1059,6 +1266,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       } else {
         sourceFiles.keys.filter(isAffected).forEach(sourceFiles::remove)
         persistedSourceFiles.keys.filter(isAffected).forEach(persistedSourceFiles::remove)
+        cursorPositions.keys.filter(isAffected).forEach(cursorPositions::remove)
         directoryPaths.removeAll(isAffected)
         openFilePaths.removeAll(isAffected)
         val nextActivePath = activeFilePath.takeUnless(isAffected)
@@ -1178,7 +1386,16 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
           directoryPaths.addAll(refreshed.directoryPaths.sorted())
           openFilePaths.retainAll(refreshed.sourceFiles.keys)
           if (nextActivePath !in openFilePaths) openFilePaths += nextActivePath
-          editorState.replaceDocument(nextActivePath, refreshed.sourceFiles.getValue(nextActivePath))
+          cursorPositions.keys.retainAll(refreshed.sourceFiles.keys)
+          cursorPositions.keys.toList().forEach { path ->
+            cursorPositions[path] = cursorPositions.getValue(path)
+              .coerceIn(0, refreshed.sourceFiles.getValue(path).length)
+          }
+          editorState.replaceDocument(
+            nextActivePath,
+            refreshed.sourceFiles.getValue(nextActivePath),
+            cursorPositions[nextActivePath],
+          )
           activeFilePath = nextActivePath
           loadedProjectWorkspace = refreshed
           output = "已从磁盘刷新项目，共 ${refreshed.sourceFiles.size} 个源码文件。"
@@ -1299,9 +1516,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       onDeletePath = ::deleteWorkspacePath,
       onRefreshProject = if (argument.projectId != null) ::refreshProjectFromDisk else null,
       onSwitchProject = {
-        // 入口页已经在进入工作区时出栈；切换项目需要显式重建入口，再移除当前工作区。
-        CodeWorkspaceHomeNavArgument.navigate()
-        argument.popBackStack()
+        leaveWorkspace {
+          // 入口页已经在进入工作区时出栈；切换项目需要显式重建入口，再移除当前工作区。
+          CodeWorkspaceHomeNavArgument.navigate()
+          argument.popBackStack()
+        }
       },
       onOpenProjectDirectory = {
         val directory = loadedProjectWorkspace?.directory
@@ -1535,13 +1754,14 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
         dirtyDocumentLabels = dirtyDocumentLabels,
         breadcrumbs = activeFilePath.split('/'),
         onDocumentSelected = ::openFile,
+        onDocumentCloseRequested = ::closeDocument,
         documentIcon = dynamicDocumentIcon,
         sidePanels = sidePanels,
         toolWindows = toolWindows,
         state = workbenchState,
         modifier = Modifier.fillMaxSize(),
         isRunning = isRunning,
-        onBack = argument::popBackStack,
+        onBack = { leaveWorkspace(argument::popBackStack) },
         onRun = ::runWorkspace,
         runButtonModifier = Modifier.guidedTourTarget(
           targetId = DynamicTutorialAnchorIds.RUN_BUTTON,
@@ -1820,6 +2040,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   /** 等待用户选择保留策略的外部文件修改冲突。 */
   private data class ProjectSourceConflict(
     val filePath: String,
+    val onResolved: (() -> Unit)? = null,
   )
 
   private companion object {
@@ -1830,6 +2051,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     const val RUN_TARGET_REFRESH_DELAY_MILLIS = 150L
     const val TUTORIAL_PROGRESS_SAVE_DELAY_MILLIS = 600L
     const val PROJECT_SOURCE_SAVE_DELAY_MILLIS = 500L
+    const val PROJECT_SESSION_SAVE_DELAY_MILLIS = 350L
 
     /** 新建文件在识别具体语言前使用的最小占位内容。 */
     val DEFAULT_NEW_FILE_CODE = """

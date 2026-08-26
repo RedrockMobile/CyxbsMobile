@@ -40,6 +40,20 @@ data class CodeProjectWorkspace(
   val directoryDisplayPath: String,
 )
 
+/**
+ * 按项目保存在 Settings 中的轻量编辑会话。
+ *
+ * 源码、滚动位置和撤销栈不写入该结构：源码仍以真实文件为准，滚动与撤销由当前页面的 KodeMirror
+ * 会话缓存管理。跨页面只恢复打开标签、活动文件和各文件主光标。
+ */
+@Serializable
+data class CodeProjectEditorSession(
+  val projectId: String,
+  val openFilePaths: List<String>,
+  val activeFilePath: String,
+  val cursorPositions: Map<String, Int> = emptyMap(),
+)
+
 /** 项目文件重命名请求；路径始终是相对于项目根目录的规范路径。 */
 data class CodeProjectFileRename(
   val oldPath: String,

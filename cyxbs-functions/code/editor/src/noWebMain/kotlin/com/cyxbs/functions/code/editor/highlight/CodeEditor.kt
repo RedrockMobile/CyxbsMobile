@@ -449,6 +449,7 @@ private fun String.isValidWorkspacePath(): Boolean {
  * @param initialCode 首次创建状态时使用的源码；后续重组不会覆盖用户已经编辑的内容。
  * @param activeFilePath 当前编辑文档在工作区中的相对路径；必须由调用方显式提供，避免编辑器
  * 隐式假定源码语言或文件扩展名。
+ * @param initialCursorPosition 首次创建状态时恢复的主光标位置；为空时位于文档开头。
  * @param workspace 当前完整工作区；默认使用 [activeFilePath] 和 [initialCode] 构造单文件工作区。
  * @param languageService 当前已经加载的动态语言服务；可先传 null，加载完成后的重组会让补全源
  * 立即使用新服务，而不会重建或覆盖编辑器文档。
@@ -461,6 +462,7 @@ private fun String.isValidWorkspacePath(): Boolean {
 fun rememberCodeEditorState(
   initialCode: String = "",
   activeFilePath: String,
+  initialCursorPosition: Int? = null,
   workspace: DynamicLanguageWorkspace = DynamicLanguageWorkspace(
     files = listOf(DynamicSourceFile(activeFilePath, initialCode)),
   ),
@@ -469,6 +471,9 @@ fun rememberCodeEditorState(
   runTargets: List<DynamicRunTarget> = emptyList(),
   onRunTarget: ((DynamicRunTarget) -> Unit)? = null,
 ): CodeEditorState {
+  require(initialCursorPosition == null || initialCursorPosition in 0..initialCode.length) {
+    "initialCursorPosition must be inside initialCode."
+  }
   val currentLanguageService = rememberUpdatedState(languageService)
   val currentWorkspace = rememberUpdatedState(workspace)
   val currentFilePath = rememberUpdatedState(activeFilePath)
@@ -525,7 +530,11 @@ fun rememberCodeEditorState(
       languageService = { currentLanguageService.value },
       workspace = { currentWorkspace.value },
       highlightCacheCapacity = highlightCacheCapacity,
-    )
+    ).also { editorState ->
+      initialCursorPosition?.let { position ->
+        editorState.replaceDocument(activeFilePath, initialCode, position)
+      }
+    }
   }
   SideEffect {
     state.highlightCacheCapacity = highlightCacheCapacity

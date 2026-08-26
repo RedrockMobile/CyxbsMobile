@@ -162,6 +162,76 @@ class CodeProjectRepository(
   }
 
   /**
+   * 读取并清理项目编辑会话；外部删除的文件会从标签和光标记录中移除。
+   *
+   * @param sourceFiles 当前真实磁盘快照，用于限制恢复路径并裁剪越界光标。
+   * @return 存在历史会话时返回清理后的状态，否则返回 null。
+   */
+  suspend fun loadEditorSession(
+    projectId: String,
+    sourceFiles: Map<String, String>,
+  ): CodeProjectEditorSession? = mutex.withLock {
+    val stored = loadEditorSessions().firstOrNull { session -> session.projectId == projectId }
+      ?: return@withLock null
+    val validOpenPaths = stored.openFilePaths
+      .filter(sourceFiles::containsKey)
+      .distinct()
+      .take(MAX_OPEN_FILES_PER_PROJECT)
+    val activeFilePath = stored.activeFilePath.takeIf(sourceFiles::containsKey)
+      ?: validOpenPaths.firstOrNull()
+      ?: sourceFiles.keys.firstOrNull()
+      ?: return@withLock null
+    val normalizedOpenPaths = if (activeFilePath in validOpenPaths) {
+      validOpenPaths
+    } else {
+      validOpenPaths.take(MAX_OPEN_FILES_PER_PROJECT - 1) + activeFilePath
+    }
+    val normalized = CodeProjectEditorSession(
+      projectId = projectId,
+      openFilePaths = normalizedOpenPaths,
+      activeFilePath = activeFilePath,
+      cursorPositions = stored.cursorPositions.mapNotNull { (path, position) ->
+        val source = sourceFiles[path] ?: return@mapNotNull null
+        path to position.coerceIn(0, source.length)
+      }.toMap(),
+    )
+    if (normalized != stored) saveEditorSessionLocked(normalized)
+    normalized
+  }
+
+  /** 保存标签、活动文件和光标；调用方必须先确保路径属于当前项目快照。 */
+  suspend fun saveEditorSession(session: CodeProjectEditorSession) = mutex.withLock {
+    require(session.projectId.isNotBlank()) { "项目会话缺少 projectId。" }
+    require(session.openFilePaths.isNotEmpty()) { "项目会话至少需要一个打开文件。" }
+    require(session.activeFilePath in session.openFilePaths) { "活动文件必须位于打开标签中。" }
+    session.openFilePaths.forEach(::requireSafeRelativePath)
+    session.cursorPositions.forEach { (path, position) ->
+      requireSafeRelativePath(path)
+      require(position >= 0) { "光标位置不能为负数：$path" }
+    }
+    val normalizedOpenPaths = session.openFilePaths
+      .distinct()
+      .let { paths ->
+        if (session.activeFilePath in paths.take(MAX_OPEN_FILES_PER_PROJECT)) {
+          paths.take(MAX_OPEN_FILES_PER_PROJECT)
+        } else {
+          paths.filterNot { path -> path == session.activeFilePath }
+            .take(MAX_OPEN_FILES_PER_PROJECT - 1) + session.activeFilePath
+        }
+      }
+    saveEditorSessionLocked(
+      session.copy(
+        openFilePaths = normalizedOpenPaths,
+        cursorPositions = session.cursorPositions
+          .filterKeys { path -> path in normalizedOpenPaths }
+          .entries
+          .take(MAX_OPEN_FILES_PER_PROJECT)
+          .associate { entry -> entry.key to entry.value },
+      ),
+    )
+  }
+
+  /**
    * 把编辑器文本覆盖写入用户项目目录；调用方应在输入停止后触发。
    *
    * 提供 [expectedSource] 时会先核对磁盘基线，外部程序已修改或删除文件则抛出
@@ -503,6 +573,7 @@ class CodeProjectRepository(
   /** 从历史列表中移除入口，但不删除用户源码和 manifest。 */
   suspend fun forgetProject(projectId: String) = mutex.withLock {
     saveProjects(loadIndexedProjects().filterNot { it.projectId == projectId })
+    saveEditorSessions(loadEditorSessions().filterNot { session -> session.projectId == projectId })
     val ignored = loadIgnoredProjectIds() + projectId
     saveIgnoredProjectIds(ignored.toList().takeLast(MAX_IGNORED_PROJECTS))
   }
@@ -753,6 +824,31 @@ class CodeProjectRepository(
     )
   }
 
+  /** 会话损坏只丢弃 UI 恢复信息，不影响真实项目和源码。 */
+  private fun loadEditorSessions(): List<CodeProjectEditorSession> {
+    val raw = settings.getStringOrNull(PROJECT_EDITOR_SESSIONS_SETTINGS_KEY) ?: return emptyList()
+    return runCatching {
+      json.decodeFromString(CodeProjectEditorSessionState.serializer(), raw).sessions
+    }.getOrElse { emptyList() }
+      .distinctBy(CodeProjectEditorSession::projectId)
+      .take(MAX_PROJECTS)
+  }
+
+  /** 替换单个项目会话，同时保留其他历史项目的恢复信息。 */
+  private fun saveEditorSessionLocked(session: CodeProjectEditorSession) {
+    saveEditorSessions(loadEditorSessions().filterNot { it.projectId == session.projectId } + session)
+  }
+
+  private fun saveEditorSessions(sessions: List<CodeProjectEditorSession>) {
+    settings.putString(
+      PROJECT_EDITOR_SESSIONS_SETTINGS_KEY,
+      json.encodeToString(
+        CodeProjectEditorSessionState.serializer(),
+        CodeProjectEditorSessionState(sessions = sessions.takeLast(MAX_PROJECTS)),
+      ),
+    )
+  }
+
   private fun loadIgnoredProjectIds(): Set<String> {
     val raw = settings.getStringOrNull(IGNORED_PROJECTS_SETTINGS_KEY) ?: return emptySet()
     return runCatching {
@@ -867,16 +963,25 @@ class CodeProjectRepository(
     val projectIds: List<String> = emptyList(),
   )
 
+  @Serializable
+  private data class CodeProjectEditorSessionState(
+    val schemaVersion: Int = PROJECT_EDITOR_SESSIONS_SCHEMA_VERSION,
+    val sessions: List<CodeProjectEditorSession> = emptyList(),
+  )
+
   private companion object {
     const val PROJECTS_SETTINGS_KEY = "code.editor.recent-projects"
     const val IGNORED_PROJECTS_SETTINGS_KEY = "code.editor.ignored-projects"
+    const val PROJECT_EDITOR_SESSIONS_SETTINGS_KEY = "code.editor.project-sessions"
     const val PROJECTS_SCHEMA_VERSION = 3
     const val PROJECT_MANIFEST_SCHEMA_VERSION = 1
+    const val PROJECT_EDITOR_SESSIONS_SCHEMA_VERSION = 1
     const val PROJECT_MANIFEST_FILE_NAME = ".cyxbs-project.json"
     const val PROJECT_TRASH_DIRECTORY_NAME = ".cyxbs-trash"
     const val MAX_PROJECTS = 20
     const val MAX_IGNORED_PROJECTS = 100
     const val MAX_PROJECT_NAME_LENGTH = 64
+    const val MAX_OPEN_FILES_PER_PROJECT = 50
     const val MAX_DISCOVERED_DIRECTORIES = 200
     const val MAX_MANIFEST_BYTES = 64L * 1024L
     const val MAX_DIRECTORY_DEPTH = 16
