@@ -4,6 +4,8 @@ import com.cyxbs.components.config.sp.defaultSettings
 import com.russhwolf.settings.Settings
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.absolutePath
+import io.github.vinceglb.filekit.atomicMove
+import io.github.vinceglb.filekit.copyTo
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
@@ -159,12 +161,90 @@ class CodeProjectRepository(
     saveProjects(projects.replace(updated))
   }
 
-  /** 把编辑器文本覆盖写入用户项目目录；调用方应在输入停止后触发。 */
-  suspend fun saveSource(projectId: String, relativePath: String, source: String) = mutex.withLock {
+  /**
+   * 把编辑器文本覆盖写入用户项目目录；调用方应在输入停止后触发。
+   *
+   * 提供 [expectedSource] 时会先核对磁盘基线，外部程序已修改或删除文件则抛出
+   * [CodeProjectSourceConflictException]；磁盘已经等于 [source] 时按幂等成功处理。
+   */
+  suspend fun saveSource(
+    projectId: String,
+    relativePath: String,
+    source: String,
+    expectedSource: String? = null,
+  ) = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    val file = resolveFile(root.directoryFor(project), relativePath, createParents = expectedSource == null)
+    if (expectedSource != null) {
+      if (!file.isRegularFile()) throw CodeProjectSourceConflictException(relativePath)
+      val diskSource = file.readString()
+      if (diskSource != expectedSource && diskSource != source) {
+        throw CodeProjectSourceConflictException(relativePath)
+      }
+    }
+    file.writeString(source)
+  }
+
+  /**
+   * 读取项目内单个源码文件的最新磁盘内容，供编辑器在外部修改冲突时执行“重新加载”。
+   *
+   * 文件已被外部删除或变成目录时直接失败，调用方不得用空文本冒充磁盘内容。
+   */
+  suspend fun readSource(projectId: String, relativePath: String): String = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val project = requireProject(projectId, root)
+    val file = resolveFile(root.directoryFor(project), relativePath, createParents = false)
+    if (!file.isRegularFile()) throw CodeProjectException("源码文件已不存在：$relativePath")
+    file.readString()
+  }
+
+  /**
+   * 无条件用 [source] 覆盖磁盘文件，只有用户在冲突对话框中明确选择覆盖时才能调用。
+   *
+   * 外部程序已删除文件时会重新创建父目录和文件，因此该接口不能用于普通自动保存。
+   */
+  suspend fun overwriteSource(projectId: String, relativePath: String, source: String) = mutex.withLock {
     requireSafeRelativePath(relativePath)
     val root = requireStorageRoot()
     val project = requireProject(projectId, root)
     resolveFile(root.directoryFor(project), relativePath, createParents = true).writeString(source)
+  }
+
+  /**
+   * 把冲突中的编辑器文本保存为同目录副本，并将副本设为活动文件。
+   *
+   * 新文件名保留原扩展名，依次尝试 `-conflict-copy` 与数字后缀；manifest 或 Settings 更新失败
+   * 时删除刚创建的副本，避免历史项目记录与真实文件树不一致。
+   */
+  suspend fun saveSourceConflictCopy(
+    projectId: String,
+    relativePath: String,
+    source: String,
+  ): CodeProjectWorkspace = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val projectDirectory = root.directoryFor(project)
+    val copyPath = uniqueConflictCopyPath(projectDirectory, relativePath)
+    val copyFile = resolveFile(projectDirectory, copyPath, createParents = true)
+    copyFile.writeString(source)
+    val updatedProject = project.copy(activeFilePath = copyPath)
+    try {
+      val snapshot = readWorkspace(projectDirectory)
+      writeProjectManifest(projectDirectory, updatedProject)
+      saveProjects(projects.replace(updatedProject))
+      workspaceOf(root, updatedProject, snapshot)
+    } catch (throwable: Throwable) {
+      runCatching { copyFile.delete(mustExist = false) }
+      runCatching { writeProjectManifest(projectDirectory, project) }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
   }
 
   /**
@@ -178,11 +258,13 @@ class CodeProjectRepository(
     projectId: String,
     updatedSources: Map<String, String>,
     fileRenames: List<CodeProjectFileRename>,
+    expectedSources: Map<String, String> = emptyMap(),
   ): CodeProject = mutex.withLock {
     require(updatedSources.isNotEmpty() || fileRenames.isNotEmpty()) {
       "源码事务不能同时缺少内容修改和文件重命名。"
     }
     updatedSources.keys.forEach(::requireSafeRelativePath)
+    expectedSources.keys.forEach(::requireSafeRelativePath)
     fileRenames.forEach { rename ->
       requireSafeRelativePath(rename.oldPath)
       requireSafeRelativePath(rename.newPath)
@@ -218,6 +300,7 @@ class CodeProjectRepository(
 
     val affectedPaths = linkedSetOf<String>().apply {
       addAll(updatedSources.keys)
+      addAll(expectedSources.keys)
       addAll(oldPaths)
       addAll(newPaths)
     }
@@ -230,6 +313,14 @@ class CodeProjectRepository(
       activeFilePath = fileRenames.firstOrNull { it.oldPath == project.activeFilePath }?.newPath
         ?: project.activeFilePath,
     )
+
+    expectedSources.forEach { (path, expectedSource) ->
+      val diskSource = originalSources[path]
+      val desiredSource = updatedSources[path]
+      if (diskSource != expectedSource && diskSource != desiredSource) {
+        throw CodeProjectSourceConflictException(path)
+      }
+    }
 
     try {
       updatedSources.forEach { (path, source) ->
@@ -294,6 +385,106 @@ class CodeProjectRepository(
   }
 
   /**
+   * 重命名或移动项目内的文件/目录，并返回最新磁盘快照。
+   *
+   * Android SAF 暂不支持目录原子移动，因此底层会回退为递归复制后删除；任一步失败时会尽力
+   * 恢复源路径。活动文件位于被移动目录内时会同步改写 manifest 与 Settings。
+   */
+  suspend fun renamePath(
+    projectId: String,
+    oldPath: String,
+    newPath: String,
+  ): CodeProjectWorkspace = mutex.withLock {
+    requireSafeRelativePath(oldPath)
+    requireSafeRelativePath(newPath)
+    require(oldPath != newPath) { "重命名前后路径不能相同。" }
+
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val projectDirectory = root.directoryFor(project)
+    val source = resolveFile(projectDirectory, oldPath, createParents = false)
+    if (!source.exists()) throw CodeProjectException("待移动路径不存在：$oldPath")
+    if (source.isDirectory() && newPath.startsWith("$oldPath/")) {
+      throw CodeProjectException("不能把文件夹移动到自身内部。")
+    }
+    val destination = resolveFile(projectDirectory, newPath, createParents = true)
+    if (destination.exists()) throw CodeProjectException("目标路径已存在：$newPath")
+
+    movePathWithFallback(source, destination)
+    val updatedProject = project.copy(
+      activeFilePath = project.activeFilePath?.remapPath(oldPath, newPath),
+    )
+    try {
+      val snapshot = readWorkspace(projectDirectory)
+      writeProjectManifest(projectDirectory, updatedProject)
+      saveProjects(projects.replace(updatedProject))
+      workspaceOf(root, updatedProject, snapshot)
+    } catch (throwable: Throwable) {
+      runCatching { movePathWithFallback(destination, source) }
+      runCatching { writeProjectManifest(projectDirectory, project) }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
+  }
+
+  /**
+   * 删除项目内的文件或目录，并返回最新磁盘快照。
+   *
+   * 删除前先移动到项目隔离目录，确保 manifest 或 Settings 写入失败时仍可恢复；项目必须至少保留
+   * 一个受支持源码文件。隔离目录清理失败不会让已经完成的逻辑删除回滚，下次扫描会继续忽略它。
+   */
+  suspend fun deletePath(projectId: String, relativePath: String): CodeProjectWorkspace = mutex.withLock {
+    requireSafeRelativePath(relativePath)
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val projectDirectory = root.directoryFor(project)
+    val source = resolveFile(projectDirectory, relativePath, createParents = false)
+    if (!source.exists()) throw CodeProjectException("待删除路径不存在：$relativePath")
+
+    val beforeSnapshot = readWorkspace(projectDirectory)
+    val remainingSourcePaths = beforeSnapshot.sourceFiles.keys.filterNot { path ->
+      path == relativePath || path.startsWith("$relativePath/")
+    }
+    if (remainingSourcePaths.isEmpty()) {
+      throw CodeProjectException("项目至少需要保留一个可编辑源码文件。")
+    }
+
+    val trashDirectory = projectDirectory / PROJECT_TRASH_DIRECTORY_NAME
+    trashDirectory.createDirectories()
+    val trashTarget = uniqueTrashTarget(trashDirectory, source.name)
+    movePathWithFallback(source, trashTarget)
+    val updatedProject = project.copy(
+      activeFilePath = project.activeFilePath
+        ?.takeUnless { path -> path == relativePath || path.startsWith("$relativePath/") }
+        ?: remainingSourcePaths.first(),
+    )
+    val workspace = try {
+      val snapshot = readWorkspace(projectDirectory)
+      writeProjectManifest(projectDirectory, updatedProject)
+      saveProjects(projects.replace(updatedProject))
+      workspaceOf(root, updatedProject, snapshot)
+    } catch (throwable: Throwable) {
+      runCatching { movePathWithFallback(trashTarget, source) }
+      runCatching { writeProjectManifest(projectDirectory, project) }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
+
+    // 隔离区只承担事务恢复，不作为长期回收站；清理失败时保留数据比破坏已提交状态更安全。
+    runCatching { trashTarget.deleteRecursively() }
+    runCatching {
+      if (trashDirectory.exists() && trashDirectory.list().isEmpty()) {
+        trashDirectory.delete(mustExist = false)
+      }
+    }
+    workspace
+  }
+
+  /**
    * 修改项目置顶状态，并同时写回 Settings 与项目 manifest。
    *
    * 置顶只改变历史列表分组，不覆盖最近点击时间；取消置顶后会自动回到正常时间顺序。
@@ -322,6 +513,100 @@ class CodeProjectRepository(
     val project = requireProject(projectId, root)
     root.directoryFor(project).takeIf { it.exists() && it.isDirectory() }
       ?: throw CodeProjectException("项目目录已不可访问：${project.name}")
+  }
+
+  /** 根据磁盘快照构造工作区，统一校验 manifest 中的活动文件仍然存在。 */
+  private fun workspaceOf(
+    root: CodeProjectStorageRoot,
+    project: CodeProject,
+    snapshot: WorkspaceSnapshot,
+  ): CodeProjectWorkspace {
+    val activeFilePath = project.activeFilePath
+      ?.takeIf(snapshot.sourceFiles::containsKey)
+      ?: snapshot.sourceFiles.keys.firstOrNull()
+      ?: throw CodeProjectException("项目中没有可编辑的源码文件：${project.name}")
+    val normalizedProject = project.copy(activeFilePath = activeFilePath)
+    return CodeProjectWorkspace(
+      project = normalizedProject,
+      sourceFiles = snapshot.sourceFiles,
+      directoryPaths = snapshot.directoryPaths,
+      activeFilePath = activeFilePath,
+      directory = root.directoryFor(normalizedProject),
+      directoryDisplayPath = root.displayPathFor(normalizedProject),
+    )
+  }
+
+  /** 优先使用平台原子移动；不支持目录原子移动的平台回退到可恢复的递归复制。 */
+  private suspend fun movePathWithFallback(source: PlatformFile, destination: PlatformFile) {
+    try {
+      source.atomicMove(destination)
+      return
+    } catch (atomicFailure: Throwable) {
+      if (!source.exists() && destination.exists()) return
+      if (destination.exists()) {
+        // 目标可能由外部程序在检查后创建；宁可保留 SAF 失败产生的副本，也不能误删未知数据。
+        throw atomicFailure
+      }
+      try {
+        source.copyRecursivelyTo(destination)
+        source.deleteRecursively()
+      } catch (fallbackFailure: Throwable) {
+        // 删除源目录中途失败时，从完整目标副本恢复缺失项，再移除未提交的目标路径。
+        if (destination.exists()) {
+          if (source.exists()) runCatching { destination.copyRecursivelyTo(source) }
+          runCatching { destination.deleteRecursively() }
+        }
+        fallbackFailure.addSuppressed(atomicFailure)
+        throw fallbackFailure
+      }
+    }
+  }
+
+  /** 复制完整文件树，保留语言源码之外的资源文件。 */
+  private suspend fun PlatformFile.copyRecursivelyTo(destination: PlatformFile) {
+    if (isDirectory()) {
+      destination.createDirectories()
+      list().forEach { child ->
+        child.copyRecursivelyTo(destination / child.name)
+      }
+    } else {
+      copyTo(destination)
+    }
+  }
+
+  /** 先删除子项再删除目录本身，兼容 kotlinx-io 不接受非空目录删除的平台。 */
+  private suspend fun PlatformFile.deleteRecursively() {
+    if (isDirectory()) list().forEach { child -> child.deleteRecursively() }
+    delete(mustExist = false)
+  }
+
+  /** 为同一次或遗留删除生成不冲突的隔离目标。 */
+  private fun uniqueTrashTarget(trashDirectory: PlatformFile, sourceName: String): PlatformFile {
+    val baseName = "${clock()}-$sourceName"
+    var candidate = trashDirectory / baseName
+    var suffix = 2
+    while (candidate.exists()) {
+      candidate = trashDirectory / "$baseName-$suffix"
+      suffix++
+    }
+    return candidate
+  }
+
+  /** 生成保留原扩展名且不会覆盖现有文件的冲突副本路径。 */
+  private fun uniqueConflictCopyPath(projectDirectory: PlatformFile, relativePath: String): String {
+    val parentPath = relativePath.substringBeforeLast('/', missingDelimiterValue = "")
+    val fileName = relativePath.substringAfterLast('/')
+    val extensionStart = fileName.lastIndexOf('.').takeIf { index -> index > 0 }
+    val baseName = extensionStart?.let { index -> fileName.substring(0, index) } ?: fileName
+    val extension = extensionStart?.let(fileName::substring) ?: ""
+    var suffix = 1
+    while (true) {
+      val suffixText = if (suffix == 1) "" else "-$suffix"
+      val copyName = "$baseName-conflict-copy$suffixText$extension"
+      val candidate = if (parentPath.isEmpty()) copyName else "$parentPath/$copyName"
+      if (!resolveFile(projectDirectory, candidate, createParents = false).exists()) return candidate
+      suffix++
+    }
   }
 
   /** 恢复固定测试目录或平台 bookmark；只在显式创建流程中允许弹出选择器。 */
@@ -526,6 +811,13 @@ class CodeProjectRepository(
   private fun List<CodeProject>.replace(project: CodeProject): List<CodeProject> =
     filterNot { it.projectId == project.projectId } + project
 
+  /** 将活动文件从旧文件/目录前缀映射到新路径。 */
+  private fun String.remapPath(oldPath: String, newPath: String): String = when {
+    this == oldPath -> newPath
+    startsWith("$oldPath/") -> newPath + removePrefix(oldPath)
+    else -> this
+  }
+
   /** 置顶项目始终在前；同一分组内按最后一次成功打开的时间倒序。 */
   private fun List<CodeProject>.sortedForHistory(): List<CodeProject> = sortedWith(
     compareByDescending<CodeProject>(CodeProject::isPinned)
@@ -540,6 +832,7 @@ class CodeProjectRepository(
         path == path.trim() &&
         !path.startsWith('/') &&
         '\\' !in path &&
+        segments.firstOrNull() !in RESERVED_PROJECT_PATHS &&
         segments.none { it.isEmpty() || it == "." || it == ".." },
     ) { "非法项目相对路径：$path" }
   }
@@ -580,6 +873,7 @@ class CodeProjectRepository(
     const val PROJECTS_SCHEMA_VERSION = 3
     const val PROJECT_MANIFEST_SCHEMA_VERSION = 1
     const val PROJECT_MANIFEST_FILE_NAME = ".cyxbs-project.json"
+    const val PROJECT_TRASH_DIRECTORY_NAME = ".cyxbs-trash"
     const val MAX_PROJECTS = 20
     const val MAX_IGNORED_PROJECTS = 100
     const val MAX_PROJECT_NAME_LENGTH = 64
@@ -590,7 +884,10 @@ class CodeProjectRepository(
     const val MAX_SINGLE_SOURCE_BYTES = 2L * 1024L * 1024L
     const val MAX_TOTAL_SOURCE_CHARACTERS = 8L * 1024L * 1024L
 
-    val IGNORED_DIRECTORY_NAMES = setOf(".git", ".gradle", "build", "node_modules")
+    val IGNORED_DIRECTORY_NAMES = setOf(
+      ".git", ".gradle", PROJECT_TRASH_DIRECTORY_NAME, "build", "node_modules",
+    )
+    val RESERVED_PROJECT_PATHS = setOf(PROJECT_MANIFEST_FILE_NAME, PROJECT_TRASH_DIRECTORY_NAME)
     val SUPPORTED_SOURCE_EXTENSIONS = setOf(
       "java", "js", "mjs", "cjs", "ts", "tsx", "py", "kt", "kts", "json", "md", "txt",
     )

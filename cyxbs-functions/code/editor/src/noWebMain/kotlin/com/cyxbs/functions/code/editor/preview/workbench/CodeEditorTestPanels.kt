@@ -110,6 +110,8 @@ internal fun rememberCodeEditorTestSidePanels(
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
+  onRenamePath: (oldPath: String, newPath: String, isDirectory: Boolean) -> Boolean,
+  onDeletePath: (path: String, isDirectory: Boolean) -> Unit,
   onRefreshProject: (() -> Unit)?,
   onSwitchProject: () -> Unit,
   onOpenProjectDirectory: () -> Unit,
@@ -142,6 +144,8 @@ internal fun rememberCodeEditorTestSidePanels(
           },
           onCreateFile = onCreateFile,
           onCreateFolder = onCreateFolder,
+          onRenamePath = onRenamePath,
+          onDeletePath = onDeletePath,
           onRefreshProject = onRefreshProject,
           onSwitchProject = onSwitchProject,
           onOpenProjectDirectory = onOpenProjectDirectory,
@@ -358,6 +362,8 @@ private fun FilePanelContent(
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
+  onRenamePath: (oldPath: String, newPath: String, isDirectory: Boolean) -> Boolean,
+  onDeletePath: (path: String, isDirectory: Boolean) -> Unit,
   onRefreshProject: (() -> Unit)?,
   onSwitchProject: () -> Unit,
   onOpenProjectDirectory: () -> Unit,
@@ -365,6 +371,10 @@ private fun FilePanelContent(
   var pendingCreation by remember { mutableStateOf<FileTreeCreation?>(null) }
   var creationName by remember { mutableStateOf("") }
   var creationError by remember { mutableStateOf<String?>(null) }
+  var pendingRename by remember { mutableStateOf<FileTreePathAction?>(null) }
+  var renamePath by remember { mutableStateOf("") }
+  var renameError by remember { mutableStateOf<String?>(null) }
+  var pendingDelete by remember { mutableStateOf<FileTreePathAction?>(null) }
   val folderPathSnapshot = folderPaths.toList()
   val fileTree = remember(filePaths, folderPathSnapshot) {
     buildFileTree(filePaths = filePaths, folderPaths = folderPathSnapshot)
@@ -399,6 +409,14 @@ private fun FilePanelContent(
           minimumRowWidth = minimumRowWidth,
           fileIcon = fileIcon,
           onOpenFile = onOpenFile,
+          onRequestRename = { path, isDirectory ->
+            pendingRename = FileTreePathAction(path, isDirectory)
+            renamePath = path
+            renameError = null
+          },
+          onRequestDelete = { path, isDirectory ->
+            pendingDelete = FileTreePathAction(path, isDirectory)
+          },
         )
       }
     }
@@ -424,6 +442,35 @@ private fun FilePanelContent(
         } else {
           creationError = "名称无效或已存在"
         }
+      },
+    )
+  }
+  pendingRename?.let { action ->
+    FileTreeRenameDialog(
+      action = action,
+      newPath = renamePath,
+      error = renameError,
+      onPathChange = {
+        renamePath = it
+        renameError = null
+      },
+      onDismiss = { pendingRename = null },
+      onConfirm = {
+        if (onRenamePath(action.path, renamePath, action.isDirectory)) {
+          pendingRename = null
+        } else {
+          renameError = "路径无效、未变化或已存在"
+        }
+      },
+    )
+  }
+  pendingDelete?.let { action ->
+    FileTreeDeleteDialog(
+      action = action,
+      onDismiss = { pendingDelete = null },
+      onConfirm = {
+        pendingDelete = null
+        onDeletePath(action.path, action.isDirectory)
       },
     )
   }
@@ -611,6 +658,81 @@ private fun FileTreeCreationDialog(
   )
 }
 
+/** 修改完整相对路径的对话框；路径中包含目录时同时承担移动能力。 */
+@Composable
+private fun FileTreeRenameDialog(
+  action: FileTreePathAction,
+  newPath: String,
+  error: String?,
+  onPathChange: (String) -> Unit,
+  onDismiss: () -> Unit,
+  onConfirm: () -> Unit,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    backgroundColor = EditorWorkbenchColors.PanelBackground,
+    contentColor = EditorWorkbenchColors.PrimaryText,
+    title = { Text(if (action.isDirectory) "重命名 / 移动文件夹" else "重命名 / 移动文件", fontSize = 16.sp) },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+          text = "当前：${action.path}",
+          color = EditorWorkbenchColors.SecondaryText,
+          fontSize = 11.sp,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        TextField(
+          value = newPath,
+          onValueChange = onPathChange,
+          modifier = Modifier.fillMaxWidth(),
+          singleLine = true,
+          label = { Text("新的项目相对路径") },
+          colors = editorTextFieldColors(),
+          shape = RoundedCornerShape(6.dp),
+        )
+        if (error != null) Text(error, color = Color(0xFFFF6B6B), fontSize = 11.sp)
+      }
+    },
+    confirmButton = {
+      TextButton(enabled = newPath.isNotBlank() && newPath != action.path, onClick = onConfirm) {
+        Text("确认")
+      }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+  )
+}
+
+/** 删除文件或目录前二次确认；目录操作会递归影响其全部子项。 */
+@Composable
+private fun FileTreeDeleteDialog(
+  action: FileTreePathAction,
+  onDismiss: () -> Unit,
+  onConfirm: () -> Unit,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    backgroundColor = EditorWorkbenchColors.PanelBackground,
+    contentColor = EditorWorkbenchColors.PrimaryText,
+    title = { Text("确认删除", fontSize = 16.sp) },
+    text = {
+      Text(
+        text = if (action.isDirectory) {
+          "将递归删除文件夹 ${action.path} 及其全部内容，此操作无法从应用内撤销。"
+        } else {
+          "将删除文件 ${action.path}，此操作无法从应用内撤销。"
+        },
+        color = EditorWorkbenchColors.SecondaryText,
+        fontSize = 12.sp,
+      )
+    },
+    confirmButton = {
+      TextButton(onClick = onConfirm) { Text("删除", color = Color(0xFFFF7777)) }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+  )
+}
+
 /**
  * 递归展示 IDEA 风格的紧凑文件树。
  *
@@ -625,6 +747,8 @@ private fun FileTreeNodes(
   minimumRowWidth: Dp,
   fileIcon: (@Composable (filePath: String, modifier: Modifier) -> Unit)?,
   onOpenFile: (String) -> Unit,
+  onRequestRename: (path: String, isDirectory: Boolean) -> Unit,
+  onRequestDelete: (path: String, isDirectory: Boolean) -> Unit,
   depth: Int = 0,
 ) {
   nodes.forEach { node ->
@@ -639,6 +763,8 @@ private fun FileTreeNodes(
           selected = false,
           minimumWidth = minimumRowWidth,
           onClick = { expandedFolders[node.path] = !expanded },
+          onRename = { onRequestRename(node.path, true) },
+          onDelete = { onRequestDelete(node.path, true) },
         )
         if (expanded) {
           FileTreeNodes(
@@ -648,6 +774,8 @@ private fun FileTreeNodes(
             minimumRowWidth = minimumRowWidth,
             fileIcon = fileIcon,
             onOpenFile = onOpenFile,
+            onRequestRename = onRequestRename,
+            onRequestDelete = onRequestDelete,
             depth = depth + 1,
           )
         }
@@ -663,6 +791,8 @@ private fun FileTreeNodes(
           { modifier -> icon(node.path, modifier) }
         },
         onClick = { onOpenFile(node.path) },
+        onRename = { onRequestRename(node.path, false) },
+        onDelete = { onRequestDelete(node.path, false) },
       )
     }
   }
@@ -685,7 +815,10 @@ private fun FileTreeRow(
   minimumWidth: Dp,
   customIcon: (@Composable (modifier: Modifier) -> Unit)? = null,
   onClick: () -> Unit,
+  onRename: () -> Unit,
+  onDelete: () -> Unit,
 ) {
+  var menuExpanded by remember { mutableStateOf(false) }
   Row(
     modifier = Modifier
       .widthIn(min = minimumWidth)
@@ -729,6 +862,50 @@ private fun FileTreeRow(
       overflow = TextOverflow.Clip,
       modifier = Modifier.padding(start = 5.dp),
     )
+    Box(
+      modifier = Modifier.size(FileTreeRowHeight).clickable { menuExpanded = true },
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        imageVector = Icons.Default.MoreVert,
+        contentDescription = "文件操作",
+        tint = EditorWorkbenchColors.SecondaryText.copy(alpha = 0.65F),
+        modifier = Modifier.size(15.dp),
+      )
+      MaterialTheme(
+        colors = MaterialTheme.colors.copy(
+          surface = EditorWorkbenchColors.PanelBackground,
+          onSurface = EditorWorkbenchColors.PrimaryText,
+        ),
+      ) {
+        DropdownMenu(
+          expanded = menuExpanded,
+          onDismissRequest = { menuExpanded = false },
+          modifier = Modifier.removeDefaultDropdownMenuVerticalPadding(),
+        ) {
+          DropdownMenuItem(
+            modifier = Modifier.height(CompactDropdownMenuItemHeight),
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            onClick = {
+              menuExpanded = false
+              onRename()
+            },
+          ) {
+            Text("重命名 / 移动", color = EditorWorkbenchColors.PrimaryText, fontSize = 12.sp)
+          }
+          DropdownMenuItem(
+            modifier = Modifier.height(CompactDropdownMenuItemHeight),
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            onClick = {
+              menuExpanded = false
+              onDelete()
+            },
+          ) {
+            Text("删除", color = Color(0xFFFF7777), fontSize = 12.sp)
+          }
+        }
+      }
+    }
   }
 }
 
@@ -802,6 +979,12 @@ private sealed interface FileTreeNode {
     override val path: String,
   ) : FileTreeNode
 }
+
+/** 文件树节点操作目标，避免对话框持有可变展示树节点。 */
+private data class FileTreePathAction(
+  val path: String,
+  val isDirectory: Boolean,
+)
 
 /** 测试文件树支持的创建类型及其输入框文案。 */
 private enum class FileTreeCreation(

@@ -259,4 +259,143 @@ class CodeProjectRepositoryTest {
     )
     assertEquals("public class OldName {}", reopened.sourceFiles.getValue("src/OldName.java"))
   }
+
+  @Test
+  fun renamesDirectoryWithSourceAndResourceFilesAndRemapsActiveFile() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "目录移动",
+    )
+    val projectId = workspace.project.projectId
+    assertTrue(
+      repository.createFile(
+        projectId,
+        "src/model/Student.java",
+        "public class Student {}",
+      ),
+    )
+    val resource = root.resolve(projectId).resolve("src/model/schema.bin")
+    resource.writeText("resource")
+    repository.updateActiveFile(projectId, "src/model/Student.java")
+
+    val renamed = repository.renamePath(projectId, "src/model", "src/domain")
+
+    assertEquals("src/domain/Student.java", renamed.activeFilePath)
+    assertEquals("public class Student {}", renamed.sourceFiles.getValue("src/domain/Student.java"))
+    assertEquals("resource", root.resolve(projectId).resolve("src/domain/schema.bin").readText())
+    assertFalse(Files.exists(root.resolve(projectId).resolve("src/model")))
+  }
+
+  @Test
+  fun deletesActiveDirectoryThroughIsolationAreaAndSelectsRemainingSource() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "目录删除",
+    )
+    val projectId = workspace.project.projectId
+    assertTrue(repository.createFile(projectId, "src/temp/Temp.java", "class Temp {}"))
+    repository.updateActiveFile(projectId, "src/temp/Temp.java")
+
+    val afterDelete = repository.deletePath(projectId, "src/temp")
+
+    assertEquals("src/Main.java", afterDelete.activeFilePath)
+    assertFalse(afterDelete.sourceFiles.containsKey("src/temp/Temp.java"))
+    assertFalse(Files.exists(root.resolve(projectId).resolve("src/temp")))
+    assertFalse(Files.exists(root.resolve(projectId).resolve(".cyxbs-trash")))
+  }
+
+  @Test
+  fun refusesToDeleteLastSourceFile() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "保留源码",
+    )
+
+    assertFailsWith<CodeProjectException> {
+      repository.deletePath(workspace.project.projectId, "src/Main.java")
+    }
+    assertTrue(Files.isRegularFile(root.resolve(workspace.project.projectId).resolve("src/Main.java")))
+  }
+
+  @Test
+  fun rejectsSaveWhenDiskSourceChangedOutsideEditor() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "外部冲突",
+    )
+    val projectId = workspace.project.projectId
+    val original = workspace.sourceFiles.getValue("src/Main.java")
+    val mainFile = root.resolve(projectId).resolve("src/Main.java")
+    mainFile.writeText("external change")
+
+    assertFailsWith<CodeProjectSourceConflictException> {
+      repository.saveSource(
+        projectId = projectId,
+        relativePath = "src/Main.java",
+        source = "editor change",
+        expectedSource = original,
+      )
+    }
+    assertEquals("external change", mainFile.readText())
+  }
+
+  @Test
+  fun reloadsAndExplicitlyOverwritesExternalSource() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "解决外部冲突",
+    )
+    val projectId = workspace.project.projectId
+    val mainFile = root.resolve(projectId).resolve("src/Main.java")
+    mainFile.writeText("external change")
+
+    assertEquals("external change", repository.readSource(projectId, "src/Main.java"))
+    repository.overwriteSource(projectId, "src/Main.java", "editor change")
+
+    assertEquals("editor change", mainFile.readText())
+  }
+
+  @Test
+  fun savesConflictCopyWithoutReplacingExternalSource() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "保留冲突副本",
+    )
+    val projectId = workspace.project.projectId
+    val mainFile = root.resolve(projectId).resolve("src/Main.java")
+    mainFile.writeText("external change")
+
+    val firstCopy = repository.saveSourceConflictCopy(
+      projectId = projectId,
+      relativePath = "src/Main.java",
+      source = "editor change 1",
+    )
+    val secondCopy = repository.saveSourceConflictCopy(
+      projectId = projectId,
+      relativePath = "src/Main.java",
+      source = "editor change 2",
+    )
+
+    assertEquals("external change", mainFile.readText())
+    assertEquals("src/Main-conflict-copy.java", firstCopy.activeFilePath)
+    assertEquals("editor change 1", firstCopy.sourceFiles.getValue(firstCopy.activeFilePath))
+    assertEquals("src/Main-conflict-copy-2.java", secondCopy.activeFilePath)
+    assertEquals("editor change 2", secondCopy.sourceFiles.getValue(secondCopy.activeFilePath))
+  }
+
+  @Test
+  fun protectsProjectMetadataPathsFromFileOperations() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "保留路径",
+    )
+
+    assertFailsWith<IllegalArgumentException> {
+      repository.createFile(workspace.project.projectId, ".cyxbs-project.json")
+    }
+    assertFailsWith<IllegalArgumentException> {
+      repository.createDirectory(workspace.project.projectId, ".cyxbs-trash/custom")
+    }
+    Unit
+  }
 }

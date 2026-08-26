@@ -46,6 +46,11 @@ data class CodeProjectFileRename(
   val newPath: String,
 )
 
+/** 磁盘源码已被外部修改，调用方必须刷新或显式解决冲突后再保存。 */
+class CodeProjectSourceConflictException(
+  val relativePath: String,
+) : IllegalStateException("文件已在编辑器外被修改，请先从磁盘刷新：$relativePath")
+
 /**
  * 创建项目时使用的最小语言模板。
  *

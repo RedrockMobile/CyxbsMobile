@@ -124,6 +124,7 @@ import kotlin.math.roundToInt
  * @param activeDocumentLabel 当前文件或文档的展示名。
  * @param subtitle 标题下方的场景说明；为空时仅显示标题。
  * @param openDocumentLabels 已打开文档的稳定标识或路径，用于渲染编辑器标签栏。
+ * @param dirtyDocumentLabels 尚未成功持久化的文档标识；对应标签会显示小圆点提示。
  * @param breadcrumbs 当前文档的路径导航；为空时根据 [activeDocumentLabel] 生成。
  * @param onDocumentSelected 点击标签后的切换回调；为空时标签仅用于展示。
  * @param documentIcon 文档标签图标槽位；调用方可按文件路径提供语言图标，为空时使用通用圆点。
@@ -151,6 +152,7 @@ fun CodeEditorWorkbench(
   modifier: Modifier = Modifier,
   subtitle: String? = null,
   openDocumentLabels: List<String> = listOf(activeDocumentLabel),
+  dirtyDocumentLabels: Set<String> = emptySet(),
   breadcrumbs: List<String> = emptyList(),
   onDocumentSelected: ((String) -> Unit)? = null,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)? = null,
@@ -266,6 +268,7 @@ fun CodeEditorWorkbench(
         EditorAndToolWindow(
           activeDocumentLabel = activeDocumentLabel,
           openDocumentLabels = openDocumentLabels,
+          dirtyDocumentLabels = dirtyDocumentLabels,
           breadcrumbs = breadcrumbs,
           onDocumentSelected = onDocumentSelected,
           documentIcon = documentIcon,
@@ -336,6 +339,7 @@ fun CodeEditorWorkbench(
 private fun EditorAndToolWindow(
   activeDocumentLabel: String,
   openDocumentLabels: List<String>,
+  dirtyDocumentLabels: Set<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
@@ -377,6 +381,7 @@ private fun EditorAndToolWindow(
       EditorDocumentBar(
         activeDocumentLabel = activeDocumentLabel,
         openDocumentLabels = openDocumentLabels,
+        dirtyDocumentLabels = dirtyDocumentLabels,
         breadcrumbs = breadcrumbs,
         onDocumentSelected = onDocumentSelected,
         documentIcon = documentIcon,
@@ -662,6 +667,7 @@ private fun EditorTopBarAction(
 private fun EditorDocumentBar(
   activeDocumentLabel: String,
   openDocumentLabels: List<String>,
+  dirtyDocumentLabels: Set<String>,
   breadcrumbs: List<String>,
   onDocumentSelected: ((String) -> Unit)?,
   documentIcon: (@Composable (document: String, modifier: Modifier) -> Unit)?,
@@ -710,6 +716,7 @@ private fun EditorDocumentBar(
     ) {
       documents.forEach { document ->
         val selected = document == activeDocumentLabel
+        val isDirty = document in dirtyDocumentLabels
         val bringIntoViewRequester = remember(document) { BringIntoViewRequester() }
         // 文件切换可能来自侧栏、定义跳转或标签点击，统一确保新标签完整进入横向可视区域。
         LaunchedEffect(selected) {
@@ -754,6 +761,15 @@ private fun EditorDocumentBar(
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             modifier = Modifier.padding(start = if (documentIcon == null) 8.dp else 6.dp),
           )
+          if (isDirty) {
+            // 小圆点不改变文件名文案，后续接入关闭标签时也可复用相同未保存语义。
+            Box(
+              Modifier
+                .padding(start = 5.dp)
+                .size(5.dp)
+                .background(EditorWorkbenchColors.FileIndicator, CircleShape),
+            )
+          }
         }
       }
     }
