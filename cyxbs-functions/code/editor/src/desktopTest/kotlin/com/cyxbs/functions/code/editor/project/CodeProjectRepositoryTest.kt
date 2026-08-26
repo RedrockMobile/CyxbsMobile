@@ -26,6 +26,7 @@ class CodeProjectRepositoryTest {
   private lateinit var root: Path
   private lateinit var preferences: Preferences
   private lateinit var repository: CodeProjectRepository
+  private val externalRoots = mutableListOf<Path>()
   private var now = 1_000L
 
   /** 每个测试使用独立临时目录和 Preferences 节点，不读取开发机真实项目记录。 */
@@ -43,8 +44,78 @@ class CodeProjectRepositoryTest {
   /** 只清理当前测试创建的数据，不触碰业务默认目录。 */
   @AfterTest
   fun tearDown() {
+    externalRoots.forEach(Path::deleteRecursively)
+    externalRoots.clear()
     root.deleteRecursively()
     preferences.removeNode()
+  }
+
+  @Test
+  fun importsExistingDirectoryWithoutCopyingSources() = runBlocking {
+    val externalRoot = createExternalProject("existing-java-project")
+    externalRoot.resolve("src").let(Files::createDirectories)
+    externalRoot.resolve("src/Main.java").writeText("public class Main {}")
+    repository = repositoryWithPicker(externalRoot)
+
+    val imported = requireNotNull(repository.importProject())
+
+    assertEquals(CodeProjectStorageKind.EXTERNAL_BOOKMARK, imported.project.storageKind)
+    assertEquals("java", imported.project.languageId)
+    assertEquals("src/Main.java", imported.activeFilePath)
+    assertEquals("public class Main {}", imported.sourceFiles.getValue("src/Main.java"))
+    assertEquals(externalRoot.toString(), imported.directoryDisplayPath)
+    assertFalse(Files.exists(root.resolve(imported.project.projectId)))
+    assertTrue(Files.isRegularFile(externalRoot.resolve(".cyxbs-project.json")))
+  }
+
+  @Test
+  fun restoresImportedProjectFromBookmarkAndWritesBackToOriginalDirectory() = runBlocking {
+    val externalRoot = createExternalProject("bookmark-project")
+    externalRoot.resolve("main.js").writeText("console.log('first')")
+    repository = repositoryWithPicker(externalRoot)
+    val imported = requireNotNull(repository.importProject())
+
+    val restoredRepository = CodeProjectRepository(
+      settings = PreferencesSettings(preferences),
+      projectsRoot = PlatformFile(root.toString()),
+      clock = { now++ },
+    )
+    val reopened = restoredRepository.openProject(imported.project.projectId)
+    restoredRepository.saveSource(
+      projectId = imported.project.projectId,
+      relativePath = "main.js",
+      source = "console.log('updated')",
+      expectedSource = "console.log('first')",
+    )
+
+    assertEquals("javascript", reopened.project.languageId)
+    assertEquals("console.log('updated')", externalRoot.resolve("main.js").readText())
+    assertTrue(restoredRepository.historicalProjects().single().isAvailable)
+  }
+
+  @Test
+  fun reimportingSameDirectoryKeepsSingleStableProject() = runBlocking {
+    val externalRoot = createExternalProject("stable-project")
+    externalRoot.resolve("src").let(Files::createDirectories)
+    externalRoot.resolve("src/App.kt").writeText("fun main() = Unit")
+    repository = repositoryWithPicker(externalRoot)
+
+    val first = requireNotNull(repository.importProject())
+    val second = requireNotNull(repository.importProject())
+
+    assertEquals(first.project.projectId, second.project.projectId)
+    assertEquals("kotlin", second.project.languageId)
+    assertEquals(listOf(first.project.projectId), repository.historicalProjects().map { it.project.projectId })
+  }
+
+  @Test
+  fun rejectsImportedDirectoryWithoutRecognizableLanguageSources() = runBlocking {
+    val externalRoot = createExternalProject("text-only-project")
+    externalRoot.resolve("README.md").writeText("documentation")
+    repository = repositoryWithPicker(externalRoot)
+
+    assertFailsWith<CodeProjectException> { repository.importProject() }
+    assertFalse(Files.exists(externalRoot.resolve(".cyxbs-project.json")))
   }
 
   @Test
@@ -451,4 +522,16 @@ class CodeProjectRepositoryTest {
     }
     Unit
   }
+
+  /** 创建独立于受管项目根目录的现有工程，验证导入过程不会复制源码。 */
+  private fun createExternalProject(name: String): Path =
+    Files.createTempDirectory("cyxbs-$name-").also(externalRoots::add)
+
+  /** 注入固定目录选择结果，单元测试不打开桌面系统选择器。 */
+  private fun repositoryWithPicker(directory: Path): CodeProjectRepository = CodeProjectRepository(
+    settings = PreferencesSettings(preferences),
+    projectsRoot = PlatformFile(root.toString()),
+    clock = { now++ },
+    externalProjectDirectoryPicker = { PlatformFile(directory.toString()) },
+  )
 }

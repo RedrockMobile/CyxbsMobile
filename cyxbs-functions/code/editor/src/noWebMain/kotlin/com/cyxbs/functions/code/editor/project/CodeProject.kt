@@ -6,19 +6,28 @@ import kotlinx.serialization.Serializable
 /**
  * 一个由编辑器管理的真实本地项目。
  *
- * 路由只传递 [projectId]，磁盘位置由已授权项目根目录和 [storageDirectoryName] 共同解析，避免把
- * Android URI 或 iOS 安全作用域 URL 写入 Deeplink 和项目 manifest。
+ * 路由只传递 [projectId]。受管项目由项目根目录和 [storageDirectoryName] 解析，外部项目由当前安装
+ * 保存的 bookmark 解析，避免把 Android URI 或 iOS 安全作用域 URL 写入 Deeplink 和 manifest。
  */
 @Serializable
 data class CodeProject(
   val projectId: String,
   val name: String,
   val languageId: String,
+  val storageKind: CodeProjectStorageKind = CodeProjectStorageKind.MANAGED_ROOT,
   val storageDirectoryName: String = projectId,
+  val directoryDisplayPathHint: String? = null,
   val lastOpenedAtEpochMilliseconds: Long,
   val isPinned: Boolean = false,
   val activeFilePath: String? = null,
 )
+
+/** 项目目录定位方式；外部目录依赖 Settings 中按项目保存的 bookmark。 */
+@Serializable
+enum class CodeProjectStorageKind {
+  MANAGED_ROOT,
+  EXTERNAL_BOOKMARK,
+}
 
 /** 首页展示的历史项目及其当前可访问目录；目录权限失效时 [directory] 为 null。 */
 data class HistoricalCodeProject(

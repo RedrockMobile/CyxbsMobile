@@ -26,7 +26,7 @@ import kotlin.time.Clock
 /**
  * 用户项目目录、项目 manifest 与历史项目索引的唯一入口。
  *
- * Settings 只缓存最近顺序和移动端目录 bookmark；每个项目自身都保存一份
+ * Settings 缓存最近顺序、受管根目录 bookmark 和外部项目 bookmark；每个项目自身都保存一份
  * [.cyxbs-project.json][PROJECT_MANIFEST_FILE_NAME]。应用卸载不会删除用户选择目录中的源码，重装后
  * 重新选择原目录即可从 manifest 恢复项目。所有写操作通过同一 [Mutex] 串行，避免自动保存和目录
  * 扫描相互覆盖。
@@ -39,6 +39,8 @@ class CodeProjectRepository(
     ignoreUnknownKeys = true
     encodeDefaults = true
   },
+  private val externalProjectDirectoryPicker: suspend () -> PlatformFile? =
+    ::selectExternalCodeProjectDirectory,
 ) {
   private val mutex = Mutex()
 
@@ -58,16 +60,17 @@ class CodeProjectRepository(
   suspend fun historicalProjects(): List<HistoricalCodeProject> = mutex.withLock {
     val root = resolveStorageRoot(requestIfMissing = false)
     val projects = loadProjects(root).sortedForHistory()
-    if (root != null) saveProjects(projects)
+    saveProjects(projects)
     projects.map { project ->
-      val directory = root?.directoryFor(project)?.takeIf {
+      val directory = resolveProjectDirectory(root, project)?.takeIf {
         it.exists() && it.isDirectory()
       }
       HistoricalCodeProject(
         project = project,
         directory = directory,
-        directoryDisplayPath = root?.displayPathFor(project)
-          ?: project.storageDirectoryName,
+        directoryDisplayPath = directory?.let { accessibleDirectory ->
+          projectDisplayPath(root, project, accessibleDirectory)
+        } ?: project.directoryDisplayPathHint ?: project.storageDirectoryName,
       )
     }
   }
@@ -116,14 +119,95 @@ class CodeProjectRepository(
     )
   }
 
+  /**
+   * 选择并导入一个已经存在的本地目录；源码继续保留在原位置，不复制到受管项目根目录。
+   *
+   * 目录中已有 manifest 时复用稳定项目 ID；没有 manifest 时根据源码扩展名推断主要语言并创建。
+   * 取消系统目录选择器返回 null，调用方无需把它当作错误提示。
+   */
+  suspend fun importProject(): CodeProjectWorkspace? = mutex.withLock {
+    val directory = externalProjectDirectoryPicker() ?: return@withLock null
+    if (!directory.exists() || !directory.isDirectory()) {
+      throw CodeProjectException("选择的项目目录不可访问。")
+    }
+    val snapshot = readWorkspace(directory)
+    if (snapshot.sourceFiles.isEmpty()) {
+      throw CodeProjectException("所选目录中没有可编辑的源码文件。")
+    }
+
+    val root = resolveStorageRoot(requestIfMissing = false)
+    val projects = loadProjects(root)
+    val manifestProject = readProjectManifest(directory)
+    val detectedLanguageId = detectPrimaryLanguage(snapshot.sourceFiles.keys)
+    val projectId = manifestProject?.projectId?.takeIf(String::isNotBlank)?.also(::requireSafeProjectId)
+      ?: uniqueProjectId(detectedLanguageId, projects)
+    val existingProject = projects.firstOrNull { it.projectId == projectId }
+    if (existingProject != null) {
+      val existingDirectory = resolveProjectDirectory(root, existingProject)
+      if (existingDirectory != null && !existingDirectory.isSameDirectoryAs(directory)) {
+        throw CodeProjectException("项目 ID 已被另一个目录使用：$projectId")
+      }
+    }
+
+    val projectName = normalizeProjectName(
+      manifestProject?.name?.takeIf(String::isNotBlank) ?: directory.name.ifBlank { "ImportedProject" },
+    )
+    val duplicateName = projects.firstOrNull { project ->
+      project.projectId != projectId && project.name.equals(projectName, ignoreCase = true)
+    }
+    if (duplicateName != null) {
+      throw CodeProjectException("项目名称已存在：$projectName")
+    }
+    val activeFilePath = manifestProject?.activeFilePath
+      ?.takeIf(snapshot.sourceFiles::containsKey)
+      ?: chooseInitialActiveFile(snapshot.sourceFiles.keys)
+    val importedProject = CodeProject(
+      projectId = projectId,
+      name = projectName,
+      languageId = manifestProject?.languageId?.takeIf(String::isNotBlank) ?: detectedLanguageId,
+      storageKind = CodeProjectStorageKind.EXTERNAL_BOOKMARK,
+      storageDirectoryName = directory.name.ifBlank { projectId },
+      // manifest 只记录可读的目录名；完整路径或 URI 只保存在当前安装的 bookmark 中。
+      directoryDisplayPathHint = directory.name.ifBlank { projectName },
+      lastOpenedAtEpochMilliseconds = clock(),
+      isPinned = manifestProject?.isPinned ?: existingProject?.isPinned ?: false,
+      activeFilePath = activeFilePath,
+    )
+    val previousBookmark = existingProject
+      ?.takeIf { it.storageKind == CodeProjectStorageKind.EXTERNAL_BOOKMARK }
+      ?.let { restoreExternalCodeProjectDirectory(settings, it.projectId) }
+    val previousManifest = readProjectManifestText(directory)
+    try {
+      saveExternalCodeProjectDirectory(settings, projectId, directory)
+      writeProjectManifest(directory, importedProject)
+      saveProjects(projects.replace(importedProject))
+      removeIgnoredProject(projectId)
+      workspaceOf(
+        project = importedProject,
+        directory = directory,
+        displayPath = directory.externalCodeProjectDisplayPath(),
+        snapshot = snapshot,
+      )
+    } catch (throwable: Throwable) {
+      restoreProjectManifest(directory, previousManifest)
+      if (previousBookmark == null) {
+        removeExternalCodeProjectDirectory(settings, projectId)
+      } else {
+        runCatching { saveExternalCodeProjectDirectory(settings, projectId, previousBookmark) }
+      }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
+  }
+
   /** 从最近项目 ID 重新解析授权目录并读取全部受支持源码。 */
   suspend fun openProject(projectId: String): CodeProjectWorkspace = mutex.withLock {
     val root = resolveStorageRoot(requestIfMissing = false)
-      ?: throw CodeProjectException("项目目录授权已失效，请重新选择项目根目录。")
     val projects = loadProjects(root)
     val project = projects.firstOrNull { it.projectId == projectId }
       ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val directory = root.directoryFor(project)
+    val directory = resolveProjectDirectory(root, project)
+      ?: throw CodeProjectException("项目目录授权已失效，请重新打开项目目录。")
     if (!directory.exists() || !directory.isDirectory()) {
       throw CodeProjectException("项目目录已不可访问：${project.name}")
     }
@@ -145,20 +229,17 @@ class CodeProjectRepository(
       directoryPaths = snapshot.directoryPaths,
       activeFilePath = activeFilePath,
       directory = directory,
-      directoryDisplayPath = root.displayPathFor(openedProject),
+      directoryDisplayPath = projectDisplayPath(root, openedProject, directory),
     )
   }
 
   /** 将当前活动文件同时写回 Settings 索引和项目 manifest，用于卸载后恢复。 */
   suspend fun updateActiveFile(projectId: String, activeFilePath: String) = mutex.withLock {
     requireSafeRelativePath(activeFilePath)
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val updated = project.copy(activeFilePath = activeFilePath)
-    writeProjectManifest(root.directoryFor(updated), updated)
-    saveProjects(projects.replace(updated))
+    val context = requireProjectContext(projectId)
+    val updated = context.project.copy(activeFilePath = activeFilePath)
+    writeProjectManifest(context.directory, updated)
+    saveProjects(context.projects.replace(updated))
   }
 
   /**
@@ -244,9 +325,8 @@ class CodeProjectRepository(
     expectedSource: String? = null,
   ) = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    val file = resolveFile(root.directoryFor(project), relativePath, createParents = expectedSource == null)
+    val context = requireProjectContext(projectId)
+    val file = resolveFile(context.directory, relativePath, createParents = expectedSource == null)
     if (expectedSource != null) {
       if (!file.isRegularFile()) throw CodeProjectSourceConflictException(relativePath)
       val diskSource = file.readString()
@@ -264,9 +344,8 @@ class CodeProjectRepository(
    */
   suspend fun readSource(projectId: String, relativePath: String): String = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    val file = resolveFile(root.directoryFor(project), relativePath, createParents = false)
+    val context = requireProjectContext(projectId)
+    val file = resolveFile(context.directory, relativePath, createParents = false)
     if (!file.isRegularFile()) throw CodeProjectException("源码文件已不存在：$relativePath")
     file.readString()
   }
@@ -278,9 +357,8 @@ class CodeProjectRepository(
    */
   suspend fun overwriteSource(projectId: String, relativePath: String, source: String) = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    resolveFile(root.directoryFor(project), relativePath, createParents = true).writeString(source)
+    val context = requireProjectContext(projectId)
+    resolveFile(context.directory, relativePath, createParents = true).writeString(source)
   }
 
   /**
@@ -295,11 +373,10 @@ class CodeProjectRepository(
     source: String,
   ): CodeProjectWorkspace = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val projectDirectory = root.directoryFor(project)
+    val context = requireProjectContext(projectId)
+    val projects = context.projects
+    val project = context.project
+    val projectDirectory = context.directory
     val copyPath = uniqueConflictCopyPath(projectDirectory, relativePath)
     val copyFile = resolveFile(projectDirectory, copyPath, createParents = true)
     copyFile.writeString(source)
@@ -308,7 +385,7 @@ class CodeProjectRepository(
       val snapshot = readWorkspace(projectDirectory)
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
-      workspaceOf(root, updatedProject, snapshot)
+      workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
     } catch (throwable: Throwable) {
       runCatching { copyFile.delete(mustExist = false) }
       runCatching { writeProjectManifest(projectDirectory, project) }
@@ -347,11 +424,10 @@ class CodeProjectRepository(
       "文件重命名目标路径不能重复。"
     }
 
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val projectDirectory = root.directoryFor(project)
+    val context = requireProjectContext(projectId)
+    val projects = context.projects
+    val project = context.project
+    val projectDirectory = context.directory
     val oldPaths = fileRenames.mapTo(linkedSetOf(), CodeProjectFileRename::oldPath)
     val newPaths = fileRenames.mapTo(linkedSetOf(), CodeProjectFileRename::newPath)
     require(newPaths.none(oldPaths::contains)) {
@@ -435,9 +511,8 @@ class CodeProjectRepository(
     initialSource: String = "",
   ): Boolean = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    val file = resolveFile(root.directoryFor(project), relativePath, createParents = true)
+    val context = requireProjectContext(projectId)
+    val file = resolveFile(context.directory, relativePath, createParents = true)
     if (file.exists()) return@withLock false
     file.writeString(initialSource)
     true
@@ -446,11 +521,10 @@ class CodeProjectRepository(
   /** 在用户项目目录中创建文件夹；已存在时返回 false。 */
   suspend fun createDirectory(projectId: String, relativePath: String): Boolean = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    val directory = resolveDirectory(root.directoryFor(project), relativePath, create = false)
+    val context = requireProjectContext(projectId)
+    val directory = resolveDirectory(context.directory, relativePath, create = false)
     if (directory.exists()) return@withLock false
-    resolveDirectory(root.directoryFor(project), relativePath, create = true)
+    resolveDirectory(context.directory, relativePath, create = true)
     true
   }
 
@@ -469,11 +543,10 @@ class CodeProjectRepository(
     requireSafeRelativePath(newPath)
     require(oldPath != newPath) { "重命名前后路径不能相同。" }
 
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val projectDirectory = root.directoryFor(project)
+    val context = requireProjectContext(projectId)
+    val projects = context.projects
+    val project = context.project
+    val projectDirectory = context.directory
     val source = resolveFile(projectDirectory, oldPath, createParents = false)
     if (!source.exists()) throw CodeProjectException("待移动路径不存在：$oldPath")
     if (source.isDirectory() && newPath.startsWith("$oldPath/")) {
@@ -490,7 +563,7 @@ class CodeProjectRepository(
       val snapshot = readWorkspace(projectDirectory)
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
-      workspaceOf(root, updatedProject, snapshot)
+      workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
     } catch (throwable: Throwable) {
       runCatching { movePathWithFallback(destination, source) }
       runCatching { writeProjectManifest(projectDirectory, project) }
@@ -507,11 +580,10 @@ class CodeProjectRepository(
    */
   suspend fun deletePath(projectId: String, relativePath: String): CodeProjectWorkspace = mutex.withLock {
     requireSafeRelativePath(relativePath)
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
-    val projectDirectory = root.directoryFor(project)
+    val context = requireProjectContext(projectId)
+    val projects = context.projects
+    val project = context.project
+    val projectDirectory = context.directory
     val source = resolveFile(projectDirectory, relativePath, createParents = false)
     if (!source.exists()) throw CodeProjectException("待删除路径不存在：$relativePath")
 
@@ -536,7 +608,7 @@ class CodeProjectRepository(
       val snapshot = readWorkspace(projectDirectory)
       writeProjectManifest(projectDirectory, updatedProject)
       saveProjects(projects.replace(updatedProject))
-      workspaceOf(root, updatedProject, snapshot)
+      workspaceOf(updatedProject, projectDirectory, context.displayPath, snapshot)
     } catch (throwable: Throwable) {
       runCatching { movePathWithFallback(trashTarget, source) }
       runCatching { writeProjectManifest(projectDirectory, project) }
@@ -560,18 +632,18 @@ class CodeProjectRepository(
    * 置顶只改变历史列表分组，不覆盖最近点击时间；取消置顶后会自动回到正常时间顺序。
    */
   suspend fun setProjectPinned(projectId: String, isPinned: Boolean) = mutex.withLock {
-    val root = requireStorageRoot()
-    val projects = loadProjects(root)
-    val project = projects.firstOrNull { it.projectId == projectId }
-      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val context = requireProjectContext(projectId)
+    val projects = context.projects
+    val project = context.project
     if (project.isPinned == isPinned) return@withLock
     val updated = project.copy(isPinned = isPinned)
-    writeProjectManifest(root.directoryFor(updated), updated)
+    writeProjectManifest(context.directory, updated)
     saveProjects(projects.replace(updated))
   }
 
   /** 从历史列表中移除入口，但不删除用户源码和 manifest。 */
   suspend fun forgetProject(projectId: String) = mutex.withLock {
+    removeExternalCodeProjectDirectory(settings, projectId)
     saveProjects(loadIndexedProjects().filterNot { it.projectId == projectId })
     saveEditorSessions(loadEditorSessions().filterNot { session -> session.projectId == projectId })
     val ignored = loadIgnoredProjectIds() + projectId
@@ -580,16 +652,16 @@ class CodeProjectRepository(
 
   /** 返回当前已授权的项目目录，供系统文件管理器打开。 */
   suspend fun projectDirectory(projectId: String): PlatformFile = mutex.withLock {
-    val root = requireStorageRoot()
-    val project = requireProject(projectId, root)
-    root.directoryFor(project).takeIf { it.exists() && it.isDirectory() }
-      ?: throw CodeProjectException("项目目录已不可访问：${project.name}")
+    val context = requireProjectContext(projectId)
+    context.directory.takeIf { it.exists() && it.isDirectory() }
+      ?: throw CodeProjectException("项目目录已不可访问：${context.project.name}")
   }
 
   /** 根据磁盘快照构造工作区，统一校验 manifest 中的活动文件仍然存在。 */
   private fun workspaceOf(
-    root: CodeProjectStorageRoot,
     project: CodeProject,
+    directory: PlatformFile,
+    displayPath: String,
     snapshot: WorkspaceSnapshot,
   ): CodeProjectWorkspace {
     val activeFilePath = project.activeFilePath
@@ -602,8 +674,8 @@ class CodeProjectRepository(
       sourceFiles = snapshot.sourceFiles,
       directoryPaths = snapshot.directoryPaths,
       activeFilePath = activeFilePath,
-      directory = root.directoryFor(normalizedProject),
-      directoryDisplayPath = root.displayPathFor(normalizedProject),
+      directory = directory,
+      directoryDisplayPath = displayPath,
     )
   }
 
@@ -689,10 +761,6 @@ class CodeProjectRepository(
     return resolveDefaultCodeProjectStorageRoot(settings, requestIfMissing)
   }
 
-  private suspend fun requireStorageRoot(): CodeProjectStorageRoot =
-    resolveStorageRoot(requestIfMissing = false)
-      ?: throw CodeProjectException("项目目录授权已失效，请重新选择项目根目录。")
-
   /** 合并 Settings 索引与磁盘 manifest；manifest 让项目可在应用重装后恢复。 */
   private suspend fun loadProjects(root: CodeProjectStorageRoot?): List<CodeProject> {
     val ignored = loadIgnoredProjectIds()
@@ -719,7 +787,11 @@ class CodeProjectRepository(
         json.decodeFromString(
           CodeProjectManifest.serializer(),
           manifest.readString(),
-        ).project.copy(storageDirectoryName = directory.name)
+        ).project.copy(
+          storageKind = CodeProjectStorageKind.MANAGED_ROOT,
+          storageDirectoryName = directory.name,
+          directoryDisplayPathHint = directory.name,
+        )
       }.getOrNull() ?: continue
       if (project.projectId.isNotBlank() && project.languageId.isNotBlank()) {
         projects += project
@@ -804,6 +876,36 @@ class CodeProjectRepository(
     )
   }
 
+  /** 读取已有 manifest；格式损坏时拒绝覆盖，避免导入操作破坏其他工具留下的元数据。 */
+  private suspend fun readProjectManifest(directory: PlatformFile): CodeProject? {
+    val manifest = directory / PROJECT_MANIFEST_FILE_NAME
+    if (!manifest.exists()) return null
+    if (!manifest.isRegularFile() || manifest.size() > MAX_MANIFEST_BYTES) {
+      throw CodeProjectException("项目 manifest 不可读取或超过大小限制。")
+    }
+    return runCatching {
+      json.decodeFromString(CodeProjectManifest.serializer(), manifest.readString()).project
+    }.getOrElse { throwable ->
+      throw CodeProjectException("项目 manifest 格式无效。", throwable)
+    }
+  }
+
+  /** 保存导入前的 manifest 原文，失败回滚时不重新序列化未知字段。 */
+  private suspend fun readProjectManifestText(directory: PlatformFile): String? {
+    val manifest = directory / PROJECT_MANIFEST_FILE_NAME
+    return manifest.takeIf(PlatformFile::isRegularFile)?.readString()
+  }
+
+  /** 恢复导入前的 manifest；原目录没有 manifest 时移除本次新增文件。 */
+  private suspend fun restoreProjectManifest(directory: PlatformFile, original: String?) {
+    val manifest = directory / PROJECT_MANIFEST_FILE_NAME
+    if (original == null) {
+      if (manifest.exists()) manifest.delete(mustExist = false)
+    } else {
+      manifest.writeString(original)
+    }
+  }
+
   /** 从 Settings 读取项目索引；损坏数据按空索引处理，真实项目目录不会被删除。 */
   private fun loadIndexedProjects(): List<CodeProject> {
     val raw = settings.getStringOrNull(PROJECTS_SETTINGS_KEY) ?: return emptyList()
@@ -870,10 +972,80 @@ class CodeProjectRepository(
     saveIgnoredProjectIds(loadIgnoredProjectIds().filterNot { it == projectId })
   }
 
-  /** 返回指定项目；不存在时拒绝写入，避免意外创建游离目录。 */
-  private suspend fun requireProject(projectId: String, root: CodeProjectStorageRoot): CodeProject =
-    loadProjects(root).firstOrNull { it.projectId == projectId }
+  /** 统一解析受管目录和外部 bookmark，业务文件操作无需感知项目来源。 */
+  private suspend fun requireProjectContext(projectId: String): ProjectContext {
+    val root = resolveStorageRoot(requestIfMissing = false)
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
       ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val directory = resolveProjectDirectory(root, project)
+      ?.takeIf { it.exists() && it.isDirectory() }
+      ?: throw CodeProjectException("项目目录已不可访问：${project.name}")
+    return ProjectContext(
+      projects = projects,
+      project = project,
+      directory = directory,
+      displayPath = projectDisplayPath(root, project, directory),
+    )
+  }
+
+  /** 外部项目从独立 bookmark 恢复；受管项目仍由统一根目录拼接稳定目录名。 */
+  private fun resolveProjectDirectory(
+    root: CodeProjectStorageRoot?,
+    project: CodeProject,
+  ): PlatformFile? = when (project.storageKind) {
+    CodeProjectStorageKind.MANAGED_ROOT -> root?.directoryFor(project)
+    CodeProjectStorageKind.EXTERNAL_BOOKMARK ->
+      restoreExternalCodeProjectDirectory(settings, project.projectId)
+  }
+
+  /** 可访问时展示真实路径，权限失效时由调用方回退到 manifest 中的目录名提示。 */
+  private fun projectDisplayPath(
+    root: CodeProjectStorageRoot?,
+    project: CodeProject,
+    directory: PlatformFile,
+  ): String = when (project.storageKind) {
+    CodeProjectStorageKind.MANAGED_ROOT -> root?.displayPathFor(project)
+      ?: project.directoryDisplayPathHint
+      ?: project.storageDirectoryName
+    CodeProjectStorageKind.EXTERNAL_BOOKMARK -> directory.externalCodeProjectDisplayPath()
+  }
+
+  /** 通过平台可解析绝对标识比较目录；失败时保守地认为不是同一目录。 */
+  private fun PlatformFile.isSameDirectoryAs(other: PlatformFile): Boolean = runCatching {
+    absolutePath().trimEnd('/', '\\') == other.absolutePath().trimEnd('/', '\\')
+  }.getOrDefault(false)
+
+  /** 按常见源码扩展名数量选择项目主语言；并列时按最先出现的源码保持稳定。 */
+  private fun detectPrimaryLanguage(sourcePaths: Collection<String>): String {
+    val languageIds = sourcePaths.mapNotNull { path ->
+      when (path.substringAfterLast('.', missingDelimiterValue = "").lowercase()) {
+        "java" -> "java"
+        "js", "mjs", "cjs", "ts", "tsx" -> "javascript"
+        "py" -> "python"
+        "kt", "kts" -> "kotlin"
+        else -> null
+      }
+    }
+    return languageIds.groupingBy(String::lowercase).eachCount()
+      .maxByOrNull(Map.Entry<String, Int>::value)
+      ?.key
+      ?: throw CodeProjectException("所选目录中没有可识别语言的源码文件。")
+  }
+
+  /** 优先选择各语言惯用入口文件，找不到时使用扫描顺序中的第一个源码。 */
+  private fun chooseInitialActiveFile(sourcePaths: Collection<String>): String =
+    sourcePaths.firstOrNull { path ->
+      path.substringAfterLast('/') in PREFERRED_ENTRY_FILE_NAMES
+    } ?: sourcePaths.first()
+
+  /** 一次文件操作所需的完整项目定位信息。 */
+  private data class ProjectContext(
+    val projects: List<CodeProject>,
+    val project: CodeProject,
+    val directory: PlatformFile,
+    val displayPath: String,
+  )
 
   private fun CodeProjectStorageRoot.directoryFor(project: CodeProject): PlatformFile =
     directory / project.storageDirectoryName
@@ -892,6 +1064,21 @@ class CodeProjectRepository(
       throw CodeProjectException("项目名称不能包含控制字符。")
     }
     return normalized
+  }
+
+  /** manifest 项目 ID 会进入 Settings key，必须保持短小且只包含稳定 ASCII 路径字符。 */
+  private fun requireSafeProjectId(projectId: String) {
+    if (
+      projectId.length > MAX_PROJECT_ID_LENGTH ||
+      projectId.any { character ->
+        character !in 'a'..'z' &&
+          character !in 'A'..'Z' &&
+          character !in '0'..'9' &&
+          character != '-' && character != '_' && character != '.'
+      }
+    ) {
+      throw CodeProjectException("项目 manifest 中的项目 ID 无效。")
+    }
   }
 
   /** 生成仅由安全路径字符组成的稳定 ID；同毫秒创建时继续增加后缀。 */
@@ -981,6 +1168,7 @@ class CodeProjectRepository(
     const val MAX_PROJECTS = 20
     const val MAX_IGNORED_PROJECTS = 100
     const val MAX_PROJECT_NAME_LENGTH = 64
+    const val MAX_PROJECT_ID_LENGTH = 128
     const val MAX_OPEN_FILES_PER_PROJECT = 50
     const val MAX_DISCOVERED_DIRECTORIES = 200
     const val MAX_MANIFEST_BYTES = 64L * 1024L
@@ -995,6 +1183,9 @@ class CodeProjectRepository(
     val RESERVED_PROJECT_PATHS = setOf(PROJECT_MANIFEST_FILE_NAME, PROJECT_TRASH_DIRECTORY_NAME)
     val SUPPORTED_SOURCE_EXTENSIONS = setOf(
       "java", "js", "mjs", "cjs", "ts", "tsx", "py", "kt", "kts", "json", "md", "txt",
+    )
+    val PREFERRED_ENTRY_FILE_NAMES = setOf(
+      "Main.java", "main.js", "main.mjs", "main.cjs", "main.ts", "main.py", "Main.kt", "main.kts",
     )
   }
 }

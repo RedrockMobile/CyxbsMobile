@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -139,6 +140,23 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
               }
             }
             .onFailure { errorMessage = it.message ?: "选择项目目录失败。" }
+          isWorking = false
+        }
+      },
+      onImportProject = {
+        if (isWorking) return@WorkspaceHomeScreen
+        errorMessage = null
+        isWorking = true
+        coroutineScope.launch {
+          runCatching { projectRepository.importProject() }
+            .onSuccess { workspace ->
+              if (workspace != null) {
+                historicalProjects = projectRepository.historicalProjects()
+                CodeEditorTestNavArgument(projectId = workspace.project.projectId)
+                  .navigateFromWorkspaceHome()
+              }
+            }
+            .onFailure { errorMessage = it.message ?: "打开项目失败。" }
           isWorking = false
         }
       },
@@ -277,6 +295,7 @@ private fun WorkspaceHomeScreen(
   isWorking: Boolean,
   errorMessage: String?,
   onCreateProject: () -> Unit,
+  onImportProject: () -> Unit,
   onOpenTutorial: () -> Unit,
   onOpenHistoricalProject: (HistoricalCodeProject) -> Unit,
   onOpenHistoricalProjectDirectory: (HistoricalCodeProject) -> Unit,
@@ -300,7 +319,7 @@ private fun WorkspaceHomeScreen(
         fontWeight = FontWeight.SemiBold,
       )
       Text(
-        text = "创建一个本地项目，或从教程开始学习",
+        text = "创建或打开本地项目，也可以从教程开始学习",
         modifier = Modifier.padding(top = 4.dp),
         color = WorkspaceHomeColors.secondaryText,
         fontSize = 12.sp,
@@ -310,6 +329,7 @@ private fun WorkspaceHomeScreen(
         modifier = Modifier.padding(top = 24.dp),
         enabled = !isWorking,
         onCreateProject = onCreateProject,
+        onImportProject = onImportProject,
         onOpenTutorial = onOpenTutorial,
       )
       Text(
@@ -334,7 +354,7 @@ private fun WorkspaceHomeScreen(
           )
 
           historicalProjects.isEmpty() -> Text(
-            text = "还没有历史项目，创建项目后会显示在这里。",
+            text = "还没有历史项目，创建或打开项目后会显示在这里。",
             modifier = Modifier.align(Alignment.Center),
             color = WorkspaceHomeColors.secondaryText,
             fontSize = 11.sp,
@@ -432,12 +452,13 @@ internal fun WorkspaceProjectLoading(
 }
 
 /**
- * 入口操作始终保持单行双列；外层限制桌面最大宽度，卡片在手机上平分剩余空间而不会换行。
+ * 三个入口始终保持单行；手机端使用紧凑卡片，避免项目与教程入口因宽度不足换行。
  */
 @Composable
 private fun WorkspaceActions(
   enabled: Boolean,
   onCreateProject: () -> Unit,
+  onImportProject: () -> Unit,
   onOpenTutorial: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -447,21 +468,26 @@ private fun WorkspaceActions(
   ) {
     Row(
       modifier = Modifier
-        .widthIn(max = 512.dp)
+        .widthIn(max = 560.dp)
         .fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       WorkspaceActionCard(
         title = "创建项目",
-        description = "选择语言并创建本地项目目录",
         icon = { Icon(Icons.Default.Add, contentDescription = null) },
         enabled = enabled,
         onClick = onCreateProject,
         modifier = Modifier.weight(1f),
       )
       WorkspaceActionCard(
+        title = "打开项目",
+        icon = { Icon(Icons.Default.Folder, contentDescription = null) },
+        enabled = enabled,
+        onClick = onImportProject,
+        modifier = Modifier.weight(1f),
+      )
+      WorkspaceActionCard(
         title = "打开教程",
-        description = "选择语言并继续课程进度",
         icon = { Icon(Icons.Default.School, contentDescription = null) },
         enabled = enabled,
         onClick = onOpenTutorial,
@@ -474,7 +500,6 @@ private fun WorkspaceActions(
 @Composable
 private fun WorkspaceActionCard(
   title: String,
-  description: String,
   icon: @Composable () -> Unit,
   enabled: Boolean,
   onClick: () -> Unit,
@@ -482,18 +507,18 @@ private fun WorkspaceActionCard(
 ) {
   Surface(
     modifier = modifier
-      .height(82.dp)
+      .height(64.dp)
       .clickable(enabled = enabled, onClick = onClick),
     shape = RoundedCornerShape(12.dp),
     color = WorkspaceHomeColors.panel,
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 12.dp),
+      modifier = Modifier.padding(horizontal = 9.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Surface(
-        modifier = Modifier.size(34.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.size(28.dp),
+        shape = RoundedCornerShape(8.dp),
         color = WorkspaceHomeColors.accent.copy(alpha = 0.16f),
         contentColor = WorkspaceHomeColors.accent,
       ) {
@@ -501,21 +526,14 @@ private fun WorkspaceActionCard(
           icon()
         }
       }
-      Spacer(Modifier.width(8.dp))
-      Column {
-        Text(
-          text = title,
-          color = WorkspaceHomeColors.primaryText,
-          fontSize = 14.sp,
-          fontWeight = FontWeight.Medium,
-        )
-        Text(
-          text = description,
-          modifier = Modifier.padding(top = 3.dp),
-          color = WorkspaceHomeColors.secondaryText,
-          fontSize = 10.sp,
-        )
-      }
+      Spacer(Modifier.width(6.dp))
+      Text(
+        text = title,
+        color = WorkspaceHomeColors.primaryText,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+      )
     }
   }
 }

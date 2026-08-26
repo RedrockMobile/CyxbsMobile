@@ -4,11 +4,14 @@ import com.russhwolf.settings.Settings
 import io.github.vinceglb.filekit.BookmarkData
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.absolutePath
 import io.github.vinceglb.filekit.bookmarkData
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.div
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.fromBookmarkData
+import io.github.vinceglb.filekit.isDirectory
 import io.github.vinceglb.filekit.name
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -34,6 +37,54 @@ internal expect suspend fun resolveDefaultCodeProjectStorageRoot(
   settings: Settings,
   requestIfMissing: Boolean,
 ): CodeProjectStorageRoot?
+
+/** 选择一个已经存在的项目目录；取消系统选择器时返回 null。 */
+internal suspend fun selectExternalCodeProjectDirectory(): PlatformFile? = FileKit.openDirectoryPicker()
+
+/**
+ * 保存单个外部项目目录的跨平台 bookmark。
+ *
+ * bookmark 只进入应用 Settings，不写入项目 manifest，避免泄露 URI、沙盒路径或安全作用域数据。
+ */
+@OptIn(ExperimentalEncodingApi::class)
+internal suspend fun saveExternalCodeProjectDirectory(
+  settings: Settings,
+  projectId: String,
+  directory: PlatformFile,
+) {
+  val bookmark = directory.bookmarkData()
+  settings.putString(
+    externalCodeProjectBookmarkKey(projectId),
+    Base64.Default.encode(bookmark.bytes),
+  )
+}
+
+/** 恢复单个外部项目目录；bookmark 失效时移除旧记录并返回 null。 */
+@OptIn(ExperimentalEncodingApi::class)
+internal fun restoreExternalCodeProjectDirectory(
+  settings: Settings,
+  projectId: String,
+): PlatformFile? {
+  val key = externalCodeProjectBookmarkKey(projectId)
+  val encoded = settings.getStringOrNull(key) ?: return null
+  val directory = runCatching {
+    PlatformFile.fromBookmarkData(BookmarkData(Base64.Default.decode(encoded)))
+  }.getOrNull()
+  if (directory != null && directory.exists() && directory.isDirectory()) return directory
+  settings.remove(key)
+  return null
+}
+
+/** 删除外部项目目录授权记录，不删除真实目录和源码。 */
+internal fun removeExternalCodeProjectDirectory(settings: Settings, projectId: String) {
+  settings.remove(externalCodeProjectBookmarkKey(projectId))
+}
+
+/** 生成适合界面展示的路径；content URI 退化为目录名，避免暴露不可读的长 URI。 */
+internal fun PlatformFile.externalCodeProjectDisplayPath(): String {
+  val path = runCatching { absolutePath() }.getOrNull().orEmpty()
+  return path.takeUnless { it.isBlank() || it.startsWith("content://") } ?: name.ifBlank { "外部项目" }
+}
 
 /**
  * 恢复或请求移动端的外部文档目录。
@@ -108,3 +159,8 @@ private fun PlatformFile.toCodeProjectStorageRoot(
 internal const val CODE_PROJECT_ROOT_BOOKMARK_SETTINGS_KEY =
   "code.editor.project-root-bookmark"
 internal const val CODE_PROJECTS_DIRECTORY_NAME = "CyxbsProjects"
+private const val CODE_EXTERNAL_PROJECT_BOOKMARK_SETTINGS_KEY_PREFIX =
+  "code.editor.external-project-bookmark."
+
+private fun externalCodeProjectBookmarkKey(projectId: String): String =
+  CODE_EXTERNAL_PROJECT_BOOKMARK_SETTINGS_KEY_PREFIX + projectId
