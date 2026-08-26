@@ -54,7 +54,6 @@ import com.cyxbs.functions.code.editor.project.CodeProjectFileRename
 import com.cyxbs.functions.code.editor.project.CodeProjectEditorSession
 import com.cyxbs.functions.code.editor.project.CodeProjectRepository
 import com.cyxbs.functions.code.editor.project.CodeProjectSourceConflictException
-import com.cyxbs.functions.code.editor.project.CodeProjectTemplates
 import com.cyxbs.functions.code.editor.project.CodeProjectWorkspace
 import com.cyxbs.functions.code.editor.project.openProjectDirectory
 import com.cyxbs.functions.code.editor.workbench.CodeEditorWorkbench
@@ -165,12 +164,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       return
     }
 
-    val initialTemplate = CodeProjectTemplates.find(argument.tutorialLanguageId.orEmpty())
-      ?: CodeProjectTemplates.all.first()
-    val initialSourceFiles = loadedProjectWorkspace?.sourceFiles ?: initialTemplate.sourceFiles
+    // 教程源码会在动态教程包加载后替换；此处只提供不绑定任何语言的短生命周期占位文件。
+    val initialSourceFiles = loadedProjectWorkspace?.sourceFiles ?: mapOf(UNTITLED_FILE_PATH to "")
     val initialActiveFilePath = loadedProjectSession?.activeFilePath
       ?: loadedProjectWorkspace?.activeFilePath
-      ?: initialTemplate.activeFilePath
+      ?: UNTITLED_FILE_PATH
     // 真实项目只提供项目工具；教程目录、进度和引导仅属于教程或原实验工作区。
     val isTutorialWorkspace = argument.projectId == null
     val dynamicLanguageManager = remember { DynamicLanguageManager() }
@@ -1507,7 +1505,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       unsupportedCapabilityStatistics = unsupportedCapabilityStatistics,
       leadingPanels = listOfNotNull(tutorialSidePanel),
       projectPath = loadedProjectWorkspace?.directoryDisplayPath
-        ?: "/${initialTemplate.defaultProjectName}",
+        ?: "/${argument.tutorialLanguageId ?: "workspace"}",
       fileIcon = dynamicDocumentIcon,
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
@@ -2044,6 +2042,8 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
   )
 
   private companion object {
+    /** 动态教程内容到达前使用的无语言占位路径，不参与项目创建或语言能力判断。 */
+    const val UNTITLED_FILE_PATH = "untitled"
     const val DISPLAY_RESULT_LIMIT = 12
     const val MAX_DISPLAYED_SOURCE_FRAMES = 8
     const val MICROSECONDS_PER_MILLISECOND = 1_000

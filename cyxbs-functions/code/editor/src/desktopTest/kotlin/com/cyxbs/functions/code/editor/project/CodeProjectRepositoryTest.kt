@@ -535,3 +535,27 @@ class CodeProjectRepositoryTest {
     externalProjectDirectoryPicker = { PlatformFile(directory.toString()) },
   )
 }
+
+/** 仓库测试专用模板；生产代码的项目源码必须由动态语言 npm 包提供。 */
+private object CodeProjectTemplates {
+  private val templates = listOf(
+    CodeProjectTemplate(
+      languageId = "java",
+      displayName = "Java",
+      defaultProjectName = "JavaProject",
+      activeFilePath = "src/Main.java",
+      sourceFiles = mapOf("src/Main.java" to "public class Main {}"),
+    ),
+    CodeProjectTemplate(
+      languageId = "javascript",
+      displayName = "JavaScript",
+      defaultProjectName = "JavaScriptProject",
+      activeFilePath = "src/main.js",
+      sourceFiles = mapOf("src/main.js" to "console.log('Hello')"),
+    ),
+  )
+
+  /** 按稳定语言 ID 返回可重复使用的仓库测试数据。 */
+  fun find(languageId: String): CodeProjectTemplate? =
+    templates.firstOrNull { it.languageId == languageId }
+}

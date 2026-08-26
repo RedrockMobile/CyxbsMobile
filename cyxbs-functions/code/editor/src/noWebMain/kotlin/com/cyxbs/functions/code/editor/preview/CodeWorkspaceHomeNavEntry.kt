@@ -59,16 +59,20 @@ import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.functions.code.editor.project.CodeProjectTemplate
 import com.cyxbs.functions.code.editor.project.CodeProjectRepository
-import com.cyxbs.functions.code.editor.project.CodeProjectTemplates
 import com.cyxbs.functions.code.editor.project.HistoricalCodeProject
 import com.cyxbs.functions.code.editor.project.openProjectDirectory
+import com.cyxbs.functions.code.editor.project.toCodeProjectTemplate
 import com.cyxbs.functions.code.editor.workbench.DynamicLanguageFileIconCache
 import com.cyxbs.functions.code.editor.workbench.rememberDynamicLanguageFileIconCache
 import com.cyxbs.functions.code.language.DynamicLanguageManager
+import com.cyxbs.functions.code.language.DynamicLanguageInfo
+import com.cyxbs.functions.code.language.DynamicLanguageSession
 import com.cyxbs.functions.code.tutorials.DynamicTutorialInfo
 import com.cyxbs.functions.code.tutorials.DynamicTutorialManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 /** 代码工作区首页路由；保留原测试页 deeplink，入口与具体工作区分别占用一层返回栈。 */
@@ -94,6 +98,8 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
     val tutorialManager = remember { DynamicTutorialManager() }
     val coroutineScope = rememberCoroutineScope()
     var historicalProjects by remember { mutableStateOf<List<HistoricalCodeProject>?>(null) }
+    var projectLanguages by remember { mutableStateOf<List<DynamicLanguageInfo>?>(null) }
+    var projectLanguageError by remember { mutableStateOf<String?>(null) }
     var tutorialChoices by remember { mutableStateOf<List<DynamicTutorialInfo>?>(null) }
     var isLoadingTutorialChoices by remember { mutableStateOf(false) }
     var selectionMode by remember { mutableStateOf<WorkspaceSelectionMode?>(null) }
@@ -130,16 +136,19 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
       errorMessage = errorMessage,
       onCreateProject = {
         errorMessage = null
+        projectLanguageError = null
         isWorking = true
         coroutineScope.launch {
-          runCatching { projectRepository.prepareProjectRoot() }
-            .onSuccess { isPrepared ->
-              if (isPrepared) {
-                historicalProjects = projectRepository.historicalProjects()
-                selectionMode = WorkspaceSelectionMode.PROJECT
-              }
+          runCatching {
+            val isPrepared = projectRepository.prepareProjectRoot()
+            if (isPrepared) {
+              val languages = dynamicLanguageManager.supportedLanguages()
+              languageIconCache.updateAll(dynamicLanguageManager.cachedIcons())
+              historicalProjects = projectRepository.historicalProjects()
+              projectLanguages = languages
+              selectionMode = WorkspaceSelectionMode.PROJECT
             }
-            .onFailure { errorMessage = it.message ?: "选择项目目录失败。" }
+          }.onFailure { errorMessage = it.message ?: "准备项目创建能力失败。" }
           isWorking = false
         }
       },
@@ -218,20 +227,50 @@ class CodeWorkspaceHomeNavEntry : AppNavEntry<CodeWorkspaceHomeNavArgument>() {
           title = "创建项目",
           subtitle = "选择项目使用的语言",
           languageIconCache = languageIconCache,
-          choices = CodeProjectTemplates.all.map { template ->
+          choices = projectLanguages.orEmpty().map { language ->
             WorkspaceLanguageChoice(
-              languageId = template.languageId,
-              displayName = template.displayName,
-              description = "创建 ${template.defaultProjectName}",
+              languageId = language.languageId,
+              displayName = language.displayName,
+              description = "从动态语言包创建 ${language.displayName} 项目",
             )
           },
           isLoading = isWorking,
+          emptyMessage = projectLanguageError,
+          failureMessage = projectLanguageError,
           onDismiss = { if (!isWorking) selectionMode = null },
           onSelect = { choice ->
-            val template = CodeProjectTemplates.find(choice.languageId) ?: return@WorkspaceLanguageDialog
-            selectionMode = null
-            projectNameError = null
-            projectTemplateForNaming = template
+            if (isWorking) return@WorkspaceLanguageDialog
+            val language = projectLanguages
+              ?.firstOrNull { it.languageId == choice.languageId }
+              ?: return@WorkspaceLanguageDialog
+            isWorking = true
+            projectLanguageError = null
+            coroutineScope.launch {
+              var languageSession: DynamicLanguageSession? = null
+              try {
+                languageSession = dynamicLanguageManager.load(language.languageId)
+                val template = languageSession.projectTemplate().getOrThrow()
+                  .toCodeProjectTemplate(language)
+                // 图标只是入口页派生数据，损坏或旧包缺失图标不能阻止有效项目模板落盘。
+                try {
+                  languageIconCache.update(language.languageId, languageSession.fileIcon().getOrThrow())
+                } catch (exception: CancellationException) {
+                  throw exception
+                } catch (_: Throwable) {
+                  // 保留通用代码图标，下一次正常加载语言能力时仍会重新尝试刷新缓存。
+                }
+                selectionMode = null
+                projectNameError = null
+                projectTemplateForNaming = template
+              } catch (exception: CancellationException) {
+                throw exception
+              } catch (throwable: Throwable) {
+                projectLanguageError = throwable.message ?: "加载项目模板失败。"
+              } finally {
+                withContext(NonCancellable) { languageSession?.close() }
+                isWorking = false
+              }
+            }
           },
         )
       }
@@ -782,6 +821,7 @@ internal fun WorkspaceLanguageDialog(
   isLoading: Boolean,
   languageIconCache: DynamicLanguageFileIconCache? = null,
   emptyMessage: String? = null,
+  failureMessage: String? = null,
   onDismiss: () -> Unit,
   onSelect: (WorkspaceLanguageChoice) -> Unit,
 ) {
@@ -862,6 +902,14 @@ internal fun WorkspaceLanguageDialog(
               }
             }
           }
+        }
+        if (!failureMessage.isNullOrBlank() && choices.isNotEmpty()) {
+          Text(
+            text = failureMessage,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            color = WorkspaceHomeColors.error,
+            fontSize = 10.sp,
+          )
         }
       }
     }

@@ -1,5 +1,7 @@
 package com.cyxbs.functions.code.editor.project
 
+import com.cyxbs.functions.code.language.DynamicLanguageInfo
+import com.cyxbs.functions.code.language.js.bridge.DynamicLanguageProjectTemplate
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.serialization.Serializable
 
@@ -77,8 +79,7 @@ class CodeProjectSourceConflictException(
 /**
  * 创建项目时使用的最小语言模板。
  *
- * 模板目前由客户端为已支持语言提供；后续语言包增加项目模板协议后，只需替换模板来源，项目仓库和
- * Navigation 参数不需要变化。
+ * 这是编辑器项目层的写盘模型，具体源码必须由动态语言包提供；项目仓库不感知 npm 协议和 Runtime。
  */
 data class CodeProjectTemplate(
   val languageId: String,
@@ -88,39 +89,48 @@ data class CodeProjectTemplate(
   val sourceFiles: Map<String, String>,
 )
 
-/** 首批可创建的真实项目模板。 */
-object CodeProjectTemplates {
-  val all: List<CodeProjectTemplate> = listOf(
-    CodeProjectTemplate(
-      languageId = "java",
-      displayName = "Java",
-      defaultProjectName = "JavaProject",
-      activeFilePath = "src/Main.java",
-      sourceFiles = mapOf(
-        "src/Main.java" to """
-          public class Main {
-            public static void main(String[] args) {
-              System.out.println("Hello, Java!");
-            }
-          }
-        """.trimIndent(),
-      ),
-    ),
-    CodeProjectTemplate(
-      languageId = "javascript",
-      displayName = "JavaScript",
-      defaultProjectName = "JavaScriptProject",
-      activeFilePath = "src/main.js",
-      sourceFiles = mapOf(
-        "src/main.js" to """
-          const message = "Hello, JavaScript!";
-          console.log(message);
-        """.trimIndent(),
-      ),
-    ),
-  )
+/**
+ * 把动态语言协议模板转换为项目写盘模型，并在接触文件系统前收紧不可信 npm 数据边界。
+ *
+ * 路径保持语言包声明的原值，不做静默修正；这样损坏模板会明确失败，而不会创建与语言包预期不同
+ * 的目录。项目仓库仍会在每次实际文件操作前重复执行路径校验，防止其他调用方绕过本入口。
+ */
+internal fun DynamicLanguageProjectTemplate.toCodeProjectTemplate(
+  language: DynamicLanguageInfo,
+): CodeProjectTemplate {
+  require(defaultProjectName.isNotBlank()) { "动态语言项目模板缺少默认项目名。" }
+  require(defaultProjectName == defaultProjectName.trim()) { "默认项目名不能包含首尾空白。" }
+  require(sourceFiles.isNotEmpty()) { "动态语言项目模板至少需要一个源码文件。" }
 
-  /** 按 Catalog 的稳定语言 ID 或别名查找当前可创建的模板。 */
-  fun find(languageId: String): CodeProjectTemplate? =
-    all.firstOrNull { it.languageId == languageId }
+  val filesByPath = linkedMapOf<String, String>()
+  sourceFiles.forEach { file ->
+    requireSafeProjectTemplatePath(file.path)
+    require(filesByPath.put(file.path, file.source) == null) {
+      "动态语言项目模板包含重复路径：${file.path}"
+    }
+  }
+  requireSafeProjectTemplatePath(activeFilePath)
+  require(activeFilePath in filesByPath) {
+    "动态语言项目模板的活动文件不存在：$activeFilePath"
+  }
+  return CodeProjectTemplate(
+    languageId = language.languageId,
+    displayName = language.displayName,
+    defaultProjectName = defaultProjectName,
+    activeFilePath = activeFilePath,
+    sourceFiles = filesByPath,
+  )
+}
+
+/** 动态模板不得写入项目根目录外，也不能覆盖编辑器维护的隐藏协议文件。 */
+private fun requireSafeProjectTemplatePath(path: String) {
+  val segments = path.split('/')
+  require(
+    path.isNotBlank() &&
+      path == path.trim() &&
+      !path.startsWith('/') &&
+      '\\' !in path &&
+      segments.firstOrNull() != ".cyxbs-project.json" &&
+      segments.none { it.isEmpty() || it == "." || it == ".." },
+  ) { "非法动态语言项目模板路径：$path" }
 }
