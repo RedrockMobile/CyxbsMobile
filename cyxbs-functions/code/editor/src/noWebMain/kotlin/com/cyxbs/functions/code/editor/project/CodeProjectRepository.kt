@@ -5,6 +5,7 @@ import com.russhwolf.settings.Settings
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.absolutePath
 import io.github.vinceglb.filekit.createDirectories
+import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
 import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.isDirectory
@@ -106,6 +107,7 @@ class CodeProjectRepository(
     CodeProjectWorkspace(
       project = project,
       sourceFiles = template.sourceFiles,
+      directoryPaths = template.sourceFiles.keys.parentDirectoryPaths(),
       activeFilePath = template.activeFilePath,
       directory = directory,
       directoryDisplayPath = root.displayPathFor(project),
@@ -123,7 +125,8 @@ class CodeProjectRepository(
     if (!directory.exists() || !directory.isDirectory()) {
       throw CodeProjectException("项目目录已不可访问：${project.name}")
     }
-    val sourceFiles = readWorkspace(directory)
+    val snapshot = readWorkspace(directory)
+    val sourceFiles = snapshot.sourceFiles
     val activeFilePath = project.activeFilePath
       ?.takeIf(sourceFiles::containsKey)
       ?: sourceFiles.keys.firstOrNull()
@@ -137,6 +140,7 @@ class CodeProjectRepository(
     CodeProjectWorkspace(
       project = openedProject,
       sourceFiles = sourceFiles,
+      directoryPaths = snapshot.directoryPaths,
       activeFilePath = activeFilePath,
       directory = directory,
       directoryDisplayPath = root.displayPathFor(openedProject),
@@ -163,14 +167,118 @@ class CodeProjectRepository(
     resolveFile(root.directoryFor(project), relativePath, createParents = true).writeString(source)
   }
 
-  /** 创建空源码文件并返回是否成功；已存在时返回 false。 */
-  suspend fun createFile(projectId: String, relativePath: String): Boolean = mutex.withLock {
+  /**
+   * 一次性应用语言服务产生的跨文件源码修改和文件重命名。
+   *
+   * [updatedSources] 使用重命名后的最终路径。提交前会保存所有受影响文件的原始内容；任一步失败时
+   * 尽力恢复原文件并移除新目标，避免只落盘一部分重命名结果。目录重命名不通过该接口处理。
+   * 返回更新后的项目元数据，调用方可据此同步活动文件路径。
+   */
+  suspend fun applySourceTransaction(
+    projectId: String,
+    updatedSources: Map<String, String>,
+    fileRenames: List<CodeProjectFileRename>,
+  ): CodeProject = mutex.withLock {
+    require(updatedSources.isNotEmpty() || fileRenames.isNotEmpty()) {
+      "源码事务不能同时缺少内容修改和文件重命名。"
+    }
+    updatedSources.keys.forEach(::requireSafeRelativePath)
+    fileRenames.forEach { rename ->
+      requireSafeRelativePath(rename.oldPath)
+      requireSafeRelativePath(rename.newPath)
+      require(rename.oldPath != rename.newPath) { "文件重命名前后路径不能相同。" }
+    }
+    require(fileRenames.map(CodeProjectFileRename::oldPath).distinct().size == fileRenames.size) {
+      "文件重命名源路径不能重复。"
+    }
+    require(fileRenames.map(CodeProjectFileRename::newPath).distinct().size == fileRenames.size) {
+      "文件重命名目标路径不能重复。"
+    }
+
+    val root = requireStorageRoot()
+    val projects = loadProjects(root)
+    val project = projects.firstOrNull { it.projectId == projectId }
+      ?: throw CodeProjectException("项目记录不存在：$projectId")
+    val projectDirectory = root.directoryFor(project)
+    val oldPaths = fileRenames.mapTo(linkedSetOf(), CodeProjectFileRename::oldPath)
+    val newPaths = fileRenames.mapTo(linkedSetOf(), CodeProjectFileRename::newPath)
+    require(newPaths.none(oldPaths::contains)) {
+      "单次源码事务暂不支持文件路径互换，请拆分为两次重命名。"
+    }
+    fileRenames.forEach { rename ->
+      val source = resolveFile(projectDirectory, rename.oldPath, createParents = false)
+      if (!source.isRegularFile()) {
+        throw CodeProjectException("待重命名文件不存在：${rename.oldPath}")
+      }
+      val destination = resolveFile(projectDirectory, rename.newPath, createParents = false)
+      if (destination.exists()) {
+        throw CodeProjectException("文件重命名目标已存在：${rename.newPath}")
+      }
+    }
+
+    val affectedPaths = linkedSetOf<String>().apply {
+      addAll(updatedSources.keys)
+      addAll(oldPaths)
+      addAll(newPaths)
+    }
+    val originalSources = affectedPaths.associateWith { path ->
+      resolveFile(projectDirectory, path, createParents = false)
+        .takeIf(PlatformFile::isRegularFile)
+        ?.readString()
+    }
+    val updatedProject = project.copy(
+      activeFilePath = fileRenames.firstOrNull { it.oldPath == project.activeFilePath }?.newPath
+        ?: project.activeFilePath,
+    )
+
+    try {
+      updatedSources.forEach { (path, source) ->
+        resolveFile(projectDirectory, path, createParents = true).writeString(source)
+      }
+      fileRenames.forEach { rename ->
+        if (rename.newPath !in updatedSources) {
+          val source = originalSources.getValue(rename.oldPath)
+            ?: throw CodeProjectException("待重命名文件无法读取：${rename.oldPath}")
+          resolveFile(projectDirectory, rename.newPath, createParents = true).writeString(source)
+        }
+      }
+      oldPaths.forEach { path ->
+        resolveFile(projectDirectory, path, createParents = false).delete(mustExist = true)
+      }
+      writeProjectManifest(projectDirectory, updatedProject)
+      saveProjects(projects.replace(updatedProject))
+      updatedProject
+    } catch (throwable: Throwable) {
+      affectedPaths.forEach { path ->
+        runCatching {
+          val file = resolveFile(projectDirectory, path, createParents = originalSources[path] != null)
+          val original = originalSources[path]
+          if (original == null) {
+            if (file.exists()) file.delete(mustExist = false)
+          } else {
+            file.writeString(original)
+          }
+        }
+      }
+      // manifest 与 Settings 也属于同一事务；回滚失败不覆盖最初抛出的文件系统异常。
+      runCatching { writeProjectManifest(projectDirectory, project) }
+      runCatching { saveProjects(projects) }
+      throw throwable
+    }
+  }
+
+  /** 创建源码文件并写入 [initialSource]；已存在时返回 false，不留下半初始化的空文件。 */
+  suspend fun createFile(
+    projectId: String,
+    relativePath: String,
+    initialSource: String = "",
+  ): Boolean = mutex.withLock {
     requireSafeRelativePath(relativePath)
     val root = requireStorageRoot()
     val project = requireProject(projectId, root)
     val file = resolveFile(root.directoryFor(project), relativePath, createParents = true)
     if (file.exists()) return@withLock false
-    file.writeString("")
+    file.writeString(initialSource)
     true
   }
 
@@ -264,9 +372,10 @@ class CodeProjectRepository(
     return projects
   }
 
-  /** 递归读取受支持的文本源码，并限制目录深度、文件数量和总源码体积。 */
-  private suspend fun readWorkspace(root: PlatformFile): Map<String, String> {
+  /** 递归读取显式目录与受支持文本源码，并限制目录深度、文件数量和总源码体积。 */
+  private suspend fun readWorkspace(root: PlatformFile): WorkspaceSnapshot {
     val result = linkedMapOf<String, String>()
+    val directoryPaths = linkedSetOf<String>()
     var totalCharacters = 0L
 
     suspend fun visit(directory: PlatformFile, prefix: String, depth: Int) {
@@ -276,7 +385,10 @@ class CodeProjectRepository(
         if (child.name in IGNORED_DIRECTORY_NAMES && child.isDirectory()) return@forEach
         val relativePath = if (prefix.isEmpty()) child.name else "$prefix/${child.name}"
         when {
-          child.isDirectory() -> visit(child, relativePath, depth + 1)
+          child.isDirectory() -> {
+            directoryPaths += relativePath
+            visit(child, relativePath, depth + 1)
+          }
           child.isRegularFile() && child.isSupportedSourceFile() -> {
             if (result.size >= MAX_SOURCE_FILES) {
               throw CodeProjectException("项目源码文件数量超过限制。")
@@ -296,8 +408,14 @@ class CodeProjectRepository(
     }
 
     visit(root, prefix = "", depth = 0)
-    return result
+    return WorkspaceSnapshot(sourceFiles = result, directoryPaths = directoryPaths)
   }
+
+  /** 磁盘扫描的不可变结果，显式保留没有源码子项的空目录。 */
+  private data class WorkspaceSnapshot(
+    val sourceFiles: Map<String, String>,
+    val directoryPaths: Set<String>,
+  )
 
   /** 按相对路径逐级创建父目录，兼容 Android SAF URI 与普通文件路径。 */
   private fun resolveFile(root: PlatformFile, path: String, createParents: Boolean): PlatformFile {
@@ -429,6 +547,14 @@ class CodeProjectRepository(
   private fun PlatformFile.isSupportedSourceFile(): Boolean {
     val extension = name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
     return extension in SUPPORTED_SOURCE_EXTENSIONS
+  }
+
+  /** 从模板文件路径推导首次创建项目时已经存在的父目录。 */
+  private fun Collection<String>.parentDirectoryPaths(): Set<String> = buildSet {
+    this@parentDirectoryPaths.forEach { path ->
+      val segments = path.split('/').dropLast(1)
+      segments.indices.forEach { index -> add(segments.take(index + 1).joinToString("/")) }
+    }
   }
 
   @Serializable

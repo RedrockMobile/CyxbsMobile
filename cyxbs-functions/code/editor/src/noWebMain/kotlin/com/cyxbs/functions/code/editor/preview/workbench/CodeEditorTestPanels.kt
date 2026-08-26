@@ -49,7 +49,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -98,6 +97,7 @@ internal const val RUN_TOOL_WINDOW_ID = "run"
 internal fun rememberCodeEditorTestSidePanels(
   activeFilePath: String,
   sourceFiles: Map<String, String>,
+  directoryPaths: List<String>,
   languageStatus: String,
   isLanguageReady: Boolean,
   isLoadingLanguage: Boolean,
@@ -110,6 +110,7 @@ internal fun rememberCodeEditorTestSidePanels(
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
+  onRefreshProject: (() -> Unit)?,
   onSwitchProject: () -> Unit,
   onOpenProjectDirectory: () -> Unit,
   onLoadLanguage: () -> Unit,
@@ -119,7 +120,6 @@ internal fun rememberCodeEditorTestSidePanels(
   onFindReferences: () -> Unit,
   onRename: (String) -> Unit,
 ): List<CodeEditorSidePanel> {
-  val createdFolderPaths = remember { mutableStateListOf<String>() }
   val panels = buildList {
     addAll(leadingPanels)
     add(
@@ -132,7 +132,7 @@ internal fun rememberCodeEditorTestSidePanels(
           projectPath = projectPath,
           activeFilePath = activeFilePath,
           filePaths = sourceFiles.keys.sorted(),
-          folderPaths = createdFolderPaths,
+          folderPaths = directoryPaths,
           fileIcon = fileIcon,
           onOpenFile = {
             onOpenFile(it)
@@ -141,14 +141,8 @@ internal fun rememberCodeEditorTestSidePanels(
             }
           },
           onCreateFile = onCreateFile,
-          onCreateFolder = { requestedPath ->
-            val created = createTestFolder(
-              requestedPath = requestedPath,
-              filePaths = sourceFiles.keys,
-              folderPaths = createdFolderPaths,
-            )
-            created && onCreateFolder(requestedPath)
-          },
+          onCreateFolder = onCreateFolder,
+          onRefreshProject = onRefreshProject,
           onSwitchProject = onSwitchProject,
           onOpenProjectDirectory = onOpenProjectDirectory,
         )
@@ -364,6 +358,7 @@ private fun FilePanelContent(
   onOpenFile: (String) -> Unit,
   onCreateFile: (String) -> Boolean,
   onCreateFolder: (String) -> Boolean,
+  onRefreshProject: (() -> Unit)?,
   onSwitchProject: () -> Unit,
   onOpenProjectDirectory: () -> Unit,
 ) {
@@ -385,6 +380,7 @@ private fun FilePanelContent(
       },
       onSwitchProject = onSwitchProject,
       onOpenProjectDirectory = onOpenProjectDirectory,
+      onRefreshProject = onRefreshProject,
     )
     BoxWithConstraints(Modifier.weight(1F)) {
       val verticalScrollState = rememberScrollState()
@@ -445,6 +441,7 @@ private fun FilePanelToolbar(
   onRequestCreation: (FileTreeCreation) -> Unit,
   onSwitchProject: () -> Unit,
   onOpenProjectDirectory: () -> Unit,
+  onRefreshProject: (() -> Unit)?,
 ) {
   var menuExpanded by remember { mutableStateOf(false) }
   Column {
@@ -503,6 +500,18 @@ private fun FilePanelToolbar(
               },
             ) {
               Text("切换 / 新建项目", color = EditorWorkbenchColors.PrimaryText, fontSize = 12.sp)
+            }
+            if (onRefreshProject != null) {
+              DropdownMenuItem(
+                modifier = Modifier.height(CompactDropdownMenuItemHeight),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                onClick = {
+                  menuExpanded = false
+                  onRefreshProject()
+                },
+              ) {
+                Text("从磁盘刷新", color = EditorWorkbenchColors.PrimaryText, fontSize = 12.sp)
+              }
             }
             DropdownMenuItem(
               modifier = Modifier.height(CompactDropdownMenuItemHeight),
@@ -721,36 +730,6 @@ private fun FileTreeRow(
       modifier = Modifier.padding(start = 5.dp),
     )
   }
-}
-
-/**
- * 在测试工作区创建空目录。
- *
- * 当前只更新内存目录池；真实文件系统接入后可直接替换该回调。路径必须位于项目内，且不能与已有
- * 文件、显式目录或文件路径隐含的目录重名。
- */
-private fun createTestFolder(
-  requestedPath: String,
-  filePaths: Collection<String>,
-  folderPaths: MutableCollection<String>,
-): Boolean {
-  val normalizedPath = requestedPath.trim().replace('\\', '/')
-  val segments = normalizedPath.split('/')
-  val conflictsWithFile = segments.indices.any { index ->
-    segments.take(index + 1).joinToString("/") in filePaths
-  }
-  val alreadyExists = normalizedPath in folderPaths || filePaths.any { it.startsWith("$normalizedPath/") }
-  if (
-    normalizedPath.isEmpty() ||
-    normalizedPath.startsWith('/') ||
-    segments.any { it.isEmpty() || it == "." || it == ".." } ||
-    conflictsWithFile ||
-    alreadyExists
-  ) {
-    return false
-  }
-  folderPaths += normalizedPath
-  return true
 }
 
 /** 将显式目录和相对文件路径构造成文件夹优先、同类型按名称排序的展示树。 */

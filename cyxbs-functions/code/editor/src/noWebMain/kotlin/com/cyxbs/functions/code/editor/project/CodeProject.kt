@@ -34,9 +34,16 @@ data class HistoricalCodeProject(
 data class CodeProjectWorkspace(
   val project: CodeProject,
   val sourceFiles: Map<String, String>,
+  val directoryPaths: Set<String>,
   val activeFilePath: String,
   val directory: PlatformFile,
   val directoryDisplayPath: String,
+)
+
+/** 项目文件重命名请求；路径始终是相对于项目根目录的规范路径。 */
+data class CodeProjectFileRename(
+  val oldPath: String,
+  val newPath: String,
 )
 
 /**

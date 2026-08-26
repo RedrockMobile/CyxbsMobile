@@ -160,17 +160,103 @@ class CodeProjectRepositoryTest {
     )
 
     assertTrue(repository.createDirectory(workspace.project.projectId, "src/model"))
-    assertTrue(repository.createFile(workspace.project.projectId, "src/model/Student.java"))
+    assertTrue(
+      repository.createFile(
+        workspace.project.projectId,
+        "src/model/Student.java",
+        "public class Student {}",
+      ),
+    )
     assertFalse(repository.createFile(workspace.project.projectId, "src/model/Student.java"))
     assertTrue(
       Files.isRegularFile(
         root.resolve(workspace.project.projectId).resolve("src/model/Student.java"),
       ),
     )
+    assertEquals(
+      "public class Student {}",
+      root.resolve(workspace.project.projectId).resolve("src/model/Student.java").readText(),
+    )
 
     assertFailsWith<IllegalArgumentException> {
       repository.createFile(workspace.project.projectId, "../outside.java")
     }
     Unit
+  }
+
+  @Test
+  fun restoresEmptyDirectoriesWhenProjectIsReopened() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "空目录恢复",
+    )
+
+    assertTrue(repository.createDirectory(workspace.project.projectId, "src/generated/model"))
+    val reopened = repository.openProject(workspace.project.projectId)
+
+    assertTrue("src" in reopened.directoryPaths)
+    assertTrue("src/generated" in reopened.directoryPaths)
+    assertTrue("src/generated/model" in reopened.directoryPaths)
+  }
+
+  @Test
+  fun appliesCrossFileSourceTransactionAndPersistsRenamedActiveFile() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "事务重命名",
+    )
+    val projectId = workspace.project.projectId
+    assertTrue(repository.createFile(projectId, "src/OldName.java"))
+    repository.saveSource(projectId, "src/OldName.java", "public class OldName {}")
+    repository.updateActiveFile(projectId, "src/OldName.java")
+
+    val updatedProject = repository.applySourceTransaction(
+      projectId = projectId,
+      updatedSources = mapOf(
+        "src/Main.java" to "public class Main { NewName value; }",
+        "src/NewName.java" to "public class NewName {}",
+      ),
+      fileRenames = listOf(
+        CodeProjectFileRename("src/OldName.java", "src/NewName.java"),
+      ),
+    )
+    val reopened = repository.openProject(projectId)
+
+    assertEquals("src/NewName.java", updatedProject.activeFilePath)
+    assertEquals("src/NewName.java", reopened.activeFilePath)
+    assertEquals("public class NewName {}", reopened.sourceFiles.getValue("src/NewName.java"))
+    assertEquals("public class Main { NewName value; }", reopened.sourceFiles.getValue("src/Main.java"))
+    assertFalse(Files.exists(root.resolve(projectId).resolve("src/OldName.java")))
+  }
+
+  @Test
+  fun rejectsRenameCollisionWithoutChangingExistingFiles() = runBlocking {
+    val workspace = repository.createProject(
+      requireNotNull(CodeProjectTemplates.find("java")),
+      "重命名冲突",
+    )
+    val projectId = workspace.project.projectId
+    assertTrue(
+      repository.createFile(
+        projectId,
+        "src/OldName.java",
+        "public class OldName {}",
+      ),
+    )
+
+    assertFailsWith<CodeProjectException> {
+      repository.applySourceTransaction(
+        projectId = projectId,
+        updatedSources = mapOf("src/Main.java" to "changed"),
+        fileRenames = listOf(CodeProjectFileRename("src/OldName.java", "src/Main.java")),
+      )
+    }
+    val reopened = repository.openProject(projectId)
+
+    assertEquals(
+      workspace.sourceFiles.getValue("src/Main.java"),
+      reopened.sourceFiles.getValue("src/Main.java"),
+    )
+    assertEquals("public class OldName {}", reopened.sourceFiles.getValue("src/OldName.java"))
   }
 }

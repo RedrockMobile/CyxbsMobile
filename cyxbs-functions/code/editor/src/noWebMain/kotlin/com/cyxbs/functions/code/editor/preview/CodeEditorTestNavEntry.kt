@@ -43,6 +43,7 @@ import com.cyxbs.functions.code.editor.preview.workbench.codeEditorTutorialToolW
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTestSidePanels
 import com.cyxbs.functions.code.editor.preview.workbench.rememberCodeEditorTutorialSidePanel
 import com.cyxbs.functions.code.editor.preview.workbench.removeDefaultDropdownMenuVerticalPadding
+import com.cyxbs.functions.code.editor.project.CodeProjectFileRename
 import com.cyxbs.functions.code.editor.project.CodeProjectRepository
 import com.cyxbs.functions.code.editor.project.CodeProjectTemplates
 import com.cyxbs.functions.code.editor.project.CodeProjectWorkspace
@@ -196,6 +197,11 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       }
     val sourceFiles = remember(argument.projectId, argument.tutorialLanguageId) {
       mutableStateMapOf<String, String>().apply { putAll(initialSourceFiles) }
+    }
+    val directoryPaths = remember(argument.projectId, argument.tutorialLanguageId) {
+      mutableStateListOf<String>().apply {
+        addAll(loadedProjectWorkspace?.directoryPaths.orEmpty().sorted())
+      }
     }
     val openFilePaths = remember(argument.projectId, argument.tutorialLanguageId) {
       mutableStateListOf(initialActiveFilePath)
@@ -804,60 +810,116 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
 
     /** 校验并创建工作区相对路径文件。 */
     fun createWorkspaceFile(requestedPath: String): Boolean {
-      val normalizedPath = requestedPath.trim().replace('\\', '/')
+      val normalizedPath = requestedPath.normalizeWorkspacePath()
       val error = when {
         normalizedPath.isEmpty() -> "文件路径不能为空。"
-        normalizedPath.startsWith('/') || normalizedPath.split('/').any { it == ".." } ->
+        !normalizedPath.isSafeWorkspacePath() ->
           "文件必须使用工作区内的相对路径。"
         normalizedPath in sourceFiles -> "文件已存在：$normalizedPath"
+        normalizedPath in directoryPaths -> "同名文件夹已存在：$normalizedPath"
+        normalizedPath.pathPrefixes().any(sourceFiles::containsKey) ->
+          "文件路径中包含同名文件：$normalizedPath"
         else -> null
       }
       return if (error != null) {
         output = error
         false
       } else {
-        sourceFiles[normalizedPath] = DEFAULT_NEW_FILE_CODE
-        openFile(normalizedPath)
-        argument.projectId?.let { projectId ->
+        val applyCreatedFile = {
+          normalizedPath.parentDirectoryPaths().forEach { directory ->
+            if (directory !in directoryPaths) directoryPaths += directory
+          }
+          sourceFiles[normalizedPath] = DEFAULT_NEW_FILE_CODE
+          openFile(normalizedPath)
+          output = "已创建并打开 $normalizedPath"
+        }
+        val projectId = argument.projectId
+        if (projectId == null) {
+          applyCreatedFile()
+        } else {
           coroutineScope.launch {
             runCatching {
-              check(projectRepository.createFile(projectId, normalizedPath)) {
+              check(
+                projectRepository.createFile(
+                  projectId = projectId,
+                  relativePath = normalizedPath,
+                  initialSource = DEFAULT_NEW_FILE_CODE,
+                ),
+              ) {
                 "文件已存在：$normalizedPath"
               }
-              projectRepository.saveSource(projectId, normalizedPath, DEFAULT_NEW_FILE_CODE)
-            }.onFailure { throwable ->
-              output = throwable.toFailureText("创建项目文件失败")
-            }
+            }.onSuccess { applyCreatedFile() }
+              .onFailure { throwable ->
+                output = throwable.toFailureText("创建项目文件失败")
+              }
           }
         }
-        output = "已创建并打开 $normalizedPath"
         true
       }
     }
 
     /** 校验并在真实项目目录中创建文件夹；教程工作区只维护当前会话的虚拟目录。 */
     fun createWorkspaceDirectory(requestedPath: String): Boolean {
-      val normalizedPath = requestedPath.trim().replace('\\', '/')
+      val normalizedPath = requestedPath.normalizeWorkspacePath()
       val error = when {
         normalizedPath.isEmpty() -> "文件夹路径不能为空。"
-        normalizedPath.startsWith('/') || normalizedPath.split('/').any { it == ".." } ->
+        !normalizedPath.isSafeWorkspacePath() ->
           "文件夹必须使用工作区内的相对路径。"
-        sourceFiles.keys.any { it == normalizedPath || it.startsWith("$normalizedPath/") } ->
+        normalizedPath in directoryPaths || normalizedPath in sourceFiles ||
+          sourceFiles.keys.any { it.startsWith("$normalizedPath/") } ->
           "文件夹已存在：$normalizedPath"
+        normalizedPath.pathPrefixes().any(sourceFiles::containsKey) ->
+          "文件夹路径中包含同名文件：$normalizedPath"
         else -> null
       }
       if (error != null) {
         output = error
         return false
       }
-      argument.projectId?.let { projectId ->
+      val applyCreatedDirectory = {
+        (normalizedPath.parentDirectoryPaths() + normalizedPath).forEach { directory ->
+          if (directory !in directoryPaths) directoryPaths += directory
+        }
+        output = "已创建文件夹 $normalizedPath"
+      }
+      val projectId = argument.projectId
+      if (projectId == null) {
+        applyCreatedDirectory()
+      } else {
         coroutineScope.launch {
-          runCatching { projectRepository.createDirectory(projectId, normalizedPath) }
+          runCatching {
+            check(projectRepository.createDirectory(projectId, normalizedPath)) {
+              "文件夹已存在：$normalizedPath"
+            }
+          }.onSuccess { applyCreatedDirectory() }
             .onFailure { throwable -> output = throwable.toFailureText("创建项目文件夹失败") }
         }
       }
-      output = "已创建文件夹 $normalizedPath"
       return true
+    }
+
+    /** 重新扫描磁盘并以磁盘内容为准，使外部新增、删除与修改及时反映到文件树和编辑器。 */
+    fun refreshProjectFromDisk() {
+      val projectId = argument.projectId ?: return
+      coroutineScope.launch {
+        runCatching { projectRepository.openProject(projectId) }.onSuccess { refreshed ->
+          val previousActivePath = activeFilePath
+          val nextActivePath = previousActivePath.takeIf(refreshed.sourceFiles::containsKey)
+            ?: refreshed.activeFilePath
+          sourceFiles.clear()
+          sourceFiles.putAll(refreshed.sourceFiles)
+          directoryPaths.clear()
+          directoryPaths.addAll(refreshed.directoryPaths.sorted())
+          openFilePaths.retainAll(refreshed.sourceFiles.keys)
+          if (nextActivePath !in openFilePaths) openFilePaths += nextActivePath
+          editorState.replaceDocument(nextActivePath, refreshed.sourceFiles.getValue(nextActivePath))
+          activeFilePath = nextActivePath
+          loadedProjectWorkspace = refreshed
+          output = "已从磁盘刷新项目，共 ${refreshed.sourceFiles.size} 个源码文件。"
+        }.onFailure { throwable ->
+          output = throwable.toFailureText("刷新项目失败")
+        }
+      }
     }
 
     val displayedSourceFiles = sourceFiles.toMutableMap().apply {
@@ -953,6 +1015,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
     val sidePanels = rememberCodeEditorTestSidePanels(
       activeFilePath = activeFilePath,
       sourceFiles = displayedSourceFiles,
+      directoryPaths = directoryPaths,
       languageStatus = languageStatus,
       isLanguageReady = dynamicLanguageService != null,
       isLoadingLanguage = isLoadingLanguage,
@@ -966,6 +1029,7 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       onOpenFile = ::openFile,
       onCreateFile = ::createWorkspaceFile,
       onCreateFolder = ::createWorkspaceDirectory,
+      onRefreshProject = if (argument.projectId != null) ::refreshProjectFromDisk else null,
       onSwitchProject = {
         // 入口页已经在进入工作区时出栈；切换项目需要显式重建入口，再移除当前工作区。
         CodeWorkspaceHomeNavArgument.navigate()
@@ -1060,16 +1124,43 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
               else -> {
                 val requestedWorkspace = currentWorkspace()
                 val editsByFile = rename.edits.groupBy { edit -> edit.filePath }
+                val updatedSources = linkedMapOf<String, String>()
                 editsByFile.forEach { (filePath, sourceEdits) ->
                   val source = requestedWorkspace.files.first { file -> file.path == filePath }.source
                   val edits = sourceEdits.map { sourceEdit -> sourceEdit.edit }
-                  sourceFiles[filePath] = source.applyTextEdits(edits)
+                  updatedSources[filePath] = source.applyTextEdits(edits)
+                }
+                rename.fileRenames.forEach { fileRename ->
+                  val renamedSource = updatedSources.remove(fileRename.oldPath)
+                    ?: requestedWorkspace.files
+                      .firstOrNull { file -> file.path == fileRename.oldPath }
+                      ?.source
+                    ?: error("待重命名文件不存在：${fileRename.oldPath}")
+                  updatedSources[fileRename.newPath] = renamedSource
+                }
+                argument.projectId?.let { projectId ->
+                  val updatedProject = projectRepository.applySourceTransaction(
+                    projectId = projectId,
+                    updatedSources = updatedSources,
+                    fileRenames = rename.fileRenames.map { fileRename ->
+                      CodeProjectFileRename(fileRename.oldPath, fileRename.newPath)
+                    },
+                  )
+                  loadedProjectWorkspace = loadedProjectWorkspace?.copy(project = updatedProject)
+                }
+                editsByFile.forEach { (filePath, sourceEdits) ->
+                  val edits = sourceEdits.map { sourceEdit -> sourceEdit.edit }
+                  sourceFiles[filePath] = updatedSources[filePath]
+                    ?: sourceFiles.getValue(filePath).applyTextEdits(edits)
                   if (filePath == activeFilePath) editorState.applyTextEdits(edits)
                 }
                 rename.fileRenames.forEach { fileRename ->
-                  val renamedSource = sourceFiles.remove(fileRename.oldPath)
-                    ?: error("待重命名文件不存在：${fileRename.oldPath}")
+                  sourceFiles.remove(fileRename.oldPath)
+                  val renamedSource = updatedSources.getValue(fileRename.newPath)
                   sourceFiles[fileRename.newPath] = renamedSource
+                  fileRename.newPath.parentDirectoryPaths().forEach { directory ->
+                    if (directory !in directoryPaths) directoryPaths += directory
+                  }
                   openFilePaths.indexOf(fileRename.oldPath).takeIf { it >= 0 }?.let { index ->
                     openFilePaths[index] = fileRename.newPath
                   }
@@ -1346,6 +1437,25 @@ class CodeEditorTestNavEntry : AppNavEntry<CodeEditorTestNavArgument>() {
       source.replaceRange(edit.from, edit.to, edit.replacement)
     }
   }
+
+  /** 统一用户输入的项目相对路径分隔符；是否越界由 [isSafeWorkspacePath] 单独校验。 */
+  private fun String.normalizeWorkspacePath(): String = trim().replace('\\', '/')
+
+  /** 判断路径是否由项目内的普通名称段组成，拒绝绝对路径、空段和目录穿越。 */
+  private fun String.isSafeWorkspacePath(): Boolean {
+    return isNotEmpty() && !startsWith('/') && split('/').none { segment ->
+      segment.isEmpty() || segment == "." || segment == ".."
+    }
+  }
+
+  /** 返回路径的父目录层级，用于同步空目录状态并检查文件阻断。 */
+  private fun String.parentDirectoryPaths(): List<String> {
+    val parentSegments = split('/').dropLast(1)
+    return parentSegments.indices.map { index -> parentSegments.take(index + 1).joinToString("/") }
+  }
+
+  /** 返回文件或目录路径之前的所有层级，不包含路径自身。 */
+  private fun String.pathPrefixes(): List<String> = parentDirectoryPaths()
 
   /** Compose 快照流中的不可变教程保存草稿，避免延迟写入读取到另一门课程的状态。 */
   private data class TutorialProgressDraft(
