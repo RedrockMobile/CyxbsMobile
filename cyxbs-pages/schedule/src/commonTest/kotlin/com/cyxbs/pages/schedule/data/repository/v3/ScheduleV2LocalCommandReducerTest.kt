@@ -459,6 +459,40 @@ class ScheduleV2LocalCommandReducerTest {
     assertEquals(600, completed.title.modifiedAt)
   }
 
+  /** 一次拖拽把所有变化写入同一 revision，并保持名称、颜色等未修改原子的时间。 */
+  @Test
+  fun reorderCategoriesUsesOneLocalRevision() {
+    val first = ScheduleCategory(CategoryId(CATEGORY_ID), 0, "学习", null, 0)
+    val second = ScheduleCategory(CategoryId("category-2"), 0, "生活", "color-json", 1)
+    val withFirst = reduce(
+      command = ScheduleCommand.CreateCategory(first),
+      now = 500,
+      revision = 1,
+    ).applied()
+    val withBoth = reduce(
+      categories = withFirst.categories,
+      command = ScheduleCommand.CreateCategory(second),
+      now = 501,
+      revision = 2,
+    ).applied()
+
+    val reordered = reduce(
+      categories = withBoth.categories,
+      command = ScheduleCommand.ReorderCategories(listOf(second, first)),
+      now = 502,
+      revision = 3,
+    ).applied()
+
+    val resources = reordered.categories.associate { state ->
+      state.identity.id to state.pendingCategoryResource()
+    }
+    assertEquals(1, resources.getValue(CATEGORY_ID).sortOrder.data)
+    assertEquals(0, resources.getValue("category-2").sortOrder.data)
+    assertEquals(500, resources.getValue(CATEGORY_ID).name.modifiedAt)
+    assertEquals(501, resources.getValue("category-2").color.modifiedAt)
+    assertEquals(setOf(3L), reordered.categories.mapNotNull { it.pending?.localRevision }.toSet())
+  }
+
   @Test
   fun deleteCategoryReferencedByEffectiveScheduleIsRejectedLocally() {
     val category = reduce(

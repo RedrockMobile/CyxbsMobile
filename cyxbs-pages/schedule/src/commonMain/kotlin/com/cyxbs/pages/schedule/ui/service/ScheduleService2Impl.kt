@@ -19,6 +19,8 @@ import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleCompletion
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleEdit
+import com.cyxbs.pages.schedule.ui.category.decodeScheduleCategoryColor
+import com.cyxbs.pages.schedule.ui.category.toOccurrenceColor
 import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 import com.cyxbs.pages.schedule.ui.model.occurrencesInRange
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -61,6 +63,7 @@ object ScheduleService2Impl : IScheduleService2 {
     endExclusive: com.cyxbs.components.config.time.MinuteTimeDate,
   ): Flow<List<ScheduleOccurrenceView>> = repository.snapshot.map { snapshot ->
     val schedulesById = snapshot.schedules.associateBy(Schedule::id)
+    val categoriesById = snapshot.categories.associateBy { it.id }
     val details = linkedMapOf<String, Detail>()
     val result = snapshot.occurrencesInRange(startInclusive, endExclusive)
       .mapNotNull { occurrence ->
@@ -68,7 +71,16 @@ object ScheduleService2Impl : IScheduleService2 {
         if (!schedule.isVisibleInCourse(occurrence.status)) return@mapNotNull null
         val identity = occurrenceIdentity(occurrence)
         details[identity] = Detail(occurrence, schedule)
-        occurrence.toApiModel(identity, schedule)
+        occurrence.toApiModel(
+          identity = identity,
+          schedule = schedule,
+          // 分组属于清单语义；纯事务即使残留旧 categoryId，也不向课表暴露对应颜色。
+          categoryColor = if (schedule.todoState == null) null else {
+            schedule.categoryId?.let(categoriesById::get)?.color
+              .let(::decodeScheduleCategoryColor)
+              ?.toOccurrenceColor()
+          },
+        )
       }
     if (details.isNotEmpty()) {
       // 可能同时有多个课表框架观察不同周，采用增量合并避免一个窗口清掉另一个窗口的点击详情。
@@ -217,6 +229,7 @@ private fun occurrenceIdentity(occurrence: ScheduleUiOccurrence): String =
 private fun ScheduleUiOccurrence.toApiModel(
   identity: String,
   schedule: Schedule,
+  categoryColor: com.cyxbs.pages.schedule.api.ScheduleOccurrenceColor?,
 ): ScheduleOccurrenceView =
   ScheduleOccurrenceView(
     identity = identity,
@@ -229,6 +242,7 @@ private fun ScheduleUiOccurrence.toApiModel(
     isInTodoList = schedule.todoState != null,
     title = title,
     description = description,
+    categoryColor = categoryColor,
     timing = when (val value = timing) {
       is ScheduleTiming.Timed -> ScheduleOccurrenceTiming.Timed(
         start = value.start,

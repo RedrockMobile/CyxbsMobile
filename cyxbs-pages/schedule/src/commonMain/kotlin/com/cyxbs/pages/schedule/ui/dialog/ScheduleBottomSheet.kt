@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -43,7 +42,8 @@ internal fun ScheduleBottomSheet(
 ) {
   if (!show) return
   val colors = LocalAppColors.current
-  val resolvedScrimColor = scrimColor ?: MaterialTheme.colors.onSurface.copy(alpha = 0.4f)
+  // 深色主题的 onSurface 接近白色，作为蒙层会把弹窗上方页面洗灰；默认统一使用黑色蒙层。
+  val resolvedScrimColor = scrimColor ?: Color.Black.copy(alpha = 0.4F)
   // 用 rememberUpdatedState 保证 BottomSheetState 内捕获的始终是最新一帧的拦截回调（避免闭包过期）。
   val dismissGate = rememberUpdatedState(onDismissRequest)
   val state = remember {

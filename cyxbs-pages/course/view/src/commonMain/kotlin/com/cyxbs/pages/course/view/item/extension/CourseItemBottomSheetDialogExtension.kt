@@ -10,10 +10,12 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -34,17 +36,20 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -278,6 +283,8 @@ private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
 ) {
   val currentPageLocked by state.currentPageLockedFlow.collectAsState()
+  val navigationBarHeight = WindowInsets.navigationBars.getBottom(LocalDensity.current).toFloat()
+  val bottomSheetBackgroundColor = LocalAppColors.current.whiteBlack
   val layoutTopOnScreenFlow = remember {
     MutableSharedFlow<Float>(
       replay = 1,
@@ -292,7 +299,17 @@ private fun BottomSheet(
   ) {
     OffsetScroll(state, layoutTopOnScreenFlow)
     Box(
-      modifier = Modifier.navigationBarsPadding()
+      modifier = Modifier
+        // navigationBarsPadding 位于内容外层，保留原有弹窗高度；这里只为其空白区域补齐背景色。
+        .drawBehind {
+          val top = (size.height - navigationBarHeight).coerceAtLeast(0F)
+          drawRect(
+            color = bottomSheetBackgroundColor,
+            topLeft = Offset(0F, top),
+            size = Size(size.width, size.height - top),
+          )
+        }
+        .navigationBarsPadding()
         .fillMaxWidth()
         .then(
           if (currentPageLocked) Modifier.heightIn(min = DefaultCourseBottomSheetHeight)

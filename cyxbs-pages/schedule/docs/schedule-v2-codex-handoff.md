@@ -43,13 +43,17 @@ DELETE /v2/schedules
 - tombstone 不含 version；
 - DELETE 优先级最高，客户端不尝试复活相同 identity；
 - OccurrenceOverride identity 是 `scheduleId + occurrenceDate`，只有 status/title/description/reminders 四个原子；
-- Category color 可为 `null`，表示没有自定义颜色；
+- Category color 可为 `null`，表示没有自定义颜色；非空时保存客户端定义的课表配色 JSON：
+  `background/content/darkBackground` 均使用 `#AARRGGBB`；深色模式文字统一使用 `0xFFF0F0F2`，
+  不写入分组 JSON。服务端把该 JSON 当作不透明字符串
+  参与原子合并，客户端解析失败时回退到清单默认灰色；分组编辑器的第一项也固定为该灰色；
 - DAILY/WEEKLY 是当前支持的 recurrence；MONTHLY/YEARLY 不支持。
 - Schedule 的 `kind=TODO|AFFAIR` 是创建来源且不可修改，不参与字段级 LWW；`todoState` 与
   `linkedToCourse` 是可合并原子并随 Schedule 一起增改。
 - `todoState=null` 表示当前不进入清单；TODO 必须非空，AFFAIR 关联清单后才改为 `OPEN`。
 - AFFAIR 必须是 TIMED 且 `linkedToCourse=true`。关联清单的 AFFAIR 完成后仍展示在课表；TODO 完成后
   暂时从课表隐藏，重新打开后恢复。
+- 纯 AFFAIR 不展示分组入口；关联清单后才展示并使用清单默认灰色，用户随后可以改为具体分组配色。
 - `COMPLETED` occurrence 只允许出现在 `todoState` 非空的父日程下。
 
 所有 HTTP 响应使用：
@@ -194,7 +198,8 @@ Android/iOS 初始化由账号 façade 在当前 delegate 初始化完成后调�
 - Desktop 全量测试通过；iOS Simulator、JS、Wasm test 源码编译通过，Android host test 已完成组装；
 - typed wire、mapper、reducer、planner/applier、daily bridge、Room mapper/store/repository 有聚焦测试；
 - 日常聚合批次覆盖 Category + Schedule + OccurrenceOverride、HTTP 400/REJECTED 清 R、transport 保留 pending 与 R→U；
-- nullable Category color 已覆盖 wire、domain、Room 与 repository；
+- nullable Category color 已覆盖 wire、domain、Room 与 repository；客户端提供 10 组背景/字体配色，首项
+  为清单默认灰。关联清单后的事务使用清单颜色并额外保留斜纹，纯事务不展示分组；
 - 后端 `schedulev2wire` 与 `service` 的 Schedule v2 聚焦测试通过；
 - `git diff --check` 通过。
 

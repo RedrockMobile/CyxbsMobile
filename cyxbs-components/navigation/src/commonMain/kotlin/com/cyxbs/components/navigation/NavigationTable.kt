@@ -85,5 +85,8 @@ const val NAV_SCHEDULE_MAIN = "schedule"
 const val NAV_SCHEDULE_TODO = "schedule/todo"
 const val NAV_SCHEDULE_TODO_DETAIL = "schedule/todo/detail"
 
+// 邮子清单分组管理
+const val NAV_SCHEDULE_CATEGORY_MANAGE = "schedule/category/manage"
+
 // 日程设置
 const val NAV_SCHEDULE_SETTINGS = "schedule_settings"

@@ -240,6 +240,11 @@ private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : Sche
       is ScheduleCommand.UpdateCategory -> current.copy(
         categories = current.categories.replaceBy({ it.id == command.category.id }, command.category),
       )
+      is ScheduleCommand.ReorderCategories -> current.copy(
+        categories = command.categories.mapIndexed { index, category ->
+          category.copy(sortOrder = index)
+        },
+      )
       is ScheduleCommand.SaveScheduleWithNewCategory -> current.copy(
         categories = current.categories.replaceBy({ it.id == command.category.id }, command.category),
         schedules = current.schedules.replaceBy({ it.id == command.schedule.id }, command.schedule),

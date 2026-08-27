@@ -20,7 +20,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
@@ -38,6 +37,9 @@ import com.cyxbs.pages.course.view.timeline.CourseTimeline
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.roundToInt
+
+/** 课表 Item 在深色模式下统一使用的文字 ARGB，不再由各类 Item 或分组数据分别配置。 */
+internal val CourseItemDarkContentColor: Color = Color(0xFFF0F0F2)
 
 /**
  * item 默认的 Compose 样式函数

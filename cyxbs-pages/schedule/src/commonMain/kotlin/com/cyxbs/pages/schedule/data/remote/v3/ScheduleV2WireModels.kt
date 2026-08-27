@@ -98,7 +98,7 @@ data class CategoryInput(
   val id: String, // required，owner 范围内稳定 identity。
   val version: ULong, // required；0 表示 CREATE，正数表示 PATCH。
   val name: AtomicField<String>, // required，名称原子。
-  val color: AtomicField<String?>, // required；没有自定义颜色时 data 显式为 null。
+  val color: AtomicField<String?>, // required；课表配色 JSON，没有自定义颜色时 data 显式为 null。
   val sortOrder: AtomicField<Long>, // required，排序原子。
 )
 

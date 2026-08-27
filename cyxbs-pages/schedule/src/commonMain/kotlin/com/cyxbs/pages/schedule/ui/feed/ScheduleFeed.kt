@@ -53,15 +53,16 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoAccentColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoCalendarLinkSelectedColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoDueSoonColor
+import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoInfoContentColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoInfoContainerColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoOnAccentColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoOverdueColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoPendingIndicatorColor
+import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_empty_notify
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_loading
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_feed_title
-import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_feed_notice
 import cyxbsmobile.cyxbs_pages.schedule.generated.resources.schedule_ic_feed_urgent_arrow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -337,10 +338,11 @@ private fun ScheduleFeedItem(
               modifier = Modifier.padding(start = 45.dp, top = 4.dp, end = 74.dp),
               verticalAlignment = Alignment.CenterVertically,
             ) {
-              Image(
-                painter = painterResource(Res.drawable.schedule_ic_feed_notice),
+              Icon(
+                imageVector = rememberIcAddtodoTime(),
                 contentDescription = null,
-                modifier = Modifier.size(width = 11.dp, height = 13.dp),
+                tint = timeColor,
+                modifier = Modifier.size(13.dp),
               )
               Spacer(modifier = Modifier.width(7.dp))
               Text(
@@ -354,6 +356,13 @@ private fun ScheduleFeedItem(
           }
         }
         if (item.canToggleCourseProjection) {
+          val isLight = MaterialTheme.colors.isLight
+          val calendarIconColor = if (isLight) {
+            if (item.isProjectedToCourse) ScheduleTodoOnAccentColor else ScheduleTodoInfoContentColor
+          } else {
+            // 深色模式与同一行的时间、提醒文字保持相同亮度，关联态由背景色区分。
+            timeColor
+          }
           Box(
             modifier = Modifier
               .align(Alignment.CenterEnd)
@@ -362,7 +371,7 @@ private fun ScheduleFeedItem(
               .clip(RoundedCornerShape(10.dp))
               .background(
                 if (item.isProjectedToCourse) ScheduleTodoCalendarLinkSelectedColor
-                else if (MaterialTheme.colors.isLight) ScheduleTodoInfoContainerColor
+                else if (isLight) ScheduleTodoInfoContainerColor
                 else colors.tvLv4.copy(alpha = 0.2f)
               )
               .clickableNoIndicator {
@@ -374,7 +383,7 @@ private fun ScheduleFeedItem(
             Icon(
               painter = painterResource(ConfigRes.configIcCalendarSync()),
               contentDescription = "关联到课表",
-              tint = if (item.isProjectedToCourse) ScheduleTodoOnAccentColor else Color.White,
+              tint = calendarIconColor,
               modifier = Modifier.size(18.dp),
             )
           }

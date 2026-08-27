@@ -100,7 +100,7 @@ enum class ReminderChannel {
   PUSH,
 }
 
-/** 用户自定义日程分类；[color] 只是可选展示令牌，领域层不解析其颜色格式。 */
+/** 用户自定义日程分类；[color] 是可选课表配色 JSON，领域层保持不透明，由 UI 边界负责校验与解析。 */
 data class ScheduleCategory(
   val id: CategoryId,
   val revision: Long,

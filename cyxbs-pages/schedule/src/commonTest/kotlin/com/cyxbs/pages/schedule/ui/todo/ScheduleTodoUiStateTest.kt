@@ -27,7 +27,7 @@ import kotlin.time.Instant
 /** 邮子清单投影的纯领域测试，不启动 Compose、Room 或网络。 */
 class ScheduleTodoUiStateTest {
 
-  /** 默认候选始终可见；已有同名真实分类会替代候选，避免保存时重复创建。 */
+  /** 默认候选始终可见；已有同名真实分类会替代候选，并按实际 sortOrder 参与统一排序。 */
   @Test
   fun defaultCategoriesAreMergedWithoutPretendingToBeRepositoryFacts() {
     val actualStudy = ScheduleCategory(CategoryId("actual-study"), 3, "学习", null, 9)
@@ -35,8 +35,8 @@ class ScheduleTodoUiStateTest {
 
     val merged = mergeScheduleCategories(listOf(custom, actualStudy))
 
-    assertEquals(listOf("学习", "生活", "其他", "项目"), merged.map { it.name })
-    assertEquals(actualStudy.id, merged.first().id)
+    assertEquals(listOf("生活", "其他", "项目", "学习"), merged.map { it.name })
+    assertEquals(actualStudy.id, merged.last().id)
     assertEquals(
       ScheduleDefaultCategories[1],
       findMissingDefaultScheduleCategory(
@@ -48,8 +48,9 @@ class ScheduleTodoUiStateTest {
       null,
       findMissingDefaultScheduleCategory(actualStudy.id, listOf(custom, actualStudy)),
     )
-    assertTrue(isFixedScheduleCategory(actualStudy))
+    assertFalse(isFixedScheduleCategory(actualStudy))
     assertTrue(isFixedScheduleCategory(ScheduleDefaultCategories[1]))
+    assertTrue(isFixedScheduleCategory(ScheduleDefaultCategories[1].copy(name = "家庭")))
     assertFalse(isFixedScheduleCategory(custom))
   }
 

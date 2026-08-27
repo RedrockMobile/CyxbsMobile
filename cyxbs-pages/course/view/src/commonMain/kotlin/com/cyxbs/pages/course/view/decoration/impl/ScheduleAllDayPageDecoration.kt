@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,14 +29,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.components.utils.compose.color
 import com.cyxbs.components.utils.compose.sharePointerInput
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayItem
+import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoBackgroundColor
+import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoContentColor
+import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceColor
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -112,7 +117,6 @@ class ScheduleAllDayPageDecoration(
 private fun ScheduleAllDayBackground(
   items: List<ScheduleAllDayItem>,
 ) {
-  val accentColor = 0xFF7654C7.dark(0xFFD3C4FF)
   val grouped = remember(items) { items.groupBy { it.data.dayIndex } }
   Row(
     modifier = Modifier
@@ -125,7 +129,6 @@ private fun ScheduleAllDayBackground(
         AllDayColumn(
           modifier = Modifier.weight(1F),
           items = dayItems,
-          accentColor = accentColor,
           onClick = onClick,
         )
       }
@@ -141,16 +144,21 @@ private fun ScheduleAllDayBackground(
 private fun AllDayColumn(
   modifier: Modifier,
   items: List<ScheduleAllDayItem>,
-  accentColor: Color,
   onClick: (() -> Unit)?,
 ) {
+  val defaultBackground = defaultScheduleTodoBackgroundColor()
+  val defaultContent = defaultScheduleTodoContentColor()
+  val categoryColor = items.firstOrNull()?.data?.occurrence?.categoryColor
+  val backgroundColor = categoryColor?.backgroundColor()
+    ?: defaultBackground
+  val contentColor = categoryColor?.contentColor() ?: defaultContent
   Box(
     modifier = modifier
       .fillMaxHeight()
       .then(if (onClick == null) Modifier else Modifier.allDayTap(onClick))
       .padding(horizontal = 1.dp)
       .background(
-        color = if (items.isEmpty()) Color.Transparent else accentColor.copy(alpha = 0.08F),
+        color = if (items.isEmpty()) Color.Transparent else backgroundColor,
         shape = RoundedCornerShape(8.dp),
       ),
   ) {
@@ -159,7 +167,8 @@ private fun AllDayColumn(
         key(item.data.stableId) {
           Text(
             text = item.data.title,
-            color = accentColor,
+            // 全天区域整列共用第一条日程的底色，文字也使用同一配对色以保证对比度。
+            color = contentColor,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
@@ -172,6 +181,17 @@ private fun AllDayColumn(
     }
   }
 }
+
+/** 按当前主题解析 Schedule API 中已经校验过的全天背景色。 */
+@Composable
+private fun ScheduleOccurrenceColor.backgroundColor(): Color = Color(
+  if (MaterialTheme.colors.isLight) lightBackgroundArgb.toInt() else darkBackgroundArgb.toInt(),
+)
+
+/** 按当前主题解析与全天背景配对的字体色。 */
+@Composable
+private fun ScheduleOccurrenceColor.contentColor(): Color =
+  if (MaterialTheme.colors.isLight) lightContentArgb.toInt().color() else CourseItemDarkContentColor
 
 /**
  * 只在短按抬手时消费事件：DOWN/MOVE 仍传给长按创建事务，避免全天背景截断长按手势。

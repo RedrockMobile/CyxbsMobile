@@ -6,6 +6,7 @@ import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
+import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
@@ -50,9 +51,9 @@ private fun CourseLessonItem.Content(
     topText = lesson.course,
     bottomText = lesson.classroomSimplify,
     textColor = when {
-      lesson.beginTime < MinuteTime(12, 0) -> 0xFFFF8015.dark(0xFFF0F0F2)
-      lesson.beginTime < MinuteTime(18, 0) -> 0xFFFF6262.dark(0xFFF0F0F2)
-      else -> 0xFF4066EA.dark(0xFFF0F0F2)
+      lesson.beginTime < MinuteTime(12, 0) -> 0xFFFF8015.dark(CourseItemDarkContentColor)
+      lesson.beginTime < MinuteTime(18, 0) -> 0xFFFF6262.dark(CourseItemDarkContentColor)
+      else -> 0xFF4066EA.dark(CourseItemDarkContentColor)
     },
     backgroundColor = when {
       lesson.beginTime < MinuteTime(12, 0) -> 0xFFF9E7D8.dark(0x26FFCCA1)

@@ -170,6 +170,14 @@ class ScheduleV2LocalCommandReducer {
         nowMillis,
         localRevision,
       )
+      is ScheduleCommand.ReorderCategories -> reorderCategories(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command.categories,
+        nowMillis,
+        localRevision,
+      )
       is ScheduleCommand.SaveScheduleWithNewCategory -> saveScheduleWithNewCategory(
         categories,
         schedules,
@@ -369,6 +377,54 @@ class ScheduleV2LocalCommandReducer {
     if (resource == effective) return ScheduleV2LocalCommandResult.NoOp
     val updated = state.replacePending(PendingUpsert(resource, revision))
     return applied(categories.replace(identity) { updated }, schedules, overrides)
+  }
+
+  /**
+   * 将一次拖拽后的完整顺序转换为同 revision 的多个 Category pending。
+   *
+   * 已存在分类只改 sortOrder；尚未落库的固定默认候选按调用方提供的稳定 identity 创建。相同 revision
+   * 让 daily bridge 自动把全部变化收敛进一个 AtomicBatch，避免逐条请求暴露中间顺序。
+   */
+  private fun reorderCategories(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    ordered: List<ScheduleCategory>,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    if (ordered.isEmpty()) return ScheduleV2LocalCommandResult.NoOp
+    requireUnique(ordered.map { it.id }, "Reordered Category")
+    var currentCategories = categories
+    var changed = false
+    ordered.forEachIndexed { index, category ->
+      val identity = CategoryIdentity(category.id.value)
+      val result = if (currentCategories.any { it.identity == identity }) {
+        updateCategory(
+          currentCategories,
+          schedules,
+          overrides,
+          category.copy(sortOrder = index),
+          now,
+          revision,
+        )
+      } else {
+        createCategory(
+          currentCategories,
+          schedules,
+          overrides,
+          category.copy(revision = 0, sortOrder = index),
+          now,
+          revision,
+        )
+      }
+      if (result is ScheduleV2LocalCommandResult.Applied) {
+        currentCategories = result.categories
+        changed = true
+      }
+    }
+    return if (changed) applied(currentCategories, schedules, overrides)
+    else ScheduleV2LocalCommandResult.NoOp
   }
 
   /**

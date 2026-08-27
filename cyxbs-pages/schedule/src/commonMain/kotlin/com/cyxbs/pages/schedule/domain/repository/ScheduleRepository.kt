@@ -103,6 +103,13 @@ sealed interface ScheduleCommand {
   /** 更新分类。 */
   data class UpdateCategory(val category: ScheduleCategory) : ScheduleCommand
   /**
+   * 按列表顺序重排完整分类集合。
+   *
+   * reducer 会把所有实际变化的 sortOrder 写成同一 localRevision，使日常 mutation bridge 在一个
+   * AtomicBatch 中提交；列表中的惰性默认分类会同时创建。
+   */
+  data class ReorderCategories(val categories: List<ScheduleCategory>) : ScheduleCommand
+  /**
    * 在所选分类尚不存在时，将分类 CREATE 与日程 CREATE/PATCH 作为同一次本地原子修改保存。
    *
    * [schedule] 必须引用 [category]；该命令只服务于固定默认分类的惰性创建，不承担通用分类管理。

@@ -21,6 +21,32 @@ data class ScheduleOccurrenceView(
   val title: String,
   val description: String,
   val timing: ScheduleOccurrenceTiming,
+  /** 分组配置的课表配色；null 时由课表继续使用当前默认视觉。 */
+  val categoryColor: ScheduleOccurrenceColor? = null,
+)
+
+/**
+ * Schedule 已解析好的课表配色。
+ *
+ * API 只传递 ARGB 数值，不把 Category JSON 格式或 Compose [androidx.compose.ui.graphics.Color]
+ * 泄漏给 course:view；调用方按当前主题选择对应的一组颜色。
+ */
+data class ScheduleOccurrenceColor(
+  val lightBackgroundArgb: Long,
+  val lightContentArgb: Long,
+  val darkBackgroundArgb: Long,
+)
+
+/**
+ * 清单与关联事务共用的默认课表配色。
+ *
+ * 分组预设第一项与课表无分组颜色时的兜底均引用此值，避免两个模块分别维护相同 ARGB。
+ */
+val ScheduleDefaultOccurrenceColor = ScheduleOccurrenceColor(
+  lightBackgroundArgb = 0xFFEFEFEF,
+  lightContentArgb = 0xFF8E8E8E,
+  // 深色背景保留约 55% 不透明度，在可辨识度和课表底色透出之间保持平衡。
+  darkBackgroundArgb = 0x8C5A5A5A,
 )
 
 /** 供外部只读判断日程来源，避免暴露 Schedule 模块内部领域类型。 */

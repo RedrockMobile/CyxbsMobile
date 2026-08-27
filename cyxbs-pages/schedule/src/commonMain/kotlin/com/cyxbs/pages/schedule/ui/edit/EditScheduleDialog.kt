@@ -746,7 +746,8 @@ private fun InfoRow(
     buildList {
       add(repeatSegment)
       add(remindSegment)
-      add(categorySegment)
+      // 原生事务没有清单分组；关联清单后才开放分组选择，并以默认灰色进入清单体系。
+      if (modelState.kind == ScheduleKind.TODO || modelState.isInTodoList) add(categorySegment)
       if (showCourseRelation) add(relationSegment)
     }.forEach {
       BasicText(
@@ -897,7 +898,9 @@ private data class InfoTextSegment(
       Icon(
         imageVector = icon,
         contentDescription = null,
-        modifier = Modifier.size(13.dp)
+        modifier = Modifier.size(13.dp),
+        // InlineTextContent 不会自动继承外层 AnnotatedString 的 SpanStyle，需显式同步文字颜色。
+        tint = color,
       )
     }
   )

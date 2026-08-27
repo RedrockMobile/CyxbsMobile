@@ -1,26 +1,35 @@
 package com.cyxbs.pages.course.view.item.impl
 
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
+import com.cyxbs.components.utils.compose.color
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
+import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import com.cyxbs.pages.course.view.item.modifier.LayoutItemModifier
+import com.cyxbs.pages.course.view.item.modifier.CourseItemModifier
+import com.cyxbs.pages.schedule.api.ScheduleDefaultOccurrenceColor
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.DayOfWeek
+import kotlin.math.roundToInt
 
 /**
  * course:view 自己拥有的日程课表 Item。
@@ -62,9 +71,51 @@ class CourseScheduleItem internal constructor(
   /** 绘制平台无关的日程 Item；点击回调完全由 [platform] 提供。 */
   @Composable
   private fun Content(onClick: ((MinuteTimePair) -> Unit)?) {
-    val accentColor = 0xFF7654C7.dark(0xFFD3C4FF)
+    val defaultBackground = defaultScheduleTodoBackgroundColor()
+    val defaultContent = defaultScheduleTodoContentColor()
     val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
-    val useTodoColors = occurrence.isInTodoList
+    val isLinkedTodoAffair = isAffair && occurrence.isInTodoList
+    // 旧版本可能给纯事务留下 categoryId；未关联清单时必须忽略该颜色，保持原生事务视觉。
+    val categoryColor = occurrence.categoryColor.takeIf { !isAffair || isLinkedTodoAffair }
+    val configuredBackground = categoryColor?.let {
+      Color(
+        if (MaterialTheme.colors.isLight) it.lightBackgroundArgb.toInt()
+        else it.darkBackgroundArgb.toInt(),
+      )
+    }
+    val configuredContent = categoryColor?.let {
+      if (MaterialTheme.colors.isLight) it.lightContentArgb.toInt().color()
+      else CourseItemDarkContentColor
+    }
+    val itemTextColor = when {
+      isLinkedTodoAffair -> configuredContent ?: defaultContent
+      isAffair -> LocalAppColors.current.tvLv2.dark(CourseItemDarkContentColor)
+      else -> configuredContent ?: defaultContent
+    }
+    val resolvedBackgroundColor = configuredBackground ?: defaultBackground
+    val itemBackgroundColor = if (isAffair) {
+      // 通用背景绘制在 modifierList 之后；事务必须透明，否则会覆盖 drawBehind 绘制的斜纹。
+      Color.Transparent
+    } else {
+      resolvedBackgroundColor
+    }
+    val affairStripeColor = if (isLinkedTodoAffair) {
+      resolvedBackgroundColor
+    } else {
+      0xFFE4E7EC.dark(0xFF4D4B4C)
+    }
+    val itemModifierList = if (isAffair) {
+      remember(affairStripeColor) {
+        createCourseDefaultModifierList()
+          .add(
+            ScheduleAffairBackgroundItemModifier(
+              stripeColor = affairStripeColor,
+            ),
+          )
+      }
+    } else {
+      remember { createCourseDefaultModifierList() }
+    }
     LayoutItemModifier.minimumVisualHeight.set(
       itemState,
       if (isDeadline) DEADLINE_VISUAL_HEIGHT else 0.dp,
@@ -73,16 +124,52 @@ class CourseScheduleItem internal constructor(
       itemState = itemState,
       topText = data.title,
       bottomText = data.description,
-      // 清单归属决定配色，创建来源只决定是否保留事务条纹；两种视觉语义可以独立组合。
-      textColor = if (useTodoColors) accentColor else LocalAppColors.current.tvLv2,
-      backgroundColor = if (useTodoColors) accentColor.copy(alpha = 0.12f) else Color.Transparent,
-      modifierList = if (isAffair) {
-        remember { createCourseDefaultModifierList().add(AffairBackgroundItemModifier) }
-      } else {
-        remember { createCourseDefaultModifierList() }
-      },
+      // 分组配色作用于清单及关联清单后的事务；事务仍由 modifierList 叠加斜纹，保留来源辨识度。
+      textColor = itemTextColor,
+      // 事务保持透明底，避免通用背景覆盖 modifierList 中先绘制的斜纹。
+      backgroundColor = itemBackgroundColor,
+      modifierList = itemModifierList,
       onClick = onClick,
     )
+  }
+}
+
+/** 默认清单使用不突出的中性灰，避免与课程的橙、红、蓝主色混淆。 */
+@Composable
+internal fun defaultScheduleTodoBackgroundColor(): Color =
+  Color(
+    if (MaterialTheme.colors.isLight) ScheduleDefaultOccurrenceColor.lightBackgroundArgb.toInt()
+    else ScheduleDefaultOccurrenceColor.darkBackgroundArgb.toInt(),
+  )
+
+/** 默认清单在浅色模式使用中灰文字，深色模式统一使用白色文字。 */
+@Composable
+internal fun defaultScheduleTodoContentColor(): Color =
+  if (MaterialTheme.colors.isLight) ScheduleDefaultOccurrenceColor.lightContentArgb.toInt().color()
+  else CourseItemDarkContentColor
+
+/**
+ * 日程事务专用斜纹；关联清单后使用分组背景色绘制斜线，间隙保持透明以透出课表颜色。
+ *
+ * [CourseDefaultItemContent] 的通用背景位于自定义 modifier 之后，因此事务必须传入透明背景，避免
+ * 覆盖本 modifier 的 `drawBehind` 结果。
+ */
+private data class ScheduleAffairBackgroundItemModifier(
+  val stripeColor: Color,
+) : CourseItemModifier {
+  @Composable
+  override fun createModifier(): Modifier {
+    return Modifier.drawBehind {
+      val lineWidth = 8.dp.toPx()
+      val lineSpace = lineWidth * 1.414F
+      var start = Offset(-3.dp.toPx(), lineSpace)
+      var end = Offset(lineSpace, -3.dp.toPx())
+      repeat(((size.width + size.height) / lineSpace / 2).roundToInt()) {
+        drawLine(stripeColor, start, end, lineWidth)
+        start = start.copy(y = start.y + lineSpace * 2)
+        end = end.copy(x = end.x + lineSpace * 2)
+      }
+    }
   }
 }
 

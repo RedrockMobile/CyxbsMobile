@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
 import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -101,6 +103,7 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryMutationMode
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.canSubmitScheduleMutation
 import com.cyxbs.pages.schedule.ui.category.mergeScheduleCategories
+import com.cyxbs.pages.schedule.ui.category.ScheduleCategoryManageNavArgument
 import com.cyxbs.pages.schedule.ui.edit.EditScheduleDialog
 import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
@@ -347,6 +350,7 @@ fun ScheduleTodoPage(
         categories = visibleCategories,
         selectedCategoryId = selectedCategoryId,
         onSelect = { selectedCategoryId = it },
+        onManageCategories = { ScheduleCategoryManageNavArgument.navigate() },
       )
       AnimatedVisibility(
         visible = visibleUrgentCount > 0,
@@ -591,54 +595,71 @@ private fun ScheduleTodoCategoryFilterBar(
   categories: List<ScheduleCategory>,
   selectedCategoryId: CategoryId?,
   onSelect: (CategoryId?) -> Unit,
+  onManageCategories: () -> Unit,
 ) {
   val colors = LocalAppColors.current
-  LazyRow(
+  Row(
     modifier = Modifier
       .fillMaxWidth()
       .wrapContentHeight(),
-    contentPadding = PaddingValues(
-      start = 16.dp,
-      top = 16.dp,
-      end = 16.dp,
-      bottom = 13.dp,
-    ),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    items(
-      items = listOf<Pair<CategoryId?, String>>(null to "全部") +
-        categories.map { it.id to it.name },
-    ) { (categoryId, label) ->
-      val isSelected = categoryId == selectedCategoryId
-      Surface(
-        color = if (isSelected) ScheduleTodoAccentColor else Color.Transparent,
-        contentColor = if (isSelected) {
-          if (MaterialTheme.colors.isLight) colors.topBg else colors.tvLv1
-        } else {
-          colors.tvLv3
-        },
-        // 设计稿的分类选中块左下角为直角，其余三个角保留胶囊式圆角。
-        shape = RoundedCornerShape(
-          topStart = 16.dp,
-          topEnd = 20.dp,
-          bottomEnd = 20.dp,
-          bottomStart = 0.dp,
-        ),
-        modifier = Modifier
-          .height(32.dp)
-          .clickableNoIndicator { onSelect(categoryId) },
-      ) {
-        Box(contentAlignment = Alignment.Center) {
-          Text(
-            text = label,
-            fontSize = 14.sp,
-            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-            letterSpacing = 0.7.sp,
-            modifier = Modifier.padding(horizontal = 18.dp),
-          )
+    LazyRow(
+      modifier = Modifier.weight(1f),
+      contentPadding = PaddingValues(
+        start = 16.dp,
+        top = 16.dp,
+        end = 4.dp,
+        bottom = 13.dp,
+      ),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      items(
+        items = listOf<Pair<CategoryId?, String>>(null to "全部") +
+          categories.map { it.id to it.name },
+      ) { (categoryId, label) ->
+        val isSelected = categoryId == selectedCategoryId
+        Surface(
+          color = if (isSelected) ScheduleTodoAccentColor else Color.Transparent,
+          contentColor = if (isSelected) {
+            if (MaterialTheme.colors.isLight) colors.topBg else colors.tvLv1
+          } else {
+            colors.tvLv3
+          },
+          // 设计稿的分类选中块左下角为直角，其余三个角保留胶囊式圆角。
+          shape = RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 20.dp,
+            bottomEnd = 20.dp,
+            bottomStart = 0.dp,
+          ),
+          modifier = Modifier
+            .height(32.dp)
+            .clickableNoIndicator { onSelect(categoryId) },
+        ) {
+          Box(contentAlignment = Alignment.Center) {
+            Text(
+              text = label,
+              fontSize = 14.sp,
+              fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+              letterSpacing = 0.7.sp,
+              modifier = Modifier.padding(horizontal = 18.dp),
+            )
+          }
         }
       }
+    }
+    IconButton(
+      onClick = onManageCategories,
+      modifier = Modifier.padding(top = 10.dp, end = 8.dp, bottom = 7.dp).size(40.dp),
+    ) {
+      Icon(
+        imageVector = Icons.Outlined.Settings,
+        contentDescription = "管理分组",
+        tint = colors.tvLv2,
+        modifier = Modifier.size(20.dp),
+      )
     }
   }
 }
@@ -1282,12 +1303,19 @@ private fun ScheduleTodoCalendarLinkButton(
   onClick: () -> Unit,
 ) {
   val colors = LocalAppColors.current
+  val isLight = MaterialTheme.colors.isLight
   val backgroundColor = if (selected) {
     ScheduleTodoCalendarLinkSelectedColor
-  } else if (MaterialTheme.colors.isLight) {
+  } else if (isLight) {
     ScheduleTodoInfoContainerColor
   } else {
     colors.negative.copy(alpha = 0.55f)
+  }
+  val iconColor = if (isLight) {
+    if (selected) ScheduleTodoOnAccentColor else ScheduleTodoInfoContentColor
+  } else {
+    // 深色模式与左侧时间、提醒文字保持相同亮度，由背景色表达关联状态。
+    colors.tvLv3.copy(alpha = 0.6f)
   }
   Surface(
     color = backgroundColor,
@@ -1298,7 +1326,7 @@ private fun ScheduleTodoCalendarLinkButton(
       Icon(
         painter = painterResource(ConfigRes.configIcCalendarSync()),
         contentDescription = if (selected) "取消关联到课表" else "关联到课表",
-        tint = if (selected) ScheduleTodoOnAccentColor else ScheduleTodoInfoContentColor,
+        tint = iconColor,
         modifier = Modifier.size(18.dp),
       )
     }
