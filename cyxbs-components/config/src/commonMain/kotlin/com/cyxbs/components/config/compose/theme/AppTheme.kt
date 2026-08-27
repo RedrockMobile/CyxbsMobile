@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Shapes
 import androidx.compose.material.Typography
@@ -44,6 +45,7 @@ fun AppTheme(
     LocalAppDark provides isSystemInDarkTheme(),
   ) {
     ConfigAppThemeBefore {
+      val appColors = if (!LocalAppDark.current) AppColor else AppDarkColor
       MaterialTheme(
         colors = if (!LocalAppDark.current) LightColor else DarkColor,
         typography = createTypography(),
@@ -51,7 +53,9 @@ fun AppTheme(
       ) {
         DefaultIndication = LocalIndication.current
         CompositionLocalProvider(
-          LocalAppColors provides if (!LocalAppDark.current) AppColor else AppDarkColor,
+          LocalAppColors provides appColors,
+          // 页面根级默认前景色；局部 Surface 可通过 contentColor 覆盖。
+          LocalContentColor provides MaterialTheme.colors.onBackground,
           LocalIndication provides CardIndicationNodeFactory,
         ) {
           ConfigAppThemeAfter(content)

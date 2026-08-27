@@ -68,7 +68,7 @@ fun formatRemindAhead(remindMinutes: Int): String? = when {
   remindMinutes < 0 -> null
   remindMinutes == 0 -> "准时"
   remindMinutes % 60 == 0 -> "提前${remindMinutes / 60}小时"
-  else -> "提前${remindMinutes}分"
+  else -> "提前${remindMinutes}分钟"
 }
 
 /** 提前提醒选项的菜单文案（含「不提醒」）。 */
