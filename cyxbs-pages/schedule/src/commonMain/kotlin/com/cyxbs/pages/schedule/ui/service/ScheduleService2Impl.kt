@@ -104,6 +104,8 @@ object ScheduleService2Impl : IScheduleService2 {
     embeddedInHost: Boolean,
     onDismiss: () -> Unit,
     onEditModeChanged: (Boolean) -> Unit,
+    onDismissRequestChanged: (((suspend () -> Boolean)?) -> Unit),
+    onWindowOverlayContentChanged: (((@Composable () -> Unit)?) -> Unit),
   ) {
     val details by detailByIdentity.collectAsState()
     val detail = details[occurrence.identity] ?: return
@@ -129,6 +131,8 @@ object ScheduleService2Impl : IScheduleService2 {
       embeddedInExternalHost = embeddedInHost,
       showCourseRelation = true,
       onEditModeChanged = onEditModeChanged,
+      onDismissRequestChanged = onDismissRequestChanged,
+      onWindowOverlayContentChanged = onWindowOverlayContentChanged,
       onDismiss = onDismiss,
       onConfirm = { state, editScope, newCategory ->
         scope.launch {
@@ -179,6 +183,8 @@ object ScheduleService2Impl : IScheduleService2 {
     onDismiss: () -> Unit,
     onCreated: () -> Unit,
     onEditModeChanged: (Boolean) -> Unit,
+    onDismissRequestChanged: (((suspend () -> Boolean)?) -> Unit),
+    onWindowOverlayContentChanged: (((@Composable () -> Unit)?) -> Unit),
   ) {
     val scope = rememberCoroutineScope()
     EditScheduleDialog(
@@ -189,6 +195,8 @@ object ScheduleService2Impl : IScheduleService2 {
       embeddedInExternalHost = embeddedInHost,
       showCourseRelation = true,
       onEditModeChanged = onEditModeChanged,
+      onDismissRequestChanged = onDismissRequestChanged,
+      onWindowOverlayContentChanged = onWindowOverlayContentChanged,
       onDismiss = onDismiss,
       onConfirm = { state, editScope, newCategory ->
         scope.launch {

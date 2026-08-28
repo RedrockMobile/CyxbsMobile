@@ -66,6 +66,8 @@ private class MobileCreateBottomSheetExtension(
       onEditModeChanged = { isEditing ->
         if (isEditing) state.lockCurrentPage()
       },
+      onDismissRequestChanged = state::updateDismissRequestGate,
+      onWindowOverlayContentChanged = state::updateWindowOverlayContent,
     )
   }
 }

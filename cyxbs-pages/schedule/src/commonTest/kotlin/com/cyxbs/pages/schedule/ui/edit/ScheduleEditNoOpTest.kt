@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -19,6 +20,27 @@ import kotlin.time.Instant
 
 /** THIS_ONLY 无改动保存必须保持既有 sparse patch，不得因 parent 演进而误删例外。 */
 class ScheduleEditNoOpTest {
+
+  /** 新建草稿的默认值不算用户修改，产生有效输入后才需要未保存确认。 */
+  @Test
+  fun untouchedCreationDraftBecomesChangedOnlyAfterUserInput() {
+    val todo = EditScheduleModelState(origin = null)
+    assertFalse(todo.isChanged)
+
+    val affair = EditScheduleModelState(
+      origin = null,
+      creationKind = ScheduleKind.AFFAIR,
+      creationTiming = ScheduleTiming.Timed(
+        MinuteTimeDate(2026, 8, 25, 14, 30),
+        90,
+        "Asia/Shanghai",
+      ),
+    )
+    assertFalse(affair.isChanged)
+
+    affair.title.setTextAndPlaceCursorAtEnd("课表事务")
+    assertTrue(affair.isChanged)
+  }
 
   @Test
   fun affairCreationUsesInitialTimingWithoutTodoState() {

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.LocalContentColor
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -185,6 +187,17 @@ fun CalendarState.CalendarDateCompose(
   maxCellHeight: Dp = 56.dp,
 ) {
   val today = today.invoke()
+  val contentColor = LocalContentColor.current
+  // 普通选中态使用中性内容色；今天单独使用强调色，避免深色模式下两个状态混成同一灰度。
+  val selectedBackgroundColor = contentColor.copy(alpha = 0.12F)
+  val todayAccentColor = if (MaterialTheme.colors.isLight) {
+    Color(0xFF1C71FF)
+  } else {
+    MaterialTheme.colors.secondary
+  }
+  val todayBackgroundColor = todayAccentColor.copy(
+    alpha = if (MaterialTheme.colors.isLight) 0.14F else 0.28F,
+  )
   Layout(
     modifier = Modifier.graphicsLayer {
       alpha = if (date !in startDateState.value..endDateState.value) 0.3F else {
@@ -197,9 +210,9 @@ fun CalendarState.CalendarDateCompose(
     }.drawBehind {
       // 画正圆高亮：直径取格子较小边，避免格子被压扁(宽>高)时 CircleShape 变成椭圆。
       val bg = when {
-        date == today && show == CalendarDateShowValue.Clicked -> Color(0xFF1C71FF)
-        show == CalendarDateShowValue.Clicked -> Color.LightGray
-        date == today -> Color.White
+        date == today && show == CalendarDateShowValue.Clicked -> todayAccentColor
+        show == CalendarDateShowValue.Clicked -> selectedBackgroundColor
+        date == today -> todayBackgroundColor
         else -> Color.Transparent
       }
       if (bg != Color.Transparent) {
@@ -211,7 +224,7 @@ fun CalendarState.CalendarDateCompose(
       }
     },
     content = {
-      CalendarDateDayCompose(date, today, show, dayFontSize)
+      CalendarDateDayCompose(date, today, show, dayFontSize, todayAccentColor)
       CalendarDateLunarCompose(date, today, show, lunarFontSize)
       CalendarDateRestCompose(date, today, show)
     },
@@ -249,14 +262,16 @@ private fun CalendarDateDayCompose(
   today: Date,
   show: CalendarDateShowValue,
   fontSize: TextUnit = 19.sp,
+  todayAccentColor: Color,
 ) {
+  val contentColor = LocalContentColor.current
   Text(
     modifier = Modifier,
     text = date.dayOfMonth.toString(),
     color = when {
       date == today && show == CalendarDateShowValue.Clicked -> Color.White
-      date == today -> Color(0xFF1C71FF)
-      else -> Color.Black
+      date == today -> todayAccentColor
+      else -> contentColor
     },
     fontSize = fontSize,
     fontWeight = FontWeight.Bold,
@@ -270,6 +285,7 @@ private fun CalendarDateLunarCompose(
   show: CalendarDateShowValue,
   fontSize: TextUnit = 9.sp,
 ) {
+  val contentColor = LocalContentColor.current
   val specialDay = remember(date) { Festival.get(date) ?: SolarTerms.get(date)?.chinese }
   Text(
     modifier = Modifier,
@@ -279,7 +295,7 @@ private fun CalendarDateLunarCompose(
     color = when {
       date == today && show == CalendarDateShowValue.Clicked -> Color.White
       specialDay != null -> Color(0xFF1C71FF)
-      else -> Color.Gray
+      else -> contentColor.copy(alpha = 0.55F)
     },
     fontSize = fontSize,
   )

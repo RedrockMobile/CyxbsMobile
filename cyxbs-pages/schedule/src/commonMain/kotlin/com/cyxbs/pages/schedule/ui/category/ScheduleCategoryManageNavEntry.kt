@@ -206,7 +206,7 @@ private fun ScheduleCategoryManagePage(onBack: () -> Unit) {
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .navigationBarsPadding()
-        .padding(end = 24.dp, bottom = 28.dp)
+        .padding(end = 26.dp, bottom = 54.dp)
         .size(50.dp),
     ) {
       Icon(

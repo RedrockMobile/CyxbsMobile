@@ -68,7 +68,14 @@ import kotlinx.coroutines.launch
 @Stable
 class BottomSheetState(
   var onDismissRequest: suspend BottomSheetState.() -> Unit = { collapseSuspend() },
-  val hideable: Boolean = false
+  val hideable: Boolean = false,
+  /**
+   * 拖拽吸附到关闭位置时是否统一通过 [onDismissRequest]。
+   *
+   * 默认开启，使返回键、点击遮罩和下拉关闭共享同一套业务拦截。依赖 [hideable] 区分“收起”与
+   * “完全隐藏”的调用方需要显式关闭，否则 [onDismissRequest] 无法获知本次拖拽的目标状态。
+   */
+  val requestDismissOnDrag: Boolean = true,
 ) {
 
   internal val showHeight = mutableFloatStateOf(0F)
@@ -441,19 +448,24 @@ private class BottomSheetScopeImpl(
       },
       onDragStopped = { velocity ->
         coroutineScope.launch {
+          var targetState = BottomSheetValueState.Expanded
           bottomSheetState.scrollableState.scroll {
             with(flingBehavior) {
               performFling(velocity)
             }
-            bottomSheetState.setState(
-              if (bottomSheetState.fraction == 0F) {
-                BottomSheetValueState.Collapsed
-              } else {
-                if (bottomSheetState.fraction < 0F) {
-                  BottomSheetValueState.Hide
-                } else BottomSheetValueState.Expanded
-              }
-            )
+            targetState = if (bottomSheetState.fraction == 0F) {
+              BottomSheetValueState.Collapsed
+            } else if (bottomSheetState.fraction < 0F) {
+              BottomSheetValueState.Hide
+            } else {
+              BottomSheetValueState.Expanded
+            }
+          }
+          if (targetState != BottomSheetValueState.Expanded && bottomSheetState.requestDismissOnDrag) {
+            // 离开 scroll mutation 后再请求关闭，回弹/收起动画才能安全重新取得 ScrollableState。
+            bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+          } else {
+            bottomSheetState.setState(targetState)
           }
         }
       }
@@ -508,14 +520,21 @@ private class BottomSheetNestedScrollConnection(
     val old = bottomSheetState.showHeight.floatValue
     if (old == max) return available.copy(x = 0F) // 完全展开时继续保持展开状态
     var consumeVelocity = available.y
+    var targetState = BottomSheetValueState.Expanded
     bottomSheetState.scrollableState.scroll(scrollPriority = MutatePriority.UserInput) {
       with(flingBehavior) {
         consumeVelocity = available.y - performFling(available.y)
       }
-      bottomSheetState.setState(
-        if (bottomSheetState.fraction == 0F)
-          BottomSheetValueState.Collapsed else BottomSheetValueState.Expanded
-      )
+      targetState = if (bottomSheetState.fraction == 0F) {
+        BottomSheetValueState.Collapsed
+      } else {
+        BottomSheetValueState.Expanded
+      }
+    }
+    if (targetState != BottomSheetValueState.Expanded && bottomSheetState.requestDismissOnDrag) {
+      bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+    } else {
+      bottomSheetState.setState(targetState)
     }
     return Velocity(x = 0F, y = consumeVelocity)
   }

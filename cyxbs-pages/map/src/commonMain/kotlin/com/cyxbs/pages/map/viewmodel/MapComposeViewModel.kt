@@ -81,7 +81,11 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 地点详细信息
   val placeDetails = mutableStateOf<PlaceDetails?>(null)
   val placeDetailsId = mutableStateOf<String>("999")
-  val bottomSheetState = BottomSheetState(hideable = true)
+  // 地图详情需要根据拖拽终点区分收起与完全隐藏，不能把两种状态合并为统一关闭请求。
+  val bottomSheetState = BottomSheetState(
+    hideable = true,
+    requestDismissOnDrag = false,
+  )
 
   // desktop下的搜索栏bottomSheet
   val searchBottomSheetState = BottomSheetState(hideable = false)

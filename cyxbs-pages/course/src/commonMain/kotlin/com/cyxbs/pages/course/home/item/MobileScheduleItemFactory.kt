@@ -1,5 +1,7 @@
 package com.cyxbs.pages.course.home.item
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,12 +69,15 @@ private class MobileScheduleCourseItem(
       else showStandalone.value = true
     }
     if (showStandalone.value) {
-      Window(dismissOnBackPress = { showStandalone.value = false }) {
-        scheduleService.ScheduleDetailContent(
-          occurrence = item.occurrence,
-          embeddedInHost = false,
-          onDismiss = { showStandalone.value = false },
-        )
+      // Window 由入口持有；返回键交给内部 BottomSheet，以保留未保存内容确认逻辑。
+      Window(dismissOnBackPress = null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+          scheduleService.ScheduleDetailContent(
+            occurrence = item.occurrence,
+            embeddedInHost = false,
+            onDismiss = { showStandalone.value = false },
+          )
+        }
       }
     }
   }
@@ -102,6 +107,8 @@ private class MobileScheduleBottomSheetExtension(
       onEditModeChanged = { isEditing ->
         if (isEditing) state.lockCurrentPage()
       },
+      onDismissRequestChanged = state::updateDismissRequestGate,
+      onWindowOverlayContentChanged = state::updateWindowOverlayContent,
     )
   }
 
@@ -160,12 +167,15 @@ private class MobileScheduleAllDayItem(
     val showDetail = remember(item) { mutableStateOf(false) }
     content { showDetail.value = true }
     if (showDetail.value) {
-      Window(dismissOnBackPress = { showDetail.value = false }) {
-        scheduleService.ScheduleDetailContent(
-          occurrence = item.occurrence,
-          embeddedInHost = false,
-          onDismiss = { showDetail.value = false },
-        )
+      // 全天日程同样由点击入口提供完整窗口层，详情组件只负责内容与内部状态。
+      Window(dismissOnBackPress = null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+          scheduleService.ScheduleDetailContent(
+            occurrence = item.occurrence,
+            embeddedInHost = false,
+            onDismiss = { showDetail.value = false },
+          )
+        }
       }
     }
   }

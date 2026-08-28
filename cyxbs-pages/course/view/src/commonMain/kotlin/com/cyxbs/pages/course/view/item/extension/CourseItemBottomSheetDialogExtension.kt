@@ -10,12 +10,10 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -30,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -49,7 +48,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -118,7 +116,15 @@ class CourseItemBottomSheetDialogState {
   val dialogContents: MutableStateFlow<List<CourseItemBottomSheetDialogExtension>> =
     MutableStateFlow(emptyList())
 
-  val bottomSheetState = BottomSheetState()
+  private var dismissRequestGate: (suspend () -> Boolean)? = null
+  private val windowOverlayContent = mutableStateOf<(@Composable () -> Unit)?>(null)
+
+  val bottomSheetState = BottomSheetState(
+    onDismissRequest = {
+      // 业务内容可挂起关闭并展示确认；继续编辑后才回弹，放弃后完成收起。
+      if (dismissRequestGate?.invoke() != false) collapseSuspend() else expandSuspend()
+    },
+  )
 
   // 当前选中的 item
   val currentPageItemFlow: MutableStateFlow<CourseItemBottomSheetDialogExtension?> =
@@ -160,7 +166,29 @@ class CourseItemBottomSheetDialogState {
     if (currentPageItemFlow.value != null) currentPageLockedFlow.value = true
   }
 
+  /**
+   * 更新当前业务内容的关闭拦截。
+   *
+   * [gate] 返回 false 时宿主保持展开，由业务内容自行展示确认层；传入 null 恢复直接关闭。
+   */
+  fun updateDismissRequestGate(gate: (suspend () -> Boolean)?) {
+    dismissRequestGate = gate
+  }
+
+  /** 更新绘制在课表 Window 最上层的业务弹层，避免其随 BottomSheet 一起被拖出屏幕。 */
+  fun updateWindowOverlayContent(content: (@Composable () -> Unit)?) {
+    windowOverlayContent.value = content
+  }
+
+  /** 在课表 Window 根布局末尾绘制当前业务弹层。 */
+  @Composable
+  internal fun WindowOverlayContent() {
+    windowOverlayContent.value?.invoke()
+  }
+
   private fun clear() {
+    dismissRequestGate = null
+    windowOverlayContent.value = null
     bottomSheetState.userScrollEnabled.value = true
     currentPageItemFlow.value = null
     currentPageLockedFlow.value = false
@@ -195,9 +223,8 @@ private fun MobileCourseBottomSheetDialog(
 ) {
   state.dialogContents.collectAsState().value.firstOrNull() ?: return
   Window(
-    dismissOnBackPress = {
-      state.dismissDialog()
-    }
+    // 返回键交给 BottomSheetState，与蒙层点击共用业务关闭拦截。
+    dismissOnBackPress = null,
   ) {
     val imePaddingTargetState = rememberImePaddingTargetState()
     CompositionLocalProvider(LocalImePaddingTargetState provides imePaddingTargetState) {
@@ -206,6 +233,8 @@ private fun MobileCourseBottomSheetDialog(
         ShowBeginFinalTime(state)
         CurrentItemShowTop(state)
         BottomSheet(state)
+        // 业务确认层必须位于可拖动 BottomSheet 之外，收起后仍能立即显示。
+        state.WindowOverlayContent()
       }
     }
   }
@@ -283,7 +312,6 @@ private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
 ) {
   val currentPageLocked by state.currentPageLockedFlow.collectAsState()
-  val navigationBarHeight = WindowInsets.navigationBars.getBottom(LocalDensity.current).toFloat()
   val bottomSheetBackgroundColor = LocalAppColors.current.whiteBlack
   val layoutTopOnScreenFlow = remember {
     MutableSharedFlow<Float>(
@@ -300,14 +328,25 @@ private fun BottomSheet(
     OffsetScroll(state, layoutTopOnScreenFlow)
     Box(
       modifier = Modifier
-        // navigationBarsPadding 位于内容外层，保留原有弹窗高度；这里只为其空白区域补齐背景色。
+        // 背景必须画在尺寸动画外层；子项的 matchParentSize 会先跳到目标高度，收缩期间会透出课表。
         .drawBehind {
-          val top = (size.height - navigationBarHeight).coerceAtLeast(0F)
-          drawRect(
+          val top = 20.dp.toPx().coerceAtMost(size.height)
+          val fillHeight = size.height - top
+          val radius = minOf(16.dp.toPx(), fillHeight / 2F)
+          drawRoundRect(
             color = bottomSheetBackgroundColor,
             topLeft = Offset(0F, top),
-            size = Size(size.width, size.height - top),
+            size = Size(size.width, fillHeight),
+            cornerRadius = CornerRadius(radius),
           )
+          // 只保留顶部圆角，底部继续铺满导航栏区域。
+          if (fillHeight > radius) {
+            drawRect(
+              color = bottomSheetBackgroundColor,
+              topLeft = Offset(0F, top + radius),
+              size = Size(size.width, fillHeight - radius),
+            )
+          }
         }
         .navigationBarsPadding()
         .fillMaxWidth()
@@ -329,13 +368,6 @@ private fun BottomSheet(
             colors = listOf(Color(0x005369BC), Color(0x205369BC))
           )
         )
-      )
-      // 背景匹配 BottomSheet 的最终测量高度，但不参与父布局测量；内容较短时也不会透出课表。
-      Spacer(
-        modifier = Modifier.matchParentSize()
-          .padding(top = 20.dp)
-          .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-          .background(LocalAppColors.current.whiteBlack)
       )
       Box(
         modifier = Modifier.padding(top = 20.dp)

@@ -24,6 +24,8 @@ actual fun Window(
   Dialog(
     onDismissRequest = { dismissOnBackPress?.invoke() },
     properties = DialogProperties(
+      // null 表示由窗口内容自己的 BackHandler 处理，不能让 Dialog 抢先消费返回事件。
+      dismissOnBackPress = dismissOnBackPress != null,
       dismissOnClickOutside = false,
       usePlatformDefaultWidth = false,
       // IME 位移由 commonMain 统一处理，避免 Android adjustPan 与其他平台行为不一致。

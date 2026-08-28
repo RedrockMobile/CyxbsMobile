@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -41,6 +42,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
@@ -81,6 +84,7 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.imePaddingTarget
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.schedule.data.repository.v2.ScheduleRepositoryProvider
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
@@ -113,7 +117,9 @@ import com.cyxbs.pages.schedule.widget.rememberIcAddtodoNotice
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRelation
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoRepeat
 import com.cyxbs.pages.schedule.widget.rememberIcAddtodoTime
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.time.Instant
@@ -146,13 +152,17 @@ class EditScheduleDialogPreview : AppNavEntry<EditScheduleDialogNavArgument>() {
 
   @Composable
   override fun Content(argument: EditScheduleDialogNavArgument) {
-    EditScheduleDialog(
-      show = true,
-      editSchedule = previewSampleSchedule(),
-      recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 4, 10, 0), "Asia/Shanghai", false),
-      onDismiss = {},
-      onConfirm = { _, _, _ -> }
-    )
+    Window(dismissOnBackPress = null) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        EditScheduleDialog(
+          show = true,
+          editSchedule = previewSampleSchedule(),
+          recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 4, 10, 0), "Asia/Shanghai", false),
+          onDismiss = {},
+          onConfirm = { _, _, _ -> }
+        )
+      }
+    }
   }
 
   private fun previewSampleSchedule() = Schedule(
@@ -179,9 +189,12 @@ fun EditScheduleDialog(
   categoryRepository: ScheduleRepository = ScheduleRepositoryProvider.repository,
   /** 弹窗外背景色；外部宿主可传透明，普通入口继续使用 Schedule 默认遮罩。 */
   scrimColor: Color? = null,
-  /** true 时只绘制业务内容，由调用方提供外层 BottomSheet。 */
+  /**
+   * true 时只绘制业务内容，由调用方同时提供外层 BottomSheet 和 Window；false 时本组件提供
+   * BottomSheet，但 Window 仍由调用入口持有，确保主编辑、范围选择和确认层处于同一窗口。
+   */
   embeddedInExternalHost: Boolean = false,
-  /** 是否展示课表专用的“关联清单/关联课表”设置入口。 */
+  /** 是否展示“关联清单/关联课表”入口；清单页与课表页可按各自业务入口启用。 */
   showCourseRelation: Boolean = false,
   onDismiss: () -> Unit,
   /** 第三个参数仅在所选固定默认分类尚未落库时非空，调用方需沿用原子保存命令。 */
@@ -191,6 +204,10 @@ fun EditScheduleDialog(
   onToggleCompleted: ((Boolean) -> Unit)? = null,
   /** 嵌入外部宿主时报告查看/编辑模式；普通 ScheduleBottomSheet 可忽略。 */
   onEditModeChanged: (Boolean) -> Unit = {},
+  /** 嵌入外部宿主时注册关闭拦截；传入 null 表示当前编辑内容已离开组合。 */
+  onDismissRequestChanged: (((suspend () -> Boolean)?) -> Unit) = {},
+  /** 嵌入外部宿主时把子弹层交给 Window 根布局绘制；传入 null 表示清除。 */
+  onWindowOverlayContentChanged: (((@Composable () -> Unit)?) -> Unit) = {},
 ) {
   if (!show) return
 
@@ -203,7 +220,9 @@ fun EditScheduleDialog(
   val categoryCatalog = rememberScheduleCategoryCatalog(categoryRepository)
 
   var showUnsavedExit by remember { mutableStateOf(false) }
+  var pendingDismissDecision by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }
+  val coroutineScope = rememberCoroutineScope()
 
   // 开学第一天（周一）：用于推导第N周，一次会话读一次即可。
   val firstMonday = remember { SchoolCalendar.getFirstMonDay() }
@@ -216,15 +235,41 @@ fun EditScheduleDialog(
     )
   }
 
-  val requestDismiss = { if (modelState.isChanged) showUnsavedExit = true else onDismiss() }
-  val doSave = {
+  val dismissGate: suspend () -> Boolean = {
+    if (modelState.isChanged) {
+      val decision = pendingDismissDecision ?: CompletableDeferred<Boolean>().also {
+        pendingDismissDecision = it
+        showUnsavedExit = true
+      }
+      decision.await()
+    } else {
+      true
+    }
+  }
+  val requestDismiss: () -> Unit = {
+    coroutineScope.launch {
+      if (dismissGate()) onDismiss()
+    }
+    Unit
+  }
+  DisposableEffect(embeddedInExternalHost, modelState, onDismissRequestChanged) {
+    // 外部 BottomSheet 必须复用编辑器的 dirty 判断，否则点击蒙层会绕过未保存确认。
+    if (embeddedInExternalHost) onDismissRequestChanged(dismissGate)
+    onDispose {
+      if (embeddedInExternalHost) onDismissRequestChanged(null)
+    }
+  }
+  DisposableEffect(modelState) {
+    onDispose { pendingDismissDecision?.cancel() }
+  }
+  val doSave: () -> Unit = {
     if (needScope) scopeChooser = ScopeAction.SAVE
     else {
       confirm(EditScope.ALL)
       onDismiss()
     }
   }
-  val doDelete = {
+  val doDelete: () -> Unit = {
     if (onDelete != null) {
       if (needScope) scopeChooser = ScopeAction.DELETE
       else {
@@ -249,9 +294,9 @@ fun EditScheduleDialog(
         firstMonday = firstMonday,
         categories = categoryCatalog.selectableCategories,
         showCourseRelation = showCourseRelation,
-        onSave = doSave,
-        onCancel = requestDismiss,
-        onDelete = doDelete,
+        onSave = { doSave() },
+        onCancel = { requestDismiss() },
+        onDelete = { doDelete() },
         onToggleCompleted = onToggleCompleted,
         onEditModeChanged = onEditModeChanged,
       )
@@ -264,41 +309,56 @@ fun EditScheduleDialog(
       show = true,
       onDismiss = onDismiss,
       scrimColor = scrimColor,
-      onDismissRequest = {
-        if (modelState.isChanged) {
-          showUnsavedExit = true; false
-        } else true
-      },
+      onDismissRequest = dismissGate,
       content = sheetContent,
     )
   }
 
-  // 三态选择
-  EditScopeChooserSheet(
-    show = scopeChooser != null,
-    isDelete = scopeChooser == ScopeAction.DELETE,
-    onDismiss = { scopeChooser = null },
-    onChoose = { scope ->
-      when (scopeChooser) {
-        ScopeAction.SAVE -> confirm(scope)
-        ScopeAction.DELETE -> onDelete?.invoke(scope)
-        null -> {}
-      }
-      scopeChooser = null
-      onDismiss()
-    },
-  )
+  val resolveDismissDecision: (Boolean) -> Unit = { allowDismiss ->
+    val decision = pendingDismissDecision
+    pendingDismissDecision = null
+    showUnsavedExit = false
+    decision?.complete(allowDismiss)
+  }
+  val overlayContent: @Composable () -> Unit = {
+    // 三态选择
+    EditScopeChooserSheet(
+      show = scopeChooser != null,
+      isDelete = scopeChooser == ScopeAction.DELETE,
+      onDismiss = { scopeChooser = null },
+      onChoose = { scope ->
+        when (scopeChooser) {
+          ScopeAction.SAVE -> confirm(scope)
+          ScopeAction.DELETE -> onDelete?.invoke(scope)
+          null -> {}
+        }
+        scopeChooser = null
+        onDismiss()
+      },
+    )
 
-  // 未保存退出确认
-  ScheduleConfirmDialog(
-    show = showUnsavedExit,
-    title = "未保存",
-    message = "当前修改未保存，是否放弃？",
-    confirmText = "放弃",
-    dismissText = "继续编辑",
-    onConfirm = onDismiss,
-    onDismiss = { showUnsavedExit = false },
-  )
+    // 确认结果会恢复挂起的关闭请求：继续编辑返回 false 并由宿主回弹，放弃返回 true 后完成收起。
+    ScheduleConfirmDialog(
+      show = showUnsavedExit,
+      title = "未保存",
+      message = "当前修改未保存，是否放弃？",
+      confirmText = "放弃",
+      dismissText = "继续编辑",
+      embeddedInWindow = true,
+      onConfirm = { resolveDismissDecision(true) },
+      onDismiss = { resolveDismissDecision(false) },
+    )
+  }
+  if (embeddedInExternalHost) {
+    val currentOverlayContent = rememberUpdatedState(overlayContent)
+    DisposableEffect(onWindowOverlayContentChanged) {
+      // 外部宿主在同一个 Window 的根布局末尾绘制，避免弹层跟随被拖下去的内容一起隐藏。
+      onWindowOverlayContentChanged { currentOverlayContent.value() }
+      onDispose { onWindowOverlayContentChanged(null) }
+    }
+  } else {
+    overlayContent()
+  }
 }
 
 /** 范围选择弹层当前要提交的动作；保存与删除共用范围状态机，但最终命令入口严格分离。 */
@@ -970,6 +1030,7 @@ private fun EditScopeChooserSheet(
 ) {
   if (!show) return
   val colors = LocalAppColors.current
+  // 调用入口已提供 Window；范围选择只叠加新的 BottomSheet，避免创建第二个窗口改变层级。
   ScheduleBottomSheet(show = true, onDismiss = onDismiss) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
       Text(

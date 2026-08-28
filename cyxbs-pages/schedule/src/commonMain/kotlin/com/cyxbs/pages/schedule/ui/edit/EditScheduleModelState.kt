@@ -194,7 +194,13 @@ class EditScheduleModelState(
     if (initialOccurrence != null) {
       return isOccurrenceFieldsChanged || isSeriesRecurrenceChanged || isSeriesRelationChanged
     }
-    return origin == null || toDraft().let { draft ->
+    if (origin == null) {
+      // 新建态只把用户相对初始草稿产生的有效输入视为修改；课表预填时间本身不触发二次确认。
+      return outputTitle.isNotEmpty() || outputDetail.isNotEmpty() || categoryId != null ||
+        isTimingInputChanged || isRecurrenceInputChanged ||
+        remindMinutes != initialReminderMinutes || isSeriesRelationChanged
+    }
+    return toDraft().let { draft ->
       draft.title.trim() != origin.title || draft.description.trim() != origin.description ||
         draft.categoryId != origin.categoryId || draft.timing != origin.timing ||
         isRecurrenceInputChanged || draft.reminders != origin.reminders || isSeriesRelationChanged

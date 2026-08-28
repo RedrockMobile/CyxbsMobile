@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CancellationException
@@ -51,13 +52,11 @@ fun WheelSelectCompose(
   selectedLine: Animatable<Float, AnimationVector1D>, // 使用 Animatable 以支持外界操控滚动
   options: ImmutableList<String>,
   modifier: Modifier = Modifier,
-  textStyle: TextStyle = remember {
-    TextStyle(
-      fontSize = 14.sp,
-      textAlign = TextAlign.Center,
-      color = Color.Black,
-    )
-  },
+  textStyle: TextStyle = TextStyle(
+    fontSize = 14.sp,
+    textAlign = TextAlign.Center,
+    color = LocalAppColors.current.tvLv2,
+  ),
   selectedTextSizeRatio: Float = 1F,
   onDrag: (() -> Unit)? = null,
   onDragStart: (() -> Unit)? = null,

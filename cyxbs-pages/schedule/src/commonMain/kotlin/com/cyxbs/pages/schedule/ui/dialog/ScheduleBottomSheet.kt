@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -13,6 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.utils.compose.LocalImePaddingTargetState
+import com.cyxbs.components.utils.compose.imePaddingWithTarget
+import com.cyxbs.components.utils.compose.rememberImePaddingTargetState
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.components.view.ui.BottomSheetValueState
@@ -37,7 +41,7 @@ internal fun ScheduleBottomSheet(
   show: Boolean,
   onDismiss: () -> Unit,
   scrimColor: Color? = null,
-  onDismissRequest: (() -> Boolean)? = null,
+  onDismissRequest: (suspend () -> Boolean)? = null,
   content: @Composable () -> Unit,
 ) {
   if (!show) return
@@ -46,11 +50,15 @@ internal fun ScheduleBottomSheet(
   val resolvedScrimColor = scrimColor ?: Color.Black.copy(alpha = 0.4F)
   // 用 rememberUpdatedState 保证 BottomSheetState 内捕获的始终是最新一帧的拦截回调（避免闭包过期）。
   val dismissGate = rememberUpdatedState(onDismissRequest)
+  // 与编辑内容的 imePaddingTarget 配对，只把标题、信息区和描述区完整抬到键盘上方。
+  val imePaddingTargetState = rememberImePaddingTargetState()
   val state = remember {
-    BottomSheetState(onDismissRequest = {
-      val gate = dismissGate.value
-      if (gate == null || gate()) hideSuspend()
-    })
+    BottomSheetState(
+      onDismissRequest = {
+        val gate = dismissGate.value
+        if (gate == null || gate()) hideSuspend() else expandSuspend()
+      },
+    )
   }
 
   // 等测量完成后展开（BottomSheetCompose 通过 onSizeChanged 设置 showMaxHeight）。
@@ -65,24 +73,27 @@ internal fun ScheduleBottomSheet(
     onDismiss()
   }
 
-  BottomSheetCompose(
-    bottomSheetState = state,
-    peekHeight = 0.dp,
-    scrimColor = resolvedScrimColor,
-    dismissOnBackPress = true,
-    dismissOnClickOutside = true,
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .then(bottomSheetDraggable())
-        .background(
-          color = colors.topBg,
-          shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        )
-        .navigationBarsPadding(),
+  CompositionLocalProvider(LocalImePaddingTargetState provides imePaddingTargetState) {
+    BottomSheetCompose(
+      modifier = Modifier.imePaddingWithTarget(imePaddingTargetState),
+      bottomSheetState = state,
+      peekHeight = 0.dp,
+      scrimColor = resolvedScrimColor,
+      dismissOnBackPress = true,
+      dismissOnClickOutside = true,
     ) {
-      content()
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .then(bottomSheetDraggable())
+          .background(
+            color = colors.topBg,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+          )
+          .navigationBarsPadding(),
+      ) {
+        content()
+      }
     }
   }
 }

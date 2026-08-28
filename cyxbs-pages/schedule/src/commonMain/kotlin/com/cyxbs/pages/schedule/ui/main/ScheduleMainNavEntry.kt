@@ -39,6 +39,7 @@ import com.cyxbs.components.navigation.NAV_SCHEDULE_MAIN
 import com.cyxbs.components.view.calendar.CalendarCompose
 import com.cyxbs.components.view.calendar.layout.createCalendarContentOffsetMeasurePolicy
 import com.cyxbs.components.view.calendar.state.rememberCalendarState
+import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.Schedule
@@ -247,25 +248,29 @@ fun SchedulePage(
   SyncStateIndicator(snapshot.status, viewModel.mutationMode)
 
   // 统一编辑弹窗（新建 / 编辑，含重复规则编辑器与三态）；状态失去 Ready 后不再组合 callback。
-  if (editorEnabled) {
+  if (editorEnabled && showEdit) {
     val currentEditing = editingSchedule
-    EditScheduleDialog(
-      show = showEdit,
-      editSchedule = currentEditing,
-      editOccurrence = editingOccurrence,
-      recurrenceId = editingRecurrenceId,
-      categoryRepository = viewModel.repository,
-      onDismiss = { showEdit = false },
-      onConfirm = { state, scope, newCategory ->
-        viewModel.saveSchedule(state, scope, editingRecurrenceId, newCategory)
-      },
-      onDelete = if (currentEditing != null) {
-        { scope -> viewModel.deleteScheduleScoped(currentEditing.id, scope, editingRecurrenceId) }
-      } else null,
-      onToggleCompleted = currentEditing?.takeIf { it.todoState != null }?.let { schedule ->
-        { completed -> viewModel.completeSchedule(schedule.id, editingRecurrenceId, completed) }
-      },
-    )
+    Window(dismissOnBackPress = null) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        EditScheduleDialog(
+          show = true,
+          editSchedule = currentEditing,
+          editOccurrence = editingOccurrence,
+          recurrenceId = editingRecurrenceId,
+          categoryRepository = viewModel.repository,
+          onDismiss = { showEdit = false },
+          onConfirm = { state, scope, newCategory ->
+            viewModel.saveSchedule(state, scope, editingRecurrenceId, newCategory)
+          },
+          onDelete = if (currentEditing != null) {
+            { scope -> viewModel.deleteScheduleScoped(currentEditing.id, scope, editingRecurrenceId) }
+          } else null,
+          onToggleCompleted = currentEditing?.takeIf { it.todoState != null }?.let { schedule ->
+            { completed -> viewModel.completeSchedule(schedule.id, editingRecurrenceId, completed) }
+          },
+        )
+      }
+    }
   }
 }
 

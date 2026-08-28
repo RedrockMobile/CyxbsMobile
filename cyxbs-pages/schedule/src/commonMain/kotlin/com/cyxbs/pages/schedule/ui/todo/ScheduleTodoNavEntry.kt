@@ -90,6 +90,7 @@ import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_SCHEDULE_TODO
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.schedule.api.ScheduleTodoNavArgument
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
@@ -481,7 +482,7 @@ fun ScheduleTodoPage(
         modifier = Modifier
           .align(Alignment.BottomEnd)
           .navigationBarsPadding()
-          .padding(end = 24.dp, bottom = 28.dp)
+          .padding(end = 26.dp, bottom = 54.dp)
           .size(50.dp),
         onClick = {
           editingIdentity = null
@@ -532,54 +533,61 @@ fun ScheduleTodoPage(
     }
   }
 
-  if (editorEnabled) {
-    EditScheduleDialog(
-      show = showCreateEditor,
-      categoryRepository = viewModel.repository,
-      onDismiss = { showCreateEditor = false },
-      onConfirm = { state, _, newCategory ->
-        viewModel.saveSchedule(
-          state,
-          EditScope.ALL,
-          null,
-          newCategory,
+  if (editorEnabled && (showCreateEditor || editingItem != null)) {
+    // Window 包住完整编辑流程，范围选择和未保存确认与主 BottomSheet 共用同一窗口层级。
+    Window(dismissOnBackPress = null) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        EditScheduleDialog(
+          show = showCreateEditor,
+          categoryRepository = viewModel.repository,
+          showCourseRelation = true,
+          onDismiss = { showCreateEditor = false },
+          onConfirm = { state, _, newCategory ->
+            viewModel.saveSchedule(
+              state,
+              EditScope.ALL,
+              null,
+              newCategory,
+            )
+            showCreateEditor = false
+          },
         )
-        showCreateEditor = false
-      },
-    )
-    editingItem?.let { item ->
-      EditScheduleDialog(
-        show = true,
-        editSchedule = item.schedule,
-        editOccurrence = item.occurrence.toDomainOccurrence(),
-        recurrenceId = item.occurrence.recurrenceId,
-        categoryRepository = viewModel.repository,
-        onDismiss = { editingIdentity = null },
-        onConfirm = { state, scope, newCategory ->
-          viewModel.saveSchedule(
-            state,
-            scope,
-            item.occurrence.recurrenceId,
-            newCategory,
+        editingItem?.let { item ->
+          EditScheduleDialog(
+            show = true,
+            editSchedule = item.schedule,
+            editOccurrence = item.occurrence.toDomainOccurrence(),
+            recurrenceId = item.occurrence.recurrenceId,
+            categoryRepository = viewModel.repository,
+            showCourseRelation = true,
+            onDismiss = { editingIdentity = null },
+            onConfirm = { state, scope, newCategory ->
+              viewModel.saveSchedule(
+                state,
+                scope,
+                item.occurrence.recurrenceId,
+                newCategory,
+              )
+              editingIdentity = null
+            },
+            onDelete = { scope ->
+              viewModel.deleteScheduleScoped(
+                item.schedule.id,
+                scope,
+                item.occurrence.recurrenceId,
+              )
+              editingIdentity = null
+            },
+            onToggleCompleted = { completed ->
+              viewModel.completeSchedule(
+                item.schedule.id,
+                item.occurrence.recurrenceId,
+                completed,
+              )
+            },
           )
-          editingIdentity = null
-        },
-        onDelete = { scope ->
-          viewModel.deleteScheduleScoped(
-            item.schedule.id,
-            scope,
-            item.occurrence.recurrenceId,
-          )
-          editingIdentity = null
-        },
-        onToggleCompleted = { completed ->
-          viewModel.completeSchedule(
-            item.schedule.id,
-            item.occurrence.recurrenceId,
-            completed,
-          )
-        },
-      )
+        }
+      }
     }
   }
 }
