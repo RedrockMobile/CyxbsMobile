@@ -37,6 +37,8 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSyncResult
+import com.cyxbs.pages.schedule.ui.category.ScheduleCategoryColorPresets
+import com.cyxbs.pages.schedule.ui.category.encodeScheduleCategoryColor
 import com.cyxbs.pages.schedule.ui.todo.ScheduleTodoPage
 import com.cyxbs.pages.schedule.ui.todo.figma.ScheduleTodoDetailRoute
 import com.cyxbs.pages.schedule.viewmodel.ScheduleMainViewModel
@@ -648,20 +650,18 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
   val weeklyDue = MinuteTimeDate(courseWeekStart.plusDays(2), 15, 30)
   val monthlyDue = MinuteTimeDate(courseWeekStart.plusDays(3), 18, 0)
   val allDayDate = courseWeekStart.plusDays(4)
-  val studyCategory = ScheduleCategory(
-    id = CategoryId("desktop-todo-study"),
-    revision = 1,
-    name = "学习",
-    color = "#5B8FF9",
-    sortOrder = 0,
-  )
-  val lifeCategory = ScheduleCategory(
-    id = CategoryId("desktop-todo-life"),
-    revision = 1,
-    name = "生活",
-    color = "#61DDAA",
-    sortOrder = 1,
-  )
+  // 直接复用分组管理页候选，保证课表中的 mock 与用户实际可选颜色始终一一对应。
+  val colorPreviewCategories = ScheduleCategoryColorPresets.mapIndexed { index, preset ->
+    ScheduleCategory(
+      id = CategoryId("desktop-todo-color-$index"),
+      revision = 1,
+      name = preset.label,
+      color = preset.value.encodeScheduleCategoryColor(),
+      sortOrder = index,
+    )
+  }
+  val studyCategory = colorPreviewCategories[0]
+  val lifeCategory = colorPreviewCategories[1]
 
   /** 创建符合领域 identity 的精简待办；mock 不模拟远端版本推进。 */
   fun todo(
@@ -674,6 +674,7 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
     reminders: List<ScheduleReminder> = emptyList(),
     todoState: ScheduleTodoState = ScheduleTodoState.PENDING,
     updatedAt: Instant = now,
+    linkedToCourse: Boolean = false,
   ): Schedule = Schedule(
     id = ScheduleId("019c7f00-0000-7000-8000-000000000$suffix"),
     revision = 1,
@@ -684,9 +685,32 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
     recurrence = recurrence,
     reminders = reminders,
     todoState = todoState,
+    linkedToCourse = linkedToCourse,
     createdAt = now - 10.days,
     updatedAt = updatedAt,
   )
+
+  /**
+   * 为每套候选配色生成一条课表时间段，集中放在 3 月 7 日和 3 月 8 日。
+   *
+   * 两天交错分配并按一小时间隔排开，避免工作日课程和其他配色预览互相遮挡。
+   */
+  val colorPreviewSchedules = ScheduleCategoryColorPresets.mapIndexed { index, preset ->
+    val date = courseWeekStart.plusDays(5 + index % 2)
+    val startHour = 7 + index / 2
+    todo(
+      suffix = (20 + index).toString().padStart(3, '0'),
+      title = "配色预览：${preset.label}",
+      description = "分组管理候选色 ${index + 1}/${ScheduleCategoryColorPresets.size}",
+      categoryId = colorPreviewCategories[index].id,
+      timing = ScheduleTiming.Timed(
+        start = MinuteTimeDate(date, startHour, 0),
+        durationMinutes = 60,
+        timeZoneId = SHANGHAI_TIME_ZONE,
+      ),
+      linkedToCourse = true,
+    )
+  }
 
   return ScheduleSnapshot(
     schedules = listOf(
@@ -807,9 +831,9 @@ private fun createDesktopTodoPreviewSnapshot(): ScheduleSnapshot {
         todoState = ScheduleTodoState.COMPLETED,
         updatedAt = now - 2.days,
       ),
-    ),
+    ) + colorPreviewSchedules,
     exceptions = emptyList(),
-    categories = listOf(studyCategory, lifeCategory),
+    categories = colorPreviewCategories,
     status = ScheduleRepositoryStatus.Ready(pendingCount = 0, hasPendingDeletes = false),
     accountId = PREVIEW_ACCOUNT_ID,
   )

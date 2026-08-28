@@ -34,23 +34,32 @@ private val ScheduleCategoryColorJson = Json {
 }
 
 /**
- * 10 组经过背景/文字对比配对的课表颜色。
+ * 18 组经过背景/文字对比配对的课表颜色。
  *
- * 候选会避开课程已有的早课橙、午间红和晚间蓝三套配色，防止日程与课程只靠细微色差区分。
+ * 候选不会直接复用课程已有的早课橙、午间红和晚间蓝色值，减少日程与课程仅靠细微色差区分的情况。
+ * 展示顺序按中性、黄橙、红粉、紫、蓝青、绿、棕的色相过渡排列，柔和与鲜艳配色穿插展示。
  * 分组只保存选中的一组 JSON；候选数量不会扩大 wire 字段。深色模式统一使用固定浅色文字，事务会在
  * 对应背景色上额外绘制斜纹。
  */
 internal val ScheduleCategoryColorPresets: List<ScheduleCategoryColorPreset> = listOf(
   ScheduleCategoryColorPreset("默认灰", ScheduleDefaultGrayCategoryColorValue),
-  preset("柠黄", "#FFF4E47F", "#FF5D5000", "#FF494323"),
-  preset("青柠", "#FFDBE88D", "#FF425B08", "#FF35421F"),
-  preset("草绿", "#FFC0E1A7", "#FF285D30", "#FF28422D"),
-  preset("苔绿", "#FFA5C881", "#FF2B4D12", "#FF344225"),
-  preset("翡翠", "#FF8AC8A5", "#FF0F5038", "#FF1F4032"),
-  preset("松石", "#FF83C8BE", "#FF0B504B", "#FF1F4140"),
-  preset("藤紫", "#FFD4A8DE", "#FF61346F", "#FF403046"),
-  preset("葡萄", "#FFB99CC5", "#FF452850", "#FF3D3041"),
-  preset("棕褐", "#FFC3A88D", "#FF493629", "#FF40362F"),
+  preset("柠檬", "#FFFFE38A", "#FF5B4800", "#BF584C10"),
+  preset("亮橙", "#FFFFC98F", "#FF6B3700", "#BF5C3514"),
+  preset("珊瑚", "#FFFFB0A6", "#FF7A2B24", "#BF6A342D"),
+  preset("莓红", "#FFF29AB2", "#FF7A2439", "#BF65303D"),
+  preset("桃粉", "#FFFFB3D8", "#FF7A2451", "#BF653151"),
+  preset("藤紫", "#FFE3C6EA", "#FF61346F", "#CC403046"),
+  preset("葡萄", "#FFD1BED9", "#FF452850", "#CC3D3041"),
+  preset("电紫", "#FFBDAAFF", "#FF432B88", "#BF42356F"),
+  preset("天蓝", "#FFA3C5FF", "#FF173E78", "#BF1F426E"),
+  preset("湖蓝", "#FF86DBE9", "#FF005262", "#BF16505A"),
+  preset("松石", "#FFAEDCD5", "#FF0B504B", "#CC1F4140"),
+  preset("薄荷", "#FF8BE4C1", "#FF00563D", "#BF145341"),
+  preset("翡翠", "#FFB3DCC4", "#FF0F5038", "#CC1F4032"),
+  preset("青提", "#FFC5EE8A", "#FF315200", "#BF3B571B"),
+  preset("草绿", "#FFD6ECC6", "#FF285D30", "#CC28422D"),
+  preset("苔绿", "#FFC5DCAD", "#FF2B4D12", "#CC344225"),
+  preset("棕褐", "#FFD8C6B5", "#FF493629", "#CC40362F"),
 )
 
 /**
