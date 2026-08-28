@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.cyxbs.components.config.compose.theme.LocalAppColors
@@ -311,20 +312,28 @@ private fun OffsetScroll(
 private fun BottomSheet(
   state: CourseItemBottomSheetDialogState,
 ) {
-  val currentPageLocked by state.currentPageLockedFlow.collectAsState()
-  val bottomSheetBackgroundColor = LocalAppColors.current.whiteBlack
-  val layoutTopOnScreenFlow = remember {
-    MutableSharedFlow<Float>(
-      replay = 1,
-      extraBufferCapacity = 1,
-      onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-  }
   BottomSheetCompose(
     bottomSheetState = state.bottomSheetState,
     dismissOnClickOutside = true,
     scrimColor = Color.Transparent,
   ) {
+    val currentPageLocked by state.currentPageLockedFlow.collectAsState()
+    val layoutTopOnScreenFlow = remember {
+      MutableSharedFlow<Float>(
+        replay = 1,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+      )
+    }
+    val bottomSheetBackgroundColor = LocalAppColors.current.whiteBlack
+    val shadowHeightPx = with(LocalDensity.current) { 36.dp.toPx() }
+    val shadowBrush = remember(shadowHeightPx) {
+      // 阴影高度固定，仅在 density 变化时重建 Brush，内容尺寸动画不会产生重复分配。
+      Brush.verticalGradient(
+        colors = listOf(Color(0x005369BC), Color(0x205369BC)),
+        endY = shadowHeightPx,
+      )
+    }
     OffsetScroll(state, layoutTopOnScreenFlow)
     Box(
       modifier = Modifier
@@ -333,6 +342,12 @@ private fun BottomSheet(
           val top = 20.dp.toPx().coerceAtMost(size.height)
           val fillHeight = size.height - top
           val radius = minOf(16.dp.toPx(), fillHeight / 2F)
+          val shadowHeight = shadowHeightPx.coerceAtMost(size.height)
+          // 先画完整阴影，再用不透明圆角背景覆盖其内部，只从弹窗的圆角外缘保留阴影。
+          drawRect(
+            brush = shadowBrush,
+            size = Size(size.width, shadowHeight),
+          )
           drawRoundRect(
             color = bottomSheetBackgroundColor,
             topLeft = Offset(0F, top),
@@ -362,13 +377,6 @@ private fun BottomSheet(
           layoutTopOnScreenFlow.tryEmit(it.positionOnScreen().y)
         }
     ) {
-      Spacer(
-        modifier = Modifier.fillMaxWidth().height(36.dp).background(
-          brush = Brush.verticalGradient(
-            colors = listOf(Color(0x005369BC), Color(0x205369BC))
-          )
-        )
-      )
       Box(
         modifier = Modifier.padding(top = 20.dp)
           .fillMaxWidth()
