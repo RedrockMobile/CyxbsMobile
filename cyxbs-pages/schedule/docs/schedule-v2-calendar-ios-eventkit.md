@@ -208,27 +208,28 @@ Compose 设置页用户点击
 
 1. 不得把旧 `MinuteTimeDate + timeZoneId`、DST resolver 或 local `recurrenceId` 写回 canonical wire；
 2. 不得从 EventKit `occurrenceDate`、设备时区或显示日期反算 wire `occurrenceDate`；
-3. 不得让平台 `.thisEvent` timing 能力增加 canonical Override timing 字段；
+3. `.thisEvent` timing 只能投影 canonical timing patch，不得据平台对象反写 occurrence identity；
 4. 不得让旧 Android/iOS adapter 字段覆盖 typed AtomicField 划分；
 5. 必须先由客户端 materializer 以 `occurrenceDate + parent offset` 得到实际时间，再生成平台投影。
 
 ## 7. OccurrenceOverride 与 span 能力
 
-当前 canonical OccurrenceOverride 只有：
+当前 canonical OccurrenceOverride 包含：
 
 ```text
 identity = scheduleId + occurrenceDate
 status = ACTIVE | COMPLETED | CANCELLED
+timing = INHERIT | REPLACE
 title = INHERIT | CLEAR | REPLACE
 description = INHERIT | CLEAR | REPLACE
+categoryId = INHERIT | CLEAR | REPLACE
 reminders = INHERIT | CLEAR | REPLACE
 ```
 
 明确没有：
 
 - 独立 exception ID；
-- category override；
-- timing / 改期字段；
+- 独立 recurrence 规则；
 - 时区；
 - occurrence 序号。
 
@@ -239,8 +240,8 @@ EventKit 平台能力与项目状态：
 | 取消本次 | `.thisEvent` 删除可表达。 | 尚未接入；foundation/runtime 继续 Unsupported。 |
 | 修改本次标题/描述/提醒 | detached `.thisEvent` 可表达。 | 尚未接入。 |
 | 完成本次 | EventKit 没有 Schedule completion 状态。 | 不能映射为删除；至少必须保留 occurrence 可见。 |
-| 修改本次分类 | EventKit 不承载应用分类。 | canonical 也不支持。 |
-| 改期本次 | `.thisEvent` 可改 start/end。 | 只能是 adapter-only 平台能力，canonical 不支持。 |
+| 修改本次分类 | EventKit 不承载应用分类。 | canonical 支持，但只保留在应用数据中。 |
+| 改期本次 | `.thisEvent` 可改 start/end。 | canonical 支持 timing patch；当前 adapter 尚未接入。 |
 | 从本次起编辑后续 | `.futureEvents` 可在平台内拆分。 | 尚未建立 canonical A/B/Override atomic batch 映射。 |
 | 从本次起删除后续 | `.futureEvents` 可截断。 | 尚未建立 canonical 最终资源图映射。 |
 

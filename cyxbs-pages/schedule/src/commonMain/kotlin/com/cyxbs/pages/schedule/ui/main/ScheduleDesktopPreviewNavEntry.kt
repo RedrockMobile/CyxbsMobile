@@ -31,8 +31,6 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCalendarChange
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCommand
-import com.cyxbs.pages.schedule.domain.repository.ScheduleMutationBusinessRejectionReason
-import com.cyxbs.pages.schedule.domain.repository.ScheduleRemoteError
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
@@ -199,9 +197,9 @@ private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : Sche
   override suspend fun initialize() = Unit
 
   /**
-   * 在内存中应用页面会发出的基本命令。
+   * 在内存中应用页面会发出的命令，包括重复系列的拆分与后半段删除。
    *
-   * @return 支持的命令返回未触网成功；“此次及后续”等当前 v2 未支持操作返回业务拒绝，避免预览静默伪造能力。
+   * @return 命令更新内存快照后返回未触网成功；该仓库只模拟本地结果，不模拟版本冲突和远端合并。
    */
   override suspend fun execute(command: ScheduleCommand): ScheduleSyncResult {
     val current = mutableSnapshot.value
@@ -257,22 +255,53 @@ private class DesktopPreviewRepository(initialSnapshot: ScheduleSnapshot) : Sche
           if (schedule.categoryId == command.categoryId) schedule.copy(categoryId = null) else schedule
         },
       )
+      is ScheduleCommand.SplitSeries -> current.applyPreviewSeriesSplit(command)
+      is ScheduleCommand.DeleteThisAndFollowing -> current.copy(
+        schedules = current.schedules.replaceBy(
+          { it.id == command.previousSchedule.id },
+          command.previousSchedule,
+        ),
+        exceptions = current.exceptions.filterNot { exception ->
+          exception.scheduleId == command.previousSchedule.id &&
+            exception.recurrenceId.originalDateTime.date >= command.recurrenceId.originalDateTime.date
+        },
+      )
       ScheduleCommand.RequestSync -> current
-      is ScheduleCommand.SplitSeries,
-      is ScheduleCommand.DeleteThisAndFollowing -> {
-        return ScheduleSyncResult.Failure(
-          ScheduleRemoteError.MutationRejected(
-            ScheduleMutationBusinessRejectionReason.UNSUPPORTED_RECURRENCE,
-          ),
-          attempted = false,
-        )
-      }
     }
     mutableSnapshot.value = next.copy(
       status = ScheduleRepositoryStatus.Ready(pendingCount = 0, hasPendingDeletes = false),
     )
     return ScheduleSyncResult.Success(attempted = false)
   }
+}
+
+/**
+ * 在预览快照中原子应用“此次及以后”拆分。
+ *
+ * 边界 occurrence 的有效字段已经提升到新系列，因此边界自身的旧例外不再保留；更晚的例外仍使用原始
+ * recurrence identity，只把所属日程切换为新系列。该行为与正式 Room reducer 一致，但不模拟版本和上传批次。
+ */
+private fun ScheduleSnapshot.applyPreviewSeriesSplit(
+  command: ScheduleCommand.SplitSeries,
+): ScheduleSnapshot {
+  val boundaryDate = command.recurrenceId.originalDateTime.date
+  return copy(
+    categories = command.newCategory?.let { category ->
+      categories.replaceBy({ it.id == category.id }, category)
+    } ?: categories,
+    schedules = schedules
+      .replaceBy({ it.id == command.previousSchedule.id }, command.previousSchedule)
+      .replaceBy({ it.id == command.followingSchedule.id }, command.followingSchedule),
+    exceptions = exceptions.mapNotNull { exception ->
+      if (exception.scheduleId != command.previousSchedule.id) {
+        exception
+      } else when {
+        exception.recurrenceId.originalDateTime.date < boundaryDate -> exception
+        exception.recurrenceId.originalDateTime.date == boundaryDate -> null
+        else -> exception.copy(scheduleId = command.followingSchedule.id)
+      }
+    },
+  )
 }
 
 /** 以 identity 替换列表元素；不存在时追加，符合预览仓库的 upsert 语义。 */

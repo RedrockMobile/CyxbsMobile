@@ -82,8 +82,10 @@ class ScheduleV2DomainWireMapperTest {
       identity = OccurrenceOverrideIdentity("schedule-1", 172_800_000),
       version = 5,
       status = AtomicField(OccurrenceStatus.COMPLETED, 51),
+      timing = AtomicField(FieldPatch.Inherit, 51),
       title = AtomicField(FieldPatch.Replace("临时标题"), 52),
       description = AtomicField(FieldPatch.Clear, 53),
+      categoryId = AtomicField(FieldPatch.Replace("category-2"), 53),
       reminders = AtomicField(
         FieldPatch.Replace(listOf(ReminderInput(5, "reminder-2"))),
         54,

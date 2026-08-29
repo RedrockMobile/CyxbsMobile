@@ -163,7 +163,7 @@ class ScheduleSyncV2StateTest {
   }
 
   @Test
-  fun occurrenceOverrideUsesCompositeIdentityAndOnlyFourAtomicFields() {
+  fun occurrenceOverrideUsesCompositeIdentityAndSixAtomicFields() {
     val identity = OccurrenceOverrideIdentity(
       scheduleId = "schedule-1",
       occurrenceDate = 1_728_000_000_000,
@@ -172,8 +172,10 @@ class ScheduleSyncV2StateTest {
       identity = identity,
       version = 3,
       status = AtomicField(OccurrenceStatus.COMPLETED, 1_700_000_000_001),
+      timing = AtomicField(FieldPatch.Inherit, 1_700_000_000_001),
       title = AtomicField(FieldPatch.Replace("补做一次"), 1_700_000_000_002),
       description = AtomicField(FieldPatch.Clear, 1_700_000_000_003),
+      categoryId = AtomicField(FieldPatch.Inherit, 1_700_000_000_003),
       reminders = AtomicField(FieldPatch.Inherit, 1_700_000_000_004),
     )
     val remote = OccurrenceOverrideRemoteSnapshot(

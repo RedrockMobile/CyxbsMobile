@@ -27,6 +27,29 @@ data class SeriesSplitResult(
  * 分类引用需要 envelope 中的 categoryIds 才能判定，不能在这里伪造集合，仍由 Repository/Store 完整边界负责。
  */
 object SeriesSplitter {
+  /** 判断 [boundary] 是否是可拆分的非首个有效 occurrence；非法 identity 返回 false。 */
+  fun canSplitAt(schedule: Schedule, boundary: RecurrenceId): Boolean =
+    runCatching { RecurrenceEngine.requireGeneratedIdentity(schedule, boundary).occurrenceIndex > 0 }
+      .getOrDefault(false)
+
+  /**
+   * 在 [boundary] 前截断重复系列。
+   *
+   * 边界本身不再属于返回系列；首次 occurrence 不能截断，否则会产生没有任何实例的空系列。
+   */
+  fun truncateBefore(schedule: Schedule, boundary: RecurrenceId): Schedule {
+    require(schedule.recurrence != null) { "only recurring schedules can be truncated" }
+    val boundaryPosition = RecurrenceEngine.requireGeneratedIdentity(schedule, boundary)
+    require(boundaryPosition.occurrenceIndex > 0) { "truncate boundary must follow the first occurrence" }
+    val previousStart = requireNotNull(boundaryPosition.previousOriginalStart) {
+      "truncate boundary must have a previous occurrence"
+    }
+    return schedule.copy(
+      recurrence = schedule.recurrence.copy(end = RecurrenceEnd.Until(previousStart.date)),
+      todoState = schedule.todoState?.let { ScheduleTodoState.PENDING },
+    )
+  }
+
   /**
    * 在 [boundary] 拆分 [schedule]。
    *
@@ -51,8 +74,6 @@ object SeriesSplitter {
     val previousStart = requireNotNull(boundaryPosition.previousOriginalStart) {
       "split boundary must have a previous occurrence"
     }
-
-    val oldRule = schedule.recurrence.copy(end = RecurrenceEnd.Until(previousStart.date))
     val newEnd = when (val end = schedule.recurrence.end) {
       is RecurrenceEnd.Count -> RecurrenceEnd.Count(end.value - boundaryPosition.occurrenceIndex).also {
         require(it.value > 0) { "split boundary lies beyond COUNT" }
@@ -60,8 +81,9 @@ object SeriesSplitter {
       else -> end
     }
     val newTiming = moveTiming(schedule.timing, boundary.originalDateTime)
+    // 复用上面已经定位出的前驱，避免边界离 anchor 很远时重复展开一次规则。
     val previousSchedule = schedule.copy(
-      recurrence = oldRule,
+      recurrence = schedule.recurrence.copy(end = RecurrenceEnd.Until(previousStart.date)),
       todoState = schedule.todoState?.let { ScheduleTodoState.PENDING },
     )
     val followingSchedule = schedule.copy(
@@ -70,6 +92,8 @@ object SeriesSplitter {
       timing = newTiming,
       recurrence = schedule.recurrence.copy(end = newEnd),
       todoState = schedule.todoState?.let { ScheduleTodoState.PENDING },
+      // 新系列沿用边界 occurrence 的稳定日期 identity；实际 timing 后续可由编辑结果独立移动。
+      recurrenceAnchorDate = boundary.originalDateTime.date,
     )
 
     val (before, after) = exceptions.partition {

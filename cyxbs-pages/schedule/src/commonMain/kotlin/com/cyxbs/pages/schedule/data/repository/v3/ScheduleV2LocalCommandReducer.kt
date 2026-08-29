@@ -1,8 +1,10 @@
 package com.cyxbs.pages.schedule.data.repository.v3
 
 import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.config.time.toDate
 import com.cyxbs.components.config.time.toLocalDate
 import com.cyxbs.components.config.time.toLocalDateTime
+import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.FieldPatch as UiFieldPatch
 import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
 import com.cyxbs.pages.schedule.domain.model.OccurrencePatch
@@ -48,7 +50,9 @@ import com.cyxbs.pages.schedule.domain.sync.v2.Weekday
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 private const val UTC_DAY_MILLIS = 86_400_000L
 
@@ -211,10 +215,23 @@ class ScheduleV2LocalCommandReducer {
         nowMillis,
         localRevision,
       )
+      is ScheduleCommand.SplitSeries -> splitSeries(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command,
+        nowMillis,
+        localRevision,
+      )
+      is ScheduleCommand.DeleteThisAndFollowing -> deleteThisAndFollowing(
+        categories,
+        schedules,
+        occurrenceOverrides,
+        command,
+        nowMillis,
+        localRevision,
+      )
       ScheduleCommand.RequestSync -> ScheduleV2LocalCommandResult.NoOp
-      is ScheduleCommand.SplitSeries,
-      is ScheduleCommand.DeleteThisAndFollowing,
-      -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     }
   } catch (rejected: ReducerRejected) {
     ScheduleV2LocalCommandResult.Rejected(rejected.reason)
@@ -570,6 +587,174 @@ class ScheduleV2LocalCommandReducer {
     return applied(categories, schedules, overrides.replace(identity) { updated })
   }
 
+  /**
+   * 原子拆分重复系列：PATCH 旧系列、CREATE 新系列，并迁移边界后的 occurrence 例外。
+   *
+   * 边界 occurrence 的有效内容已经被提升为新系列字段，因此只删除旧 identity、不复制该例外；更晚的有效例外
+   * 保留原 occurrenceDate 并改挂新 scheduleId。仅存在本地 CREATE 的旧例外可直接移除，已经存在远端快照的
+   * 例外则必须显式 DELETE。所有成员共享 [revision] 与 batchId，日常请求不会暴露半拆分状态。
+   */
+  private fun splitSeries(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    command: ScheduleCommand.SplitSeries,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val previousIdentity = ScheduleIdentity(command.previousSchedule.id.value)
+    val followingIdentity = ScheduleIdentity(command.followingSchedule.id.value)
+    if (previousIdentity == followingIdentity || command.previousSchedule.recurrence == null ||
+      command.followingSchedule.recurrence == null
+    ) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val previousState = schedules.firstOrNull { it.identity == previousIdentity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val previousEffective = previousState.effectiveResource()
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    if (schedules.any { it.identity == followingIdentity }) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val boundaryDate = occurrenceIdentity(previousIdentity.id, command.recurrenceId).occurrenceDate
+    val batchId = "series-split-$revision"
+
+    var nextCategories = categories
+    command.newCategory?.let { category ->
+      if (command.followingSchedule.categoryId != category.id) {
+        reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+      }
+      val categoryResult = createCategory(
+        nextCategories, schedules, overrides, category, now, revision,
+      ) as? ScheduleV2LocalCommandResult.Applied
+        ?: reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+      nextCategories = categoryResult.categories.map { state ->
+        if (state.identity.id == category.id.value) {
+          state.copy(pending = state.pending?.withLocalBatchId(batchId))
+        } else {
+          state
+        }
+      }
+    }
+
+    val previousResource = command.previousSchedule.toResource(
+      version = previousEffective.version,
+      old = previousEffective,
+      now = now,
+    )
+    val followingResource = command.followingSchedule.toResource(version = 0, old = null, now = now)
+    val nextSchedules = schedules.replace(previousIdentity) { state ->
+      state.replacePending(PendingUpsert(previousResource, revision, batchId))
+    } + ScheduleSyncState(
+      identity = followingIdentity,
+      remoteSnapshot = null,
+      pending = PendingUpsert(followingResource, revision, batchId),
+    )
+
+    val nextOverrides = migrateFollowingOverrides(
+      overrides = overrides,
+      previousScheduleId = previousIdentity.id,
+      followingScheduleId = followingIdentity.id,
+      boundaryDate = boundaryDate,
+      now = now,
+      revision = revision,
+      batchId = batchId,
+    )
+    return applied(nextCategories, nextSchedules, nextOverrides)
+  }
+
+  /**
+   * 删除当前及后续 occurrence：PATCH 截断后的父系列，并同步删除边界及更晚的旧例外。
+   *
+   * 本地尚未上传的例外直接从双快照集合移除；已有 remote 的例外生成无版本 DELETE。系列 PATCH 与所有 DELETE
+   * 共享原子批次，服务端最终图校验时不会看到落在截断范围外的孤立例外。
+   */
+  private fun deleteThisAndFollowing(
+    categories: List<CategorySyncState>,
+    schedules: List<ScheduleSyncState>,
+    overrides: List<OccurrenceOverrideSyncState>,
+    command: ScheduleCommand.DeleteThisAndFollowing,
+    now: Long,
+    revision: Long,
+  ): ScheduleV2LocalCommandResult {
+    val identity = ScheduleIdentity(command.previousSchedule.id.value)
+    val state = schedules.firstOrNull { it.identity == identity }
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    val effective = state.effectiveResource()
+      ?: reject(ScheduleV2LocalCommandRejectionReason.NOT_FOUND)
+    if (command.previousSchedule.recurrence == null) {
+      reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    }
+    val boundaryDate = occurrenceIdentity(identity.id, command.recurrenceId).occurrenceDate
+    val batchId = "series-truncate-$revision"
+    val previousResource = command.previousSchedule.toResource(effective.version, effective, now)
+    val nextSchedules = schedules.replace(identity) { current ->
+      current.replacePending(PendingUpsert(previousResource, revision, batchId))
+    }
+    val nextOverrides = overrides.mapNotNull { override ->
+      if (override.identity.scheduleId != identity.id || override.identity.occurrenceDate < boundaryDate) {
+        override
+      } else if (override.remoteSnapshot == null) {
+        null
+      } else {
+        override.replacePending(PendingDelete(
+          identity = override.identity,
+          localModifiedAt = now,
+          localRevision = revision,
+          localBatchId = batchId,
+        ))
+      }
+    }
+    return applied(categories, nextSchedules, nextOverrides)
+  }
+
+  /**
+   * 把拆分边界后的例外从旧 schedule identity 迁移到新系列。
+   *
+   * 边界例外不复制；它的有效字段已成为新系列字段。更晚例外只有在当前 effective 仍 live 时才创建新资源，
+   * pending DELETE 不会复活。旧 identity 若已存在远端资源则保留为同批 DELETE，否则直接移除本地临时行。
+   */
+  private fun migrateFollowingOverrides(
+    overrides: List<OccurrenceOverrideSyncState>,
+    previousScheduleId: String,
+    followingScheduleId: String,
+    boundaryDate: Long,
+    now: Long,
+    revision: Long,
+    batchId: String,
+  ): List<OccurrenceOverrideSyncState> = buildList {
+    overrides.forEach { state ->
+      if (state.identity.scheduleId != previousScheduleId || state.identity.occurrenceDate < boundaryDate) {
+        add(state)
+        return@forEach
+      }
+      val effective = state.effectiveResource()
+      if (state.remoteSnapshot != null) {
+        add(state.replacePending(PendingDelete(
+          identity = state.identity,
+          localModifiedAt = now,
+          localRevision = revision,
+          localBatchId = batchId,
+        )))
+      }
+      if (state.identity.occurrenceDate > boundaryDate && effective != null) {
+        val followingOverrideIdentity = OccurrenceOverrideIdentity(
+          scheduleId = followingScheduleId,
+          occurrenceDate = state.identity.occurrenceDate,
+        )
+        add(OccurrenceOverrideSyncState(
+          identity = followingOverrideIdentity,
+          remoteSnapshot = null,
+          pending = PendingUpsert(
+            resource = effective.copy(identity = followingOverrideIdentity, version = 0),
+            localRevision = revision,
+            localBatchId = batchId,
+          ),
+        ))
+      }
+    }
+  }
+
   private fun Schedule.toResource(
     version: Long,
     old: ScheduleResource?,
@@ -578,7 +763,10 @@ class ScheduleV2LocalCommandReducer {
     val category = categoryId
       ?: reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     val timingValue = timing.toWireTiming()
-    val recurrenceValue = recurrence?.toWireRecurrence(timing)
+    val recurrenceValue = recurrence?.toWireRecurrence(
+      timing = timing,
+      stableAnchorDate = old?.recurrence?.data?.anchorDate ?: recurrenceAnchorDate?.toUtcDaySlot(),
+    )
     val reminderValues = reminders.toWireReminders()
     if (old != null && old.kind != kind.toWire()) {
       reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
@@ -618,20 +806,19 @@ class ScheduleV2LocalCommandReducer {
     now: Long,
   ): OccurrenceOverrideResource {
     val patchValue = patch ?: OccurrencePatch()
-    if (patchValue.timing !is UiFieldPatch.Inherit ||
-      patchValue.categoryId !is UiFieldPatch.Inherit
-    ) {
-      reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
-    }
+    val timingValue = patchValue.timing.toWireTimingPatch()
     val titleValue = patchValue.title.toWireTitlePatch()
     val descriptionValue = patchValue.description.toWireStringPatch()
+    val categoryValue = patchValue.categoryId.toWireCategoryPatch()
     val reminderValue = patchValue.reminders.toWireReminderPatch()
     return OccurrenceOverrideResource(
       identity = identity,
       version = version,
       status = atomic(status.toWire(), old?.status, now),
+      timing = atomic(timingValue, old?.timing, now),
       title = atomic(titleValue, old?.title, now),
       description = atomic(descriptionValue, old?.description, now),
+      categoryId = atomic(categoryValue, old?.categoryId, now),
       reminders = atomic(reminderValue, old?.reminders, now),
     )
   }
@@ -670,7 +857,10 @@ class ScheduleV2LocalCommandReducer {
     ScheduleTiming.Unscheduled -> TimingInput(kind = TimingKind.UNSCHEDULED)
   }
 
-  private fun RecurrenceRule.toWireRecurrence(timing: ScheduleTiming): RecurrenceInput {
+  private fun RecurrenceRule.toWireRecurrence(
+    timing: ScheduleTiming,
+    stableAnchorDate: Long?,
+  ): RecurrenceInput {
     if (byMonthDays.isNotEmpty() || byMonths.isNotEmpty()) {
       reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     }
@@ -681,12 +871,13 @@ class ScheduleV2LocalCommandReducer {
       UiRecurrenceFrequency.YEARLY,
       -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     }
-    val anchor = when (timing) {
+    val timingAnchor = when (timing) {
       is ScheduleTiming.Timed -> timing.start.date
       is ScheduleTiming.Deadline -> timing.due.date
       is ScheduleTiming.AllDay -> timing.startDate
       ScheduleTiming.Unscheduled -> reject(ScheduleV2LocalCommandRejectionReason.UNSUPPORTED)
     }
+    val anchor = stableAnchorDate?.toUtcDate() ?: timingAnchor
     val count: Int?
     val untilDate: Long?
     when (val recurrenceEnd = end) {
@@ -741,6 +932,22 @@ class ScheduleV2LocalCommandReducer {
     is UiFieldPatch.Replace -> FieldPatch.Replace(value)
   }
 
+  /** timing 是不可清空的联合值；单次移动始终以完整 REPLACE 上传。 */
+  private fun UiFieldPatch<ScheduleTiming>.toWireTimingPatch(): FieldPatch<TimingInput> = when (this) {
+    UiFieldPatch.Inherit -> FieldPatch.Inherit
+    UiFieldPatch.Clear -> reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+    is UiFieldPatch.Replace -> {
+      if (value == ScheduleTiming.Unscheduled) reject(ScheduleV2LocalCommandRejectionReason.INVALID_STATE)
+      FieldPatch.Replace(value.toWireTiming())
+    }
+  }
+
+  private fun UiFieldPatch<CategoryId>.toWireCategoryPatch(): FieldPatch<String> = when (this) {
+    UiFieldPatch.Inherit -> FieldPatch.Inherit
+    UiFieldPatch.Clear -> FieldPatch.Clear
+    is UiFieldPatch.Replace -> FieldPatch.Replace(value.value)
+  }
+
   private fun UiFieldPatch<String>.toWireStringPatch(): FieldPatch<String> = when (this) {
     UiFieldPatch.Inherit -> FieldPatch.Inherit
     UiFieldPatch.Clear -> FieldPatch.Clear
@@ -768,6 +975,9 @@ class ScheduleV2LocalCommandReducer {
 
   private fun Date.toUtcDaySlot(): Long =
     toLocalDate().atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+
+  private fun Long.toUtcDate(): Date =
+    Instant.fromEpochMilliseconds(this).toLocalDateTime(TimeZone.UTC).date.toDate()
 
   private fun ScheduleTodoState.toWire(): TodoState = when (this) {
     ScheduleTodoState.PENDING -> TodoState.OPEN

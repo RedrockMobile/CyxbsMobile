@@ -195,8 +195,10 @@ class ScheduleV2DailyMutationBridgeTest {
       identity,
       version = 0,
       status = AtomicField(OccurrenceStatus.ACTIVE, 1),
+      timing = AtomicField(FieldPatch.Inherit, 1),
       title = AtomicField(FieldPatch.Inherit, 1),
       description = AtomicField(FieldPatch.Inherit, 1),
+      categoryId = AtomicField(FieldPatch.Inherit, 1),
       reminders = AtomicField(FieldPatch.Inherit, 1),
     )
     val pending: PendingChange<OccurrenceOverrideIdentity, OccurrenceOverrideResource> = if (delete) {

@@ -230,10 +230,10 @@ scheduleId + occurrenceDate
 occurrenceDate = parent recurrence 真实生成的 UTC 午夜 date-slot
 ```
 
-canonical OccurrenceOverride 只有：
+canonical OccurrenceOverride 包含：
 
 ```text
-status + title patch + description patch + reminders patch
+status + timing patch + title patch + description patch + categoryId patch + reminders patch
 ```
 
 canonical 明确没有：
@@ -241,11 +241,10 @@ canonical 明确没有：
 - 独立 exception ID；
 - timeZoneId / allDay identity；
 - occurrence 序号；
-- timing override；
-- category override；
-- 单次改期字段。
+- 独立 recurrence 规则。
 
-因此当前 `RecurrenceId`、Room exception 主键、DTO、mapper、UI 的 THIS_ONLY 改期/分类能力和平台 detached occurrence 映射都必须重新评估。平台原始实例字段只能留在 adapter 映射层，不能进入远端 identity。
+`RecurrenceId`、Room exception 主键与远端 identity 仍只由原始 date-slot 定位；THIS_ONLY 改期/分类写入
+独立原子，平台原始实例字段只能留在 adapter 映射层，不能进入远端 identity。
 
 ### 3.3 “恢复系列默认”必须改语义
 
@@ -255,8 +254,10 @@ canonical tombstone 不可复活，因此“恢复默认”必须写入 neutral 
 
 ```text
 status = ACTIVE
+timing = INHERIT
 title = INHERIT
 description = INHERIT
+categoryId = INHERIT
 reminders = INHERIT
 ```
 
@@ -467,7 +468,8 @@ batch 内仍是 Category/Schedule/OccurrenceOverride 的 typed upsert/delete，�
 5. **接本地 reducer**：复用完整领域目标图；普通命令归约为完整 pending，recurrence 结构变化归约为 typed atomic batch 最终图。
 6. **实现事务性同步循环**：锁外网络；响应事务内更新 remote 并 compare-and-clear；覆盖 R→U、丢响应、tombstone、mixed ordinary result 和 atomic batch retry。
 7. **迁移平台 production factory**：Android、iOS、Desktop、Web 分别接 canonical gateway；在后端实际部署与互操作验收前保持 fail-closed。
-8. **收口 recurrence/UI/adapter**：identity 改用 `scheduleId + UTC occurrenceDate`；移除远端单次 timing/category 权威覆盖；系统日历原始实例字段只留 adapter。
+8. **收口 recurrence/UI/adapter**：identity 改用 `scheduleId + UTC occurrenceDate`；单次 timing/category 作为
+   独立 Override 原子上传；系统日历原始实例字段只留 adapter。
 
 以下场景已由 [Codex handoff §9.2](./schedule-v2-codex-handoff.md#92-每个客户端切片的最低测试场景) 收录；实施时必须逐项验证：
 

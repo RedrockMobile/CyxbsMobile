@@ -174,11 +174,13 @@ scheduleId
 
 当前 `OccurrencePatch` 可覆盖 timing、title、description、category 和 reminders。改期不改变原始 `RecurrenceId`，因此 UI 可继续定位原始实例。
 
-这套模型对于当前 UI 和本地 recurrence engine 是 ACTIVE，但与 canonical Override 不兼容：canonical identity 是 `scheduleId + UTC occurrenceDate`，且不允许 timing/category override。迁移时必须明确区分：
+当前 UI 与本地 recurrence engine 保留完整 timing/category patch，但 canonical identity 统一为
+`scheduleId + UTC occurrenceDate`；上传时把两者编码为独立 AtomicField，不把墙上时间、时区或全天标记并入 identity。
+迁移与 adapter 仍必须明确区分：
 
 - 可保留的本地显示/平台映射信息；
 - 可上传的 canonical authority；
-- 不可上传且需要 UI 降级或阻断的能力。
+- 仅平台支持、不能反向扩展 canonical 的额外能力。
 
 ### 3.5 Snapshot 到 UI（ACTIVE）
 
@@ -306,8 +308,9 @@ flowchart TD
 三类资源均为完整 typed object：
 
 - `Category`：`name`、`color`、`sortOrder` 三个 AtomicField；
-- `Schedule`：七个 AtomicField；
-- `OccurrenceOverride`：`status`、`title`、`description`、`reminders` 四个 AtomicField。
+- `Schedule`：`title`、`description`、`categoryId`、`timing`、`recurrence`、`reminders`、`todoState`、
+  `linkedToCourse` 八个 AtomicField，另有不可变 `kind`；
+- `OccurrenceOverride`：`status`、`timing`、`title`、`description`、`categoryId`、`reminders` 六个 AtomicField。
 
 每个 AtomicField 必须同时携带 `data` 和 `modifiedAt`。客户端上传完整资源，不上传字段 patch；未编辑原子保留原值和原时间。
 
@@ -381,7 +384,8 @@ scheduleId + occurrenceDate
 occurrenceDate = UTC 午夜 date-slot
 ```
 
-只有 status/title/description/reminders；无 timing/category override。恢复默认写 neutral live Override，不发 DELETE。
+包含 status/timing/title/description/categoryId/reminders 六个原子。恢复默认写全部字段 INHERIT 的
+neutral live Override，不发 DELETE。
 
 以下必须使用 typed atomic batch：
 
@@ -403,7 +407,7 @@ occurrenceDate = UTC 午夜 date-slot
 | Schedule 字段 | 普通值 + createdAt/updatedAt | 七个完整 AtomicField + server meta | 新同步模型与严格 mapper。 |
 | Category | 普通 name/color/sortOrder + revision | `name`、`color`、`sortOrder` 三个 AtomicField | 新 typed model。 |
 | Override identity | original wall time + zone + allDay | scheduleId + UTC occurrenceDate | Room/UI/wire identity 迁移。 |
-| Override fields | timing/title/description/category/reminders | status/title/description/reminders | 阻断或降级单次改期/分类 authority。 |
+| Override fields | timing/title/description/category/reminders | status/timing/title/description/categoryId/reminders | 保留原 date-slot identity，并补齐 status 与六原子映射。 |
 | 恢复默认 | 物理 DELETE Override | neutral live Override | 修改命令、UI 和 storage。 |
 | recurrence | 当前可表达 MONTHLY/YEARLY；无稳定 anchor history | 当前后端受限 DAILY/WEEKLY + stable UTC anchor history | unsupported fail-closed；持久化 anchor。 |
 | reminder | 本地 stable ID/channel | wire 完整列表原子 | 明确无损/有损映射。 |

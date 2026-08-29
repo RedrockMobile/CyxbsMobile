@@ -161,7 +161,8 @@ canonical 通过以下方式消解原问题：
 - **响应丢失不需要 receipt**：CREATE 使用稳定 identity；PATCH 使用完整 AtomicField 快照；DELETE 使用 tombstone；atomic batch 可根据 related 当前状态重建 base 后重试。
 - **R → U 不做客户端字段 rebase**：R 只更新 remoteSnapshot，请求期间产生的更高 localRevision pending 保持不动，下一轮完整上传后最终收敛。代价是极少场景多一次网络往返，不是数据丢失。
 - **没有时区和本地墙钟承诺**：实际 timing 与 recurrence date-slot 都是 Unix 毫秒/UTC 槽；DST 墙钟漂移是已记录代价。
-- **没有单次分类或单次改期**：OccurrenceOverride 只有 status、title、description、reminders 四个原子；平台 detached event 能力不能反向扩展 wire。
+- **单次分类与单次改期已进入 canonical 合同**：OccurrenceOverride 以独立 categoryId/timing 原子表达；改期不改变
+  `scheduleId + occurrenceDate` identity，timing 只能完整 REPLACE 且不能变成 UNSCHEDULED。
 - **不通过 DELETE 恢复本次默认**：使用 `ACTIVE + INHERIT` 的 neutral live Override，避免不可复活 tombstone 阻止以后再次编辑同一 date-slot。
 - **同一路径名不代表同一协议**：当前 Android `KtorScheduleMutationGateway` 虽然也请求 `/v2/schedule-mutations`，但发送的是旧单条 mutation + receipt 合同；canonical 是一次请求中的三类 typed inventory/upserts/deletes/atomicBatches。客户端迁移时必须整体替换，不能因 URL 相同而复用旧 codec 或 receipt 分类。
 

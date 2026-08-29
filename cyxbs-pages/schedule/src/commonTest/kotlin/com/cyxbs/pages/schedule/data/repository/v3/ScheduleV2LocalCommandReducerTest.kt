@@ -356,7 +356,7 @@ class ScheduleV2LocalCommandReducerTest {
   }
 
   @Test
-  fun occurrenceUsesOriginalDateIdentityAndOnlyFourAtoms() {
+  fun occurrenceUsesOriginalDateIdentityAndSixAtoms() {
     val recurrenceId = RecurrenceId(
       originalDateTime = MinuteTimeDate(2026, 7, 23, 9, 30),
       timeZoneId = "Asia/Shanghai",
@@ -368,8 +368,12 @@ class ScheduleV2LocalCommandReducerTest {
       revision = 8_888,
       status = UiOccurrenceStatus.COMPLETED,
       patch = OccurrencePatch(
+        timing = UiFieldPatch.Replace(ScheduleTiming.Timed(
+          MinuteTimeDate(2026, 7, 23, 10, 0), 90, "Asia/Shanghai",
+        )),
         title = UiFieldPatch.Replace("单次标题"),
         description = UiFieldPatch.Clear,
+        categoryId = UiFieldPatch.Replace(CategoryId("category-2")),
         reminders = UiFieldPatch.Replace(listOf(deviceReminder())),
       ),
       createdAt = Instant.fromEpochMilliseconds(1),
@@ -389,13 +393,17 @@ class ScheduleV2LocalCommandReducerTest {
     assertEquals(SCHEDULE_ID, resource.identity.scheduleId)
     assertEquals(0, resource.version)
     assertEquals(OccurrenceStatus.COMPLETED, resource.status.data)
+    assertIs<FieldPatch.Replace<TimingInput>>(resource.timing.data)
     assertEquals(FieldPatch.Replace("单次标题"), resource.title.data)
     assertEquals(FieldPatch.Clear, resource.description.data)
+    assertEquals(FieldPatch.Replace("category-2"), resource.categoryId.data)
     assertEquals(FieldPatch.Replace(listOf(ReminderInput(15, ""))), resource.reminders.data)
-    assertEquals(List(4) { 400L }, listOf(
+    assertEquals(List(6) { 400L }, listOf(
       resource.status.modifiedAt,
+      resource.timing.modifiedAt,
       resource.title.modifiedAt,
       resource.description.modifiedAt,
+      resource.categoryId.modifiedAt,
       resource.reminders.modifiedAt,
     ))
 
@@ -539,6 +547,101 @@ class ScheduleV2LocalCommandReducerTest {
   }
 
   @Test
+  fun splitSeriesUsesOneBatchAndMovesFutureOverridesToNewIdentity() {
+    val recurrence = RecurrenceRule(UiRecurrenceFrequency.DAILY)
+    val parent = schedule(recurrence = recurrence)
+    val created = reduce(
+      command = ScheduleCommand.Create(parent),
+      revision = 1,
+    ).applied()
+    val futureId = RecurrenceId(
+      MinuteTimeDate(2026, 7, 23, 9, 0), "Asia/Shanghai", false,
+    )
+    val futureCreated = reduce(
+      schedules = created.schedules,
+      command = ScheduleCommand.UpsertOccurrenceException(exception(
+        futureId,
+        OccurrencePatch(title = UiFieldPatch.Replace("未来例外")),
+      )),
+      revision = 2,
+    ).applied()
+    val pendingFuture = futureCreated.occurrenceOverrides.single()
+    val futureResource = assertIs<PendingUpsert<*, *>>(pendingFuture.pending)
+      .resource.let { assertIs<OccurrenceOverrideResource>(it) }
+    val remoteFuture = pendingFuture.copy(
+      remoteSnapshot = OccurrenceOverrideRemoteSnapshot(
+        futureResource.copy(version = 4),
+        ServerResourceMeta(createdAt = 10, remoteModifiedAt = 20),
+      ),
+      pending = null,
+    )
+    val boundary = RecurrenceId(
+      MinuteTimeDate(2026, 7, 22, 9, 0), "Asia/Shanghai", false,
+    )
+    val previous = parent.copy(
+      recurrence = recurrence.copy(end = RecurrenceEnd.Until(Date(2026, 7, 21))),
+    )
+    val following = parent.copy(
+      id = ScheduleId(SCHEDULE_ID_2),
+      revision = 0,
+      timing = ScheduleTiming.Timed(
+        MinuteTimeDate(2026, 7, 22, 9, 0), 60, "Asia/Shanghai",
+      ),
+      recurrenceAnchorDate = Date(2026, 7, 22),
+    )
+
+    val result = reduce(
+      schedules = futureCreated.schedules,
+      occurrenceOverrides = listOf(remoteFuture),
+      command = ScheduleCommand.SplitSeries(previous, following, boundary),
+      revision = 3,
+    ).applied()
+
+    assertEquals(2, result.schedules.size)
+    val batchId = result.schedules.first { it.identity.id == SCHEDULE_ID }
+      .pending?.localBatchId
+    assertEquals("series-split-3", batchId)
+    assertEquals(setOf(batchId), result.schedules.map { it.pending?.localBatchId }.toSet())
+    val oldOverride = result.occurrenceOverrides.first { it.identity.scheduleId == SCHEDULE_ID }
+    assertEquals(batchId, assertIs<PendingDelete<*, *>>(oldOverride.pending).localBatchId)
+    val newOverride = result.occurrenceOverrides.first { it.identity.scheduleId == SCHEDULE_ID_2 }
+    val newPending = assertIs<PendingUpsert<*, *>>(newOverride.pending)
+    assertEquals(batchId, newPending.localBatchId)
+    assertEquals(0, assertIs<OccurrenceOverrideResource>(newPending.resource).version)
+  }
+
+  @Test
+  fun deleteThisAndFollowingTruncatesParentAndDropsLocalOnlyFutureOverride() {
+    val recurrence = RecurrenceRule(UiRecurrenceFrequency.DAILY)
+    val parent = schedule(recurrence = recurrence)
+    val created = reduce(command = ScheduleCommand.Create(parent), revision = 1).applied()
+    val futureId = RecurrenceId(
+      MinuteTimeDate(2026, 7, 23, 9, 0), "Asia/Shanghai", false,
+    )
+    val withFuture = reduce(
+      schedules = created.schedules,
+      command = ScheduleCommand.UpsertOccurrenceException(exception(futureId, OccurrencePatch())),
+      revision = 2,
+    ).applied()
+    val boundary = RecurrenceId(
+      MinuteTimeDate(2026, 7, 22, 9, 0), "Asia/Shanghai", false,
+    )
+    val previous = parent.copy(
+      recurrence = recurrence.copy(end = RecurrenceEnd.Until(Date(2026, 7, 21))),
+    )
+
+    val result = reduce(
+      schedules = withFuture.schedules,
+      occurrenceOverrides = withFuture.occurrenceOverrides,
+      command = ScheduleCommand.DeleteThisAndFollowing(previous, boundary),
+      revision = 3,
+    ).applied()
+
+    assertEquals("series-truncate-3", result.schedules.single().pending?.localBatchId)
+    assertEquals(emptyList(), result.occurrenceOverrides)
+  }
+
+  @Test
   fun unsupportedProtocolBoundariesAreRejected() {
     val recurrenceId = RecurrenceId(MinuteTimeDate(2026, 7, 23, 9, 30), "Asia/Shanghai", false)
     val unsupported = listOf(
@@ -559,18 +662,6 @@ class ScheduleV2LocalCommandReducerTest {
         recurrenceId,
         OccurrencePatch(title = UiFieldPatch.Clear),
       )),
-      ScheduleCommand.UpsertOccurrenceException(exception(
-        recurrenceId,
-        OccurrencePatch(timing = UiFieldPatch.Replace(
-          ScheduleTiming.AllDay(Date(2026, 7, 23)),
-        )),
-      )),
-      ScheduleCommand.UpsertOccurrenceException(exception(
-        recurrenceId,
-        OccurrencePatch(categoryId = UiFieldPatch.Replace(CategoryId(CATEGORY_ID))),
-      )),
-      ScheduleCommand.SplitSeries(ScheduleId(SCHEDULE_ID), recurrenceId),
-      ScheduleCommand.DeleteThisAndFollowing(ScheduleId(SCHEDULE_ID), recurrenceId),
     )
 
     unsupported.forEachIndexed { index, command ->

@@ -26,6 +26,11 @@ data class Schedule(
   val kind: ScheduleKind = ScheduleKind.TODO,
   /** 用户是否要求把该日程投射到课表；最终可见性仍需结合 [kind] 与完成态判断。 */
   val linkedToCourse: Boolean = false,
+  /**
+   * 重复系列最初的逻辑日期锚点；修改整个系列的实际日期时保持不变，用于继续识别既有 occurrence。
+   * 新建且尚未经过仓库投影时可为 null，此时以当前 [timing] 日期作为初始锚点。
+   */
+  val recurrenceAnchorDate: Date? = null,
 )
 
 /**

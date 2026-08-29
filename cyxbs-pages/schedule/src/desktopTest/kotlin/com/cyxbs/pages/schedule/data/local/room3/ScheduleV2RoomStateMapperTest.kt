@@ -258,8 +258,10 @@ class ScheduleV2RoomStateMapperTest {
     identity = OccurrenceOverrideIdentity(scheduleId, occurrenceDate),
     version = 3,
     status = AtomicField(OccurrenceStatus.COMPLETED, 20),
+    timing = AtomicField(FieldPatch.Inherit, 20),
     title = AtomicField(FieldPatch.Replace(title), 21),
     description = AtomicField(FieldPatch.Clear, 22),
+    categoryId = AtomicField(FieldPatch.Inherit, 22),
     reminders = AtomicField(FieldPatch.Replace(listOf(ReminderInput(5, "reminder-2"))), 23),
   )
 

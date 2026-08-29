@@ -1,10 +1,14 @@
 package com.cyxbs.pages.schedule.ui.edit
 
+import com.cyxbs.components.config.time.toLocalDateTime
 import com.cyxbs.pages.schedule.data.repository.ScheduleIdGenerators
 import com.cyxbs.pages.schedule.domain.model.*
+import com.cyxbs.pages.schedule.domain.recurrence.SeriesSplitter
 import com.cyxbs.pages.schedule.domain.repository.*
 import com.cyxbs.pages.schedule.ui.model.toNewDomain
 import com.cyxbs.pages.schedule.ui.model.toUpdatedDomain
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -54,7 +58,11 @@ suspend fun ScheduleRepository.applyScheduleEdit(
     title = if (state.isOccurrenceTitleChanged) edited.title else origin.title,
     description = if (state.isOccurrenceDescriptionChanged) edited.description else origin.description,
     categoryId = if (state.isOccurrenceCategoryChanged) edited.categoryId else origin.categoryId,
-    timing = if (state.isOccurrenceTimingChanged) edited.timing else origin.timing,
+    timing = if (state.isOccurrenceTimingChanged) {
+      rebaseSeriesTiming(origin.timing, state.initialOccurrence.timing, edited.timing)
+    } else {
+      origin.timing
+    },
     recurrence = if (state.isSeriesRecurrenceChanged) edited.recurrence else origin.recurrence,
     reminders = if (state.isOccurrenceRemindersChanged ||
       (state.isOccurrenceTimingChanged && edited.timing == ScheduleTiming.Unscheduled)
@@ -116,17 +124,48 @@ suspend fun ScheduleRepository.applyScheduleEdit(
       }
     }
     EditScope.THIS_AND_FOLLOWING -> {
-      // 关联关系不随系列拆分；先更新原系列，再把其余内容字段交给后续系列命令。
-      if (state.isSeriesRelationChanged) execute(ScheduleCommand.Update(relationEdited))
-      if (!hasSeriesContentChanges) return
-      execute(ScheduleCommand.SplitSeries(
-        origin.id,
-        requireNotNull(recurrenceId),
-        ScheduleSeriesChanges(
-          seriesEdited.title, seriesEdited.description, seriesEdited.categoryId, seriesEdited.timing,
-          seriesEdited.recurrence, seriesEdited.reminders,
-        ),
-      ))
+      val boundary = requireNotNull(recurrenceId)
+      // 首次 occurrence 的“此次及以后”等价于整个系列；即使旧版调用方仍传入该范围也不能产生空旧系列。
+      if (!SeriesSplitter.canSplitAt(origin, boundary)) {
+        if (hasSeriesScopeChanges) {
+          execute(
+            newCategory?.let { ScheduleCommand.SaveScheduleWithNewCategory(it, seriesEdited) }
+              ?: ScheduleCommand.Update(seriesEdited),
+          )
+        }
+        return
+      }
+      // 只修改系列级关联关系时无需拆分；关系对原系列所有 occurrence 一次生效。
+      if (!hasSeriesContentChanges) {
+        if (state.isSeriesRelationChanged) execute(ScheduleCommand.Update(relationEdited))
+        return
+      }
+      val split = SeriesSplitter.split(
+        schedule = origin,
+        exceptions = snapshot.value.exceptions.filter { it.scheduleId == origin.id },
+        boundary = boundary,
+        followingId = idGenerators.scheduleId(),
+      )
+      val previous = split.previousSchedule.copy(
+        todoState = edited.todoState?.let { ScheduleTodoState.PENDING },
+        linkedToCourse = edited.linkedToCourse,
+        updatedAt = now,
+      )
+      val following = split.followingSchedule.copy(
+        // 新系列把当前 occurrence 的有效内容提升为系列值；边界自身的旧 exception 随后会被移除。
+        title = edited.title,
+        description = edited.description,
+        categoryId = edited.categoryId,
+        timing = edited.timing,
+        recurrence = if (state.isSeriesRecurrenceChanged) edited.recurrence
+        else split.followingSchedule.recurrence,
+        reminders = edited.reminders,
+        todoState = edited.todoState?.let { ScheduleTodoState.PENDING },
+        linkedToCourse = edited.linkedToCourse,
+        createdAt = now,
+        updatedAt = now,
+      )
+      execute(ScheduleCommand.SplitSeries(previous, following, boundary, newCategory))
     }
   }
 }
@@ -198,10 +237,55 @@ suspend fun ScheduleRepository.applyScheduleDelete(
           )
       ))
     }
-    EditScope.THIS_AND_FOLLOWING -> execute(
-      ScheduleCommand.DeleteThisAndFollowing(scheduleId, requireNotNull(recurrenceId)),
-    )
+    EditScope.THIS_AND_FOLLOWING -> {
+      val boundary = requireNotNull(recurrenceId)
+      val schedule = snapshot.value.schedules.firstOrNull { it.id == scheduleId }
+        ?: return
+      if (!SeriesSplitter.canSplitAt(schedule, boundary)) {
+        execute(ScheduleCommand.Delete(scheduleId))
+      } else {
+        execute(ScheduleCommand.DeleteThisAndFollowing(
+          previousSchedule = SeriesSplitter.truncateBefore(schedule, boundary),
+          recurrenceId = boundary,
+        ))
+      }
+    }
   }
+}
+
+/**
+ * 把中间 occurrence 的实际移动量应用到父系列锚点，同时保留编辑后的 timing 类型、时长与时区。
+ *
+ * 直接把所选 occurrence 的绝对日期写回父系列会让 DTSTART 跳到系列中段并丢失早期实例；这里仅迁移用户相对
+ * 当前 occurrence 输入的墙上时间偏移。UTC 仅作为无时区分钟坐标使用，避免 DST 改变用户输入的日期/时分差。
+ */
+private fun rebaseSeriesTiming(
+  parent: ScheduleTiming,
+  initialOccurrence: ScheduleTiming,
+  editedOccurrence: ScheduleTiming,
+): ScheduleTiming {
+  val parentStart = parent.effectiveStart()
+  val initialStart = initialOccurrence.effectiveStart()
+  val editedStart = editedOccurrence.effectiveStart()
+  val deltaMinutes = (
+    editedStart.toLocalDateTime().toInstant(TimeZone.UTC) -
+      initialStart.toLocalDateTime().toInstant(TimeZone.UTC)
+    ).inWholeMinutes.toInt()
+  val rebasedStart = parentStart.plusMinutes(deltaMinutes)
+  return when (editedOccurrence) {
+    is ScheduleTiming.Timed -> editedOccurrence.copy(start = rebasedStart)
+    is ScheduleTiming.Deadline -> editedOccurrence.copy(due = rebasedStart)
+    is ScheduleTiming.AllDay -> editedOccurrence.copy(startDate = rebasedStart.date)
+    ScheduleTiming.Unscheduled -> error("recurring schedule cannot become unscheduled")
+  }
+}
+
+/** 返回 timing 的墙上开始；未排期值没有可供重复系列迁移的锚点。 */
+private fun ScheduleTiming.effectiveStart() = when (this) {
+  is ScheduleTiming.Timed -> start
+  is ScheduleTiming.Deadline -> due
+  is ScheduleTiming.AllDay -> com.cyxbs.components.config.time.MinuteTimeDate(startDate, 0, 0)
+  ScheduleTiming.Unscheduled -> error("unscheduled timing has no occurrence start")
 }
 
 /**

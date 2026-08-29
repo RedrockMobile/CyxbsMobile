@@ -42,7 +42,7 @@ DELETE /v2/schedules
 - DELETE 只上传 identity 与 `localModifiedAt`，不上传 version；
 - tombstone 不含 version；
 - DELETE 优先级最高，客户端不尝试复活相同 identity；
-- OccurrenceOverride identity 是 `scheduleId + occurrenceDate`，只有 status/title/description/reminders 四个原子；
+- OccurrenceOverride identity 是 `scheduleId + occurrenceDate`，包含 status/timing/title/description/categoryId/reminders 六个原子；
 - Category color 可为 `null`，表示没有自定义颜色；非空时保存客户端定义的课表配色 JSON：
   `background/content/darkBackground` 均使用 `#AARRGGBB`；深色模式文字统一使用 `0xFFF0F0F2`，
   不写入分组 JSON。服务端把该 JSON 当作不透明字符串
@@ -180,14 +180,15 @@ Android/iOS 初始化由账号 façade 在当前 delegate 初始化完成后调�
 为避免再次过度设计，当前不实现：
 
 - MONTHLY/YEARLY、RDATE；
-- 单次 occurrence 的 timing/category override；
-- `SplitSeries`、`DeleteThisAndFollowing` 的远端因果命令；
+- 把 `SplitSeries`、`DeleteThisAndFollowing` 当作服务端命令上传；客户端只在一个 `AtomicBatch` 中提交
+  截断后的旧 Schedule、新 Schedule 与受影响 Override 的最终资源图；
 - 同 identity DELETE 后恢复；
 - Web 离线编辑与持久 pending；
 - 旧数据库数据推断迁移；
 - receipt/history/cursor/protocol rollout/自动重试框架。
 
-现有 UI 命令若落入这些情况，应明确返回 Unsupported/Rejected，不扩展 wire。
+重复日程编辑已支持“仅此次 / 此次及以后 / 整个系列”：仅此次写 Override；此次及以后拆分系列；整个系列从
+中间 occurrence 编辑时间时只把相对移动量应用到父系列锚点，稳定 `occurrenceDate` identity 不变。
 
 ## 8. 当前验证状态
 
@@ -197,6 +198,7 @@ Android/iOS 初始化由账号 façade 在当前 delegate 初始化完成后调�
 - Android、Desktop、iOS Simulator、JS、Wasm production 源码编译通过；
 - Desktop 全量测试通过；iOS Simulator、JS、Wasm test 源码编译通过，Android host test 已完成组装；
 - typed wire、mapper、reducer、planner/applier、daily bridge、Room mapper/store/repository 有聚焦测试；
+- 单次 timing/category Override、此次及以后原子拆分/截断、整个系列相对改期已有 reducer 与路由聚焦测试；
 - 日常聚合批次覆盖 Category + Schedule + OccurrenceOverride、HTTP 400/REJECTED 清 R、transport 保留 pending 与 R→U；
 - nullable Category color 已覆盖 wire、domain、Room 与 repository；客户端提供 10 组背景/字体配色，首项
   为清单默认灰。关联清单后的事务使用清单颜色并额外保留斜纹，纯事务不展示分组；

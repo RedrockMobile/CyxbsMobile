@@ -12,7 +12,7 @@ data class AtomicField<T>(
   val modifiedAt: UnixMillis, // 客户端最后修改此原子的时刻；零值合法但字段不可缺失。
 )
 
-/** OccurrenceOverride 非时间字段的继承、清空与替换模式。 */
+/** OccurrenceOverride 字段的继承、清空与替换模式。 */
 @Serializable
 enum class PatchMode { INHERIT, CLEAR, REPLACE }
 
@@ -118,15 +118,17 @@ data class ScheduleInput(
   val linkedToCourse: AtomicField<Boolean>, // required，是否请求投射到课表。
 )
 
-/** identity 固定为 scheduleId + occurrenceDate，仅提供四个覆盖原子。 */
+/** identity 固定为 scheduleId + occurrenceDate；移动 timing 不改变原始实例身份。 */
 @Serializable
 data class OccurrenceOverrideInput(
   val scheduleId: String, // required，parent Schedule identity。
   val occurrenceDate: UnixMillis, // required，UTC 午夜日期槽。
   val version: ULong, // required；0 表示 CREATE，正数表示 PATCH。
   val status: AtomicField<OccurrenceStatus>, // required，实例状态原子。
+  val timing: AtomicField<FieldPatch<TimingInput>>, // required，完整 timing 三态原子；CLEAR 非法。
   val title: AtomicField<FieldPatch<String>>, // required，标题三态原子。
   val description: AtomicField<FieldPatch<String>>, // required，详情三态原子。
+  val categoryId: AtomicField<FieldPatch<String>>, // required，分类三态原子。
   val reminders: AtomicField<FieldPatch<List<ReminderInput>>>, // required，提醒列表三态原子。
 )
 

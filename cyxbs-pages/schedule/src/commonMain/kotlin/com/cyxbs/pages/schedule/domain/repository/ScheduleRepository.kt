@@ -58,16 +58,6 @@ sealed interface ScheduleRepositoryStatus {
   data class Corrupted(val cause: Throwable) : ScheduleRepositoryStatus
 }
 
-/** “此次及后续”拆分后应用于新系列的可编辑字段；未提供部分继承旧系列。 */
-data class ScheduleSeriesChanges(
-  val title: String,
-  val description: String,
-  val categoryId: CategoryId?,
-  val timing: ScheduleTiming,
-  val recurrence: RecurrenceRule?,
-  val reminders: List<ScheduleReminder>,
-)
-
 /** 显式领域命令；用类型区分整系列与单次操作，防止调用方误把 occurrence 语义应用到整个系列。 */
 sealed interface ScheduleCommand {
   /** 创建完整日程。 */
@@ -83,21 +73,27 @@ sealed interface ScheduleCommand {
   /** 删除单次例外，使该次发生恢复继承系列。 */
   data class DeleteOccurrenceException(val scheduleId: ScheduleId, val recurrenceId: RecurrenceId) : ScheduleCommand
   /**
-   * 从 [recurrenceId] 起拆出新系列的预留命令。
+   * 从 [recurrenceId] 起拆出 [followingSchedule]，并把原系列替换为 [previousSchedule]。
    *
-   * 当前 local reducer 明确返回 `UNSUPPORTED`；仓库不得静默降级为其他命令，也不设计补偿流程。
+   * 两条完整日程由领域拆分器提前生成；仓库负责把它们与边界后的 occurrence 例外作为同一原子批次保存，
+   * 禁止先截断旧系列、再异步创建新系列而暴露中间状态。
    */
   data class SplitSeries(
-    val scheduleId: ScheduleId,
+    val previousSchedule: Schedule,
+    val followingSchedule: Schedule,
     val recurrenceId: RecurrenceId,
-    val followingChanges: ScheduleSeriesChanges? = null,
+    /** 新系列引用但当前尚不存在的惰性默认分类；仓库会把它并入同一原子批次。 */
+    val newCategory: ScheduleCategory? = null,
   ) : ScheduleCommand
   /**
-   * 从指定原始发生起删除后半系列的预留命令。
+   * 从 [recurrenceId] 起删除后半系列，并把原系列替换为已截断的 [previousSchedule]。
    *
-   * 当前 local reducer 明确返回 `UNSUPPORTED`，不会改写为逐条删除或生成补偿操作。
+   * 仓库必须把系列 PATCH 与边界后的 occurrence 例外 DELETE 放入同一原子批次。
    */
-  data class DeleteThisAndFollowing(val scheduleId: ScheduleId, val recurrenceId: RecurrenceId) : ScheduleCommand
+  data class DeleteThisAndFollowing(
+    val previousSchedule: Schedule,
+    val recurrenceId: RecurrenceId,
+  ) : ScheduleCommand
   /** 创建分类。 */
   data class CreateCategory(val category: ScheduleCategory) : ScheduleCommand
   /** 更新分类。 */

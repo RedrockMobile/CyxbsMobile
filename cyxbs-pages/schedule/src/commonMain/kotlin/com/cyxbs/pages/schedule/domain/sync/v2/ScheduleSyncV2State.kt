@@ -182,17 +182,15 @@ data class ScheduleResource(
   }
 }
 
-/**
- * OccurrenceOverrideInput：只允许四个可独立合并的原子字段。
- *
- * 时间与分类仍来自 parent Schedule，不能在单次覆盖中新增 timing 或 category 字段。
- */
+/** OccurrenceOverrideInput：六个字段可独立合并，identity 始终使用原始 parent/date。 */
 data class OccurrenceOverrideResource(
   override val identity: OccurrenceOverrideIdentity,
   override val version: Long,
   val status: AtomicField<OccurrenceStatus>,
+  val timing: AtomicField<FieldPatch<TimingInput>>,
   val title: AtomicField<FieldPatch<String>>,
   val description: AtomicField<FieldPatch<String>>,
+  val categoryId: AtomicField<FieldPatch<String>>,
   val reminders: AtomicField<FieldPatch<List<ReminderInput>>>,
 ) : SyncResource<OccurrenceOverrideIdentity> {
   init {

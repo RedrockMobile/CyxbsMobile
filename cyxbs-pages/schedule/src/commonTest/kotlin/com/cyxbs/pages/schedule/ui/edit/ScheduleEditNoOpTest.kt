@@ -132,7 +132,7 @@ class ScheduleEditNoOpTest {
     val all = commandFor(EditScope.ALL)
     assertEquals(2, (all as ScheduleCommand.Update).schedule.recurrence?.interval)
     val following = commandFor(EditScope.THIS_AND_FOLLOWING)
-    assertEquals(2, (following as ScheduleCommand.SplitSeries).followingChanges?.recurrence?.interval)
+    assertEquals(2, (following as ScheduleCommand.SplitSeries).followingSchedule.recurrence?.interval)
     assertEquals(null, commandFor(EditScope.THIS_ONLY))
   }
 
@@ -227,7 +227,8 @@ class ScheduleEditNoOpTest {
     val all = (apply(EditScope.ALL) as ScheduleCommand.Update).schedule
     assertEquals(ScheduleTiming.Unscheduled, all.timing)
     assertTrue(all.reminders.isEmpty())
-    val following = (apply(EditScope.THIS_AND_FOLLOWING) as ScheduleCommand.SplitSeries).followingChanges!!
+    // 非重复日程没有可拆分的 occurrence，“此次及以后”防御性等价于整个系列更新。
+    val following = (apply(EditScope.THIS_AND_FOLLOWING) as ScheduleCommand.Update).schedule
     assertEquals(ScheduleTiming.Unscheduled, following.timing)
     assertTrue(following.reminders.isEmpty())
     assertFailsWith<IllegalArgumentException> { apply(EditScope.THIS_ONLY) }
@@ -358,14 +359,35 @@ class ScheduleEditNoOpTest {
     assertSeriesFieldsEqual(parentSchedule(), all)
     assertEquals(2, all.recurrence?.interval)
 
-    val following = (command(EditScope.THIS_AND_FOLLOWING) as ScheduleCommand.SplitSeries).followingChanges!!
-    val parent = parentSchedule()
-    assertEquals(parent.title, following.title)
-    assertEquals(parent.description, following.description)
-    assertEquals(parent.categoryId, following.categoryId)
-    assertEquals(parent.timing, following.timing)
-    assertEquals(parent.reminders, following.reminders)
+    val following = (command(EditScope.THIS_AND_FOLLOWING) as ScheduleCommand.SplitSeries).followingSchedule
+    // “此次及以后”以当前 occurrence 的有效内容作为新系列基线，已有单次覆盖不会在边界处丢失。
+    assertEquals("Occurrence title", following.title)
+    assertEquals("Occurrence description", following.description)
+    assertEquals(CategoryId("occurrence-category"), following.categoryId)
+    assertEquals(
+      ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 8, 15, 0), 90, "Asia/Shanghai"),
+      following.timing,
+    )
+    assertTrue(following.reminders.isEmpty())
     assertEquals(2, following.recurrence?.interval)
+  }
+
+  @Test
+  fun editingWholeSeriesFromMiddleOccurrenceAppliesOnlyRelativeTimingOffset() = runTest {
+    val parent = parentSchedule()
+    val id = recurrenceId()
+    val repository = RecordingRepository(snapshot(parent))
+    val state = EditScheduleModelState(parent, occurrence(parent, id))
+    state.startTime = "2026年7月9日 10:00"
+    state.endTime = "2026年7月9日 11:00"
+
+    repository.applyScheduleEdit(state, EditScope.ALL, id, FakeIds, Clock.System)
+
+    val updated = (repository.commands.single() as ScheduleCommand.Update).schedule
+    assertEquals(
+      ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 2, 10, 0), 60, "Asia/Shanghai"),
+      updated.timing,
+    )
   }
 
   @Test

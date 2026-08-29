@@ -42,7 +42,6 @@ R → U：
 - `FieldGroupPatch[]`、普通编辑操作历史或 mutation event stream；
 - cursor、receipt、`settledSnapshotToken`、HLC 或客户端 rebase 状态机；
 - `schedule_structure_operations`、SplitSeries receipt、A→B lineage；
-- OccurrenceOverride 的单次分类覆盖或单次 timing；
 - 同时间冲突交给用户二选一；
 - 为未观测到的极端规模设置应用层请求、列表、ID 或时间上限。
 
@@ -300,16 +299,19 @@ OccurrenceOverride identity 直接位于 typed resource：
 scheduleId + occurrenceDate
 ```
 
-它只有四个原子：
+它有六个原子：
 
 | JSON 字段 | `data` 语义 |
 | --- | --- |
 | `status` | `ACTIVE / COMPLETED / CANCELLED` |
+| `timing` | `FieldPatch<Timing>`，只允许 `INHERIT / REPLACE` |
 | `title` | `FieldPatch<string>` |
 | `description` | `FieldPatch<string>` |
+| `categoryId` | `FieldPatch<string>` |
 | `reminders` | `FieldPatch<Reminder[]>` |
 
-没有独立 exception ID、分类覆盖、timing、全天标记或时区字段。分类和实际时间始终继承 parent Schedule。
+没有独立 exception ID 或 recurrence 规则。timing REPLACE 携带完整 union 并保持父系列 kind，categoryId
+REPLACE 必须引用同 owner 的 live Category；两者都不改变 occurrence identity。
 
 `FieldPatch<T>` 三态：
 
@@ -329,12 +331,20 @@ REPLACE → 使用完整替换值，必须携带 value
     "data": "CANCELLED",
     "modifiedAt": 1786669323000
   },
+  "timing": {
+    "data": { "mode": "INHERIT" },
+    "modifiedAt": 1786669323000
+  },
   "title": {
     "data": { "mode": "INHERIT" },
     "modifiedAt": 1786669323001
   },
   "description": {
     "data": { "mode": "REPLACE", "value": "本周改为线上" },
+    "modifiedAt": 1786669323002
+  },
+  "categoryId": {
+    "data": { "mode": "INHERIT" },
     "modifiedAt": 1786669323002
   },
   "reminders": {
@@ -344,7 +354,8 @@ REPLACE → 使用完整替换值，必须携带 value
 }
 ```
 
-仅修改本次分类不在合同范围内；如果用户需要改变分类，只能修改 parent Schedule 的分类，或未来重新审批新的产品语义。
+仅修改本次分类写入 categoryId patch；仅修改本次时间写入 timing patch。两者都保留原始
+`scheduleId + occurrenceDate` identity，不把实际移动后的日期反写为 occurrenceDate。
 
 ---
 

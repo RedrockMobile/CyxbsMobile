@@ -262,12 +262,15 @@ Schedule:
 
 OccurrenceOverride:
   status
+  timing patch
   title patch
   description patch
+  categoryId patch
   reminders patch
 ```
 
-Override 没有 category 或 timing。`title` 与 `description` 独立；`timing` 与 `recurrence` 独立。非重复 Schedule 使用 `recurrence: {data:null, modifiedAt:...}`。
+Override 的六个原子独立合并；timing 只能 INHERIT/REPLACE，categoryId 的 REPLACE 必须引用 live Category。
+非重复 Schedule 使用 `recurrence: {data:null, modifiedAt:...}`。
 
 OccurrenceOverride PATCH 示例：
 
@@ -280,11 +283,19 @@ OccurrenceOverride PATCH 示例：
     "data": "CANCELLED",
     "modifiedAt": 1775995200123
   },
+  "timing": {
+    "data": { "mode": "INHERIT" },
+    "modifiedAt": 1775995200123
+  },
   "title": {
     "data": { "mode": "INHERIT" },
     "modifiedAt": 1775995200123
   },
   "description": {
+    "data": { "mode": "INHERIT" },
+    "modifiedAt": 1775995200123
+  },
+  "categoryId": {
     "data": { "mode": "INHERIT" },
     "modifiedAt": 1775995200123
   },

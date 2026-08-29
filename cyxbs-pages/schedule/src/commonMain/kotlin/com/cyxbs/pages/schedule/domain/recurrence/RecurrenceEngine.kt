@@ -2,6 +2,7 @@ package com.cyxbs.pages.schedule.domain.recurrence
 
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTimeDate
+import com.cyxbs.components.config.time.toLocalDateTime
 import com.cyxbs.pages.schedule.domain.model.FieldPatch
 import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
@@ -15,6 +16,8 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceException
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.validation.ScheduleValidator
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 
 /**
  * 纯函数、窗口有界的 Schedule v2 重复规则展开器与例外应用器。
@@ -63,7 +66,13 @@ object RecurrenceEngine {
       rangeEndExclusive,
       exceptionMap.keys.maxOfOrNull { it.originalDateTime } ?: rangeEndExclusive,
     )
-    val generated = generatedStarts(schedule.timing, recurrence, validationEnd)
+    val identityAnchor = identityAnchor(schedule)
+    val actualOffsetMinutes = wallMinuteDelta(identityAnchor, effectiveStart(schedule.timing))
+    val generated = generatedStarts(
+      identityAnchor,
+      recurrence,
+      if (actualOffsetMinutes < 0) validationEnd.plusMinutes(-actualOffsetMinutes) else validationEnd,
+    )
 
     return generated.mapNotNull { originalStart ->
       val id = recurrenceId(schedule.timing, originalStart)
@@ -113,7 +122,7 @@ object RecurrenceEngine {
     require(schedule.timing != ScheduleTiming.Unscheduled) { "unscheduled items cannot recur" }
     var previousStart: MinuteTimeDate? = null
     var occurrenceIndex = 0
-    for (candidate in generatedStarts(schedule.timing, recurrence, recurrenceId.originalDateTime)) {
+    for (candidate in generatedStarts(identityAnchor(schedule), recurrence, recurrenceId.originalDateTime)) {
       if (candidate > recurrenceId.originalDateTime) break
       if (candidate == recurrenceId.originalDateTime && recurrenceId(schedule.timing, candidate) == recurrenceId) {
         return RecurrenceIdentityPosition(occurrenceIndex, candidate, previousStart)
@@ -206,10 +215,13 @@ object RecurrenceEngine {
     exception: ScheduleOccurrenceException?,
   ): ScheduleOccurrence {
     val patch = exception?.patch
+    val actualStart = originalStart.plusMinutes(
+      wallMinuteDelta(identityAnchor(schedule), effectiveStart(schedule.timing)),
+    )
     val inheritedTiming = when (val source = schedule.timing) {
-      is ScheduleTiming.Timed -> source.copy(start = originalStart)
-      is ScheduleTiming.Deadline -> source.copy(due = originalStart)
-      is ScheduleTiming.AllDay -> source.copy(startDate = originalStart.date)
+      is ScheduleTiming.Timed -> source.copy(start = actualStart)
+      is ScheduleTiming.Deadline -> source.copy(due = actualStart)
+      is ScheduleTiming.AllDay -> source.copy(startDate = actualStart.date)
       ScheduleTiming.Unscheduled -> error("unscheduled recurrence was rejected")
     }
     val timing = patch?.timing?.resolve(inheritedTiming, clear = null) ?: inheritedTiming
@@ -234,16 +246,15 @@ object RecurrenceEngine {
   }
 
   /**
-   * 从规则锚点生成至 [validationEndInclusive] 的原始开始时间。
+   * 从稳定 identity 锚点生成至 [validationEndInclusive] 的原始开始时间。
    *
    * 调用方应先完成 identity 校验；这里保留到窗口末端之后的上界只用于让窗口外实例的 patch 有机会迁入。
    */
   private fun generatedStarts(
-    timing: ScheduleTiming,
+    anchor: MinuteTimeDate,
     rule: RecurrenceRule,
     validationEndInclusive: MinuteTimeDate,
   ): List<MinuteTimeDate> {
-    val anchor = effectiveStart(timing)
     val result = ArrayList<MinuteTimeDate>()
     var period = 0
     while (period < MAX_PERIODS) {
@@ -387,4 +398,15 @@ object RecurrenceEngine {
     is ScheduleTiming.AllDay -> MinuteTimeDate(timing.startDate, 0, 0)
     ScheduleTiming.Unscheduled -> error("unscheduled timing has no occurrence start")
   }
+
+  /** 首次锚点只决定 occurrence identity 日期；实际 timing 可以在整系列编辑后相对它平移。 */
+  private fun identityAnchor(schedule: Schedule): MinuteTimeDate {
+    val timingStart = effectiveStart(schedule.timing)
+    return MinuteTimeDate(schedule.recurrenceAnchorDate ?: timingStart.date, timingStart.time)
+  }
+
+  /** 在 UTC 中把两个墙上时间当作无时区分钟计算差值，避免 DST 改变用户输入的日期/时分偏移。 */
+  private fun wallMinuteDelta(from: MinuteTimeDate, to: MinuteTimeDate): Int =
+    (to.toLocalDateTime().toInstant(TimeZone.UTC) -
+      from.toLocalDateTime().toInstant(TimeZone.UTC)).inWholeMinutes.toInt()
 }

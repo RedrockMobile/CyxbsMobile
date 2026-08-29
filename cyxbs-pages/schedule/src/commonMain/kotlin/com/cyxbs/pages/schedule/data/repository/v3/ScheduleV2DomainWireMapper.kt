@@ -89,25 +89,29 @@ internal fun ScheduleInput.toDomain(): ScheduleResource = ScheduleResource(
   linkedToCourse = DomainAtomicField(linkedToCourse.data, linkedToCourse.modifiedAt),
 )
 
-/** OccurrenceOverride 只映射协议允许的状态、标题、详情和提醒四个原子。 */
+/** OccurrenceOverride 映射六个可编辑原子；timing 变化不会改写 identity。 */
 internal fun OccurrenceOverrideResource.toWire(): OccurrenceOverrideInput = OccurrenceOverrideInput(
   scheduleId = identity.scheduleId,
   occurrenceDate = identity.occurrenceDate,
   version = version.toULong(),
   status = WireAtomicField(status.data.toWire(), status.modifiedAt),
+  timing = WireAtomicField(timing.data.toWireTimingPatch(), timing.modifiedAt),
   title = WireAtomicField(title.data.toWireStringPatch(), title.modifiedAt),
   description = WireAtomicField(description.data.toWireStringPatch(), description.modifiedAt),
+  categoryId = WireAtomicField(categoryId.data.toWireStringPatch(), categoryId.modifiedAt),
   reminders = WireAtomicField(reminders.data.toWireReminderPatch(), reminders.modifiedAt),
 )
 
-/** wire OccurrenceOverride payload 到领域四原子资源的无损映射。 */
+/** wire OccurrenceOverride payload 到领域六原子资源的无损映射。 */
 internal fun OccurrenceOverrideInput.toDomain(): OccurrenceOverrideResource =
   OccurrenceOverrideResource(
     identity = OccurrenceOverrideIdentity(scheduleId, occurrenceDate),
     version = version.toDomainVersion(),
     status = DomainAtomicField(status.data.toDomain(), status.modifiedAt),
+    timing = DomainAtomicField(timing.data.toDomainTimingPatch(), timing.modifiedAt),
     title = DomainAtomicField(title.data.toDomainStringPatch(), title.modifiedAt),
     description = DomainAtomicField(description.data.toDomainStringPatch(), description.modifiedAt),
+    categoryId = DomainAtomicField(categoryId.data.toDomainStringPatch(), categoryId.modifiedAt),
     reminders = DomainAtomicField(reminders.data.toDomainReminderPatch(), reminders.modifiedAt),
   )
 
@@ -263,6 +267,12 @@ private fun DomainFieldPatch<String>.toWireStringPatch(): WireFieldPatch<String>
   is DomainFieldPatch.Replace -> WireFieldPatch(PatchMode.REPLACE, value)
 }
 
+private fun DomainFieldPatch<DomainTimingInput>.toWireTimingPatch(): WireFieldPatch<WireTimingInput> = when (this) {
+  DomainFieldPatch.Inherit -> WireFieldPatch(PatchMode.INHERIT)
+  DomainFieldPatch.Clear -> WireFieldPatch(PatchMode.CLEAR)
+  is DomainFieldPatch.Replace -> WireFieldPatch(PatchMode.REPLACE, value.toWire())
+}
+
 private fun DomainFieldPatch<List<DomainReminderInput>>.toWireReminderPatch():
   WireFieldPatch<List<WireReminderInput>> = when (this) {
   DomainFieldPatch.Inherit -> WireFieldPatch(PatchMode.INHERIT)
@@ -274,6 +284,14 @@ private fun WireFieldPatch<String>.toDomainStringPatch(): DomainFieldPatch<Strin
   PatchMode.INHERIT -> DomainFieldPatch.Inherit
   PatchMode.CLEAR -> DomainFieldPatch.Clear
   PatchMode.REPLACE -> DomainFieldPatch.Replace(requireNotNull(value) { "REPLACE title/description requires value" })
+}
+
+private fun WireFieldPatch<WireTimingInput>.toDomainTimingPatch(): DomainFieldPatch<DomainTimingInput> = when (mode) {
+  PatchMode.INHERIT -> DomainFieldPatch.Inherit
+  PatchMode.CLEAR -> DomainFieldPatch.Clear
+  PatchMode.REPLACE -> DomainFieldPatch.Replace(
+    requireNotNull(value) { "REPLACE timing requires value" }.toDomain(),
+  )
 }
 
 private fun WireFieldPatch<List<WireReminderInput>>.toDomainReminderPatch():

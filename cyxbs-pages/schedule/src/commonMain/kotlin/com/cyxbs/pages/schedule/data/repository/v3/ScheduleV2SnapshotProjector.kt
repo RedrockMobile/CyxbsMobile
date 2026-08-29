@@ -66,8 +66,8 @@ sealed interface ScheduleV2SnapshotProjection {
  *
  * pending UPSERT 由 effective 规则覆盖 remote，pending DELETE 不可见。绝对毫秒没有携带原始时区，
  * 因此 Timed/Deadline 必须使用调用方传入的 [timeZone] 恢复墙上时间；本类不访问 Room 或网络。
- * ScheduleRemoteSnapshot.firstRecurrenceAnchorDate 仍完整保留在 typed 持久状态中，旧 UI 没有对应字段，
- * 因此它不经过本次展示投影；projector 不修改 state，也不会导致该持久信息丢失。
+ * ScheduleRemoteSnapshot.firstRecurrenceAnchorDate 会投影为领域层稳定 recurrenceAnchorDate；整个系列移动实际
+ * 日期时仍以它生成 occurrence identity，不能退回当前 timing 日期。
  * 旧 UI 同样没有 Reminder message，故只接受空 message；ReminderId 按 identity 与 canonical 顺序派生，
  * 不承诺列表重排后的 ID 稳定性，也不为此引入 sidecar。
  */
@@ -170,6 +170,8 @@ class ScheduleV2SnapshotProjector {
       updatedAt = updatedAt,
       kind = resource.kind.toUi(),
       linkedToCourse = resource.linkedToCourse.data,
+      recurrenceAnchorDate = (remoteSnapshot?.firstRecurrenceAnchorDate
+        ?: resource.recurrence.data?.anchorDate)?.toUtcDate(),
     )
   }
 
@@ -236,7 +238,6 @@ class ScheduleV2SnapshotProjector {
         requireProjection(uiWeekdays.isNotEmpty() && anchorWeekday in uiWeekdays, "WEEKLY anchor must be included")
       }
     }
-    requireProjection(anchorDate == parentTiming.anchorDateSlot(), "recurrence anchorDate must match parent timing")
     return RecurrenceRule(
       frequency = when (frequency) {
         RecurrenceFrequency.DAILY -> UiRecurrenceFrequency.DAILY
@@ -270,8 +271,10 @@ class ScheduleV2SnapshotProjector {
   ): ScheduleOccurrenceException {
     val atomTimes = listOf(
       resource.status.modifiedAt,
+      resource.timing.modifiedAt,
       resource.title.modifiedAt,
       resource.description.modifiedAt,
+      resource.categoryId.modifiedAt,
       resource.reminders.modifiedAt,
     )
     val (createdAt, updatedAt) = timestamps(remoteSnapshot?.meta, atomTimes)
@@ -282,10 +285,10 @@ class ScheduleV2SnapshotProjector {
       revision = resource.version,
       status = resource.status.data.toUi(),
       patch = OccurrencePatch(
-        timing = UiFieldPatch.Inherit,
+        timing = resource.timing.data.toUiTimingPatch(parent),
         title = resource.title.data.toUiTitlePatch(),
         description = resource.description.data.toUiStringPatch(),
-        categoryId = UiFieldPatch.Inherit,
+        categoryId = resource.categoryId.data.toUiCategoryPatch(),
         reminders = resource.reminders.data.toUiReminderPatch(
           "${parent.id.value}@${resource.identity.occurrenceDate}",
         ),
@@ -293,6 +296,27 @@ class ScheduleV2SnapshotProjector {
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
+  }
+
+  /** timing patch 沿用 parent 的 IANA 时区恢复墙上时间；identity 日期不取移动后的 timing。 */
+  private fun FieldPatch<TimingInput>.toUiTimingPatch(parent: Schedule): UiFieldPatch<ScheduleTiming> = when (this) {
+    FieldPatch.Inherit -> UiFieldPatch.Inherit
+    FieldPatch.Clear -> abortProjection("OccurrenceOverride timing cannot be Clear")
+    is FieldPatch.Replace -> {
+      val zone = when (val timing = parent.timing) {
+        is ScheduleTiming.Timed -> TimeZone.of(timing.timeZoneId)
+        is ScheduleTiming.Deadline -> TimeZone.of(timing.timeZoneId)
+        is ScheduleTiming.AllDay -> TimeZone.UTC
+        ScheduleTiming.Unscheduled -> abortProjection("Unscheduled parent cannot own timing override")
+      }
+      UiFieldPatch.Replace(value.toUi(zone))
+    }
+  }
+
+  private fun FieldPatch<String>.toUiCategoryPatch(): UiFieldPatch<CategoryId> = when (this) {
+    FieldPatch.Inherit -> UiFieldPatch.Inherit
+    FieldPatch.Clear -> UiFieldPatch.Clear
+    is FieldPatch.Replace -> UiFieldPatch.Replace(CategoryId(value))
   }
 
   /** occurrenceDate 提供日期，parent timing 提供稳定墙上时刻、时区与 allDay 语义。 */

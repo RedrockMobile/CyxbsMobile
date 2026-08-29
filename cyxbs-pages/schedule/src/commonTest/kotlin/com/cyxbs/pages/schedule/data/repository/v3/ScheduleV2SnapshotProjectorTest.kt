@@ -448,8 +448,10 @@ class ScheduleV2SnapshotProjectorTest {
       identity = identity,
       version = version,
       status = AtomicField(OccurrenceStatus.COMPLETED, 610),
+      timing = AtomicField(FieldPatch.Inherit, 610),
       title = AtomicField(FieldPatch.Replace("单次标题"), 620),
       description = AtomicField(FieldPatch.Clear, 630),
+      categoryId = AtomicField(FieldPatch.Inherit, 640),
       reminders = AtomicField(FieldPatch.Replace(listOf(ReminderInput(5, ""))), 650),
     )
     return OccurrenceOverrideSyncState(

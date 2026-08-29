@@ -26,4 +26,5 @@
 
 代码合入不等于上线。真实后端 HTTP、账号切换、断网 pending、R→U、Android Calendar Provider、iOS EventKit、生产数据库和多设备行为需要在部署与测试账号准备完成后另行授权验收。
 
-当前明确不恢复 MONTHLY/YEARLY、occurrence timing/category override、Web 离线编辑、旧库推断迁移、自动重试框架或 Calendar 入站冲突合并。
+当前明确不恢复 MONTHLY/YEARLY、Web 离线编辑、旧库推断迁移、自动重试框架或 Calendar 入站冲突合并。
+occurrence timing/category override 已纳入 typed canonical 合同，但系统日历 adapter 的正式投影仍需单独验收。

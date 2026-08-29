@@ -101,6 +101,7 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrence
 import com.cyxbs.pages.schedule.domain.model.ScheduleReminder
 import com.cyxbs.pages.schedule.domain.model.ScheduleTiming
 import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
+import com.cyxbs.pages.schedule.domain.recurrence.SeriesSplitter
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.ui.category.rememberScheduleCategoryCatalog
 import com.cyxbs.pages.schedule.ui.dialog.ScheduleBottomSheet
@@ -320,11 +321,16 @@ fun EditScheduleDialog(
     showUnsavedExit = false
     decision?.complete(allowDismiss)
   }
+  val showThisAndFollowing = remember(editSchedule, recurrenceId) {
+    editSchedule != null && recurrenceId != null &&
+      SeriesSplitter.canSplitAt(editSchedule, recurrenceId)
+  }
   val overlayContent: @Composable () -> Unit = {
     // 三态选择
     EditScopeChooserSheet(
       show = scopeChooser != null,
       isDelete = scopeChooser == ScopeAction.DELETE,
+      showThisAndFollowing = showThisAndFollowing,
       onDismiss = { scopeChooser = null },
       onChoose = { scope ->
         when (scopeChooser) {
@@ -1025,6 +1031,7 @@ internal fun ToggleChip(
 private fun EditScopeChooserSheet(
   show: Boolean,
   isDelete: Boolean,
+  showThisAndFollowing: Boolean,
   onDismiss: () -> Unit,
   onChoose: (EditScope) -> Unit,
 ) {
@@ -1039,6 +1046,11 @@ private fun EditScopeChooserSheet(
         modifier = Modifier.fillMaxWidth().padding(20.dp),
       )
       ScopeRow(if (isDelete) "仅删除此次" else "仅此次") { onChoose(EditScope.THIS_ONLY) }
+      if (showThisAndFollowing) {
+        ScopeRow(if (isDelete) "删除此次及以后" else "此次及以后") {
+          onChoose(EditScope.THIS_AND_FOLLOWING)
+        }
+      }
       ScopeRow(if (isDelete) "删除整个系列" else "整个系列") { onChoose(EditScope.ALL) }
       Spacer(modifier = Modifier.height(8.dp))
       Text(
