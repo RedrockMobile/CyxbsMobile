@@ -6,6 +6,10 @@ import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.schedule.data.repository.ScheduleIdGenerators
 import com.cyxbs.pages.schedule.domain.model.*
 import com.cyxbs.pages.schedule.domain.repository.*
+import com.cyxbs.pages.schedule.ui.edit.area.ScheduleTimeBoundary
+import com.cyxbs.pages.schedule.ui.edit.area.ScheduleTimeComponent
+import com.cyxbs.pages.schedule.ui.edit.area.ScheduleTimeInterval
+import com.cyxbs.pages.schedule.ui.edit.area.adjustScheduleTimeInterval
 import com.cyxbs.pages.schedule.ui.edit.area.applyExplicitTimeModeSelection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +24,89 @@ import kotlin.time.Instant
 
 /** THIS_ONLY 无改动保存必须保持既有 sparse patch，不得因 parent 演进而误删例外。 */
 class ScheduleEditNoOpTest {
+
+  /** 开始小时越过结束小时后优先只抬高结束小时，并保留原结束分钟。 */
+  @Test
+  fun changingStartHourPreservesEndMinuteBeforeApplyingMinimumDuration() {
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 14 * 60 + 10, endMinuteOfDay = 14 * 60 + 50),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 14 * 60 + 10,
+        endMinuteOfDay = 11 * 60 + 50,
+        changedBoundary = ScheduleTimeBoundary.START,
+        changedComponent = ScheduleTimeComponent.HOUR,
+      ),
+    )
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 14 * 60 + 50, endMinuteOfDay = 15 * 60 + 20),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 14 * 60 + 50,
+        endMinuteOfDay = 11 * 60 + 10,
+        changedBoundary = ScheduleTimeBoundary.START,
+        changedComponent = ScheduleTimeComponent.HOUR,
+      ),
+    )
+  }
+
+  /** 调整开始分钟后不足 30 分钟时，由结束端向后补足。 */
+  @Test
+  fun changingStartMinutePushesEndToThirtyMinutesLater() {
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 10 * 60 + 50, endMinuteOfDay = 11 * 60 + 20),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 10 * 60 + 50,
+        endMinuteOfDay = 11 * 60 + 10,
+        changedBoundary = ScheduleTimeBoundary.START,
+        changedComponent = ScheduleTimeComponent.MINUTE,
+      ),
+    )
+  }
+
+  /** 调整结束端时始终保留结束值，并把开始端向前调整到至少相隔 30 分钟。 */
+  @Test
+  fun changingEndKeepsEndAndPullsStartBackward() {
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 9 * 60 + 45, endMinuteOfDay = 10 * 60 + 15),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 10 * 60 + 45,
+        endMinuteOfDay = 10 * 60 + 15,
+        changedBoundary = ScheduleTimeBoundary.END,
+        changedComponent = ScheduleTimeComponent.HOUR,
+      ),
+    )
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 10 * 60 + 15, endMinuteOfDay = 10 * 60 + 45),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 10 * 60 + 30,
+        endMinuteOfDay = 10 * 60 + 45,
+        changedBoundary = ScheduleTimeBoundary.END,
+        changedComponent = ScheduleTimeComponent.MINUTE,
+      ),
+    )
+  }
+
+  /** 同日时间段无法跨越午夜，起止两端分别收敛到 23:29—23:59 与 00:00—00:30。 */
+  @Test
+  fun intervalAdjustmentHandlesDayBoundary() {
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 23 * 60 + 29, endMinuteOfDay = 23 * 60 + 59),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 23 * 60 + 40,
+        endMinuteOfDay = 10 * 60,
+        changedBoundary = ScheduleTimeBoundary.START,
+        changedComponent = ScheduleTimeComponent.HOUR,
+      ),
+    )
+    assertEquals(
+      ScheduleTimeInterval(startMinuteOfDay = 0, endMinuteOfDay = 30),
+      adjustScheduleTimeInterval(
+        startMinuteOfDay = 10 * 60,
+        endMinuteOfDay = 10,
+        changedBoundary = ScheduleTimeBoundary.END,
+        changedComponent = ScheduleTimeComponent.MINUTE,
+      ),
+    )
+  }
 
   /** 新建草稿的默认值不算用户修改，产生有效输入后才需要未保存确认。 */
   @Test
