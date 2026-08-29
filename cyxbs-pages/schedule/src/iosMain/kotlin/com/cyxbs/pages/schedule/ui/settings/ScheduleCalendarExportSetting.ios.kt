@@ -79,7 +79,7 @@ internal actual fun ScheduleCalendarExportSetting(modifier: Modifier) {
       ScheduleSettingActionRow(
         title = "选择日历账户",
         summary = state.selectedSourceIdentifier?.let { "已选择一个日历账户，可重新选择" }
-          ?: "选择用于以后创建邮子清单日历的账户",
+          ?: "选择用于以后创建“掌邮日程”日历的账户",
         enabled = state.status !in setOf(
           IosScheduleCalendarSettingsStatus.PERMISSION_NOT_REQUESTED,
           IosScheduleCalendarSettingsStatus.PERMISSION_REQUESTING,
@@ -112,7 +112,7 @@ internal actual fun ScheduleCalendarExportSetting(modifier: Modifier) {
 
 /** 将 controller 的 fail-closed 状态收窄为不泄露 identifier 或系统错误文本的恢复提示。 */
 private fun IosScheduleCalendarSettingsState.toUserSummary(): String = when (status) {
-  IosScheduleCalendarSettingsStatus.UNCONFIGURED -> "请选择日历账户后再开启；首次导出才会创建邮子清单日历"
+  IosScheduleCalendarSettingsStatus.UNCONFIGURED -> "请选择日历账户后再开启；首次导出才会创建“掌邮日程”日历"
   IosScheduleCalendarSettingsStatus.PERMISSION_NOT_REQUESTED -> "需要完整日历权限，点击开启后才会请求"
   IosScheduleCalendarSettingsStatus.PERMISSION_REQUESTING -> "正在等待系统日历权限"
   IosScheduleCalendarSettingsStatus.PERMISSION_CANCELLED -> "已取消权限请求，可再次点击开启"
@@ -120,7 +120,7 @@ private fun IosScheduleCalendarSettingsState.toUserSummary(): String = when (sta
   IosScheduleCalendarSettingsStatus.PERMISSION_RESTRICTED -> "此设备限制了完整日历权限"
   IosScheduleCalendarSettingsStatus.PERMISSION_WRITE_ONLY -> "仅写入权限无法安全恢复和管理日历，需要完整权限"
   IosScheduleCalendarSettingsStatus.SOURCE_MISSING -> "已选日历账户不可用，请重新选择"
-  IosScheduleCalendarSettingsStatus.CALENDAR_MISSING -> "缓存的邮子清单日历已不存在，请重新选择账户"
+  IosScheduleCalendarSettingsStatus.CALENDAR_MISSING -> "缓存的“掌邮日程”日历已不存在，请重新选择账户"
   IosScheduleCalendarSettingsStatus.CALENDAR_MOVED_TO_OTHER_SOURCE -> "缓存日历已移动到其他账户，请重新选择"
   IosScheduleCalendarSettingsStatus.AMBIGUOUS_REQUIRES_RESELECTION -> "无法安全确认日历归属，请重新选择日历账户"
   IosScheduleCalendarSettingsStatus.CONFIGURED -> "已开启；关闭后会保留系统日历中已有日程"

@@ -40,6 +40,7 @@ import kotlin.math.roundToInt
 internal fun EditScheduleRemindArea(
   current: Int,
   onChoose: (Int) -> Unit,
+  onEnableRequested: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -55,7 +56,9 @@ internal fun EditScheduleRemindArea(
     Row {
       ToggleChip("不提醒", selected = current < 0) { onChoose(-1) }
       Spacer(modifier = Modifier.width(8.dp))
-      ToggleChip("提醒", selected = current >= 0) { if (current < 0) onChoose(10) }
+      ToggleChip("提醒", selected = current >= 0) {
+        if (current < 0) onEnableRequested()
+      }
     }
     if (current >= 0) {
       Spacer(modifier = Modifier.height(8.dp))

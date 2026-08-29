@@ -40,7 +40,7 @@ value class CalendarExportScope private constructor(val value: String) {
 enum class CalendarProjectionKind(val uriValue: String) {
   /** 非重复定时或全天日程。 */
   SINGLE("single"),
-  /** 截止事项的一分钟平台投影；显式 kind 保证回读幂等，禁止按时长猜测。 */
+  /** 时间点事项的零时长平台投影；显式 kind 保证回读幂等，禁止按时长猜测。 */
   DEADLINE("deadline"),
   /** 重复系列的主事件。 */
   SERIES_MASTER("series"),

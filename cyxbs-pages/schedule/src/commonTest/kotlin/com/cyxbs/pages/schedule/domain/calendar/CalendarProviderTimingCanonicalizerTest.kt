@@ -24,7 +24,7 @@ class CalendarProviderTimingCanonicalizerTest {
       CalendarTiming.Deadline(MinuteTimeDate(2026, 7, 12, 9, 30), "Asia/Shanghai"),
       reconstruct(
         start,
-        duration = "PT1M",
+        duration = "PT0M",
         recurring = true,
         kind = CalendarProjectionKind.DEADLINE,
       ),
@@ -40,6 +40,7 @@ class CalendarProviderTimingCanonicalizerTest {
     assertNull(reconstruct(start, dtEnd = start + 60 * MILLIS_PER_MINUTE + 1))
     assertNull(reconstruct(start, dtEnd = start + 90_000))
     assertNull(reconstruct(start, duration = "PT90S", recurring = true))
+    assertNull(reconstruct(start, duration = "P", recurring = true, kind = CalendarProjectionKind.DEADLINE))
     assertNull(reconstruct(start, duration = "P1DT", recurring = true))
     assertNull(reconstruct(start, duration = "P999999999999999999999999DT1M", recurring = true))
     assertNull(reconstruct(start, duration = "PT999999999999999999999999H1M", recurring = true))
@@ -81,20 +82,27 @@ class CalendarProviderTimingCanonicalizerTest {
   }
 
   @Test
-  fun deadlineRejectsAnyDurationOtherThanOneMinute() {
+  fun deadlineAcceptsOnlyZeroDuration() {
     val start = epochMillis(MinuteTimeDate(2026, 7, 12, 9, 30), "Asia/Shanghai")
 
+    assertEquals(
+      CalendarTiming.Deadline(MinuteTimeDate(2026, 7, 12, 9, 30), "Asia/Shanghai"),
+      reconstruct(start, dtEnd = start, kind = CalendarProjectionKind.DEADLINE),
+    )
     assertNull(reconstruct(
       start,
-      dtEnd = start + 2 * MILLIS_PER_MINUTE,
+      dtEnd = start + MILLIS_PER_MINUTE,
       kind = CalendarProjectionKind.DEADLINE,
     ))
     assertNull(reconstruct(
       start,
-      duration = "PT2M",
+      duration = "PT1M",
       recurring = true,
       kind = CalendarProjectionKind.DEADLINE,
     ))
+    // 相同边界只属于 Deadline，不能被普通时间段误读成零分钟 Timed。
+    assertNull(reconstruct(start, dtEnd = start))
+    assertNull(reconstruct(start, duration = "PT0M", recurring = true))
   }
 
   @Test

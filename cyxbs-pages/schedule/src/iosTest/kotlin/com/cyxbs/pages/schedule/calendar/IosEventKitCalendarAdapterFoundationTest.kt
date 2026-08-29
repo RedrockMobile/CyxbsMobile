@@ -68,7 +68,7 @@ class IosEventKitCalendarAdapterFoundationTest {
   }
 
   @Test
-  fun writePayloadKeepsCanonicalIdentityMinuteTimingDeadlineAndDeviceAlarms() {
+  fun writePayloadKeepsCanonicalIdentityZeroDurationDeadlineAndDeviceAlarms() {
     val timed = projection(
       timing = CalendarTiming.Timed(MinuteTimeDate(2026, 7, 12, 9, 30), 90, ZONE),
       reminders = listOf(0, 15),
@@ -91,7 +91,16 @@ class IosEventKitCalendarAdapterFoundationTest {
     val deadlinePayload = IosEventKitCalendarAdapterFoundation.toWritePayload(deadline).mapped()
     val deadlineTiming = assertIs<IosEventKitWriteTiming.Timed>(deadlinePayload.timing)
     assertEquals(rawMoment(MinuteTimeDate(2026, 7, 12, 18, 0)), deadlineTiming.start)
-    assertEquals(rawMoment(MinuteTimeDate(2026, 7, 12, 18, 1)), deadlineTiming.endExclusive)
+    assertEquals(deadlineTiming.start, deadlineTiming.endExclusive)
+
+    val restoredDeadline = IosEventKitCalendarAdapterFoundation.toManagedEvent(
+      rawFor(deadline).copy(
+        start = deadlineTiming.start,
+        endExclusive = deadlineTiming.endExclusive,
+      ),
+      SCOPE,
+    ).mapped()
+    assertEquals(deadline.timing, restoredDeadline.canonicalFields.timing)
   }
 
   /**
@@ -378,7 +387,7 @@ class IosEventKitCalendarAdapterFoundationTest {
     )
     val deadlineRaw = rawFor(deadline).copy(
       start = rawMoment(MinuteTimeDate(2026, 7, 12, 18, 0)),
-      endExclusive = rawMoment(MinuteTimeDate(2026, 7, 12, 18, 1)),
+      endExclusive = rawMoment(MinuteTimeDate(2026, 7, 12, 18, 0)),
     )
     val series = projection(
       kind = CalendarProjectionKind.SERIES_MASTER,

@@ -77,7 +77,7 @@ class AndroidCalendarProviderInstrumentedTest {
     }
   }
 
-  /** 验证受管 Calendar row 使用严格本地身份，并在每次创建时持久化 canonical `CAL_SYNC1` UUID。 */
+  /** 验证受管 Calendar row 使用严格本地身份，并持久化 ownership token 与当前投射版本。 */
   @Test
   fun registryCreatesAndFindsStrictLocalIdentity() = withTestCalendar {
     val firstId = requireNotNull(registry.getOrCreateManagedCalendar(accountId, requiredScope))
@@ -99,6 +99,7 @@ class AndroidCalendarProviderInstrumentedTest {
       )
       assertEquals(id, decoded.calendarRowId)
       assertEquals(incarnation, decoded.incarnation)
+      assertEquals(AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION, projectionVersion)
     }
   }
 
@@ -521,7 +522,7 @@ class AndroidCalendarProviderInstrumentedTest {
   /**
    * 验证真实 Provider 对不同投影形状的持久化与回读合同。
    *
-   * 所有事件均属于当前随机账号创建的受管日历。断言单次 AllDay 的 UTC 半开区间、Deadline 的一分钟 DTEND，
+   * 所有事件均属于当前随机账号创建的受管日历。断言单次 AllDay 的 UTC 半开区间、Deadline 的零时长 DTEND，
    * 以及重复事件的 DURATION/RRULE 形状；随后经 gateway 回读 fingerprint，证明 Provider 对 RRULE 重排和
    * reminder 重复/顺序不会破坏 canonical 对账。
    */
@@ -571,7 +572,7 @@ class AndroidCalendarProviderInstrumentedTest {
     val deadlineRaw = requireNotNull(queryEvent(deadlineEventId))
     assertEquals(0, deadlineRaw.allDay)
     assertEquals("Asia/Shanghai", deadlineRaw.timeZone)
-    assertEquals(deadlineRaw.dtStart + MILLIS_PER_MINUTE, deadlineRaw.dtEnd)
+    assertEquals(deadlineRaw.dtStart, deadlineRaw.dtEnd)
     assertEquals(null, deadlineRaw.duration)
 
     val recurringTimedRaw = requireNotNull(queryEvent(recurringTimedEventId))
@@ -994,6 +995,7 @@ class AndroidCalendarProviderInstrumentedTest {
       CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
       CalendarContract.Calendars.OWNER_ACCOUNT,
       CalendarContract.Calendars.CAL_SYNC1,
+      CalendarContract.Calendars.CAL_SYNC2,
     )
     val selection = "${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND " +
         "${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ${CalendarContract.Calendars.NAME} = ?"
@@ -1015,6 +1017,7 @@ class AndroidCalendarProviderInstrumentedTest {
               displayName = cursor.getString(4),
               ownerAccount = cursor.getString(5),
               incarnation = cursor.getString(6),
+              projectionVersion = cursor.getString(7),
             ),
           )
         }
@@ -1056,6 +1059,10 @@ class AndroidCalendarProviderInstrumentedTest {
           put(CalendarContract.Calendars.VISIBLE, 1)
           put(CalendarContract.Calendars.SYNC_EVENTS, 1)
           put(CalendarContract.Calendars.CAL_SYNC1, incarnation)
+          put(
+            CalendarContract.Calendars.CAL_SYNC2,
+            AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION,
+          )
         },
       )?.let(ContentUris::parseId),
     )
@@ -1291,6 +1298,7 @@ class AndroidCalendarProviderInstrumentedTest {
     val displayName: String,
     val ownerAccount: String,
     val incarnation: String?,
+    val projectionVersion: String? = null,
   )
 
   private data class EventRow(
@@ -1307,7 +1315,7 @@ class AndroidCalendarProviderInstrumentedTest {
   )
 
   private companion object {
-    const val MANAGED_CALENDAR_NAME = "邮子清单"
+    const val MANAGED_CALENDAR_NAME = "掌邮日程"
     const val AUXILIARY_CALENDAR_NAME_PREFIX = "cyxbs-schedule-auxiliary-"
     const val AUXILIARY_CALENDAR_COLOR = -0xbbcca
     const val MILLIS_PER_MINUTE = 60_000L

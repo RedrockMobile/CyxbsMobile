@@ -229,6 +229,21 @@ class AndroidManagedCalendarSnapshotAcquirerTest {
     }
   }
 
+  /** `CAL_SYNC2` 缺失或不匹配时不读取 Events，而是要求上游安全重建整个受管投影。 */
+  @Test
+  fun mismatchedProjectionVersionRequiresManagedCalendarRebuild() {
+    listOf(null, "0", "2").forEach { version ->
+      val fake = SnapshotReadHostFake(calendarProjectionVersion = version)
+
+      val failure = assertFailsWith<ManagedCalendarRebuildRequiredException> {
+        AndroidManagedCalendarSnapshotAcquirer(fake, HOST_ACCOUNT).acquire(hostScope())
+      }
+
+      assertTrue(failure.message.orEmpty().contains("projection version"), version)
+      assertEquals(listOf("permission", "calendar"), fake.operations, version)
+    }
+  }
+
 
   /** host cursor 的 close 失败也必须与 query/copy 失败相同地归类为 Provider 读取失败。 */
   @Test
@@ -281,14 +296,14 @@ class AndroidManagedCalendarSnapshotAcquirerTest {
     assertEquals("host provider broken", providerFailure.cause?.message)
   }
 
-  /** 外部行无法 canonicalize 时仍是受管读取失败，不能被折叠为空快照或继而发起写入。 */
+  /** 已确认属于应用的托管行无法 canonicalize 时要求整表重建，不能被折叠为空快照或直接增量写入。 */
   @Test
   fun canonicalizationFailureIsProviderReadFailure() {
     val scope = hostScope()
     val badRow = hostEventRow(hostProjectionId(scope), eventId = 93L).copy(allDay = 2)
     val fake = SnapshotReadHostFake(events = listOf(badRow))
 
-    val failure = assertFailsWith<AndroidScheduleCalendarGateway.CalendarProviderReadException> {
+    val failure = assertFailsWith<ManagedCalendarRebuildRequiredException> {
       AndroidManagedCalendarSnapshotAcquirer(fake, HOST_ACCOUNT).acquire(scope)
     }
 
@@ -316,6 +331,7 @@ internal class SnapshotReadHostFake(
   override val packageName: String = "com.cyxbs.schedule.host",
   var calendarId: Long? = 41L,
   var calendarIncarnation: String? = HOST_INCARNATION,
+  var calendarProjectionVersion: String? = AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION,
   var events: List<AndroidManagedCalendarSnapshotEventRow>? = emptyList(),
   private val remindersByEventId: Map<Long, List<AndroidManagedCalendarSnapshotReminderRow>?> = emptyMap(),
   private val calendarFailure: Throwable? = null,
@@ -349,7 +365,13 @@ internal class SnapshotReadHostFake(
     calendarFailure?.let { throw it }
     return SnapshotReadHostRowCursor(
       calendarId?.let {
-        listOf(AndroidManagedCalendarSnapshotCalendarRow(it, calendarIncarnation))
+        listOf(
+          AndroidManagedCalendarSnapshotCalendarRow(
+            calendarId = it,
+            incarnation = calendarIncarnation,
+            projectionVersion = calendarProjectionVersion,
+          ),
+        )
       } ?: emptyList(),
     )
   }

@@ -43,7 +43,7 @@ sealed interface CalendarTiming {
     val durationDays: Int,
   ) : CalendarTiming
 
-  /** 截止任务的外部展示语义；Android 层会投影为从 [due] 开始的一分钟事件。 */
+  /** 时间点任务的外部展示语义；平台日历使用开始、结束相同的零时长事件保留该语义。 */
   data class Deadline(
     val due: MinuteTimeDate,
     val timeZoneId: String,

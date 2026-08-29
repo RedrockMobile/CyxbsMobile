@@ -221,9 +221,16 @@ fun EditScheduleDialog(
   val categoryCatalog = rememberScheduleCategoryCatalog(categoryRepository)
 
   var showUnsavedExit by remember { mutableStateOf(false) }
+  var showReminderPermissionExplanation by remember { mutableStateOf(false) }
+  var resetReminderAfterRejectedAuthorization by remember { mutableStateOf(false) }
   var pendingDismissDecision by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
   var scopeChooser by remember { mutableStateOf<ScopeAction?>(null) }
   val coroutineScope = rememberCoroutineScope()
+  val reminderAuthorization = rememberScheduleReminderAuthorization { granted ->
+    showReminderPermissionExplanation = false
+    if (!granted && resetReminderAfterRejectedAuthorization) modelState.remindMinutes = -1
+    resetReminderAfterRejectedAuthorization = false
+  }
 
   // 开学第一天（周一）：用于推导第N周，一次会话读一次即可。
   val firstMonday = remember { SchoolCalendar.getFirstMonDay() }
@@ -295,6 +302,16 @@ fun EditScheduleDialog(
         firstMonday = firstMonday,
         categories = categoryCatalog.selectableCategories,
         showCourseRelation = showCourseRelation,
+        reminderAuthorized = reminderAuthorization.authorized,
+        onRequestReminderAuthorization = { resetOnFailure ->
+          resetReminderAfterRejectedAuthorization = resetOnFailure
+          if (resetOnFailure && modelState.remindMinutes < 0) modelState.remindMinutes = 10
+          if (reminderAuthorization.authorized) {
+            reminderAuthorization.requestAuthorization()
+          } else {
+            showReminderPermissionExplanation = true
+          }
+        },
         onSave = { doSave() },
         onCancel = { requestDismiss() },
         onDelete = { doDelete() },
@@ -354,6 +371,27 @@ fun EditScheduleDialog(
       onConfirm = { resolveDismissDecision(true) },
       onDismiss = { resolveDismissDecision(false) },
     )
+
+    ScheduleConfirmDialog(
+      show = showReminderPermissionExplanation,
+      title = "开启日历权限？",
+      message = "日程提醒借助手机系统日历实现。授权后，掌邮会把日程和提醒写入自己管理的“掌邮日程”日历。",
+      confirmText = "去授权",
+      dismissText = "暂不使用",
+      embeddedInWindow = true,
+      onConfirm = {
+        // 先关闭说明层，避免 ScheduleConfirmDialog 随后的 onDismiss 把本次确认误判为拒绝。
+        showReminderPermissionExplanation = false
+        reminderAuthorization.requestAuthorization()
+      },
+      onDismiss = {
+        if (showReminderPermissionExplanation) {
+          showReminderPermissionExplanation = false
+          if (resetReminderAfterRejectedAuthorization) modelState.remindMinutes = -1
+          resetReminderAfterRejectedAuthorization = false
+        }
+      },
+    )
   }
   if (embeddedInExternalHost) {
     val currentOverlayContent = rememberUpdatedState(overlayContent)
@@ -397,6 +435,8 @@ private fun ScheduleContent(
   firstMonday: Date?,
   categories: List<ScheduleCategory>,
   showCourseRelation: Boolean,
+  reminderAuthorized: Boolean,
+  onRequestReminderAuthorization: (resetOnFailure: Boolean) -> Unit,
   onSave: () -> Unit,
   onCancel: () -> Unit,
   onDelete: () -> Unit,
@@ -486,11 +526,18 @@ private fun ScheduleContent(
       firstMonday = firstMonday,
       categories = categories,
       showCourseRelation = showCourseRelation,
+      reminderAuthorized = reminderAuthorized,
       editable = uiState is ScheduleUi.Edit,
       onClickDate = { uiState = ScheduleUi.Edit.Date },
       onClickTime = { uiState = ScheduleUi.Edit.Time },
       onClickRepeat = { uiState = ScheduleUi.Edit.Repeat },
-      onClickRemind = { uiState = ScheduleUi.Edit.Remind },
+      onClickRemind = {
+        val editing = uiState is ScheduleUi.Edit
+        // 只有“从不提醒切换为提醒”的新选择在授权失败后回退；其他设备同步来的提醒必须保留业务值。
+        val enablingNewReminder = editing && modelState.remindMinutes < 0
+        if (editing) uiState = ScheduleUi.Edit.Remind
+        onRequestReminderAuthorization(enablingNewReminder)
+      },
       onClickCategory = { uiState = ScheduleUi.Edit.Category },
       onClickRelation = modelState::toggleCourseRelation,
     )
@@ -532,6 +579,7 @@ private fun ScheduleContent(
     ScheduleUi.Edit.Remind -> EditScheduleRemindArea(
       current = modelState.remindMinutes,
       onChoose = { modelState.remindMinutes = it },
+      onEnableRequested = { onRequestReminderAuthorization(true) },
       modifier = Modifier,
     )
     // 分类：由信息栏进入，选择后仍停留在子区域，右上返回按钮回到备注。
@@ -665,6 +713,7 @@ private fun InfoRow(
   firstMonday: Date?,
   categories: List<ScheduleCategory>,
   showCourseRelation: Boolean,
+  reminderAuthorized: Boolean,
   editable: Boolean,
   onClickDate: () -> Unit = {},
   onClickTime: () -> Unit = {},
@@ -740,14 +789,25 @@ private fun InfoRow(
   // ⏰提醒时间
   val remindIcon = rememberIcAddtodoNotice()
   val remindSegment =
-    remember(colors, editable, modelState.remindMinutes, remindIcon, onClickRemind) {
+    remember(
+      colors,
+      editable,
+      modelState.remindMinutes,
+      reminderAuthorized,
+      remindIcon,
+      onClickRemind,
+    ) {
       val text = formatRemindAhead(modelState.remindMinutes)
+      val unauthorized = text != null && !reminderAuthorized
       InfoTextSegment(
         id = "remind",
         text = text ?: "不提醒",
         icon = remindIcon,
-        color = colors.tvLv2,
-        onClick = if (editable) onClickRemind else null,
+        color = if (unauthorized) placeholderColor else colors.tvLv2,
+        suffix = if (unauthorized) "(未授权)" else null,
+        suffixColor = colors.tvLv2,
+        // 只读态仅开放“已有提醒但当前设备未授权”的修复入口，不把普通信息项变成编辑入口。
+        onClick = if (editable || unauthorized) onClickRemind else null,
       )
     }
   // 🏷分类；使用纯描边标签图标，避免 Material 图标与其余自绘图标的风格不一致。
@@ -950,6 +1010,8 @@ private data class InfoTextSegment(
   val text: String?,
   val icon: ImageVector,
   val color: Color,
+  val suffix: String? = null,
+  val suffixColor: Color = color,
   val onClick: (() -> Unit)?,
 ) {
   // 图标
@@ -978,6 +1040,7 @@ private data class InfoTextSegment(
     append(" ")
     append(text.orEmpty())
     addStyle(SpanStyle(color = color), start, length)
+    val mainEnd = length
     onClick?.let { onClick ->
       addLink(
         LinkAnnotation.Clickable(
@@ -987,8 +1050,23 @@ private data class InfoTextSegment(
           onClick()
         },
         start,
-        length,
+        mainEnd,
       )
+    }
+    suffix?.let { suffix ->
+      val suffixStart = length
+      append(suffix)
+      addStyle(SpanStyle(color = suffixColor), suffixStart, length)
+      onClick?.let { onClick ->
+        addLink(
+          LinkAnnotation.Clickable(
+            tag = "${id}_suffix",
+            styles = TextLinkStyles(style = SpanStyle(color = suffixColor)),
+          ) { onClick() },
+          suffixStart,
+          length,
+        )
+      }
     }
   }
 }

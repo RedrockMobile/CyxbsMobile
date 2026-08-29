@@ -120,10 +120,10 @@ class AndroidManagedCalendarOccurrenceExceptionSnapshotTest {
     rDate = null,
   )
 
-  /** Deadline 重复 master 维持 kind=deadline 与一分钟 DURATION，用于证明例外链不会擅自接受该身份。 */
+  /** Deadline 重复 master 维持 kind=deadline 与零分钟 DURATION，用于证明例外链不会擅自接受该身份。 */
   private fun deadlineMasterRow(eventId: Long) = hostEventRow(DEADLINE_MASTER_ID, eventId).copy(
     dtEnd = null,
-    duration = "PT1M",
+    duration = "PT0M",
     recurrenceRule = "FREQ=DAILY",
     rDate = null,
   )

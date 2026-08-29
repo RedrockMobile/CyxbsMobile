@@ -14,6 +14,7 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleId
 import com.cyxbs.pages.schedule.domain.repository.ScheduleCalendarChange
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepository
 import com.cyxbs.pages.schedule.domain.repository.ScheduleRepositoryStatus
+import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -91,7 +92,8 @@ internal class ScheduleCalendarExportCoordinator(
    * 使用当前仓库快照构造并执行一次单向计划。
    *
    * [scheduleIds] 为 `null` 时执行全量；非空时同时截取这些日程的 occurrence exception，并读取 Provider 中同一
-   * 身份集合，以便已删除日程产生精确 Delete。快照损坏时整轮失败关闭，不跳过坏行。
+   * 身份集合，以便已删除日程产生精确 Delete。可信受管身份中的投射损坏允许重建一次；普通 Provider 失败仍然
+   * 失败关闭，不跳过坏行或自动删除。
    */
   private fun reconcile(scheduleIds: Set<ScheduleId>?) {
     ensureAuthorized()
@@ -105,27 +107,16 @@ internal class ScheduleCalendarExportCoordinator(
         else -> Unit
       }
 
-      val selectedSchedules = if (scheduleIds == null) {
-        snapshot.schedules
-      } else {
-        snapshot.schedules.filter { it.id in scheduleIds }
+      val stats = try {
+        reconcileOnce(snapshot, scheduleIds)
+      } catch (_: ManagedCalendarRebuildRequiredException) {
+        // 受管日历是 Schedule 的派生投影；版本或托管内容不兼容时只允许重建一次，并强制全量回写。
+        ensureAuthorized()
+        check(gateway.recreateManagedCalendarForRecovery(ensureAuthorized)) {
+          "Calendar Provider did not recreate the managed calendar"
+        }
+        reconcileOnce(snapshot, scheduleIds = null)
       }
-      val selectedIds = selectedSchedules.mapTo(mutableSetOf()) { it.id }
-      val selectedExceptions = snapshot.exceptions.filter { exception ->
-        exception.scheduleId in selectedIds
-      }
-      val projection = ScheduleCalendarProjectionFactory.project(
-        source = ScheduleCalendarSource(selectedSchedules, selectedExceptions),
-        scope = exportScope,
-      )
-      ensureAuthorized()
-      val managedEvents = gateway.queryManagedEvents(
-        scope = exportScope,
-        scheduleIds = scheduleIds,
-        ensureAuthorized = ensureAuthorized,
-      )
-      val plan = CalendarExportPlanner.plan(projection, managedEvents, exportScope)
-      val stats = applyPlan(plan)
       val status = if (stats.failures.isEmpty()) {
         ExportStatus.Completed(stats)
       } else {
@@ -142,6 +133,39 @@ internal class ScheduleCalendarExportCoordinator(
     } catch (failure: Throwable) {
       ScheduleCalendarExportCoordinatorProvider.publishStatus(exportScope, ExportStatus.Failed(failure))
     }
+  }
+
+  /**
+   * 对同一个不可变仓库快照执行一次严格对账。
+   *
+   * 本方法不捕获 [ManagedCalendarRebuildRequiredException]；外层仅允许恢复一次。重建后的调用必须传 `null`，确保
+   * 已被清空的日历重新获得完整 Schedule 投影，而不是只写回触发本轮的增量 ID。
+   */
+  private fun reconcileOnce(
+    snapshot: ScheduleSnapshot,
+    scheduleIds: Set<ScheduleId>?,
+  ): ExportStats {
+    val selectedSchedules = if (scheduleIds == null) {
+      snapshot.schedules
+    } else {
+      snapshot.schedules.filter { it.id in scheduleIds }
+    }
+    val selectedIds = selectedSchedules.mapTo(mutableSetOf()) { it.id }
+    val selectedExceptions = snapshot.exceptions.filter { exception ->
+      exception.scheduleId in selectedIds
+    }
+    val projection = ScheduleCalendarProjectionFactory.project(
+      source = ScheduleCalendarSource(selectedSchedules, selectedExceptions),
+      scope = exportScope,
+    )
+    ensureAuthorized()
+    val managedEvents = gateway.queryManagedEvents(
+      scope = exportScope,
+      scheduleIds = scheduleIds,
+      ensureAuthorized = ensureAuthorized,
+    )
+    val plan = CalendarExportPlanner.plan(projection, managedEvents, exportScope)
+    return applyPlan(plan)
   }
 
   /**
@@ -234,6 +258,9 @@ internal interface ScheduleCalendarExportEventGateway {
     ensureAuthorized: () -> Unit,
   ): List<ManagedCalendarEvent>
 
+  /** 重建完整身份可信的受管日历；成功后调用方必须执行全量回写。 */
+  fun recreateManagedCalendarForRecovery(ensureAuthorized: () -> Unit): Boolean
+
   /** 创建目标投影，返回正数 Provider event id；失败或无结果返回 `null`。 */
   fun createEvent(
     projection: CalendarEventProjection,
@@ -266,6 +293,10 @@ private class AndroidScheduleCalendarExportEventGateway(
     scheduleIds: Set<ScheduleId>?,
     ensureAuthorized: () -> Unit,
   ): List<ManagedCalendarEvent> = delegate.queryManagedEvents(scope, scheduleIds, ensureAuthorized)
+
+  override fun recreateManagedCalendarForRecovery(
+    ensureAuthorized: () -> Unit,
+  ): Boolean = delegate.recreateManagedCalendarForRecovery(ensureAuthorized)
 
   override fun createEvent(
     projection: CalendarEventProjection,

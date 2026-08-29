@@ -55,6 +55,83 @@ class ScheduleCalendarExportCoordinatorTest {
     assertEquals(true, authorizationChecks > 0)
   }
 
+  /** 托管投射不兼容时只重建一次，并在空日历上重新执行全量查询。 */
+  @Test
+  fun managedProjectionFailureRebuildsOnceThenRunsFullReconcile() = runTest {
+    val accountId = "20260002"
+    val gateway = RecoveryRecordingGateway(
+      queryFailures = listOf(ManagedCalendarRebuildRequiredException("host projection mismatch")),
+    )
+    val coordinator = ScheduleCalendarExportCoordinator(
+      context = null,
+      repository = EmptyReadyRepository(accountId),
+      accountId = accountId,
+      exportScope = CalendarExportScope(accountId),
+      coroutineScope = this,
+      ensureAuthorized = {},
+      gateway = gateway,
+    )
+
+    coordinator.start()
+    runCurrent()
+    coordinator.stop()
+    runCurrent()
+
+    assertEquals(listOf<Set<ScheduleId>?>(null, null), gateway.queries)
+    assertEquals(1, gateway.rebuilds)
+  }
+
+  /** Provider I/O 失败不具备覆盖资格；即使恢复后的严格读取仍损坏，同一轮也不得再次删除。 */
+  @Test
+  fun providerFailureNeverRebuildsAndRecoveryIsLimitedToOneAttempt() = runTest {
+    val providerAccount = "20260003"
+    val providerGateway = RecoveryRecordingGateway(
+      queryFailures = listOf(
+        AndroidScheduleCalendarGateway.CalendarProviderReadException("host provider unavailable"),
+      ),
+    )
+    val providerCoordinator = ScheduleCalendarExportCoordinator(
+      context = null,
+      repository = EmptyReadyRepository(providerAccount),
+      accountId = providerAccount,
+      exportScope = CalendarExportScope(providerAccount),
+      coroutineScope = this,
+      ensureAuthorized = {},
+      gateway = providerGateway,
+    )
+    providerCoordinator.start()
+    runCurrent()
+    providerCoordinator.stop()
+    runCurrent()
+
+    assertEquals(0, providerGateway.rebuilds)
+    assertEquals(listOf<Set<ScheduleId>?>(null), providerGateway.queries)
+
+    val repeatedAccount = "20260004"
+    val repeatedGateway = RecoveryRecordingGateway(
+      queryFailures = listOf(
+        ManagedCalendarRebuildRequiredException("first invalid snapshot"),
+        ManagedCalendarRebuildRequiredException("rebuilt snapshot still invalid"),
+      ),
+    )
+    val repeatedCoordinator = ScheduleCalendarExportCoordinator(
+      context = null,
+      repository = EmptyReadyRepository(repeatedAccount),
+      accountId = repeatedAccount,
+      exportScope = CalendarExportScope(repeatedAccount),
+      coroutineScope = this,
+      ensureAuthorized = {},
+      gateway = repeatedGateway,
+    )
+    repeatedCoordinator.start()
+    runCurrent()
+    repeatedCoordinator.stop()
+    runCurrent()
+
+    assertEquals(1, repeatedGateway.rebuilds)
+    assertEquals(listOf<Set<ScheduleId>?>(null, null), repeatedGateway.queries)
+  }
+
   /** 仅提供 Ready 空快照；任何 mutation 都表示单向导出测试越过了只读仓库边界。 */
   private class EmptyReadyRepository(accountId: String) : ScheduleRepository {
     override val snapshot = MutableStateFlow(
@@ -88,6 +165,10 @@ class ScheduleCalendarExportCoordinatorTest {
       return managedEvents
     }
 
+    override fun recreateManagedCalendarForRecovery(
+      ensureAuthorized: () -> Unit,
+    ): Boolean = error("Valid managed snapshot must not rebuild its Calendar")
+
     override fun createEvent(
       projection: CalendarEventProjection,
       scope: CalendarExportScope,
@@ -110,5 +191,53 @@ class ScheduleCalendarExportCoordinatorTest {
       deleted += event
       return true
     }
+  }
+
+  /** 按顺序抛出查询失败并记录恢复次数，覆盖协调器的一次性重建状态机。 */
+  private class RecoveryRecordingGateway(
+    queryFailures: List<Throwable>,
+  ) : ScheduleCalendarExportEventGateway {
+    private val remainingFailures = ArrayDeque(queryFailures)
+    val queries = mutableListOf<Set<ScheduleId>?>()
+    var rebuilds = 0
+      private set
+
+    override fun queryManagedEvents(
+      scope: CalendarExportScope,
+      scheduleIds: Set<ScheduleId>?,
+      ensureAuthorized: () -> Unit,
+    ): List<ManagedCalendarEvent> {
+      ensureAuthorized()
+      queries += scheduleIds
+      if (remainingFailures.isNotEmpty()) throw remainingFailures.removeFirst()
+      return emptyList()
+    }
+
+    override fun recreateManagedCalendarForRecovery(
+      ensureAuthorized: () -> Unit,
+    ): Boolean {
+      ensureAuthorized()
+      rebuilds += 1
+      return true
+    }
+
+    override fun createEvent(
+      projection: CalendarEventProjection,
+      scope: CalendarExportScope,
+      ensureAuthorized: () -> Unit,
+    ): Long? = error("Empty snapshot must not create Provider events")
+
+    override fun updateEvent(
+      projection: CalendarEventProjection,
+      eventRef: PlatformCalendarEventRef,
+      scope: CalendarExportScope,
+      ensureAuthorized: () -> Unit,
+    ): Boolean = error("Empty snapshot must not update Provider events")
+
+    override fun deleteEvent(
+      event: ManagedCalendarEvent,
+      scope: CalendarExportScope,
+      ensureAuthorized: () -> Unit,
+    ): Boolean = error("Empty snapshot must not delete Provider events")
   }
 }

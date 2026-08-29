@@ -22,7 +22,7 @@ internal object CalendarProviderTimingCanonicalizer {
    * 从 Provider 字段重建规范时间。
    *
    * [recurring] 冻结 `单次 = DTEND`、`重复 = DURATION` 的写入形状，避免同时存在或缺失字段时猜测
-   * Provider 意图；[projectionKind] 只允许 canonical URI 明确标记的 Deadline 使用一分钟展示语义。
+   * Provider 意图；[projectionKind] 只允许 canonical URI 明确标记的 Deadline 使用零时长语义。
    */
   fun reconstructOrNull(
     dtStart: Long?,
@@ -71,7 +71,7 @@ internal object CalendarProviderTimingCanonicalizer {
     )
   }
 
-  /** 定时事件只接受整分钟 instant 和可无损换算为正整数分钟的结束边界。 */
+  /** 定时事件只接受整分钟 instant；普通时间段必须为正时长，Deadline 必须为零时长。 */
   private fun reconstructTimed(
     dtStart: Long,
     dtEnd: Long?,
@@ -94,15 +94,16 @@ internal object CalendarProviderTimingCanonicalizer {
       parseDurationMinutes(duration)
     } else {
       val endMillis = dtEnd ?: return null
-      if (!endMillis.isWholeMinute() || endMillis <= dtStart) return null
-      ((endMillis / MILLIS_PER_MINUTE) - (dtStart / MILLIS_PER_MINUTE)).toPositiveIntOrNull()
+      if (!endMillis.isWholeMinute() || endMillis < dtStart) return null
+      ((endMillis / MILLIS_PER_MINUTE) - (dtStart / MILLIS_PER_MINUTE)).toNonNegativeIntOrNull()
     } ?: return null
 
     return if (projectionKind == CalendarProjectionKind.DEADLINE) {
-      if (durationMinutes != 1) null
+      if (durationMinutes != 0) null
       else CalendarTiming.Deadline(localStart.toMinuteTimeDate(), timeZone.id)
     } else {
-      CalendarTiming.Timed(localStart.toMinuteTimeDate(), durationMinutes, timeZone.id)
+      if (durationMinutes == 0) null
+      else CalendarTiming.Timed(localStart.toMinuteTimeDate(), durationMinutes, timeZone.id)
     }
   }
 
@@ -120,6 +121,8 @@ internal object CalendarProviderTimingCanonicalizer {
     val daysText = match.groupValues[1]
     val hoursText = match.groupValues[2]
     val minutesText = match.groupValues[3]
+    // 零时长必须由 `P0D`/`PT0M` 等显式分量表达；裸 `P` 没有任何 duration 语义。
+    if (daysText.isEmpty() && hoursText.isEmpty() && minutesText.isEmpty()) return null
     // RFC 5545 的 `T` 分隔符后至少要有一个时间分量；`P1DT` 不能被近似成一天。
     if ('T' in duration && hoursText.isEmpty() && minutesText.isEmpty()) return null
     // 缺失分量才等于零；存在但超出 Long 的数字属于损坏输入，不能静默降级成零。
@@ -131,7 +134,7 @@ internal object CalendarProviderTimingCanonicalizer {
     if (hours > (Long.MAX_VALUE - dayMinutes) / 60L) return null
     val hourMinutes = hours * 60L
     if (minutes > Long.MAX_VALUE - dayMinutes - hourMinutes) return null
-    return (dayMinutes + hourMinutes + minutes).toPositiveIntOrNull()
+    return (dayMinutes + hourMinutes + minutes).toNonNegativeIntOrNull()
   }
 
   private fun Long.isWholeMinute(): Boolean = this % MILLIS_PER_MINUTE == 0L
@@ -139,4 +142,6 @@ internal object CalendarProviderTimingCanonicalizer {
   private fun Long.isUtcMidnight(): Boolean = this % MILLIS_PER_DAY == 0L
 
   private fun Long.toPositiveIntOrNull(): Int? = takeIf { it in 1..Int.MAX_VALUE.toLong() }?.toInt()
+
+  private fun Long.toNonNegativeIntOrNull(): Int? = takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt()
 }

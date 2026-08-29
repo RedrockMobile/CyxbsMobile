@@ -412,6 +412,16 @@ class AndroidScheduleCalendarGateway private constructor(
   }
 
   /**
+   * 删除并重建完整身份可信的当前受管日历，供协调器从不可兼容投射中恢复。
+   *
+   * 本方法不会处理 tokenless 或身份异常的 Calendar row；成功后日历为空，调用方必须立刻使用完整 Schedule
+   * 快照全量回写，不能沿用触发恢复的增量范围。
+   */
+  internal fun recreateManagedCalendarForRecovery(
+    ensureAuthorized: () -> Unit = {},
+  ): Boolean = registry.recreateCurrentManagedCalendar(accountId, ensureAuthorized) != null
+
+  /**
    * 创建新的日历事件。
    *
    * Provider 的等价 RRULE 重排在下一轮查询时统一规范化；本方法只负责原子写入事件与提醒。
@@ -967,12 +977,13 @@ class AndroidScheduleCalendarGateway private constructor(
           put(CalendarContract.Events.EVENT_TIMEZONE, timing.timeZoneId)
           put(CalendarContract.Events.ALL_DAY, 0)
           if (projection.recurrenceRule == null) {
-            put(CalendarContract.Events.DTEND, dueMillis + 60_000L)
+            // Calendar Provider 允许 DTEND 与 DTSTART 相等，避免把时间点伪装成一分钟时间段。
+            put(CalendarContract.Events.DTEND, dueMillis)
             putNull(CalendarContract.Events.DURATION)
           } else {
-            // CalendarContract 要求重复事件使用 DURATION 而非 DTEND；截止事项固定投影为一分钟。
+            // CalendarContract 要求重复事件使用 DURATION 而非 DTEND；零分钟保留时间点语义。
             putNull(CalendarContract.Events.DTEND)
-            put(CalendarContract.Events.DURATION, formatDurationMinutes(1))
+            put(CalendarContract.Events.DURATION, formatDurationMinutes(0))
           }
         }
       }
@@ -1023,7 +1034,7 @@ class AndroidScheduleCalendarGateway private constructor(
   ) : IllegalStateException("Fixed Calendar row Create blocked: $reason")
 
   /** 已验证为本应用托管事件，但 Provider 无法完整回读时终止本轮，避免重复创建或覆盖。 */
-  class CalendarProviderReadException(message: String, cause: Throwable? = null) :
+  open class CalendarProviderReadException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
 
 
@@ -1045,3 +1056,13 @@ class AndroidScheduleCalendarGateway private constructor(
   class CalendarPermissionException :
     SecurityException("Calendar read/write permissions are required")
 }
+
+/**
+ * 受管 Calendar 身份可信，但投射版本或其中的应用托管数据已无法按当前协议解释。
+ *
+ * 协调器只捕获这一分型执行一次整表重建；普通 Provider I/O、权限和生命周期异常不得转换为自动删除。
+ */
+internal class ManagedCalendarRebuildRequiredException(
+  message: String,
+  cause: Throwable? = null,
+) : AndroidScheduleCalendarGateway.CalendarProviderReadException(message, cause)

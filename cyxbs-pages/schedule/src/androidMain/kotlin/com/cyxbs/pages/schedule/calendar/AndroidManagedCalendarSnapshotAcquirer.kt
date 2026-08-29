@@ -48,8 +48,9 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
    *
    * [ensureAuthorized] 是调用方传入的窄生命周期/currentness 门禁。它只在每一次实际 Provider 读取前后执行，
    * 且刻意位于 Provider 错误包装之外：取消、currentness 撤销和 [SecurityException] 保持原有语义；只有真实
-   * Provider 读取失败才归类为 [AndroidScheduleCalendarGateway.CalendarProviderReadException]。所有实际 Events 与
-   * Reminders 读取完成后还会重读 Calendar identity，避免同一次返回混合旧 incarnation 的事件与新 Calendar row。
+   * Provider 读取失败才归类为 [AndroidScheduleCalendarGateway.CalendarProviderReadException]；投射版本或已确认
+   * 托管内容不兼容则使用 [ManagedCalendarRebuildRequiredException]，允许上游执行一次安全重建。所有实际 Events
+   * 与 Reminders 读取完成后还会重读 Calendar identity，避免同一次返回混合旧 incarnation 的事件与新 Calendar row。
    *
    * @param scheduleIds 可选的 Schedule ID 子集；空集合仍读取 Calendar row，以区分 row 缺失与空事件集。
    */
@@ -126,7 +127,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       row.incarnation ?: throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
         "Managed Provider calendar is missing CAL_SYNC1 incarnation",
       )
-    return runCatching {
+    val identifier = runCatching {
       AndroidManagedCalendarIdentifier(calendarId, incarnation)
     }.getOrElse { cause ->
       throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
@@ -134,6 +135,13 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
         cause,
       )
     }
+    if (row.projectionVersion != AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION) {
+      throw ManagedCalendarRebuildRequiredException(
+        "Managed Provider calendar projection version is ${row.projectionVersion ?: "missing"}, " +
+            "expected ${AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION}",
+      )
+    }
+    return identifier
   }
 
   /**
@@ -191,12 +199,12 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
             it.event.projectionId.kind == CalendarProjectionKind.SERIES_MASTER
       }
       if (masters.size != 1) {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Occurrence exceptions require exactly one managed series master: $scheduleId",
         )
       }
       if (rows.map { it.event.projectionId }.distinct().size != rows.size) {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Duplicate managed occurrence exception identity: $scheduleId",
         )
       }
@@ -271,7 +279,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       if (row.customAppPackage == platform.packageName &&
         isRequestedManagedV2Candidate(customUri, scope, requestedScheduleIds)
       ) {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Managed event uses noncanonical CUSTOM_APP_URI: ${row.eventId}",
         )
       }
@@ -287,21 +295,21 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
     if (isOccurrence != hasCompleteOriginalIdentity ||
       !isOccurrence && (row.originalId != null || row.originalInstanceTime != null || row.originalAllDay != null)
     ) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      throw ManagedCalendarRebuildRequiredException(
         "Malformed managed occurrence relationship: $eventId",
       )
     }
     if (isOccurrence && row.recurrenceRule != null) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      throw ManagedCalendarRebuildRequiredException(
         "Managed occurrence exception must not carry RRULE: $eventId",
       )
     }
     // RDATE 会引入本投影不支持的 occurrence；即使它是空串也必须拒绝，不能伪装成无外部变化。
     if (row.rDate != null) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException("Unsupported managed event RDATE: $eventId")
+      throw ManagedCalendarRebuildRequiredException("Unsupported managed event RDATE: $eventId")
     }
     if (row.customAppPackage != platform.packageName) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      throw ManagedCalendarRebuildRequiredException(
         "Managed event owner does not match this application: $eventId",
       )
     }
@@ -311,7 +319,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       0 -> false
       1 -> true
       else -> null
-    } ?: throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+    } ?: throw ManagedCalendarRebuildRequiredException(
       "Invalid managed event ALL_DAY value: $eventId",
     )
     val timing = CalendarProviderTimingCanonicalizer.reconstructOrNull(
@@ -322,7 +330,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       allDay = allDay,
       recurring = recurring,
       projectionKind = projectionId.kind,
-    ) ?: throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+    ) ?: throw ManagedCalendarRebuildRequiredException(
       "Cannot reconstruct managed event timing: $eventId",
     )
     val reminders = readReminderMinutes(eventId, ensureAuthorized)
@@ -331,7 +339,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       CalendarRecurrenceCanonicalizer.canonicalizeOrNull(
         requireNotNull(providerRule),
         timing is CalendarTiming.AllDay,
-      ) ?: throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      ) ?: throw ManagedCalendarRebuildRequiredException(
         "Unsupported managed event RRULE: $eventId",
       )
     }
@@ -344,7 +352,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
         deviceReminderMinutes = reminders,
       )
     } catch (e: IllegalArgumentException) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      throw ManagedCalendarRebuildRequiredException(
         "Cannot canonicalize managed event fields: $eventId",
         e,
       )
@@ -359,7 +367,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
     )
     val platformEventRef = runCatching { AndroidCalendarEventRefCodec.encode(eventId) }
       .getOrElse {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Invalid managed Provider event ID: $eventId",
           it,
         )
@@ -380,7 +388,7 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
     occurrenceRow: CanonicalizedSnapshotRow,
   ): AndroidManagedCalendarSnapshotOccurrenceException {
     val masterEventId = AndroidCalendarEventRefCodec.decodeOrNull(masterRow.event.platformEventRef)
-      ?: throw AndroidScheduleCalendarGateway.CalendarProviderReadException("Invalid managed series master reference")
+      ?: throw ManagedCalendarRebuildRequiredException("Invalid managed series master reference")
     val row = occurrenceRow.row
     val occurrenceId = requireNotNull(occurrenceRow.event.projectionId.recurrenceId)
     val expectedOriginalTime = AndroidOccurrenceExceptionWritePlanner.originalInstanceTimeMillis(occurrenceId)
@@ -388,14 +396,14 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
     if (row.originalId != masterEventId || row.originalInstanceTime != expectedOriginalTime ||
       row.originalAllDay != expectedAllDay
     ) {
-      throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      throw ManagedCalendarRebuildRequiredException(
         "Managed occurrence relationship drifted from canonical identity: ${row.eventId}",
       )
     }
     val operation = when (row.status) {
       CalendarContract.Events.STATUS_CONFIRMED -> CalendarOccurrenceExceptionOperation.UPSERT
       CalendarContract.Events.STATUS_CANCELED -> CalendarOccurrenceExceptionOperation.CANCEL
-      else -> throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+      else -> throw ManagedCalendarRebuildRequiredException(
         "Unsupported managed occurrence status: ${row.eventId}",
       )
     }
@@ -477,12 +485,12 @@ internal class AndroidManagedCalendarSnapshotAcquirer internal constructor(
       val minutes = row.minutes
       val method = row.method
       if (minutes == null || method == null) {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Incomplete managed event reminder: $eventId",
         )
       }
       if (minutes < 0 || method != CalendarContract.Reminders.METHOD_ALERT) {
-        throw AndroidScheduleCalendarGateway.CalendarProviderReadException(
+        throw ManagedCalendarRebuildRequiredException(
           "Unsupported managed event reminder: $eventId",
         )
       }
@@ -590,12 +598,13 @@ internal interface AndroidManagedCalendarSnapshotRowCursor<T> : Closeable {
 /**
  * 已从 Android Cursor 复制的受管 Calendar identity 行。
  *
- * `incarnation` 保留 Provider 的 nullable 原值，采集器才能把 tokenless/畸形旧行分型为 read failure，而不是在
- * cursor adapter 中丢失迁移边界或自动补值。
+ * `incarnation` 与 `projectionVersion` 保留 Provider 的 nullable 原值：tokenless/畸形身份继续失败关闭，版本缺失
+ * 或不匹配则明确要求重建，不能在 cursor adapter 中静默补值。
  */
 internal data class AndroidManagedCalendarSnapshotCalendarRow(
   val calendarId: Long,
   val incarnation: String?,
+  val projectionVersion: String? = AndroidManagedCalendarRegistry.CURRENT_PROJECTION_VERSION,
 )
 
 /** 已从 Android Cursor 复制的 Events 原始字段；采集器离开 Provider 后只处理该普通值对象。 */
@@ -658,6 +667,7 @@ private class AndroidContentResolverManagedCalendarSnapshotReadPlatform(
     val projection = arrayOf(
       CalendarContract.Calendars._ID,
       CalendarContract.Calendars.CAL_SYNC1,
+      CalendarContract.Calendars.CAL_SYNC2,
     )
     val selection = "${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND " +
         "${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ${CalendarContract.Calendars.NAME} = ?"
@@ -731,13 +741,14 @@ private class AndroidContentResolverManagedCalendarSnapshotReadPlatform(
 private class AndroidContentResolverCalendarRowCursor(
   private val cursor: Cursor,
 ) : AndroidManagedCalendarSnapshotRowCursor<AndroidManagedCalendarSnapshotCalendarRow> {
-  /** 同时复制 row id 与 nullable `CAL_SYNC1`；完整校验集中在采集器的 fail-closed 迁移边界。 */
+  /** 同时复制 row id、nullable `CAL_SYNC1` 与投射版本；完整校验集中在采集器的 fail-closed 迁移边界。 */
   override fun copyRows(): List<AndroidManagedCalendarSnapshotCalendarRow> = buildList {
     while (cursor.moveToNext()) {
       add(
         AndroidManagedCalendarSnapshotCalendarRow(
           calendarId = cursor.getLong(0),
           incarnation = cursor.getString(1),
+          projectionVersion = cursor.getString(2),
         ),
       )
     }

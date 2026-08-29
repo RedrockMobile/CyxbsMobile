@@ -1581,7 +1581,7 @@ class IosEventKitFullAccessGateway private constructor(
 
   private companion object {
     /** 仅作展示；gateway 的所有权判断绝不比较该标题。 */
-    const val MANAGED_CALENDAR_DISPLAY_TITLE = "邮子清单"
+    const val MANAGED_CALENDAR_DISPLAY_TITLE = "掌邮日程"
     const val SECONDS_PER_DAY = 24L * 60L * 60L
     const val EVENTKIT_SCAN_HALF_SECONDS = 730L * SECONDS_PER_DAY
   }

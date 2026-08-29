@@ -16,8 +16,9 @@ import java.util.UUID
  * Android 受管日历注册器。
  *
  * 日历身份边界固定为 ACCOUNT_NAME=学号、ACCOUNT_TYPE=CalendarContract.ACCOUNT_TYPE_LOCAL、
- * NAME=CURRENT_CALENDAR_NAME（"邮子清单"）。这三项只定位候选 row；真正写资格还必须匹配正数 `_ID` 与创建时
- * 持久化在 `CAL_SYNC1` 的 UUID incarnation，避免 Provider 复用数字 id 后把 replacement 当成旧日历。
+ * NAME=CURRENT_CALENDAR_NAME（"掌邮日程"）。这三项只定位候选 row；真正写资格还必须匹配正数 `_ID` 与创建时
+ * 持久化在 `CAL_SYNC1` 的 UUID incarnation，避免 Provider 复用数字 id 后把 replacement 当成旧日历；
+ * `CAL_SYNC2` 保存当前投射协议版本，发生不兼容变更时可安全重建这份派生数据。
  */
 class AndroidManagedCalendarRegistry(private val context: Context) {
   /**
@@ -35,7 +36,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     ensureAuthorized()
     if (!hasCalendarPermissions()) return null
     require(accountId.isNotBlank()) { "accountId must not be blank" }
-    // scope 仅校验为非空白，不参与日历身份；查找和创建均使用 ACCOUNT_NAME=账号、ACCOUNT_TYPE=CalendarContract.ACCOUNT_TYPE_LOCAL、NAME=CURRENT_CALENDAR_NAME（"邮子清单"）。
+    // scope 仅校验为非空白，不参与日历身份；查找和创建均使用 ACCOUNT_NAME=账号、ACCOUNT_TYPE=CalendarContract.ACCOUNT_TYPE_LOCAL、NAME=CURRENT_CALENDAR_NAME（"掌邮日程"）。
     require(scope.value.isNotBlank()) { "scope must not be blank" }
     return findCurrentManagedCalendar(accountId, ensureAuthorized)
       ?: createManagedCalendar(accountId, ensureAuthorized)
@@ -44,9 +45,9 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
   /**
    * 只查找当前格式日历，不存在时绝不创建；供 legacy 写入口和清理前查询使用。
    *
-   * 已存在的同名 row 必须同时携带 canonical `CAL_SYNC1` incarnation。缺失或异常 token 是不可静默跨越的迁移
-   * 边界：本方法按 Provider 读取失败终止，既不认领旧 row，也不原地 backfill。查询完成后仍调用
-   * [ensureAuthorized]，避免调用方在被阻塞的 Provider 读取期间撤销后继续后续写入。
+   * 已存在的同名 row 必须同时携带 canonical `CAL_SYNC1` incarnation 和当前 `CAL_SYNC2` 投射版本。缺失或异常
+   * token 是不可静默跨越的所有权边界；版本不匹配则要求协调器重建。查询完成后仍调用 [ensureAuthorized]，避免
+   * 调用方在被阻塞的 Provider 读取期间撤销后继续后续写入。
    */
   fun findCurrentManagedCalendar(
     accountId: String,
@@ -60,6 +61,12 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
       AndroidManagedCalendarIdentifier(calendar.id, incarnation)
     }.getOrElse { cause ->
       throw IOException("Managed calendar has an invalid CAL_SYNC1 incarnation", cause)
+    }
+    if (calendar.projectionVersion != CURRENT_PROJECTION_VERSION) {
+      throw ManagedCalendarRebuildRequiredException(
+        "Managed calendar projection version is ${calendar.projectionVersion ?: "missing"}, " +
+            "expected $CURRENT_PROJECTION_VERSION",
+      )
     }
     ensureAuthorized()
     return decoded.calendarRowId
@@ -82,8 +89,34 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     ensureAuthorized()
     return current?.id?.takeIf { rowId ->
       rowId == expectedCalendarIdentity.calendarRowId &&
-          current.incarnation == expectedCalendarIdentity.incarnation
+          current.incarnation == expectedCalendarIdentity.incarnation &&
+          current.projectionVersion == CURRENT_PROJECTION_VERSION
     }
+  }
+
+  /**
+   * 自动恢复当前账号的受管日历，并返回新 Calendar row id。
+   *
+   * 与用户显式清理不同，本入口只接受带合法 `CAL_SYNC1` 的完整受管身份；版本字段可以旧或缺失，因为它正是
+   * 触发重建的依据。删除后创建写入当前 `CAL_SYNC2` 版本，调用方必须随后执行全量回写，不能继续增量计划。
+   */
+  fun recreateCurrentManagedCalendar(
+    accountId: String,
+    ensureAuthorized: () -> Unit = {},
+  ): Long? {
+    ensureAuthorized()
+    requireCalendarPermissions()
+    val target = findManagedCalendar(currentIdentity(accountId), ensureAuthorized)
+    if (target != null) {
+      val incarnation = target.incarnation
+        ?: throw IOException("Managed calendar is missing its CAL_SYNC1 incarnation")
+      runCatching { AndroidManagedCalendarIdentifier(target.id, incarnation) }
+        .getOrElse { cause ->
+          throw IOException("Managed calendar has an invalid CAL_SYNC1 incarnation", cause)
+        }
+      deleteManagedCalendarTarget(target, ensureAuthorized)
+    }
+    return createManagedCalendar(accountId, ensureAuthorized)
   }
 
   /**
@@ -106,57 +139,66 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     var deletedEvents = 0
     val deletedCalendarIds = mutableListOf<Long>()
     targets.forEach { target ->
-      // 进入破坏性操作前重新核验完整身份，避免把初始枚举后已经替换的 row 直接带入删除 batch。
-      check(isManagedCalendarTargetCurrent(target, ensureAuthorized)) {
-        "Managed calendar identity changed before deletion"
-      }
-      val calendarSelection = buildString {
-        append("${CalendarContract.Calendars._ID} = ? AND ")
-        append("${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND ")
-        append("${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ")
-        append("${CalendarContract.Calendars.NAME} = ? AND ")
-        if (target.incarnation == null) {
-          // 旧 tokenless row 只允许在用户确认的显式清理中按 SQL NULL 精确删除，绝不因此取得事件写资格。
-          append("${CalendarContract.Calendars.CAL_SYNC1} IS NULL")
-        } else {
-          append("${CalendarContract.Calendars.CAL_SYNC1} = ?")
-        }
-      }
-      val calendarSelectionArgs = buildList {
-        add(target.id.toString())
-        add(target.identity.accountName)
-        add(CalendarContract.ACCOUNT_TYPE_LOCAL)
-        add(target.identity.calendarName)
-        target.incarnation?.let { add(it) }
-      }.toTypedArray()
-      val operations = arrayListOf(
-        ContentProviderOperation.newDelete(CalendarContract.Events.CONTENT_URI)
-          .withSelection(
-            "${CalendarContract.Events.CALENDAR_ID} = ?",
-            arrayOf(target.id.toString()),
-          )
-          .build(),
-        ContentProviderOperation.newDelete(calendarSyncAdapterUri(target.identity.accountName))
-          .withSelection(calendarSelection, calendarSelectionArgs)
-          .withExpectedCount(1)
-          .build(),
-      )
-
-      // 同一 authority 的 batch 让 token 条件失败通过 expectedCount 回滚前序 Event 删除；这只是 best-effort
-      // 破坏性边界，不把 Provider 实现宣称为跨查询窗口 CAS。
-      ensureAuthorized()
-      val results = context.contentResolver.applyBatch(CalendarContract.AUTHORITY, operations)
-      ensureAuthorized()
-      val eventCount = checkNotNull(results.getOrNull(0)?.count) {
-        "Calendar Provider did not return the deleted event count for calendar ${target.id}"
-      }
-      check(results.getOrNull(1)?.count == 1) {
-        "Calendar Provider did not delete managed calendar ${target.id}"
-      }
-      deletedEvents += eventCount
+      deletedEvents += deleteManagedCalendarTarget(target, ensureAuthorized)
       deletedCalendarIds += target.id
     }
     return DeleteResult.Deleted(deletedCalendarIds, deletedEvents)
+  }
+
+  /**
+   * 以完整账号、名称、row id 与 nullable incarnation 精确删除一个已枚举目标。
+   *
+   * tokenless 分支只会由显式清理传入；自动恢复在调用本方法前已要求合法 `CAL_SYNC1`。Events 与 Calendar row
+   * 位于同一 batch，末尾 identity 条件未命中时通过 expectedCount 回滚事件删除。
+   */
+  private fun deleteManagedCalendarTarget(
+    target: ManagedCalendar,
+    ensureAuthorized: () -> Unit,
+  ): Int {
+    check(isManagedCalendarTargetCurrent(target, ensureAuthorized)) {
+      "Managed calendar identity changed before deletion"
+    }
+    val calendarSelection = buildString {
+      append("${CalendarContract.Calendars._ID} = ? AND ")
+      append("${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND ")
+      append("${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ")
+      append("${CalendarContract.Calendars.NAME} = ? AND ")
+      if (target.incarnation == null) {
+        append("${CalendarContract.Calendars.CAL_SYNC1} IS NULL")
+      } else {
+        append("${CalendarContract.Calendars.CAL_SYNC1} = ?")
+      }
+    }
+    val calendarSelectionArgs = buildList {
+      add(target.id.toString())
+      add(target.identity.accountName)
+      add(CalendarContract.ACCOUNT_TYPE_LOCAL)
+      add(target.identity.calendarName)
+      target.incarnation?.let(::add)
+    }.toTypedArray()
+    val operations = arrayListOf(
+      ContentProviderOperation.newDelete(CalendarContract.Events.CONTENT_URI)
+        .withSelection(
+          "${CalendarContract.Events.CALENDAR_ID} = ?",
+          arrayOf(target.id.toString()),
+        )
+        .build(),
+      ContentProviderOperation.newDelete(calendarSyncAdapterUri(target.identity.accountName))
+        .withSelection(calendarSelection, calendarSelectionArgs)
+        .withExpectedCount(1)
+        .build(),
+    )
+
+    ensureAuthorized()
+    val results = context.contentResolver.applyBatch(CalendarContract.AUTHORITY, operations)
+    ensureAuthorized()
+    val eventCount = checkNotNull(results.getOrNull(0)?.count) {
+      "Calendar Provider did not return the deleted event count for calendar ${target.id}"
+    }
+    check(results.getOrNull(1)?.count == 1) {
+      "Calendar Provider did not delete managed calendar ${target.id}"
+    }
+    return eventCount
   }
 
   /**
@@ -174,6 +216,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
       CalendarContract.Calendars._ID,
       CalendarContract.Calendars.NAME,
       CalendarContract.Calendars.CAL_SYNC1,
+      CalendarContract.Calendars.CAL_SYNC2,
     )
     val selection = "${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND " +
         "${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ${CalendarContract.Calendars.NAME} = ?"
@@ -203,6 +246,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
                   id = it.getLong(0),
                   identity = CalendarIdentity(accountId, name),
                   incarnation = it.getString(2),
+                  projectionVersion = it.getString(3),
                 ),
               )
             }
@@ -280,6 +324,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     val projection = arrayOf(
       CalendarContract.Calendars._ID,
       CalendarContract.Calendars.CAL_SYNC1,
+      CalendarContract.Calendars.CAL_SYNC2,
     )
     val selection = "${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND " +
         "${CalendarContract.Calendars.ACCOUNT_TYPE} = ? AND ${CalendarContract.Calendars.NAME} = ?"
@@ -304,6 +349,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
             id = it.getLong(0),
             identity = identity,
             incarnation = it.getString(1),
+            projectionVersion = it.getString(2),
           )
           check(!it.moveToNext()) { "Multiple managed calendars share the same identity" }
           calendar
@@ -336,6 +382,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
       put(CalendarContract.Calendars.VISIBLE, 1)
       put(CalendarContract.Calendars.SYNC_EVENTS, 1)
       put(CalendarContract.Calendars.CAL_SYNC1, incarnation)
+      put(CalendarContract.Calendars.CAL_SYNC2, CURRENT_PROJECTION_VERSION)
     }
     ensureAuthorized()
     val insertedUri =
@@ -347,7 +394,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     }
   }
 
-  /** sync-adapter URI 必须绑定 ACCOUNT_NAME=目标账号、ACCOUNT_TYPE=CalendarContract.ACCOUNT_TYPE_LOCAL，避免 Provider 将写入解释为其他本地账号；日历 NAME 固定为 CURRENT_CALENDAR_NAME（"邮子清单"）。 */
+  /** sync-adapter URI 必须绑定 ACCOUNT_NAME=目标账号、ACCOUNT_TYPE=CalendarContract.ACCOUNT_TYPE_LOCAL，避免 Provider 将写入解释为其他本地账号；日历 NAME 固定为 CURRENT_CALENDAR_NAME（"掌邮日程"）。 */
   private fun calendarSyncAdapterUri(accountName: String) =
     CalendarContract.Calendars.CONTENT_URI.buildUpon()
       .appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
@@ -377,6 +424,7 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
     val id: Long,
     val identity: CalendarIdentity,
     val incarnation: String?,
+    val projectionVersion: String?,
   )
 
   /** 显式清理结果；目标不存在与重复执行均属于成功语义。 */
@@ -391,8 +439,10 @@ class AndroidManagedCalendarRegistry(private val context: Context) {
      *
      * 快照采集器只读取该完整 identity，注册器的创建/清理也使用同一常量；不得改为用户可编辑显示名或 scope。
      */
-    internal const val CURRENT_CALENDAR_NAME = "邮子清单"
-    private const val DISPLAY_NAME = "邮子清单"
+    internal const val CURRENT_CALENDAR_NAME = "掌邮日程"
+    /** 不兼容的 Provider 投射结构变更必须递增此值，由自动恢复执行整表重建。 */
+    internal const val CURRENT_PROJECTION_VERSION = "1"
+    private const val DISPLAY_NAME = "掌邮日程"
     private const val CALENDAR_COLOR = -0xbbcca
   }
 }

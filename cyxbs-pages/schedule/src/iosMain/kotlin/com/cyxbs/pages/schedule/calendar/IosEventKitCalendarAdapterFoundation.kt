@@ -144,7 +144,7 @@ object IosEventKitCalendarAdapterFoundation {
    * 将 common 投影映射为未来 EventKit bridge 可写的纯 payload。
    *
    * 解析墙上时间时复用统一 DST resolver：gap 无法随 EventKit instant 无歧义读回，立即拒绝；overlap 使用
-   * common 规定的 EARLIER_INSTANT。无法回写为完整分钟 instant 的历史时区结果同样拒绝。Deadline 固定为一分钟，
+   * common 规定的 EARLIER_INSTANT。无法回写为完整分钟 instant 的历史时区结果同样拒绝。Deadline 使用零时长，
    * 全天保留日期半开区间。
    */
   fun toWritePayload(
@@ -309,7 +309,8 @@ object IosEventKitCalendarAdapterFoundation {
       val start = resolveMinuteMomentOrNull(this.due, this.timeZoneId) ?: return null
       IosEventKitWriteTiming.Timed(
         start = start,
-        endExclusive = start.plusWholeMinutesOrNull(1) ?: return null,
+        // EventKit 只拒绝结束早于开始；相等可准确表达时间点，避免伪造一分钟时长。
+        endExclusive = start,
         timeZoneId = this.timeZoneId,
       )
     }
@@ -375,7 +376,7 @@ object IosEventKitCalendarAdapterFoundation {
   }
 
   /**
-   * 定时事件必须可逆回统一 resolver 选定的分钟墙上时间；Deadline 额外冻结为一分钟。
+   * 定时事件必须可逆回统一 resolver 选定的分钟墙上时间；Deadline 额外冻结为零时长。
    *
    * 先在 instant 轴拒绝非整分钟的 epoch 秒与纳秒，再转换到 local time。IANA 历史时区可能有秒级
    * offset：若先看 local 的分钟外观再反推，会把该秒级精度静默丢失，故此处必须 fail-closed。
@@ -400,11 +401,11 @@ object IosEventKitCalendarAdapterFoundation {
         ?: return null
     if (resolved.instant != startInstant) return null
     val duration = (endInstant - startInstant).inWholeMinutes
-    if (duration <= 0 || duration > Int.MAX_VALUE || startInstant + duration.minutes != endInstant) return null
+    if (duration < 0 || duration > Int.MAX_VALUE || startInstant + duration.minutes != endInstant) return null
     return if (kind == CalendarProjectionKind.DEADLINE) {
-      if (duration != 1L) null else CalendarTiming.Deadline(startMinute, zoneId)
+      if (duration != 0L) null else CalendarTiming.Deadline(startMinute, zoneId)
     } else {
-      CalendarTiming.Timed(startMinute, duration.toInt(), zoneId)
+      if (duration == 0L) null else CalendarTiming.Timed(startMinute, duration.toInt(), zoneId)
     }
   }
 

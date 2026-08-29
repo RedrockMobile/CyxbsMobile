@@ -177,7 +177,7 @@ internal actual fun ScheduleCalendarExportSetting(modifier: Modifier) {
       )
       ScheduleSettingActionRow(
         title = "清空并删除系统日历",
-        summary = "删除当前学号的邮子清单日历及其中全部日程，并关闭自动导出",
+        summary = "删除当前学号的“掌邮日程”日历及其中全部日程，并关闭自动导出",
         enabled = true,
         danger = true,
         onClick = { deleteConfirmationSession = session },
@@ -187,7 +187,7 @@ internal actual fun ScheduleCalendarExportSetting(modifier: Modifier) {
     ScheduleConfirmDialog(
       show = deleteConfirmationSession === session,
       title = "清空并删除系统日历？",
-      message = "将清空当前学号的“邮子清单”日历及其中全部日程，同时关闭自动导出。" +
+      message = "将清空当前学号的“掌邮日程”日历及其中全部日程，同时关闭自动导出。" +
         "不会影响 Schedule 数据、其他日历或其他账号。",
       confirmText = "清空并删除",
       onConfirm = {
