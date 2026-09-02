@@ -67,5 +67,5 @@ object AppScheme {
     return jumpNav(webViewRoute)
   }
 
-  private const val DEFAULT_WEB_VIEW_TITLE = "网页"
+  private const val DEFAULT_WEB_VIEW_TITLE = ""
 }

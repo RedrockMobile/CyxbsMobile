@@ -168,12 +168,12 @@ abstract class CommonLoginViewModel(val argument: LoginNavArgument) : BaseViewMo
 
   // 点击用户协议
   open fun clickUserAgreement() {
-    ILegalNoticeService::class.impl().startUserAgreementActivity()
+    ILegalNoticeService::class.impl().openUserAgreementScreen()
   }
 
   // 点击隐私政策
   open fun clickPrivacyPolicy() {
-    ILegalNoticeService::class.impl().startPrivacyPolicyActivity()
+    ILegalNoticeService::class.impl().openPrivacyPolicyScreen()
   }
 
   // 点击游客模式

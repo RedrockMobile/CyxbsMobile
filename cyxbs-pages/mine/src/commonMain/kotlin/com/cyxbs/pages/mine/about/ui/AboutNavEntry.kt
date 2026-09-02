@@ -54,7 +54,7 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
-import com.cyxbs.pages.mine.about.service.IAboutService
+import com.cyxbs.pages.login.api.ILegalNoticeService
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
 import kotlinx.coroutines.flow.collectLatest
@@ -300,7 +300,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableNoIndicator {
-                    IAboutService::class.implOrNull()?.clickUserAgreement() ?: toast("当前应用未实现「用户协议」功能")
+                    ILegalNoticeService::class.implOrNull()?.openUserAgreementScreen() ?: toast("当前应用未实现「用户协议」功能")
                 }
             )
             Text(
@@ -313,7 +313,7 @@ private fun BottomInfoCompose(modifier: Modifier = Modifier) {
                 fontSize = 11.sp,
                 color = blueTextColor,
                 modifier = Modifier.clickableSingle {
-                    IAboutService::class.implOrNull()?.clickPrivacyPolicy() ?: toast("当前应用未实现「隐私政策」功能")
+                    ILegalNoticeService::class.implOrNull()?.openPrivacyPolicyScreen() ?: toast("当前应用未实现「隐私政策」功能")
                 }
             )
         }

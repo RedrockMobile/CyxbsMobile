@@ -161,7 +161,7 @@ private class AndroidWebViewPlatformHost(
       return
     }
     runOnMain {
-      val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+      val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
         addCategory(Intent.CATEGORY_BROWSABLE)
         if (activity == null) {
           addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

@@ -84,7 +84,13 @@ private fun WebViewContent(
   NavigationBackHandler(
     state = backEventState,
     isBackEnabled = true,
-    onBackCompleted = onBack,
+    onBackCompleted = {
+      if (webViewState.canGoBack) {
+        controller.goBack()
+      } else {
+        onBack()
+      }
+    },
   )
 
   Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
