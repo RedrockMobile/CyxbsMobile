@@ -4,9 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -116,13 +113,6 @@ fun AnchorItem(
   anchorItemState: AnchorItemState,
   onClick: () -> Unit
 ) {
-  // 这里不推荐写成size(45.dp / scale),因为会不断触发measure->layout->draw的重组
-  // 应该写在graphicsLayer里面，只会在draw阶段重组
-  val anchorScale by remember(mapWidgetState.scale) {
-    mutableStateOf(
-      if (mapWidgetState.scale != 0f) 1f / mapWidgetState.scale else 1f
-    )
-  }
   Image(
     modifier = Modifier
       .offset {
@@ -133,6 +123,8 @@ fun AnchorItem(
       }
       .size(45.dp)
       .graphicsLayer {
+        val mapScale = mapWidgetState.scale
+        val anchorScale = if (mapScale != 0f) 1f / mapScale else 1f
         // 更改transformOrigin为底边中间
         transformOrigin = TransformOrigin(0.5f, 1f)
         scaleX = anchorScale * anchorItemState.scale

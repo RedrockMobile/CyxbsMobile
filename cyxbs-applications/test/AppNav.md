@@ -76,6 +76,17 @@ object fields:
 
 解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
 
+## :cyxbs-components:base
+
+### webview
+
+- entry: `com.cyxbs.components.base.webview.WebViewNavEntry`
+- argument: `com.cyxbs.components.base.webview.WebViewNavArgument`
+
+```text
+deeplink: cyxbs://webview?url={String}&hideTitle=[Boolean]&title=[String?]&defaultTitle=[String]
+```
+
 ## :cyxbs-functions:update
 
 ### dialog/update

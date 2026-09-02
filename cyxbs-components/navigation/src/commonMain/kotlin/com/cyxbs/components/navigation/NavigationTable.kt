@@ -82,3 +82,6 @@ const val NAV_EMPTY_ROOM = "emptyroom"
 const val NAV_SCHEDULE_MAIN = "schedule"
 
 const val NAV_SIGN = "sign"
+
+// 通用 WebView
+const val NAV_WEBVIEW = "webview"

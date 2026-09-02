@@ -11,7 +11,6 @@ import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.utils.judge.NetworkUtil
-import com.cyxbs.pages.login.api.ILegalNoticeService
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.bean.DeviceInfoParams
 import com.cyxbs.pages.login.bean.LoginBean
@@ -41,14 +40,6 @@ actual class LoginViewModel actual constructor(argument: LoginNavArgument) :
 
   override fun clickForgetPassword() {
     startActivity(MINE_FORGET_PASSWORD)
-  }
-
-  override fun clickUserAgreement() {
-    ILegalNoticeService::class.impl().startUserAgreementActivity()
-  }
-
-  override fun clickPrivacyPolicy() {
-    ILegalNoticeService::class.impl().startPrivacyPolicyActivity()
   }
 
   override fun enterTouristMode() {
