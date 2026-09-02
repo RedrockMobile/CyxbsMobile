@@ -57,15 +57,10 @@ object AppScheme {
       )
       .apply {
         uri.getQueryParameter("title")?.let { appendQueryParameter("title", it) }
+        uri.getQueryParameter("defaultTitle")?.let { appendQueryParameter("defaultTitle", it) }
       }
-      .appendQueryParameter(
-        "defaultTitle",
-        uri.getQueryParameter("defaultTitle") ?: DEFAULT_WEB_VIEW_TITLE,
-      )
       .build()
       .toString()
     return jumpNav(webViewRoute)
   }
-
-  private const val DEFAULT_WEB_VIEW_TITLE = ""
 }
