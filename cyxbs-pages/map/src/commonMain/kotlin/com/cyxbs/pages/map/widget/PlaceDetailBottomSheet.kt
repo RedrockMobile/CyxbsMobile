@@ -50,7 +50,7 @@ import com.cyxbs.pages.map.ui.UploadPhotoDialog
 import com.cyxbs.pages.map.ui.UploadPhotoResult
 import com.cyxbs.pages.map.ui.UploadingPhotoProgressDialog
 import com.cyxbs.pages.map.util.clickAnimation
-import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
+import com.cyxbs.pages.map.viewmodel.PlaceDetailViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_detail_more
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_like
@@ -72,7 +72,7 @@ import org.jetbrains.compose.resources.painterResource
  */
 @Composable
 fun PlaceDetailBottomSheetContent() {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel: PlaceDetailViewModel = viewModel()
   val bottomSheetScope = LocalBottomSheetScope.current
   viewmodel.placeDetails.value?.let { placeDetails ->
     val ratio = getWindowScreenSize().height / getWindowScreenSize().width
@@ -191,7 +191,7 @@ private fun PlaceAttributeListCompose(modifier: Modifier = Modifier, placeDetail
 
 @Composable
 private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel: PlaceDetailViewModel = viewModel()
   val isFavorite = remember { mutableStateOf(false) }
   val loginDialogState = rememberLoginDialogState()
   Image(
@@ -228,7 +228,7 @@ private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: Pl
 
 @Composable
 private fun PlaceNavigationCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel: PlaceDetailViewModel = viewModel()
   Box(
     modifier = modifier
       .width(80.dp)
@@ -260,7 +260,7 @@ private fun DetailTextCompose(modifier: Modifier = Modifier, placeDetails: Place
 
 @Composable
 private fun DetailMoreTextCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel: PlaceDetailViewModel = viewModel()
   Row(
     modifier = modifier
       .clickableSingle {
@@ -328,7 +328,7 @@ private fun ImageBannerCompose(modifier: Modifier = Modifier, placeDetails: Plac
 
 @Composable
 private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel: PlaceDetailViewModel = viewModel()
   val showState = remember { mutableStateOf(false) }
   val loginDialogState = rememberLoginDialogState()
   Row(

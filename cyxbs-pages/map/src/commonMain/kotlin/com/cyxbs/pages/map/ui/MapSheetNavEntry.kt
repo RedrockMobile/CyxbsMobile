@@ -24,6 +24,11 @@ import com.cyxbs.components.view.ui.bottomsheet.BottomSheetSceneStrategy
 import com.cyxbs.components.view.ui.bottomsheet.BottomSheetSceneStrategy.Companion.Properties
 import com.cyxbs.pages.map.widget.PlaceDetailBottomSheetContent
 import com.cyxbs.pages.map.widget.SearchBottomSheetContent
+import com.cyxbs.pages.map.viewmodel.PlaceDetailViewModel
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.pages.map.viewmodel.CommonMapComposeViewModel
+import com.cyxbs.pages.map.viewmodel.MapNavEvent
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,8 +37,7 @@ import kotlinx.serialization.Serializable
  * - 通过重写 [AppNavEntry.getSceneStrategy] 注入 [BottomSheetSceneStrategy]，把自身渲染成 overlay 的 bottomSheet。
  * - [AppNavEntry.buildMetadata] 里用 [Properties.stateProvider] 复用 [MapComposeViewModel] 现有的
  *   bottomSheetState / searchBottomSheetState，使 MapUiController 的联动逻辑零改动。
- * - [AppNavEntry.Content] 里通过 [MapVmHolder.WithMapScope] 切回 Map 页的 owner，
- *   使内层 `viewModel(MapComposeViewModel::class)` 解析到同一个 VM 实例。
+ * - [AppNavEntry.Content] 直接获取当前 NavEntry 自己的 ViewModel，避免跨 NavEntry 共享 owner。
  *
  * 进出栈时机由 [MapBottomSheetEntryHost] 统一随地图页处理（[Properties.popOnHide] = false）。
  *
@@ -41,7 +45,7 @@ import kotlinx.serialization.Serializable
  */
 
 @Serializable
-object PlaceDetailNavArgument : AppNavArgument
+data class PlaceDetailNavArgument(val placeId: String) : AppNavArgument
 
 @AppNav(route = NAV_MAP_PLACE_DETAIL)
 class PlaceDetailNavEntry : AppNavEntry<PlaceDetailNavArgument>() {
@@ -56,7 +60,7 @@ class PlaceDetailNavEntry : AppNavEntry<PlaceDetailNavArgument>() {
         // 仅当有地点数据、且处于地图主页面（非"全部图片"页 / 非竖屏搜索整页）时才渲染，避免空 peek 或漏显到其他页之上。
         // 横屏下 mapPagerState/mapSearchPagerState 恒为 0，这两个条件不影响横屏正常显示。
         stateProvider = {
-          MapVmHolder.current?.vm
+          viewModel<PlaceDetailViewModel>()
             ?.takeIf {
               it.placeDetails.value != null &&
                   it.mapPagerState.value == 0 &&
@@ -79,9 +83,11 @@ class PlaceDetailNavEntry : AppNavEntry<PlaceDetailNavArgument>() {
 
   @Composable
   override fun Content(argument: PlaceDetailNavArgument) {
-    MapVmHolder.WithMapScope {
-      PlaceDetailBottomSheetContent()
+    val viewModel: PlaceDetailViewModel = viewModel()
+    LaunchedEffect(argument.placeId) {
+      viewModel.getPlaceDetails(argument.placeId)
     }
+    PlaceDetailBottomSheetContent()
   }
 }
 
@@ -102,7 +108,7 @@ class SearchNavEntry : AppNavEntry<SearchNavArgument>() {
     return BottomSheetSceneStrategy.bottomSheet(
       Properties(
         stateProvider = {
-          MapVmHolder.current?.vm
+          viewModel<SearchViewModel>()
             ?.takeIf { it.mapPagerState.value == 0 }
             ?.searchBottomSheetState
         },
@@ -120,9 +126,7 @@ class SearchNavEntry : AppNavEntry<SearchNavArgument>() {
 
   @Composable
   override fun Content(argument: SearchNavArgument) {
-    MapVmHolder.WithMapScope {
-      SearchBottomSheetContent()
-    }
+    SearchBottomSheetContent()
   }
 }
 
@@ -132,8 +136,16 @@ fun MapBottomSheetEntryHost(landscape: Boolean) {
     if (landscape && SearchNavArgument !in appNavBackStack) {
       SearchNavArgument.navigate()
     }
-    if (PlaceDetailNavArgument !in appNavBackStack) {
-      PlaceDetailNavArgument.navigate()
+    if (appNavBackStack.none { it is PlaceDetailNavArgument }) {
+      PlaceDetailNavArgument("").navigate()
+    }
+  }
+  LaunchedEffect(Unit) {
+    CommonMapComposeViewModel.navEvents.collect { event ->
+      if (event is MapNavEvent.OpenPlaceDetail) {
+        appNavBackStack.filterIsInstance<PlaceDetailNavArgument>().forEach { it.popBackStack() }
+        PlaceDetailNavArgument(event.placeId).navigate()
+      }
     }
   }
 }

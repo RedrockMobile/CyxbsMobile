@@ -27,7 +27,6 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,7 +45,6 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
@@ -108,14 +106,6 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
   @Composable
   override fun Content(argument: MapNavArgument) {
     val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
-    // 把当前 Map 的 VM / owner / 跳转参数发布给独立的 sheet NavEntry 复用（见 MapVmHolder）
-    val viewModelStoreOwner = LocalViewModelStoreOwner.current
-    DisposableEffect(viewmodel, viewModelStoreOwner) {
-      if (viewModelStoreOwner != null) {
-        MapVmHolder.publish(viewmodel, viewModelStoreOwner)
-      }
-      onDispose { MapVmHolder.clear(viewmodel) }
-    }
     MapCompose(argument)
     MapProgressDialog()
     DownloadFailedDialog(argument)
@@ -696,7 +686,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
 }
 
 private fun popMapAndSheets(argument: MapNavArgument) {
-  PlaceDetailNavArgument.popBackStack()
+  appNavBackStack.filterIsInstance<PlaceDetailNavArgument>().lastOrNull()?.popBackStack()
   SearchNavArgument.popBackStack()
   if (appNavBackStack.size > 1) {
     argument.popBackStack()

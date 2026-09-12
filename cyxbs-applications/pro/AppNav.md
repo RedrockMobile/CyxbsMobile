@@ -4,7 +4,7 @@
 > 该文件需要被 git 提交用于后续使用
 
 - versionCode: 94
-- versionName: 7.0.0
+- versionName: 6.10.6-alpha
 
 ## 调试方法
 
@@ -199,7 +199,7 @@ deeplink: cyxbs://map/picture?imageList={List<String>}&currentIndex={Int}
 - argument: `com.cyxbs.pages.map.ui.PlaceDetailNavArgument`
 
 ```text
-deeplink: cyxbs://map/detail
+deeplink: cyxbs://map/detail?placeId={String}
 ```
 
 ### map/search
@@ -341,15 +341,4 @@ deeplink: cyxbs://schedule/failures
 
 ```text
 deeplink: cyxbs://school/car
-```
-
-## :cyxbs-pages:sport
-
-### sport
-
-- entry: `com.cyxbs.pages.sport.ui.SportNavEntry`
-- argument: `com.cyxbs.pages.sport.api.SportNavArgument`
-
-```text
-deeplink: cyxbs://sport
 ```

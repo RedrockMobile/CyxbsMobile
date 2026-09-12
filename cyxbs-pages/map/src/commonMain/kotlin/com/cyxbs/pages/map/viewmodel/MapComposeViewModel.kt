@@ -33,6 +33,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -43,11 +44,27 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 expect class MapComposeViewModel() : CommonMapComposeViewModel
 
+class PlaceDetailViewModel : CommonMapComposeViewModel()
+
+class SearchViewModel : CommonMapComposeViewModel()
+
+
 abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   companion object {
     const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
     const val MIN_SCALE = 1f
+
+    private val _navEvents = MutableSharedFlow<MapNavEvent>(
+      replay = 0,
+      extraBufferCapacity = 1,
+      onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val navEvents: SharedFlow<MapNavEvent> = _navEvents.asSharedFlow()
+
+    fun emitNavEvent(event: MapNavEvent) {
+      _navEvents.tryEmit(event)
+    }
   }
 
   var maxScale = 6f
@@ -148,6 +165,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   fun searchToPlace(placeItem: PlaceItem) {
     getPlaceDetails(placeItem.placeId)
+    emitNavEvent(MapNavEvent.OpenPlaceDetail(placeItem.placeId))
     sendMapUiEvent(
       MapUiEvent.SearchToPlace(
         placeId = placeItem.placeId,
@@ -218,6 +236,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   // 聚焦于某个地点
   fun focusOnPlace(placeItem: PlaceItem) {
     getPlaceDetails(placeItem.placeId)
+    emitNavEvent(MapNavEvent.OpenPlaceDetail(placeItem.placeId))
     sendMapUiEvent(
       MapUiEvent.FocusOnPlace(
         placeId = placeItem.placeId,
