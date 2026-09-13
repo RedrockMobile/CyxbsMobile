@@ -49,7 +49,6 @@ import kotlin.time.Duration.Companion.minutes
  */
 @Stable
 class CreateItemPageDecoration(
-  val courseFrame: AbstractCourseFrame,
   // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseCreateItemFactory,
 ) : CoursePageDecoration<CourseCreateItem>() {

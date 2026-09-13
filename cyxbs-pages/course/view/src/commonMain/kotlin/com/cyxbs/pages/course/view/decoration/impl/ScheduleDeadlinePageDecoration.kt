@@ -1,13 +1,11 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
-import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleCourseDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleItemWhatTime
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
@@ -18,12 +16,10 @@ import kotlinx.coroutines.flow.onEach
  * 无需 Schedule 模块设置跨层级 zIndex，也不会把真实截止时间伪装成一分钟区间。
  */
 class ScheduleDeadlinePageDecoration(
-  courseFrame: AbstractCourseFrame,
-  coroutineScope: CoroutineScope,
-  platformItemFactory: PlatformScheduleItemFactory,
-) : SchedulePageDecoration<CourseScheduleItem>(courseFrame, coroutineScope) {
+  private val platformItemFactory: PlatformScheduleItemFactory,
+) : SchedulePageDecoration<CourseScheduleItem>() {
 
-  init {
+  override fun onScheduleAttached() {
     scheduleRangeFlow.onEach { range ->
       val items = if (range == null) emptyList() else projectDeadlineRange(range)
       itemHierarchy.reset(
@@ -31,7 +27,7 @@ class ScheduleDeadlinePageDecoration(
           ScheduleItemWhatTime(item, platformItemFactory)
         },
       )
-    }.launchIn(coroutineScope)
+    }.launchIn(courseCoroutineScope)
   }
 
   /** 转换整个学期内的截止时间点；时间点继续保持零分钟业务区间。 */

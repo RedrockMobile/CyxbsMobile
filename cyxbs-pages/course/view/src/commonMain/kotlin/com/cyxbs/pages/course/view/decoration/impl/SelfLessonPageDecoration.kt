@@ -1,7 +1,5 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
@@ -14,6 +12,7 @@ import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItemFactory
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
@@ -31,12 +31,18 @@ import kotlin.time.Duration.Companion.days
  * @date 2025/10/12
  */
 @Stable
+@OptIn(ExperimentalCoroutinesApi::class)
 class SelfLessonPageDecoration(
   // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseLessonItemFactory,
 ) : CoursePageDecoration<CourseLessonItem>() {
 
   private val lessonService = ILessonService2::class.impl()
+
+  override fun onAttached() {
+    // 数据只跟随 Decoration 所属的 Manager 收集一次，避免 HorizontalPager 每个页面重复发起订阅和请求。
+    courseCoroutineScope.launch { observeSelfLesson() }
+  }
 
   private suspend fun observeSelfLesson() {
     IAccountService::class.impl()
@@ -102,13 +108,6 @@ class SelfLessonPageDecoration(
     }
   }
 
-  @Composable
-  override fun CoursePageContent() {
-    super.CoursePageContent()
-    LaunchedEffect(Unit) {
-      observeSelfLesson()
-    }
-  }
 }
 
 private data class SelfLessonWhatTime(

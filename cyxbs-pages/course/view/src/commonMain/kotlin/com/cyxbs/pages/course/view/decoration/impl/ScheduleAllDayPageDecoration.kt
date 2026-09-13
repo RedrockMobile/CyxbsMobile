@@ -31,19 +31,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.utils.compose.color
 import com.cyxbs.components.utils.compose.sharePointerInput
-import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayItem
 import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoBackgroundColor
 import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoContentColor
-import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
-import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceColor
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -54,18 +53,20 @@ import kotlinx.coroutines.flow.stateIn
  * 截止时间都绘制在它上方；短按打开详情，长按事件继续共享给底层创建事务手势。
  */
 class ScheduleAllDayPageDecoration(
-  courseFrame: AbstractCourseFrame,
-  coroutineScope: CoroutineScope,
   private val platformItemFactory: PlatformScheduleItemFactory,
-) : SchedulePageDecoration<CourseScheduleItem>(courseFrame, coroutineScope) {
+) : SchedulePageDecoration<CourseScheduleItem>() {
 
-  private val items = scheduleRangeFlow.map { range ->
-    if (range == null) emptyList() else projectAllDayRange(range)
-  }.stateIn(
-    scope = coroutineScope,
-    started = SharingStarted.Eagerly,
-    initialValue = emptyList(),
-  )
+  private lateinit var items: StateFlow<List<ScheduleAllDayDecorationItem>>
+
+  override fun onScheduleAttached() {
+    items = scheduleRangeFlow.map { range ->
+      if (range == null) emptyList() else projectAllDayRange(range)
+    }.stateIn(
+      scope = courseCoroutineScope,
+      started = SharingStarted.Eagerly,
+      initialValue = emptyList(),
+    )
+  }
 
   @Composable
   override fun CoursePageContent() {
