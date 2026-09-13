@@ -1,7 +1,5 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.ILinkService2
@@ -12,6 +10,7 @@ import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.impl.CourseLinkLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLinkLessonItemFactory
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -20,6 +19,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 
 /**
  * 关联人的课程展示
@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.onEach
  * @author 985892345
  * @date 2025/10/18
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class LinkLessonPageDecoration(
   // 根据不同平台对 item 进行定制化操作
   val platformItemFactory: PlatformCourseLinkLessonItemFactory
@@ -34,6 +35,11 @@ class LinkLessonPageDecoration(
 
   private val linkService = ILinkService2::class.impl()
   private val lessonService = ILessonService2::class.impl()
+
+  override fun onAttached() {
+    // 关联课程属于 Manager 级数据源，不能由每个 Pager 页面各自启动收集。
+    courseCoroutineScope.launch { observeLinkLesson() }
+  }
 
   private suspend fun observeLinkLesson() {
     linkService.state.map {
@@ -72,13 +78,6 @@ class LinkLessonPageDecoration(
     })
   }
 
-  @Composable
-  override fun CoursePageContent() {
-    super.CoursePageContent()
-    LaunchedEffect(Unit) {
-      observeLinkLesson()
-    }
-  }
 }
 
 private data class LinkLessonWhatTime(

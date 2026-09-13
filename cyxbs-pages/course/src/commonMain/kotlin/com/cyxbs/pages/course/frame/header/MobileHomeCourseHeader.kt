@@ -6,7 +6,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -23,6 +22,8 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.CourseFrameHeader
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
@@ -97,6 +98,48 @@ private val EmptyHeader = HintCourseBottomSheetHeader("加载中...")
 private val NoLessonHeader = HintCourseBottomSheetHeader("今天和明天都没课咯～")
 private val HolidayHeader = HintCourseBottomSheetHeader("享受假期吧～")
 
+/**
+ * 保存主页外层课表头的已解析内容，并在 Home Frame 作用域内持续观察下一项数据。
+ *
+ * 首次冷加载仍保留 500ms 缓冲；页面压栈返回时复用最后一次结果，不再退回“加载中”。
+ */
+internal class MobileHomeCourseOuterHeaderState {
+
+  private val _content = MutableStateFlow<CourseBottomSheetHeaderExtension>(EmptyHeader)
+  val content = _content.asStateFlow()
+
+  private var hasResolvedContent = false
+
+  /** 持续观察主页课表 Header；调用方应在 Frame 的内部作用域中执行。 */
+  suspend fun observe(
+    frame: HomeCourseFrame,
+    decorationManager: CoursePageDecorationManager,
+  ) {
+    frame.beginDate.filterNotNull().collectLatest { beginDate ->
+      snapshotFlow { Today }.collectLatest { today ->
+        if (today < beginDate || frame.getPage(today) == null) {
+          update(HolidayHeader)
+        } else {
+          // 只在真正的首次加载等待上游稳定；后续日期或导航恢复继续展示上次结果。
+          if (!hasResolvedContent) delay(500.milliseconds)
+          decorationManager.nextItemFlow.collectLatest { itemState ->
+            update(
+              if (itemState == null) NoLessonHeader
+              else itemState.item.extensions.get(CourseBottomSheetHeaderExtension::class)!!
+            )
+          }
+        }
+      }
+    }
+  }
+
+  /** 更新已解析内容；该标记用于区分冷加载与同一 Home NavEntry 的后续恢复。 */
+  private fun update(content: CourseBottomSheetHeaderExtension) {
+    _content.value = content
+    hasResolvedContent = true
+  }
+}
+
 @Composable
 private fun MobileHomeCourseOuterHeader(
   modifier: Modifier,
@@ -104,34 +147,9 @@ private fun MobileHomeCourseOuterHeader(
 ) {
   val login = rememberLoginDialogState()
   login.doIfLoginNotShowDialog {
-    val headerState = remember(frame) {
-      mutableStateOf<CourseBottomSheetHeaderExtension>(EmptyHeader)
-    }
-    key(headerState.value) {
-      headerState.value.CourseBottomSheetHeaderContent(modifier)
-    }
-    val decorationManager = CoursePageDecorationManager.current
-    LaunchedEffect(frame) {
-      frame.beginDate.filterNotNull().collectLatest { beginDate ->
-        snapshotFlow { Today }.collectLatest { today ->
-          if (today < beginDate) {
-            headerState.value = HolidayHeader
-          } else {
-            val page = frame.getPage(today)
-            if (page == null) {
-              headerState.value = HolidayHeader
-            } else {
-              delay(500.milliseconds) // 防止上游数据因为首次加载的抖动
-              decorationManager.nextItemFlow.collectLatest {
-                headerState.value = if (it == null) NoLessonHeader else {
-                  // MobileCourseNextSearch 保证返回的一定是 CourseBottomSheetHeaderExtension 类型
-                  it.item.extensions.get(CourseBottomSheetHeaderExtension::class)!!
-                }
-              }
-            }
-          }
-        }
-      }
+    val headerContent by frame.outerHeaderState.content.collectAsState()
+    key(headerContent) {
+      headerContent.CourseBottomSheetHeaderContent(modifier)
     }
   }.doIfNotLogin {
     HintCourseBottomSheetHeader("登录后才可查看课表") {

@@ -1,7 +1,5 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.LessonByWeeks
@@ -15,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 
 /**
  * 普通课程展示
@@ -29,6 +28,11 @@ class CourseLessonPageDecoration(
 ) : CoursePageDecoration<CourseLessonItem>() {
 
   private val lessonService = ILessonService2::class.impl()
+
+  override fun onAttached() {
+    // 普通课程同样只允许 Manager 级单订阅，避免 Pager 预加载放大 forceRequest。
+    courseCoroutineScope.launch { observeLesson() }
+  }
 
   private suspend fun observeLesson() {
     lessonService.observeLesson(
@@ -49,13 +53,6 @@ class CourseLessonPageDecoration(
     }.collect()
   }
 
-  @Composable
-  override fun CoursePageContent() {
-    super.CoursePageContent()
-    LaunchedEffect(Unit) {
-      observeLesson()
-    }
-  }
 }
 
 private data class LessonWhatTime(

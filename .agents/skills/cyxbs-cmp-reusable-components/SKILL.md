@@ -124,3 +124,4 @@ description: >
 - **点击无涟漪**：`com.cyxbs.components.utils.compose.clickableNoIndicator { ... }`。
 - **对勾动画**：`cyxbs-pages/todo/src/commonMain/.../ui/main/CheckLineCompose.kt`（Canvas + Animatable 复刻老端 `CheckLineView`）。
 - **教学周 / 学期日期**：`com.cyxbs.components.config.time.SchoolCalendar`（commonMain object）—— `getWeekOfTerm()` 当前教学周、`getFirstMonDay()` 开学第一天；配 `Num2CN.number2ChineseNumber()` 转中文。示例 `TodoWeekHeader.kt`。
+- **Navigation3 返回与 Compose 数据生命周期**：栈内 `NavEntry` 返回时会重新进入 Composition，`remember` / `rememberCoroutineScope` / `LaunchedEffect` 不会因为 `contentKey` 固定而保留。

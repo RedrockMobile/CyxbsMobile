@@ -13,6 +13,11 @@ class AdaptiveCourseFrameViewModel(
   initialStuNum: String
 ) : BaseViewModel() {
 
-  // 课表主页框架；stuNum 在框架内部是可变 State，外部通过 frame.updateStuNum 切换
-  val frame = AdaptiveCourseFrame(initialStuNum = initialStuNum)
+  /**
+   * 课表主页框架；学号在框架内部是可变状态，Frame 及其数据作用域随当前 ViewModel 自动释放。
+   */
+  val frame = AdaptiveCourseFrame.create(
+    owner = this,
+    initialStuNum = initialStuNum,
+  )
 }

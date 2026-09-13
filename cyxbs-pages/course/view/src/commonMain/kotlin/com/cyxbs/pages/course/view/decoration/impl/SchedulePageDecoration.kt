@@ -4,7 +4,6 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimeDate
-import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
@@ -15,7 +14,6 @@ import com.cyxbs.pages.schedule.api.IScheduleOccurrenceService
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,8 +32,6 @@ import kotlinx.coroutines.flow.stateIn
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 abstract class SchedulePageDecoration<Item : CourseItem>(
-  protected val courseFrame: AbstractCourseFrame,
-  coroutineScope: CoroutineScope,
   private val scheduleService: IScheduleOccurrenceService = IScheduleOccurrenceService::class.impl(),
 ) : CoursePageDecoration<Item>() {
 
@@ -47,25 +43,35 @@ abstract class SchedulePageDecoration<Item : CourseItem>(
   )
 
   /** 整个课表学期的数据；学期起始日期尚未初始化时为 null。 */
-  protected val scheduleRangeFlow: StateFlow<ScheduleRange?> = courseFrame.beginDate
-    .flatMapLatest { beginDate ->
-      val startDate = semesterStart(beginDate, courseFrame.timeline.beginDayOfWeek.ordinal)
-      if (startDate == null) {
-        flowOf<ScheduleRange?>(null)
-      } else {
-        val endDateExclusive = startDate.plusWeeks(courseFrame.maxWeek)
-        scheduleService.observeLinkedOccurrencesInRange(
-          startInclusive = MinuteTimeDate(startDate, 0, 0),
-          endExclusive = MinuteTimeDate(endDateExclusive, 0, 0),
-        ).map { occurrences ->
-          ScheduleRange(startDate, endDateExclusive, occurrences)
+  protected lateinit var scheduleRangeFlow: StateFlow<ScheduleRange?>
+    private set
+
+  /** Manager 挂载后再创建共享数据流，保证它与 Manager 子会话使用同一个生命周期。 */
+  final override fun onAttached() {
+    scheduleRangeFlow = courseFrame.beginDate
+      .flatMapLatest { beginDate ->
+        val startDate = semesterStart(beginDate, courseFrame.timeline.beginDayOfWeek.ordinal)
+        if (startDate == null) {
+          flowOf<ScheduleRange?>(null)
+        } else {
+          val endDateExclusive = startDate.plusWeeks(courseFrame.maxWeek)
+          scheduleService.observeLinkedOccurrencesInRange(
+            startInclusive = MinuteTimeDate(startDate, 0, 0),
+            endExclusive = MinuteTimeDate(endDateExclusive, 0, 0),
+          ).map { occurrences ->
+            ScheduleRange(startDate, endDateExclusive, occurrences)
+          }
         }
-      }
-    }.stateIn(
-    scope = coroutineScope,
-    started = SharingStarted.Eagerly,
-    initialValue = null,
-  )
+      }.stateIn(
+        scope = courseCoroutineScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+      )
+    onScheduleAttached()
+  }
+
+  /** [scheduleRangeFlow] 初始化完成后的扩展点，子类在这里启动筛选与映射。 */
+  protected open fun onScheduleAttached() = Unit
 
   /** 同一 occurrence 的跨日切片使用独立身份，防止 ItemHierarchy 合并不同日期片段。 */
   protected fun ScheduleOccurrenceView.courseSegmentIdentity(
@@ -106,21 +112,19 @@ abstract class SchedulePageDecoration<Item : CourseItem>(
  * module-internal，不会通过公共或 protected API 暴露给其他模块。
  */
 abstract class ScheduleTimedKindPageDecoration protected constructor(
-  courseFrame: AbstractCourseFrame,
-  coroutineScope: CoroutineScope,
-  platformItemFactory: PlatformScheduleItemFactory,
+  private val platformItemFactory: PlatformScheduleItemFactory,
   private val kind: ScheduleOccurrenceKind,
   private val segmentType: String,
-) : SchedulePageDecoration<CourseScheduleItem>(courseFrame, coroutineScope) {
+) : SchedulePageDecoration<CourseScheduleItem>() {
 
-  init {
+  override fun onScheduleAttached() {
     scheduleRangeFlow.onEach { range ->
       itemHierarchy.reset(
         range?.projectTimedOccurrences().orEmpty().map { item ->
           ScheduleItemWhatTime(item, platformItemFactory)
         },
       )
-    }.launchIn(coroutineScope)
+    }.launchIn(courseCoroutineScope)
   }
 
   /** 过滤固定来源并把整个学期内的跨日时间段切成逐日课表 Item。 */

@@ -9,15 +9,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
+import com.cyxbs.pages.course.api.IMobileHomeCourseFrameFactory
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
+import com.cyxbs.pages.course.frame.header.MobileHomeCourseOuterHeaderState
 import com.cyxbs.pages.course.home.bottomsheet.MobileHomeBottomSheet
 import com.cyxbs.pages.course.home.item.MobileCourseCreateItemFactory
 import com.cyxbs.pages.course.home.item.MobileCourseLessonItemFactory
@@ -25,7 +26,6 @@ import com.cyxbs.pages.course.home.item.MobileCourseLinkLessonItemFactory
 import com.cyxbs.pages.course.home.item.MobileScheduleItemFactory
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.HomeCoursePageContent
-import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.LinkLessonPageDecoration
 import com.cyxbs.pages.course.view.decoration.impl.ScheduleAffairPageDecoration
@@ -53,8 +53,15 @@ import com.g985892345.provider.api.annotation.ImplProvider
  * @date 2025/2/15
  */
 @Stable
-@ImplProvider(clazz = IMobileHomeCourseFrame::class)
-class HomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
+class HomeCourseFrame private constructor() : AbstractCourseFrame(), IMobileHomeCourseFrame {
+
+  companion object {
+
+    /** 创建并立即登记到 [owner] 的主页课表 Frame，禁止产生无生命周期归属的实例。 */
+    internal fun create(owner: ViewModel): HomeCourseFrame {
+      return HomeCourseFrame().also(owner::addCloseable)
+    }
+  }
 
   // 底部抽屉状态
   override val bottomSheetState by lazy {
@@ -65,13 +72,43 @@ class HomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
 
   val bottomBarHeightState = mutableStateOf(0.dp)
 
+  internal val outerHeaderState = MobileHomeCourseOuterHeaderState()
+
+  init {
+    updateCoursePageDecorations(
+      ScheduleDeadlinePageDecoration(
+        platformItemFactory = MobileScheduleItemFactory,
+      ), // 截止时间点始终位于课表最上层
+      CreateItemPageDecoration(
+        platformItemFactory = MobileCourseCreateItemFactory
+      ), // 长按创建事务
+      SelfLessonPageDecoration(
+        platformItemFactory = MobileCourseLessonItemFactory,
+      ), // 自己的课程
+      ScheduleTodoTimedPageDecoration(
+        platformItemFactory = MobileScheduleItemFactory,
+      ), // 清单时间段独立位于事务上方
+      ScheduleAffairPageDecoration(
+        platformItemFactory = MobileScheduleItemFactory,
+      ), // Schedule 原生事务使用独立层级
+      LinkLessonPageDecoration(
+        platformItemFactory = MobileCourseLinkLessonItemFactory,
+      ), // 关联人的课程
+      ScheduleAllDayPageDecoration(
+        platformItemFactory = MobileScheduleItemFactory,
+      ), // 全天背景不参与重叠，固定放在最底层
+    )
+    launchInCourseFrameScope {
+      outerHeaderState.observe(
+        frame = this@HomeCourseFrame,
+        decorationManager = decorationManager,
+      )
+    }
+  }
+
   @Composable
   override fun HomeCourseContent(modifier: Modifier, bottomBarHeight: Dp) {
-    val decorationManager = createCoursePageDecorationManager(this)
-    CompositionLocalProvider(
-      Local provides this,
-      CoursePageDecorationManager.Local provides decorationManager,
-    ) {
+    CourseFrameComposition {
       MobileHomeCourseFrameContent(
         modifier = modifier,
         frame = this,
@@ -80,6 +117,16 @@ class HomeCourseFrame : AbstractCourseFrame(), IMobileHomeCourseFrame {
     SideEffect {
       bottomBarHeightState.value = bottomBarHeight
     }
+  }
+}
+
+/** Provider 只暴露强制绑定 ViewModel 的工厂，不直接暴露 [HomeCourseFrame] 构造能力。 */
+@ImplProvider(clazz = IMobileHomeCourseFrameFactory::class)
+class MobileHomeCourseFrameFactory : IMobileHomeCourseFrameFactory {
+
+  /** 创建主页课表 Frame，并在返回业务方之前完成生命周期登记。 */
+  override fun create(owner: ViewModel): IMobileHomeCourseFrame {
+    return HomeCourseFrame.create(owner)
   }
 }
 
@@ -112,48 +159,5 @@ private fun MobileHomeCourseFrameContent(
         },
       )
     }
-  }
-}
-
-@Composable
-private fun createCoursePageDecorationManager(
-  frame: AbstractCourseFrame
-): CoursePageDecorationManager {
-  val coroutineScope = rememberCoroutineScope()
-  return remember {
-    CoursePageDecorationManager(
-      courseFrame = frame,
-      courseCoroutineScope = coroutineScope,
-      ScheduleDeadlinePageDecoration(
-        courseFrame = frame,
-        coroutineScope = coroutineScope,
-        platformItemFactory = MobileScheduleItemFactory,
-      ), // 截止时间点始终位于课表最上层
-      CreateItemPageDecoration(
-        courseFrame = frame,
-        platformItemFactory = MobileCourseCreateItemFactory
-      ), // 长按创建事务
-      SelfLessonPageDecoration(
-        platformItemFactory = MobileCourseLessonItemFactory
-      ), // 自己的课程
-      ScheduleTodoTimedPageDecoration(
-        courseFrame = frame,
-        coroutineScope = coroutineScope,
-        platformItemFactory = MobileScheduleItemFactory,
-      ), // 清单时间段独立位于事务上方
-      ScheduleAffairPageDecoration(
-        courseFrame = frame,
-        coroutineScope = coroutineScope,
-        platformItemFactory = MobileScheduleItemFactory,
-      ), // Schedule 原生事务使用独立层级
-      LinkLessonPageDecoration(
-        platformItemFactory = MobileCourseLinkLessonItemFactory
-      ), // 关联人的课程
-      ScheduleAllDayPageDecoration(
-        courseFrame = frame,
-        coroutineScope = coroutineScope,
-        platformItemFactory = MobileScheduleItemFactory,
-      ), // 全天背景不参与重叠，固定放在最底层
-    )
   }
 }
