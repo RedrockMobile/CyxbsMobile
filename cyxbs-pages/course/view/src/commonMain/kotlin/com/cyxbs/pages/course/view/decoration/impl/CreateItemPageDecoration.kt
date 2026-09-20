@@ -1,7 +1,5 @@
 package com.cyxbs.pages.course.view.decoration.impl
 
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -198,18 +196,10 @@ internal data class CreateScheduleTouchItemWhatTime(
 
   suspend fun cancel() {
     val itemState = itemState ?: return
-    try {
-      animate(
-        initialValue = 1F,
-        targetValue = 0F,
-        animationSpec = tween(durationMillis = 200),
-      ) { value, _ ->
-        itemState.alphaState.value = value
-      }
-    } finally {
-      itemState.alphaState.value = 0F
-      viewModel.itemHierarchy.remove(this@CreateScheduleTouchItemWhatTime)
-    }
+    // 不能在这里使用 withFrameNanos/animate：item 的协程作用域没有 Compose 的
+    // MonotonicFrameClock，iOS 上长按草稿取消时会抛 IllegalStateException 并崩溃。
+    itemState.alphaState.value = 0F
+    viewModel.itemHierarchy.remove(this@CreateScheduleTouchItemWhatTime)
   }
 }
 
