@@ -3,8 +3,8 @@
 > 打包时由 build-logic/manager/nav.AppNavReportTask 自动生成
 > 该文件需要被 git 提交用于后续使用
 
-- versionCode: 94
-- versionName: 6.10.6-alpha
+- versionCode: 1
+- versionName: 7.0.0
 
 ## 调试方法
 
