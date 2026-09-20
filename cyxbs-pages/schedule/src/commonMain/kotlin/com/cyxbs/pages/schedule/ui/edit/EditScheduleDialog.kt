@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -521,15 +522,18 @@ private fun ScheduleContent(
             },
         )
         val focusManager = LocalFocusManager.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        val latestUiState by rememberUpdatedState(uiState)
         LaunchedEffect(Unit) {
-          snapshotFlow { uiState }.first { it is ScheduleUi.Edit }
+          snapshotFlow { latestUiState }.first { it is ScheduleUi.Edit }
           withFrameMillis {  } // 刚进入 Edit 需要等待 Compose 重组后把 enable 设置为 true 才可以请求聚焦
           // 首次进入编辑状态时标题显示光标提示用户可以输入
           focusRequester.requestFocus()
-          snapshotFlow { uiState }.collect {
+          snapshotFlow { latestUiState }.collect {
             if (it !is ScheduleUi.Edit.Note) {
-              // 进入其他状态移除焦点，防止光标一直闪烁
-              focusManager.clearFocus()
+              // 切到日期/时间等子区时，iOS 在 clearFocus 后键盘可能仍保留，需要显式隐藏。
+              focusManager.clearFocus(force = true)
+              keyboardController?.hide()
             }
           }
         }
