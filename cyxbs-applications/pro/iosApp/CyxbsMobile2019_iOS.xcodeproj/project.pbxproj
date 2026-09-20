@@ -477,6 +477,7 @@
 		DB4065022466D889006CE5BC /* DLReminderView+Reset.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F32466D888006CE5BC /* DLReminderView+Reset.m */; };
 		DB4065032466D889006CE5BC /* DLReminderView.m in Sources */ = {isa = PBXBuildFile; fileRef = DB4064F42466D888006CE5BC /* DLReminderView.m */; };
 		E700DA83D883A1453118CA83 /* KmpInterfaceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */; };
+		E7A100000000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A100000000000000000002 /* SceneDelegate.swift */; };
 		EE131C212471362E00B6ED97 /* URLController.m in Sources */ = {isa = PBXBuildFile; fileRef = EE131C202471362E00B6ED97 /* URLController.m */; };
 		EE899DEA2367DB2600DDB0D9 /* Bahnschrift.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */; };
 		FC05B1CC2ADAF054008B245B /* JudgeArrangeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC05B1CB2ADAF054008B245B /* JudgeArrangeMessage.swift */; };
@@ -1382,6 +1383,7 @@
 		DB4064F42466D888006CE5BC /* DLReminderView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DLReminderView.m; sourceTree = "<group>"; };
 		DB4064F52466D888006CE5BC /* DLReminderModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DLReminderModel.h; sourceTree = "<group>"; };
 		E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KmpInterfaceImpl.swift; sourceTree = "<group>"; };
+		E7A100000000000000000002 /* SceneDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		EE131C1F2471362E00B6ED97 /* URLController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLController.h; sourceTree = "<group>"; };
 		EE131C202471362E00B6ED97 /* URLController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = URLController.m; sourceTree = "<group>"; };
 		EE899DDE2367D89900DDB0D9 /* Bahnschrift.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bahnschrift.ttf; sourceTree = "<group>"; };
@@ -2972,6 +2974,7 @@
 			isa = PBXGroup;
 			children = (
 				14F6F4CE2AFB8171007C7CA6 /* AppDelegate.swift */,
+				E7A100000000000000000002 /* SceneDelegate.swift */,
 				E700D9635952CDA117A0EDEC /* KmpInterfaceImpl.swift */,
 				14F6F5002AFB8CDA007C7CA6 /* Curriculum */,
 				14F6F5352AFB8CDA007C7CA6 /* Login */,
@@ -6037,6 +6040,7 @@
 				B0F71C912ABC71B200F8B1AC /* ExpressDetailModel.m in Sources */,
 				14F6F4FB2AFB8171007C7CA6 /* AppDelegate.swift in Sources */,
 				D0101D572433C885004337ED /* NSLayoutConstraint+SDMask.m in Sources */,
+				E7A100000000000000000001 /* SceneDelegate.swift in Sources */,
 				18CDF4BB257F8DBD006E8E5C /* ResetPwdViewController.m in Sources */,
 				B0C9F2412B0126E1006F4286 /* ActivitySearchVC.swift in Sources */,
 				752A03F02B0796D9003256C1 /* ActivityMessageVC.swift in Sources */,

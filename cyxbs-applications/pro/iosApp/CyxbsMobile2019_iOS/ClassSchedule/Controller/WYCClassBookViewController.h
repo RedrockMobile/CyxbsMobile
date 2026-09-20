@@ -19,7 +19,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface WYCClassBookViewController : UIViewController<WYCClassAndRemindDataModelDelegate,UIApplicationDelegate>
+@interface WYCClassBookViewController : UIViewController<WYCClassAndRemindDataModelDelegate>
 
 /// 课表数据、备忘数据模型
 @property (nonatomic, strong) WYCClassAndRemindDataModel *model;
