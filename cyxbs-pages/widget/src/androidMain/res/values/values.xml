@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- AppWidget updatePeriodMillis 的系统下限为 30 分钟，每次获准更新时重绘当前时间线。 -->
     <integer name="widget_update_period_millis">1800000</integer>
 
 </resources>

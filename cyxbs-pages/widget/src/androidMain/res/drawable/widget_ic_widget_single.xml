@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="80dp"
+    android:viewportWidth="220"
+    android:viewportHeight="80">
+    <!-- picker 中用三条白线近似表达透明背景上的时间、课程名与地点。 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10,10h80v8h-80z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10,28h140v13h-140z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10,47h140v2h-140z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10,56h105v11h-105z" />
+</vector>

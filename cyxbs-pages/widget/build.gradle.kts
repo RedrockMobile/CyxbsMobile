@@ -1,31 +1,27 @@
 plugins {
   id("manager.lib")
+  id("kmp.compose")
 }
 
-useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
-useRoom(rxjava = true)
+useUnitTest() // Glance 快照投影使用 Android Host Test 验证纯映射逻辑
 
 kotlin {
   sourceSets {
     commonMain.dependencies {
       implementation(projects.cyxbsComponents.init)
-      implementation(projects.cyxbsComponents.base)
-      implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.utils)
-      implementation(projects.cyxbsComponents.account.api)
-      implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.widget.api)
+      implementation(libs.kotlinx.coroutines)
+      implementation(libs.kotlinx.datetime)
     }
     androidMain.dependencies {
-      // 桌面小组件继续读取旧 Android 事务数据。
-      implementation(projects.cyxbsPages.affair.api)
-      implementation(libs.bundles.projectBase)
-      implementation(libs.bundles.views)
-
-      // 985892345 写的桌面小组件 https://github.com/985892345/CQUPTCourseWidget
-      // 目前只实现了单个透明的小组件，后续没精力维护了，让学弟重构吧
-      implementation("io.github.985892345:widget:0.0.2")
+      // 课程详情入口暂时只保留空 Compose Activity，后续弹窗完成分层后再接入内容。
+      implementation(projects.cyxbsComponents.config)
+      implementation(libs.compose.activity)
+      implementation(libs.androidx.glance)
+      implementation(libs.androidx.glance.appwidget)
+      implementation(libs.kotlinx.serialization)
     }
   }
 }
-

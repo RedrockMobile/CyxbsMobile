@@ -3,14 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:initialKeyguardLayout="@layout/glance_default_loading_layout"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:minWidth="40dp"
-    android:minHeight="250dp"
-    android:minResizeWidth="40dp"
-    android:minResizeHeight="250dp"
-    android:previewImage="@drawable/widget_ic_oversized_example"
-    android:resizeMode="vertical|horizontal"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:resizeMode="none"
+    android:widgetCategory="home_screen"
+    android:previewImage="@drawable/widget_ic_widget_single"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
     android:updatePeriodMillis="@integer/widget_update_period_millis"
-    android:widgetCategory="home_screen|keyguard"
-    >
-
-</appwidget-provider>
+    tools:targetApi="s" />

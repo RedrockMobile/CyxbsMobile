@@ -8,16 +8,23 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.color
-import com.cyxbs.components.utils.compose.dark
+import com.cyxbs.pages.widget.api.CourseWidgetAction
+import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
+import com.cyxbs.pages.widget.api.CourseWidgetItemStyle
+import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
+import com.cyxbs.pages.widget.api.CourseWidgetVisibleRange
 import com.cyxbs.pages.course.view.item.CourseDefaultItemContent
 import com.cyxbs.pages.course.view.item.CourseItem
 import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
+import com.cyxbs.pages.course.view.item.CourseWidgetRenderProvider
+import com.cyxbs.pages.course.view.item.CourseWidgetDarkContentArgb
+import com.cyxbs.pages.course.view.item.CourseWidgetSecondaryContentArgb
+import com.cyxbs.pages.course.view.item.courseWidgetDialogItemId
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
@@ -28,6 +35,7 @@ import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.isoDayNumber
 import kotlin.math.roundToInt
 
 /**
@@ -41,7 +49,13 @@ class CourseScheduleItem internal constructor(
   coroutineScope: CoroutineScope,
   private val data: ScheduleCourseDecorationItem,
   platformItemFactory: PlatformScheduleItemFactory,
-) : CourseItem(whatTime, coroutineScope) {
+) : CourseItem(whatTime, coroutineScope), CourseWidgetRenderProvider {
+
+  override val widgetItemId: String
+    get() = "schedule:${data.stableId}"
+
+  override val widgetDialogItemId: String
+    get() = occurrence.courseWidgetDialogItemId()
 
   init {
     // 仅复用课表的长按拖动预览；扩展保留默认落点，松手后回到原位置且不修改日程数据。
@@ -61,48 +75,46 @@ class CourseScheduleItem internal constructor(
     }
   }
 
+  /** 导出日程的稳定身份、来源配色与事务斜纹，让 Widget 复用 Compose 的视觉语义。 */
+  override fun createWidgetRenderItem(
+    itemState: CourseItemState,
+    visibleRanges: List<CourseWidgetVisibleRange>,
+  ): CourseWidgetRenderItem {
+    val fixed = whatTime.now.value
+    val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
+    val styles = occurrence.widgetStyles(isAffair)
+    return CourseWidgetRenderItem(
+      id = widgetItemId,
+      dayOfWeek = fixed.dayOfWeek.isoDayNumber,
+      title = data.title,
+      content = data.description,
+      beginMinute = fixed.beginTime.minuteOfDay,
+      endMinute = fixed.finalTime.minuteOfDay,
+      visibleRanges = visibleRanges,
+      lightStyle = styles.first,
+      darkStyle = styles.second,
+      backgroundPattern = if (isAffair) CourseWidgetBackgroundPattern.DIAGONAL_STRIPE else CourseWidgetBackgroundPattern.SOLID,
+      action = CourseWidgetAction(week = fixed.page, itemId = widgetDialogItemId),
+    )
+  }
+
   /** 绘制平台无关的日程 Item；点击回调完全由 [platform] 提供。 */
   @Composable
   private fun Content(onClick: ((MinuteTimePair) -> Unit)?) {
-    val defaultBackground = defaultScheduleTodoBackgroundColor()
-    val defaultContent = defaultScheduleTodoContentColor()
     val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
-    val isLinkedTodoAffair = isAffair && occurrence.isInTodoList
-    // 旧版本可能给纯事务留下 categoryId；未关联清单时必须忽略该颜色，保持原生事务视觉。
-    val categoryColor = occurrence.categoryColor.takeIf { !isAffair || isLinkedTodoAffair }
-    val configuredBackground = categoryColor?.let {
-      Color(
-        if (MaterialTheme.colors.isLight) it.lightBackgroundArgb.toInt()
-        else it.darkBackgroundArgb.toInt(),
-      )
-    }
-    val configuredContent = categoryColor?.let {
-      if (MaterialTheme.colors.isLight) it.lightContentArgb.toInt().color()
-      else CourseItemDarkContentColor
-    }
-    val itemTextColor = when {
-      isLinkedTodoAffair -> configuredContent ?: defaultContent
-      isAffair -> LocalAppColors.current.tvLv2.dark(CourseItemDarkContentColor)
-      else -> configuredContent ?: defaultContent
-    }
-    val resolvedBackgroundColor = configuredBackground ?: defaultBackground
-    val itemBackgroundColor = if (isAffair) {
-      // 通用背景绘制在 modifierList 之后；事务必须透明，否则会覆盖 drawBehind 绘制的斜纹。
-      Color.Transparent
-    } else {
-      resolvedBackgroundColor
-    }
-    val affairStripeColor = if (isLinkedTodoAffair) {
-      resolvedBackgroundColor
-    } else {
-      0xFFE4E7EC.dark(0xFF4D4B4C)
-    }
+    // Compose 与 Widget 都从同一个纯样式解析结果取值，避免主题和事务斜纹颜色随实现分支漂移。
+    val styles = occurrence.widgetStyles(isAffair)
+    val style = if (MaterialTheme.colors.isLight) styles.first else styles.second
+    // 小组件样式保存的是 32 位 ARGB Long，不能当成 Compose 内部 ULong 打包值解析。
+    val itemTextColor = Color(style.contentArgb)
+    val itemBackgroundColor = Color(style.backgroundArgb)
+    val affairStripeColor = style.stripeArgb?.let(::Color)
     val itemModifierList = if (isAffair) {
       remember(affairStripeColor) {
         createCourseDefaultModifierList()
           .add(
             ScheduleAffairBackgroundItemModifier(
-              stripeColor = affairStripeColor,
+              stripeColor = checkNotNull(affairStripeColor),
             ),
           )
       }
@@ -121,6 +133,35 @@ class CourseScheduleItem internal constructor(
       onClick = onClick,
     )
   }
+}
+
+/** 日程样式选择与 Compose 中的 occurrence/category/事务判断保持同一业务分支。 */
+internal fun ScheduleOccurrenceView.widgetStyles(isAffair: Boolean): Pair<CourseWidgetItemStyle, CourseWidgetItemStyle> {
+  val linkedTodoAffair = isAffair && isInTodoList
+  val category = categoryColor.takeIf { !isAffair || linkedTodoAffair }
+  val lightBackground = category?.lightBackgroundArgb ?: ScheduleDefaultOccurrenceColor.lightBackgroundArgb
+  val darkBackground = category?.darkBackgroundArgb ?: ScheduleDefaultOccurrenceColor.darkBackgroundArgb
+  val lightContent = when {
+    // 关联到清单的事务仍继承该清单分组的文字色；只有纯事务才使用主题二级文字色。
+    linkedTodoAffair && category != null -> category.lightContentArgb
+    isAffair -> CourseWidgetSecondaryContentArgb
+    category != null -> category.lightContentArgb
+    else -> ScheduleDefaultOccurrenceColor.lightContentArgb
+  }
+  val stripeLight = if (isAffair) if (linkedTodoAffair) lightBackground else 0xFFE4E7EC else null
+  val stripeDark = if (isAffair) if (linkedTodoAffair) darkBackground else 0xFF4D4B4C else null
+  // AFFAIR 只绘制斜线，背景必须透明，才能保留线条之间透出的课表底色。
+  val lightStyle = CourseWidgetItemStyle(
+    contentArgb = lightContent,
+    backgroundArgb = if (isAffair) 0L else lightBackground,
+    stripeArgb = stripeLight,
+  )
+  val darkStyle = CourseWidgetItemStyle(
+    contentArgb = CourseWidgetDarkContentArgb,
+    backgroundArgb = if (isAffair) 0L else darkBackground,
+    stripeArgb = stripeDark,
+  )
+  return lightStyle to darkStyle
 }
 
 /** 默认清单使用不突出的中性灰，避免与课程的橙、红、蓝主色混淆。 */

@@ -33,6 +33,7 @@ import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.page.CourseWeekCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.widget.api.CourseWidgetSnapshot
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -156,11 +157,13 @@ abstract class AbstractCourseFrame : AutoCloseable {
    */
   protected fun updateCoursePageDecorations(
     vararg decorations: CoursePageDecoration<*>,
+    widgetSnapshotPublisher: (suspend (CourseWidgetSnapshot) -> Unit)? = null,
   ) {
     decorationManagerState.value?.close()
     decorationManagerState.value = CoursePageDecorationManager(
       courseFrame = this,
       decorations.toList(),
+      widgetSnapshotPublisher = widgetSnapshotPublisher,
     )
   }
 

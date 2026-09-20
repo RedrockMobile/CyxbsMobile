@@ -131,6 +131,29 @@ data class CourseTimeline(
   }
 
   /**
+   * 以固定 [CourseTimelineData.initialWeight] 计算时间轴比例。
+   *
+   * 该方法专用于 Widget 等外部稳定快照，避免用户展开早晨/中午/夜间导致 `nowWeight` 瞬时变化并被错误持久化。
+   */
+  fun calculateInitialWeightRatio(time: MinuteTime): Float {
+    val first = linkNodeList.first()
+    val last = linkNodeList.last()
+    if (time <= first.startTime) return 0F
+    if (time >= last.endTime) return 1F
+    val index = linkNodeList.binarySearchBy(time) { it.endTime }
+    val weight = if (index >= 0) {
+      linkNodeList[index].totalInitialWeight
+    } else {
+      val start = linkNodeList.getOrNull(-index - 2)
+      val end = linkNodeList[-index - 1]
+      (start?.totalInitialWeight ?: 0F) +
+        end.startTime.minutesUntil(time) /
+          end.startTime.minutesUntil(end.endTime).toFloat() * end.value.initialWeight
+    }
+    return weight / totalInitialWeight
+  }
+
+  /**
    * 计算 [beginTime1] [finalTime1] 在 [beginTime2] [finalTime2] 上的占比
    * @return Offset(startWeight, endWeight)
    */
@@ -246,4 +269,3 @@ private fun Modifier.drawNowTimeLine(
     )
   }
 }
-
