@@ -20,7 +20,6 @@ import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.pages.course.view.decoration.impl.CreateScheduleTouchItemWhatTime
 import com.cyxbs.pages.course.view.decoration.impl.CreateItemPageDecoration
 import com.cyxbs.pages.course.view.item.CourseItem
-import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.CourseShowRange
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
@@ -28,7 +27,6 @@ import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -56,11 +54,13 @@ class CourseCreateItem(
     mutableInitialTiming.value = timing
   }
 
-  /** Schedule 本地创建成功后移除占位 Item；真实日程随后由 Schedule Decoration 观察并展示。 */
-  fun removeDraft() {
-    coroutineScope.launch {
-      (whatTime as? CreateScheduleTouchItemWhatTime)?.cancel()
-    }
+  /**
+   * Schedule 本地创建成功后淡出并移除占位 Item；真实日程随后由 Schedule Decoration 观察并展示。
+   *
+   * 调用方必须从当前 Composition 的 UI 协程调用，确保淡出动画能够取得 Compose 帧时钟。
+   */
+  suspend fun removeDraft() {
+    (whatTime as? CreateScheduleTouchItemWhatTime)?.cancelWithAnimation()
   }
 
   @Composable

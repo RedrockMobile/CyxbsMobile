@@ -46,7 +46,12 @@ class CoursePageDecorationManager internal constructor(
   val decorations: List<CoursePageDecoration<*>>
 ) : AutoCloseable {
 
-  /** Manager 自己拥有 Frame 根任务下的子作用域，调用方无需创建或传递 CoroutineScope。 */
+  /**
+   * Manager 自己拥有 Frame 根任务下的数据作用域，调用方无需创建或传递 CoroutineScope。
+   *
+   * 该作用域不包含 Compose 的 `MonotonicFrameClock`，只能用于数据订阅、刷新和资源生命周期管理，
+   * 禁止执行 `Animatable.animateTo`、`animate`、滚动动画等需要 UI 帧时钟的操作。
+   */
   internal val courseCoroutineScope = CoroutineScope(
     Dispatchers.Main.immediate + SupervisorJob(courseFrame.courseFrameJob)
   )

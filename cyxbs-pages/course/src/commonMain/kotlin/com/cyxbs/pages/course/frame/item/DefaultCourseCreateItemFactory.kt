@@ -2,6 +2,7 @@ package com.cyxbs.pages.course.frame.item
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.item.CourseItemState
@@ -12,6 +13,7 @@ import com.cyxbs.pages.course.view.item.impl.CourseCreateItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItemFactory
 import com.cyxbs.pages.schedule.api.IScheduleOccurrenceService
+import kotlinx.coroutines.launch
 
 /**
  * 完整课表中的事务创建 Item 配置。
@@ -62,11 +64,14 @@ private class DefaultCreateBottomSheetExtension(
   @Composable
   override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
     val initialTiming = item.initialTimingFlow.collectAsState().value ?: return
+    val uiCoroutineScope = rememberCoroutineScope()
     scheduleService.ScheduleCreateAffairContent(
       initialTiming = initialTiming,
       embeddedInHost = true,
       onDismiss = state::dismissDialogAnimated,
-      onCreated = item::removeDraft,
+      onCreated = {
+        uiCoroutineScope.launch { item.removeDraft() }
+      },
       onEditModeChanged = { isEditing ->
         if (isEditing) state.lockCurrentPage()
       },

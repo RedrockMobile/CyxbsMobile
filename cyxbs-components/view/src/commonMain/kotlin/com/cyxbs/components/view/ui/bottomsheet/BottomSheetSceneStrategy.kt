@@ -84,6 +84,8 @@ class BottomSheetSceneStrategy<T : AppNavArgument> : SceneStrategy<T> {
       val expandOnShow: Boolean = false, // 出现时是否展开到最大高度
       val dismissOnBackPress: Boolean = true, // 是否让 BottomSheetCompose 自己处理返回键
       val dismissOnClickOutside: Boolean = false, // 点击 sheet 外部区域是否 dismiss
+      /** 键盘可见时，点击外部区域是否优先收起键盘并消费本次关闭请求。 */
+      val dismissImeOnClickOutsideFirst: Boolean = true,
       val scrimColor: Color = Color.Transparent, // 背景遮罩颜色
       val modifier: Modifier = Modifier,
       /**
@@ -151,6 +153,7 @@ private class BottomSheetScene<T : AppNavArgument>(
         navigationBarPaddingInContent = properties.navigationBarPaddingInContent,
         dismissOnBackPress = properties.dismissOnBackPress,
         dismissOnClickOutside = properties.dismissOnClickOutside,
+        dismissImeOnClickOutsideFirst = properties.dismissImeOnClickOutsideFirst,
         scrimColor = properties.scrimColor
       ) {
         // entry.Content() 不携带 BottomSheetScope receiver，这里通过 CompositionLocal 下传，
