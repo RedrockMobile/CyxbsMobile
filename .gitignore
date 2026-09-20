@@ -43,3 +43,6 @@ node_modules/
 
 *.local.json
 cyxbs-applications/pro/iosApp/Podfile.lock
+
+# build-logic 构建时生成的源码副本/中间产物
+build-logic/**/bin/
