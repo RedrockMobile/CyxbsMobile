@@ -1,4 +1,4 @@
-source 'https://github.com/CocoaPods/specs'
+source 'https://cdn.cocoapods.org/'
 source 'https://github.com/aliyun/aliyun-specs.git'
 
 platform :ios, '26.0'
@@ -7,7 +7,7 @@ use_frameworks!
 # 是否为模拟器环境，优先读取环境变量，未设置时默认 true（模拟器）：
 #   pod install                  → 模拟器（默认）
 #   IS_SIMULATOR=0 pod install   → 真机 / 发布包
-IS_SIMULATOR = ENV.fetch('IS_SIMULATOR', '1') != '0'
+IS_SIMULATOR = false
 
 inhibit_all_warnings!
 
