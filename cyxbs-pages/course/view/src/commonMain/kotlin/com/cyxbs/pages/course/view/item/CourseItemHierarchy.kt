@@ -326,7 +326,7 @@ class CourseItemHierarchy<Item : CourseItem> {
     val decorationManager: CoursePageDecorationManager,
   ) {
 
-    // 绑定在 viewModelScope 之下的子协程作用域
+    // 绑定在 Manager 数据作用域下的子作用域；不含 Compose 帧时钟，不能用于 UI 动画
     private val coroutineScope = CoroutineScope(
       decorationManager.courseCoroutineScope.coroutineContext
           + SupervisorJob(decorationManager.courseCoroutineScope.coroutineContext[Job])

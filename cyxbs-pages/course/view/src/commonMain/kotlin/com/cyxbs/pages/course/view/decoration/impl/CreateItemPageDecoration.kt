@@ -35,6 +35,7 @@ import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.datetime.DayOfWeek
@@ -67,7 +68,7 @@ class CreateItemPageDecoration(
   suspend fun cancelAllTouchedItem() {
     supervisorScope {
       itemHierarchy.getAllWhatTime().forEach {
-        launch { (it as CreateScheduleTouchItemWhatTime).cancel() }
+        launch { (it as CreateScheduleTouchItemWhatTime).cancelWithAnimation() }
       }
     }
     itemHierarchy.reset(emptyList())
@@ -106,7 +107,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
   val courseFrame = AbstractCourseFrame.current
   courseFrame.beginDate.collectAsState().value ?: return
   courseFrame.getWeekNumByPage(coursePage.page) ?: return // 仅在有周数的页面才允许创建事务
-  val coroutineScope = rememberCoroutineScope()
+  val uiCoroutineScope = rememberCoroutineScope()
   LongPressCreateItemCompose(
     modifier = Modifier.fillMaxSize().zIndex(-999F), // 在最底层接收触摸事件
     onCreate = { beginPosition, size ->
@@ -123,6 +124,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
         initMinuteTime = initTime,
         coursePage = coursePage,
         initPosition = beginPosition,
+        uiCoroutineScope = uiCoroutineScope,
       )
       decoration.itemHierarchy.add(
         CreateScheduleTouchItemWhatTime(
@@ -135,7 +137,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
     onTap = { position, size ->
       if (!decoration.itemHierarchy.isEmpty()) {
         // 手指轻击时清理已有的 item
-        coroutineScope.launch {
+        uiCoroutineScope.launch {
           decoration.cancelAllTouchedItem()
         }
       } else {
@@ -151,6 +153,7 @@ private fun LongPressCreateCoursePageWrapper(decoration: CreateItemPageDecoratio
           initMinuteTime = initTime,
           coursePage = coursePage,
           initPosition = position,
+          uiCoroutineScope = uiCoroutineScope,
         )
         decoration.itemHierarchy.add(
           CreateScheduleTouchItemWhatTime(
@@ -196,8 +199,17 @@ internal data class CreateScheduleTouchItemWhatTime(
     )
   }
 
-  suspend fun cancel() {
-    val itemState = itemState ?: return
+  /**
+   * 在调用方提供的 Compose UI 协程中播放淡出动画并移除草稿。
+   *
+   * 调用上下文必须包含 `MonotonicFrameClock`；Manager/Item 的数据作用域不满足该要求。
+   */
+  suspend fun cancelWithAnimation() {
+    val itemState = itemState
+    if (itemState == null) {
+      discard()
+      return
+    }
     try {
       animate(
         initialValue = 1F,
@@ -207,9 +219,14 @@ internal data class CreateScheduleTouchItemWhatTime(
         itemState.alphaState.value = value
       }
     } finally {
-      itemState.alphaState.value = 0F
-      viewModel.itemHierarchy.remove(this@CreateScheduleTouchItemWhatTime)
+      discard()
     }
+  }
+
+  /** 跳过动画并立即移除草稿，用于对应 UI scope 已销毁的生命周期边界。 */
+  fun discard() {
+    itemState?.alphaState?.value = 0F
+    viewModel.itemHierarchy.remove(this@CreateScheduleTouchItemWhatTime)
   }
 }
 
@@ -227,6 +244,7 @@ internal class TouchingItem(
   val initMinuteTime: MinuteTime,
   val coursePage: LocalCoursePageContext,
   override val initPosition: Offset,
+  private val uiCoroutineScope: CoroutineScope,
 ) : TouchItem, LongPressCreateItem {
 
   override val now: MutableStateFlow<CourseItemWhatTime.Fixed> = MutableStateFlow(
@@ -275,23 +293,31 @@ internal class TouchingItem(
     clickLock.forEach { it.unlock() }
     clickLock.clear()
     layoutAnimUnlock?.run()
-    val coroutineScope = itemState.item.coroutineScope
     val whatTime = itemState.item.whatTime as CreateScheduleTouchItemWhatTime
     if (now.value.finalTime - now.value.beginTime < MIN_MINUTE_INTERVAL.minutes) {
       // 暂定小于 MIN_MINUTE_INTERVAL 分钟的事务不支持
       toast("不支持创建小于 $MIN_MINUTE_INTERVAL 分钟的事务")
-      coroutineScope.launch {
-        whatTime.cancel()
-      }
+      cancelDraft(whatTime)
     } else {
       val initialTiming = viewModel.createInitialTiming(whatTime)
       if (initialTiming == null) {
         toast("事务时间初始化失败")
-        coroutineScope.launch { whatTime.cancel() }
+        cancelDraft(whatTime)
       } else {
         // 保存前只把时间草稿交给临时 Item，真正的 Schedule 由点击后的编辑弹窗创建。
         (itemState.item as CourseCreateItem).setInitialTiming(initialTiming)
       }
+    }
+  }
+
+  /** 使用创建当前触摸 Item 的 UI scope 执行动画；页面已销毁时直接清理草稿。 */
+  private fun cancelDraft(whatTime: CreateScheduleTouchItemWhatTime) {
+    if (!uiCoroutineScope.isActive) {
+      whatTime.discard()
+      return
+    }
+    uiCoroutineScope.launch {
+      whatTime.cancelWithAnimation()
     }
   }
 

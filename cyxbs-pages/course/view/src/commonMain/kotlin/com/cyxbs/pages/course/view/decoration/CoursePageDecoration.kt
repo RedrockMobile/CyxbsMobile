@@ -27,7 +27,11 @@ abstract class CoursePageDecoration<Item: CourseItem> {
   protected val courseFrame
     get() = checkNotNull(decorationManager) { "CoursePageDecoration 当前未挂载" }.courseFrame
 
-  /** 当前 Manager 的数据作用域；Manager 被替换或 Frame 销毁时会自动取消。 */
+  /**
+   * 当前 Manager 的数据作用域；Manager 被替换或 Frame 销毁时会自动取消。
+   *
+   * 该作用域没有 Compose 帧时钟，不得用于 UI 动画；动画应由当前 Composition 提供的协程执行。
+   */
   protected val courseCoroutineScope
     get() = checkNotNull(decorationManager) { "CoursePageDecoration 当前未挂载" }.courseCoroutineScope
 

@@ -23,7 +23,13 @@ val LocalCourseItemState = staticCompositionLocalOf<CourseItemState> { error("�
 // 更新后应保证等价的 item 前后属于同一个对象
 abstract class CourseItem(
   val whatTime: CourseItemWhatTime, // item 的时间信息
-  val coroutineScope: CoroutineScope, // item 所在的协程作用域
+  /**
+   * Item 的数据生命周期作用域，随所属 Manager 关闭或 Item 移除而取消。
+   *
+   * 该作用域不包含 Compose 的 `MonotonicFrameClock`，不得用于 UI 动画；Item 可能跨 Composition
+   * 销毁与重建复用，需要动画时应使用当前 Composition 的 `rememberCoroutineScope()`。
+   */
+  val coroutineScope: CoroutineScope,
 ) {
 
   // item 支持的扩展功能

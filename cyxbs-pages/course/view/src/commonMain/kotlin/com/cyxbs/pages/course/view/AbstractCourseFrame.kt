@@ -66,10 +66,14 @@ abstract class AbstractCourseFrame : AutoCloseable {
 
   /**
    * Frame 内部数据生命周期，不向外部调用方暴露，避免 ViewModel 或 Composable 传递 CoroutineScope。
+   * 该作用域不包含 Compose 帧时钟，不得执行 UI 动画。
    */
   private val courseFrameScope = CoroutineScope(Dispatchers.Main.immediate + courseFrameJob)
 
-  /** 启动与整个 Frame 同生命周期的任务，适合账号观察、主页 Header 等跨 Manager 数据。 */
+  /**
+   * 启动与整个 Frame 同生命周期的数据任务，适合账号观察、主页 Header 等跨 Manager 数据。
+   * 需要 Compose 帧时钟的动画必须由当前 Composition 启动。
+   */
   protected fun launchInCourseFrameScope(block: suspend CoroutineScope.() -> Unit): Job =
     courseFrameScope.launch(block = block)
 
