@@ -43,6 +43,13 @@ import kotlin.math.roundToInt
  */
 
 /**
+ * 同步查询当前平台软键盘是否正在占用应用窗口。
+ *
+ * 该接口不依赖 Compose 状态，应在平台 UI 主线程调用；不支持的平台返回 false。
+ */
+expect fun isImeVisible(): Boolean
+
+/**
  * 创建一份仅在当前弹窗生命周期内使用的目标 IME 状态。
  *
  * 宿主使用 [imePaddingWithTarget] 执行实际位移，并通过 [LocalImePaddingTargetState] 将状态提供给

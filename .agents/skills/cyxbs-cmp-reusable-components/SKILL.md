@@ -44,6 +44,7 @@ description: >
 - **项目内使用示例**：`cyxbs-pages/schoolcar/src/commonMain/.../widget/CarInfoButtonSheet.kt`
 - **说明**：`peekHeight` 控制常驻高度，稳定锚点与拖动/吸附状态分别对外暴露；具体状态 API、等待方式和中途改向语义查看 `BottomSheetState.kt` 的 KDoc。`bottomSheetDraggable()` 必须挂在 content 内子组件上才能响应拖拽。
 - **导航栏适配**：组件支持根据父级剩余 Insets 自动补齐折叠高度、绘制底部占位并避让展开态内容；相关参数为 `navigationBarContent` 和 `navigationBarPaddingInContent`，具体默认值、自定义方式与行为边界请直接查看 `BottomSheet.kt` 中的 KDoc 和源码逻辑。
+- **IME 关闭顺序**：启用 `dismissOnClickOutside` 时默认由 `dismissImeOnClickOutsideFirst` 保证键盘可见时第一次点击蒙层只收起键盘，键盘收起后再次点击才触发业务 `onDismissRequest`；无此需求时显式传 false。iOS 可见性由 utils 模块的 `IosImeInitialService` 在应用启动时全局监听 UIKit 通知，组件内不要重复注册。
 
 ### `TodoBottomSheet` — 临时对话框用法（包装模式）
 

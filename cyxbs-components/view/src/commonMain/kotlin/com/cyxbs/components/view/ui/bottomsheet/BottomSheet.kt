@@ -35,12 +35,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
+import com.cyxbs.components.utils.compose.isImeVisible
 import com.cyxbs.components.utils.compose.plusDsl
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import kotlinx.coroutines.CancellationException
@@ -75,6 +78,8 @@ fun rememberBottomSheetState(
  * 默认使用 `LocalAppColors.topBg`，传入 {} 可保留高度但保持透明，传 null 则关闭导航栏适配，由调用方自行兼容。
  * @param navigationBarPaddingInContent 是否对展开的内容应用 `navigationBarsPadding()`，
  * 默认在 [navigationBarContent] 非 null 时开启；业务已自行处理时传 false。
+ * @param dismissImeOnClickOutsideFirst 点击外部区域时是否优先清除焦点并收起软键盘。为 true 且键盘
+ * 可见时，本次点击只处理键盘；键盘完全收起后再次点击才会触发 [BottomSheetState.onDismissRequest]。
  */
 @Composable
 fun BottomSheetCompose(
@@ -85,6 +90,7 @@ fun BottomSheetCompose(
   navigationBarPaddingInContent: Boolean = navigationBarContent != null,
   dismissOnBackPress: Boolean = true,
   dismissOnClickOutside: Boolean = false,
+  dismissImeOnClickOutsideFirst: Boolean = true,
   scrimColor: Color = Color.Transparent.copy(alpha = 0.6F),
   content: @Composable BottomSheetScope.() -> Unit
 ) {
@@ -101,6 +107,7 @@ fun BottomSheetCompose(
     bottomSheetState = bottomSheetState,
     dismissOnBackPress = dismissOnBackPress,
     dismissOnClickOutside = dismissOnClickOutside,
+    dismissImeOnClickOutsideFirst = dismissImeOnClickOutsideFirst,
   ) {
     BottomSheetContent(
       modifier = Modifier.align(Alignment.BottomCenter),
@@ -159,10 +166,13 @@ private fun BottomSheetBackgroundCompose(
   scrimColor: Color,
   dismissOnBackPress: Boolean = true,
   dismissOnClickOutside: Boolean = false,
+  dismissImeOnClickOutsideFirst: Boolean = true,
   content: @Composable BoxScope.() -> Unit,
 ) {
   val coroutineScope = rememberCoroutineScope()
   val focusRequester = remember { FocusRequester() }
+  val focusManager = LocalFocusManager.current
+  val keyboardController = LocalSoftwareKeyboardController.current
   val dismissInteractionEnabled by rememberDerivedStateOfStructure {
     // 关闭目标建立后立即撤销内部关闭入口，避免动画期间再次点击导致旧动画被取消并重新开始。
     // Window 仍会拦截底层内容，真正解除平台级触摸隔离要等宿主在动画完成后移除 Window。
@@ -189,8 +199,14 @@ private fun BottomSheetBackgroundCompose(
         // 全屏 Window 会保留到收起动画结束；这里只控制组件内部是否仍可重复发起关闭。
         if (dismissOnClickOutside && dismissInteractionEnabled) {
           clickableNoIndicator { // 这里给背景设置点击事件默认会拦截后面的 XML 布局，所以只有需要时才设置
-            coroutineScope.launch {
-              bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+            if (dismissImeOnClickOutsideFirst && isImeVisible()) {
+              // iOS 隐藏键盘后仍可能保留输入焦点；先强制清焦点，再显式请求收起软键盘。
+              focusManager.clearFocus(force = true)
+              keyboardController?.hide()
+            } else {
+              coroutineScope.launch {
+                bottomSheetState.onDismissRequest.invoke(bottomSheetState)
+              }
             }
           }
         }
