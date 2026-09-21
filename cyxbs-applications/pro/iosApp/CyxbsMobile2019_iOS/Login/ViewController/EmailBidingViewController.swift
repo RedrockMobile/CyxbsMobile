@@ -164,7 +164,7 @@ extension EmailBidingViewController {
                 let status = model["status"].intValue
                 if status == 10000 {
                     ProgressHUD.showSuccess("绑定成功")
-                    self.dismissSelf()
+                    self.skipBinding()
                 } else {
                     fallthrough
                 }
@@ -179,13 +179,25 @@ extension EmailBidingViewController {
         let alertVC = UIAlertController.normalType(title: title, content: "你可以跳过本次绑定，但当你更改了密码却忘记密码时，你必须联系相关人员。", cancelText: "继续绑定", sureText: "跳过绑定") { action in
             
             if action.title == "跳过绑定" {
-                
-                self.dismissSelf()
+                // 避免 Alert 还在收起时直接触发 push/pop 转场冲突。
+                DispatchQueue.main.async {
+                    self.skipBinding()
+                }
             }
         }
         present(alertVC, animated: true)
     }
     
+    /// 该页面在登录后是 push 到导航栈里的；这里只能返回上一页，不能用 dismiss。
+    /// 否则 iOS 27 会因为 presentedViewController 为 nil 而终止转场回调，导致跳过弹窗看似无响应。
+    func skipBinding() {
+        if let nav = navigationController, !nav.viewControllers.isEmpty {
+            nav.popViewController(animated: true)
+        } else {
+            dismissSelf()
+        }
+    }
+
     func dismissSelf() {
         self.dismiss(animated: true) {
             self.dismissAction?(false, nil)
