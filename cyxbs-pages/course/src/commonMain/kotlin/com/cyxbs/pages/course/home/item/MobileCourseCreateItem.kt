@@ -6,8 +6,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.dialog.CourseBottomSheetScope
 import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.impl.CourseCreateItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseCreateItem
@@ -58,21 +58,21 @@ private class MobileCreateBottomSheetExtension(
     get() = item.itemState
 
   @Composable
-  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
+  override fun CourseBottomSheetDialogContent(scope: CourseBottomSheetScope) {
     val initialTiming = item.initialTimingFlow.collectAsState().value ?: return
     val uiCoroutineScope = rememberCoroutineScope()
     scheduleService.ScheduleCreateAffairContent(
       initialTiming = initialTiming,
       embeddedInHost = true,
-      onDismiss = state::dismissDialogAnimated,
+      onDismiss = scope::dismissDialogAnimated,
       onCreated = {
         uiCoroutineScope.launch { item.removeDraft() }
       },
       onEditModeChanged = { isEditing ->
-        if (isEditing) state.lockCurrentPage()
+        if (isEditing) scope.lockCurrentPage()
       },
-      onDismissRequestChanged = state::updateDismissRequestGate,
-      onWindowOverlayContentChanged = state::updateWindowOverlayContent,
+      onDismissRequestChanged = scope::updateDismissRequestGate,
+      onWindowOverlayContentChanged = scope::updateWindowOverlayContent,
     )
   }
 }

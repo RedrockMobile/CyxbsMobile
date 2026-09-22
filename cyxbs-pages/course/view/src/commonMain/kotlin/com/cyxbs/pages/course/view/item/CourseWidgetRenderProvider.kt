@@ -1,10 +1,7 @@
 package com.cyxbs.pages.course.view.item
 
-import com.cyxbs.pages.course.api.LessonByWeeks
-import com.cyxbs.pages.schedule.api.ScheduleOccurrenceView
 import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
 import com.cyxbs.pages.widget.api.CourseWidgetVisibleRange
-import kotlinx.datetime.isoDayNumber
 
 /** Widget 与 Compose 深色模式共用的纯 ARGB 文字色，避免把 Compose `Color` 泄漏到快照协议。 */
 const val CourseWidgetDarkContentArgb: Long = 0xFFF0F0F2L
@@ -36,12 +33,3 @@ interface CourseWidgetRenderProvider {
     visibleRanges: List<CourseWidgetVisibleRange>,
   ): CourseWidgetRenderItem?
 }
-
-/** 生成课程及关联课程共用的稳定 Widget 身份，供快照导出和独立详情查询使用。 */
-fun LessonByWeeks.courseWidgetItemId(isLinked: Boolean): String {
-  val prefix = if (isLinked) "link-lesson" else "lesson"
-  return "$prefix:$courseNum:${dayOfWeek.isoDayNumber}:$beginLesson:$period:$rawWeek:$teacher:$classroom"
-}
-
-/** 生成日程详情业务身份；不包含课表切片信息，移动或跨日后仍可实时定位同一 occurrence。 */
-fun ScheduleOccurrenceView.courseWidgetDialogItemId(): String = "schedule:$identity"

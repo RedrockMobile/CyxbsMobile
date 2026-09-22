@@ -5,6 +5,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.api.courseItemDetailId
 import com.cyxbs.pages.widget.api.CourseWidgetAction
 import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
 import com.cyxbs.pages.widget.api.CourseWidgetItemStyle
@@ -16,7 +17,6 @@ import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.CourseWidgetRenderProvider
 import com.cyxbs.pages.course.view.item.CourseWidgetDarkContentArgb
-import com.cyxbs.pages.course.view.item.courseWidgetItemId
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.datetime.isoDayNumber
@@ -36,7 +36,7 @@ class CourseLessonItem(
 ) : CourseItem(whatTime, coroutineScope), CourseWidgetRenderProvider {
 
   override val widgetItemId: String
-    get() = lesson.courseWidgetItemId(isLinked = false)
+    get() = lesson.courseItemDetailId(isLinked = false)
 
   init {
     extensions.add(CourseLessonMovableItemExtension())

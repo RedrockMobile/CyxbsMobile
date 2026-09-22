@@ -3,14 +3,18 @@ package com.cyxbs.pages.widget.widget.glance
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.pages.course.api.CourseItemDetailRequest
+import com.cyxbs.pages.course.api.ICourseItemDetailService
 import com.cyxbs.pages.widget.api.CourseWidgetAction
-import kotlinx.serialization.decodeFromString
 
 /**
- * Glance 课程详情的透明 Activity 占位容器。
+ * Glance 课程详情的透明 Activity 容器。
  *
- * 当前只保留独立入口和参数边界，暂不接入课表详情内容；后续完成弹窗分层后再由课程侧提供 UI。
+ * 本类只校验 Widget 参数并提供 Compose 生命周期；课程实时查询、重叠分页和业务内容均由
+ * [ICourseItemDetailService] 提供，避免 Widget 依赖 course:view 或课程数据模型。
  */
 class CourseWidgetEntryActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,13 +35,30 @@ class CourseWidgetEntryActivity : ComponentActivity() {
       finish()
       return
     }
-    // 暂时保留空 Compose 容器，避免在弹窗架构重构前继续耦合 course:view。
-    setContent {}
+    val overlapItemIds = action.overlapItemIds.asSequence()
+      .filter { it.isNotBlank() && it.length <= MAX_ID_LENGTH }
+      .distinct()
+      .take(MAX_OVERLAP_ITEM_COUNT)
+      .toList()
+    val request = CourseItemDetailRequest(
+      week = action.week,
+      itemId = itemId,
+      overlapItemIds = overlapItemIds,
+    )
+    setContent {
+      AppTheme {
+        ICourseItemDetailService::class.impl().CourseItemDetailDialog(
+          request = request,
+          onDismiss = ::finish,
+        )
+      }
+    }
   }
 
   private companion object {
     const val MAX_VALID_WEEK = 60
     const val MAX_ID_LENGTH = 256
     const val MAX_ACTION_JSON_LENGTH = 32 * 1024
+    const val MAX_OVERLAP_ITEM_COUNT = 16
   }
 }

@@ -11,8 +11,8 @@ import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.dialog.CourseBottomSheetScope
 import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.impl.CourseLessonItem
 import com.cyxbs.pages.course.view.item.impl.PlatformCourseLessonItem
@@ -66,7 +66,7 @@ private class MobileCourseBottomSheetExtension(
     get() = itemKeyImpl.itemState
 
   @Composable
-  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
+  override fun CourseBottomSheetDialogContent(scope: CourseBottomSheetScope) {
     LessonBottomSheetDialog(itemKeyImpl.lesson, false)
   }
 

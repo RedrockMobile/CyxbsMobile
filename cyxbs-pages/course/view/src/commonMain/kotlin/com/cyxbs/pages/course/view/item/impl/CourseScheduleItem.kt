@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.color
+import com.cyxbs.pages.course.api.scheduleCourseItemDetailId
 import com.cyxbs.pages.widget.api.CourseWidgetAction
 import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
 import com.cyxbs.pages.widget.api.CourseWidgetItemStyle
@@ -24,7 +25,6 @@ import com.cyxbs.pages.course.view.item.CourseItemWhatTime
 import com.cyxbs.pages.course.view.item.CourseWidgetRenderProvider
 import com.cyxbs.pages.course.view.item.CourseWidgetDarkContentArgb
 import com.cyxbs.pages.course.view.item.CourseWidgetSecondaryContentArgb
-import com.cyxbs.pages.course.view.item.courseWidgetDialogItemId
 import com.cyxbs.pages.course.view.item.ItemHierarchyWhatTime
 import com.cyxbs.pages.course.view.item.createCourseDefaultModifierList
 import com.cyxbs.pages.course.view.item.extension.IMovableItemExtension
@@ -55,7 +55,7 @@ class CourseScheduleItem internal constructor(
     get() = "schedule:${data.stableId}"
 
   override val widgetDialogItemId: String
-    get() = occurrence.courseWidgetDialogItemId()
+    get() = scheduleCourseItemDetailId(occurrence.identity)
 
   init {
     // 仅复用课表的长按拖动预览；扩展保留默认落点，松手后回到原位置且不修改日程数据。
