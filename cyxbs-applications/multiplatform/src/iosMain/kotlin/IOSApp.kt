@@ -11,6 +11,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.navigation.AppNavDisplay
+import com.cyxbs.components.navigation.AppSnackbarCompose
 import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.cyxbs.pages.discover.home.DiscoverIosPlatform
@@ -79,6 +80,7 @@ fun MainViewController(): UIViewController {
     IOSNavigationBarInsets {
       AppTheme {
         AppNavDisplay()
+        AppSnackbarCompose()
         if (!IOSKmpInterfaceLink.enableUsePlatformToast()) {
           PlatformToastCompose()
         }

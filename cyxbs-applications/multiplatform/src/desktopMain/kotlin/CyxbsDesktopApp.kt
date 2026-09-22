@@ -9,6 +9,7 @@ import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.res.ConfigRes
 import com.cyxbs.components.init.runApp
 import com.cyxbs.components.navigation.AppNavDisplay
+import com.cyxbs.components.navigation.AppSnackbarCompose
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.multiplatform.MultiplatformKtProviderInitializer
@@ -48,6 +49,7 @@ fun main() {
         }
         AppTheme {
           AppNavDisplay()
+          AppSnackbarCompose()
           PlatformToastCompose()
         }
       }

@@ -17,6 +17,7 @@ import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import com.cyxbs.pages.schedule.ui.edit.EditScope
 import com.cyxbs.pages.schedule.ui.edit.applyScheduleDelete
 import com.cyxbs.pages.schedule.ui.feed.ScheduleFeedUiState
+import com.cyxbs.pages.schedule.ui.feed.ScheduleFeedItemIdentity
 import com.cyxbs.pages.schedule.ui.feed.projectScheduleFeed
 import com.cyxbs.pages.schedule.ui.todo.main.loadScheduleTodoPinnedIds
 import com.cyxbs.pages.schedule.ui.todo.main.saveScheduleTodoPinnedIds
@@ -38,6 +39,9 @@ class ScheduleFeedViewModel(
   val uiState: StateFlow<ScheduleFeedUiState> = _uiState.asStateFlow()
   private var pinnedSettingsAccountId: String? = null
   private var pinnedIds: List<ScheduleId> = emptyList()
+  private val _pendingCompletion = MutableStateFlow<SchedulePendingCompletion?>(null)
+  internal val pendingCompletion: StateFlow<SchedulePendingCompletion?> = _pendingCompletion.asStateFlow()
+  private var completionRequestId = 0L
 
   init {
     launchByViewModelScope { repository.snapshot.collect(::updateList) }
@@ -105,22 +109,55 @@ class ScheduleFeedViewModel(
   }
 
   /**
-   * 在 ViewModel scope 中完成被点击的精确实例。重复项按 recurrenceId 写完成例外，并保留既有移动/覆盖 patch；
-   * 非重复项才写系列完成命令，不会通过删除或“推进到下一次”改变重复规则。
+   * 请求完成 Feed 中的精确实例，并保留 [ScheduleCompletionUndoDurationMillis] 的撤销窗口。
+   *
+   * 撤销窗口内只更新 UI，不写仓库，避免用户撤销时再发一次反向同步；若连续勾选不同事项，
+   * 上一项会立即提交，再为新事项重新开启完整的两秒窗口。
    */
-  fun onItemCheck(id: ScheduleId, recurrenceId: RecurrenceId?) = launchByViewModelScope {
-    if (recurrenceId == null) repository.execute(ScheduleCommand.CompleteNonRepeating(id, true))
-    else {
+  fun onItemCheck(id: ScheduleId, recurrenceId: RecurrenceId?) {
+    val identity = ScheduleFeedItemIdentity(id, recurrenceId)
+    if (_pendingCompletion.value?.identity == identity) return
+
+    _pendingCompletion.value?.let { previous ->
+      launchByViewModelScope { complete(previous.identity) }
+    }
+
+    val pending = SchedulePendingCompletion(identity, ++completionRequestId)
+    _pendingCompletion.value = pending
+  }
+
+  /** 取消仍在两秒窗口内的完成请求；仓库尚未写入，因此无需执行反向命令。 */
+  fun undoPendingCompletion() {
+    _pendingCompletion.value = null
+  }
+
+  /** 仅提交与应用级 Snackbar 超时事件匹配的请求，避免旧回调误完成后续点击的事项。 */
+  fun commitPendingCompletion(requestId: Long) {
+    val pending = _pendingCompletion.value?.takeIf { it.requestId == requestId } ?: return
+    _pendingCompletion.value = null
+    launchByViewModelScope { complete(pending.identity) }
+  }
+
+  /**
+   * 把精确实例写为完成态。重复项写 occurrence 例外并保留既有 patch，普通项写系列完成命令。
+   */
+  private suspend fun complete(identity: ScheduleFeedItemIdentity) {
+    val (id, recurrenceId) = identity
+    if (recurrenceId == null) {
+      repository.execute(ScheduleCommand.CompleteNonRepeating(id, true))
+    } else {
       val now = clock.now()
       val existing = repository.snapshot.value.occurrenceAdjustments.firstOrNull {
         it.scheduleId == id && it.recurrenceId == recurrenceId
       }
-      repository.execute(ScheduleCommand.UpsertOccurrenceAdjustment(
-        existing?.copy(status = OccurrenceStatus.COMPLETED, updatedAt = now)
-          ?: ScheduleOccurrenceAdjustment(
-            id, recurrenceId, 0, OccurrenceStatus.COMPLETED, null, now, now,
-          )
-      ))
+      repository.execute(
+        ScheduleCommand.UpsertOccurrenceAdjustment(
+          existing?.copy(status = OccurrenceStatus.COMPLETED, updatedAt = now)
+            ?: ScheduleOccurrenceAdjustment(
+              id, recurrenceId, 0, OccurrenceStatus.COMPLETED, null, now, now,
+            )
+        )
+      )
     }
   }
 
@@ -152,3 +189,12 @@ class ScheduleFeedViewModel(
     _uiState.value = projectScheduleFeed(snapshot, now, zone, pinnedIds)
   }
 }
+
+/** 一次可撤销完成请求；[requestId] 用于让 Snackbar 倒计时在连续操作时重新开始。 */
+internal data class SchedulePendingCompletion(
+  val identity: ScheduleFeedItemIdentity,
+  val requestId: Long,
+)
+
+/** 首页完成操作的撤销窗口，保持与 Snackbar 展示时长一致。 */
+internal const val ScheduleCompletionUndoDurationMillis = 2_000L

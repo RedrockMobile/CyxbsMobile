@@ -62,6 +62,12 @@ data class ScheduleFeedItemUi(
   val isProjectedToCourse: Boolean,
 )
 
+/** Feed 中唯一标识一个普通事项或重复实例的键，用于关联延迟完成与撤销状态。 */
+data class ScheduleFeedItemIdentity(
+  val id: ScheduleId,
+  val recurrenceId: RecurrenceId?,
+)
+
 /**
  * 将 Schedule 快照投影为主页 Feed 状态。
  *

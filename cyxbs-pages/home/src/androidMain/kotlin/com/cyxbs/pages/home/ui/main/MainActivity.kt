@@ -12,6 +12,7 @@ import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.route.MAIN_ENTRY
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppNavDisplay
+import com.cyxbs.components.navigation.AppSnackbarCompose
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.utils.extensions.launchByLifecycleScope
 import com.cyxbs.components.utils.extensions.logg
@@ -39,6 +40,7 @@ class MainActivity : BaseActivity() {
     setContent {
       AppTheme {
         AppNavDisplay()
+        AppSnackbarCompose()
         DeepLinkHandler()
       }
     }

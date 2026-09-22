@@ -119,6 +119,7 @@ description: >
 - **左滑删除**：当前用 Material1 的 `IconButton` 直接显示删除按钮。如后续引入 `SwipeToDismiss` 或第三方，应追加。
 - **图片加载**：`com.cyxbs.components.utils.extensions.ImageFromUrlCompose`（DiscoverPage、校历页用到），支持自定义 placeholder/error、`colorFilter` 和 `ImageRequest.Builder`；业务需要自定义缓存身份时，应直接在 builder 中同时设置 `memoryCacheKey` / `diskCacheKey`，校历页是 URL + 版本号的参考实现。
 - **Toast**：`com.cyxbs.components.utils.extensions.toast`（Compose 内也能调）。
+- **应用级 Snackbar**：Compose 页面中使用 `showAppSnackbar(...)` 弹出，内容支持正文、操作文字、操作图标三个 Composable 插槽，并提供 `String + String + Painter` 重载；倒计时等业务动画应由图标插槽实现，不能写死在通用宿主中。
 - **自定义下拉刷新与 iOS 回弹**：列表通过 `NestedScrollConnection` 驱动刷新头时，应设置 `LazyColumn(overscrollEffect = null)`，避免 iOS 默认回弹消费后续拖动；判断顶部的 `LazyListState` 必须绑定到该列表。参考 `SportNavEntry.kt` 的 `SportRecord`。
 - **登录弹窗**：`com.cyxbs.components.config.login.rememberLoginDialogState` + `doIfLogin(function="签到") { ... }`。
 - **主题色 / 暗黑模式**：`com.cyxbs.components.config.compose.theme.LocalAppColors.current.xxx`（如 `.bottomBg` / `.tvLv2` / `.whiteBlack`）。
