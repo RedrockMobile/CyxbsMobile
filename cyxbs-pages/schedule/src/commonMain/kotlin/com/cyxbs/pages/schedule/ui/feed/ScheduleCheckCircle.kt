@@ -8,14 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -33,33 +32,29 @@ import org.jetbrains.compose.resources.painterResource
  *
  * 行为对齐旧版：
  * - 未勾选时画一个完整圆环（[uncheckedColor]），完成态颜色来自全局主题正文色。
- * - 点击后立即回调 [onClick]（旧版点击瞬间即把标题/时间置灰），随后播放约 800ms 的
- *   收拢动画（圆弧从 [startAngle] 起收拢成 320° 弧 + 中心浮现对勾），动画结束再回调
- *   [onAnimEnd]（对齐旧版 `setStatusWithAnime` 的 `doOnEnd`，在此触发数据层删除/更新）。
+ * - 点击后立即回调 [onClick]，随后播放约 800ms 的收拢动画（圆弧从 [startAngle] 起收拢成
+ *   320° 弧 + 中心浮现对勾）。数据提交由外层两秒撤销窗口统一调度，不再与图标动画结束时机耦合。
  *
- * 注：旧 View 在勾选时还会画一条横穿到标题的删除线，因 feed 勾选完成后该项随即被移除、
- * 横线仅一闪而过，这里改用「圆弧收拢 + 对勾图标」表达完成态，省去跨标题层叠布局。
+ * 标题删除线由外层 Text 根据同一个 [checked] 状态绘制，避免该图标组件与文字测量互相耦合。
  */
 @Composable
 fun ScheduleCheckCircle(
   checked: Boolean,
   uncheckedColor: Color,
   onClick: () -> Unit,
-  onAnimEnd: () -> Unit,
   modifier: Modifier = Modifier,
   diameter: Dp = 17.dp,
   lineWidth: Dp = 1.5.dp,
   startAngle: Float = 40f,
 ) {
-  val checkedColor = LocalAppColors.current.tvLv3.copy(alpha = 0.65f)
+  val checkedBaseColor = LocalAppColors.current.tvLv3
+  val checkedColor = checkedBaseColor.copy(alpha = 0.65f)
   // 动画进度为 0..200：0~100 收拢圆弧，100~200 进入完成态，以保持旧 View 的节奏。
   val process = remember { Animatable(200f) }
-  val currentOnAnimEnd by rememberUpdatedState(onAnimEnd)
   LaunchedEffect(checked) {
     if (checked) {
       process.snapTo(0f)
       process.animateTo(200f, tween(durationMillis = 800))
-      currentOnAnimEnd()
     }
   }
 
@@ -88,6 +83,8 @@ fun ScheduleCheckCircle(
         painter = painterResource(Res.drawable.schedule_ic_feed_check),
         contentDescription = null,
         contentScale = ContentScale.Fit,
+        // 矢量资源原本写死为浅色主题的深蓝色；运行时着色以保证深色主题下仍清晰可见。
+        colorFilter = ColorFilter.tint(checkedBaseColor),
         modifier = Modifier.size(width = 12.dp, height = 9.dp),
       )
     }

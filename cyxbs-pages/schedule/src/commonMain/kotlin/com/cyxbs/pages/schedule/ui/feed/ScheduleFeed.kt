@@ -1,6 +1,8 @@
 package com.cyxbs.pages.schedule.ui.feed
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,9 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,8 +88,9 @@ import kotlin.math.roundToInt
  * 组件本身不观察仓库，也不再依赖旧 ScheduleService。
  *
  * @param onCardClick 点击整张卡片（跳邮子清单主页）
+ * @param pendingCompletion 仍在两秒撤销窗口内的精确实例；用于驱动置灰和删除线动画。
  * @param onItemClick 点击标题后跳到该系列/实例详情，参数包含稳定的系列 ID 与 recurrence ID。
- * @param onItemCheck 勾选动画结束后完成精确实例，参数 identity 与 [onItemClick] 一致。
+ * @param onItemCheck 请求完成精确实例，参数 identity 与 [onItemClick] 一致；实际提交由外层撤销窗口调度。
  * @param onTogglePin 左滑后切换系列的端上置顶状态，不会发起网络请求。
  * @param onDelete 左滑后删除精确事项；重复实例与普通事项的范围由 ViewModel 路由。
  * @param onToggleCourseProjection 切换系列在课表中的进程内投射状态。
@@ -91,6 +98,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ScheduleFeed(
   state: ScheduleFeedUiState,
+  pendingCompletion: ScheduleFeedItemIdentity?,
   onCardClick: () -> Unit,
   onItemClick: (ScheduleId, RecurrenceId?) -> Unit,
   onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
@@ -121,6 +129,7 @@ fun ScheduleFeed(
         state.items.forEach { item ->
           ScheduleFeedItem(
             item = item,
+            checked = pendingCompletion == ScheduleFeedItemIdentity(item.id, item.recurrenceId),
             onItemClick = onItemClick,
             onItemCheck = onItemCheck,
             onTogglePin = onTogglePin,
@@ -206,6 +215,7 @@ private fun ScheduleFeedHint(text: String) {
 @Composable
 private fun ScheduleFeedItem(
   item: ScheduleFeedItemUi,
+  checked: Boolean,
   onItemClick: (ScheduleId, RecurrenceId?) -> Unit,
   onItemCheck: (ScheduleId, RecurrenceId?) -> Unit,
   onTogglePin: (ScheduleId) -> Unit,
@@ -213,8 +223,6 @@ private fun ScheduleFeedItem(
   onToggleCourseProjection: (ScheduleId) -> Unit,
 ) {
   val colors = LocalAppColors.current
-  // 本地完成态：点击勾选圈后立即置灰（对齐旧版点击瞬间变色），动画结束再触发 onItemCheck
-  var checked by remember(item.id, item.recurrenceId) { mutableStateOf(false) }
   val actionWidth = 110.dp
   val actionWidthPx = with(LocalDensity.current) { actionWidth.toPx() }
   var dragOffsetPx by remember(item.id, item.recurrenceId) { mutableFloatStateOf(0f) }
@@ -233,7 +241,7 @@ private fun ScheduleFeedItem(
     }
   }
 
-  val titleColor = when {
+  val titleTargetColor = when {
     checked -> colors.tvLv3.copy(alpha = 0.45f)
     item.isOverTime -> ScheduleTodoOverdueColor
     item.isDueSoon -> ScheduleTodoDueSoonColor
@@ -319,17 +327,14 @@ private fun ScheduleFeedItem(
             ScheduleCheckCircle(
               checked = checked,
               uncheckedColor = circleUncheckedColor,
-              onClick = { checked = true },
-              onAnimEnd = { onItemCheck(item.id, item.recurrenceId) },
+              onClick = { onItemCheck(item.id, item.recurrenceId) },
               modifier = Modifier.padding(start = 15.dp),
             )
             Spacer(modifier = Modifier.width(13.dp))
-            Text(
+            ScheduleFeedAnimatedTitle(
               text = item.title,
-              color = titleColor,
-              fontSize = 15.sp,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
+              checked = checked,
+              targetColor = titleTargetColor,
               modifier = Modifier.weight(1f),
             )
           }
@@ -391,6 +396,54 @@ private fun ScheduleFeedItem(
       }
     }
   }
+}
+
+/**
+ * 绘制完成态标题的渐变与删除线动画。
+ *
+ * 动画状态只在这个最小子树中读取，避免每一帧都让包含滑动手势和操作按钮的整个 Feed 行重组。
+ */
+@Composable
+private fun ScheduleFeedAnimatedTitle(
+  text: String,
+  checked: Boolean,
+  targetColor: Color,
+  modifier: Modifier = Modifier,
+) {
+  val titleColor by animateColorAsState(
+    targetValue = targetColor,
+    animationSpec = tween(durationMillis = 800),
+  )
+  val strikeProgress by animateFloatAsState(
+    targetValue = if (checked) 1f else 0f,
+    animationSpec = tween(durationMillis = 800),
+  )
+  var titleLayoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+
+  Text(
+    text = text,
+    color = titleColor,
+    fontSize = 15.sp,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+    onTextLayout = { titleLayoutResult = it },
+    modifier = modifier.drawWithContent {
+      drawContent()
+      val layout = titleLayoutResult ?: return@drawWithContent
+      if (strikeProgress <= 0f || layout.lineCount == 0) return@drawWithContent
+      // 删除线只覆盖真实排版宽度，避免 Text 的 weight 空白也被横线贯穿。
+      val startX = layout.getLineLeft(0)
+      val endX = layout.getLineRight(0)
+      val centerY = (layout.getLineTop(0) + layout.getLineBottom(0)) / 2f
+      drawLine(
+        color = titleColor,
+        start = Offset(startX, centerY),
+        end = Offset(startX + (endX - startX) * strikeProgress, centerY),
+        strokeWidth = 1.dp.toPx(),
+        cap = StrokeCap.Round,
+      )
+    },
+  )
 }
 
 /** Feed 左滑后使用设计稿的等宽文字动作块；它与详情页的 28dp 图标按钮属于两套独立样式。 */
