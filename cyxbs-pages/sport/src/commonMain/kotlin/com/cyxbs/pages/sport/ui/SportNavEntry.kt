@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,9 +42,9 @@ import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.res.ConfigRes
+import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_SPORT
@@ -52,13 +52,11 @@ import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.pages.sport.api.SportNavArgument
-import com.cyxbs.pages.sport.viewModel.SportViewModel
+import com.cyxbs.pages.sport.model.SportDetailBean
+import com.cyxbs.pages.sport.model.SportDetailRepository
 import com.cyxbs.pages.sport.widget.RefreshHeader
 import com.cyxbs.pages.sport.widget.RefreshNestedScrollConnection
 import com.cyxbs.pages.sport.widget.RefreshState
-import com.cyxbs.pages.sport.widget.SportDetailUiState
-import com.cyxbs.pages.sport.widget.SportRecordUi
-import com.cyxbs.pages.sport.widget.currentTermText
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_award
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_holiday
@@ -70,8 +68,12 @@ import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_shoes
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_spot
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_time
 import cyxbsmobile.cyxbs_pages.sport.generated.resources.sport_ic_valid
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
+import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.time.Clock
 
 /**
  * @Desc : 体育打卡 Compose 页面及导航入口
@@ -89,12 +91,11 @@ class SportNavEntry : AppNavEntry<SportNavArgument>() {
     }
 
     /**
-     * 创建页面 ViewModel 并渲染体育页面
+     * 渲染体育页面；数据由进程级 Repository 统一提供，避免依赖平台 ViewModel Factory。
      * @param argument 体育页面导航参数
      */
     @Composable
     override fun Content(argument: SportNavArgument) {
-        viewModel { SportViewModel() }
         SportPage(argument)
     }
 }
@@ -105,23 +106,20 @@ class SportNavEntry : AppNavEntry<SportNavArgument>() {
  */
 @Composable
 fun SportPage(argument: SportNavArgument) {
+    val result by SportDetailRepository.sportData.collectAsState()
+    val data = result?.getOrNull()
     ConstraintLayout(
         modifier = Modifier.fillMaxSize()
             .background(LocalAppColors.current.bottomBg)
             .statusBarsPadding(),
         constraintSet = createConstraintSet()
     ) {
-        val viewModel: SportViewModel = viewModel()
-        val state = viewModel.uiState.collectAsStateWithLifecycle().value
         TopBarCompose(modifier = Modifier.layoutId(SportElement.TopBar), argument)
         DetailTotalTitle(modifier = Modifier.layoutId(SportElement.DetailTotalTitle))
-        DetailTotal(modifier = Modifier.layoutId(SportElement.DetailTotal))
+        DetailTotal(data = data, modifier = Modifier.layoutId(SportElement.DetailTotal))
         SportImage(modifier = Modifier.layoutId(SportElement.SportImage))
-        SportDetailRun(modifier = Modifier.layoutId(SportElement.SportDetailRun))
-        SportRecord(
-            modifier = Modifier.layoutId(SportElement.SportRecord),
-            state = state
-        )
+        SportDetailRun(data = data, modifier = Modifier.layoutId(SportElement.SportDetailRun))
+        SportRecord(result = result, modifier = Modifier.layoutId(SportElement.SportRecord))
     }
 }
 
@@ -177,7 +175,17 @@ private fun TopBarCompose(
             modifier = Modifier
                 .padding(end = 15.dp)
                 .align(Alignment.CenterVertically),
-            text = currentTermText(),
+            text = remember {
+                val currentDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+                val year = currentDate.year
+                val season = when (currentDate.month.number) {
+                    1 -> "秋"
+                    in 2..7 -> "春"
+                    in 8..12 -> "秋"
+                    else -> ""
+                }
+                "${year}年  $season"
+            },
             color = 0xFF697c9b.dark(0xFF606061),
             fontSize = 15.sp,
             textAlign = TextAlign.Center
@@ -202,24 +210,13 @@ private fun DetailTotalTitle(
 // 展示总完成次数、目标次数和奖励统计
 @Composable
 private fun DetailTotal(
+    data: SportDetailBean?,
     modifier: Modifier = Modifier,
 ) {
     val impactFontFamily = ConfigRes.impactFontFamily()
     val impactMinFontFamily = ConfigRes.impactMinFontFamily()
-    val viewmodel: SportViewModel = viewModel()
-    val sportUiState by viewmodel.uiState.collectAsStateWithLifecycle()
-    val textDone = when (val state = sportUiState) {
-        SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
-        is SportDetailUiState.Empty -> state.summary.totalDone
-        is SportDetailUiState.Holiday -> state.summary.totalDone
-        is SportDetailUiState.Content -> state.summary.totalDone
-    }
-    val textNeed = when (val state = sportUiState) {
-        SportDetailUiState.Error, SportDetailUiState.Loading -> ""
-        is SportDetailUiState.Empty -> state.summary.totalNeed
-        is SportDetailUiState.Holiday -> state.summary.totalNeed
-        is SportDetailUiState.Content -> state.summary.totalNeed
-    }
+    val textDone = data?.let { it.otherDone + it.runDone }?.toString() ?: "M"
+    val textNeed = data?.let { "/${it.runTotal + it.otherTotal}" } ?: "/N"
     Row(
         modifier = modifier
             .padding(top = 15.dp),
@@ -262,10 +259,9 @@ private fun SportImage(
 //展示跑步和其他项目的完成进度
 @Composable
 private fun SportDetailRun(
+    data: SportDetailBean?,
     modifier: Modifier = Modifier,
 ) {
-    val viewmodel: SportViewModel = viewModel()
-    val sportUiState by viewmodel.uiState.collectAsStateWithLifecycle()
     Row(
         modifier = modifier
             .padding(bottom = 10.dp)
@@ -276,49 +272,24 @@ private fun SportDetailRun(
             modifier = Modifier
                 .padding(start = 19.dp),
             title = "跑步:",
-            done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
-                is SportDetailUiState.Empty -> state.summary.runDone
-                is SportDetailUiState.Holiday -> state.summary.runDone
-                is SportDetailUiState.Content -> state.summary.runDone
-            },
-            need = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> ""
-                is SportDetailUiState.Empty -> state.summary.runNeed
-                is SportDetailUiState.Holiday -> state.summary.runNeed
-                is SportDetailUiState.Content -> state.summary.runNeed
-            }
+            done = data?.runDone?.toString() ?: "X",
+            need = data?.let { "/${it.runTotal}" }.orEmpty(),
         )
         Spacer(modifier = Modifier.weight(1f))
         SportDetailItem(
             modifier = Modifier
                 .padding(start = 35.dp),
             title = "其他:",
-            done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
-                is SportDetailUiState.Empty -> state.summary.otherDone
-                is SportDetailUiState.Holiday -> state.summary.otherDone
-                is SportDetailUiState.Content -> state.summary.otherDone
-            },
-            need = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> ""
-                is SportDetailUiState.Empty -> state.summary.otherNeed
-                is SportDetailUiState.Holiday -> state.summary.otherNeed
-                is SportDetailUiState.Content -> state.summary.otherNeed
-            }
+            done = data?.otherDone?.toString() ?: "Y",
+            need = data?.let { "/${it.otherTotal}" }.orEmpty(),
         )
         Spacer(modifier = Modifier.weight(1f))
         SportDetailItem(
             modifier = Modifier
                 .padding(start = 35.dp, end = 10.dp),
             title = "奖励:",
-            done = when (val state = sportUiState) {
-                SportDetailUiState.Error, SportDetailUiState.Loading -> "null"
-                is SportDetailUiState.Empty -> state.summary.award
-                is SportDetailUiState.Holiday -> state.summary.award
-                is SportDetailUiState.Content -> state.summary.award
-            },
-            need = ""
+            done = data?.award?.toString() ?: "Z",
+            need = "",
         )
     }
 }
@@ -365,16 +336,16 @@ private fun SportDetailItem(
 }
 
 /**
- * 根据 UI 状态渲染记录列表或空状态提示
+ * 根据体育详情请求结果渲染记录列表或空状态提示。
+ *
+ * @param result null 表示加载中，失败结果展示错误态，成功结果直接读取网络模型。
  * @param modifier 记录区域布局修饰符
- * @param state 当前详情 UI 状态
  */
 @Composable
 private fun SportRecord(
+    result: Result<SportDetailBean>?,
     modifier: Modifier = Modifier,
-    state: SportDetailUiState
 ) {
-    val viewModel: SportViewModel = viewModel()
     val listState = rememberLazyListState()
     val triggerOffset = with(LocalDensity.current) {
         70.dp.toPx()
@@ -398,7 +369,7 @@ private fun SportRecord(
                         listState.firstVisibleItemScrollOffset == 0
             },
             onRefresh = {
-                viewModel.refresh(isFirstLoading = false)
+                SportDetailRepository.refresh()
             },
             modifier = Modifier,
         ) {
@@ -412,17 +383,41 @@ private fun SportRecord(
                     .padding(start = 15.dp, end = 15.dp),
                 contentPadding = PaddingValues(vertical = 5.dp)
             ) {
-                if (state is SportDetailUiState.Content) {
-                    items(state.records.size) { index ->
-                        ContentItem(
-                            modifier = Modifier,
-                            record = state.records[index]
+                val week = SchoolCalendar.getWeekOfTerm() ?: 22
+                when {
+                    week !in 1..21 -> item {
+                        HintItem(
+                            modifier = Modifier.fillParentMaxSize(),
+                            drawableResource = Res.drawable.sport_ic_holiday,
+                            content = "大家都放假了，好好度假吧",
                         )
                     }
-                } else {
-                    if (state !is SportDetailUiState.Loading) {
-                        item {
-                            DetailHint(modifier = Modifier.fillParentMaxSize(), state = state)
+                    result == null -> Unit
+                    result.isFailure -> item {
+                        HintItem(
+                            modifier = Modifier.fillParentMaxSize(),
+                            drawableResource = ConfigRes.configIc404(),
+                            content = "数据异常，请刷新重试",
+                        )
+                    }
+                    else -> {
+                        // 后端按时间正序返回；页面保持最新记录在前。
+                        val records = result.getOrThrow().item.orEmpty().asReversed()
+                        if (records.isEmpty()) {
+                            item {
+                                HintItem(
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    drawableResource = Res.drawable.sport_ic_no_data,
+                                    content = "暂时还没有记录哦~",
+                                )
+                            }
+                        } else {
+                            items(records.size) { index ->
+                                ContentItem(
+                                    modifier = Modifier,
+                                    item = records[index],
+                                )
+                            }
                         }
                     }
                 }
@@ -430,7 +425,7 @@ private fun SportRecord(
         }
     }
 
-    val vmRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val vmRefreshing by SportDetailRepository.isRefreshing.collectAsStateWithLifecycle()
     LaunchedEffect(vmRefreshing) {
         if (refreshState.isRefreshing && !vmRefreshing) {
             refreshState.finishRefresh()
@@ -497,7 +492,7 @@ private fun PullToRefresh(
 @Composable
 private fun ContentItem(
     modifier: Modifier = Modifier,
-    record: SportRecordUi
+    item: SportDetailBean.Item
 ) {
     Box(
         modifier = modifier
@@ -509,15 +504,15 @@ private fun ContentItem(
         Column {
             LabelItem(
                 modifier = Modifier.padding(top = 8.dp, bottom = 5.dp),
-                date = record.date,
-                isValid = record.isValid,
-                isAward = record.isAward
+                date = item.date,
+                isValid = item.valid,
+                isAward = item.isAward
             )
             Info(
                 modifier = Modifier.padding(bottom = 8.dp),
-                time = record.time,
-                location = record.spot,
-                type = record.type
+                time = item.time,
+                location = item.spot,
+                type = item.type,
             )
         }
     }
@@ -635,27 +630,6 @@ private fun InfoItem(
             color = 0xFF697C9B.dark(0xFF606061)
         )
     }
-}
-
-// 根据详情状态选择对应的空状态提示
-@Composable
-private fun DetailHint(
-    state: SportDetailUiState,
-    modifier: Modifier = Modifier,
-) {
-    HintItem(
-        modifier = modifier.fillMaxSize(),
-        drawableResource = when (state) {
-            is SportDetailUiState.Holiday -> Res.drawable.sport_ic_holiday
-            is SportDetailUiState.Empty -> Res.drawable.sport_ic_no_data
-            else -> ConfigRes.configIc404()
-        },
-        content = when (state) {
-            is SportDetailUiState.Holiday -> "大家都放假了，好好度假吧"
-            is SportDetailUiState.Empty -> "暂时还没有记录哦~"
-            else -> "数据错误"
-        }
-    )
 }
 
 // 展示空状态插图和提示文案
