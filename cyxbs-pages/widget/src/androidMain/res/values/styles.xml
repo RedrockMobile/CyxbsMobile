@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Widget 详情仅提供透明窗口承载 Compose BottomSheet；系统栏必须透出桌面，避免 Activity
+      创建到 enableEdgeToEdge 生效之间短暂显示平台主题的黑色底色。
+    -->
+    <style name="CourseWidgetDialogTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+
+</resources>

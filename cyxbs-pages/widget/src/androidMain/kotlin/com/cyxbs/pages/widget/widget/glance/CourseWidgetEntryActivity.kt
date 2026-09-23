@@ -1,8 +1,12 @@
 package com.cyxbs.pages.widget.widget.glance
 
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
@@ -19,6 +23,15 @@ import com.cyxbs.pages.widget.api.CourseWidgetAction
 class CourseWidgetEntryActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // 透明入口需要让桌面一直绘制到系统栏下方；图标明暗仍交由 ComponentActivity 按系统主题判断。
+    enableEdgeToEdge(
+      statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+      navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      // Android 10+ 默认可能给三键导航栏叠加对比度底色，透明弹窗中必须主动关闭。
+      window.isNavigationBarContrastEnforced = false
+    }
     // Glance 会按 ActionParameters.Key.name 写入普通 Intent extra；先限制体积再反序列化，
     // 避免损坏或伪造的启动参数占用过多内存。
     val actionJson = intent.getStringExtra(COURSE_WIDGET_ACTION_EXTRA)

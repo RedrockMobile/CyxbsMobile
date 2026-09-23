@@ -52,6 +52,7 @@ import com.cyxbs.pages.widget.widget.glance.OversizedExpandedTimelineMaskKey
 import com.cyxbs.pages.widget.widget.glance.OversizedTimelineSectionIndexKey
 import com.cyxbs.pages.widget.widget.glance.ToggleOversizedTimelineSectionAction
 import com.cyxbs.pages.widget.widget.glance.WidgetRenderItemCard
+import com.cyxbs.pages.widget.widget.glance.currentMinute
 import com.cyxbs.pages.widget.widget.glance.dispatchRefreshToGlanceReceiver
 import com.cyxbs.pages.widget.widget.glance.findAllDayItem
 import com.cyxbs.pages.widget.widget.glance.widgetColorProvider
@@ -108,6 +109,7 @@ internal object OversizedGlanceWidget : GlanceAppWidget() {
         monthLabel = headerDate.monthLabel,
         dayOfMonths = headerDate.dayOfMonths,
         today = calendar.mondayBasedDay(),
+        nowMinute = currentMinute(calendar),
         expandedTimelineMask = preferences[OversizedExpandedTimelineMaskKey] ?: 0,
       )
     }
@@ -125,6 +127,7 @@ internal object OversizedGlanceWidget : GlanceAppWidget() {
         monthLabel = headerDate.monthLabel,
         dayOfMonths = headerDate.dayOfMonths,
         today = calendar.mondayBasedDay(),
+        nowMinute = currentMinute(calendar),
         expandedTimelineMask = 0,
       )
     }
@@ -138,6 +141,7 @@ private fun OversizedWidgetContent(
   monthLabel: String,
   dayOfMonths: List<Int>,
   today: Int,
+  nowMinute: Int,
   expandedTimelineMask: Int,
 ) {
   val localSize = LocalSize.current
@@ -170,6 +174,11 @@ private fun OversizedWidgetContent(
     availableHeightDp = timelineViewportHeight,
   )
   val timelineContentHeight = sectionHeights.sum().coerceAtLeast(timelineViewportHeight)
+  val currentTimeOffsetDp = resolveOversizedCurrentTimeOffset(
+    sections = sections,
+    sectionHeights = sectionHeights,
+    nowMinute = nowMinute,
+  )
   Column(
     modifier = GlanceModifier.fillMaxSize().background(widgetColorProvider(Color.White))
       .appWidgetBackground().cornerRadius(14.dp),
@@ -202,6 +211,7 @@ private fun OversizedWidgetContent(
           sections = sections,
           sectionHeights = sectionHeights,
           contentHeightDp = timelineContentHeight,
+          currentTimeOffsetDp = currentTimeOffsetDp,
           expandedTimelineMask = expandedTimelineMask,
           timelineWidth = timelineWidth,
           cardWidth = cardWidth,
@@ -225,6 +235,7 @@ private fun OversizedScrollableTimeline(
   sections: List<CourseWidgetTimelineSection>,
   sectionHeights: List<Float>,
   contentHeightDp: Float,
+  currentTimeOffsetDp: Float?,
   expandedTimelineMask: Int,
   timelineWidth: Dp,
   cardWidth: Dp,
@@ -262,6 +273,13 @@ private fun OversizedScrollableTimeline(
         )
       }
     }
+    if (currentTimeOffsetDp != null) {
+      OversizedTimelineCurrentLine(
+        offsetDp = currentTimeOffsetDp,
+        timelineWidth = timelineWidth,
+        timelineHeightDp = contentHeightDp,
+      )
+    }
     ExpandableTimeLabelsOverlay(
       sections = sections,
       sectionHeights = sectionHeights,
@@ -270,6 +288,53 @@ private fun OversizedScrollableTimeline(
       isDesktopSingleCell = isDesktopSingleCell,
       timelineHeightDp = contentHeightDp,
     )
+  }
+}
+
+/**
+ * 参照课表当前时间标记，在左侧时间轴绘制圆点和 1dp 横线。
+ *
+ * 该覆盖层不进入日期列，避免遮挡课程卡片及其点击区域；可折叠标签随后绘制，仍能正常响应点击。
+ */
+@Composable
+private fun OversizedTimelineCurrentLine(
+  offsetDp: Float,
+  timelineWidth: Dp,
+  timelineHeightDp: Float,
+) {
+  val markerTopDp = (offsetDp - OversizedTimelineCurrentPointDiameter.value / 2).coerceIn(
+    minimumValue = 0f,
+    maximumValue = (timelineHeightDp - OversizedTimelineCurrentPointDiameter.value).coerceAtLeast(0f),
+  )
+  Column(modifier = GlanceModifier.width(timelineWidth).height(timelineHeightDp.dp)) {
+    if (markerTopDp > 0f) Spacer(GlanceModifier.height(markerTopDp.dp))
+    Box(
+      modifier = GlanceModifier.width(timelineWidth).height(OversizedTimelineCurrentPointDiameter),
+    ) {
+      Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+      ) {
+        Spacer(GlanceModifier.width(OversizedTimelineCurrentPointStart))
+        Box(
+          modifier = GlanceModifier.defaultWeight().height(OversizedTimelineCurrentLineWidth)
+            .background(OversizedTimelineCurrentColor),
+        ) {}
+        Spacer(GlanceModifier.width(OversizedTimelineCurrentLineEndInset))
+      }
+      Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+      ) {
+        Spacer(GlanceModifier.width(OversizedTimelineCurrentPointInset))
+        Box(
+          modifier = GlanceModifier.width(OversizedTimelineCurrentPointDiameter)
+            .height(OversizedTimelineCurrentPointDiameter)
+            .background(OversizedTimelineCurrentColor)
+            .cornerRadius(OversizedTimelineCurrentPointDiameter / 2),
+        ) {}
+      }
+    }
   }
 }
 
@@ -649,6 +714,8 @@ private fun RowScope.OversizedDayTimeline(
             contentPaddingVertical = if (isDesktopSingleCell) 1.dp else 3.dp,
             maxTitleLines = 3,
             topBottomText = true,
+            // 标题与内容继续上下分布，只增加标题距内容层顶部的视觉留白。
+            titleTopPadding = OversizedItemTitleTopPadding,
             coverTipColor = if (hasUnderlyingOverlap) {
               widgetColorProvider(Color(item.lightStyle.contentArgb))
             } else {
@@ -695,6 +762,24 @@ internal fun resolveOversizedMinuteOffset(
     offset += height
   }
   return offset
+}
+
+/**
+ * 返回当前分钟在大组件实际时间轴中的纵向位置。
+ *
+ * 分段折叠或展开后都复用课程卡片的分钟映射；当前时间超出半开时间范围时返回 null，不把标记
+ * 错误吸附到时间轴首尾。
+ */
+internal fun resolveOversizedCurrentTimeOffset(
+  sections: List<CourseWidgetTimelineSection>,
+  sectionHeights: List<Float>,
+  nowMinute: Int,
+): Float? {
+  if (sections.isEmpty() || sections.size != sectionHeights.size) return null
+  val beginMinute = sections.first().beginMinute
+  val endMinute = sections.last().endMinute
+  if (endMinute <= beginMinute || nowMinute !in beginMinute until endMinute) return null
+  return resolveOversizedMinuteOffset(sections, sectionHeights, nowMinute)
 }
 
 /**
@@ -852,6 +937,8 @@ internal fun resolveOversizedWeekHeaderDate(
 }
 
 private val OversizedCellPadding = 2.dp
+/** 大组件时间轴 item 的标题额外下移 1dp，避免文字紧贴内容层顶部。 */
+private val OversizedItemTitleTopPadding = 1.dp
 private val OversizedTimelineWidth = 40.dp
 private val OversizedCompactCellPadding = 1.dp
 private val OversizedNarrowTimelineWidth = 28.dp
@@ -862,6 +949,13 @@ private val OversizedCompactTimelineLabelHeight = 14.dp
 private val OversizedTimelineBottomLabelInset = 2.dp
 // 左侧可见区域包含根容器外边距；右侧收窄 4dp，使标签视觉中心向左补偿 2dp。
 private val OversizedTimelineLabelRightInset = 4.dp
+private val OversizedTimelineCurrentColor = widgetColorProvider(Color.Gray)
+private val OversizedTimelineCurrentLineWidth = 1.dp
+private val OversizedTimelineCurrentPointDiameter = 4.dp
+private val OversizedTimelineCurrentPointInset = 2.dp
+private val OversizedTimelineCurrentPointStart =
+  OversizedTimelineCurrentPointInset + OversizedTimelineCurrentPointDiameter / 2
+private val OversizedTimelineCurrentLineEndInset = 2.dp
 private const val OversizedExpandableLabelsPerOverlay = 2
 private val OversizedHeaderHeight = 44.dp
 private val OversizedAllDayHeight = 22.dp

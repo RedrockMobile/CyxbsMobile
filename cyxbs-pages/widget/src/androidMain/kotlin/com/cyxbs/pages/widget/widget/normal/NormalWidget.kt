@@ -50,6 +50,7 @@ import com.cyxbs.pages.widget.widget.glance.NormalTimelineGroup
 import com.cyxbs.pages.widget.widget.glance.NormalTimelinePlacedBar
 import com.cyxbs.pages.widget.widget.glance.NormalTimelineTextMode
 import com.cyxbs.pages.widget.widget.glance.WidgetRenderItemCard
+import com.cyxbs.pages.widget.widget.glance.WidgetItemContainerGap
 import com.cyxbs.pages.widget.widget.glance.WidgetDayOffsetKey
 import com.cyxbs.pages.widget.widget.glance.currentMinute
 import com.cyxbs.pages.widget.widget.glance.dispatchRefreshToGlanceReceiver
@@ -63,6 +64,7 @@ import com.cyxbs.pages.widget.widget.glance.projectNormalTimeline
 import com.cyxbs.pages.widget.widget.glance.readCourseWidgetPreviewSnapshot
 import com.cyxbs.pages.widget.widget.glance.resolveLaneLayout
 import com.cyxbs.pages.widget.widget.glance.resolveNormalTimelineCurrentRatio
+import com.cyxbs.pages.widget.widget.glance.resolveNormalTimelineGroupLaneCount
 import com.cyxbs.pages.widget.widget.glance.resolveNormalTimelinePreferredLaneSpan
 import com.cyxbs.pages.widget.widget.glance.resolveNormalTimelineTextAllocation
 import com.cyxbs.pages.widget.widget.glance.resolveNormalTimelineTextMode
@@ -272,7 +274,7 @@ private fun NormalTimelineGroups(
       if (gapWidth > 0f) Spacer(GlanceModifier.width(gapWidth.dp).fillMaxHeight())
       val groupWidth = (group.endRatio - group.beginRatio).coerceAtLeast(0f) * trackWidth.value
       val baseLaneHeightDp = timelineContentHeightDp / maxVisibleLaneCount.coerceAtLeast(1)
-      val laneLayout = group.resolveLaneLayout(maxVisibleLaneCount) { bar ->
+      val preferredLaneSpan = { bar: NormalTimelineBar ->
         resolveNormalTimelinePreferredLaneSpan(
           bar = bar,
           trackWidthDp = trackWidth.value,
@@ -280,6 +282,11 @@ private fun NormalTimelineGroups(
           fontScale = fontScale,
         )
       }
+      val groupLaneCount = group.resolveNormalTimelineGroupLaneCount(
+        maxVisibleLaneCount = maxVisibleLaneCount,
+        preferredLaneSpan = preferredLaneSpan,
+      )
+      val laneLayout = group.resolveLaneLayout(groupLaneCount, preferredLaneSpan)
       val overflowLanes = laneLayout.overflowLanes
       val overflowBars = overflowLanes.flatten()
       val overflowEdgeLanes = overflowLanes.take(NormalTimelineMaxOverflowEdges)
@@ -290,7 +297,7 @@ private fun NormalTimelineGroups(
       }
       val overflowStackHeight = overflowEdgeLanes.size * overflowEdgeHeight
       val visibleLaneHeight = (timelineContentHeightDp - overflowStackHeight).coerceAtLeast(1f) /
-        maxVisibleLaneCount.coerceAtLeast(1)
+        groupLaneCount
       Box(
         modifier = GlanceModifier.width(groupWidth.dp).fillMaxHeight(),
       ) {
@@ -318,7 +325,7 @@ private fun NormalTimelineGroups(
               trackWidth = trackWidth,
               groupBeginRatio = group.beginRatio,
               groupEndRatio = group.endRatio,
-              laneCount = maxVisibleLaneCount,
+              laneCount = groupLaneCount,
               laneHeightDp = visibleLaneHeight,
               fontScale = fontScale,
               modifier = GlanceModifier.fillMaxSize(),
@@ -380,6 +387,7 @@ private fun NormalTimelineCurrentLine(
  * 按课程横条的同一时间比例生成透明点击区。
  *
  * 仅在当前时间线叠加时启用，用来补偿 RemoteViews 顶层容器对下层点击分发的拦截。
+ * 定位 padding 必须留在不可点击的外层，否则桌面宿主会把占位区域也绘制成按压阴影。
  */
 @Composable
 private fun NormalTimelineClickOverlay(
@@ -407,7 +415,7 @@ private fun NormalTimelineClickOverlay(
             if (hasTimelineScale) NormalTimelineScaleHeight.value else 0f
           ).coerceAtLeast(1f)
         val baseLaneHeightDp = timelineContentHeightDp / maxVisibleLaneCount.coerceAtLeast(1)
-        val laneLayout = group.resolveLaneLayout(maxVisibleLaneCount) { bar ->
+        val preferredLaneSpan = { bar: NormalTimelineBar ->
           resolveNormalTimelinePreferredLaneSpan(
             bar = bar,
             trackWidthDp = trackWidth.value,
@@ -415,13 +423,18 @@ private fun NormalTimelineClickOverlay(
             fontScale = fontScale,
           )
         }
+        val groupLaneCount = group.resolveNormalTimelineGroupLaneCount(
+          maxVisibleLaneCount = maxVisibleLaneCount,
+          preferredLaneSpan = preferredLaneSpan,
+        )
+        val laneLayout = group.resolveLaneLayout(groupLaneCount, preferredLaneSpan)
         val overflowEdgeLanes = laneLayout.overflowLanes.take(NormalTimelineMaxOverflowEdges)
         val overflowStackHeight = if (overflowEdgeLanes.isEmpty()) 0f else {
           overflowEdgeLanes.size *
             (NormalTimelineMaxOverflowStackHeight.value / overflowEdgeLanes.size).coerceAtMost(1f)
         }
         val laneHeightDp = (timelineContentHeightDp - overflowStackHeight).coerceAtLeast(1f) /
-          maxVisibleLaneCount.coerceAtLeast(1)
+          groupLaneCount
         Box(
           modifier = GlanceModifier.width(groupWidth.dp).fillMaxHeight()
             .padding(bottom = overflowStackHeight.dp),
@@ -437,13 +450,17 @@ private fun NormalTimelineClickOverlay(
                 val barWidth = (bar.endRatio - bar.beginRatio).coerceAtLeast(0f) * trackWidth.value
                 val topPadding = placedBar.laneIndex * laneHeightDp
                 val bottomPadding = (
-                  maxVisibleLaneCount - placedBar.laneIndex - placedBar.laneSpan
+                  groupLaneCount - placedBar.laneIndex - placedBar.laneSpan
                   ).coerceAtLeast(0) * laneHeightDp
                 Box(
                   modifier = GlanceModifier.width(barWidth.dp).fillMaxHeight()
-                    .padding(top = topPadding.dp, bottom = bottomPadding.dp)
-                    .clickable(openCourseWidgetItemAction(bar.item.action)),
-                ) {}
+                    .padding(top = topPadding.dp, bottom = bottomPadding.dp),
+                ) {
+                  Box(
+                    modifier = GlanceModifier.fillMaxSize()
+                      .clickable(openCourseWidgetItemAction(bar.item.action)),
+                  ) {}
+                }
                 laneCursor = bar.endRatio
               }
               val laneTrailingWidth = (group.endRatio - laneCursor).coerceAtLeast(0f) * trackWidth.value
@@ -590,8 +607,16 @@ private fun NormalTimelineLane(
       // 高度不足时只保留标题单行；内容不再与标题拼接，避免最小形态过密且难以辨认。
       val titleText = bar.item.title
       val safeFontScale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
+      // 第三层单行卡片已有 2dp 外底卡间距，继续叠加正文上下 padding 会把 9sp TextView
+      // 压缩到约 9dp，部分字体的下沿会被 RemoteViews 宿主裁掉；仅多行形态保留额外间距。
+      val contentPaddingVertical = if (isStackedText) {
+        NormalTimelineItemContentPadding
+      } else {
+        0.dp
+      }
       val availableTextHeightDp = (
-        cardHeightDp - NormalTimelineItemContentPadding.value * 2
+        cardHeightDp -
+          (contentPaddingVertical.value + WidgetItemContainerGap.value) * 2
         ).coerceAtLeast(1f)
       val titleLineLimit = if (isStackedText) {
         // 窄卡片先按 9sp 下限反推实际可容纳行数，再据此选字号，避免估算为三行但高度只有两行。
@@ -608,9 +633,9 @@ private fun NormalTimelineLane(
         NormalTimelineItemContentPadding
       }
       val actualTitleWidthDp = (
-        barWidth - contentPaddingHorizontal.value * 2
+        barWidth - (contentPaddingHorizontal.value + WidgetItemContainerGap.value) * 2
         ).coerceAtLeast(1f)
-      // 字号选择保留安全余量，但实际行数必须按真实内容宽度计算，避免保守估算反而制造省略号。
+      // 字号选择必须扣除外底卡与内容层间距；否则窄卡片会误判大字号能放下，实际渲染才出现省略号。
       val titleStyleWidthDp = (actualTitleWidthDp * NormalTimelineTitleWidthSafetyRatio)
         .coerceAtLeast(1f)
       val initialTitleStyle = resolveNormalTimelineTitleStyle(
@@ -675,9 +700,9 @@ private fun NormalTimelineLane(
         topBottomText = showContent,
         // 上下布局已经用弹性 Spacer 分隔，额外固定间隔会挤压三行标题和底部内容。
         textGap = 0.dp,
-        // 所有高度分支共用固定四边内容边距，避免三行标题与普通条目的上下留白不一致。
+        // 多行条目保留正文上下间距；单行条目释放该空间，避免字体下沿被宿主裁剪。
         contentPaddingHorizontal = contentPaddingHorizontal,
-        contentPaddingVertical = NormalTimelineItemContentPadding,
+        contentPaddingVertical = contentPaddingVertical,
         containerColorOverride = NormalTrackColor,
         coverTipColor = if (overflowBars.any(bar::overlaps)) {
           widgetColorProvider(Color(bar.item.lightStyle.contentArgb))

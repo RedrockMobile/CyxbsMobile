@@ -122,6 +122,38 @@ class WidgetGlanceModelsTest {
     assertEquals(75f, end - begin)
   }
 
+  /** 当前时间线复用展开后的分钟坐标，超出时间轴范围时不吸附到首尾。 */
+  @Test
+  fun oversizedCurrentTimeLineUsesExpandedMinuteOffset() {
+    val sections = listOf(
+      CourseWidgetTimelineSection("first", "1", "1", 8 * 60, 9 * 60, 1f, 2f, true),
+      CourseWidgetTimelineSection("second", "2", "2", 9 * 60, 10 * 60, 1f, 1f, false),
+    )
+    val heights = listOf(100f, 50f)
+
+    val current = com.cyxbs.pages.widget.widget.oversize.resolveOversizedCurrentTimeOffset(
+      sections = sections,
+      sectionHeights = heights,
+      nowMinute = 8 * 60 + 30,
+    )
+
+    assertEquals(50f, current)
+    assertNull(
+      com.cyxbs.pages.widget.widget.oversize.resolveOversizedCurrentTimeOffset(
+        sections = sections,
+        sectionHeights = heights,
+        nowMinute = 8 * 60 - 1,
+      ),
+    )
+    assertNull(
+      com.cyxbs.pages.widget.widget.oversize.resolveOversizedCurrentTimeOffset(
+        sections = sections,
+        sectionHeights = heights,
+        nowMinute = 10 * 60,
+      ),
+    )
+  }
+
   /** 可折叠分段展开后按真实分钟比例显示整点，而不是继续显示“早晨”等概括文案。 */
   @Test
   fun oversizedExpandedTimelineShowsHourlyTimeLabels() {
@@ -478,6 +510,48 @@ class WidgetGlanceModelsTest {
     )
   }
 
+  /** 局部容量按同时重叠条目的首选高度累加，不能只按条目数量强制等分。 */
+  @Test
+  fun normalTimelineLocalOverlapUsesPreferredTextHeight() {
+    val first = item("first", begin = 8 * 60, end = 10 * 60)
+    val second = item("second", begin = 9 * 60, end = 11 * 60)
+    val group = projectNormalTimeline(
+      week = week(first, second),
+      day = 0,
+      timelineBeginMinute = 8 * 60,
+      timelineEndMinute = 22 * 60 + 30,
+    ).single()
+
+    assertEquals(
+      3,
+      group.resolveNormalTimelineGroupLaneCount(maxVisibleLaneCount = 3) { 2 },
+    )
+    assertEquals(
+      2,
+      group.resolveNormalTimelineGroupLaneCount(maxVisibleLaneCount = 3) { 1 },
+    )
+  }
+
+  /** 同组但时间不重叠的条目复用纵向空间，单个详情条目仍可铺满局部高度。 */
+  @Test
+  fun normalTimelineLocalNonOverlapReusesPreferredHeight() {
+    val group = NormalTimelineGroup(
+      beginRatio = 0f,
+      endRatio = 1f,
+      lanes = listOf(
+        listOf(
+          NormalTimelineBar(item("first", 8 * 60, 9 * 60), 8 * 60, 9 * 60, 0f, 0.5f),
+          NormalTimelineBar(item("second", 9 * 60, 10 * 60), 9 * 60, 10 * 60, 0.5f, 1f),
+        ),
+      ),
+    )
+
+    assertEquals(
+      2,
+      group.resolveNormalTimelineGroupLaneCount(maxVisibleLaneCount = 3) { 2 },
+    )
+  }
+
   /** 系统字体放大会提高每条轨道的最低高度，避免文字被相邻轨道裁切。 */
   @Test
   fun normalTimelineLaneCapacityHonorsFontScale() {
@@ -617,16 +691,50 @@ class WidgetGlanceModelsTest {
     )
   }
 
-  /** 标题完整展示后仍有高度时，剩余空间才可以继续展示内容。 */
+  /** 两行窄卡片应降到与相邻重叠卡片一致的 9sp，避免大字号只显示“通信 / 原…”。 */
   @Test
-  fun normalTimelineShowsContentAfterTitleFits() {
+  fun normalTimelineTwoLineTitleUsesReadableSmallSize() {
+    assertEquals(
+      NormalTimelineTitleStyle(fontSizeSp = 9, maxLines = 2),
+      resolveNormalTimelineTitleStyle(
+        text = "通信原理A",
+        availableWidthDp = 22f,
+        preferredFontSizeSp = 11,
+        minFontSizeSp = 9,
+        maxLines = 2,
+      ),
+    )
+  }
+
+  /** 理论行高刚好卡边时仍需扣除独立内容 TextView 的字体留白，不能泄露一截内容。 */
+  @Test
+  fun normalTimelineHidesContentAtTextViewPaddingBoundary() {
+    assertEquals(
+      NormalTimelineTextAllocation(titleLines = 1, contentLines = 0),
+      resolveNormalTimelineTextAllocation(
+        title = "IT",
+        content = "科教楼",
+        availableWidthDp = 30f,
+        availableHeightDp = 25f,
+        titleFontSizeSp = 11,
+        contentFontSizeSp = 9,
+        maxTitleLines = 3,
+        maxContentLines = 2,
+        fontScale = 1f,
+      ),
+    )
+  }
+
+  /** 标题、内容行高和独立文字节点留白都能容纳时，才展示完整内容。 */
+  @Test
+  fun normalTimelineShowsContentAfterTextViewPaddingFits() {
     assertEquals(
       NormalTimelineTextAllocation(titleLines = 1, contentLines = 1),
       resolveNormalTimelineTextAllocation(
         title = "IT",
         content = "科教楼",
         availableWidthDp = 30f,
-        availableHeightDp = 25f,
+        availableHeightDp = 29f,
         titleFontSizeSp = 11,
         contentFontSizeSp = 9,
         maxTitleLines = 3,

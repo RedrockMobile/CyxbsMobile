@@ -498,7 +498,11 @@ internal fun resolveNormalTimelineTextAllocation(
   }
   val remainingHeightDp = availableHeightDp - allocatedTitleLines * titleLineHeightDp
   val contentLineHeightDp = safeContentSize * safeFontScale * NORMAL_TIMELINE_TEXT_LINE_HEIGHT_FACTOR
-  val allocatedContentLines = floor(remainingHeightDp / contentLineHeightDp).toInt()
+  // Glance 最终把标题和内容翻译成两个独立 TextView；内容节点自身还带字体上下留白。
+  // 如果只比较理论行高，临界高度会创建内容 TextView，但宿主只能裁出底部的一小截。
+  val allocatedContentLines = floor(
+    (remainingHeightDp - NORMAL_TIMELINE_CONTENT_TEXT_BLOCK_PADDING_DP) / contentLineHeightDp,
+  ).toInt()
     .coerceIn(0, contentLineLimit)
   return NormalTimelineTextAllocation(allocatedTitleLines, allocatedContentLines)
 }
@@ -551,6 +555,31 @@ internal fun resolveNormalTimelineVisibleLaneCount(
   val minimumLaneHeightDp = oneLineTextHeightDp + NORMAL_TIMELINE_ITEM_VERTICAL_PADDING_DP
   return floor(availableHeightDp / minimumLaneHeightDp).toInt()
     .coerceIn(1, NORMAL_TIMELINE_MAX_VISIBLE_LANE_COUNT)
+}
+
+/**
+ * 根据局部重叠区间内所有条目的首选文字高度，计算该组实际需要的纵向行数。
+ *
+ * [maxVisibleLaneCount] 是宿主高度允许的上限，[preferredLaneSpan] 是每个条目为了展示有效文字
+ * 希望占用的行数。互不重叠的条目可以复用高度；真正重叠的条目才累加首选行数。这样单个条目
+ * 仍能铺满，而两个需要详情的条目在三行容量中会按 `2 + 1` 分配，不会被强制等分成两个单行标题。
+ */
+internal fun NormalTimelineGroup.resolveNormalTimelineGroupLaneCount(
+  maxVisibleLaneCount: Int,
+  preferredLaneSpan: (NormalTimelineBar) -> Int,
+): Int {
+  val capacity = maxVisibleLaneCount.coerceAtLeast(1)
+  val bars = lanes.flatten()
+  if (bars.isEmpty()) return 1
+  val timePoints = bars.flatMap { bar -> listOf(bar.beginMinute, bar.endMinute) }
+    .distinct()
+    .sorted()
+  val requiredLaneCount = timePoints.zipWithNext().maxOfOrNull { (beginMinute, endMinute) ->
+    bars.asSequence()
+      .filter { bar -> bar.beginMinute < endMinute && bar.endMinute > beginMinute }
+      .sumOf { bar -> preferredLaneSpan(bar).coerceIn(1, capacity) }
+  } ?: 1
+  return requiredLaneCount.coerceIn(1, capacity)
 }
 
 /**
@@ -943,6 +972,7 @@ private const val NORMAL_TIMELINE_SCALE_HEIGHT_DP = 12f
 private const val NORMAL_TIMELINE_STACKED_TEXT_MIN_HEIGHT_DP = 28f
 private const val NORMAL_TIMELINE_TITLE_ONLY_TEXT_SIZE_SP = 9f
 private const val NORMAL_TIMELINE_TEXT_LINE_HEIGHT_FACTOR = 1.2f
+private const val NORMAL_TIMELINE_CONTENT_TEXT_BLOCK_PADDING_DP = 2f
 private const val NORMAL_TIMELINE_ITEM_HORIZONTAL_PADDING_DP = 4f
 private const val NORMAL_TIMELINE_ITEM_VERTICAL_PADDING_DP = 4f
 private const val NORMAL_TIMELINE_MAX_VISIBLE_LANE_COUNT = 10

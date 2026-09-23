@@ -2,12 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <!-- Widget 详情只借用透明 Activity 承载弹窗，不得复用或拉起主应用任务栈。 -->
         <activity
             android:name=".widget.glance.CourseWidgetEntryActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:taskAffinity="${applicationId}.course_widget"
+            android:theme="@style/CourseWidgetDialogTheme" />
         <receiver
             android:name=".widget.normal.NormalWidget"
             android:enabled="@bool/glance_appwidget_available"

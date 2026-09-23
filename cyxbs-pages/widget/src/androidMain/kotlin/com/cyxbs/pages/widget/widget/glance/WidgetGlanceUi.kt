@@ -39,7 +39,10 @@ import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
  * 按快照的 light/dark style 绘制通用 item。
  *
  * 圆角底卡与条目内容层之间固定保留 2dp，使同色重叠卡片仍能辨认边缘；事务斜纹只绘制在内容层。
- * [renderSize] 是扣除调用方外边距后的卡片真实尺寸，用于生成无需缩放的固定粗细斜纹。
+ * [modifier] 只负责卡片的外部尺寸与定位间距，点击节点位于其内部，避免 RemoteViews 宿主把
+ * 外部 padding 也绘制成按压阴影。[renderSize] 是扣除调用方外边距后的卡片真实尺寸，用于生成
+ * 无需缩放的固定粗细斜纹。
+ * [titleTopPadding] 仅在标题置顶模式下增加标题上方留白，不会改变底部内容的下间距。
  * [containerColorOverride] 允许布局用自身画布色替换外层底卡，避免非纯白轨道出现突兀白边。
  */
 @Composable
@@ -55,6 +58,7 @@ internal fun WidgetRenderItemCard(
   inlineContent: Boolean = false,
   topBottomText: Boolean = false,
   textGap: Dp = 0.dp,
+  titleTopPadding: Dp = 0.dp,
   contentPaddingHorizontal: Dp = 2.dp,
   contentPaddingVertical: Dp = 3.dp,
   containerColorOverride: ColorProvider? = null,
@@ -63,58 +67,61 @@ internal fun WidgetRenderItemCard(
 ) {
   val style = if (isDark) item.darkStyle else item.lightStyle
   val foreground = widgetColorProvider(Color(style.contentArgb))
-  val cardModifier = modifier.let { base ->
+  val cardModifier = GlanceModifier.fillMaxSize().let { base ->
       if (item.action.itemId == null) base else base.clickable(openCourseWidgetItemAction(item.action))
     }
   Box(
-    modifier = cardModifier,
-    contentAlignment = Alignment.Center,
+    modifier = modifier,
   ) {
-    WidgetRenderItemBackground(
-      item = item,
-      isDark = isDark,
-      modifier = GlanceModifier.fillMaxSize(),
-      renderSize = renderSize,
-      containerColorOverride = containerColorOverride,
-    )
-    Column(
-      modifier = GlanceModifier.fillMaxSize().padding(
-        // 背景内容层已相对卡片外沿内缩 2dp，文字还需在内容层内部保留调用方指定的留白。
-        horizontal = contentPaddingHorizontal + WidgetItemContainerGap,
-        vertical = contentPaddingVertical + WidgetItemContainerGap,
-      ),
-      horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
-      verticalAlignment = if (topBottomText) Alignment.Vertical.Top else Alignment.Vertical.CenterVertically,
+    Box(
+      modifier = cardModifier,
+      contentAlignment = Alignment.Center,
     ) {
-      val detailText = item.content
-      // 矮横条的主体合并成一行，避免内容在有限高度中被 RemoteViews 裁剪。
-      val titleText = if (inlineContent) {
-        joinWidgetText(item.title, item.content)
-      } else {
-        item.title
-      }
-      if (topBottomText && !inlineContent) {
-        // 与课表 Item 一致：标题贴近顶部，描述贴近底部，剩余高度全部留在两者之间。
-        Text(
-          text = titleText,
-          style = TextStyle(color = foreground, fontSize = titleSizeSp.sp, textAlign = TextAlign.Center),
-          maxLines = maxTitleLines,
-        )
-        if (showContent && detailText.isNotBlank()) {
-          Spacer(GlanceModifier.defaultWeight().fillMaxWidth())
-          if (textGap > 0.dp) Spacer(GlanceModifier.height(textGap).fillMaxWidth())
-          Text(
-            text = detailText,
-            style = TextStyle(color = foreground, fontSize = contentSizeSp.sp, textAlign = TextAlign.Center),
-            maxLines = maxContentLines,
-          )
+      WidgetRenderItemBackground(
+        item = item,
+        isDark = isDark,
+        modifier = GlanceModifier.fillMaxSize(),
+        renderSize = renderSize,
+        containerColorOverride = containerColorOverride,
+      )
+      Column(
+        modifier = GlanceModifier.fillMaxSize().padding(
+          // 背景内容层已相对卡片外沿内缩 2dp，文字还需在内容层内部保留调用方指定的留白。
+          horizontal = contentPaddingHorizontal + WidgetItemContainerGap,
+          vertical = contentPaddingVertical + WidgetItemContainerGap,
+        ),
+        horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+        verticalAlignment = if (topBottomText) Alignment.Vertical.Top else Alignment.Vertical.CenterVertically,
+      ) {
+        val detailText = item.content
+        // 矮横条的主体合并成一行，避免内容在有限高度中被 RemoteViews 裁剪。
+        val titleText = if (inlineContent) {
+          joinWidgetText(item.title, item.content)
+        } else {
+          item.title
         }
-      } else {
-        Column(
-          modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-          horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
-          verticalAlignment = Alignment.Vertical.CenterVertically,
-        ) {
+        if (topBottomText && !inlineContent) {
+          // 与课表 Item 一致：标题贴近顶部，描述贴近底部，剩余高度全部留在两者之间。
+          if (titleTopPadding > 0.dp) {
+            Spacer(GlanceModifier.height(titleTopPadding).fillMaxWidth())
+          }
+          Text(
+            text = titleText,
+            style = TextStyle(color = foreground, fontSize = titleSizeSp.sp, textAlign = TextAlign.Center),
+            maxLines = maxTitleLines,
+          )
+          if (showContent && detailText.isNotBlank()) {
+            Spacer(GlanceModifier.defaultWeight().fillMaxWidth())
+            if (textGap > 0.dp) Spacer(GlanceModifier.height(textGap).fillMaxWidth())
+            Text(
+              text = detailText,
+              style = TextStyle(color = foreground, fontSize = contentSizeSp.sp, textAlign = TextAlign.Center),
+              maxLines = maxContentLines,
+            )
+          }
+        } else {
+          // 外层 Column 已按整个文字区域垂直居中；这里不能再套 defaultWeight 容器，
+          // 否则部分 RemoteViews 宿主会把单行标题按权重区域顶部放置。
           Text(
             text = titleText,
             style = TextStyle(color = foreground, fontSize = titleSizeSp.sp, textAlign = TextAlign.Center),
@@ -129,17 +136,17 @@ internal fun WidgetRenderItemCard(
           }
         }
       }
-    }
-    if (coverTipColor != null) {
-      // tips 是独立右上角覆盖层，不进入标题/内容的 Column，避免 RemoteViews 宿主把标题向下挤。
-      Box(
-        modifier = GlanceModifier.fillMaxSize().padding(top = 3.dp, end = 4.dp),
-        contentAlignment = Alignment.TopEnd,
-      ) {
+      if (coverTipColor != null) {
+        // tips 是独立右上角覆盖层，不进入标题/内容的 Column，避免 RemoteViews 宿主把标题向下挤。
         Box(
-          modifier = GlanceModifier.width(6.dp).height(2.dp)
-            .background(coverTipColor).cornerRadius(1.dp),
-        ) {}
+          modifier = GlanceModifier.fillMaxSize().padding(top = 3.dp, end = 4.dp),
+          contentAlignment = Alignment.TopEnd,
+        ) {
+          Box(
+            modifier = GlanceModifier.width(6.dp).height(2.dp)
+              .background(coverTipColor).cornerRadius(1.dp),
+          ) {}
+        }
       }
     }
   }
@@ -251,7 +258,9 @@ private fun createDiagonalStripeBitmap(
 
 private const val WidgetStripeWidthDp = 2f
 private const val WidgetStripePitchDp = 8f
-private val WidgetItemContainerGap = 2.dp
+
+/** 条目外底卡与内部内容层的固定间距；文字可用区域计算必须复用同一数值。 */
+internal val WidgetItemContainerGap = 2.dp
 
 /** 忽略空字段后用中点连接，避免缺少地点时出现多余分隔符。 */
 private fun joinWidgetText(vararg values: String?): String =
