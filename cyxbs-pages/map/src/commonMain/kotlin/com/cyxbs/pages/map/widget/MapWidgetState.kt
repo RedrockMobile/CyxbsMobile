@@ -12,6 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * @Desc : 地图组件的状态
@@ -32,45 +35,69 @@ class MapWidgetState(
   var isLock by mutableStateOf(false)
 
   // 暴露给外部的scale
-  val scale: Float get() = scaleAnim.value
+  val scale: Float get() = currentScale
 
   // 暴露给外部的offset
-  val offset: Offset get() = offsetAnim.value
+  val offset: Offset get() = currentOffset
+
+  private var currentScale by mutableStateOf(initialScale)
+  private var currentOffset by mutableStateOf(initialOffset)
 
   // Animatable动画数值包装器
   private val scaleAnim = Animatable(initialScale)
   private val offsetAnim = Animatable(initialOffset, Offset.VectorConverter)
+  private var scaleAnimationJob: Job? = null
+  private var offsetAnimationJob: Job? = null
 
   // 不带动画的设置scale
-  suspend fun setScale(scale: Float = this.scale) {
-    scaleAnim.snapTo(scale.coerceIn(1f, 15f))
+  fun setScale(scale: Float = this.scale) {
+    scaleAnimationJob?.cancel()
+    currentScale = scale.coerceIn(1f, 15f)
   }
 
   // 不带动画的设置offset
-  suspend fun setOffset(offset: Offset = this.offset) {
-    offsetAnim.snapTo(offset)
+  fun setOffset(offset: Offset = this.offset) {
+    offsetAnimationJob?.cancel()
+    currentOffset = offset
   }
 
   // 停止动画
-  suspend fun stop() {
-    scaleAnim.stop()
-    offsetAnim.stop()
+  fun stop() {
+    scaleAnimationJob?.cancel()
+    offsetAnimationJob?.cancel()
   }
 
   // 带动画的scale
-  suspend fun animateScale(scale: Float = this.scale) {
-    scaleAnim.animateTo(
-      targetValue = scale,
-      animationSpec = tween(800, easing = LinearOutSlowInEasing)
-    )
+  suspend fun animateScale(scale: Float = this.scale) = coroutineScope {
+    scaleAnimationJob?.cancel()
+    val animationJob = launch {
+      // 手势直接更新状态，动画开始时从当前显示值接续。
+      scaleAnim.snapTo(this@MapWidgetState.scale)
+      scaleAnim.animateTo(
+        targetValue = scale,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+      ) {
+        currentScale = value
+      }
+    }
+    scaleAnimationJob = animationJob
+    animationJob.join()
   }
 
   // 带动画的offset
-  suspend fun animateOffset(offset: Offset = this.offset) {
-    offsetAnim.animateTo(
-      targetValue = offset,
-      animationSpec = tween(800, easing = LinearOutSlowInEasing)
-    )
+  suspend fun animateOffset(offset: Offset = this.offset) = coroutineScope {
+    offsetAnimationJob?.cancel()
+    val animationJob = launch {
+      offsetAnim.snapTo(this@MapWidgetState.offset)
+      offsetAnim.animateTo(
+        targetValue = offset,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+      ) {
+        currentOffset = value
+      }
+    }
+    offsetAnimationJob = animationJob
+    animationJob.join()
   }
 
 }
