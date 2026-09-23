@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
@@ -19,7 +18,6 @@ import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_local
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -38,7 +36,6 @@ fun MapWidgetCompose(
   anchorItemStateList: List<AnchorItemState>
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
-  val coroutineScope = rememberCoroutineScope()
 
   MapImageLoad(
     inputStream = inputStream,
@@ -47,10 +44,8 @@ fun MapWidgetCompose(
       viewmodel.mapContainer.value = size
     },
     onMapWidgetStateChange = { scale, offset ->
-      coroutineScope.launch {
-        mapWidgetState.setScale(scale)
-        mapWidgetState.setOffset(offset)
-      }
+      mapWidgetState.setScale(scale)
+      mapWidgetState.setOffset(offset)
     },
     onClick = { offset ->
       if (mapWidgetState.isLock) {
