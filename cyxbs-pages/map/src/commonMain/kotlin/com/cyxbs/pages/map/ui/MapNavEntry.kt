@@ -69,6 +69,9 @@ import com.cyxbs.pages.map.util.MapImageHelper
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
 import com.cyxbs.pages.map.util.getImageFile
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
+import com.cyxbs.pages.map.viewmodel.MapNavEvent
+import com.cyxbs.pages.map.widget.MapUiEvent
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.rememberMapUiController
@@ -106,10 +109,19 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
   @Composable
   override fun Content(argument: MapNavArgument) {
     val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
+    val searchViewModel = viewModel { SearchViewModel() }
+    LaunchedEffect(viewmodel, searchViewModel) {
+      snapshotFlow {
+        MapNavEvent.MapPageChanged(viewmodel.mapPagerState.value == 1, searchViewModel.mapSearchPagerState.value == 1)
+      }.collect { MapComposeViewModel.emitNavEvent(it) }
+    }
     MapCompose(argument)
     MapProgressDialog()
     DownloadFailedDialog(argument)
     MapUpdateDialog()
+    UploadPhotoDialog(viewmodel.uploadPhotoDialogState, viewmodel.uploadPlaceId.value)
+    UploadPhotoResult(viewmodel.uploadPhotoResultState)
+    UploadingPhotoProgressDialog()
     val ratio = getWindowScreenSize().height / getWindowScreenSize().width
     when {
       ratio > 1.5f -> WH100vInfinityCompose(argument)
@@ -146,7 +158,12 @@ fun WH100vInfinityCompose(argument: MapNavArgument) {
     },
   ) { targetPage ->
     if (targetPage == 1) {
-      AllPictureCompose(Modifier.fillMaxSize())
+      AllPictureCompose(
+        modifier = Modifier.fillMaxSize(),
+        images = viewmodel.pictureImages.value,
+        placeId = viewmodel.picturePlaceId.value,
+        onBack = { viewmodel.mapPagerState.value = 0 },
+      )
     } else {
       MapContent(argument = argument, modifier = Modifier.fillMaxWidth())
       // 竖屏：地点详情 sheet 以 NavEntry overlay 形式压栈（搜索仍是整页，由 mapSearchPagerState 控制）
@@ -183,7 +200,12 @@ fun WH100v150Compose(argument: MapNavArgument) {
     },
   ) { targetPage ->
     if (targetPage == 1) {
-      AllPictureCompose(Modifier.fillMaxSize())
+      AllPictureCompose(
+        modifier = Modifier.fillMaxSize(),
+        images = viewmodel.pictureImages.value,
+        placeId = viewmodel.picturePlaceId.value,
+        onBack = { viewmodel.mapPagerState.value = 0 },
+      )
     } else {
       Column {
         BackIconCompose(
@@ -207,7 +229,7 @@ fun WH100v150Compose(argument: MapNavArgument) {
 
 @Composable
 fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   Image(
     modifier = modifier
       .clickableNoIndicator {
@@ -225,7 +247,7 @@ fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
 
 @Composable
 fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   Column(
     modifier = modifier
   ) {
@@ -286,7 +308,7 @@ fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
 
 @Composable
 fun SearchBar(modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   BasicTextField(
     modifier = modifier
       .background(
@@ -574,8 +596,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
     mapWidgetState = viewmodel.mapWidgetState,
     mainAnchorState = viewmodel.anchorItemState,
     anchorItemStateList = viewmodel.anchorItemStateList,
-    bottomSheetState = viewmodel.bottomSheetState,
-    searchBottomSheetState = viewmodel.searchBottomSheetState,
     mapContainer = viewmodel.mapContainer
   )
   val imageResult by produceState<ByteArray?>(
@@ -651,6 +671,23 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     launch {
       viewmodel.mapUiEvent.collect { event ->
+        when (event) {
+          is MapUiEvent.SearchToPlace -> showPlaceDetail(event.placeId, false)
+          is MapUiEvent.FocusOnPlace -> showPlaceDetail(event.placeId, false)
+          is MapUiEvent.OpenPlaceDetail -> showPlaceDetail(event.placeId, true)
+          is MapUiEvent.ClickMapPlace -> {
+            if (event.placeId != null) showPlaceDetail(event.placeId, null)
+            else MapComposeViewModel.emitNavEvent(MapNavEvent.HidePlaceDetail)
+          }
+          is MapUiEvent.ShowAnchorList, MapUiEvent.ShowCollectAnchors ->
+            MapComposeViewModel.emitNavEvent(MapNavEvent.CollapsePlaceDetail)
+          else -> Unit
+        }
+        if (event is MapUiEvent.SearchToPlace || event is MapUiEvent.FocusOnPlace ||
+          event is MapUiEvent.OpenPlaceDetail || event is MapUiEvent.ClickMapPlace ||
+          event is MapUiEvent.ShowAnchorList) {
+          MapComposeViewModel.emitNavEvent(MapNavEvent.CollapseSearch)
+        }
         mapUiController.handleMapUiEvent(
           event = event,
           scope = this,
@@ -658,11 +695,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           maxScale = viewmodel.maxScale,
           collectList = viewmodel.collectListState.toList(),
           calculatePlaceOffset = viewmodel::calculatePlaceOffset,
-          clearSearchText = {
-            viewmodel.searchTextFieldState.edit {
-              replace(0, length, "")
-            }
-          }
         )
       }
     }

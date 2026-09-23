@@ -1,6 +1,5 @@
 package com.cyxbs.pages.map.viewmodel
 
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -8,33 +7,29 @@ import androidx.compose.ui.unit.IntSize
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
-import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.ButtonInfoItem
 import com.cyxbs.pages.map.model.bean.MapInfo
-import com.cyxbs.pages.map.model.bean.PlaceDetails
 import com.cyxbs.pages.map.model.bean.PlaceItem
 import com.cyxbs.pages.map.util.calculateClickBuildingInMap
 import com.cyxbs.pages.map.util.calculateClickTagInMap
 import com.cyxbs.pages.map.util.calculateOriginPosition
 import com.cyxbs.pages.map.util.calculatePlaceInMap
-import com.cyxbs.pages.map.util.getMilliseconds
 import com.cyxbs.pages.map.widget.AnchorItemState
 import com.cyxbs.pages.map.widget.MapUiEvent
 import com.cyxbs.pages.map.widget.MapWidgetState
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withTimeoutOrNull
+import com.cyxbs.pages.map.util.getMilliseconds
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * @Desc : Map的ViewModel
@@ -42,32 +37,76 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @Date : 2025/11/18 10:48
  */
 
-expect class MapComposeViewModel() : CommonMapComposeViewModel
-
-class PlaceDetailViewModel : CommonMapComposeViewModel()
-
-class SearchViewModel : CommonMapComposeViewModel()
-
-
-abstract class CommonMapComposeViewModel : BaseViewModel() {
+class MapComposeViewModel : BaseViewModel() {
 
   companion object {
     const val NETWORK_ERROR_INFO = "服务君似乎打盹了呢"
     const val MIN_SCALE = 1f
 
-    private val _navEvents = MutableSharedFlow<MapNavEvent>(
-      replay = 0,
-      extraBufferCapacity = 1,
-      onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
+    private val _navEvents = MutableSharedFlow<MapNavEvent>(replay = 0)
     val navEvents: SharedFlow<MapNavEvent> = _navEvents.asSharedFlow()
 
-    fun emitNavEvent(event: MapNavEvent) {
-      _navEvents.tryEmit(event)
+    suspend fun emitNavEvent(event: MapNavEvent) {
+      _navEvents.emit(event)
     }
   }
 
   var maxScale = 6f
+  val mapPagerState = mutableStateOf(0)
+  val picturePlaceId = mutableStateOf("")
+  val pictureImages = mutableStateOf<List<String>>(emptyList())
+  val uploadPhotoDialogState = mutableStateOf(false)
+  val uploadPlaceId = mutableStateOf("")
+
+  fun requestPhotoUpload(placeId: String) {
+    uploadPlaceId.value = placeId
+    uploadPhotoDialogState.value = true
+  }
+
+  val uploadPhotoResultState = mutableStateOf(false)
+  val uploadingPhotoState = mutableStateOf(false)
+  var successImageCount = 0
+  var failedImageCount = 0
+
+  fun uploadPhoto(uploadPlaceId: String, imageList: List<PlatformFile>?) {
+    if (imageList.isNullOrEmpty() || uploadingPhotoState.value) return
+    launchByViewModelScope {
+      try {
+        successImageCount = 0
+        failedImageCount = 0
+        uploadingPhotoState.value = true
+        uploadPhotoResultState.value = false
+        for (i in imageList.indices) {
+          val file = imageList[i]
+          val fileName = getMilliseconds().toString() + "${i}.jpg"
+          val fileBytes = file.readBytes()
+          val multipartBody = MultiPartFormDataContent(
+            formData {
+              append("place_id", uploadPlaceId)
+              append("file", fileBytes, Headers.build {
+                append(HttpHeaders.ContentType, "image/jpeg")
+                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+              })
+            }
+          )
+          MapRepository.uploadPhoto(multipartBody).getOrElse { throwable: Throwable ->
+            toast("上传第${i}张图片失败！")
+            failedImageCount++
+            null
+          }?.let {
+            if (it.isSuccess()) {
+              successImageCount++
+            } else {
+              failedImageCount++
+            }
+          }
+        }
+        uploadPhotoResultState.value = true
+      } finally {
+        uploadingPhotoState.value = false
+      }
+    }
+  }
 
   // 地图组件状态
   val mapWidgetState = MapWidgetState()
@@ -96,45 +135,32 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   val updateMapDialogState = mutableStateOf(false)
   val isUpdateStart = mutableStateOf(false)
 
-  // 地点详细信息
-  val placeDetails = mutableStateOf<PlaceDetails?>(null)
-  val placeDetailsId = mutableStateOf<String>("999")
-  // 地图详情需要根据拖拽终点区分收起与完全隐藏，不能把两种状态合并为统一关闭请求。
-  val bottomSheetState = BottomSheetState(
-    hideable = true,
-    requestDismissOnDrag = false,
-  )
-
-  // desktop下的搜索栏bottomSheet
-  val searchBottomSheetState = BottomSheetState(hideable = false)
-
-  // 地图主页与所有图片页的切换(0表示地图主页，1表示所有图片页)
-  val mapPagerState = mutableStateOf(0)
-
-  // 地图基本和搜索页的切换(0表示地图，1表示搜索)
-  val mapSearchPagerState = mutableStateOf(0)
-
   // 当前button选中项
   val currentSelectedItem = mutableStateOf(999)
 
-  // 搜索框内容
-  val searchTextFieldState = TextFieldState()
-  val searchResultList = mutableStateListOf<PlaceItem>()
-  val searchHistory = mutableStateListOf<PlaceItem>()
-
   // 收藏列表
   val collectListState = mutableStateListOf<String>()
-
-  // 上传图片完成的dialog的状态
-  val uploadPhotoResultState = mutableStateOf(false)
-  val uploadingPhotoState = mutableStateOf(false)
-  var successImageCount = 0
-  var failedImageCount = 0
 
   private val _mapUiEvent = MutableSharedFlow<MapUiEvent>()
   val mapUiEvent: SharedFlow<MapUiEvent> = _mapUiEvent.asSharedFlow()
 
   init {
+    navEvents.collectLaunch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { event ->
+      when (event) {
+        is MapNavEvent.SelectPlace -> searchToPlace(event.place)
+        is MapNavEvent.RequestPhotoUpload -> requestPhotoUpload(event.placeId)
+        is MapNavEvent.OpenAllPictures -> {
+          picturePlaceId.value = event.placeId
+          pictureImages.value = event.images
+          mapPagerState.value = 1
+        }
+        MapNavEvent.CollectionsChanged -> {
+          collectListState.clear()
+          collectListState.addAll(MapDataRepository.getCollectList().orEmpty())
+        }
+        else -> Unit
+      }
+    }
     initMapInfo()
     getButtonInfo()
     if (IAccountService::class.impl().isLogin()) {
@@ -151,21 +177,7 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
   }
 
-  // 搜索功能
-  fun search() {
-    searchResultList.clear()
-    if (searchTextFieldState.text.isEmpty()) return
-    mapInfo.value?.let { mapInfo ->
-      val resultList = mapInfo.placeList.filter { placeItem ->
-        placeItem.placeName.contains(searchTextFieldState.text, true)
-      }
-      searchResultList.addAll(resultList)
-    }
-  }
-
   fun searchToPlace(placeItem: PlaceItem) {
-    getPlaceDetails(placeItem.placeId)
-    emitNavEvent(MapNavEvent.OpenPlaceDetail(placeItem.placeId))
     sendMapUiEvent(
       MapUiEvent.SearchToPlace(
         placeId = placeItem.placeId,
@@ -222,8 +234,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
   fun initFocus(placeId: String) {
     if (hasInitializedFocus) return
     hasInitializedFocus = true
-    // 如果初始化时bottomSheet展开的，说明当前是从image页pop回来的，不需要重新focus
-    if (bottomSheetState.isSettledAt(BottomSheetAnchor.Expanded)) return
     mapInfo.value?.let { mapInfo ->
       mapInfo.placeList.find {
         it.placeId == placeId
@@ -235,8 +245,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 聚焦于某个地点
   fun focusOnPlace(placeItem: PlaceItem) {
-    getPlaceDetails(placeItem.placeId)
-    emitNavEvent(MapNavEvent.OpenPlaceDetail(placeItem.placeId))
     sendMapUiEvent(
       MapUiEvent.FocusOnPlace(
         placeId = placeItem.placeId,
@@ -284,48 +292,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
   }
 
-  // 获取地点详细信息
-  fun getPlaceDetails(placeId: String) {
-    launchByViewModelScope {
-      val localPlaceDetails =
-        MapDataRepository.getPlaceDetails(placeId) ?: getLocalPlaceDetails(placeId)
-      localPlaceDetails?.let {
-        placeDetails.value = it
-        placeDetailsId.value = placeId
-      }
-      MapRepository.getPlaceDetails(placeId).getOrElse { throwable ->
-        toast(NETWORK_ERROR_INFO)
-        localPlaceDetails
-      }?.let {
-        placeDetails.value = it
-        placeDetailsId.value = placeId
-        if (it != localPlaceDetails || MapDataRepository.getPlaceDetails(placeId) != it) {
-          MapDataRepository.savePlaceDetails(placeId, it)
-        }
-      }
-    }
-  }
-
-  private fun getLocalPlaceDetails(placeId: String): PlaceDetails? {
-    return mapInfo.value?.placeList?.find { it.placeId == placeId }?.let {
-      PlaceDetails(
-        placeName = it.placeName,
-        placeAttribute = null,
-        tags = null,
-        images = null
-      )
-    }
-  }
-
-  // 上传搜索热度
-  fun addHot(placeId: String) {
-    launchByViewModelScope {
-      MapRepository.addHot(placeId).getOrElse { throwable ->
-        toast("上传搜索热度失败~")
-      }
-    }
-  }
-
   fun getCollect() {
     launchByViewModelScope {
       MapRepository.getCollect().getOrElse { throwable ->
@@ -337,94 +303,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
         MapDataRepository.saveCollectList(it)
       }
     }
-  }
-
-  fun addCollect(placeId: String) {
-    launchByViewModelScope {
-      MapRepository.addCollect(placeId).getOrElse { throwable ->
-        toast("添加收藏失败~")
-        null
-      }?.let {
-        if (it.isSuccess()) {
-          toast("收藏成功!")
-          getCollect()
-        }
-      }
-    }
-  }
-
-  fun deleteCollect(placeId: String) {
-    launchByViewModelScope {
-      MapRepository.deleteCollect(placeId).getOrElse { throwable ->
-        toast("删除收藏失败~")
-        null
-      }?.let {
-        if (it.isSuccess()) {
-          toast("已取消收藏!")
-          getCollect()
-        }
-      }
-    }
-  }
-
-  fun getSearchHistory() {
-    MapDataRepository.getSearchHistory()?.let {
-      searchHistory.clear()
-      searchHistory.addAll(it)
-    }
-  }
-
-  // 上传图片
-  fun uploadPhoto(imageList: List<PlatformFile>?) {
-    launchByViewModelScope {
-      imageList?.let { imageList ->
-        uploadingPhotoState.value = true
-        uploadPhotoResultState.value = false
-        for (i in imageList.indices) {
-          val file = imageList[i]
-          val fileName = getMilliseconds().toString() + "${i}.jpg"
-          val fileBytes = file.readBytes()
-          val multipartBody = MultiPartFormDataContent(
-            formData {
-              append("place_id", placeDetailsId.value)
-              append("file", fileBytes, Headers.build {
-                append(HttpHeaders.ContentType, "image/jpeg")
-                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
-              })
-            }
-          )
-          MapRepository.uploadPhoto(multipartBody).getOrElse { throwable: Throwable ->
-            toast("上传第${i}张图片失败！")
-            failedImageCount++
-            null
-          }?.let {
-            if (it.isSuccess()) {
-              successImageCount++
-            } else {
-              failedImageCount++
-            }
-          }
-        }
-        uploadingPhotoState.value = false
-        uploadPhotoResultState.value = true
-      }
-    }
-  }
-
-  fun addSearchHistory(placeItem: PlaceItem) {
-    searchHistory.removeAll { it.placeId == placeItem.placeId }
-    searchHistory.add(placeItem)
-    MapDataRepository.saveSearchHistory(searchHistory)
-  }
-
-  fun deleteSearchHistory(placeItem: PlaceItem) {
-    searchHistory.remove(placeItem)
-    MapDataRepository.saveSearchHistory(searchHistory)
-  }
-
-  fun clearSearchHistory() {
-    searchHistory.clear()
-    MapDataRepository.saveSearchHistory(searchHistory)
   }
 
   fun closeAnchorList() {
@@ -445,7 +323,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
 
   // 点击anchorItem
   fun clickAnchorItem(placeId: String, position: Offset) {
-    getPlaceDetails(placeId)
     sendMapUiEvent(
       MapUiEvent.OpenPlaceDetail(
         placeId = placeId,
@@ -505,7 +382,6 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
     }
     currentSelectedItem.value = 999
     anchorItemState.placeId = placeId // 更新一下对应的placeId
-    if (isFind) getPlaceDetails(placeId)
     sendMapUiEvent(
       MapUiEvent.ClickMapPlace(
         placeId = placeId.takeIf { isFind },
@@ -539,8 +415,5 @@ abstract class CommonMapComposeViewModel : BaseViewModel() {
       )
     )
   }
-
-  // 跳转导航
-  open fun jumpToNavigation(endPlace: String) {}
 
 }

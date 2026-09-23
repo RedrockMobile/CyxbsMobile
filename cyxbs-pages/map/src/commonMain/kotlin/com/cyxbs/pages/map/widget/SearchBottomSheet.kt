@@ -117,7 +117,7 @@ fun SearchBottomSheetContent() {
 
 @Composable
 private fun BottomSearchBar(modifier: Modifier = Modifier) {
-  val viewmodel: SearchViewModel = viewModel()
+  val viewmodel = viewModel { SearchViewModel() }
   BasicTextField(
     modifier = modifier
       .background(

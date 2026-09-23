@@ -46,11 +46,9 @@ import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.components.view.ui.bottomsheet.LocalBottomSheetScope
 import com.cyxbs.pages.map.model.bean.PlaceDetails
-import com.cyxbs.pages.map.ui.UploadPhotoDialog
-import com.cyxbs.pages.map.ui.UploadPhotoResult
-import com.cyxbs.pages.map.ui.UploadingPhotoProgressDialog
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.viewmodel.PlaceDetailViewModel
+import com.cyxbs.pages.map.viewmodel.openMapNavigation
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_detail_more
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_like
@@ -72,7 +70,7 @@ import org.jetbrains.compose.resources.painterResource
  */
 @Composable
 fun PlaceDetailBottomSheetContent() {
-  val viewmodel: PlaceDetailViewModel = viewModel()
+  val viewmodel = viewModel { PlaceDetailViewModel() }
   val bottomSheetScope = LocalBottomSheetScope.current
   viewmodel.placeDetails.value?.let { placeDetails ->
     val ratio = getWindowScreenSize().height / getWindowScreenSize().width
@@ -191,7 +189,7 @@ private fun PlaceAttributeListCompose(modifier: Modifier = Modifier, placeDetail
 
 @Composable
 private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel: PlaceDetailViewModel = viewModel()
+  val viewmodel = viewModel { PlaceDetailViewModel() }
   val isFavorite = remember { mutableStateOf(false) }
   val loginDialogState = rememberLoginDialogState()
   Image(
@@ -228,7 +226,6 @@ private fun PlaceFavoriteCompose(modifier: Modifier = Modifier, placeDetails: Pl
 
 @Composable
 private fun PlaceNavigationCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel: PlaceDetailViewModel = viewModel()
   Box(
     modifier = modifier
       .width(80.dp)
@@ -236,7 +233,7 @@ private fun PlaceNavigationCompose(modifier: Modifier = Modifier, placeDetails: 
       .clip(RoundedCornerShape(100.dp))
       .background(Color(0XFF4841E2))
       .clickableNoIndicator {
-        viewmodel.jumpToNavigation("重庆邮电大学" + placeDetails.placeName)
+        openMapNavigation("重庆邮电大学" + placeDetails.placeName)
       },
   ) {
     Text(
@@ -260,11 +257,11 @@ private fun DetailTextCompose(modifier: Modifier = Modifier, placeDetails: Place
 
 @Composable
 private fun DetailMoreTextCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel: PlaceDetailViewModel = viewModel()
+  val viewmodel = viewModel { PlaceDetailViewModel() }
   Row(
     modifier = modifier
       .clickableSingle {
-        viewmodel.mapPagerState.value = 1
+        viewmodel.openAllPictures()
       },
     verticalAlignment = Alignment.CenterVertically
   ) {
@@ -328,8 +325,7 @@ private fun ImageBannerCompose(modifier: Modifier = Modifier, placeDetails: Plac
 
 @Composable
 private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: PlaceDetails) {
-  val viewmodel: PlaceDetailViewModel = viewModel()
-  val showState = remember { mutableStateOf(false) }
+  val viewmodel = viewModel { PlaceDetailViewModel() }
   val loginDialogState = rememberLoginDialogState()
   Row(
     modifier = modifier
@@ -337,7 +333,7 @@ private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: Plac
         loginDialogState.doIfLogin(
           function = "上传图片"
         ) {
-          showState.value = true
+          viewmodel.requestPhotoUpload()
         }
       }
       .padding(top = 10.dp),
@@ -354,9 +350,6 @@ private fun DetailShareCompose(modifier: Modifier = Modifier, placeDetails: Plac
       color = LocalAppColors.current.tvLv4
     )
   }
-  UploadPhotoDialog(showState)
-  UploadPhotoResult(viewmodel.uploadPhotoResultState)
-  UploadingPhotoProgressDialog()
 }
 
 @Composable

@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_delete
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search
@@ -45,7 +45,7 @@ fun SearchCompose(
   modifier: Modifier = Modifier,
   needPlaceList: Boolean = false
 ) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   val backState = rememberNavigationEventState(NavigationEventInfo.None)
   NavigationBackHandler(
     state = backState,
@@ -74,7 +74,7 @@ fun SearchCompose(
 @Composable
 fun SearchResultCompose(modifier: Modifier = Modifier) {
   val textColor = 0xFF234780.dark(0xFFF0F0F2)
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   LazyColumn(
     modifier = modifier.fillMaxSize()
   ) {
@@ -121,7 +121,7 @@ fun SearchHistoryCompose(
   modifier: Modifier = Modifier,
   needPlaceList: Boolean = false
 ) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   val showState = remember { mutableStateOf(false) }
   Column(
     modifier = modifier.fillMaxSize()

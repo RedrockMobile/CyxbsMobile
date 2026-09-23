@@ -199,7 +199,7 @@ deeplink: cyxbs://map/picture?imageList={List<String>}&currentIndex={Int}
 - argument: `com.cyxbs.pages.map.ui.PlaceDetailNavArgument`
 
 ```text
-deeplink: cyxbs://map/detail?placeId={String}
+deeplink: cyxbs://map/detail?placeId={String}&expanded=[Boolean?]
 ```
 
 ### map/search

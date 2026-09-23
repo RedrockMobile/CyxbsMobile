@@ -9,6 +9,10 @@ useNavigation() // navigation 跳转
 
 kotlin {
   sourceSets {
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+      implementation(libs.kotlinx.coroutines.test)
+    }
     commonMain.dependencies {
       subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
