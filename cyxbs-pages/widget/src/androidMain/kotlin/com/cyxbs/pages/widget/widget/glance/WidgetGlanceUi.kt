@@ -22,6 +22,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -43,6 +44,7 @@ import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
  * 外部 padding 也绘制成按压阴影。[renderSize] 是扣除调用方外边距后的卡片真实尺寸，用于生成
  * 无需缩放的固定粗细斜纹。
  * [titleTopPadding] 仅在标题置顶模式下增加标题上方留白，不会改变底部内容的下间距。
+ * [clipStartEdge] / [clipEndEdge] 表示条目被时间轴边界裁剪，对应边缘使用直角提示仍有内容。
  * [containerColorOverride] 允许布局用自身画布色替换外层底卡，避免非纯白轨道出现突兀白边。
  */
 @Composable
@@ -61,6 +63,8 @@ internal fun WidgetRenderItemCard(
   titleTopPadding: Dp = 0.dp,
   contentPaddingHorizontal: Dp = 2.dp,
   contentPaddingVertical: Dp = 3.dp,
+  clipStartEdge: Boolean = false,
+  clipEndEdge: Boolean = false,
   containerColorOverride: ColorProvider? = null,
   coverTipColor: ColorProvider? = null,
   renderSize: DpSize? = null,
@@ -83,6 +87,8 @@ internal fun WidgetRenderItemCard(
         modifier = GlanceModifier.fillMaxSize(),
         renderSize = renderSize,
         containerColorOverride = containerColorOverride,
+        clipStartEdge = clipStartEdge,
+        clipEndEdge = clipEndEdge,
       )
       Column(
         modifier = GlanceModifier.fillMaxSize().padding(
@@ -166,6 +172,8 @@ internal fun WidgetRenderItemBackground(
   modifier: GlanceModifier,
   renderSize: DpSize? = null,
   containerColorOverride: ColorProvider? = null,
+  clipStartEdge: Boolean = false,
+  clipEndEdge: Boolean = false,
 ) {
   val style = if (isDark) item.darkStyle else item.lightStyle
   // 兼容升级前没有 containerArgb 的快照；新快照始终由课表侧下发该颜色。
@@ -177,40 +185,145 @@ internal fun WidgetRenderItemBackground(
   } else {
     widgetColorProvider(Color(style.backgroundArgb))
   }
-  Box(
-    // Glance 会把同一节点的 padding 与 background 转成一个 RemoteViews：padding 只缩进子内容，
-    // 不会缩小该节点自身的背景。间距必须放在纯白外层，才能让课程色子节点真正内缩 2dp。
-    modifier = modifier.background(container).cornerRadius(6.dp).padding(WidgetItemContainerGap),
-  ) {
-    Box(
-      modifier = GlanceModifier.fillMaxSize().background(contentBackground).cornerRadius(4.dp),
-    ) {
-      if (item.backgroundPattern == CourseWidgetBackgroundPattern.DIAGONAL_STRIPE) {
-        val stripeColor = Color(style.stripeArgb ?: style.contentArgb)
-        val stripeImageProvider = renderSize?.let { size ->
-          val density = LocalContext.current.resources.displayMetrics.density
-          // 纹理按内层真实尺寸生成，宿主无需缩放图片，因此任意卡片高度下角度、线宽和间距都固定。
-          remember(size, density, stripeColor) {
-            ImageProvider(
-              createDiagonalStripeBitmap(
-                widthDp = (size.width.value - WidgetItemContainerGap.value * 2)
-                  .coerceAtLeast(1f),
-                heightDp = (size.height.value - WidgetItemContainerGap.value * 2)
-                  .coerceAtLeast(1f),
-                density = density,
-                color = stripeColor,
-              ),
-            )
-          }
-        } ?: ImageProvider(R.drawable.widget_ic_diagonal_stripe)
-        // 透明间隔继续透出内容层的 topBg，而不是直接透出时间轴背景。
-        Box(
-          modifier = GlanceModifier.fillMaxSize().background(
-            imageProvider = stripeImageProvider,
-            contentScale = ContentScale.FillBounds,
-          ).cornerRadius(4.dp),
-        ) {}
+  val stripeImageProvider = if (item.backgroundPattern == CourseWidgetBackgroundPattern.DIAGONAL_STRIPE) {
+    val stripeColor = Color(style.stripeArgb ?: style.contentArgb)
+    renderSize?.let { size ->
+      val density = LocalContext.current.resources.displayMetrics.density
+      // 纹理按内层真实尺寸生成，宿主无需缩放图片，因此任意卡片高度下角度、线宽和间距都固定。
+      remember(size, density, stripeColor) {
+        ImageProvider(
+          createDiagonalStripeBitmap(
+            widthDp = (size.width.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+            heightDp = (size.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+            density = density,
+            color = stripeColor,
+          ),
+        )
       }
+    } ?: ImageProvider(R.drawable.widget_ic_diagonal_stripe)
+  } else {
+    null
+  }
+  if (!clipStartEdge && !clipEndEdge) {
+    Box(
+      // Glance 会把同一节点的 padding 与 background 转成一个 RemoteViews：padding 只缩进子内容，
+      // 不会缩小该节点自身的背景。间距必须放在纯白外层，才能让课程色子节点真正内缩 2dp。
+      modifier = modifier.background(container).cornerRadius(WidgetItemOuterCornerRadius)
+        .padding(WidgetItemContainerGap),
+    ) {
+      WidgetRenderItemContentBackground(
+        contentBackground = contentBackground,
+        stripeImageProvider = stripeImageProvider,
+        modifier = GlanceModifier.fillMaxSize().cornerRadius(WidgetItemInnerCornerRadius),
+      )
+    }
+    return
+  }
+
+  val stripeEdgeImageProvider = if (stripeImageProvider != null) {
+    val stripeColor = Color(style.stripeArgb ?: style.contentArgb)
+    renderSize?.let { size ->
+      val density = LocalContext.current.resources.displayMetrics.density
+      // 被裁边单独生成固定宽度纹理，避免把整张斜纹图压缩后改变线宽和角度。
+      remember(size.height, density, stripeColor) {
+        ImageProvider(
+          createDiagonalStripeBitmap(
+            widthDp = WidgetItemInnerCornerRadius.value,
+            heightDp = (size.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+            density = density,
+            color = stripeColor,
+          ),
+        )
+      }
+    } ?: ImageProvider(R.drawable.widget_ic_diagonal_stripe)
+  } else {
+    null
+  }
+  Box(
+    modifier = modifier.background(container).cornerRadius(WidgetItemOuterCornerRadius),
+  ) {
+    // 先用同色矩形补齐被裁侧的圆角区域，再在内缩内容层重复处理课程色或事务斜纹。
+    WidgetRenderClippedEdgeFill(
+      clipStartEdge = clipStartEdge,
+      clipEndEdge = clipEndEdge,
+      edgeWidth = WidgetItemOuterCornerRadius,
+      background = container,
+    )
+    Box(modifier = GlanceModifier.fillMaxSize().padding(WidgetItemContainerGap)) {
+      WidgetRenderItemContentBackground(
+        contentBackground = contentBackground,
+        stripeImageProvider = stripeImageProvider,
+        modifier = GlanceModifier.fillMaxSize().cornerRadius(WidgetItemInnerCornerRadius),
+      )
+      WidgetRenderClippedEdgeFill(
+        clipStartEdge = clipStartEdge,
+        clipEndEdge = clipEndEdge,
+        edgeWidth = WidgetItemInnerCornerRadius,
+        background = contentBackground,
+        imageProvider = stripeEdgeImageProvider,
+      )
+    }
+  }
+}
+
+/** 绘制课程色或事务斜纹内容层；调用方负责决定四角形状。 */
+@Composable
+private fun WidgetRenderItemContentBackground(
+  contentBackground: ColorProvider,
+  stripeImageProvider: ImageProvider?,
+  modifier: GlanceModifier,
+) {
+  Box(modifier = modifier.background(contentBackground)) {
+    if (stripeImageProvider != null) {
+      // 透明间隔继续透出内容层的 topBg，而不是直接透出时间轴背景。
+      Box(
+        modifier = GlanceModifier.fillMaxSize().background(
+          imageProvider = stripeImageProvider,
+          contentScale = ContentScale.FillBounds,
+        ),
+      ) {}
+    }
+  }
+}
+
+/** 用无圆角矩形覆盖被时间轴裁掉的一侧，未裁侧继续保留原圆角。 */
+@Composable
+private fun WidgetRenderClippedEdgeFill(
+  clipStartEdge: Boolean,
+  clipEndEdge: Boolean,
+  edgeWidth: Dp,
+  background: ColorProvider,
+  imageProvider: ImageProvider? = null,
+) {
+  if (clipStartEdge) {
+    Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+      WidgetRenderClippedEdge(edgeWidth, background, imageProvider)
+    }
+  }
+  if (clipEndEdge) {
+    Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+      WidgetRenderClippedEdge(edgeWidth, background, imageProvider)
+    }
+  }
+}
+
+/** 绘制单侧直角补片；事务条目会在补片上继续绘制固定粗细斜纹。 */
+@Composable
+private fun WidgetRenderClippedEdge(
+  edgeWidth: Dp,
+  background: ColorProvider,
+  imageProvider: ImageProvider?,
+) {
+  Box(
+    modifier = GlanceModifier.width(edgeWidth).fillMaxHeight().background(background),
+  ) {
+    if (imageProvider != null) {
+      Box(
+        modifier = GlanceModifier.fillMaxSize().background(
+          imageProvider = imageProvider,
+          contentScale = ContentScale.FillBounds,
+        ),
+      ) {}
     }
   }
 }
@@ -258,6 +371,8 @@ private fun createDiagonalStripeBitmap(
 
 private const val WidgetStripeWidthDp = 2f
 private const val WidgetStripePitchDp = 8f
+private val WidgetItemOuterCornerRadius = 6.dp
+private val WidgetItemInnerCornerRadius = 4.dp
 
 /** 条目外底卡与内部内容层的固定间距；文字可用区域计算必须复用同一数值。 */
 internal val WidgetItemContainerGap = 2.dp

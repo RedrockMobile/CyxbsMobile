@@ -51,6 +51,10 @@ internal data class NormalTimelineBar(
   val endMinute: Int,
   val beginRatio: Float,
   val endRatio: Float,
+  /** 原始条目从时间轴左侧之外开始，左边缘需要使用直角表示仍有内容。 */
+  val isStartClipped: Boolean = false,
+  /** 原始条目在时间轴右侧之外结束，右边缘需要使用直角表示仍有内容。 */
+  val isEndClipped: Boolean = false,
   /** 同层条目沿用快照顺序，避免 Widget 用标题或 id 猜测业务优先级。 */
   val snapshotOrder: Int = 0,
 )
@@ -807,23 +811,25 @@ internal fun projectNormalTimeline(
     if (beginMinute !in 0 until MINUTES_PER_DAY || endMinute !in 1..MINUTES_PER_DAY || endMinute <= beginMinute) {
       return@mapIndexedNotNull null
     }
-    // 固定时间轴不绘制越界事项，避免边缘出现经过比例裁剪但语义不完整的半条内容。
+    // 固定时间轴仅丢弃完全不相交的事项；跨越边界的部分夹取到可见范围，并由 UI 抹平被裁侧圆角。
     if (linearRange != null &&
-      (beginMinute < linearRange.beginMinute || endMinute > linearRange.endMinute)
-    ) {
-      return@mapIndexedNotNull null
-    }
-    val beginRatio = linearRange?.ratioOf(beginMinute)
+      (endMinute <= linearRange.beginMinute || beginMinute >= linearRange.endMinute)
+    ) return@mapIndexedNotNull null
+    val visibleBeginMinute = linearRange?.let { maxOf(beginMinute, it.beginMinute) } ?: beginMinute
+    val visibleEndMinute = linearRange?.let { minOf(endMinute, it.endMinute) } ?: endMinute
+    val beginRatio = linearRange?.ratioOf(visibleBeginMinute)
       ?: item.beginRatio.validTimelineRatioOr(beginMinute)
-    val endRatio = linearRange?.ratioOf(endMinute)
+    val endRatio = linearRange?.ratioOf(visibleEndMinute)
       ?: item.endRatio.validTimelineRatioOr(endMinute)
     if (endRatio <= beginRatio) return@mapIndexedNotNull null
     NormalTimelineBar(
       item = item,
-      beginMinute = beginMinute,
-      endMinute = endMinute,
+      beginMinute = visibleBeginMinute,
+      endMinute = visibleEndMinute,
       beginRatio = beginRatio,
       endRatio = endRatio,
+      isStartClipped = linearRange != null && beginMinute < linearRange.beginMinute,
+      isEndClipped = linearRange != null && endMinute > linearRange.endMinute,
       snapshotOrder = snapshotOrder,
     )
   }.sortedWith(

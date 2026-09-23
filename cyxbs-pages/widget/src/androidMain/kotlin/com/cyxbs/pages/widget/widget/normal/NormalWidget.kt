@@ -704,6 +704,8 @@ private fun NormalTimelineLane(
         contentPaddingHorizontal = contentPaddingHorizontal,
         contentPaddingVertical = contentPaddingVertical,
         containerColorOverride = NormalTrackColor,
+        clipStartEdge = bar.isStartClipped,
+        clipEndEdge = bar.isEndClipped,
         coverTipColor = if (overflowBars.any(bar::overlaps)) {
           widgetColorProvider(Color(bar.item.lightStyle.contentArgb))
         } else {
@@ -773,6 +775,8 @@ private fun NormalTimelineOverflowLane(
           contentPaddingHorizontal = NormalTimelineItemContentPadding,
           contentPaddingVertical = NormalTimelineItemContentPadding,
           containerColorOverride = NormalTrackColor,
+          clipStartEdge = bar.isStartClipped,
+          clipEndEdge = bar.isEndClipped,
           renderSize = DpSize(
             width = barWidth.dp,
             height = availableItemHeightDp.dp,

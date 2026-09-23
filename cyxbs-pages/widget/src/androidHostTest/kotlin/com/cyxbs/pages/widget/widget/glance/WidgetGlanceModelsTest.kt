@@ -247,22 +247,34 @@ class WidgetGlanceModelsTest {
     assertEquals(120f / 870f, bar.endRatio)
   }
 
-  /** 固定时间轴只保留完整落在 8:00–22:30 内的条目，越过任一边界都不绘制。 */
+  /** 固定时间轴裁剪相交条目并记录被裁边，完全位于 8:00–22:30 外的条目仍不绘制。 */
   @Test
-  fun normalTimelineOmitsItemsOutsideFixedRange() {
+  fun normalTimelineClipsItemsAtFixedRangeEdges() {
+    val fullyBefore = item("fully-before", begin = 7 * 60, end = 7 * 60 + 30)
     val before = item("before", begin = 7 * 60 + 30, end = 8 * 60 + 30)
     val startsAtBoundary = item("starts-at-boundary", begin = 8 * 60, end = 9 * 60)
     val endsAtBoundary = item("ends-at-boundary", begin = 21 * 60, end = 22 * 60 + 30)
     val after = item("after", begin = 22 * 60, end = 23 * 60)
+    val fullyAfter = item("fully-after", begin = 22 * 60 + 30, end = 23 * 60 + 30)
 
-    val ids = projectNormalTimeline(
-      week = week(before, startsAtBoundary, endsAtBoundary, after),
+    val bars = projectNormalTimeline(
+      week = week(fullyBefore, before, startsAtBoundary, endsAtBoundary, after, fullyAfter),
       day = 0,
       timelineBeginMinute = 8 * 60,
       timelineEndMinute = 22 * 60 + 30,
-    ).flatMap { it.lanes }.flatten().map { it.item.id }
+    ).flatMap { it.lanes }.flatten().associateBy { it.item.id }
 
-    assertEquals(listOf("starts-at-boundary", "ends-at-boundary"), ids)
+    assertEquals(setOf("before", "starts-at-boundary", "ends-at-boundary", "after"), bars.keys)
+    assertEquals(8 * 60, bars.getValue("before").beginMinute)
+    assertEquals(0f, bars.getValue("before").beginRatio)
+    assertTrue(bars.getValue("before").isStartClipped)
+    assertFalse(bars.getValue("before").isEndClipped)
+    assertFalse(bars.getValue("starts-at-boundary").isStartClipped)
+    assertFalse(bars.getValue("ends-at-boundary").isEndClipped)
+    assertEquals(22 * 60 + 30, bars.getValue("after").endMinute)
+    assertEquals(1f, bars.getValue("after").endRatio)
+    assertFalse(bars.getValue("after").isStartClipped)
+    assertTrue(bars.getValue("after").isEndClipped)
   }
 
   /** 当前时间线按固定范围线性定位，范围外与右侧半开边界不绘制。 */
