@@ -105,12 +105,14 @@ if (secretGradleFile.exists()) {
   tasks.register("cyxbsRelease") {
     group = "cyxbs"
     dependsOn("channelRelease", "cyxbsReleaseExistApk")
+    notCompatibleWithConfigurationCache("")
   }
 
   // 仅发布 apk，不打包
   tasks.register("cyxbsReleaseExistApk", CyxbsReleaseTask::class) {
     group = "cyxbs"
     mustRunAfter("channelRelease")
+    notCompatibleWithConfigurationCache("")
     getApkFile.set {
       channel.outputDir.listFiles()!!.single {
         it.name.matches(

@@ -1,4 +1,4 @@
-package com.cyxbs.functions.update.network
+package com.cyxbs.functions.update.service
 
 import com.cyxbs.functions.update.api.UpdateInfo
 import com.cyxbs.functions.update.bean.GithubUpdateInfo

@@ -1,4 +1,4 @@
-package com.cyxbs.functions.update.bean
+package com.cyxbs.functions.update.service
 
 import com.cyxbs.functions.update.api.UpdateInfo
 import com.eygraber.uri.Uri

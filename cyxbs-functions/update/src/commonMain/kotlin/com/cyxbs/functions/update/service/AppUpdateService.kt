@@ -1,20 +1,11 @@
 package com.cyxbs.functions.update.service
 
-import com.cyxbs.components.config.Platform
-import com.cyxbs.components.config.appPlatform
-import com.cyxbs.components.config.isDebug
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.utils.get.getAppVersionCode
-import com.cyxbs.components.utils.utils.get.getAppVersionName
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.functions.update.api.UpdateInfo
 import com.cyxbs.functions.update.dialog.UpdateInfoNavArgument
-import com.cyxbs.functions.update.network.AppUpdateApiService
-import com.cyxbs.functions.update.network.getAppStoreUpdateInfo
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -32,25 +23,23 @@ import kotlin.time.Duration.Companion.milliseconds
 @ImplProvider
 object AppUpdateService : IAppUpdateService {
 
+  // 是否用于 mock 更新数据用于测试
+  // 这将控制版本的判断逻辑，最后显示为线上的更新信息的弹窗
+  private var isMockTestUpdate = false
+
   private val checker = AppUpdateChecker(
     scope = appCoroutineScope,
     requestInfo = {
-      if (appPlatform == Platform.IOS) getAppStoreUpdateInfo() else getAndroidUpdateInfo()
+      AppUpdatePlatform.requestUpdateInfo()
     },
     isNewVersion = { remoteInfo ->
-      isUpdateAvailable(
-        platform = appPlatform,
-        remoteInfo = remoteInfo,
-        installedVersionName = getAppVersionName(),
-        installedVersionCode = getAppVersionCode(),
-      )
+      AppUpdatePlatform.isNewVersion(remoteInfo) || isMockTestUpdate
     },
   )
 
   init {
-    // iOS 由关于页触发检查，避免首次进入时与初始化请求重复。
-    if (appPlatform != Platform.IOS) {
-      appCoroutineScope.launch { checkUpdate() }
+    appCoroutineScope.launch {
+      checkUpdate()
     }
   }
 
@@ -76,36 +65,12 @@ object AppUpdateService : IAppUpdateService {
       val status = checkUpdate() as? AppUpdateStatus.Result.Dated ?: return@launch
       noticeUpdate(status.newVersion)
       defaultSettings.putLong("上次提醒更新时间", nowTime.inWholeMilliseconds)
+      isMockTestUpdate = false
     }
   }
 
   override fun debug() {
-    if (!isDebug()) return
-    appCoroutineScope.launch(Dispatchers.Main.immediate) {
-      val info = checker.checkPreviewInfo()
-      if (info != null) noticeUpdate(info) else "检查更新失败，请稍后重试".toast()
-    }
-  }
-
-  private suspend fun getAndroidUpdateInfo(): UpdateInfo {
-    val apiService = AppUpdateApiService::class.impl()
-    return runCatching {
-      apiService.getUpdateInfo()
-    }.recoverCatching {
-      // 兜底使用 github release 更新，但需要发版时需要遵循格式：vX.X.X-X
-      val githubUpdateInfo = apiService.getUpdateInfoByGithub()
-      if (githubUpdateInfo.tag.matches("v\\d+\\.\\d+\\.\\d+-\\d+".toRegex())){
-        val strings = githubUpdateInfo.tag.split("-")
-        val versionName = strings[0].removeRange(0,1)
-        val versionCode = strings[1].toLong()
-        UpdateInfo(
-          apkUrl = githubUpdateInfo.assets.first().downloadUrl,
-          updateContent = githubUpdateInfo.body,
-          versionCode = versionCode,
-          versionName = versionName,
-        )
-      }
-      throw it
-    }.getOrThrow()
+    isMockTestUpdate = true
+    tryNoticeUpdate(needFrequency = false)
   }
 }

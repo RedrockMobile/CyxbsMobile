@@ -26,9 +26,6 @@ internal class AppUpdateChecker(
 
   private data class CheckResult(val status: AppUpdateStatus.Result, val info: UpdateInfo?)
 
-  // 预览参与正常检查和请求合并，会刷新 status/info；只展示本次信息，不强制改成 Dated。
-  suspend fun checkPreviewInfo(): UpdateInfo? = check().info
-
   suspend fun checkUpdate(): AppUpdateStatus.Result = check().status
 
   private suspend fun check(): CheckResult {
