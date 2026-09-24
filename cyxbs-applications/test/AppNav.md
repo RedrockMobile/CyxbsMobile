@@ -4,7 +4,7 @@
 > 该文件需要被 git 提交用于后续使用
 
 - versionCode: 94
-- versionName: 6.10.6-alpha
+- versionName: 7.0.0
 
 ## 调试方法
 
