@@ -12,7 +12,7 @@ import java.util.regex.Pattern
 object Config {
   // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
   const val versionCode = 94 // 线上93，开发94
-  const val versionName = "6.10.6-alpha" // 线上6.10.5，开发6.10.6-alpha，自己打包 -alpha，内测 -beta
+  const val versionName = "7.0.0" // 线上7.0.0，开发7.0.0-alpha，自己打包 -alpha，内测 -beta
 
   val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
     get() = versionName.substringBefore("-")
@@ -22,9 +22,11 @@ object Config {
 
   // 线上版本更新内容，注意缩进统一
   val updateContent = """
-    [bugfix]
-    1. 修护无法编辑和创建课表事务
-    2. 修护登录经常过期
+    掌上重邮7.0.0版本焕新升级！
+    1. 邮子清单升级，新增日历提醒、与课表双向同步、关联系统日历等
+    2. 课表重构，事务支持分钟级粒度以及全天时间段
+    3. 校园地图更新 
+    4. 优化使用体验，修复已知问题
   """.trimIndent()
 
   val resourcesExclude = listOf(
