@@ -105,6 +105,7 @@ if (secretGradleFile.exists()) {
   tasks.register("cyxbsRelease") {
     group = "cyxbs"
     dependsOn("channelRelease", "cyxbsReleaseExistApk")
+    notCompatibleWithConfigurationCache("...")
   }
 
   // 仅发布 apk，不打包
@@ -164,7 +165,7 @@ tasks.register("buildReleaseAndInstall") {
 }
 
 tasks.all {
-  if (name == "channelRelease") {
+  if (name == "channelRelease" || name == "cyxbsReleaseExistApk") {
     // 抑制 channelRelease 不能缓存的报错
     notCompatibleWithConfigurationCache("suppres configuration cache")
   }

@@ -60,7 +60,7 @@ class ApkInstallStep(val project: Project) {
     var result = check("${index++}. 覆盖安装后能否继承登录状态?", listOf())
     result = result && check("${index++}. 首页轮播图是否正常加载出图片?", null)
     result = result && check("${index++}. 即将打开课表，请确认能否正常打开并显示?", listOf("-a", "com.mredrock.cyxbs.action.COURSE"))
-    result = result && check("${index++}. 即将强制触发更新弹窗，请确认更新弹窗能正常弹出且能跳转下载? " + "(最核心功能)".red(), listOf("-a", "com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG"))
+    result = result && check("${index++}. 即将强制触发更新弹窗，将测试线上版本的数据拉取，请确认更新弹窗能正常弹出且能跳转下载? " + "(最核心功能)".red(), listOf("-a", "com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG"))
     return result
   }
 

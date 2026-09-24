@@ -10,9 +10,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.utils.Umeng
-import com.cyxbs.components.config.route.DISCOVER_EMPTY_ROOM
 import com.cyxbs.components.config.route.DISCOVER_GRADES
-import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
 import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
@@ -20,9 +18,11 @@ import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.functions.update.api.IAppUpdateService
+import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
+import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 
 // 长按桌面图标的那个东西，对应 AndroidManifest.xml 中的设置
 private const val DESKTOP_SHORTCUT_COURSE = "com.mredrock.cyxbs.action.COURSE"
@@ -76,18 +76,23 @@ private fun execIntentAction(
         courseBottomNavViewModel.state.value = true
       }
     }
+
     DESKTOP_SHORTCUT_EXAM -> {
       startActivity(DISCOVER_GRADES)
     }
+
     DESKTOP_SHORTCUT_SCHOOL_CAR -> {
-      startActivity(DISCOVER_SCHOOL_CAR)
+      SchoolCarNavArgument.navigate()
     }
+
     DESKTOP_SHORTCUT_EMPTY_ROOM -> {
-      startActivity(DISCOVER_EMPTY_ROOM)
+      EmptyRoomNavArgument.navigate()
     }
+
     ACTION_TEST_UPDATE_DIALOG -> {
       IAppUpdateService.debug() // 测试更新弹窗是否正常
     }
+
     else -> {
       if (defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
         // 打开应用优先显示课表的设置

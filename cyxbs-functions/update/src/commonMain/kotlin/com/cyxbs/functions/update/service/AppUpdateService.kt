@@ -80,7 +80,6 @@ object AppUpdateService : IAppUpdateService {
   }
 
   override fun debug() {
-    if (!isDebug()) return
     appCoroutineScope.launch(Dispatchers.Main.immediate) {
       val info = checker.checkPreviewInfo()
       if (info != null) noticeUpdate(info) else "检查更新失败，请稍后重试".toast()

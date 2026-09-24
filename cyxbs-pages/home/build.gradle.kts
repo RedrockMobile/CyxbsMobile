@@ -21,6 +21,8 @@ kotlin {
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.notification.api)
       implementation(projects.cyxbsPages.map.api)
+      implementation(projects.cyxbsPages.emptyroom.api)
+      implementation(projects.cyxbsPages.schoolcar.api)
     }
     androidMain.dependencies {
       // 旧首页 View 课表仍需读取 Android 事务服务。
