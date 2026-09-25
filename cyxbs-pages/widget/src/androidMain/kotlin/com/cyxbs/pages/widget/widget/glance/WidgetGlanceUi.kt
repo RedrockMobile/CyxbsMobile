@@ -32,7 +32,6 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.cyxbs.pages.widget.R
 import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
 import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
 
@@ -52,6 +51,7 @@ internal fun WidgetRenderItemCard(
   item: CourseWidgetRenderItem,
   modifier: GlanceModifier,
   isDark: Boolean,
+  renderSize: DpSize,
   titleSizeSp: Int = 9,
   contentSizeSp: Int = 8,
   maxTitleLines: Int = 3,
@@ -67,7 +67,6 @@ internal fun WidgetRenderItemCard(
   clipEndEdge: Boolean = false,
   containerColorOverride: ColorProvider? = null,
   coverTipColor: ColorProvider? = null,
-  renderSize: DpSize? = null,
 ) {
   val style = if (isDark) item.darkStyle else item.lightStyle
   val foreground = widgetColorProvider(Color(style.contentArgb))
@@ -162,7 +161,7 @@ internal fun WidgetRenderItemCard(
  * 绘制课表 Item 的两层背景：外层圆角底卡，内缩 2dp 后绘制课程色或事务斜纹内容层。
  *
  * 该组件同时用于正文卡片和溢出叠卡，避免两种状态的颜色、圆角与边缘间距不一致。
- * [renderSize] 非空时按真实尺寸生成斜纹位图；空值仅用于无法获知尺寸的兼容调用。
+ * [renderSize] 必须由调用方提供，用实际尺寸和快照颜色生成斜纹位图，避免静态图缩放或丢失分组颜色。
  * [containerColorOverride] 仅覆盖外层和事务斜纹透明间隔，课程内容背景仍使用快照样式。
  */
 @Composable
@@ -170,7 +169,7 @@ internal fun WidgetRenderItemBackground(
   item: CourseWidgetRenderItem,
   isDark: Boolean,
   modifier: GlanceModifier,
-  renderSize: DpSize? = null,
+  renderSize: DpSize,
   containerColorOverride: ColorProvider? = null,
   clipStartEdge: Boolean = false,
   clipEndEdge: Boolean = false,
@@ -187,20 +186,18 @@ internal fun WidgetRenderItemBackground(
   }
   val stripeImageProvider = if (item.backgroundPattern == CourseWidgetBackgroundPattern.DIAGONAL_STRIPE) {
     val stripeColor = Color(style.stripeArgb ?: style.contentArgb)
-    renderSize?.let { size ->
-      val density = LocalContext.current.resources.displayMetrics.density
-      // 纹理按内层真实尺寸生成，宿主无需缩放图片，因此任意卡片高度下角度、线宽和间距都固定。
-      remember(size, density, stripeColor) {
-        ImageProvider(
-          createDiagonalStripeBitmap(
-            widthDp = (size.width.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
-            heightDp = (size.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
-            density = density,
-            color = stripeColor,
-          ),
-        )
-      }
-    } ?: ImageProvider(R.drawable.widget_ic_diagonal_stripe)
+    val density = LocalContext.current.resources.displayMetrics.density
+    // 纹理按内层真实尺寸生成，宿主无需缩放图片，因此任意卡片高度下角度、线宽和间距都固定。
+    remember(renderSize, density, stripeColor) {
+      ImageProvider(
+        createDiagonalStripeBitmap(
+          widthDp = (renderSize.width.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+          heightDp = (renderSize.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+          density = density,
+          color = stripeColor,
+        ),
+      )
+    }
   } else {
     null
   }
@@ -222,20 +219,18 @@ internal fun WidgetRenderItemBackground(
 
   val stripeEdgeImageProvider = if (stripeImageProvider != null) {
     val stripeColor = Color(style.stripeArgb ?: style.contentArgb)
-    renderSize?.let { size ->
-      val density = LocalContext.current.resources.displayMetrics.density
-      // 被裁边单独生成固定宽度纹理，避免把整张斜纹图压缩后改变线宽和角度。
-      remember(size.height, density, stripeColor) {
-        ImageProvider(
-          createDiagonalStripeBitmap(
-            widthDp = WidgetItemInnerCornerRadius.value,
-            heightDp = (size.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
-            density = density,
-            color = stripeColor,
-          ),
-        )
-      }
-    } ?: ImageProvider(R.drawable.widget_ic_diagonal_stripe)
+    val density = LocalContext.current.resources.displayMetrics.density
+    // 被裁边单独生成固定宽度纹理，避免把整张斜纹图压缩后改变线宽和角度。
+    remember(renderSize.height, density, stripeColor) {
+      ImageProvider(
+        createDiagonalStripeBitmap(
+          widthDp = WidgetItemInnerCornerRadius.value,
+          heightDp = (renderSize.height.value - WidgetItemContainerGap.value * 2).coerceAtLeast(1f),
+          density = density,
+          color = stripeColor,
+        ),
+      )
+    }
   } else {
     null
   }
