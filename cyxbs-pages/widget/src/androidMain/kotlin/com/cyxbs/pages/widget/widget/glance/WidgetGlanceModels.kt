@@ -694,6 +694,65 @@ internal fun resolveOversizedVisibleDays(widgetWidthDp: Float, today: Int): List
   return (start until start + count).toList()
 }
 
+/** 周课表课程卡片的统一字号与实际可展示行数，设置页示例和桌面组件共用。 */
+internal data class OversizedDayTextLayout(
+  val titleSizeSp: Int,
+  val contentSizeSp: Int,
+  val titleLines: Int,
+  val contentLines: Int,
+) {
+  val showContent: Boolean get() = contentLines > 0
+}
+
+/**
+ * 按每张日期列卡片的实际宽高分配文字，所有天数档位的标题固定 9sp，内容固定 8sp。
+ *
+ * [cardWidthDp]、[cardHeightDp] 是已扣除日期列外边距的卡片尺寸。估算时继续扣除内容层的
+ * 2dp 边框间距、[contentPaddingHorizontalDp] 和 [contentPaddingVerticalDp]；
+ * 标题最多展示三行，超出时截断；剩余高度足够时才展示内容。Glance 无法回传 TextView
+ * 实测尺寸，因此给横向字宽和纵向行高预留少量宿主差异空间。
+ */
+internal fun resolveOversizedDayTextLayout(
+  title: String,
+  content: String,
+  cardWidthDp: Float,
+  cardHeightDp: Float,
+  contentPaddingHorizontalDp: Float,
+  contentPaddingVerticalDp: Float,
+  fontScale: Float,
+): OversizedDayTextLayout {
+  val scale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
+  val textWidthDp = ((cardWidthDp -
+    (WidgetItemContainerGap.value + contentPaddingHorizontalDp) * 2) * 0.95f)
+    .coerceAtLeast(1f)
+  val textHeightDp = (cardHeightDp -
+    (WidgetItemContainerGap.value + contentPaddingVerticalDp) * 2)
+    .coerceAtLeast(1f)
+
+  val titleSizeSp = 9
+  val contentSizeSp = 8
+  fun requiredLines(sizeSp: Int): Int = title.split('\n').sumOf { line ->
+    val widthUnits = line.sumOf { it.normalTimelineWidthUnit().toDouble() }.toFloat()
+    ceil(widthUnits * sizeSp * scale / textWidthDp).toInt().coerceAtLeast(1)
+  }
+
+  fun lineHeightDp(sizeSp: Int): Float = sizeSp * scale * 1.25f
+
+  val neededTitleLines = requiredLines(titleSizeSp)
+  val titleLines = minOf(
+    neededTitleLines,
+    3,
+    floor(textHeightDp / lineHeightDp(titleSizeSp)).toInt().coerceAtLeast(1),
+  )
+  val contentLines = if (content.isNotBlank()) {
+    val remainingHeightDp = textHeightDp - titleLines * lineHeightDp(titleSizeSp)
+    floor((remainingHeightDp - 2f) / lineHeightDp(contentSizeSp)).toInt().coerceIn(0, 2)
+  } else {
+    0
+  }
+  return OversizedDayTextLayout(titleSizeSp, contentSizeSp, titleLines, contentLines)
+}
+
 /** 过滤损坏分段；空结果回退到升级前的默认课表，避免旧持久化快照显示空白。 */
 internal fun CourseWidgetSnapshot.resolveOversizedTimelineSections(): List<CourseWidgetTimelineSection> =
   oversizedTimelineSections.filter { section ->

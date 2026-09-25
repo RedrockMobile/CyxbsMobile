@@ -51,20 +51,33 @@ import java.util.Calendar
 import kotlin.math.roundToInt
 
 /** 最小组件内容两侧留白，与参考实现保持一致。 */
-private val SingleWidgetHorizontalPadding = 10.dp
+internal val SingleWidgetHorizontalPadding = 10.dp
 
 /** 标题与地点之间的分割线高度，同时参与整体文字高度计算。 */
-private val SingleWidgetDividerHeight = 0.8.dp
+internal val SingleWidgetDividerHeight = 0.8.dp
 
-private const val SingleWidgetTimeSizeSp = 14F
-private const val SingleWidgetDefaultTitleSizeSp = 18F
-private const val SingleWidgetMinimumTitleSizeSp = 14F
-private const val SingleWidgetDefaultContentSizeSp = 16F
-private const val SingleWidgetTwoLineMinimumWidthRatio = 1.3F
-private const val SingleWidgetTwoLineMaximumWidthRatio = 1.9F
+/** 单课程字号档位，依次记录标题、时间和内容的 sp 值。 */
+private data class SingleWidgetFontTier(
+  val titleSizeSp: Float,
+  val timeSizeSp: Float,
+  val contentSizeSp: Float,
+)
+
+/** 从大到小尝试；后四档延续原先 14/13/13sp 开始的降级顺序。 */
+private val SingleWidgetFontTiers = listOf(
+  SingleWidgetFontTier(16F, 15F, 15F),
+  SingleWidgetFontTier(16F, 14F, 14F),
+  SingleWidgetFontTier(15F, 14F, 14F),
+  SingleWidgetFontTier(15F, 13F, 13F),
+  SingleWidgetFontTier(14F, 13F, 13F),
+  SingleWidgetFontTier(14F, 12F, 13F),
+  SingleWidgetFontTier(14F, 12F, 12F),
+  SingleWidgetFontTier(13F, 12F, 12F),
+)
 
 /** 最小组件根据标题实测宽度计算出的文字布局。 */
-private data class SingleWidgetTextLayout(
+internal data class SingleWidgetTextLayout(
+  val timeSizeSp: Float,
   val titleSizeSp: Float,
   val titleMaxLines: Int,
   val contentSizeSp: Float,
@@ -174,7 +187,7 @@ private fun SingleWidgetContent(
   ) {
     Text(
       text = item?.let { compactTimeLabel(it, nowMinute) } ?: "今日",
-      style = whiteTextStyle(SingleWidgetTimeSizeSp),
+      style = whiteTextStyle(textLayout.timeSizeSp),
       maxLines = 1,
     )
     Text(
@@ -203,75 +216,35 @@ private fun whiteTextStyle(size: Float): TextStyle = TextStyle(
 )
 
 /**
- * 根据标题在原始 18sp 样式下的实测宽度计算行数和字号。
+ * 根据宿主实际宽高选择最小组件的字号和标题行数。
  *
- * 使用系统字形实测像素宽度而不是字符数，因此中文、英文、数字和混排标题都按当前字体缩放准确判断；
- * 优先在 18sp 到 14sp 之间选择能完整放下一行的最大字号；只有 14sp 仍无法单行容纳时才计算双行。
- * 双行候选字号的总占宽必须位于 [1.3, 1.9] 行；若 14sp 时仍超过上限，则保留最小字号并交给
- * maxLines 截断。最后按宿主实际高度再次约束标题和内容字号，确保内容行不会被挤出边界。
+ * 从 16/15/15sp 开始按预设档位依次缩小，标题在每一档按实际宽度决定一行或两行。
+ * 所有档位仍超出高度时保留最后一档，不再继续缩小字号。
  */
-private fun resolveSingleWidgetTextLayout(
+internal fun resolveSingleWidgetTextLayout(
   title: String,
   maxWidth: Dp,
   maxHeight: Dp,
   displayMetrics: DisplayMetrics,
 ): SingleWidgetTextLayout {
-  val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-    textSize = TypedValue.applyDimension(
-      TypedValue.COMPLEX_UNIT_SP,
-      SingleWidgetDefaultTitleSizeSp,
-      displayMetrics,
-    )
-  }
+  val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
   val maxWidthPx = TypedValue.applyDimension(
     TypedValue.COMPLEX_UNIT_DIP,
     maxWidth.value,
     displayMetrics,
   ).toInt().coerceAtLeast(1)
-  val titleWidthPx = title.lineSequence().fold(0F) { width, line ->
-    width + paint.measureText(line)
-  }
-  val widthRatio = titleWidthPx / maxWidthPx
-  val oneLineTitleSizeSp = findLargestSingleLineTitleSizeSp(
-    title = title,
-    maxWidthPx = maxWidthPx,
-    displayMetrics = displayMetrics,
-    paint = paint,
-  )
-  val widthConstrainedLayout = if (oneLineTitleSizeSp != null) {
+  val candidates = SingleWidgetFontTiers.map { tier ->
     SingleWidgetTextLayout(
-      titleSizeSp = oneLineTitleSizeSp,
-      titleMaxLines = 1,
-      contentSizeSp = minOf(SingleWidgetDefaultContentSizeSp, oneLineTitleSizeSp - 1F),
-    )
-  } else {
-    val twoLineTitleSizeSp = when {
-      widthRatio < SingleWidgetTwoLineMaximumWidthRatio -> SingleWidgetDefaultTitleSizeSp
-      else -> (
-        SingleWidgetDefaultTitleSizeSp * SingleWidgetTwoLineMaximumWidthRatio / widthRatio
-      ).coerceAtLeast(SingleWidgetMinimumTitleSizeSp)
-    }
-    val twoLineWidthRatio = widthRatio * twoLineTitleSizeSp / SingleWidgetDefaultTitleSizeSp
-    val reachesMinimumTitleSize = twoLineTitleSizeSp == SingleWidgetMinimumTitleSizeSp
-    // 非最小字号来自“按 1.9 行宽反推字号”的公式，理论上已满足上限；避免 Float 回算为
-    // 1.9000001 后被误判为超限。只有字号被 14sp 下限截住时，才需要重新校验实际占宽。
-    val fitsTwoLineMaximumWidth = !reachesMinimumTitleSize ||
-      twoLineWidthRatio <= SingleWidgetTwoLineMaximumWidthRatio
-    val fitsBalancedTwoLines = twoLineWidthRatio >= SingleWidgetTwoLineMinimumWidthRatio &&
-      fitsTwoLineMaximumWidth
-    val exceedsTwoLinesAtMinimumSize = reachesMinimumTitleSize &&
-      twoLineWidthRatio >= SingleWidgetTwoLineMaximumWidthRatio
-    val useTwoLines = '\n' in title || fitsBalancedTwoLines || exceedsTwoLinesAtMinimumSize
-    val titleSizeSp = if (useTwoLines) twoLineTitleSizeSp else SingleWidgetMinimumTitleSizeSp
-    SingleWidgetTextLayout(
-      titleSizeSp = titleSizeSp,
-      titleMaxLines = if (useTwoLines) 2 else 1,
-      contentSizeSp = minOf(SingleWidgetDefaultContentSizeSp, titleSizeSp - 1F),
+      timeSizeSp = tier.timeSizeSp,
+      titleSizeSp = tier.titleSizeSp,
+      titleMaxLines = if (fitsSingleWidgetTitleOnOneLine(
+          title, tier.titleSizeSp, maxWidthPx, displayMetrics, paint,
+        )) 1 else 2,
+      contentSizeSp = tier.contentSizeSp,
     )
   }
   return constrainSingleWidgetTextLayoutHeight(
-    layout = widthConstrainedLayout,
-    widthRatio = widthRatio,
+    candidates = candidates,
     maxHeight = maxHeight,
     displayMetrics = displayMetrics,
     paint = paint,
@@ -279,14 +252,13 @@ private fun resolveSingleWidgetTextLayout(
 }
 
 /**
- * 按宿主实际高度压缩标题与内容字号，避免两行标题把最后一行内容推出 RemoteViews 边界。
+ * 按宿主高度从大到小选择第一个能完整展示的字号档位。
  *
- * 标题不会低于 14sp；双行标题同时维持至少 1.3 行的总占宽。内容字号随标题同步变化，且始终
- * 小于标题字号。字体高度使用 TextView 默认包含 font padding 的 font metrics 计算。
+ * 字体高度使用 TextView 默认包含 font padding 的 font metrics 计算；全部档位都不合适时返回最后一档，
+ * 不再继续缩小，以免文字难以辨认。
  */
 private fun constrainSingleWidgetTextLayoutHeight(
-  layout: SingleWidgetTextLayout,
-  widthRatio: Float,
+  candidates: List<SingleWidgetTextLayout>,
   maxHeight: Dp,
   displayMetrics: DisplayMetrics,
   paint: TextPaint,
@@ -301,20 +273,6 @@ private fun constrainSingleWidgetTextLayoutHeight(
     SingleWidgetDividerHeight.value,
     displayMetrics,
   ).roundToInt()
-  val minimumTitleSizeSp = if (layout.titleMaxLines == 2) {
-    maxOf(
-      SingleWidgetMinimumTitleSizeSp,
-      SingleWidgetDefaultTitleSizeSp * SingleWidgetTwoLineMinimumWidthRatio / widthRatio,
-    ).coerceAtMost(layout.titleSizeSp)
-  } else {
-    SingleWidgetMinimumTitleSizeSp
-  }
-
-  fun createLayout(titleSizeSp: Float): SingleWidgetTextLayout = layout.copy(
-    titleSizeSp = titleSizeSp,
-    contentSizeSp = minOf(SingleWidgetDefaultContentSizeSp, titleSizeSp - 1F),
-  )
-
   fun lineHeightPx(sizeSp: Float): Int {
     paint.textSize = TypedValue.applyDimension(
       TypedValue.COMPLEX_UNIT_SP,
@@ -325,71 +283,37 @@ private fun constrainSingleWidgetTextLayoutHeight(
   }
 
   fun fitsHeight(candidate: SingleWidgetTextLayout): Boolean {
-    val totalHeightPx = lineHeightPx(SingleWidgetTimeSizeSp) +
+    val totalHeightPx = lineHeightPx(candidate.timeSizeSp) +
       lineHeightPx(candidate.titleSizeSp) * candidate.titleMaxLines +
       dividerHeightPx +
       lineHeightPx(candidate.contentSizeSp)
     return totalHeightPx <= maxHeightPx
   }
 
-  val preferredLayout = createLayout(layout.titleSizeSp)
-  if (fitsHeight(preferredLayout)) return preferredLayout
-
-  val minimumLayout = createLayout(minimumTitleSizeSp)
-  if (!fitsHeight(minimumLayout)) return minimumLayout
-
-  var fittingSizeSp = minimumTitleSizeSp
-  var overflowingSizeSp = layout.titleSizeSp
-  repeat(10) {
-    val candidateSizeSp = (fittingSizeSp + overflowingSizeSp) / 2F
-    if (fitsHeight(createLayout(candidateSizeSp))) {
-      fittingSizeSp = candidateSizeSp
-    } else {
-      overflowingSizeSp = candidateSizeSp
-    }
-  }
-  return createLayout(fittingSizeSp)
+  return candidates.firstOrNull(::fitsHeight) ?: candidates.last()
 }
 
 /**
- * 在允许的标题字号区间内查找能够被 Android 单行文字布局完整容纳的最大字号。
+ * 验证标题在指定字号下能否被 Android 单行文字布局完整容纳。
  *
- * 比例换算无法覆盖字形 hinting 和像素取整；这里使用与 Glance 最终 TextView 更接近的
- * [StaticLayout] 逐次验证，返回 null 表示 14sp 仍需换行。
+ * 使用与 Glance 最终 TextView 更接近的 [StaticLayout]，避免按字符数判断中文与英文混排。
  */
-private fun findLargestSingleLineTitleSizeSp(
+private fun fitsSingleWidgetTitleOnOneLine(
   title: String,
+  sizeSp: Float,
   maxWidthPx: Int,
   displayMetrics: DisplayMetrics,
   paint: TextPaint,
-): Float? {
-  if ('\n' in title) return null
-
-  fun fitsSingleLine(sizeSp: Float): Boolean {
-    paint.textSize = TypedValue.applyDimension(
-      TypedValue.COMPLEX_UNIT_SP,
-      sizeSp,
-      displayMetrics,
-    )
-    val layout = StaticLayout.Builder
-      .obtain(title, 0, title.length, paint, maxWidthPx)
-      .setIncludePad(false)
-      .build()
-    return layout.lineCount == 1 && layout.getLineEnd(0) == title.length
-  }
-
-  if (!fitsSingleLine(SingleWidgetMinimumTitleSizeSp)) return null
-  if (fitsSingleLine(SingleWidgetDefaultTitleSizeSp)) return SingleWidgetDefaultTitleSizeSp
-
-  var fittingSizeSp = SingleWidgetMinimumTitleSizeSp
-  var overflowingSizeSp = SingleWidgetDefaultTitleSizeSp
-  repeat(10) {
-    val candidateSizeSp = (fittingSizeSp + overflowingSizeSp) / 2F
-    if (fitsSingleLine(candidateSizeSp)) {
-      fittingSizeSp = candidateSizeSp
-    } else {
-      overflowingSizeSp = candidateSizeSp
-    }
-  }
-  return fittingSizeSp
+): Boolean {
+  if ('\n' in title) return false
+  paint.textSize = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_SP,
+    sizeSp,
+    displayMetrics,
+  )
+  val layout = StaticLayout.Builder
+    .obtain(title, 0, title.length, paint, maxWidthPx)
+    .setIncludePad(false)
+    .build()
+  return layout.lineCount == 1 && layout.getLineEnd(0) == title.length
 }

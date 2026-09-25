@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
@@ -52,6 +53,8 @@ import com.cyxbs.pages.widget.widget.glance.OversizedExpandedTimelineMaskKey
 import com.cyxbs.pages.widget.widget.glance.OversizedTimelineSectionIndexKey
 import com.cyxbs.pages.widget.widget.glance.ToggleOversizedTimelineSectionAction
 import com.cyxbs.pages.widget.widget.glance.WidgetRenderItemCard
+import com.cyxbs.pages.widget.widget.glance.WidgetWeekItemInnerPadding
+import com.cyxbs.pages.widget.widget.glance.WidgetWeekItemVerticalPadding
 import com.cyxbs.pages.widget.widget.glance.currentMinute
 import com.cyxbs.pages.widget.widget.glance.dispatchRefreshToGlanceReceiver
 import com.cyxbs.pages.widget.widget.glance.findAllDayItem
@@ -61,6 +64,7 @@ import com.cyxbs.pages.widget.widget.glance.observeCourseWidgetSnapshot
 import com.cyxbs.pages.widget.widget.glance.readCourseWidgetPreviewSnapshot
 import com.cyxbs.pages.widget.widget.glance.resolveCurrentWeek
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedTimelineSections
+import com.cyxbs.pages.widget.widget.glance.resolveOversizedDayTextLayout
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedVisibleDays
 import com.cyxbs.pages.widget.widget.glance.weekOrEmpty
 import java.time.LocalDate
@@ -198,7 +202,6 @@ private fun OversizedWidgetContent(
       visibleDays = visibleDays,
       cardWidth = cardWidth,
       timelineWidth = timelineWidth,
-      cellPadding = cellPadding,
       isDesktopSingleCell = isDesktopSingleCell,
     )
     LazyColumn(
@@ -215,7 +218,6 @@ private fun OversizedWidgetContent(
           expandedTimelineMask = expandedTimelineMask,
           timelineWidth = timelineWidth,
           cardWidth = cardWidth,
-          cellPadding = cellPadding,
           isDesktopSingleCell = isDesktopSingleCell,
         )
       }
@@ -239,7 +241,6 @@ private fun OversizedScrollableTimeline(
   expandedTimelineMask: Int,
   timelineWidth: Dp,
   cardWidth: Dp,
-  cellPadding: Dp,
   isDesktopSingleCell: Boolean,
 ) {
   Box(modifier = GlanceModifier.fillMaxWidth().height(contentHeightDp.dp)) {
@@ -267,9 +268,6 @@ private fun OversizedScrollableTimeline(
           sections = sections,
           sectionHeights = sectionHeights,
           cardWidth = cardWidth,
-          visibleDayCount = visibleDays.size,
-          cellPadding = cellPadding,
-          isDesktopSingleCell = isDesktopSingleCell,
         )
       }
     }
@@ -384,7 +382,6 @@ private fun AllDayRow(
   visibleDays: List<Int>,
   cardWidth: Dp,
   timelineWidth: Dp,
-  cellPadding: Dp,
   isDesktopSingleCell: Boolean,
 ) {
   val allDayItems = visibleDays.map { findAllDayItem(week, it) }
@@ -396,9 +393,6 @@ private fun AllDayRow(
         item = item,
         columnWidth = cardWidth,
         rowHeight = OversizedAllDayHeight,
-        visibleDayCount = visibleDays.size,
-        cellPadding = cellPadding,
-        isDesktopSingleCell = isDesktopSingleCell,
       )
     }
   }
@@ -621,9 +615,6 @@ private fun RowScope.AllDayItemCell(
   item: CourseWidgetRenderItem?,
   columnWidth: Dp,
   rowHeight: Dp,
-  visibleDayCount: Int = 7,
-  cellPadding: Dp,
-  isDesktopSingleCell: Boolean,
 ) {
   if (item == null) {
     Spacer(GlanceModifier.defaultWeight().fillMaxHeight().padding(2.dp))
@@ -632,17 +623,18 @@ private fun RowScope.AllDayItemCell(
   WidgetRenderItemCard(
     item = item,
     // 横向贴合相邻日期列；纵向仍保留原定位间距，避免全天项挤占表头或时间轴。
-    modifier = GlanceModifier.defaultWeight().fillMaxHeight().padding(vertical = cellPadding),
+    modifier = GlanceModifier.defaultWeight().fillMaxHeight()
+      .padding(vertical = WidgetWeekItemVerticalPadding),
     isDark = false,
-    titleSizeSp = if (isDesktopSingleCell) 7 else if (visibleDayCount == 1) 10 else 8,
-    contentSizeSp = if (isDesktopSingleCell) 6 else if (visibleDayCount == 1) 9 else 7,
+    titleSizeSp = 9,
+    contentSizeSp = 8,
     showContent = false,
-    contentPaddingHorizontal = if (isDesktopSingleCell) 1.dp else 2.dp,
-    contentPaddingVertical = 1.dp,
+    contentPaddingHorizontal = WidgetWeekItemInnerPadding,
+    contentPaddingVertical = WidgetWeekItemInnerPadding,
     maxTitleLines = 1,
     renderSize = DpSize(
       width = columnWidth,
-      height = (rowHeight - cellPadding * 2).coerceAtLeast(1.dp),
+      height = (rowHeight - WidgetWeekItemVerticalPadding * 2).coerceAtLeast(1.dp),
     ),
   )
 }
@@ -660,10 +652,8 @@ private fun RowScope.OversizedDayTimeline(
   sections: List<CourseWidgetTimelineSection>,
   sectionHeights: List<Float>,
   cardWidth: Dp,
-  visibleDayCount: Int,
-  cellPadding: Dp,
-  isDesktopSingleCell: Boolean,
 ) {
+  val fontScale = LocalContext.current.resources.configuration.fontScale
   val items = week.items.withIndex()
     .filter { (_, item) ->
       val beginMinute = item.beginMinute
@@ -689,33 +679,32 @@ private fun RowScope.OversizedDayTimeline(
       val bottomDp = resolveOversizedMinuteOffset(sections, sectionHeights, endMinute)
       val itemHeight = (bottomDp - topDp).coerceAtLeast(0f).dp
       if (itemHeight > 0.dp) {
+        // 所有天数档位固定 4dp 文字内边距与 1dp 条目间隔，再按真实尺寸分配行数。
+        val textLayout = resolveOversizedDayTextLayout(
+          title = item.title,
+          content = item.content,
+          cardWidthDp = cardWidth.value,
+          cardHeightDp = (itemHeight - WidgetWeekItemVerticalPadding * 2).value,
+          contentPaddingHorizontalDp = WidgetWeekItemInnerPadding.value,
+          contentPaddingVerticalDp = WidgetWeekItemInnerPadding.value,
+          fontScale = fontScale,
+        )
         Column(modifier = GlanceModifier.fillMaxSize()) {
           if (topDp > 0f) Spacer(GlanceModifier.height(topDp.dp))
           WidgetRenderItemCard(
             item = item,
             // 日期列之间不再加外边距，课程自身的纯白背景层承担横向分隔。
             modifier = GlanceModifier.fillMaxWidth().height(itemHeight)
-              .padding(vertical = cellPadding),
+              .padding(vertical = WidgetWeekItemVerticalPadding),
             isDark = false,
-            titleSizeSp = when {
-              isDesktopSingleCell -> 7
-              visibleDayCount == 1 -> 10
-              visibleDayCount == 3 -> 9
-              else -> 8
-            },
-            contentSizeSp = when {
-              isDesktopSingleCell -> 6
-              visibleDayCount == 1 -> 9
-              visibleDayCount == 3 -> 8
-              else -> 7
-            },
-            showContent = !isDesktopSingleCell,
-            contentPaddingHorizontal = if (isDesktopSingleCell) 1.dp else 2.dp,
-            contentPaddingVertical = if (isDesktopSingleCell) 1.dp else 3.dp,
-            maxTitleLines = 3,
+            titleSizeSp = textLayout.titleSizeSp,
+            contentSizeSp = textLayout.contentSizeSp,
+            showContent = textLayout.showContent,
+            contentPaddingHorizontal = WidgetWeekItemInnerPadding,
+            contentPaddingVertical = WidgetWeekItemInnerPadding,
+            maxTitleLines = textLayout.titleLines,
+            maxContentLines = textLayout.contentLines,
             topBottomText = true,
-            // 标题与内容继续上下分布，只增加标题距内容层顶部的视觉留白。
-            titleTopPadding = OversizedItemTitleTopPadding,
             coverTipColor = if (hasUnderlyingOverlap) {
               widgetColorProvider(Color(item.lightStyle.contentArgb))
             } else {
@@ -723,7 +712,7 @@ private fun RowScope.OversizedDayTimeline(
             },
             renderSize = DpSize(
               width = cardWidth,
-              height = (itemHeight - cellPadding * 2).coerceAtLeast(1.dp),
+              height = (itemHeight - WidgetWeekItemVerticalPadding * 2).coerceAtLeast(1.dp),
             ),
           )
         }
@@ -785,13 +774,14 @@ internal fun resolveOversizedCurrentTimeOffset(
 /**
  * 根据可见天数计算固定的时间轴宽度。
  *
- * 1 天、3 天档始终保留完整显示 `HH:mm` 所需的宽度，避免展开时横向扩容造成日期列和课程卡片
- * 跳动。5 天、7 天档分别沿用原有宽度。
+ * 1 天档的时间文字采用更小字号，因此单独收窄以增加课程列宽；3 天档保留完整显示 `HH:mm`
+ * 所需的宽度。各档宽度不随展开状态变化，避免日期列和课程卡片横向跳动。
  */
 internal fun resolveOversizedTimelineWidth(
   visibleDayCount: Int,
 ): Dp = when (visibleDayCount) {
-    1, 3 -> OversizedNarrowTimelineWidth
+    1 -> OversizedSingleDayTimelineWidth
+    3 -> OversizedNarrowTimelineWidth
     5 -> OversizedFiveDayTimelineWidth
     else -> OversizedTimelineWidth
   }
@@ -937,10 +927,9 @@ internal fun resolveOversizedWeekHeaderDate(
 }
 
 private val OversizedCellPadding = 2.dp
-/** 大组件时间轴 item 的标题额外下移 1dp，避免文字紧贴内容层顶部。 */
-private val OversizedItemTitleTopPadding = 1.dp
 private val OversizedTimelineWidth = 40.dp
 private val OversizedCompactCellPadding = 1.dp
+private val OversizedSingleDayTimelineWidth = 24.dp
 private val OversizedNarrowTimelineWidth = 28.dp
 private val OversizedFiveDayTimelineWidth = 32.dp
 // 非紧凑视图使用 12dp 标签盒，使首尾标签距边缘同为 6dp，并扩大其与第 1/12 节的间距。

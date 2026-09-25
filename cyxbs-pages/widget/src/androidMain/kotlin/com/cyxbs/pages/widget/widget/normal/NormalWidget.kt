@@ -594,95 +594,14 @@ private fun NormalTimelineLane(
       val itemHeightDp = (placedBar.laneSpan * laneHeightDp).coerceAtLeast(1f)
       val cardHeightDp = (itemHeightDp - NormalTimelineItemVerticalPadding.value * 2)
         .coerceAtLeast(1f)
-      val isStackedText = resolveNormalTimelineTextMode(
-        widgetHeightDp = itemHeightDp,
-        laneCount = 1,
-        hasTimelineScale = false,
-      ) == NormalTimelineTextMode.STACKED
-      val preferredTitleSize = when {
-        isStackedText -> 11
-        placedBar.laneSpan >= 2 -> 10
-        else -> 9
-      }
-      // 高度不足时只保留标题单行；内容不再与标题拼接，避免最小形态过密且难以辨认。
-      val titleText = bar.item.title
-      val safeFontScale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
-      // 第三层单行卡片已有 2dp 外底卡间距，继续叠加正文上下 padding 会把 9sp TextView
-      // 压缩到约 9dp，部分字体的下沿会被 RemoteViews 宿主裁掉；仅多行形态保留额外间距。
-      val contentPaddingVertical = if (isStackedText) {
-        NormalTimelineItemContentPadding
-      } else {
-        0.dp
-      }
-      val availableTextHeightDp = (
-        cardHeightDp -
-          (contentPaddingVertical.value + WidgetItemContainerGap.value) * 2
-        ).coerceAtLeast(1f)
-      val titleLineLimit = if (isStackedText) {
-        // 窄卡片先按 9sp 下限反推实际可容纳行数，再据此选字号，避免估算为三行但高度只有两行。
-        (availableTextHeightDp /
-          (NormalTimelineMinimumStackedTitleSizeSp * safeFontScale *
-            NormalTimelineTextLineHeightFactor))
-          .toInt().coerceIn(1, 3)
-      } else {
-        1
-      }
-      val contentPaddingHorizontal = if (barWidth < NormalTimelineNarrowItemWidthThreshold.value) {
-        NormalTimelineNarrowItemContentPadding
-      } else {
-        NormalTimelineItemContentPadding
-      }
-      val actualTitleWidthDp = (
-        barWidth - (contentPaddingHorizontal.value + WidgetItemContainerGap.value) * 2
-        ).coerceAtLeast(1f)
-      // 字号选择必须扣除外底卡与内容层间距；否则窄卡片会误判大字号能放下，实际渲染才出现省略号。
-      val titleStyleWidthDp = (actualTitleWidthDp * NormalTimelineTitleWidthSafetyRatio)
-        .coerceAtLeast(1f)
-      val initialTitleStyle = resolveNormalTimelineTitleStyle(
-        text = titleText,
-        availableWidthDp = titleStyleWidthDp,
-        preferredFontSizeSp = preferredTitleSize,
-        minFontSizeSp = if (isStackedText) NormalTimelineMinimumStackedTitleSizeSp else 9,
-        maxLines = titleLineLimit,
-      )
-      val initialContentSizeSp = minOf(9, initialTitleStyle.fontSizeSp - 1).coerceAtLeast(6)
-      val initialTextAllocation = resolveNormalTimelineTextAllocation(
-        title = titleText,
-        content = if (isStackedText) bar.item.content else "",
-        availableWidthDp = actualTitleWidthDp,
-        availableHeightDp = availableTextHeightDp,
-        titleFontSizeSp = initialTitleStyle.fontSizeSp,
-        contentFontSizeSp = initialContentSizeSp,
-        maxTitleLines = initialTitleStyle.maxLines,
-        maxContentLines = if (isStackedText) 2 else 0,
+      val textLayout = resolveNormalTimelineCardTextLayout(
+        title = bar.item.title,
+        content = bar.item.content,
+        barWidthDp = barWidth,
+        itemHeightDp = itemHeightDp,
+        laneSpan = placedBar.laneSpan,
         fontScale = fontScale,
       )
-      // 首轮字号导致高度只能容纳更少行时，必须用最终行数再次选字号，不能继续沿用三行字号。
-      val titleStyle = if (initialTextAllocation.titleLines < initialTitleStyle.maxLines) {
-        resolveNormalTimelineTitleStyle(
-          text = titleText,
-          availableWidthDp = titleStyleWidthDp,
-          preferredFontSizeSp = preferredTitleSize,
-          minFontSizeSp = if (isStackedText) NormalTimelineMinimumStackedTitleSizeSp else 9,
-          maxLines = initialTextAllocation.titleLines,
-        )
-      } else {
-        initialTitleStyle
-      }
-      // 内容始终比标题至少小 1sp；标题为完整展示降到下限时，内容不会反过来比标题更大。
-      val contentSizeSp = minOf(9, titleStyle.fontSizeSp - 1).coerceAtLeast(6)
-      val textAllocation = resolveNormalTimelineTextAllocation(
-        title = titleText,
-        content = if (isStackedText) bar.item.content else "",
-        availableWidthDp = actualTitleWidthDp,
-        availableHeightDp = availableTextHeightDp,
-        titleFontSizeSp = titleStyle.fontSizeSp,
-        contentFontSizeSp = contentSizeSp,
-        maxTitleLines = titleStyle.maxLines,
-        maxContentLines = if (isStackedText) 2 else 0,
-        fontScale = fontScale,
-      )
-      val showContent = textAllocation.contentLines > 0
       WidgetRenderItemCard(
         item = bar.item,
         modifier = GlanceModifier.width(barWidth.dp).fillMaxHeight()
@@ -691,18 +610,18 @@ private fun NormalTimelineLane(
           .padding(vertical = NormalTimelineItemVerticalPadding),
         // 旧版小组件没有夜间色资源，固定使用课表的浅色样式才能保持原有橙/红/蓝配色。
         isDark = false,
-        titleSizeSp = titleStyle.fontSizeSp,
-        contentSizeSp = contentSizeSp,
-        maxTitleLines = textAllocation.titleLines,
-        maxContentLines = textAllocation.contentLines.coerceAtLeast(1),
-        showContent = showContent,
+        titleSizeSp = textLayout.titleSizeSp,
+        contentSizeSp = textLayout.contentSizeSp,
+        maxTitleLines = textLayout.titleLines,
+        maxContentLines = textLayout.contentLines.coerceAtLeast(1),
+        showContent = textLayout.showContent,
         inlineContent = false,
-        topBottomText = showContent,
+        topBottomText = textLayout.showContent,
         // 上下布局已经用弹性 Spacer 分隔，额外固定间隔会挤压三行标题和底部内容。
         textGap = 0.dp,
         // 多行条目保留正文上下间距；单行条目释放该空间，避免字体下沿被宿主裁剪。
-        contentPaddingHorizontal = contentPaddingHorizontal,
-        contentPaddingVertical = contentPaddingVertical,
+        contentPaddingHorizontal = textLayout.contentPaddingHorizontal,
+        contentPaddingVertical = textLayout.contentPaddingVertical,
         containerColorOverride = NormalTrackColor,
         clipStartEdge = bar.isStartClipped,
         clipEndEdge = bar.isEndClipped,
@@ -721,6 +640,121 @@ private fun NormalTimelineLane(
     val trailingWidth = (groupEndRatio - cursor).coerceAtLeast(0f) * trackWidth.value
     if (trailingWidth > 0f) Spacer(GlanceModifier.width(trailingWidth.dp).fillMaxHeight())
   }
+}
+
+/** 横向日课表卡片的文字分配结果，真实小组件和设置页示例共用同一套布局规则。 */
+internal data class NormalTimelineCardTextLayout(
+  val titleSizeSp: Int,
+  val contentSizeSp: Int,
+  val titleLines: Int,
+  val contentLines: Int,
+  val contentPaddingHorizontal: Dp,
+  val contentPaddingVertical: Dp,
+) {
+  val showContent: Boolean get() = contentLines > 0
+}
+
+/**
+ * 根据横条实际宽高分配标题与内容；高度不够时优先保证标题完整，最多展示三行标题。
+ *
+ * [barWidthDp] 为含底卡的宽度，[itemHeightDp] 为占用层的总高度；字号按 [fontScale] 防裁剪。
+ */
+internal fun resolveNormalTimelineCardTextLayout(
+  title: String,
+  content: String,
+  barWidthDp: Float,
+  itemHeightDp: Float,
+  laneSpan: Int,
+  fontScale: Float,
+): NormalTimelineCardTextLayout {
+  val cardHeightDp = (itemHeightDp - NormalTimelineItemVerticalPadding.value * 2)
+    .coerceAtLeast(1f)
+  val isStackedText = resolveNormalTimelineTextMode(
+    widgetHeightDp = itemHeightDp,
+    laneCount = 1,
+    hasTimelineScale = false,
+  ) == NormalTimelineTextMode.STACKED
+  val preferredTitleSize = when {
+    isStackedText -> 11
+    laneSpan >= 2 -> 10
+    else -> 9
+  }
+  val safeFontScale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
+  // 单行形态释放正文上下间距，避免字体下沿被 RemoteViews 宿主裁掉。
+  val contentPaddingVertical = if (isStackedText) NormalTimelineItemContentPadding else 0.dp
+  val availableTextHeightDp = (
+    cardHeightDp - (contentPaddingVertical.value + WidgetItemContainerGap.value) * 2
+    ).coerceAtLeast(1f)
+  // 先由最低字号反推实际行数，再决定字号，避免估算三行但最终只能渲染两行。
+  val titleLineLimit = if (isStackedText) {
+    (availableTextHeightDp /
+      (NormalTimelineMinimumStackedTitleSizeSp * safeFontScale * NormalTimelineTextLineHeightFactor))
+      .toInt().coerceIn(1, 3)
+  } else {
+    1
+  }
+  val contentPaddingHorizontal = if (barWidthDp < NormalTimelineNarrowItemWidthThreshold.value) {
+    NormalTimelineNarrowItemContentPadding
+  } else {
+    NormalTimelineItemContentPadding
+  }
+  val actualTitleWidthDp = (
+    barWidthDp - (contentPaddingHorizontal.value + WidgetItemContainerGap.value) * 2
+    ).coerceAtLeast(1f)
+  // 扣除底卡和内容层间距，再留宽度安全量，避免宿主实际渲染时意外出现省略号。
+  val titleStyleWidthDp = (actualTitleWidthDp * NormalTimelineTitleWidthSafetyRatio)
+    .coerceAtLeast(1f)
+  val initialTitleStyle = resolveNormalTimelineTitleStyle(
+    text = title,
+    availableWidthDp = titleStyleWidthDp,
+    preferredFontSizeSp = preferredTitleSize,
+    minFontSizeSp = if (isStackedText) NormalTimelineMinimumStackedTitleSizeSp else 9,
+    maxLines = titleLineLimit,
+  )
+  val initialContentSizeSp = minOf(9, initialTitleStyle.fontSizeSp - 1).coerceAtLeast(6)
+  val initialTextAllocation = resolveNormalTimelineTextAllocation(
+    title = title,
+    content = if (isStackedText) content else "",
+    availableWidthDp = actualTitleWidthDp,
+    availableHeightDp = availableTextHeightDp,
+    titleFontSizeSp = initialTitleStyle.fontSizeSp,
+    contentFontSizeSp = initialContentSizeSp,
+    maxTitleLines = initialTitleStyle.maxLines,
+    maxContentLines = if (isStackedText) 2 else 0,
+    fontScale = fontScale,
+  )
+  // 若首轮高度分配收紧了行数，需要按最终行数重算字号。
+  val titleStyle = if (initialTextAllocation.titleLines < initialTitleStyle.maxLines) {
+    resolveNormalTimelineTitleStyle(
+      text = title,
+      availableWidthDp = titleStyleWidthDp,
+      preferredFontSizeSp = preferredTitleSize,
+      minFontSizeSp = if (isStackedText) NormalTimelineMinimumStackedTitleSizeSp else 9,
+      maxLines = initialTextAllocation.titleLines,
+    )
+  } else {
+    initialTitleStyle
+  }
+  val contentSizeSp = minOf(9, titleStyle.fontSizeSp - 1).coerceAtLeast(6)
+  val textAllocation = resolveNormalTimelineTextAllocation(
+    title = title,
+    content = if (isStackedText) content else "",
+    availableWidthDp = actualTitleWidthDp,
+    availableHeightDp = availableTextHeightDp,
+    titleFontSizeSp = titleStyle.fontSizeSp,
+    contentFontSizeSp = contentSizeSp,
+    maxTitleLines = titleStyle.maxLines,
+    maxContentLines = if (isStackedText) 2 else 0,
+    fontScale = fontScale,
+  )
+  return NormalTimelineCardTextLayout(
+    titleSizeSp = titleStyle.fontSizeSp,
+    contentSizeSp = contentSizeSp,
+    titleLines = textAllocation.titleLines,
+    contentLines = textAllocation.contentLines,
+    contentPaddingHorizontal = contentPaddingHorizontal,
+    contentPaddingVertical = contentPaddingVertical,
+  )
 }
 
 /**

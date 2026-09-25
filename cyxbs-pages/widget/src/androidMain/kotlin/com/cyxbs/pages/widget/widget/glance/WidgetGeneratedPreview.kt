@@ -104,7 +104,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       content = "综合楼 305",
       beginMinute = activeBegin,
       endMinute = activeEnd,
-      style = BLUE_STYLE,
+      style = lessonPreviewStyle(activeBegin),
     ),
     timedItem(
       id = "preview-math",
@@ -113,7 +113,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       content = "二教 201",
       beginMinute = 8 * 60,
       endMinute = 9 * 60 + 40,
-      style = ORANGE_STYLE,
+      style = MORNING_STYLE,
     ),
     timedItem(
       id = "preview-physics",
@@ -122,7 +122,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       content = "三教 101",
       beginMinute = 14 * 60,
       endMinute = 15 * 60 + 40,
-      style = RED_STYLE,
+      style = AFTERNOON_STYLE,
     ),
     timedItem(
       id = "preview-next-day",
@@ -131,7 +131,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       content = "逸夫楼 203",
       beginMinute = 10 * 60 + 15,
       endMinute = 11 * 60 + 55,
-      style = BLUE_STYLE,
+      style = MORNING_STYLE,
     ),
     timedItem(
       id = "preview-affair",
@@ -267,19 +267,26 @@ private val PREVIEW_TARGETS = listOf(
 )
 
 private val BLUE_STYLE = CourseWidgetItemStyle(
-  contentArgb = 0xFF15315BL,
-  backgroundArgb = 0xFFDCE9F9L,
+  contentArgb = 0xFF4066EAL,
+  backgroundArgb = 0xFFDDE3F8L,
 )
 
-private val ORANGE_STYLE = CourseWidgetItemStyle(
-  contentArgb = 0xFF5B3511L,
-  backgroundArgb = 0xFFFFDFC2L,
+private val MORNING_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFFF8015L,
+  backgroundArgb = 0xFFF9E7D8L,
 )
 
-private val RED_STYLE = CourseWidgetItemStyle(
-  contentArgb = 0xFF632B2BL,
-  backgroundArgb = 0xFFFFD6D6L,
+private val AFTERNOON_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFFF6262L,
+  backgroundArgb = 0xFFF9E3E4L,
 )
+
+/** 系统生成预览的模拟课程与真实课表采用相同的时段颜色规则。 */
+private fun lessonPreviewStyle(beginMinute: Int): CourseWidgetItemStyle = when {
+  beginMinute < 12 * 60 -> MORNING_STYLE
+  beginMinute < 18 * 60 -> AFTERNOON_STYLE
+  else -> BLUE_STYLE
+}
 
 private val AFFAIR_STYLE = CourseWidgetItemStyle(
   contentArgb = 0xFF112C57L,

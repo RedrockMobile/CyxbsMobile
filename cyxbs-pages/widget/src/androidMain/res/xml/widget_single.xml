@@ -7,7 +7,7 @@
     android:minHeight="40dp"
     android:resizeMode="none"
     android:widgetCategory="home_screen"
-    android:previewImage="@drawable/widget_ic_widget_single"
+    android:previewImage="@drawable/widget_ic_single_example"
     android:targetCellWidth="2"
     android:targetCellHeight="1"
     android:updatePeriodMillis="@integer/widget_update_period_millis"

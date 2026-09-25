@@ -369,13 +369,20 @@ private fun createDiagonalStripeBitmap(
   return bitmap
 }
 
-private const val WidgetStripeWidthDp = 2f
-private const val WidgetStripePitchDp = 8f
-private val WidgetItemOuterCornerRadius = 6.dp
-private val WidgetItemInnerCornerRadius = 4.dp
+/** Compose 示例与真实 Glance 背景共用的斜纹和圆角尺寸。 */
+internal const val WidgetStripeWidthDp = 2f
+internal const val WidgetStripePitchDp = 8f
+internal val WidgetItemOuterCornerRadius = 6.dp
+internal val WidgetItemInnerCornerRadius = 4.dp
 
 /** 条目外底卡与内部内容层的固定间距；文字可用区域计算必须复用同一数值。 */
 internal val WidgetItemContainerGap = 2.dp
+
+/** 周课表条目的文字层再留 2dp，与外底卡的 2dp 合计为上下左右各 4dp。 */
+internal val WidgetWeekItemInnerPadding = 2.dp
+
+/** 周课表条目在时间方向的外部间隔，所有天数档位保持一致。 */
+internal val WidgetWeekItemVerticalPadding = 1.dp
 
 /** 忽略空字段后用中点连接，避免缺少地点时出现多余分隔符。 */
 private fun joinWidgetText(vararg values: String?): String =

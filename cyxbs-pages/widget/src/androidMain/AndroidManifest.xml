@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 部分 MIUI 桌面会在接收固定小组件请求后再次检查该权限；缺失时确认页立即关闭。 -->
+    <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
+
     <application>
+        <!-- 系统固定成功时在桌面上显示确认提示，不启动应用页面。 -->
+        <receiver
+            android:name=".page.CourseWidgetPinSuccessReceiver"
+            android:exported="false" />
         <!-- Widget 详情只借用透明 Activity 承载弹窗，不得复用或拉起主应用任务栈。 -->
         <activity
             android:name=".widget.glance.CourseWidgetEntryActivity"
@@ -13,7 +20,7 @@
         <receiver
             android:name=".widget.normal.NormalWidget"
             android:enabled="@bool/glance_appwidget_available"
-            android:label="课程显示(大)"
+            android:label="横向课程显示"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -45,7 +52,7 @@
         <receiver
             android:name=".widget.oversize.OversizedAppWidget"
             android:enabled="@bool/glance_appwidget_available"
-            android:label="超大小部件"
+            android:label="竖向课程显示"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -55,7 +62,7 @@
 
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_oversized_app_widget_info" />
+                android:resource="@xml/widget_oversized" />
         </receiver>
 
     </application>

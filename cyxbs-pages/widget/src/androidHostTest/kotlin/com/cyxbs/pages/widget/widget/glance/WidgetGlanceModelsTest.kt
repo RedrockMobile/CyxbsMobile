@@ -31,6 +31,86 @@ class WidgetGlanceModelsTest {
     assertEquals((0..6).toList(), resolveOversizedVisibleDays(widgetWidthDp = 320f, today = 3))
   }
 
+  /** 固定 9sp 标题最多占三行，内容是否展示由单张卡片的剩余高度决定。 */
+  @Test
+  fun oversizedDayTextUsesAvailableHeightForContent() {
+    val tall = resolveOversizedDayTextLayout(
+      title = "大学物理实验课程设计",
+      content = "三教 101",
+      cardWidthDp = 41f,
+      cardHeightDp = 70f,
+      contentPaddingHorizontalDp = 1f,
+      contentPaddingVerticalDp = 1f,
+      fontScale = 1f,
+    )
+    assertEquals(9, tall.titleSizeSp)
+    assertEquals(3, tall.titleLines)
+    assertTrue(tall.showContent)
+    assertEquals(2, tall.contentLines)
+
+    val short = resolveOversizedDayTextLayout(
+      title = "大学物理实验课程设计",
+      content = "三教 101",
+      cardWidthDp = 41f,
+      cardHeightDp = 35f,
+      contentPaddingHorizontalDp = 1f,
+      contentPaddingVerticalDp = 1f,
+      fontScale = 1f,
+    )
+    assertFalse(short.showContent)
+  }
+
+  /** 特别窄的日期列也保持 9sp；截断长标题后仍可用底部空间显示教室。 */
+  @Test
+  fun oversizedDayTitleKeepsFixedSizeInNarrowColumn() {
+    val layout = resolveOversizedDayTextLayout(
+      title = "大学物理实验课程设计",
+      content = "三教 101",
+      cardWidthDp = 41f,
+      cardHeightDp = 80f,
+      contentPaddingHorizontalDp = 1f,
+      contentPaddingVerticalDp = 1f,
+      fontScale = 1f,
+    )
+    assertEquals(9, layout.titleSizeSp)
+    assertEquals(3, layout.titleLines)
+    assertTrue(layout.contentSizeSp < layout.titleSizeSp)
+
+    // 真机窄列可能连最小字号的三行标题都放不全；底部空间仍应展示教室信息。
+    val narrowTall = resolveOversizedDayTextLayout(
+      title = "嵌入式与Linux程序设计",
+      content = "综合楼 4201",
+      cardWidthDp = 27f,
+      cardHeightDp = 90f,
+      contentPaddingHorizontalDp = 1f,
+      contentPaddingVerticalDp = 1f,
+      fontScale = 1f,
+    )
+    assertEquals(9, narrowTall.titleSizeSp)
+    assertEquals(3, narrowTall.titleLines)
+    assertTrue(narrowTall.showContent)
+  }
+
+  /** 1、3、5、7 天的常见列宽和内边距均使用 9sp 标题、8sp 内容。 */
+  @Test
+  fun oversizedAllDayCountsShareFixedCardFonts() {
+    listOf(27f, 41f, 34f, 37f).forEachIndexed { index, columnWidth ->
+      val compact = index == 0
+      val layout = resolveOversizedDayTextLayout(
+        title = "通信原理A",
+        content = "3105",
+        cardWidthDp = columnWidth,
+        cardHeightDp = 70f,
+        contentPaddingHorizontalDp = if (compact) 1f else 2f,
+        contentPaddingVerticalDp = if (compact) 1f else 3f,
+        fontScale = 1f,
+      )
+      assertEquals(9, layout.titleSizeSp)
+      assertEquals(8, layout.contentSizeSp)
+      assertTrue(layout.titleLines in 1..3)
+    }
+  }
+
   /** 时间轴宽度只由可见天数决定，展开和折叠不能让日期列横向跳动。 */
   @Test
   fun oversizedTimelineWidthIsIndependentFromExpansion() {
@@ -40,7 +120,7 @@ class WidgetGlanceModelsTest {
       ).value
     }
 
-    assertEquals(28f, resolveWidth(1))
+    assertEquals(24f, resolveWidth(1))
     assertEquals(28f, resolveWidth(3))
     assertEquals(32f, resolveWidth(5))
     assertEquals(40f, resolveWidth(7))
