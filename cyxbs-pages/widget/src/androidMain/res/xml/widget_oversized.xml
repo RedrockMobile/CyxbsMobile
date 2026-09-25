@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ 初次添加请求一列，旧系统继续按 minWidth 回退。 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:initialKeyguardLayout="@layout/glance_default_loading_layout"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:targetCellWidth="1"
+    android:minWidth="40dp"
+    android:minHeight="250dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="250dp"
+    android:previewImage="@drawable/widget_ic_oversized_example"
+    android:resizeMode="vertical|horizontal"
+    android:updatePeriodMillis="@integer/widget_update_period_millis"
+    android:widgetCategory="home_screen|keyguard"
+    tools:targetApi="s"
+    >
+
+</appwidget-provider>

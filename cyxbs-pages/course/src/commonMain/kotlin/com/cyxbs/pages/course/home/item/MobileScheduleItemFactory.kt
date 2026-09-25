@@ -16,8 +16,8 @@ import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.frame.header.CourseBottomSheetHeaderExtension
 import com.cyxbs.pages.course.frame.header.CourseItemBottomSheetHeader
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.dialog.CourseBottomSheetScope
 import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleAllDayItem
@@ -102,16 +102,16 @@ private class MobileScheduleBottomSheetExtension(
 
   /** 在课表通用 BottomSheet 宿主中显示日程详情。 */
   @Composable
-  override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
+  override fun CourseBottomSheetDialogContent(scope: CourseBottomSheetScope) {
     scheduleService.ScheduleDetailContent(
       occurrence = item.occurrence,
       embeddedInHost = true,
-      onDismiss = state::dismissDialogAnimated,
+      onDismiss = scope::dismissDialogAnimated,
       onEditModeChanged = { isEditing ->
-        if (isEditing) state.lockCurrentPage()
+        if (isEditing) scope.lockCurrentPage()
       },
-      onDismissRequestChanged = state::updateDismissRequestGate,
-      onWindowOverlayContentChanged = state::updateWindowOverlayContent,
+      onDismissRequestChanged = scope::updateDismissRequestGate,
+      onWindowOverlayContentChanged = scope::updateWindowOverlayContent,
     )
   }
 

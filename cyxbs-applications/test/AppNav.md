@@ -231,6 +231,15 @@ deeplink: cyxbs://about
 deeplink: cyxbs://mine/edit
 ```
 
+### mine/setting
+
+- entry: `com.cyxbs.pages.mine.setting.SettingNavEntry`
+- argument: `com.cyxbs.pages.mine.setting.SettingNavArgument`
+
+```text
+deeplink: cyxbs://mine/setting
+```
+
 ### sign
 
 - entry: `com.cyxbs.pages.mine.sign.ui.SignNavEntry`
@@ -352,4 +361,15 @@ deeplink: cyxbs://school/car
 
 ```text
 deeplink: cyxbs://sport
+```
+
+## :cyxbs-pages:widget
+
+### widget
+
+- entry: `com.cyxbs.pages.widget.page.CourseWidgetNavEntry`
+- argument: `com.cyxbs.pages.widget.page.CourseWidgetNavArgument`
+
+```text
+deeplink: cyxbs://widget
 ```

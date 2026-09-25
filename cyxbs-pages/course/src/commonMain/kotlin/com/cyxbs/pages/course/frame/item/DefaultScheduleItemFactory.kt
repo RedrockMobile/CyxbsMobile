@@ -10,8 +10,8 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.view.ui.Window
 import com.cyxbs.pages.course.view.item.CourseItemState
+import com.cyxbs.pages.course.view.dialog.CourseBottomSheetScope
 import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogExtension
-import com.cyxbs.pages.course.view.item.extension.CourseItemBottomSheetDialogState
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleAllDayItem
@@ -45,16 +45,16 @@ private class DefaultScheduleCourseItem(
         get() = item.itemState
 
       @Composable
-      override fun CourseBottomSheetDialogContent(state: CourseItemBottomSheetDialogState) {
+      override fun CourseBottomSheetDialogContent(scope: CourseBottomSheetScope) {
         scheduleService.ScheduleDetailContent(
           occurrence = item.occurrence,
           embeddedInHost = true,
-          onDismiss = state::dismissDialogAnimated,
+          onDismiss = scope::dismissDialogAnimated,
           onEditModeChanged = { isEditing ->
-            if (isEditing) state.lockCurrentPage()
+            if (isEditing) scope.lockCurrentPage()
           },
-          onDismissRequestChanged = state::updateDismissRequestGate,
-          onWindowOverlayContentChanged = state::updateWindowOverlayContent,
+          onDismissRequestChanged = scope::updateDismissRequestGate,
+          onWindowOverlayContentChanged = scope::updateWindowOverlayContent,
         )
       }
     })

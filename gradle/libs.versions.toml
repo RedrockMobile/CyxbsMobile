@@ -53,6 +53,8 @@ androidx-room3 = "3.0.0"
 androidx-sqlite = "2.7.0"
 # https://developer.android.com/jetpack/androidx/releases/work
 androidx-work = "2.11.2"
+# https://developer.android.com/jetpack/androidx/releases/glance
+androidx-glance = "1.2.0"
 # https://developer.android.com/jetpack/androidx/releases/test
 androidx-test = "1.7.0"
 androidx-test-ext-junit = "1.3.0"
@@ -241,6 +243,8 @@ androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref 
 androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "androidx-room3" }
 androidx-room3-gradlePlugin = { module = "androidx.room3:room3-gradle-plugin", version.ref = "androidx-room3" }
 androidx-work = { module = "androidx.work:work-runtime-ktx", version.ref = "androidx-work" }
+androidx-glance = { module = "androidx.glance:glance", version.ref = "androidx-glance" }
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "androidx-glance" }
 # Room3 的 SQLite bundled driver：非 Web target 复用既有 SQLite 2.7.0 实现。
 androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "androidx-sqlite" }
 androidx-sqlite-bundled-jvm = { module = "androidx.sqlite:sqlite-bundled-jvm", version.ref = "androidx-sqlite" }

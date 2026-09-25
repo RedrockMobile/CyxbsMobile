@@ -42,6 +42,17 @@ object LessonRepository {
 
   private val mLessonObserveFlowObject = SynchronizedObject()
   private val mLessonObserveFlowMap = mutableMapOf<String, MutableSharedFlow<List<LessonByWeeks>>>()
+
+  /**
+   * 解析课程仓库实际读写的数据源学号。
+   *
+   * 该替换仅用于 Debug 环境给无课程的测试账号提供稳定数据；缓存、网络请求和更新 Flow 必须全部
+   * 使用解析后的同一学号，否则 Widget 展示与点击详情会分别命中两份数据。
+   */
+  private fun resolveDataStuNum(stuNum: String): String {
+    return if (stuNum == "2020214988") "2024210480" else stuNum
+  }
+
   private fun getLessonObserveFlow(stuNum: String): MutableSharedFlow<List<LessonByWeeks>> {
     return mLessonObserveFlowMap[stuNum] ?: synchronized(mLessonObserveFlowObject) {
       mLessonObserveFlowMap.getOrPut(stuNum) {
@@ -64,10 +75,11 @@ object LessonRepository {
     forceRequest: Boolean = false,
   ): Flow<List<LessonByWeeks>> {
     stuNum ?: return emptyFlow()
-    return getLessonObserveFlow(stuNum).onStart {
+    val dataStuNum = resolveDataStuNum(stuNum)
+    return getLessonObserveFlow(dataStuNum).onStart {
       var needRequest = forceRequest
       if (needOldData) {
-        val cache = getCacheLesson(stuNum)
+        val cache = getCacheLesson(dataStuNum)
         if (cache != null) {
           emit(cache.data)
         } else {
@@ -76,7 +88,7 @@ object LessonRepository {
       }
       if (needRequest) {
         // 使用应用级别的协程去请求数据
-        appCoroutineScope.launch { requestLesson(stuNum) }
+        appCoroutineScope.launch { requestLesson(dataStuNum) }
       }
     }
   }
@@ -86,11 +98,12 @@ object LessonRepository {
    */
   fun getCacheLesson(stuNum: String?): ILessonService2.CacheLesson? {
     stuNum ?: return null
+    val dataStuNum = resolveDataStuNum(stuNum)
     // 先取内存级缓存
-    val cache = mLessonCache[stuNum]
+    val cache = mLessonCache[dataStuNum]
     if (cache != null) return cache
     // 再读取磁盘
-    val accountSettings = AccountSettings.get(stuNum)
+    val accountSettings = AccountSettings.get(dataStuNum)
     return accountSettings.getStringOrNull(SETTING_KEY_LESSON)?.let { json ->
       runCatching {
         defaultJson.decodeFromString<StuLessonBean>(json)
@@ -104,7 +117,7 @@ object LessonRepository {
         val data = bean.data.mapNotNull { it.toLessonByWeeks() }
         ILessonService2.CacheLesson(requestTime, data)
       }.onSuccess {
-        mLessonCache[stuNum] = it
+        mLessonCache[dataStuNum] = it
       }.getOrNull()
     }
   }
@@ -113,9 +126,10 @@ object LessonRepository {
    * 请求课程
    */
   suspend fun requestLesson(stuNum: String): Result<List<LessonByWeeks>> {
+    val dataStuNum = resolveDataStuNum(stuNum)
     val requestTime = Clock.System.now()
     return runCatchingCoroutine {
-      CourseApiService::class.impl().getStuLesson(stuNum)
+      CourseApiService::class.impl().getStuLesson(dataStuNum)
     }.mapCatching {
       it.throwApiExceptionIfFail()
       it
@@ -124,14 +138,14 @@ object LessonRepository {
       SchoolCalendar.updateFirstCalendar(it.nowWeek)
     }.onSuccess {
       // 保存进磁盘
-      val accountSettings = AccountSettings.get(stuNum)
+      val accountSettings = AccountSettings.get(dataStuNum)
       val stuLessonBeanJson= defaultJson.encodeToString<StuLessonBean>(it)
       accountSettings.putLong(SETTING_KEY_LESSON_REQUEST_TIME, requestTime.toEpochMilliseconds())
       accountSettings.putString(SETTING_KEY_LESSON, stuLessonBeanJson)
       // 同步给 iOS 原生侧（仅 iOS 实现，其它平台 implOrNull 直接返回 null）。
       // 目前用于让 CyxbsWidgetExtension 课表小组件读到最新的 App Group 共享缓存。
       CourseIosPlatform::class.implOrNull()?.onLessonUpdated(
-        stuNum = stuNum,
+        stuNum = dataStuNum,
         nowWeek = it.nowWeek,
         stuLessonBeanJson = stuLessonBeanJson,
       )
@@ -141,10 +155,10 @@ object LessonRepository {
       bean.data.mapNotNull { it.toLessonByWeeks() }
     }.onSuccess {
       // 保存进内存
-      val oldCache = mLessonCache[stuNum]
-      mLessonCache[stuNum] = ILessonService2.CacheLesson(requestTime, it)
+      val oldCache = mLessonCache[dataStuNum]
+      mLessonCache[dataStuNum] = ILessonService2.CacheLesson(requestTime, it)
       if (oldCache?.data != it) {
-        mLessonObserveFlowMap[stuNum]?.tryEmit(it)
+        mLessonObserveFlowMap[dataStuNum]?.tryEmit(it)
       }
     }.onFailure {
       if (isDebug()) {

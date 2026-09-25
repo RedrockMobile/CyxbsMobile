@@ -35,6 +35,15 @@ abstract class CoursePageDecoration<Item: CourseItem> {
   protected val courseCoroutineScope
     get() = checkNotNull(decorationManager) { "CoursePageDecoration 当前未挂载" }.courseCoroutineScope
 
+  /**
+   * 请求主页延迟发布 Widget 快照。
+   *
+   * 仅供不经过 [itemHierarchy] 刷新的 Decoration 在只读数据变化后调用；非主页 Manager 会自动忽略。
+   */
+  protected fun requestWidgetSnapshotPublish() {
+    checkNotNull(decorationManager) { "CoursePageDecoration 当前未挂载" }.requestWidgetSnapshotPublish()
+  }
+
   val coursePage: LocalCoursePageContext
     @Composable
     get() = LocalCoursePage.current

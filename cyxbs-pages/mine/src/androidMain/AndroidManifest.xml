@@ -8,7 +8,6 @@
         <activity android:name="com.cyxbs.pages.mine.page.feedback.history.detail.HistoryDetailActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.feedback.edit.ui.FeedbackEditActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.feedback.history.list.HistoryListActivity" />
-        <activity android:name="com.cyxbs.pages.mine.page.setting.SettingActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.FindPasswordActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.ForgetPasswordActivity" />
         <activity android:name="com.cyxbs.pages.mine.page.security.activity.BindEmailActivity" />

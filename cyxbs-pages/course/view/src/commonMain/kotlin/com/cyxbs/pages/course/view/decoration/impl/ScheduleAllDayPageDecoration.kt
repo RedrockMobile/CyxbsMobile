@@ -32,18 +32,25 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.components.utils.compose.color
 import com.cyxbs.components.utils.compose.sharePointerInput
 import com.cyxbs.pages.course.view.item.CourseItemDarkContentColor
+import com.cyxbs.pages.course.view.decoration.CourseWidgetSnapshotContributor
+import com.cyxbs.pages.widget.api.CourseWidgetAction
+import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
+import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
 import com.cyxbs.pages.course.view.item.impl.CourseScheduleItem
 import com.cyxbs.pages.course.view.item.impl.PlatformScheduleItemFactory
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayDecorationItem
 import com.cyxbs.pages.course.view.item.impl.ScheduleAllDayItem
 import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoBackgroundColor
 import com.cyxbs.pages.course.view.item.impl.defaultScheduleTodoContentColor
+import com.cyxbs.pages.course.view.item.impl.widgetStyles
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceColor
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -54,7 +61,7 @@ import kotlinx.coroutines.flow.stateIn
  */
 class ScheduleAllDayPageDecoration(
   private val platformItemFactory: PlatformScheduleItemFactory,
-) : SchedulePageDecoration<CourseScheduleItem>() {
+) : SchedulePageDecoration<CourseScheduleItem>(), CourseWidgetSnapshotContributor {
 
   private lateinit var items: StateFlow<List<ScheduleAllDayDecorationItem>>
 
@@ -66,7 +73,35 @@ class ScheduleAllDayPageDecoration(
       started = SharingStarted.Eagerly,
       initialValue = emptyList(),
     )
+    // 全天背景不写入 ItemHierarchy；数据变化时需显式触发同一发布防抖，避免旧 Widget 快照残留。
+    items.onEach { requestWidgetSnapshotPublish() }.launchIn(courseCoroutineScope)
   }
+
+  /**
+   * 导出全天 TODO 的只读快照项。它们不占用线性时间轴，因此没有 visibleRanges，点击只定位周页。
+   */
+  override fun createWidgetSnapshotItems(week: Int): List<CourseWidgetRenderItem> =
+    items.value.asSequence()
+      .filter { it.page == week }
+      .map { item ->
+        val styles = item.occurrence.widgetStyles(isAffair = false)
+        CourseWidgetRenderItem(
+          id = "all-day:${item.stableId}",
+          dayOfWeek = item.dayIndex + 1,
+          title = item.title,
+          content = "",
+          beginMinute = null,
+          endMinute = null,
+          visibleRanges = emptyList(),
+          isAllDay = true,
+          lightStyle = styles.first,
+          darkStyle = styles.second,
+          backgroundPattern = CourseWidgetBackgroundPattern.SOLID,
+          // 全天列只提供周定位，避免没有 CourseItem 承载时尝试打开虚假的详情。
+          action = CourseWidgetAction(week = week),
+        )
+      }
+      .toList()
 
   @Composable
   override fun CoursePageContent() {

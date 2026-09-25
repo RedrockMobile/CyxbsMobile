@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrameFactory
@@ -35,6 +36,7 @@ import com.cyxbs.pages.course.view.decoration.impl.ScheduleTodoTimedPageDecorati
 import com.cyxbs.pages.course.view.decoration.impl.SelfLessonPageDecoration
 import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDialog
 import com.cyxbs.pages.course.view.item.extension.rememberCourseItemBottomSheetDialogState
+import com.cyxbs.pages.widget.api.ICourseWidgetSnapshotPublisher
 import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
@@ -97,6 +99,10 @@ class HomeCourseFrame private constructor() : AbstractCourseFrame(), IMobileHome
       ScheduleAllDayPageDecoration(
         platformItemFactory = MobileScheduleItemFactory,
       ), // 全天背景不参与重叠，固定放在最底层
+      widgetSnapshotPublisher = { snapshot ->
+        ICourseWidgetSnapshotPublisher::class.implOrNull()
+          ?.replace(snapshot)
+      },
     )
     launchInCourseFrameScope {
       outerHeaderState.observe(

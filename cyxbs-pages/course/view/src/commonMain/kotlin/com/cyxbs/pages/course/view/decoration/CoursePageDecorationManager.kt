@@ -10,6 +10,8 @@ import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.OverlapCover
+import com.cyxbs.pages.course.view.widget.CourseWidgetManager
+import com.cyxbs.pages.widget.api.CourseWidgetSnapshot
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -43,7 +45,9 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CoursePageDecorationManager internal constructor(
   val courseFrame: AbstractCourseFrame,
-  val decorations: List<CoursePageDecoration<*>>
+  val decorations: List<CoursePageDecoration<*>>,
+  /** 仅主页传入；具体小组件协议和持久化由顶层 course 模块适配。 */
+  private val widgetSnapshotPublisher: (suspend (CourseWidgetSnapshot) -> Unit)? = null,
 ) : AutoCloseable {
 
   /**
@@ -76,12 +80,21 @@ class CoursePageDecorationManager internal constructor(
   private val refreshDateSet = HashSet<Int>()
   private val refreshDateMapSynchronized = SynchronizedObject()
   private val isClosed = atomic(false)
+  private var courseWidgetManager: CourseWidgetManager? = null
 
   init {
     try {
       decorations.forEach {
         it.itemHierarchy.bindCourseItemViewModel(this)
         it.attach(this)
+      }
+      courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
+        CourseWidgetManager(
+          courseFrame = courseFrame,
+          decorations = decorations,
+          coroutineScope = courseCoroutineScope,
+          snapshotPublisher = publisher,
+        )
       }
     } catch (throwable: Throwable) {
       try {
@@ -100,6 +113,8 @@ class CoursePageDecorationManager internal constructor(
    */
   override fun close() {
     if (!isClosed.compareAndSet(expect = false, update = true)) return
+    courseWidgetManager?.close()
+    courseWidgetManager = null
     courseCoroutineScope.cancel()
     var failure: Throwable? = null
     for (index in decorations.lastIndex downTo 0) {
@@ -135,6 +150,15 @@ class CoursePageDecorationManager internal constructor(
       }
       refreshDateSet.clear()
     }
+    courseWidgetManager?.requestSnapshotPublish()
+  }
+
+  /**
+   * 等待同一批重叠刷新稳定后再发布一次快照，避免把不同层级的中间裁剪状态持久化给 Widget。
+   * 背景型 Decoration 可通过此入口在非 Hierarchy 数据变化后复用同一套防抖发布流程。
+   */
+  internal fun requestWidgetSnapshotPublish() {
+    courseWidgetManager?.requestSnapshotPublish()
   }
 
   ////////////////////////////

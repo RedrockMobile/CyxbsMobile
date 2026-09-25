@@ -4,6 +4,7 @@ plugins {
 }
 
 useNavigation() // navigation 跳转
+useUnitTest() // 课程详情身份协议等 commonTest 在 Android Host 上执行
 
 kotlin {
   sourceSets {

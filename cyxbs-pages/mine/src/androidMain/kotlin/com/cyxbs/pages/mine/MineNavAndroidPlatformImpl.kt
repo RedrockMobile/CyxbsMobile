@@ -9,7 +9,7 @@ import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.mine.home.MineNavPlatform
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
-import com.cyxbs.pages.mine.page.setting.SettingActivity
+import com.cyxbs.pages.mine.setting.SettingNavArgument
 import com.cyxbs.pages.notification.api.ILaunchNotificationService
 import com.cyxbs.pages.notification.api.INotificationService
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -46,7 +46,7 @@ object MineNavAndroidPlatformImpl : MineNavPlatform {
   }
 
   override fun jumpSetting() {
-    startActivity(SettingActivity::class)
+    SettingNavArgument.navigate()
   }
 
   override fun jumpActivityCenter() {

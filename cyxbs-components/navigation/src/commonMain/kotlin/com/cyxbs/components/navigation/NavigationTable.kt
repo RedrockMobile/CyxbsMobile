@@ -49,6 +49,12 @@ const val NAV_ABOUT = "about"
 // 资料编辑
 const val NAV_EDIT_INFO = "mine/edit"
 
+// 设置
+const val NAV_SETTING = "mine/setting"
+
+// 桌面小组件
+const val NAV_WIDGET = "widget"
+
 // 更新弹窗
 const val NAV_DIALOG_UPDATE = "dialog/update"
 
