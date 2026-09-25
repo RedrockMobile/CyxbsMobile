@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,7 +61,6 @@ import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
-import com.cyxbs.pages.widget.api.IWidgetEntryService
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
 import kotlinx.coroutines.launch
@@ -86,15 +86,13 @@ class SettingNavEntry : AppNavEntry<SettingNavArgument>() {
 /**
  * 设置主页面。
  *
- * Widget 入口是否出现及如何跳转完全由 [IWidgetEntryService] 决定，设置模块不认识具体组件类型。
+ * 只渲染 [SettingPlatform.settingItems] 提供的条目；平台决定能力、顺序和对应动作。
  */
 @Composable
 private fun SettingPage(argument: SettingNavArgument) {
   val platform = remember { SettingPlatform::class.implOrNull() }
-  val widgetEntryService = remember { IWidgetEntryService::class.implOrNull() }
   val loginDialogState = rememberLoginDialogState()
   val coroutineScope = rememberCoroutineScope()
-  var showCourseFirst by remember { mutableStateOf(platform?.showCourseFirst == true) }
   var checkingLogout by remember { mutableStateOf(false) }
   val showClearDialog = remember { mutableStateOf(false) }
   val showMaxWeekDialog = remember { mutableStateOf(false) }
@@ -102,6 +100,21 @@ private fun SettingPage(argument: SettingNavArgument) {
   val showLogoutWarningDialog = remember { mutableStateOf(false) }
   var clearConfirmArmed by remember { mutableStateOf(false) }
   var maxWeekText by remember { mutableStateOf((platform?.courseMaxWeek ?: 22).toString()) }
+  // 条目定义和平台能力在页面生命周期内不变；回调操作的是已 remember 的页面状态。
+  val settingItems = remember(platform) {
+    platform?.settingItems(
+      SettingItemActions(
+        showClearDataDialog = {
+          clearConfirmArmed = false
+          showClearDialog.value = true
+        },
+        showCourseMaxWeekDialog = {
+          maxWeekText = (platform?.courseMaxWeek ?: 22).toString()
+          showMaxWeekDialog.value = true
+        },
+      )
+    ).orEmpty()
+  }
 
   Column(
     modifier = Modifier.fillMaxSize()
@@ -111,54 +124,33 @@ private fun SettingPage(argument: SettingNavArgument) {
     SettingTopBar(argument)
     LazyColumn(
       modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-      contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp),
+      contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 14.dp, bottom = 32.dp),
     ) {
-      item {
-        SettingSwitchRow(
-          text = "启动 App 优先显示课表",
-          checked = showCourseFirst,
-          onCheckedChange = { checked ->
-            showCourseFirst = checked
-            platform?.setShowCourseFirst(checked)
-          },
-          modifier = Modifier.padding(top = 14.dp),
-        )
-      }
-      item {
-        SettingArrowRow(
-          text = "账号与安全",
-          onClick = {
-            loginDialogState.doIfLogin(function = "账号与安全") {
-              platform?.openAccountSecurity() ?: toast("当前平台暂不支持")
+      items(settingItems, key = SettingItem::key) { settingItem ->
+        when (settingItem) {
+          is SettingItem.Switch -> {
+            var checked by remember(settingItem.key) { mutableStateOf(settingItem.readChecked()) }
+            SettingSwitchRow(
+              text = settingItem.title,
+              checked = checked,
+              onCheckedChange = { value ->
+                checked = value
+                settingItem.onCheckedChange(value)
+              },
+            )
+          }
+          is SettingItem.Action -> {
+            SettingArrowRow(text = settingItem.title) {
+              if (settingItem.requiresLogin) {
+                loginDialogState.doIfLogin(function = settingItem.title) {
+                  settingItem.onClick()
+                }
+              } else {
+                settingItem.onClick()
+              }
             }
-          },
-        )
-      }
-      if (widgetEntryService?.isSettingEntryVisible == true) {
-        item {
-          SettingArrowRow(
-            text = "桌面小组件",
-            onClick = widgetEntryService::navigateToWidgetPage,
-          )
+          }
         }
-      }
-      item {
-        SettingArrowRow(
-          text = "清理软件数据",
-          onClick = {
-            clearConfirmArmed = false
-            showClearDialog.value = true
-          },
-        )
-      }
-      item {
-        SettingArrowRow(
-          text = "设置课表最大周数",
-          onClick = {
-            maxWeekText = (platform?.courseMaxWeek ?: 22).toString()
-            showMaxWeekDialog.value = true
-          },
-        )
       }
       item {
         Spacer(Modifier.height(110.dp))
@@ -273,10 +265,9 @@ private fun SettingSwitchRow(
   text: String,
   checked: Boolean,
   onCheckedChange: (Boolean) -> Unit,
-  modifier: Modifier = Modifier,
 ) {
   Row(
-    modifier = modifier.fillMaxWidth().heightIn(min = 56.dp)
+    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
       .clickableNoIndicator { onCheckedChange(!checked) }
       .padding(horizontal = 16.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -295,13 +286,14 @@ private fun SettingSwitchRow(
   }
 }
 
-/** 普通设置项，统一保持旧页的文字与右箭头结构。 */
+/** 普通设置项；箭头右边缘与上方开关的可见轨道右边缘对齐。 */
 @Composable
 private fun SettingArrowRow(text: String, onClick: () -> Unit) {
   Row(
     modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)
       .clickableNoIndicator(onClick = onClick)
-      .padding(horizontal = 16.dp),
+      // Material Switch 的可见轨道比其触控区域右缘内缩约 6dp，箭头需要同样内缩。
+      .padding(start = 16.dp, end = 22.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(

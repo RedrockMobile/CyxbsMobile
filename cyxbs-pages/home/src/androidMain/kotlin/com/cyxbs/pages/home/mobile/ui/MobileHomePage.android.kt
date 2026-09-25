@@ -5,6 +5,10 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.account.api.IAccountService
@@ -40,9 +44,13 @@ internal actual fun PlatformMobileHomePage(
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseBottomNavViewModel = viewModel(CourseBottomSheetViewModel::class)
   val activity = LocalActivity.current as BaseActivity
+  var initialIntentHandled by rememberSaveable { mutableStateOf(false) }
   DisposableEffect(Unit) {
-    // 处理 intent.action
-    execIntentAction(activity.intent, courseBottomNavViewModel)
+    // 导航返回会重新进入组合，保存一次性标记以免重复执行 Activity 的启动 Intent。
+    if (!initialIntentHandled) {
+      initialIntentHandled = true
+      execIntentAction(activity.intent, courseBottomNavViewModel)
+    }
     val onNewIntentListener = Consumer<Intent> { intent ->
       execIntentAction(intent, courseBottomNavViewModel)
     }

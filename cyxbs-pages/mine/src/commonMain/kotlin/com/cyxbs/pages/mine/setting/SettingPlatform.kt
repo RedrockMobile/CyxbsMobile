@@ -8,17 +8,14 @@ package com.cyxbs.pages.mine.setting
  */
 interface SettingPlatform {
 
-  /** 启动应用时是否优先打开课表。 */
-  val showCourseFirst: Boolean
+  /**
+   * 提供当前平台可展示的设置项；顺序即页面顺序，不支持的能力不应出现在列表中。
+   * [actions] 用于请求公共确认弹窗，具体系统动作仍由平台实现。
+   */
+  fun settingItems(actions: SettingItemActions): List<SettingItem>
 
   /** 当前课表最大周数。 */
   val courseMaxWeek: Int
-
-  /** 保存“启动时优先课表”开关。 */
-  fun setShowCourseFirst(enabled: Boolean)
-
-  /** 打开账号与安全页面。 */
-  fun openAccountSecurity()
 
   /**
    * 请求系统清除应用数据。

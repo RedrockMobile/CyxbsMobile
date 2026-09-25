@@ -194,7 +194,8 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     }
   }
   LaunchedEffect(Unit) {
-    courseFrameViewModel.frame.bottomSheetState.settledAnchorFlow.collect {
+    // 初始 Collapsed 只是 BottomSheetState 的默认值，不能覆盖启动页刚写入的展开请求。
+    courseFrameViewModel.frame.bottomSheetState.settledAnchorFlow.drop(1).collect {
       when (it) {
         BottomSheetAnchor.Hidden -> {
           if (courseBottomSheetViewModel.state.value != null) {
