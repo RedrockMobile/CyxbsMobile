@@ -1,6 +1,7 @@
 plugins {
   id("manager.lib")
   id("kmp.compose")
+  alias(libs.plugins.buildconfig)
 }
 
 useKtProvider() // api 模块服务提供
@@ -24,5 +25,13 @@ kotlin {
   }
 }
 
-
-
+if (Multiplatform.enableIOS(project)) {
+  buildConfig {
+    packageName("com.cyxbs.components.config")
+    useKotlinOutput()
+    sourceSets.named("iosMain") {
+      // 仅从主 App 的 entitlement 生成，不读取小组件扩展的配置。
+      buildConfigField("APP_GROUP_ID", IosAppGroup.mainAppId(project))
+    }
+  }
+}

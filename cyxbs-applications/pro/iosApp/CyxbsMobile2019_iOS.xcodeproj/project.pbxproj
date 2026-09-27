@@ -5281,6 +5281,7 @@
 				1476CA162AFCD1C000635848 /* Sources */,
 				1476CA172AFCD1C000635848 /* Frameworks */,
 				1476CA182AFCD1C000635848 /* Resources */,
+				C0DEC0DE26F9000000000002 /* Copy Widget App Group Configuration */,
 			);
 			buildRules = (
 			);
@@ -5508,7 +5509,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ncd \"$SRCROOT/../../..\"\n./gradlew :cyxbs-applications:multiplatform:embedAndSignAppleFrameworkForXcode :cyxbs-applications:multiplatform:syncComposeResourcesForIos\n";
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\nset -e\ncd \"$SRCROOT/../../..\"\n./gradlew :cyxbs-applications:multiplatform:embedAndSignAppleFrameworkForXcode :cyxbs-applications:multiplatform:syncComposeResourcesForIos";
 		};
 		BF95850F95C3649A0F1C132D /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -5531,6 +5532,26 @@
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
+		};
+		C0DEC0DE26F9000000000002 /* Copy Widget App Group Configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/$(CODE_SIGN_ENTITLEMENTS)",
+			);
+			name = "Copy Widget App Group Configuration";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/CourseWidgetAppGroup.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n# 只复制 Xcode Signing & Capabilities 使用的同一份 entitlement，Swift 不再维护第二份 ID。\ncp \"$PROJECT_DIR/$CODE_SIGN_ENTITLEMENTS\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/CourseWidgetAppGroup.plist\"\n";
 		};
 		D20A96DC9B125C7C260E5CA0 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;

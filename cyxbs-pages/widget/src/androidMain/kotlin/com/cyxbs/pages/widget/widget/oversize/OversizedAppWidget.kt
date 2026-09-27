@@ -183,43 +183,59 @@ private fun OversizedWidgetContent(
     sectionHeights = sectionHeights,
     nowMinute = nowMinute,
   )
-  Column(
+  Box(
     modifier = GlanceModifier.fillMaxSize().background(widgetColorProvider(Color.White))
       .appWidgetBackground().cornerRadius(14.dp),
   ) {
-    WeekHeader(
-      monthLabel = monthLabel,
-      dayOfMonths = dayOfMonths,
-      today = today,
-      visibleDays = visibleDays,
-      timelineWidth = timelineWidth,
-      headerCellSize = headerCellSize,
-      cellPadding = cellPadding,
-      isDesktopSingleCell = isDesktopSingleCell,
-    )
-    AllDayRow(
-      week = week,
-      visibleDays = visibleDays,
-      cardWidth = cardWidth,
-      timelineWidth = timelineWidth,
-      isDesktopSingleCell = isDesktopSingleCell,
-    )
-    LazyColumn(
-      modifier = GlanceModifier.fillMaxWidth().height(timelineViewportHeight.dp),
-    ) {
-      item(itemId = OversizedTimelineLazyItemId) {
-        OversizedScrollableTimeline(
-          week = week,
-          visibleDays = visibleDays,
-          sections = sections,
-          sectionHeights = sectionHeights,
-          contentHeightDp = timelineContentHeight,
-          currentTimeOffsetDp = currentTimeOffsetDp,
-          expandedTimelineMask = expandedTimelineMask,
-          timelineWidth = timelineWidth,
-          cardWidth = cardWidth,
-          isDesktopSingleCell = isDesktopSingleCell,
-        )
+    // 今日底纹覆盖表头、全天项和滚动时间轴；放在最底层，不改变课程卡片的时间坐标。
+    Row(modifier = GlanceModifier.fillMaxSize()) {
+      Spacer(GlanceModifier.width(timelineWidth).fillMaxHeight())
+      visibleDays.forEach { day ->
+        if (day == today) {
+          Box(
+            modifier = GlanceModifier.defaultWeight().fillMaxHeight()
+              .background(widgetColorProvider(OversizedTodayHighlightColor)).cornerRadius(8.dp),
+          ) {}
+        } else {
+          Spacer(GlanceModifier.defaultWeight().fillMaxHeight())
+        }
+      }
+    }
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+      WeekHeader(
+        monthLabel = monthLabel,
+        dayOfMonths = dayOfMonths,
+        today = today,
+        visibleDays = visibleDays,
+        timelineWidth = timelineWidth,
+        headerCellSize = headerCellSize,
+        cellPadding = cellPadding,
+        isDesktopSingleCell = isDesktopSingleCell,
+      )
+      AllDayRow(
+        week = week,
+        visibleDays = visibleDays,
+        cardWidth = cardWidth,
+        timelineWidth = timelineWidth,
+        isDesktopSingleCell = isDesktopSingleCell,
+      )
+      LazyColumn(
+        modifier = GlanceModifier.fillMaxWidth().height(timelineViewportHeight.dp),
+      ) {
+        item(itemId = OversizedTimelineLazyItemId) {
+          OversizedScrollableTimeline(
+            week = week,
+            visibleDays = visibleDays,
+            sections = sections,
+            sectionHeights = sectionHeights,
+            contentHeightDp = timelineContentHeight,
+            currentTimeOffsetDp = currentTimeOffsetDp,
+            expandedTimelineMask = expandedTimelineMask,
+            timelineWidth = timelineWidth,
+            cardWidth = cardWidth,
+            isDesktopSingleCell = isDesktopSingleCell,
+          )
+        }
       }
     }
   }
@@ -625,7 +641,6 @@ private fun RowScope.AllDayItemCell(
     // 横向贴合相邻日期列；纵向仍保留原定位间距，避免全天项挤占表头或时间轴。
     modifier = GlanceModifier.defaultWeight().fillMaxHeight()
       .padding(vertical = WidgetWeekItemVerticalPadding),
-    isDark = false,
     titleSizeSp = 9,
     contentSizeSp = 8,
     showContent = false,
@@ -696,7 +711,6 @@ private fun RowScope.OversizedDayTimeline(
             // 日期列之间不再加外边距，课程自身的纯白背景层承担横向分隔。
             modifier = GlanceModifier.fillMaxWidth().height(itemHeight)
               .padding(vertical = WidgetWeekItemVerticalPadding),
-            isDark = false,
             titleSizeSp = textLayout.titleSizeSp,
             contentSizeSp = textLayout.contentSizeSp,
             showContent = textLayout.showContent,
@@ -927,6 +941,8 @@ internal fun resolveOversizedWeekHeaderDate(
 }
 
 private val OversizedCellPadding = 2.dp
+/** 与课表页面的今日列阴影一致；组件画布固定为浅色。 */
+internal val OversizedTodayHighlightColor = Color(0x93E8F0FC)
 private val OversizedTimelineWidth = 40.dp
 private val OversizedCompactCellPadding = 1.dp
 private val OversizedSingleDayTimelineWidth = 24.dp

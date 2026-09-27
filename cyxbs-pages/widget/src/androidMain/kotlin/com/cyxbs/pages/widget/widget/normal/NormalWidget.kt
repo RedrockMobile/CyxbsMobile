@@ -608,8 +608,6 @@ private fun NormalTimelineLane(
           .padding(top = topPaddingDp.dp, bottom = bottomPaddingDp.dp)
           // 横向不能加外边距，否则可见色块会偏离真实时间坐标；纵向仍留出轨道间隔。
           .padding(vertical = NormalTimelineItemVerticalPadding),
-        // 旧版小组件没有夜间色资源，固定使用课表的浅色样式才能保持原有橙/红/蓝配色。
-        isDark = false,
         titleSizeSp = textLayout.titleSizeSp,
         contentSizeSp = textLayout.contentSizeSp,
         maxTitleLines = textLayout.titleLines,
@@ -797,8 +795,6 @@ private fun NormalTimelineOverflowLane(
         )
         WidgetRenderItemCard(
           item = bar.item,
-          // 普通小组件与正文卡片一致，固定复用课表浅色样式。
-          isDark = false,
           modifier = GlanceModifier.fillMaxSize(),
           titleSizeSp = titleStyle.fontSizeSp,
           contentSizeSp = minOf(9, titleStyle.fontSizeSp - 1).coerceAtLeast(8),

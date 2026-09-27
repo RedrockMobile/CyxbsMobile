@@ -36,7 +36,7 @@ import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
 import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
 
 /**
- * 按快照的 light/dark style 绘制通用 item。
+ * 固定按快照的浅色样式绘制通用 item，不随桌面深色模式改变课程配色。
  *
  * 圆角底卡与条目内容层之间固定保留 2dp，使同色重叠卡片仍能辨认边缘；事务斜纹只绘制在内容层。
  * [modifier] 只负责卡片的外部尺寸与定位间距，点击节点位于其内部，避免 RemoteViews 宿主把
@@ -50,7 +50,6 @@ import com.cyxbs.pages.widget.api.CourseWidgetRenderItem
 internal fun WidgetRenderItemCard(
   item: CourseWidgetRenderItem,
   modifier: GlanceModifier,
-  isDark: Boolean,
   renderSize: DpSize,
   titleSizeSp: Int = 9,
   contentSizeSp: Int = 8,
@@ -68,7 +67,7 @@ internal fun WidgetRenderItemCard(
   containerColorOverride: ColorProvider? = null,
   coverTipColor: ColorProvider? = null,
 ) {
-  val style = if (isDark) item.darkStyle else item.lightStyle
+  val style = item.lightStyle
   val foreground = widgetColorProvider(Color(style.contentArgb))
   val cardModifier = GlanceModifier.fillMaxSize().let { base ->
       if (item.action.itemId == null) base else base.clickable(openCourseWidgetItemAction(item.action))
@@ -82,7 +81,6 @@ internal fun WidgetRenderItemCard(
     ) {
       WidgetRenderItemBackground(
         item = item,
-        isDark = isDark,
         modifier = GlanceModifier.fillMaxSize(),
         renderSize = renderSize,
         containerColorOverride = containerColorOverride,
@@ -167,16 +165,15 @@ internal fun WidgetRenderItemCard(
 @Composable
 internal fun WidgetRenderItemBackground(
   item: CourseWidgetRenderItem,
-  isDark: Boolean,
   modifier: GlanceModifier,
   renderSize: DpSize,
   containerColorOverride: ColorProvider? = null,
   clipStartEdge: Boolean = false,
   clipEndEdge: Boolean = false,
 ) {
-  val style = if (isDark) item.darkStyle else item.lightStyle
+  val style = item.lightStyle
   // 兼容升级前没有 containerArgb 的快照；新快照始终由课表侧下发该颜色。
-  val containerArgb = style.containerArgb ?: if (isDark) 0xFF2D2D2DL else 0xFFFFFFFFL
+  val containerArgb = style.containerArgb ?: 0xFFFFFFFFL
   // 不同 Widget 的画布底色可以不同；覆盖色只替换外层与斜纹透明间隔，不修改课程内容色。
   val container = containerColorOverride ?: widgetColorProvider(Color(containerArgb))
   val contentBackground = if (item.backgroundPattern == CourseWidgetBackgroundPattern.DIAGONAL_STRIPE) {
@@ -324,13 +321,13 @@ private fun WidgetRenderClippedEdge(
 }
 
 /**
- * 使用 Glance 官方的日夜颜色实现构造固定 [Color] 提供器。
+ * 使用 Glance 官方实现为日夜两种宿主状态提供同一个浅色外观 [Color]。
  *
  * 两个模式传入相同颜色可避开受限的资源 ID 重载；必须使用官方实现，RemoteViews 转换器无法
  * 正确识别任意自定义 [ColorProvider]，否则背景与文字会回落为透明色。
  */
-internal fun widgetColorProvider(day: Color, night: Color = day): ColorProvider =
-  androidx.glance.color.ColorProvider(day = day, night = night)
+internal fun widgetColorProvider(color: Color): ColorProvider =
+  androidx.glance.color.ColorProvider(day = color, night = color)
 
 /**
  * 生成与卡片内容层等大的透明斜纹位图。

@@ -52,6 +52,7 @@ import com.cyxbs.pages.widget.widget.glance.WidgetWeekItemVerticalPadding
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedVisibleDays
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedDayTextLayout
 import com.cyxbs.pages.widget.widget.normal.resolveNormalTimelineCardTextLayout
+import com.cyxbs.pages.widget.widget.oversize.OversizedTodayHighlightColor
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedMinuteOffset
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedExpandableTimeLabels
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedSectionHeights
@@ -317,7 +318,10 @@ private fun WeekTimetableSamplePreview(dayCount: Int, modifier: Modifier = Modif
       visibleDays.forEach { day ->
         val selected = day == 2
         BoxWithConstraints(
-          modifier = Modifier.weight(1f).fillMaxHeight(),
+          modifier = Modifier.weight(1f).fillMaxHeight().background(
+            if (selected) OversizedTodayHighlightColor else Color.Transparent,
+            RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+          ),
           contentAlignment = Alignment.Center,
         ) {
           val cellPadding = if (dayCount == 1) 1.dp else 2.dp
@@ -352,6 +356,13 @@ private fun WeekTimetableSamplePreview(dayCount: Int, modifier: Modifier = Modif
       val dayWidth = contentWidth / dayCount
       val sections = DEFAULT_OVERSIZED_TIMELINE_SECTIONS
       val sectionHeights = resolveOversizedSectionHeights(sections, 0, maxHeight.value)
+      // 示例的周三与真实组件一样，整列底纹位于课程和时间轴之下。
+      visibleDays.indexOf(2).takeIf { it >= 0 }?.let { todayColumn ->
+        Box(
+          Modifier.offset(x = axisWidth + dayWidth * todayColumn)
+            .width(dayWidth).fillMaxHeight().background(OversizedTodayHighlightColor),
+        )
+      }
       PreviewWeekTimeAxis(sections, sectionHeights, axisWidth, maxHeight, dayCount == 1)
       visibleDays.forEachIndexed { column, day ->
         // 与 Glance 一致：每天只占一整列，低优先级先画，高优先级叠在其上。

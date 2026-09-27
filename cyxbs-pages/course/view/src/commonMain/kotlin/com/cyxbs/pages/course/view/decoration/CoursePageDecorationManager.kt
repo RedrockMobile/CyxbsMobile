@@ -7,6 +7,7 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.OverlapCover
@@ -88,13 +89,17 @@ class CoursePageDecorationManager internal constructor(
         it.itemHierarchy.bindCourseItemViewModel(this)
         it.attach(this)
       }
-      courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
-        CourseWidgetManager(
-          courseFrame = courseFrame,
-          decorations = decorations,
-          coroutineScope = courseCoroutineScope,
-          snapshotPublisher = publisher,
-        )
+      runCatching {
+        courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
+          CourseWidgetManager(
+            courseFrame = courseFrame,
+            decorations = decorations,
+            coroutineScope = courseCoroutineScope,
+            snapshotPublisher = publisher,
+          )
+        }
+      }.onFailure {
+        toast("widgetSnapshotPublisher: ${it.message}")
       }
     } catch (throwable: Throwable) {
       try {
@@ -102,7 +107,7 @@ class CoursePageDecorationManager internal constructor(
       } catch (closeThrowable: Throwable) {
         throwable.addSuppressed(closeThrowable)
       }
-      throw throwable
+      toast("CoursePageDecorationManager: ${throwable.message}")
     }
   }
 

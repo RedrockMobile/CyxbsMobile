@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
  * 课表 Manager 只调用跨平台接口；本实现负责在 IO 线程持久化并唤醒 AppWidget，不参与任何网络请求或业务数据合并。
  */
 @ImplProvider(clazz = ICourseWidgetSnapshotPublisher::class)
-object CourseWidgetSnapshotPublisher : ICourseWidgetSnapshotPublisher {
+object AndroidCourseWidgetSnapshotPublisher : ICourseWidgetSnapshotPublisher {
 
   /** 原子替换磁盘快照，成功提交后才发送 AppWidget 更新广播。 */
   override suspend fun replace(snapshot: CourseWidgetSnapshot) {
