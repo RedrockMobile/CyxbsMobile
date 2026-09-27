@@ -176,7 +176,7 @@ private fun InfoHeader(
         text = introduction ?: "快来红岩网校和我一起玩吧~",
         color = IntroduceColor,
         fontSize = 18.sp,
-        modifier = Modifier.padding(start = 50.dp, top = 30.dp),
+        modifier = Modifier.padding(horizontal = 50.dp, vertical = 30.dp),
       )
     }
   }
