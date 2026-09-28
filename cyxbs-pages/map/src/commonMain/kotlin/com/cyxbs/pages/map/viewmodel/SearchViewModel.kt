@@ -5,7 +5,7 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.base.ui.BaseViewModel
-import com.cyxbs.components.view.ui.BottomSheetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.MapInfo

@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import com.cyxbs.components.config.Platform
-import com.cyxbs.components.config.appPlatform
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,7 +33,7 @@ import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.view.ui.LocalBottomSheetScope
+import com.cyxbs.components.view.ui.bottomsheet.LocalBottomSheetScope
 import com.cyxbs.pages.map.ui.SearchCompose
 import com.cyxbs.pages.map.viewmodel.SearchViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
@@ -62,20 +59,8 @@ import org.jetbrains.compose.resources.vectorResource
 @Composable
 fun SearchBottomSheetContent() {
   val bottomSheetScope = LocalBottomSheetScope.current
-  val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-  val modifier = when {
-    ratio > 1.5 -> {
-      Modifier.fillMaxWidth()
-    }
-
-    else -> {
-      Modifier
-        .padding(start = 30.dp)
-        .width(getWindowScreenSize().width / 3)
-    }
-  }
   Column(
-    modifier = modifier
+    modifier = Modifier.fillMaxWidth()
       .then(bottomSheetScope.bottomSheetDraggable())
       .shadow(
         elevation = 10.dp,
@@ -83,11 +68,7 @@ fun SearchBottomSheetContent() {
       )
       .background(LocalAppColors.current.topBg)
       .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-      .padding(
-        horizontal = if (appPlatform == Platform.IOS) 20.dp else 16.dp,
-      )
-      .padding(bottom = if (appPlatform == Platform.IOS) 12.dp else 0.dp)
-      .then(if (appPlatform == Platform.Android) Modifier.navigationBarsPadding() else Modifier)
+      .padding(horizontal = 16.dp)
   ) {
     Box(
       modifier = Modifier

@@ -5,8 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.view.ui.BottomSheetState
-import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
 import com.cyxbs.pages.map.model.bean.PlaceDetails
@@ -60,7 +60,7 @@ class PlaceDetailViewModel : BaseViewModel() {
     }
     if (placeChanged || (!hasLoadedDetails && detailsJob?.isActive != true)) {
       detailsJob = launchByViewModelScope {
-        placeDetails.value?.let {
+        if (placeDetails.value == null) {
           val localPlace = MapDataRepository.getMapInfo()?.placeList?.find { it.placeId == placeId }
           if (placeDetailsId.value == placeId && localPlace != null) {
             placeDetails.value = PlaceDetails(localPlace.placeName, null, null, null)
@@ -78,7 +78,7 @@ class PlaceDetailViewModel : BaseViewModel() {
     }
     when {
       expanded == true -> bottomSheetState.expandAsync()
-      expanded == false || bottomSheetState.state == BottomSheetValueState.Hide ->
+      expanded == false || bottomSheetState.isSettledAt(BottomSheetAnchor.Hidden) ->
         bottomSheetState.collapseAsync()
     }
   }

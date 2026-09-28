@@ -1,6 +1,7 @@
 package com.cyxbs.pages.map.ui
 
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -10,16 +11,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.scene.SceneStrategy
-import com.cyxbs.components.config.Platform
-import com.cyxbs.components.config.appPlatform
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_MAP_PLACE_DETAIL
 import com.cyxbs.components.navigation.NAV_MAP_SEARCH
 import com.cyxbs.components.navigation.appNavBackStack
-import com.cyxbs.components.view.ui.BottomSheetCompose
-import com.cyxbs.components.view.ui.LocalBottomSheetScope
+import com.cyxbs.components.utils.compose.getWindowScreenSize
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetCompose
+import com.cyxbs.components.view.ui.bottomsheet.LocalBottomSheetScope
 import com.cyxbs.pages.map.util.MapOverlaySceneStrategy
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.viewmodel.MapNavEvent
@@ -50,11 +50,11 @@ class PlaceDetailNavEntry : AppNavEntry<PlaceDetailNavArgument>() {
         vm.showPlace(argument.placeId, argument.expanded)
       }
     }
-    if (vm.placeDetails.value != null && vm.sheetVisible.value) {
+    if (vm.sheetVisible.value) {
       BottomSheetCompose(
         bottomSheetState = vm.bottomSheetState,
-        modifier = if (appPlatform == Platform.Android) Modifier.navigationBarsPadding() else Modifier,
-        peekHeight = 112.dp + if (appPlatform == Platform.IOS) 12.dp else 0.dp,
+        modifier = mapSheetModifier(),
+        peekHeight = 112.dp,
         dismissOnBackPress = false,
         dismissOnClickOutside = false,
         scrimColor = Color.Transparent,
@@ -83,8 +83,8 @@ class SearchNavEntry : AppNavEntry<SearchNavArgument>() {
     if (vm.sheetVisible.value) {
       BottomSheetCompose(
         bottomSheetState = vm.searchBottomSheetState,
-        modifier = if (appPlatform == Platform.Android) Modifier.navigationBarsPadding() else Modifier,
-        peekHeight = 80.dp + if (appPlatform == Platform.IOS) 12.dp else 0.dp,
+        modifier = mapSheetModifier(),
+        peekHeight = 80.dp,
         dismissOnBackPress = false,
         dismissOnClickOutside = false,
         scrimColor = Color.Transparent,
@@ -95,6 +95,18 @@ class SearchNavEntry : AppNavEntry<SearchNavArgument>() {
       }
     }
   }
+}
+
+@Composable
+internal fun mapSheetModifier(): Modifier {
+  val windowSize = getWindowScreenSize()
+  // 限制外壳的命中区域，不能只缩窄内部卡片，否则透明区域仍会拦截地图。
+  val bounds = if (windowSize.height / windowSize.width > 1.5f) {
+    Modifier
+  } else {
+    Modifier.padding(start = 30.dp).width(windowSize.width / 3)
+  }
+  return bounds
 }
 
 @Composable

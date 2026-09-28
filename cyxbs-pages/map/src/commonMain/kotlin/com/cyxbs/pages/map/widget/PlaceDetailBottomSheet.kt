@@ -1,12 +1,11 @@
 package com.cyxbs.pages.map.widget
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -71,60 +72,68 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun PlaceDetailBottomSheetContent() {
   val viewmodel = viewModel { PlaceDetailViewModel() }
-  val bottomSheetScope = LocalBottomSheetScope.current
-  viewmodel.placeDetails.value?.let { placeDetails ->
-    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-    val modifier = when {
-      ratio > 1.5 -> {
-        Modifier.fillMaxWidth()
-      }
-
-      else -> {
-        Modifier
-          .padding(start = 30.dp)
-          .width(getWindowScreenSize().width / 3)
-      }
-    }
-    ConstraintLayout(
-      constraintSet = createConstraintSet(),
-      modifier = modifier
-        .then(bottomSheetScope.bottomSheetDraggable())
-        .shadow(
-          elevation = 10.dp,
-          shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+  val placeDetails = viewmodel.placeDetails.value
+  val scrollState = rememberScrollState()
+  LaunchedEffect(viewmodel.placeDetailsId.value) {
+    scrollState.scrollTo(0)
+  }
+  PlaceDetailSheetFrame {
+    if (placeDetails == null) {
+      Text(
+        text = "正在加载地点信息…",
+        color = LocalAppColors.current.tvLv2,
+        modifier = Modifier.padding(24.dp),
+      )
+    } else {
+      ConstraintLayout(
+        constraintSet = createConstraintSet(),
+        modifier = Modifier
+          .fillMaxSize()
+          .verticalScroll(scrollState)
+          .padding(horizontal = 16.dp),
+      ) {
+        ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
+        PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
+        PlaceAttributeListCompose(
+          modifier = Modifier.layoutId(Element.PlaceAttributeList),
+          placeDetails
         )
-        .background(LocalAppColors.current.topBg)
-        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-        .padding(start = 16.dp, end = 16.dp),
-      animateChangesSpec = spring(
-        stiffness = Spring.StiffnessMediumLow
-      )
-    ) {
-      ShapeTipCompose(modifier = Modifier.layoutId(Element.ShapeTip), placeDetails)
-      PlaceTitleCompose(modifier = Modifier.layoutId(Element.PlaceTitle), placeDetails)
-      PlaceAttributeListCompose(
-        modifier = Modifier.layoutId(Element.PlaceAttributeList),
-        placeDetails
-      )
-      PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
-      PlaceNavigationCompose(
-        modifier = Modifier.layoutId(Element.PlaceNavigation),
-        placeDetails
-      )
-      DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
-      DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
-      ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
-      DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
-      DetailAboutTextCompose(
-        modifier = Modifier.layoutId(Element.DetailAboutText),
-        placeDetails
-      )
-      DetailAboutListCompose(
-        modifier = Modifier.layoutId(Element.DetailAboutList),
-        placeDetails
-      )
+        PlaceFavoriteCompose(modifier = Modifier.layoutId(Element.PlaceFavorite), placeDetails)
+        PlaceNavigationCompose(
+          modifier = Modifier.layoutId(Element.PlaceNavigation),
+          placeDetails
+        )
+        DetailTextCompose(modifier = Modifier.layoutId(Element.DetailText), placeDetails)
+        DetailMoreTextCompose(modifier = Modifier.layoutId(Element.DetailMoreText), placeDetails)
+        ImageBannerCompose(modifier = Modifier.layoutId(Element.ImageBanner), placeDetails)
+        DetailShareCompose(modifier = Modifier.layoutId(Element.DetailShare), placeDetails)
+        DetailAboutTextCompose(
+          modifier = Modifier.layoutId(Element.DetailAboutText),
+          placeDetails
+        )
+        DetailAboutListCompose(
+          modifier = Modifier.layoutId(Element.DetailAboutList),
+          placeDetails
+        )
+      }
     }
   }
+}
+
+@Composable
+internal fun PlaceDetailSheetFrame(content: @Composable BoxScope.() -> Unit) {
+  val bottomSheetScope = LocalBottomSheetScope.current
+  // 外壳高度不依赖地点数据，切换和加载只更新内部内容。
+  Box(
+    modifier = Modifier
+      .fillMaxWidth()
+      .height((getWindowScreenSize().height * 2 / 3).coerceAtLeast(112.dp))
+      .then(bottomSheetScope.bottomSheetDraggable())
+      .shadow(10.dp, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+      .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+      .background(LocalAppColors.current.topBg),
+    content = content,
+  )
 }
 
 @Composable
