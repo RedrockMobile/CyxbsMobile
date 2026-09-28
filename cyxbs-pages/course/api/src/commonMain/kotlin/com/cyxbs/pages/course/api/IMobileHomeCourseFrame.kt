@@ -19,6 +19,15 @@ interface IMobileHomeCourseFrame : AutoCloseable {
 
   val bottomSheetState: BottomSheetState
 
+  /**
+   * 定位课表 Item 并复用原 item 点击弹窗展示详情。
+   *
+   * [itemId] 是包含教学周的课表不透明稳定身份，使用 [CourseItemIdProvider]；
+   * 非法 ID 或已删除条目不会打开弹窗。
+   * 连续调用相同参数仍视为新的打开请求。
+   */
+  fun showCourseItemDetail(itemId: String)
+
   @Composable
   fun HomeCourseContent(
     modifier: Modifier,

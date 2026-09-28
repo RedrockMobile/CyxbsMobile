@@ -71,9 +71,16 @@ struct ScheduleSystemMedium: View {
                                 let right = CGFloat(bar.end - begin) / CGFloat(max(end - begin, 1))
                                 let laneHeight = trackHeight / CGFloat(min(bar.laneCount, 4))
                                 if right > left {
-                                    CourseWidgetItemCard(item: bar.item, showText: true, cardHeight: laneHeight - 2)
-                                        .frame(width: max(1, contentWidth * (right - left)), height: laneHeight - 2)
-                                        .offset(x: timelineInset + contentWidth * left, y: CGFloat(bar.lane) * laneHeight + 1)
+                                    Group {
+                                        if #available(iOS 17.0, *) {
+                                            CourseWidgetLinkedItemCard(item: bar.item, showText: true, cardHeight: laneHeight - 2)
+                                        } else {
+                                            // iOS 16 及以下中号 Widget 不支持逐条 Link，整卡由 widgetURL 打开课表。
+                                            CourseWidgetItemCard(item: bar.item, showText: true, cardHeight: laneHeight - 2)
+                                        }
+                                    }
+                                    .frame(width: max(1, contentWidth * (right - left)), height: laneHeight - 2)
+                                    .offset(x: timelineInset + contentWidth * left, y: CGFloat(bar.lane) * laneHeight + 1)
                                 }
                             }
                         }
@@ -209,7 +216,7 @@ struct ScheduleSystemLarge: View {
                             let item = items.first(where: { $0.dayOfWeek == day && $0.isAllDay })
                             Group {
                                 if let item {
-                                    CourseWidgetItemCard(item: item, showText: true, cardHeight: allDayHeight)
+                                    CourseWidgetLinkedItemCard(item: item, showText: true, cardHeight: allDayHeight)
                                 } else {
                                     Color.clear
                                 }
@@ -240,7 +247,7 @@ struct ScheduleSystemLarge: View {
                                         let bottom = Self.position(ranges[index].upperBound, sections: usableSections, total: totalWeight)
                                         if bottom > top {
                                             let height = trackHeight * (bottom - top)
-                                            CourseWidgetItemCard(item: item, showText: index == (textIndex ?? 0), cardHeight: height)
+                                            CourseWidgetLinkedItemCard(item: item, showText: index == (textIndex ?? 0), cardHeight: height)
                                                 .frame(width: column.size.width, height: height)
                                                 .offset(y: trackHeight * top)
                                         }
@@ -421,6 +428,25 @@ private struct CourseWidgetTimeAxis: View {
     }
 }
 
+/// 中、大号组件把每个可见课程片段作为独立点击区域，地址失效时仍保留原卡片外观。
+private struct CourseWidgetLinkedItemCard: View {
+    let item: CourseWidgetRenderItem
+    let showText: Bool
+    let cardHeight: CGFloat
+
+    @ViewBuilder
+    var body: some View {
+        if let destination = item.action.destinationURL() {
+            Link(destination: destination) {
+                CourseWidgetItemCard(item: item, showText: showText, cardHeight: cardHeight)
+            }
+            .buttonStyle(.plain)
+        } else {
+            CourseWidgetItemCard(item: item, showText: showText, cardHeight: cardHeight)
+        }
+    }
+}
+
 /// iOS 小组件按桌面外观选择课表快照中的明暗样式，与 Android 小组件保持一致。
 private struct CourseWidgetItemCard: View {
     let item: CourseWidgetRenderItem
@@ -477,9 +503,10 @@ private struct CourseWidgetItemCard: View {
             }
             .padding(2)
             if !item.action.overlapItemIds.isEmpty {
-                Circle()
+                // 与 Android 课表一致使用右上角短横条，圆点会被误认为当前时间标记。
+                RoundedRectangle(cornerRadius: 1)
                     .fill(Color(argb: style.contentArgb))
-                    .frame(width: 5, height: 5)
+                    .frame(width: 6, height: 2)
                     .padding(3)
             }
         }

@@ -223,7 +223,7 @@ struct CourseWidgetItemStyle: Decodable {
     let containerArgb: UInt64?
 }
 
-/// 当前只消费重叠提示；点击详情链路会在课表选择状态打通后再读取这些 ID。
+/// 与 Kotlin 快照保持一致的点击身份；Item ID 内含教学周，不把可能过期的展示内容放进 URL。
 struct CourseWidgetAction: Decodable {
     let week: Int
     let itemId: String?
@@ -236,5 +236,17 @@ struct CourseWidgetAction: Decodable {
         week = try values.decode(Int.self, forKey: .week)
         itemId = try values.decodeIfPresent(String.self, forKey: .itemId)
         overlapItemIds = try values.decodeIfPresent([String].self, forKey: .overlapItemIds) ?? []
+    }
+
+    /// Item ID 已包含教学周；同一 Item 的多个可见绘制片段共享该 ID，无需额外传递片段信息。
+    func destinationURL() -> URL? {
+        guard let itemId, !itemId.isEmpty else { return nil }
+        var components = URLComponents()
+        components.scheme = "cyxbs"
+        components.host = "home"
+        components.queryItems = [
+            URLQueryItem(name: "courseItemId", value: itemId)
+        ]
+        return components.url
     }
 }

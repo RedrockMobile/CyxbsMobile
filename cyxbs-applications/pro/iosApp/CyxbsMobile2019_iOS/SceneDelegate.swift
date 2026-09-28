@@ -31,5 +31,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = nav
         window?.makeKeyAndVisible()
+
+        // 冷启动的 URL 会随 Scene 创建参数到达，CMP 首帧尚未建立时由 Kotlin 入口排队处理。
+        openNavigationURL(from: connectionOptions.urlContexts)
+    }
+
+    /// 已运行的应用由 Scene 接收小组件链接，和冷启动共用同一条 CMP 导航入口。
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        openNavigationURL(from: URLContexts)
+    }
+
+    /// 仅转交 CMP 能解析的 URL；旧分享 scheme 不在这里被误识别为课程链接。
+    private func openNavigationURL(from contexts: Set<UIOpenURLContext>) {
+        for context in contexts where context.url.scheme?.lowercased() == "cyxbs" {
+            if IOSAppKt.openExternalAppUrl(url: context.url.absoluteString) { break }
+        }
     }
 }

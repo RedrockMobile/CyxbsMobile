@@ -80,7 +80,7 @@ class MobileHomePage : PlatformHomePage {
         modifier = Modifier.fillMaxSize()
       ) {
         HomeViewPagerCompose(argument)
-        HomeCourseCompose()
+        HomeCourseCompose(argument)
         HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
       }
     }
@@ -156,14 +156,22 @@ internal fun HomeViewPagerCompose(
 }
 
 @Composable
-private fun HomeCourseCompose(modifier: Modifier = Modifier) {
+private fun HomeCourseCompose(argument: HomeNavArgument, modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
   // CourseBottomSheetViewModel 提供对外控制课表展示和监听当前展示状态
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
+  LaunchedEffect(argument.courseOpenId) {
+    val itemId = argument.courseItemId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
+    if (argument.courseOpenId != null) {
+      // 主页只负责展开课表并调用通用定位入口；ID 解析、切页和原 item 弹窗由 Frame 封装。
+      courseBottomSheetViewModel.state.value = true
+      courseFrameViewModel.frame.showCourseItemDetail(itemId)
+    }
+  }
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier,
-    bottomBarHeight = bottomNavViewModel.height
+    bottomBarHeight = bottomNavViewModel.height,
   )
   LaunchedEffect(Unit) {
     val bottomSheetState = courseFrameViewModel.frame.bottomSheetState

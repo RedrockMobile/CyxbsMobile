@@ -30,6 +30,16 @@
 				<string>redrock.zscy.youwen.share</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.mredrock.cyxbs.navigation</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cyxbs</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>

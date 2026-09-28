@@ -5,6 +5,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.pages.course.api.LessonByWeeks
+import com.cyxbs.pages.course.api.courseItemId
 import com.cyxbs.pages.course.api.courseItemDetailId
 import com.cyxbs.pages.widget.api.CourseWidgetAction
 import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
@@ -35,8 +36,15 @@ class CourseLessonItem(
   platformItemFactory: PlatformCourseLessonItemFactory,
 ) : CourseItem(whatTime, coroutineScope), CourseWidgetRenderProvider {
 
-  override val widgetItemId: String
-    get() = lesson.courseItemDetailId(isLinked = false)
+  override val courseItemId: String
+    get() {
+      val detailId = lesson.courseItemDetailId(isLinked = false)
+      return courseItemId(
+        week = whatTime.now.value.page,
+        itemKey = detailId,
+        detailId = detailId,
+      )
+    }
 
   init {
     extensions.add(CourseLessonMovableItemExtension())
@@ -60,7 +68,7 @@ class CourseLessonItem(
     val fixed = whatTime.now.value
     val style = lesson.widgetStyle()
     return CourseWidgetRenderItem(
-      id = widgetItemId,
+      id = courseItemId,
       dayOfWeek = fixed.dayOfWeek.isoDayNumber,
       title = lesson.course,
       content = lesson.classroomSimplify,
@@ -70,7 +78,7 @@ class CourseLessonItem(
       lightStyle = style.first,
       darkStyle = style.second,
       backgroundPattern = CourseWidgetBackgroundPattern.SOLID,
-      action = CourseWidgetAction(week = fixed.page, itemId = widgetItemId),
+      action = CourseWidgetAction(week = fixed.page, itemId = courseItemId),
     )
   }
 }

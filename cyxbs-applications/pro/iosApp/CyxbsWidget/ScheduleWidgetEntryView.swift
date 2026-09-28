@@ -19,10 +19,13 @@ struct ScheduleWidgetEntryView: View {
                 ScheduleSystemMediumWithMargins(entry: entry)
                     .background { ScheduleWidgetSurface(color: CourseWidgetTheme.surface(colorScheme)) }
                     .widgetBackground(CourseWidgetTheme.surface(colorScheme))
+                    // 旧系统中号不保证逐条 Link 可用；点到非条目区域仍能进入课表。
+                    .widgetURL(URL(string: "cyxbs://home"))
             case .systemLarge:
                 ScheduleSystemLarge(entry: entry)
                     .background { ScheduleWidgetSurface(color: CourseWidgetTheme.surface(colorScheme)) }
                     .widgetBackground(CourseWidgetTheme.surface(colorScheme))
+                    .widgetURL(URL(string: "cyxbs://home"))
             default:
                 Color.clear
             }
@@ -144,5 +147,7 @@ struct ScheduleSystemSmall: View {
             .frame(width: max(1, geometry.size.width - 20), height: geometry.size.height, alignment: .center)
             .padding(.horizontal, 10)
         }
+        // 小号 Widget 整体只有一个点击目标，优先打开当前课程详情，否则打开课表。
+        .widgetURL(item.flatMap { $0.action.destinationURL() } ?? URL(string: "cyxbs://home"))
     }
 }

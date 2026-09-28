@@ -12,6 +12,7 @@ import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.MinuteTimePair
 import com.cyxbs.components.utils.compose.color
 import com.cyxbs.pages.course.api.scheduleCourseItemDetailId
+import com.cyxbs.pages.course.api.courseItemId
 import com.cyxbs.pages.widget.api.CourseWidgetAction
 import com.cyxbs.pages.widget.api.CourseWidgetBackgroundPattern
 import com.cyxbs.pages.widget.api.CourseWidgetItemStyle
@@ -51,11 +52,15 @@ class CourseScheduleItem internal constructor(
   platformItemFactory: PlatformScheduleItemFactory,
 ) : CourseItem(whatTime, coroutineScope), CourseWidgetRenderProvider {
 
-  override val widgetItemId: String
-    get() = "schedule:${data.stableId}"
-
-  override val widgetDialogItemId: String
-    get() = scheduleCourseItemDetailId(occurrence.identity)
+  override val courseItemId: String
+    get() {
+      val fixed = whatTime.now.value
+      return courseItemId(
+        week = fixed.page,
+        itemKey = data.stableId,
+        detailId = scheduleCourseItemDetailId(occurrence.identity),
+      )
+    }
 
   init {
     // 仅复用课表的长按拖动预览；扩展保留默认落点，松手后回到原位置且不修改日程数据。
@@ -84,7 +89,8 @@ class CourseScheduleItem internal constructor(
     val isAffair = occurrence.kind == ScheduleOccurrenceKind.AFFAIR
     val styles = occurrence.widgetStyles(isAffair)
     return CourseWidgetRenderItem(
-      id = widgetItemId,
+      // visibleRanges 只是同一 Item 的多个绘制片段，因此渲染和点击统一使用同一个 ID。
+      id = courseItemId,
       dayOfWeek = fixed.dayOfWeek.isoDayNumber,
       title = data.title,
       content = data.description,
@@ -94,7 +100,7 @@ class CourseScheduleItem internal constructor(
       lightStyle = styles.first,
       darkStyle = styles.second,
       backgroundPattern = if (isAffair) CourseWidgetBackgroundPattern.DIAGONAL_STRIPE else CourseWidgetBackgroundPattern.SOLID,
-      action = CourseWidgetAction(week = fixed.page, itemId = widgetDialogItemId),
+      action = CourseWidgetAction(week = fixed.page, itemId = courseItemId),
     )
   }
 
