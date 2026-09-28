@@ -1,9 +1,11 @@
 package com.cyxbs.pages.widget.page
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -43,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.cyxbs.pages.widget.api.CourseWidgetTimelineSection
 import com.cyxbs.pages.widget.widget.glance.DEFAULT_OVERSIZED_TIMELINE_SECTIONS
 import com.cyxbs.pages.widget.widget.glance.WidgetItemContainerGap
+import com.cyxbs.pages.widget.widget.glance.WidgetCoverTipTopPadding
+import com.cyxbs.pages.widget.widget.glance.WidgetCoverTipEndPadding
 import com.cyxbs.pages.widget.widget.glance.WidgetItemInnerCornerRadius
 import com.cyxbs.pages.widget.widget.glance.WidgetItemOuterCornerRadius
 import com.cyxbs.pages.widget.widget.glance.WidgetStripePitchDp
@@ -51,8 +55,10 @@ import com.cyxbs.pages.widget.widget.glance.WidgetWeekItemInnerPadding
 import com.cyxbs.pages.widget.widget.glance.WidgetWeekItemVerticalPadding
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedVisibleDays
 import com.cyxbs.pages.widget.widget.glance.resolveOversizedDayTextLayout
+import com.cyxbs.pages.widget.widget.glance.resolveOversizedHeaderCellHeight
 import com.cyxbs.pages.widget.widget.normal.resolveNormalTimelineCardTextLayout
 import com.cyxbs.pages.widget.widget.oversize.OversizedTodayHighlightColor
+import com.cyxbs.pages.widget.widget.oversize.OversizedTodayDarkHighlightColor
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedMinuteOffset
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedExpandableTimeLabels
 import com.cyxbs.pages.widget.widget.oversize.resolveOversizedSectionHeights
@@ -113,6 +119,41 @@ private val PreviewBlue = Color(0xFF2A4E84)
 private val PreviewWhite = Color.White
 private val PreviewTrack = Color(0xFFF7F8FA)
 private val PreviewOutline = Color(0xFFD5DDE8)
+
+/** 设置页示例跟随设备深色模式；静态导出预览也能用 Preview 的 uiMode 单独检查。 */
+private data class PreviewWidgetPalette(
+  val isDark: Boolean,
+  val surface: Color,
+  val track: Color,
+  val ink: Color,
+  val axis: Color,
+  val outline: Color,
+  val today: Color,
+)
+
+/** 示例配色与真实 Glance 的画布、时间轴和今日底纹使用相同 ARGB 值。 */
+@Composable
+private fun previewWidgetPalette(): PreviewWidgetPalette = if (isSystemInDarkTheme()) {
+  PreviewWidgetPalette(
+    isDark = true,
+    surface = Color(0xFF2D2D2D),
+    track = Color(0xFF262626),
+    ink = Color(0xFFF0F0F2),
+    axis = Color(0xFFB0B8C4),
+    outline = Color(0xFF5C626A),
+    today = OversizedTodayDarkHighlightColor,
+  )
+} else {
+  PreviewWidgetPalette(
+    isDark = false,
+    surface = PreviewWhite,
+    track = PreviewTrack,
+    ink = PreviewInk,
+    axis = Color(0xFF7A879B),
+    outline = PreviewOutline,
+    today = OversizedTodayHighlightColor,
+  )
+}
 /**
  * 小组件目录页的 Compose 示例入口。
  *
@@ -172,9 +213,10 @@ private fun CompactWidgetSamplePreview(modifier: Modifier = Modifier) {
 /** 按实际分钟比例放置示例横条；局部三重叠使用三层，独立课程占满轨道。 */
 @Composable
 private fun DayTimelineSamplePreview(modifier: Modifier = Modifier) {
+  val palette = previewWidgetPalette()
   Row(
-    modifier = modifier.clip(RoundedCornerShape(12.dp)).background(PreviewWhite)
-      .border(1.dp, PreviewOutline, RoundedCornerShape(12.dp)).padding(4.dp),
+    modifier = modifier.clip(RoundedCornerShape(12.dp)).background(palette.surface)
+      .border(1.dp, palette.outline, RoundedCornerShape(12.dp)).padding(4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Column(
@@ -189,7 +231,7 @@ private fun DayTimelineSamplePreview(modifier: Modifier = Modifier) {
     }
     BoxWithConstraints(
       Modifier.weight(1f).fillMaxHeight().padding(start = 2.dp)
-        .clip(RoundedCornerShape(6.dp)).background(PreviewTrack),
+        .clip(RoundedCornerShape(6.dp)).background(palette.track),
     ) {
       val timelineWidth = maxWidth
       val markWidth = 14.dp
@@ -202,7 +244,7 @@ private fun DayTimelineSamplePreview(modifier: Modifier = Modifier) {
         // 与真实组件一样：刻度盒子左侧从比例坐标开始，中心和课程起点同在半盒宽后的时间点。
         val x = trackWidth * ((hour * 60 - 8 * 60) / (14.5f * 60))
         Text(
-          hour.toString(), color = Color(0xFF7A879B), fontSize = 9.sp,
+          hour.toString(), color = palette.axis, fontSize = 9.sp,
           modifier = Modifier.offset(x = x).width(markWidth),
           textAlign = TextAlign.Center, maxLines = 1,
         )
@@ -242,7 +284,7 @@ private fun DayTimelineSamplePreview(modifier: Modifier = Modifier) {
             maxContentLines = textLayout.contentLines,
             innerHorizontalPadding = textLayout.contentPaddingHorizontal,
             innerVerticalPadding = textLayout.contentPaddingVertical,
-            containerColor = PreviewTrack,
+            containerColor = palette.track,
             modifier = Modifier.offset(
               x = timelineOrigin + trackWidth * begin,
               y = scaleHeight + laneHeight * lane + 1.dp,
@@ -263,6 +305,7 @@ private fun DayTimelineSamplePreview(modifier: Modifier = Modifier) {
  */
 @Composable
 private fun WeekTimetableSampleGallery(modifier: Modifier = Modifier) {
+  val palette = previewWidgetPalette()
   Row(
     modifier = modifier.horizontalScroll(rememberScrollState()),
     verticalAlignment = Alignment.CenterVertically,
@@ -270,7 +313,7 @@ private fun WeekTimetableSampleGallery(modifier: Modifier = Modifier) {
   ) {
     listOf(1, 3, 5, 7).forEachIndexed { index, days ->
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("$days 天", color = PreviewInk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text("$days 天", color = palette.ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         WeekTimetableSamplePreview(
           dayCount = days,
           // 周课表支持纵向扩高；示例保留足够的课程块高度，才能展示真实组件允许的多行标题。
@@ -279,7 +322,7 @@ private fun WeekTimetableSampleGallery(modifier: Modifier = Modifier) {
         )
       }
       if (index < 3) {
-        Text("→", color = PreviewBlue, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("→", color = palette.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
       }
     }
   }
@@ -297,113 +340,115 @@ private fun weekPreviewWidth(dayCount: Int): Dp =
  */
 @Composable
 private fun WeekTimetableSamplePreview(dayCount: Int, modifier: Modifier = Modifier) {
+  val palette = previewWidgetPalette()
   val visibleDays = resolveOversizedVisibleDays(weekPreviewWidth(dayCount).value, today = 2)
   val fontScale = LocalConfiguration.current.fontScale
-  Column(
-    modifier = modifier.clip(RoundedCornerShape(14.dp)).background(PreviewWhite)
-      .border(1.dp, PreviewOutline, RoundedCornerShape(14.dp)),
+  BoxWithConstraints(
+    modifier = modifier.clip(RoundedCornerShape(14.dp)).background(palette.surface)
+      .border(1.dp, palette.outline, RoundedCornerShape(14.dp)),
   ) {
-    Row(
-      modifier = Modifier.fillMaxWidth().height(44.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-        if (dayCount == 1) "9\n月" else "9月",
-        color = PreviewInk,
-        fontSize = if (dayCount <= 3) 7.sp else 9.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.width(resolveOversizedTimelineWidth(dayCount)),
-        textAlign = TextAlign.Center,
+    val axisWidth = resolveOversizedTimelineWidth(dayCount)
+    val dayWidth = (maxWidth - axisWidth).coerceAtLeast(1.dp) / dayCount
+    val cellPadding = if (dayCount == 1) 1.dp else 2.dp
+    val headerCellHeight = resolveOversizedHeaderCellHeight(visibleDays.size, dayWidth.value).dp
+    val headerHeight = maxOf(44.dp, headerCellHeight + cellPadding * 2)
+    // 与桌面组件一样，表头和底纹都铺满日期列宽；底纹上缘藏在圆角表头后，底端直角。
+    visibleDays.indexOf(2).takeIf { it >= 0 }?.let { todayColumn ->
+      val top = (headerHeight - headerCellHeight) / 2 + 8.dp
+      Box(
+        Modifier.offset(
+          x = axisWidth + dayWidth * todayColumn,
+          y = top,
+        ).width(dayWidth).height((maxHeight - top).coerceAtLeast(1.dp))
+          .background(palette.today),
       )
-      visibleDays.forEach { day ->
-        val selected = day == 2
-        BoxWithConstraints(
-          modifier = Modifier.weight(1f).fillMaxHeight().background(
-            if (selected) OversizedTodayHighlightColor else Color.Transparent,
-            RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
-          ),
-          contentAlignment = Alignment.Center,
-        ) {
-          val cellPadding = if (dayCount == 1) 1.dp else 2.dp
-          val side = minOf(
-            (maxWidth - cellPadding * 2).coerceAtLeast(1.dp),
-            maxHeight - cellPadding * 2,
-          )
-          Column(
-            modifier = Modifier.size(side).clip(RoundedCornerShape(8.dp))
-              .background(if (selected) PreviewBlue else PreviewWhite),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+    }
+    Column(Modifier.fillMaxSize()) {
+      Row(
+        modifier = Modifier.fillMaxWidth().height(headerHeight),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          if (dayCount == 1) "9\n月" else "9月",
+          color = palette.ink,
+          fontSize = if (dayCount <= 3) 7.sp else 9.sp,
+          fontWeight = FontWeight.Bold,
+          modifier = Modifier.width(axisWidth),
+          textAlign = TextAlign.Center,
+        )
+        visibleDays.forEach { day ->
+          val selected = day == 2
+          Box(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentAlignment = Alignment.Center,
           ) {
-            Text(
-              "周${"一二三四五六日"[day]}",
-              color = if (selected) PreviewWhite else PreviewInk,
-              fontSize = if (dayCount == 1) 10.sp else 11.sp,
-              fontWeight = FontWeight.Bold,
-              maxLines = 1,
-            )
-            Text(
-              "${21 + day}日", color = if (selected) PreviewWhite else PreviewInk,
-              fontSize = if (dayCount == 1) 9.sp else 10.sp, maxLines = 1,
-            )
+            Column(
+              modifier = Modifier.fillMaxWidth().height(headerCellHeight)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (selected) PreviewBlue else palette.surface),
+              horizontalAlignment = Alignment.CenterHorizontally,
+              verticalArrangement = Arrangement.Center,
+            ) {
+              Text(
+                "周${"一二三四五六日"[day]}",
+                color = if (selected) PreviewWhite else palette.ink,
+                fontSize = if (dayCount == 1) 10.sp else 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+              )
+              Text(
+                "${21 + day}日", color = if (selected) PreviewWhite else palette.ink,
+                fontSize = if (dayCount == 1) 9.sp else 10.sp, maxLines = 1,
+              )
+            }
           }
         }
       }
-    }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-      val axisWidth = resolveOversizedTimelineWidth(dayCount)
-      val contentWidth = (maxWidth - axisWidth).coerceAtLeast(1.dp)
-      val dayWidth = contentWidth / dayCount
-      val sections = DEFAULT_OVERSIZED_TIMELINE_SECTIONS
-      val sectionHeights = resolveOversizedSectionHeights(sections, 0, maxHeight.value)
-      // 示例的周三与真实组件一样，整列底纹位于课程和时间轴之下。
-      visibleDays.indexOf(2).takeIf { it >= 0 }?.let { todayColumn ->
-        Box(
-          Modifier.offset(x = axisWidth + dayWidth * todayColumn)
-            .width(dayWidth).fillMaxHeight().background(OversizedTodayHighlightColor),
-        )
-      }
-      PreviewWeekTimeAxis(sections, sectionHeights, axisWidth, maxHeight, dayCount == 1)
-      visibleDays.forEachIndexed { column, day ->
-        // 与 Glance 一致：每天只占一整列，低优先级先画，高优先级叠在其上。
-        val dayItems = PreviewItems.filter { it.day == day }
-          .sortedWith(compareByDescending<PreviewCourseItem> { it.renderLayer }
-            .thenBy(PreviewItems::indexOf))
-        dayItems.forEachIndexed { drawIndex, item ->
-          val top = resolveOversizedMinuteOffset(sections, sectionHeights, item.beginMinute)
-          val bottom = resolveOversizedMinuteOffset(sections, sectionHeights, item.endMinute)
-          if (bottom > top) {
-            val cardHeight = ((bottom - top).dp - WidgetWeekItemVerticalPadding * 2)
-              .coerceAtLeast(1.dp)
-            // 预览与桌面组件共用相同的 4dp 文字内边距和行数分配规则。
-            val textLayout = resolveOversizedDayTextLayout(
-              title = item.title,
-              content = item.content,
-              cardWidthDp = dayWidth.value,
-              cardHeightDp = cardHeight.value,
-              contentPaddingHorizontalDp = WidgetWeekItemInnerPadding.value,
-              contentPaddingVerticalDp = WidgetWeekItemInnerPadding.value,
-              fontScale = fontScale,
-            )
-            val hasUnderlyingOverlap = dayItems.take(drawIndex).any { other ->
-              item.beginMinute < other.endMinute && other.beginMinute < item.endMinute
+      BoxWithConstraints(Modifier.fillMaxSize()) {
+        val sections = DEFAULT_OVERSIZED_TIMELINE_SECTIONS
+        val sectionHeights = resolveOversizedSectionHeights(sections, 0, maxHeight.value)
+        PreviewWeekTimeAxis(sections, sectionHeights, axisWidth, maxHeight, dayCount == 1)
+        visibleDays.forEachIndexed { column, day ->
+          // 与 Glance 一致：每天只占一整列，低优先级先画，高优先级叠在其上。
+          val dayItems = PreviewItems.filter { it.day == day }
+            .sortedWith(compareByDescending<PreviewCourseItem> { it.renderLayer }
+              .thenBy(PreviewItems::indexOf))
+          dayItems.forEachIndexed { drawIndex, item ->
+            val top = resolveOversizedMinuteOffset(sections, sectionHeights, item.beginMinute)
+            val bottom = resolveOversizedMinuteOffset(sections, sectionHeights, item.endMinute)
+            if (bottom > top) {
+              val cardHeight = ((bottom - top).dp - WidgetWeekItemVerticalPadding * 2)
+                .coerceAtLeast(1.dp)
+              // 预览与桌面组件共用相同的内容层文字间距和行数分配规则。
+              val textLayout = resolveOversizedDayTextLayout(
+                title = item.title,
+                content = item.content,
+                cardWidthDp = dayWidth.value,
+                cardHeightDp = cardHeight.value,
+                contentPaddingHorizontalDp = WidgetWeekItemInnerPadding.value,
+                contentPaddingVerticalDp = WidgetWeekItemInnerPadding.value,
+                fontScale = fontScale,
+              )
+              val hasUnderlyingOverlap = dayItems.take(drawIndex).any { other ->
+                item.beginMinute < other.endMinute && other.beginMinute < item.endMinute
+              }
+              PreviewItemCard(
+                item = item,
+                titleSizeSp = textLayout.titleSizeSp,
+                contentSizeSp = textLayout.contentSizeSp,
+                showContent = textLayout.showContent,
+                topBottomText = true,
+                maxTitleLines = textLayout.titleLines,
+                maxContentLines = textLayout.contentLines,
+                showTip = hasUnderlyingOverlap,
+                innerHorizontalPadding = WidgetWeekItemInnerPadding,
+                innerVerticalPadding = WidgetWeekItemInnerPadding,
+                modifier = Modifier.offset(
+                  x = axisWidth + dayWidth * column,
+                  y = top.dp + WidgetWeekItemVerticalPadding,
+                ).width(dayWidth).height(cardHeight),
+              )
             }
-            PreviewItemCard(
-              item = item,
-              titleSizeSp = textLayout.titleSizeSp,
-              contentSizeSp = textLayout.contentSizeSp,
-              showContent = textLayout.showContent,
-              topBottomText = true,
-              maxTitleLines = textLayout.titleLines,
-              maxContentLines = textLayout.contentLines,
-              showTip = hasUnderlyingOverlap,
-              innerHorizontalPadding = WidgetWeekItemInnerPadding,
-              innerVerticalPadding = WidgetWeekItemInnerPadding,
-              modifier = Modifier.offset(
-                x = axisWidth + dayWidth * column,
-                y = top.dp + WidgetWeekItemVerticalPadding,
-              ).width(dayWidth).height(cardHeight),
-            )
           }
         }
       }
@@ -420,6 +465,7 @@ private fun PreviewWeekTimeAxis(
   timelineHeight: Dp,
   isSingleCell: Boolean,
 ) {
+  val palette = previewWidgetPalette()
   val labelHeight = if (isSingleCell) 14.dp else 12.dp
   val labelWidth = axisWidth - if (isSingleCell) 0.dp else 4.dp
   val labelSize = if (isSingleCell) 6.sp else if (axisWidth <= 28.dp) 7.sp else 8.sp
@@ -433,7 +479,7 @@ private fun PreviewWeekTimeAxis(
       labels.forEachIndexed { labelIndex, label ->
         val center = sectionTop + sectionHeight * (labelIndex + 0.5f) / labels.size
         Text(
-          label, color = PreviewInk, fontSize = labelSize,
+          label, color = palette.ink, fontSize = labelSize,
           modifier = Modifier.offset(y = (center - labelHeight.value / 2).dp)
             .width(labelWidth).height(labelHeight),
           textAlign = TextAlign.Center, maxLines = 1,
@@ -451,7 +497,7 @@ private fun PreviewWeekTimeAxis(
     bottomLabelInsetDp = if (isSingleCell) 2f else 0f,
   ).forEach { mark ->
     Text(
-      mark.text, color = PreviewInk, fontSize = labelSize,
+      mark.text, color = palette.ink, fontSize = labelSize,
       modifier = Modifier.offset(y = mark.topDp.dp)
         .width(labelWidth).height(labelHeight),
       textAlign = TextAlign.Center, maxLines = 1,
@@ -465,7 +511,7 @@ private fun PreviewItemCard(
   item: PreviewCourseItem,
   titleSizeSp: Int,
   modifier: Modifier = Modifier,
-  containerColor: Color = PreviewWhite,
+  containerColor: Color? = null,
   contentSizeSp: Int = 8,
   showContent: Boolean? = null,
   topBottomText: Boolean = false,
@@ -476,15 +522,25 @@ private fun PreviewItemCard(
   innerVerticalPadding: Dp = 2.dp,
   titleTopPadding: Dp = 0.dp,
 ) {
+  val palette = previewWidgetPalette()
+  val actualContainer = containerColor ?: palette.surface
+  // 示例条目与课表生成的深色快照按同一时间段配色，事务仍透出外底卡。
+  val itemBackground = if (!palette.isDark) item.background else when {
+    item.beginMinute < 12 * 60 -> Color(0x26FFCCA1)
+    item.beginMinute < 18 * 60 -> Color(0x26FF979B)
+    else -> Color(0x269BB2FF)
+  }
+  val itemForeground = if (palette.isDark) Color(0xFFF0F0F2) else item.foreground
+  val stripeColor = if (palette.isDark) Color(0xFF4D4B4C) else Color(0xFFE4E7EC)
   Box(
     modifier = modifier.clip(RoundedCornerShape(WidgetItemOuterCornerRadius))
-      .background(containerColor),
+      .background(actualContainer),
   ) {
     Box(
       Modifier.fillMaxSize().padding(WidgetItemContainerGap)
         .clip(RoundedCornerShape(WidgetItemInnerCornerRadius))
         // 纯事务的斜纹间隔透出外底卡色，而非测试数据里占位的透明背景。
-        .background(if (item.isAffair) containerColor else item.background),
+        .background(if (item.isAffair) actualContainer else itemBackground),
     ) {
       if (item.isAffair) {
         Canvas(Modifier.matchParentSize()) {
@@ -492,7 +548,7 @@ private fun PreviewItemCard(
           var x = -size.height
           while (x < size.width + size.height) {
             drawLine(
-              color = Color(0xFFE4E7EC),
+              color = stripeColor,
               start = Offset(x, size.height),
               end = Offset(x + size.height, 0f),
               strokeWidth = WidgetStripeWidthDp.dp.toPx(),
@@ -524,7 +580,7 @@ private fun PreviewItemCard(
           Box(Modifier.fillMaxWidth().height(titleTopPadding))
         }
         Text(
-          item.title, color = item.foreground, fontSize = titleSizeSp.sp,
+          item.title, color = itemForeground, fontSize = titleSizeSp.sp,
           lineHeight = (titleSizeSp + 1).sp,
           modifier = Modifier.fillMaxWidth(),
           textAlign = TextAlign.Center,
@@ -534,7 +590,7 @@ private fun PreviewItemCard(
         if (canShowContent && item.content.isNotBlank()) {
           Box(Modifier.weight(1f))
           Text(
-            item.content, color = item.foreground, fontSize = contentSizeSp.sp,
+            item.content, color = itemForeground, fontSize = contentSizeSp.sp,
             lineHeight = (contentSizeSp + 1).sp,
             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
             maxLines = maxContentLines.coerceAtLeast(1), overflow = TextOverflow.Ellipsis,
@@ -543,10 +599,13 @@ private fun PreviewItemCard(
       }
     }
     if (showTip) {
-      Box(Modifier.fillMaxSize().padding(top = 3.dp, end = 4.dp),
+      Box(Modifier.fillMaxSize().padding(
+        top = WidgetCoverTipTopPadding,
+        end = WidgetCoverTipEndPadding,
+      ),
         contentAlignment = Alignment.TopEnd) {
         Box(Modifier.width(6.dp).height(2.dp)
-          .clip(RoundedCornerShape(1.dp)).background(item.foreground))
+          .clip(RoundedCornerShape(1.dp)).background(itemForeground))
       }
     }
   }
@@ -563,6 +622,14 @@ private fun CompactWidgetImagePreview() {
 @Preview(widthDp = 360, heightDp = 100, showBackground = false)
 @Composable
 private fun DayTimelineWidgetImagePreview() {
+  CourseWidgetSamplePreview(CourseWidgetKind.DAY_TIMELINE, Modifier.fillMaxSize())
+}
+
+/** 供低版本系统选择器补充夜间静态图时导出；不改变现有浅色 previewImage。 */
+@Preview(widthDp = 360, heightDp = 100, showBackground = false,
+  uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun DayTimelineWidgetDarkImagePreview() {
   CourseWidgetSamplePreview(CourseWidgetKind.DAY_TIMELINE, Modifier.fillMaxSize())
 }
 
@@ -600,11 +667,20 @@ private fun WeekTimetableSevenDayImagePreview() {
   WeekTimetableImagePreview(7)
 }
 
+/** 七天周课表夜间导出入口；低版本系统启用该图需另放入 drawable-night。 */
+@Preview(widthDp = 327, heightDp = 310, showBackground = false,
+  uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WeekTimetableSevenDayDarkImagePreview() {
+  WeekTimetableImagePreview(7)
+}
+
 /** Android Studio 独立预览将完整的 7 天板块放在第二行；设置页 Gallery 不受影响。 */
 @Preview(widthDp = 560, heightDp = 310, showBackground = false)
 @Composable
 private fun WeekTimetableGalleryPreview() {
   // 只调整设计预览的板块位置，不复用设置页入口，避免改变应用内的横向滚动展示。
+  val palette = previewWidgetPalette()
   CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(letterSpacing = 0.sp)) {
     Column(
       modifier = Modifier.fillMaxSize(),
@@ -617,14 +693,14 @@ private fun WeekTimetableGalleryPreview() {
       ) {
         listOf(1, 3, 5).forEachIndexed { index, days ->
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$days 天", color = PreviewInk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("$days 天", color = palette.ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             WeekTimetableSamplePreview(
               dayCount = days,
               modifier = Modifier.width(weekPreviewWidth(days)).height(450.dp).padding(top = 5.dp),
             )
           }
           if (index < 2) {
-            Text("→", color = PreviewBlue, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("→", color = palette.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
           }
         }
       }

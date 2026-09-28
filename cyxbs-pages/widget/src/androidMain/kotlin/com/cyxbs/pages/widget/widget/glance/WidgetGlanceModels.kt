@@ -694,6 +694,18 @@ internal fun resolveOversizedVisibleDays(widgetWidthDp: Float, today: Int): List
   return (start until start + count).toList()
 }
 
+/**
+ * 一天视图的周几背景高度略大于日期列宽度，使“周几 + 日期”的两行背景呈微竖向形状。
+ *
+ * [columnWidthDp] 是扣除时间轴后的单列宽度；高度至少 32dp，避免宿主压窄时裁掉两行文字。
+ * 三、五、七天仍保持 40dp；调用方需根据返回值另算表头行高和当天底纹起点。
+ */
+internal fun resolveOversizedHeaderCellHeight(visibleDayCount: Int, columnWidthDp: Float): Float {
+  if (visibleDayCount != 1) return 40f
+  val safeWidth = columnWidthDp.takeIf { it.isFinite() && it > 0f } ?: 0f
+  return (safeWidth * 1.02f).coerceAtLeast(32f)
+}
+
 /** 周课表课程卡片的统一字号与实际可展示行数，设置页示例和桌面组件共用。 */
 internal data class OversizedDayTextLayout(
   val titleSizeSp: Int,
@@ -708,7 +720,7 @@ internal data class OversizedDayTextLayout(
  * 按每张日期列卡片的实际宽高分配文字，所有天数档位的标题固定 9sp，内容固定 8sp。
  *
  * [cardWidthDp]、[cardHeightDp] 是已扣除日期列外边距的卡片尺寸。估算时继续扣除内容层的
- * 2dp 边框间距、[contentPaddingHorizontalDp] 和 [contentPaddingVerticalDp]；
+ * 1dp 外底卡间距、[contentPaddingHorizontalDp] 和 [contentPaddingVerticalDp]；
  * 标题最多展示三行，超出时截断；剩余高度足够时才展示内容。Glance 无法回传 TextView
  * 实测尺寸，因此给横向字宽和纵向行高预留少量宿主差异空间。
  */

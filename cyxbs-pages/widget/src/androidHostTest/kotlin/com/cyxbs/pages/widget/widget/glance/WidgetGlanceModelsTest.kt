@@ -31,6 +31,16 @@ class WidgetGlanceModelsTest {
     assertEquals((0..6).toList(), resolveOversizedVisibleDays(widgetWidthDp = 320f, today = 3))
   }
 
+  /** 一天视图的蓝色日期块应略高于列宽，并给窄列的两行日期文字保留最低高度。 */
+  @Test
+  fun oversizedSingleDayHeaderCellHeightFollowsColumnWidth() {
+    assertTrue(kotlin.math.abs(resolveOversizedHeaderCellHeight(1, 35f) - 35.7f) < 0.001f)
+    assertTrue(kotlin.math.abs(resolveOversizedHeaderCellHeight(1, 41f) - 41.82f) < 0.001f)
+    assertEquals(76.5f, resolveOversizedHeaderCellHeight(1, 75f))
+    assertEquals(32f, resolveOversizedHeaderCellHeight(1, 24f))
+    assertEquals(40f, resolveOversizedHeaderCellHeight(3, 75f))
+  }
+
   /** 固定 9sp 标题最多占三行，内容是否展示由单张卡片的剩余高度决定。 */
   @Test
   fun oversizedDayTextUsesAvailableHeightForContent() {
@@ -888,6 +898,13 @@ class WidgetGlanceModelsTest {
     assertTrue(markGaps.all { gap -> kotlin.math.abs(gap - markGaps.first()) < 0.0001f })
     assertTrue(week.items.any { it.isAllDay })
     assertTrue(week.items.any { it.backgroundPattern == CourseWidgetBackgroundPattern.DIAGONAL_STRIPE })
+    // 无真实快照时的深色高级预览也必须使用课程半透明底色和事务深色斜纹。
+    val morning = week.items.first { it.id == "preview-math" }
+    val affair = week.items.first { it.id == "preview-affair" }
+    assertEquals(0x26FFCCA1L, morning.darkStyle.backgroundArgb)
+    assertEquals(0xFF2D2D2DL, morning.darkStyle.containerArgb)
+    assertEquals(0xFF4D4B4CL, affair.darkStyle.stripeArgb)
+    assertEquals(0xFF2D2D2DL, affair.darkStyle.containerArgb)
   }
 
   /** 创建最小通用渲染条目，测试不依赖任何课程/事务业务类型。 */

@@ -421,7 +421,7 @@ private struct CourseWidgetTimeAxis: View {
     }
 }
 
-/// iOS 小组件按桌面外观选择课表快照中的明暗样式；Android 仍固定消费浅色样式。
+/// iOS 小组件按桌面外观选择课表快照中的明暗样式，与 Android 小组件保持一致。
 private struct CourseWidgetItemCard: View {
     let item: CourseWidgetRenderItem
     let showText: Bool
