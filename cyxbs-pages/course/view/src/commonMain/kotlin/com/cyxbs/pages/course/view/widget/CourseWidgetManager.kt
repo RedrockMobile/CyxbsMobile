@@ -3,6 +3,7 @@ package com.cyxbs.pages.course.view.widget
 import com.cyxbs.pages.course.view.AbstractCourseFrame
 import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.decoration.CourseWidgetSnapshotContributor
+import com.cyxbs.pages.course.view.item.CourseItemIdProvider
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.item.CourseWidgetRenderProvider
 import com.cyxbs.pages.course.view.timeline.data.FixedTimelineData
@@ -25,6 +26,9 @@ import kotlinx.datetime.DayOfWeek
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
+/** 点击详情最多展示的下层条目数，沿用 Android 独立 Activity 的安全上限。 */
+private const val MAX_OVERLAP_ITEM_COUNT = 16
+
 /**
  * 负责从课表绘制状态生成并发布桌面小组件快照。
  *
@@ -39,8 +43,6 @@ internal class CourseWidgetManager(
 ) : AutoCloseable {
 
   private companion object {
-    /** 单次 Widget 跳转最多携带的重叠项数量，避免 Intent 参数过长。 */
-    const val MAX_OVERLAP_ITEM_COUNT = 16
     const val DEFAULT_TIMELINE_BEGIN_MINUTE = 8 * 60
     const val DEFAULT_TIMELINE_END_MINUTE = 22 * 60 + 30
     const val TIMELINE_MARK_INTERVAL_MINUTE = 2 * 60
@@ -114,7 +116,7 @@ internal class CourseWidgetManager(
                 beginRatio = courseFrame.timeline.calculateInitialWeightRatio(fixed.beginTime),
                 endRatio = courseFrame.timeline.calculateInitialWeightRatio(fixed.finalTime),
                 action = renderItem.action.copy(
-                  overlapItemIds = collectOverlapItemIds(itemState, provider.widgetItemId),
+                  overlapItemIds = itemState.collectWidgetOverlapItemIds(provider.courseItemId),
                 ),
               )
             }
@@ -207,37 +209,35 @@ internal class CourseWidgetManager(
       }
     }
 
-  /**
-   * 递归收集与根条目实际时间相交的覆盖条目 ID。
-   *
-   * 保留重叠结果的遍历顺序并限制总量，避免小组件点击参数无限膨胀。
-   */
-  private fun collectOverlapItemIds(
-    rootItemState: CourseItemState,
-    rootItemId: String,
-  ): List<String> {
-    val ids = LinkedHashSet<String>()
-    val rootFixed = rootItemState.item.whatTime.now.value
-
-    fun collect(overlap: com.cyxbs.pages.course.view.overlay.OverlapResult) {
-      overlap.coveredItemList.forEach { cover ->
-        val state = cover.result.itemState
-        val fixed = state.item.whatTime.now.value
-        if (fixed.beginTime < rootFixed.finalTime && fixed.finalTime > rootFixed.beginTime) {
-          (state.item as? CourseWidgetRenderProvider)?.widgetDialogItemId?.let(ids::add)
-        }
-        if (ids.size < MAX_OVERLAP_ITEM_COUNT) collect(cover.result)
-      }
-    }
-
-    rootItemState.overlap?.let(::collect)
-    ids.remove(rootItemId)
-    return ids.take(MAX_OVERLAP_ITEM_COUNT)
-  }
-
   /** 普通小组件线性时间轴范围；结束分钟保持开区间语义。 */
   private data class TimelineRange(
     val beginMinute: Int,
     val endMinute: Int,
   )
+}
+
+/**
+ * 从课表已计算的覆盖树收集与根 Item 实际时间相交的 Item ID。
+ *
+ * 这些 ID 仅用于小组件快照中的重叠提示及 Android 现有详情容器；点击定位只需要根 Item ID。
+ * [rootItemId] 用于过滤自身；同一 Item 的多个可见绘制区间不会产生额外 ID。
+ */
+internal fun CourseItemState.collectWidgetOverlapItemIds(rootItemId: String): List<String> {
+  val ids = LinkedHashSet<String>()
+  val rootFixed = item.whatTime.now.value
+
+  fun collect(overlap: com.cyxbs.pages.course.view.overlay.OverlapResult) {
+    overlap.coveredItemList.forEach { cover ->
+      val state = cover.result.itemState
+      val fixed = state.item.whatTime.now.value
+      if (fixed.beginTime < rootFixed.finalTime && fixed.finalTime > rootFixed.beginTime) {
+        (state.item as? CourseItemIdProvider)?.courseItemId?.let(ids::add)
+      }
+      if (ids.size < MAX_OVERLAP_ITEM_COUNT) collect(cover.result)
+    }
+  }
+
+  overlap?.let(::collect)
+  ids.remove(rootItemId)
+  return ids.take(MAX_OVERLAP_ITEM_COUNT)
 }

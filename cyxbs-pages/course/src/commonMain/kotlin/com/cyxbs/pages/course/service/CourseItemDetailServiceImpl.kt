@@ -15,6 +15,7 @@ import com.cyxbs.pages.course.api.ILessonService2
 import com.cyxbs.pages.course.api.ILinkService2
 import com.cyxbs.pages.course.api.LessonByWeeks
 import com.cyxbs.pages.course.api.courseItemDetailId
+import com.cyxbs.pages.course.api.courseItemDetailIdOrNull
 import com.cyxbs.pages.course.api.scheduleCourseItemDetailId
 import com.cyxbs.pages.course.home.dialog.LessonBottomSheetDialog
 import com.cyxbs.pages.course.view.dialog.CourseBottomSheetContent
@@ -141,13 +142,16 @@ object CourseItemDetailServiceImpl : ICourseItemDetailService {
         put(id, ScheduleDetailContent(id, occurrence))
       }
     }
-    val root = contentById[request.itemId] ?: return emptyList()
+    // 新协议的 Item ID 同时携带周次、Item 键和详情键；旧 Android 快照仍可回退为原详情 ID。
+    val rootDetailId = courseItemDetailIdOrNull(request.itemId) ?: request.itemId
+    val root = contentById[rootDetailId] ?: return emptyList()
     return buildList {
       val seen = HashSet<String>()
       add(root)
-      seen.add(request.itemId)
-      request.overlapItemIds.asSequence().forEach { id ->
-        if (seen.add(id)) contentById[id]?.let(::add)
+      seen.add(rootDetailId)
+      request.overlapItemIds.asSequence().forEach { itemId ->
+        val detailId = courseItemDetailIdOrNull(itemId) ?: itemId
+        if (seen.add(detailId)) contentById[detailId]?.let(::add)
       }
     }
   }

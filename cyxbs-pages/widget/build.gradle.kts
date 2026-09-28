@@ -1,6 +1,7 @@
 plugins {
   id("manager.lib")
   id("kmp.compose")
+  alias(libs.plugins.buildconfig)
 }
 
 useKtProvider() // api 模块服务提供
@@ -25,6 +26,17 @@ kotlin {
       implementation(libs.androidx.glance)
       implementation(libs.androidx.glance.appwidget)
       implementation(libs.kotlinx.serialization)
+    }
+  }
+}
+
+if (Multiplatform.enableIOS(project)) {
+  buildConfig {
+    packageName("com.cyxbs.pages.widget")
+    useKotlinOutput()
+    sourceSets.named("iosMain") {
+      // 生成值来自扩展 entitlement；同时确保主 App 和 Swift 读取端使用同一个组。
+      buildConfigField("APP_GROUP_ID", IosAppGroup.validatedWidgetExtensionId(project))
     }
   }
 }

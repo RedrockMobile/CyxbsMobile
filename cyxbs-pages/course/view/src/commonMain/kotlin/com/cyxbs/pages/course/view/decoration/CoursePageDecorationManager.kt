@@ -7,7 +7,10 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.pages.course.api.courseItemWeekOrNull
 import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.item.CourseItemIdProvider
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.OverlapCover
 import com.cyxbs.pages.course.view.widget.CourseWidgetManager
@@ -21,11 +24,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.isActive
@@ -88,13 +93,17 @@ class CoursePageDecorationManager internal constructor(
         it.itemHierarchy.bindCourseItemViewModel(this)
         it.attach(this)
       }
-      courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
-        CourseWidgetManager(
-          courseFrame = courseFrame,
-          decorations = decorations,
-          coroutineScope = courseCoroutineScope,
-          snapshotPublisher = publisher,
-        )
+      runCatching {
+        courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
+          CourseWidgetManager(
+            courseFrame = courseFrame,
+            decorations = decorations,
+            coroutineScope = courseCoroutineScope,
+            snapshotPublisher = publisher,
+          )
+        }
+      }.onFailure {
+        toast("widgetSnapshotPublisher: ${it.message}")
       }
     } catch (throwable: Throwable) {
       try {
@@ -102,7 +111,7 @@ class CoursePageDecorationManager internal constructor(
       } catch (closeThrowable: Throwable) {
         throwable.addSuppressed(closeThrowable)
       }
-      throw throwable
+      toast("CoursePageDecorationManager: ${throwable.message}")
     }
   }
 
@@ -159,6 +168,23 @@ class CoursePageDecorationManager internal constructor(
    */
   internal fun requestWidgetSnapshotPublish() {
     courseWidgetManager?.requestSnapshotPublish()
+  }
+
+  /**
+   * 根据通用课表 Item ID 观察对应 ItemState，供主页等外部入口模拟用户点击原课表条目。
+   *
+   * 教学周已包含在 [itemId] 中；条目尚未载入、已删除或 ID 非法时发出 null。同一 Item 被裁剪出的
+   * 多个可见区间不会生成额外 ItemState，因此无需向调用方暴露绘制片段身份。
+   */
+  fun observeItemStateById(itemId: String): Flow<CourseItemState?> {
+    val week = courseItemWeekOrNull(itemId) ?: return flowOf(null)
+    val weeklyItems = decorations.map { it.itemHierarchy.observeWeek(week) }
+    if (weeklyItems.isEmpty()) return flowOf(null)
+    return combine(weeklyItems) { itemLists ->
+      itemLists.asSequence()
+        .flatMap { it.asSequence() }
+        .firstOrNull { state -> (state.item as? CourseItemIdProvider)?.courseItemId == itemId }
+    }
   }
 
   ////////////////////////////

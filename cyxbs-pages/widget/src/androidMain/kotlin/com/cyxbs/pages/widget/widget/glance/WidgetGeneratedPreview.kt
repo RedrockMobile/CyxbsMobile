@@ -65,6 +65,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
     endMinute: Int,
     style: CourseWidgetItemStyle,
     pattern: CourseWidgetBackgroundPattern = CourseWidgetBackgroundPattern.SOLID,
+    darkStyle: CourseWidgetItemStyle = lessonPreviewDarkStyle(beginMinute),
   ) = CourseWidgetRenderItem(
     id = id,
     dayOfWeek = dayOfWeek,
@@ -81,7 +82,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       ),
     ),
     lightStyle = style,
-    darkStyle = style.copy(contentArgb = 0xFFF0F0F2L),
+    darkStyle = darkStyle,
     backgroundPattern = pattern,
     action = CourseWidgetAction(week = 1),
   )
@@ -94,7 +95,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       content = "",
       isAllDay = true,
       lightStyle = BLUE_STYLE,
-      darkStyle = BLUE_STYLE.copy(contentArgb = 0xFFF0F0F2L),
+      darkStyle = BLUE_DARK_STYLE,
       action = CourseWidgetAction(week = 1),
     ),
     timedItem(
@@ -142,6 +143,7 @@ internal fun createCourseWidgetPreviewSnapshot(calendar: Calendar): CourseWidget
       endMinute = 20 * 60 + 40,
       style = AFFAIR_STYLE,
       pattern = CourseWidgetBackgroundPattern.DIAGONAL_STRIPE,
+      darkStyle = AFFAIR_DARK_STYLE,
     ),
   )
   return CourseWidgetSnapshot(
@@ -270,15 +272,30 @@ private val BLUE_STYLE = CourseWidgetItemStyle(
   contentArgb = 0xFF4066EAL,
   backgroundArgb = 0xFFDDE3F8L,
 )
+private val BLUE_DARK_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFF0F0F2L,
+  backgroundArgb = 0x269BB2FFL,
+  containerArgb = 0xFF2D2D2DL,
+)
 
 private val MORNING_STYLE = CourseWidgetItemStyle(
   contentArgb = 0xFFFF8015L,
   backgroundArgb = 0xFFF9E7D8L,
 )
+private val MORNING_DARK_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFF0F0F2L,
+  backgroundArgb = 0x26FFCCA1L,
+  containerArgb = 0xFF2D2D2DL,
+)
 
 private val AFTERNOON_STYLE = CourseWidgetItemStyle(
   contentArgb = 0xFFFF6262L,
   backgroundArgb = 0xFFF9E3E4L,
+)
+private val AFTERNOON_DARK_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFF0F0F2L,
+  backgroundArgb = 0x26FF979BL,
+  containerArgb = 0xFF2D2D2DL,
 )
 
 /** 系统生成预览的模拟课程与真实课表采用相同的时段颜色规则。 */
@@ -288,8 +305,21 @@ private fun lessonPreviewStyle(beginMinute: Int): CourseWidgetItemStyle = when {
   else -> BLUE_STYLE
 }
 
+/** 示例深色配色直接采用课表课程对应时段的快照值，避免高级预览沿用浅色底卡。 */
+private fun lessonPreviewDarkStyle(beginMinute: Int): CourseWidgetItemStyle = when {
+  beginMinute < 12 * 60 -> MORNING_DARK_STYLE
+  beginMinute < 18 * 60 -> AFTERNOON_DARK_STYLE
+  else -> BLUE_DARK_STYLE
+}
+
 private val AFFAIR_STYLE = CourseWidgetItemStyle(
   contentArgb = 0xFF112C57L,
   backgroundArgb = 0x00000000L,
   stripeArgb = 0xFFE4E7ECL,
+)
+private val AFFAIR_DARK_STYLE = CourseWidgetItemStyle(
+  contentArgb = 0xFFF0F0F2L,
+  backgroundArgb = 0x00000000L,
+  stripeArgb = 0xFF4D4B4CL,
+  containerArgb = 0xFF2D2D2DL,
 )

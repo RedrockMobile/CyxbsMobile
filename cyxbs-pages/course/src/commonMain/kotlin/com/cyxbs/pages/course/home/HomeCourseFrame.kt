@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +19,7 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrame
 import com.cyxbs.pages.course.api.IMobileHomeCourseFrameFactory
+import com.cyxbs.pages.course.api.courseItemWeekOrNull
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseHeader
 import com.cyxbs.pages.course.frame.header.MobileHomeCourseOuterHeaderState
 import com.cyxbs.pages.course.home.bottomsheet.MobileHomeBottomSheet
@@ -38,6 +40,13 @@ import com.cyxbs.pages.course.view.item.extension.LocalCourseItemBottomSheetDial
 import com.cyxbs.pages.course.view.item.extension.rememberCourseItemBottomSheetDialogState
 import com.cyxbs.pages.widget.api.ICourseWidgetSnapshotPublisher
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+
+/** 引用身份用于区分连续两次相同定位请求，避免 StateFlow 按值去重。 */
+internal class CourseItemOpenRequest(val itemId: String)
 
 /**
  * 移动端主页课表框架
@@ -57,6 +66,8 @@ import com.g985892345.provider.api.annotation.ImplProvider
 @Stable
 class HomeCourseFrame private constructor() : AbstractCourseFrame(), IMobileHomeCourseFrame {
 
+  internal val itemDetailRequest = MutableStateFlow<CourseItemOpenRequest?>(null)
+
   companion object {
 
     /** 创建并立即登记到 [owner] 的主页课表 Frame，禁止产生无生命周期归属的实例。 */
@@ -75,6 +86,13 @@ class HomeCourseFrame private constructor() : AbstractCourseFrame(), IMobileHome
   val bottomBarHeightState = mutableStateOf(0.dp)
 
   internal val outerHeaderState = MobileHomeCourseOuterHeaderState()
+
+  /** 校验入口参数后交给已组合的课表弹窗宿主处理，不向调用方暴露 Frame 的周数和 ItemState。 */
+  override fun showCourseItemDetail(itemId: String) {
+    val week = courseItemWeekOrNull(itemId) ?: return
+    if (week !in 1..maxWeek || itemId.isBlank()) return
+    itemDetailRequest.value = CourseItemOpenRequest(itemId)
+  }
 
   init {
     updateCoursePageDecorations(
@@ -164,6 +182,21 @@ private fun MobileHomeCourseFrameContent(
           )
         },
       )
+    }
+  }
+  LaunchedEffect(frame, itemBottomSheetDialog) {
+    frame.itemDetailRequest.filterNotNull().collectLatest { request ->
+      try {
+        // 与用户直接点击 item 完全走同一入口；week 由 ID 内部解析，不再由主页单独传递。
+        val itemState = frame.decorationManager.observeItemStateById(request.itemId)
+          .filterNotNull()
+          .first()
+        frame.pagerState.scrollToPage(itemState.item.whatTime.now.value.page)
+        itemBottomSheetDialog.showDialog(itemState.overlap)
+      } finally {
+        // 只消费自己处理的请求；期间到达的新请求会由 collectLatest 继续处理。
+        frame.itemDetailRequest.compareAndSet(request, null)
+      }
     }
   }
 }

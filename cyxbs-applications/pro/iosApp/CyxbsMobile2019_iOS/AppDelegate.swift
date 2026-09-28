@@ -9,6 +9,7 @@
 import UIKit
 import XBSBugly
 import CyxbsApplicationsMultiplatform
+import WidgetKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -23,6 +24,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         setupAlicloudSDK() // 设置网络环境和阿里云SDK
         IOSAppKt.doInitApp(impl: KmpInterfaceImpl()) // Kotlin Multiplatform 工程初始化
         XBSBugly.buglyInit() // 设置bugly
+
+        // KMP 发布快照后由应用进程请求 WidgetKit 重载；扩展本身只读取 App Group 文件。
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(courseWidgetSnapshotDidChange),
+            name: Notification.Name("CourseWidgetSnapshotDidChange"),
+            object: nil
+        )
 
         return true
     }
@@ -48,6 +57,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // 当应用程序终止时调用的方法
     func applicationWillTerminate(_ application: UIApplication) {
         setupEnd() // 设置结束操作
+    }
+
+    /// 收到课表最终快照提交事件后请求刷新所有本应用的小组件；实际刷新时机由系统决定。
+    @objc private func courseWidgetSnapshotDidChange() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

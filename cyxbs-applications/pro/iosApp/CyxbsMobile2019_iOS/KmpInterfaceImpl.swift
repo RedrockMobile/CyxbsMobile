@@ -30,11 +30,19 @@ class KmpInterfaceImpl: IOSKmpInterface {
         return true
     }
 
+    /// KMP 可能从任意协程线程进入该桥接方法，UIKit 的 HUD 创建和更新必须最终落在主线程。
     func toast(s: String, isLong: Bool) {
-        if isLong {
-            RemindHUD.shared().showDefaultHUDLong(withText: s)
+        let showToast = {
+            if isLong {
+                RemindHUD.shared().showDefaultHUDLong(withText: s)
+            } else {
+                RemindHUD.shared().showDefaultHUD(withText: s)
+            }
+        }
+        if Thread.isMainThread {
+            showToast()
         } else {
-            RemindHUD.shared().showDefaultHUD(withText: s)
+            DispatchQueue.main.async(execute: showToast)
         }
     }
 

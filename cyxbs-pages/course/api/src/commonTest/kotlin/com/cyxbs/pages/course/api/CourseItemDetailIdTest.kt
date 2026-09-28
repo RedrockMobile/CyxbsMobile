@@ -3,6 +3,7 @@ package com.cyxbs.pages.course.api
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 class CourseItemDetailIdTest {
 
@@ -40,5 +41,31 @@ class CourseItemDetailIdTest {
   @Test
   fun scheduleDetailId_onlyWrapsStableOccurrenceIdentity() {
     assertEquals("schedule:occurrence-42", scheduleCourseItemDetailId("occurrence-42"))
+  }
+
+  /** Item ID 同时保存周次、实际 Item 键和详情键，但外部只需原样传递一个字符串。 */
+  @Test
+  fun courseItemId_containsWeekAndKeepsItemSegmentsDistinct() {
+    val first = courseItemId(
+      week = 5,
+      itemKey = "occurrence-42|2026-09-28|08:00|10:00",
+      detailId = "schedule:occurrence-42",
+    )
+    val second = courseItemId(
+      week = 5,
+      itemKey = "occurrence-42|2026-09-28|14:00|16:00",
+      detailId = "schedule:occurrence-42",
+    )
+
+    assertEquals(5, courseItemWeekOrNull(first))
+    assertEquals("schedule:occurrence-42", courseItemDetailIdOrNull(first))
+    assertNotEquals(first, second)
+  }
+
+  /** 旧详情 ID 不是 Item 定位 ID，不能在没有独立 week 参数时被误解析。 */
+  @Test
+  fun invalidCourseItemId_doesNotExposePartialLocation() {
+    assertNull(courseItemWeekOrNull("schedule:occurrence-42"))
+    assertNull(courseItemDetailIdOrNull("schedule:occurrence-42"))
   }
 }

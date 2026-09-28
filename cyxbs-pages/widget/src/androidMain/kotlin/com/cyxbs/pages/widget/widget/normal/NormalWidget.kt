@@ -51,6 +51,7 @@ import com.cyxbs.pages.widget.widget.glance.NormalTimelinePlacedBar
 import com.cyxbs.pages.widget.widget.glance.NormalTimelineTextMode
 import com.cyxbs.pages.widget.widget.glance.WidgetRenderItemCard
 import com.cyxbs.pages.widget.widget.glance.WidgetItemContainerGap
+import com.cyxbs.pages.widget.widget.glance.WidgetSurfaceColor
 import com.cyxbs.pages.widget.widget.glance.WidgetDayOffsetKey
 import com.cyxbs.pages.widget.widget.glance.currentMinute
 import com.cyxbs.pages.widget.widget.glance.dispatchRefreshToGlanceReceiver
@@ -608,8 +609,6 @@ private fun NormalTimelineLane(
           .padding(top = topPaddingDp.dp, bottom = bottomPaddingDp.dp)
           // 横向不能加外边距，否则可见色块会偏离真实时间坐标；纵向仍留出轨道间隔。
           .padding(vertical = NormalTimelineItemVerticalPadding),
-        // 旧版小组件没有夜间色资源，固定使用课表的浅色样式才能保持原有橙/红/蓝配色。
-        isDark = false,
         titleSizeSp = textLayout.titleSizeSp,
         contentSizeSp = textLayout.contentSizeSp,
         maxTitleLines = textLayout.titleLines,
@@ -626,7 +625,10 @@ private fun NormalTimelineLane(
         clipStartEdge = bar.isStartClipped,
         clipEndEdge = bar.isEndClipped,
         coverTipColor = if (overflowBars.any(bar::overlaps)) {
-          widgetColorProvider(Color(bar.item.lightStyle.contentArgb))
+          widgetColorProvider(
+            Color(bar.item.lightStyle.contentArgb),
+            Color(bar.item.darkStyle.contentArgb),
+          )
         } else {
           null
         },
@@ -760,7 +762,7 @@ internal fun resolveNormalTimelineCardTextLayout(
 /**
  * 按原始时间边缘绘制一条低优先级溢出轨道。
  *
- * 低层仍使用完整卡片：被高层覆盖的区间只露出 2dp 底卡边缘，未被覆盖且高度足够的区间
+ * 低层仍使用完整卡片：被高层覆盖的区间只露出 1dp 底卡边缘，未被覆盖且高度足够的区间
  * 继续显示标题、内容并响应点击，不会因为进入折叠层就无条件丢失信息。
  */
 @Composable
@@ -797,8 +799,6 @@ private fun NormalTimelineOverflowLane(
         )
         WidgetRenderItemCard(
           item = bar.item,
-          // 普通小组件与正文卡片一致，固定复用课表浅色样式。
-          isDark = false,
           modifier = GlanceModifier.fillMaxSize(),
           titleSizeSp = titleStyle.fontSizeSp,
           contentSizeSp = minOf(9, titleStyle.fontSizeSp - 1).coerceAtLeast(8),
@@ -881,17 +881,17 @@ private fun navigatorStyle() = TextStyle(
   textAlign = TextAlign.Center,
 )
 
-/** 普通 Widget 复刻旧版始终为浅色的白色底板。 */
-private val NormalSurfaceColor = widgetColorProvider(Color.White)
+/** 普通 Widget 与周课表共用日夜画布，外层底卡才不会在深色桌面露出亮边。 */
+private val NormalSurfaceColor = WidgetSurfaceColor
 
-/** 无条目区域使用轻微灰度区分轨道，同时保持旧版浅色视觉。 */
-private val NormalTrackColor = widgetColorProvider(Color(0xFFF7F8FA))
+/** 无条目区域在两种模式下均与画布保持轻微明度差。 */
+private val NormalTrackColor = widgetColorProvider(Color(0xFFF7F8FA), Color(0xFF262626))
 
 /** 顶部小时刻度使用弱化蓝灰色，避免与课程标题争夺视觉层级。 */
-private val NormalTimelineScaleColor = widgetColorProvider(Color(0xFF7A879B))
+private val NormalTimelineScaleColor = widgetColorProvider(Color(0xFF7A879B), Color(0xFFB0B8C4))
 
 /** 与课表 drawNowTimeLine 保持一致的灰色。 */
-private val NormalTimelineCurrentColor = widgetColorProvider(Color.Gray)
+private val NormalTimelineCurrentColor = widgetColorProvider(Color.Gray, Color.LightGray)
 
 private val NormalTimelineScaleHeight = 12.dp
 private val NormalTimelineMarkWidth = 14.dp

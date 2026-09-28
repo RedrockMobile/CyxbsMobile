@@ -1,3 +1,4 @@
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.ComposeUIViewController
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountEditService
@@ -10,10 +11,12 @@ import com.cyxbs.components.config.init.InitialManager
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.time.toMinuteTimeDate
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavDisplay
 import com.cyxbs.components.navigation.AppSnackbarCompose
 import com.cyxbs.components.utils.extensions.IOSToast
 import com.cyxbs.components.utils.extensions.PlatformToastCompose
+import com.cyxbs.pages.course.service.CourseIosPlatform
 import com.cyxbs.pages.discover.home.DiscoverIosPlatform
 import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.api.HomeNavArgument
@@ -30,9 +33,9 @@ import com.cyxbs.pages.schedule.api.ScheduleExternalSource
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
 import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
-import com.cyxbs.pages.course.service.CourseIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
@@ -40,6 +43,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.UIKit.UIViewController
 import kotlin.time.Instant
+
+/** 系统 URL 可能早于首帧到达；先排队，等 CMP 导航栈完成 Composition 后再消费。 */
+private val externalNavigationRequests = Channel<AppNavArgument>(capacity = 8)
 
 /**
  * .
@@ -80,6 +86,11 @@ fun MainViewController(): UIViewController {
     IOSNavigationBarInsets {
       AppTheme {
         AppNavDisplay()
+        LaunchedEffect(Unit) {
+          for (argument in externalNavigationRequests) {
+            argument.navigate()
+          }
+        }
         AppSnackbarCompose()
         if (!IOSKmpInterfaceLink.enableUsePlatformToast()) {
           PlatformToastCompose()
@@ -87,6 +98,16 @@ fun MainViewController(): UIViewController {
       }
     }
   }
+}
+
+/**
+ * iOS SceneDelegate 收到系统 URL 时调用；返回 false 表示协议不属于已注册 CMP 页面。
+ *
+ * 只排队导航参数，不直接操作尚未创建的 Compose 导航栈；各页面自行处理重复打开语义。
+ */
+fun openExternalAppUrl(url: String): Boolean {
+  val argument = AppNavArgument.decodeFromUrl(url) ?: return false
+  return externalNavigationRequests.trySend(argument).isSuccess
 }
 
 fun onLogout() {
