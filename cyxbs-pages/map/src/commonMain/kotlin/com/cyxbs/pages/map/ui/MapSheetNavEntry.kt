@@ -20,6 +20,7 @@ import com.cyxbs.components.navigation.NAV_MAP_SEARCH
 import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.view.ui.BottomSheetCompose
 import com.cyxbs.components.view.ui.LocalBottomSheetScope
+import com.cyxbs.pages.map.util.MapOverlaySceneStrategy
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.viewmodel.MapNavEvent
 import com.cyxbs.pages.map.viewmodel.PlaceDetailViewModel

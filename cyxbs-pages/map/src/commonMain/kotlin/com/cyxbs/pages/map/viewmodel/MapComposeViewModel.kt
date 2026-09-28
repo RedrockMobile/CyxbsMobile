@@ -30,6 +30,8 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.CoroutineStart
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * @Desc : Map的ViewModel
@@ -145,7 +147,7 @@ class MapComposeViewModel : BaseViewModel() {
   val mapUiEvent: SharedFlow<MapUiEvent> = _mapUiEvent.asSharedFlow()
 
   init {
-    navEvents.collectLaunch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { event ->
+    navEvents.collectLaunch(start = CoroutineStart.UNDISPATCHED) { event ->
       when (event) {
         is MapNavEvent.SelectPlace -> searchToPlace(event.place)
         is MapNavEvent.RequestPhotoUpload -> requestPhotoUpload(event.placeId)
@@ -190,7 +192,7 @@ class MapComposeViewModel : BaseViewModel() {
   // 从外部跳转而来的placeSearch
   fun placeSearch(placeSearch: String) {
     launchByViewModelScope {
-      val placeId = withTimeoutOrNull(1500) {
+      val placeId = withTimeoutOrNull(1500.milliseconds) {
         MapRepository.placeSearch(placeSearch).getOrElse { throwable ->
           findLocalPlace(placeSearch)?.placeId ?: mapInfo.value?.openSiteId
         }

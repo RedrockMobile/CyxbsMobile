@@ -57,12 +57,15 @@ class PlaceDetailViewModel : BaseViewModel() {
       hasLoadedDetails = false
       placeDetailsId.value = placeId
       placeDetails.value = MapDataRepository.getPlaceDetails(placeId)
-        ?: MapDataRepository.getMapInfo()?.placeList?.find { it.placeId == placeId }?.let {
-          PlaceDetails(it.placeName, null, null, null)
-        }
     }
     if (placeChanged || (!hasLoadedDetails && detailsJob?.isActive != true)) {
       detailsJob = launchByViewModelScope {
+        placeDetails.value?.let {
+          val localPlace = MapDataRepository.getMapInfo()?.placeList?.find { it.placeId == placeId }
+          if (placeDetailsId.value == placeId && localPlace != null) {
+            placeDetails.value = PlaceDetails(localPlace.placeName, null, null, null)
+          }
+        }
         MapRepository.getPlaceDetails(placeId).onSuccess {
           // 切换地点后，旧请求不能覆盖新地点的数据。
           if (placeDetailsId.value == placeId) {

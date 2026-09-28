@@ -8,6 +8,7 @@ import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.view.ui.BottomSheetState
 import com.cyxbs.pages.map.model.MapDataRepository
 import com.cyxbs.pages.map.model.MapRepository
+import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceItem
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -16,7 +17,7 @@ class SearchViewModel : BaseViewModel() {
   val searchTextFieldState = TextFieldState()
   val searchResultList = mutableStateListOf<PlaceItem>()
   val searchHistory = mutableStateListOf<PlaceItem>()
-  val mapInfo = mutableStateOf(MapDataRepository.getMapInfo())
+  val mapInfo = mutableStateOf<MapInfo?>(null)
   val searchBottomSheetState = BottomSheetState(hideable = false)
   val mapSearchPagerState = mutableStateOf(0)
   val sheetVisible = mutableStateOf(true)
@@ -31,6 +32,8 @@ class SearchViewModel : BaseViewModel() {
       }
     }
     launchByViewModelScope {
+      mapInfo.value = MapDataRepository.getMapInfo()
+      search()
       MapRepository.getMapInfo().getOrNull()?.let {
         mapInfo.value = it
         search()

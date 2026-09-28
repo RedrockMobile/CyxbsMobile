@@ -1,4 +1,4 @@
-package com.cyxbs.pages.map.ui
+package com.cyxbs.pages.map.util
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
