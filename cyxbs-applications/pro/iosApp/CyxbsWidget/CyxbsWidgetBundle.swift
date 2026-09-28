@@ -9,16 +9,11 @@
 import WidgetKit
 import SwiftUI
 
+/// 仅注册仍在使用的课表组件；沿用原 kind，让桌面已有组件继续由新布局更新。
 @main
 struct CyxbsWidgetBundle: WidgetBundle {
-    
     @WidgetBundleBuilder
     var body: some Widget {
-        
         ScheduleWidget()
-        
-        if #available(iOS 16.1, *) {
-            CyxbsWidgetLiveActivity()
-        }
     }
 }
