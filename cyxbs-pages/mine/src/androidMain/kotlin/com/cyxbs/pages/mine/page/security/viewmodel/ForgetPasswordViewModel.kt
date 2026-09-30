@@ -1,11 +1,11 @@
 package com.cyxbs.pages.mine.page.security.viewmodel
 
 import androidx.lifecycle.MutableLiveData
-import com.mredrock.cyxbs.common.utils.extensions.doOnErrorWithDefaultErrorHandler
-import com.mredrock.cyxbs.common.utils.extensions.unsafeSubscribeBy
-import com.mredrock.cyxbs.common.utils.extensions.setSchedulers
+import androidx.lifecycle.viewModelScope
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.mredrock.cyxbs.common.viewmodel.BaseViewModel
 import com.cyxbs.pages.mine.util.apiService
+import kotlinx.coroutines.launch
 
 /**
  *@Date 2020-11-03
@@ -24,35 +24,35 @@ class ForgetPasswordViewModel : BaseViewModel() {
 
     //检查是否为默认密码
     fun checkDefaultPassword(stu_num: String, onError: () -> Unit) {
-        apiService.checkDefaultPassword(stu_num)
-                .setSchedulers()
-                .doOnErrorWithDefaultErrorHandler {
-                    toast(it.toString())
-                    onError()
-                    true
-                }
-                .unsafeSubscribeBy {
-                    defaultPassword.value = it.status == 10000
-                }
+        viewModelScope.launch {
+            runCatchingCoroutine {
+                apiService.checkDefaultPasswordDirect(stu_num)
+            }.onSuccess { response ->
+                defaultPassword.value = response.status == 10000
+            }.onFailure {
+                toast(it.toString())
+                onError()
+            }
+        }
     }
 
     //检查是否绑定信息
     fun checkBinding(stu_num: String, onSucceed: () -> Unit) {
-        apiService.checkBinding(stu_num)
-                .setSchedulers()
-                .doOnErrorWithDefaultErrorHandler {
-                    toast(it.toString())
-                    true
+        viewModelScope.launch {
+            runCatchingCoroutine {
+                apiService.checkBindingDirect(stu_num)
+            }.getOrElse {
+                toast(it.toString())
+                null
+            }?.let { response ->
+                if (response.status == 10000) {
+                    bindingEmail.value = response.data.email_is == 1
+                    bindingPasswordProtect.value = response.data.question_is == 1
+                    onSucceed()
+                } else {
+                    toast("检查绑定失败")
                 }
-                .unsafeSubscribeBy {
-                    if (it.status == 10000) {
-                        //设置信息绑定的情况
-                        bindingEmail.value = it.data.email_is == 1
-                        bindingPasswordProtect.value = it.data.question_is == 1
-                        onSucceed()
-                    } else {
-                        toast("检查绑定失败")
-                    }
-                }
+            }
+        }
     }
 }

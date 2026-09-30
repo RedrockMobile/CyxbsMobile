@@ -30,10 +30,7 @@ class SecurityActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.mine_activity_security)
-        viewModel.checkBinding {
-            if (!viewModel.netRequestSuccess)
-                toast("绑定信息请求失败")
-        }
+        viewModel.checkBinding()
         mLlChangeBindingMail.setOnSingleClickListener {//绑定邮箱
             if (viewModel.canClick) {
                 val intent = Intent(this, BindEmailActivity::class.java)
@@ -77,6 +74,6 @@ class SecurityActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.checkBinding { }//刷新数据
+        viewModel.checkBinding() // 刷新数据
     }
 }

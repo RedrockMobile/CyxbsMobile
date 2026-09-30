@@ -1,11 +1,14 @@
 package com.cyxbs.pages.mine.page.security.viewmodel
 
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
+import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.mredrock.cyxbs.common.utils.extensions.doOnErrorWithDefaultErrorHandler
 import com.mredrock.cyxbs.common.utils.extensions.unsafeSubscribeBy
 import com.mredrock.cyxbs.common.utils.extensions.setSchedulers
 import com.mredrock.cyxbs.common.viewmodel.BaseViewModel
 import com.cyxbs.pages.mine.util.apiService
+import kotlinx.coroutines.launch
 
 /**
  * Author: SpreadWater
@@ -105,35 +108,35 @@ class ChangePasswordViewModel : BaseViewModel() {
 
     //检查是否绑定信息
     fun checkBinding(stu_num: String, onSuccess: () -> Unit) {
-        apiService.checkBinding(stu_num)
-                .setSchedulers()
-                .doOnErrorWithDefaultErrorHandler {
-                    toast(it.toString())
-                    true
+        viewModelScope.launch {
+            runCatchingCoroutine {
+                apiService.checkBindingDirect(stu_num)
+            }.getOrElse {
+                toast(it.toString())
+                null
+            }?.let { response ->
+                if (response.status == 10000) {
+                    bindingEmail = response.data.email_is == 1
+                    bindingPasswordProtect = response.data.question_is == 1
+                    onSuccess()
+                } else {
+                    toast("检查绑定失败")
                 }
-                .unsafeSubscribeBy {
-                    if (it.status == 10000) {
-                        //设置信息绑定的情况
-                        bindingEmail = it.data.email_is == 1
-                        bindingPasswordProtect = it.data.question_is == 1
-                        onSuccess()
-                    } else {
-                        toast("检查绑定失败")
-                    }
-                }
+            }
+        }
     }
 
     //检查是否为默认密码
     fun checkDefaultPassword(stu_num: String, onSuccess: () -> Unit) {
-        apiService.checkDefaultPassword(stu_num)
-                .setSchedulers()
-                .doOnErrorWithDefaultErrorHandler {
-                    toast(it.toString())
-                    true
-                }
-                .unsafeSubscribeBy {
-                    isDefaultPassword = it.status == 10000
-                    onSuccess()
-                }
+        viewModelScope.launch {
+            runCatchingCoroutine {
+                apiService.checkDefaultPasswordDirect(stu_num)
+            }.onSuccess { response ->
+                isDefaultPassword = response.status == 10000
+                onSuccess()
+            }.onFailure {
+                toast(it.toString())
+            }
+        }
     }
 }
