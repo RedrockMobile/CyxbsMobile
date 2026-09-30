@@ -35,6 +35,9 @@ class BindEmailViewModel : BaseViewModel() {
                         10009 -> {
                             toastLong("发送验证码邮件次数过多")
                         }
+                        else -> {
+                            toastLong("发送验证码失败")
+                        }
                     }
                 }.lifeCycle()
     }

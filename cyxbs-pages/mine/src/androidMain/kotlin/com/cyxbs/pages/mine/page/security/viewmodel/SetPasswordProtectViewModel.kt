@@ -28,9 +28,13 @@ class SetPasswordProtectViewModel : BaseViewModel() {
                 .doOnError {
                     toast("获取密保问题失败")
                 }
-                .safeSubscribeBy {
-                    listOfSecurityQuestion = it.data
-                    onQuestionLoaded(listOfSecurityQuestion)
+                .safeSubscribeBy { response ->
+                    if (response.status == 10000) {
+                        listOfSecurityQuestion = response.data
+                        onQuestionLoaded(listOfSecurityQuestion)
+                    } else {
+                        toast("获取密保问题失败")
+                    }
                 }
     }
 

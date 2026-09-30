@@ -3,8 +3,8 @@
 > 打包时由 build-logic/manager/nav.AppNavReportTask 自动生成
 > 该文件需要被 git 提交用于后续使用
 
-- versionCode: 94
-- versionName: 7.0.0
+- versionCode: 95
+- versionName: 7.0.1-alpha
 
 ## 调试方法
 
@@ -231,6 +231,15 @@ deeplink: cyxbs://about
 deeplink: cyxbs://mine/edit
 ```
 
+### mine/setting
+
+- entry: `com.cyxbs.pages.mine.setting.SettingNavEntry`
+- argument: `com.cyxbs.pages.mine.setting.SettingNavArgument`
+
+```text
+deeplink: cyxbs://mine/setting
+```
+
 ### sign
 
 - entry: `com.cyxbs.pages.mine.sign.ui.SignNavEntry`
@@ -352,4 +361,15 @@ deeplink: cyxbs://school/car
 
 ```text
 deeplink: cyxbs://sport
+```
+
+## :cyxbs-pages:widget
+
+### widget
+
+- entry: `com.cyxbs.pages.widget.page.CourseWidgetNavEntry`
+- argument: `com.cyxbs.pages.widget.page.CourseWidgetNavArgument`
+
+```text
+deeplink: cyxbs://widget
 ```

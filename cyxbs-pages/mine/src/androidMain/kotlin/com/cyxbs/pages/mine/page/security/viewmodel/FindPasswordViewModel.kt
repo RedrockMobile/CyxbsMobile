@@ -137,7 +137,7 @@ class FindPasswordViewModel : BaseViewModel() {
             }.safeSubscribeBy {
                 if (it.status == 10000) {
                     email = it.data.email
-                    if (email == null || email == "") {
+                    if (email.isEmpty()) {
                         toast("返回邮箱为空")
                     } else {
                         //下面是抄的齐哥的邮箱加密策略
@@ -159,8 +159,8 @@ class FindPasswordViewModel : BaseViewModel() {
                         emailAddressOrQuestion.postValue(showUserEmail)
                         canClickNext = true//数据加载完毕，允许用户点击next
                     }
-                } else if (it.status == 10024) {
-                    toast("你尚未绑定邮箱")
+                } else {
+                    toast(if (it.status == 10024) "你尚未绑定邮箱" else "获取邮箱信息失败")
                 }
             }
     }
@@ -177,9 +177,11 @@ class FindPasswordViewModel : BaseViewModel() {
                         //目前仅仅有一个密保问题
                         //后端为了拓展将这里的返回值设计成了一个集合
                         //就目前而言这个集合应该之后一个值
-                        question = it.data[0]
-                        emailAddressOrQuestion.postValue(it.data[0].content)
-                        canClickNext = true//数据加载完毕，允许用户点击下一步
+                        it.data.firstOrNull()?.let { securityQuestion ->
+                            question = securityQuestion
+                            emailAddressOrQuestion.postValue(securityQuestion.content)
+                            canClickNext = true//数据加载完毕，允许用户点击下一步
+                        } ?: toast("您还没有设置密保")
                     } else {
                         toast("您还没有设置密保")
                     }
