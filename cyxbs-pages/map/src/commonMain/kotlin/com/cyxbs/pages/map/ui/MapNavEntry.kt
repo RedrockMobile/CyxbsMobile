@@ -102,6 +102,8 @@ import org.jetbrains.compose.resources.vectorResource
 @AppNav(route = NAV_MAP)
 class MapNavEntry : AppNavEntry<MapNavArgument>() {
 
+  override fun getContentKey(argument: MapNavArgument) = NAV_MAP
+
   override fun isNeedLogin(argument: MapNavArgument): Boolean {
     return false
   }
