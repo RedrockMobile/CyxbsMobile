@@ -83,6 +83,46 @@ class MapImageLoaderTest {
   }
 
   @Test
+  fun emptyCachedImageDownloadsInsteadOfReturningCache() = runTest {
+    var downloadCount = 0
+    val loader = MapImageLoader(
+      readCachedImage = { byteArrayOf() },
+      readCachedVersion = { 3L },
+      downloadImage = { _, _ ->
+        downloadCount++
+        MapImageDownloadResult(byteArrayOf(2), isCached = true)
+      },
+    )
+
+    val result = loader.load(MapImageLoadRequest("https://example.com/map.png", 3L, false), {}, {})
+
+    val success = assertIs<MapImageLoadResult.Success>(result)
+    assertContentEquals(byteArrayOf(2), success.bytes)
+    assertEquals(1, downloadCount)
+  }
+
+  @Test
+  fun zeroContentLengthReportsZeroProgress() = runTest {
+    val progress = mutableListOf<Float>()
+    val loader = MapImageLoader(
+      readCachedImage = { null },
+      readCachedVersion = { null },
+      downloadImage = { _, listener ->
+        listener(0L, 0L)
+        MapImageDownloadResult(byteArrayOf(2), isCached = true)
+      },
+    )
+
+    loader.load(
+      request = MapImageLoadRequest("https://example.com/map.png", 3L, false),
+      onDownloadStart = {},
+      onProgress = { progress += it },
+    )
+
+    assertEquals(listOf(0f), progress)
+  }
+
+  @Test
   fun missingCachedVersionDownloadsEvenWhenImageExists() = runTest {
     var downloadCount = 0
     val loader = MapImageLoader(

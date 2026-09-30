@@ -46,7 +46,12 @@ internal class MapImageLoader(
 
       onDownloadStart()
       val downloadResult = downloadImage(request.url) { bytesSent, contentLength ->
-        onProgress((bytesSent.toFloat() / contentLength).coerceIn(0f, 1f))
+        val progress = if (contentLength > 0L) {
+          (bytesSent.toFloat() / contentLength).coerceIn(0f, 1f)
+        } else {
+          0f
+        }
+        onProgress(progress)
       }
       if (downloadResult.isCached) {
         saveVersion(request.version)
