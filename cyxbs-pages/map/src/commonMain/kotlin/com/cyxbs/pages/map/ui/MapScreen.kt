@@ -30,7 +30,7 @@ import com.cyxbs.pages.map.viewmodel.SearchViewModel
 @Composable
 internal fun MapScreen(argument: MapNavArgument) {
   val mapViewModel = viewModel<MapComposeViewModel>()
-  val searchViewModel = viewModel<SearchViewModel>()
+  val searchViewModel = viewModel { SearchViewModel() }
   LaunchedEffect(mapViewModel, searchViewModel) {
     snapshotFlow {
       MapNavEvent.MapPageChanged(

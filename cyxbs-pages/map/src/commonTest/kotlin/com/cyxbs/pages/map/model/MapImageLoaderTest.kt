@@ -205,4 +205,38 @@ class MapImageLoaderTest {
 
     assertEquals(cancellation, thrown)
   }
+
+  @Test
+  fun saveVersionExceptionReturnsDownloadedBytes() = runTest {
+    val downloadedBytes = byteArrayOf(4, 5, 6)
+    val loader = MapImageLoader(
+      readCachedImage = { null },
+      readCachedVersion = { null },
+      downloadImage = { _, _ -> MapImageDownloadResult(downloadedBytes, isCached = true) },
+      saveVersion = { throw IllegalStateException("settings unavailable") },
+    )
+
+    val result = loader.load(MapImageLoadRequest("https://example.com/map.png", 3L, false), {}, {})
+
+    val success = assertIs<MapImageLoadResult.Success>(result)
+    assertContentEquals(downloadedBytes, success.bytes)
+    assertEquals(false, success.updateAvailable)
+  }
+
+  @Test
+  fun saveVersionCancellationIsRethrown() = runTest {
+    val cancellation = CancellationException("cancelled")
+    val loader = MapImageLoader(
+      readCachedImage = { null },
+      readCachedVersion = { null },
+      downloadImage = { _, _ -> MapImageDownloadResult(byteArrayOf(2), isCached = true) },
+      saveVersion = { throw cancellation },
+    )
+
+    val thrown = assertFailsWith<CancellationException> {
+      loader.load(MapImageLoadRequest("https://example.com/map.png", 3L, false), {}, {})
+    }
+
+    assertEquals(cancellation, thrown)
+  }
 }

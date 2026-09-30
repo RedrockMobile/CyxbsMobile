@@ -54,7 +54,12 @@ internal class MapImageLoader(
         onProgress(progress)
       }
       if (downloadResult.isCached) {
-        saveVersion(request.version)
+        try {
+          saveVersion(request.version)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (_: Exception) {
+        }
       }
       return MapImageLoadResult.Success(downloadResult.bytes, updateAvailable = false)
     } catch (e: CancellationException) {

@@ -12,7 +12,11 @@ import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import com.cyxbs.components.navigation.AppNavArgument
 
-/** 弹层外壳由 entry 内部创建，确保 VM 与 sheet 都处于 entry 的生命周期内。 */
+/**
+ * 弹层外壳由 entry 内部创建，确保 VM 与 sheet 都处于 entry 的生命周期内。
+ * 临时使用的Map的Strategy，用于解决生命周期的问题
+ * 后续[com.cyxbs.components.view.ui.bottomsheet.BottomSheetSceneStrategy]重构后可以进行替换
+ */
 internal class MapOverlaySceneStrategy : SceneStrategy<AppNavArgument> {
   override fun SceneStrategyScope<AppNavArgument>.calculateScene(
     entries: List<NavEntry<AppNavArgument>>,
