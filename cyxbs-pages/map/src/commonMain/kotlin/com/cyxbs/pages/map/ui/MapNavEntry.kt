@@ -1,10 +1,10 @@
 package com.cyxbs.pages.map.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,9 +46,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
 import com.cyxbs.components.config.MAP_VR_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
@@ -111,121 +108,13 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
   @Composable
   override fun Content(argument: MapNavArgument) {
     val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
-    val searchViewModel = viewModel { SearchViewModel() }
-    LaunchedEffect(viewmodel, searchViewModel) {
-      snapshotFlow {
-        MapNavEvent.MapPageChanged(viewmodel.mapPagerState.value == 1, searchViewModel.mapSearchPagerState.value == 1)
-      }.collect { MapComposeViewModel.emitNavEvent(it) }
-    }
-    MapCompose(argument)
+    MapScreen(argument)
     MapProgressDialog()
     DownloadFailedDialog(argument)
     MapUpdateDialog()
     UploadPhotoDialog(viewmodel.uploadPhotoDialogState, viewmodel.uploadPlaceId.value)
     UploadPhotoResult(viewmodel.uploadPhotoResultState)
     UploadingPhotoProgressDialog()
-    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-    when {
-      ratio > 1.5f -> WH100vInfinityCompose(argument)
-      ratio <= 1.5f -> WH100v150Compose(argument)
-    }
-  }
-}
-
-// 竖屏
-@Composable
-fun WH100vInfinityCompose(argument: MapNavArgument) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  val backState = rememberNavigationEventState(NavigationEventInfo.None)
-  NavigationBackHandler(
-    state = backState,
-    onBackCompleted = {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        popMapAndSheets(argument)
-      }
-    },
-  )
-  AnimatedContent(
-    targetState = viewmodel.mapPagerState.value,
-    transitionSpec = {
-      if (targetState > initialState) {
-        slideInHorizontally { width -> width } togetherWith
-            slideOutHorizontally { width -> -width }
-      } else {
-        slideInHorizontally { width -> -width } togetherWith
-            slideOutHorizontally { width -> width }
-      }
-    },
-  ) { targetPage ->
-    if (targetPage == 1) {
-      AllPictureCompose(
-        modifier = Modifier.fillMaxSize(),
-        images = viewmodel.pictureImages.value,
-        placeId = viewmodel.picturePlaceId.value,
-        onBack = { viewmodel.mapPagerState.value = 0 },
-      )
-    } else {
-      MapContent(argument = argument, modifier = Modifier.fillMaxWidth())
-      // 竖屏：地点详情 sheet 以 NavEntry overlay 形式压栈（搜索仍是整页，由 mapSearchPagerState 控制）
-      MapBottomSheetEntryHost(landscape = false)
-    }
-  }
-}
-
-// desktop/横屏
-@Composable
-fun WH100v150Compose(argument: MapNavArgument) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  val backState = rememberNavigationEventState(NavigationEventInfo.None)
-  NavigationBackHandler(
-    state = backState,
-    onBackCompleted = {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        popMapAndSheets(argument)
-      }
-    },
-  )
-  AnimatedContent(
-    targetState = viewmodel.mapPagerState.value,
-    transitionSpec = {
-      if (targetState > initialState) {
-        slideInHorizontally { width -> width } togetherWith
-            slideOutHorizontally { width -> -width }
-      } else {
-        slideInHorizontally { width -> -width } togetherWith
-            slideOutHorizontally { width -> width }
-      }
-    },
-  ) { targetPage ->
-    if (targetPage == 1) {
-      AllPictureCompose(
-        modifier = Modifier.fillMaxSize(),
-        images = viewmodel.pictureImages.value,
-        placeId = viewmodel.picturePlaceId.value,
-        onBack = { viewmodel.mapPagerState.value = 0 },
-      )
-    } else {
-      Column {
-        BackIconCompose(
-          argument = argument,
-          modifier = Modifier
-            .padding(start = 12.dp, top = 12.dp)
-            .width(32.dp)
-            .height(32.dp),
-        )
-        MapFunctionImageCompose(
-          modifier = Modifier
-            .padding(top = 32.dp)
-            .background(Color.Transparent)
-        )
-      }
-      // 横屏：把两个 bottomSheet 以 NavEntry overlay 形式压栈显示（见 MapBottomSheetEntryHost）
-      MapBottomSheetEntryHost(landscape = true)
-    }
   }
 }
 
@@ -719,7 +608,7 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   }
 }
 
-private fun popMapAndSheets(argument: MapNavArgument) {
+internal fun popMapAndSheets(argument: MapNavArgument) {
   appNavBackStack.filterIsInstance<PlaceDetailNavArgument>().lastOrNull()?.popBackStack()
   SearchNavArgument.popBackStack()
   if (appNavBackStack.size > 1) {
