@@ -61,11 +61,11 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
-import com.cyxbs.pages.map.model.MapDataRepository
-import com.cyxbs.pages.map.util.MapImageHelper
+import com.cyxbs.pages.map.model.MapImageLoadRequest
+import com.cyxbs.pages.map.model.MapImageLoadResult
+import com.cyxbs.pages.map.model.MapImageLoader
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
-import com.cyxbs.pages.map.util.getImageFile
 import com.cyxbs.pages.map.viewmodel.SearchViewModel
 import com.cyxbs.pages.map.viewmodel.MapNavEvent
 import com.cyxbs.pages.map.widget.MapUiEvent
@@ -82,7 +82,6 @@ import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search_edit_text_i
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_unlock
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr_description
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
@@ -483,6 +482,8 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
 @Composable
 fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val mapInfo = viewmodel.mapInfo.value
+  val imageLoader = remember { MapImageLoader() }
   val mapUiController = rememberMapUiController(
     mapWidgetState = viewmodel.mapWidgetState,
     mainAnchorState = viewmodel.anchorItemState,
@@ -491,52 +492,36 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   )
   val imageResult by produceState<ByteArray?>(
     null,
-    viewmodel.mapInfo.value,
+    mapInfo?.mapUrl,
+    mapInfo?.pictureVersion,
     viewmodel.isUpdateStart.value
   ) {
-    try {
-      viewmodel.mapInfo.value?.let { mapInfo ->
-        // 如果不是更新地图，就走正常流程，否则就直接下载地图
-        if (!viewmodel.isUpdateStart.value) {
-          val localMapImage = getImageFile()?.takeIf { it.isNotEmpty() }
-          val localMapVersion = MapDataRepository.getMapVersion()
-          // 本地没有就直接下载,如果本地没有版本号信息也直接走下载
-          if (localMapImage == null || localMapVersion == null) {
-            viewmodel.progressDialogState.value = true
-            val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-              viewmodel.downloadProgress.value =
-                bytesRead.toFloat() / contentLength.toFloat()
-            }
-            value = result.bytes
-            if (result.isCached) {
-              runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
-            }
-            viewmodel.progressDialogState.value = false
-          } else {
-            // 如果有，则先核对版本，版本对就直接拿缓存，不对就走更新
-            value = localMapImage
-            if (mapInfo.pictureVersion != localMapVersion) {
-              viewmodel.updateMapDialogState.value = true
-            }
-          }
-        } else {
-          viewmodel.progressDialogState.value = true
-          val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-            viewmodel.downloadProgress.value =
-              bytesRead.toFloat() / contentLength.toFloat()
-          }
-          value = result.bytes
-          if (result.isCached) {
-            runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
-          }
-          viewmodel.progressDialogState.value = false
+    mapInfo ?: return@produceState
+    when (val result = imageLoader.load(
+      request = MapImageLoadRequest(
+        url = mapInfo.mapUrl,
+        version = mapInfo.pictureVersion,
+        forceDownload = viewmodel.isUpdateStart.value,
+      ),
+      onDownloadStart = {
+        viewmodel.downloadProgress.value = 0f
+        viewmodel.progressDialogState.value = true
+      },
+      onProgress = { progress ->
+        viewmodel.downloadProgress.value = progress
+      },
+    )) {
+      is MapImageLoadResult.Success -> {
+        value = result.bytes
+        viewmodel.progressDialogState.value = false
+        if (result.updateAvailable) {
+          viewmodel.updateMapDialogState.value = true
         }
       }
-    } catch (e: CancellationException) {
-      throw e
-    } catch (_: Exception) {
-      viewmodel.progressDialogState.value = false
-      viewmodel.downloadFailedDialogState.value = true
+      is MapImageLoadResult.Failure -> {
+        viewmodel.progressDialogState.value = false
+        viewmodel.downloadFailedDialogState.value = true
+      }
     }
   }
   viewmodel.maxScale =
