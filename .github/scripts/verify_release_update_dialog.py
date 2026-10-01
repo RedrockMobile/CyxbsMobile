@@ -1,6 +1,7 @@
 """在模拟器上安装 CI 专用 release 包，并检查更新弹窗是否真正显示。"""
 
 import argparse
+import re
 import subprocess
 import time
 import xml.etree.ElementTree as ET
@@ -12,6 +13,39 @@ from urllib.parse import urlencode
 PACKAGE = "com.mredrock.cyxbs"
 DUMP_PATH = "/sdcard/cyxbs-release-dialog.xml"
 EXPECTED_TEXT = ("有新版本更新", "CI 更新弹窗测试", "立即更新")
+
+
+def select_emulator_api(sdk_list: str) -> int:
+    """从稳定通道的 SDK 列表选择最新正式 API；缺少对应镜像时拒绝降级。
+
+    sdk_list 必须来自 sdkmanager --list --channel=0。只读取远端可用包，
+    防止 Runner 已安装的预览包参与选择；命名预览和扩展 SDK 不作为正式 API。
+    """
+    platforms: set[int] = set()
+    images: set[int] = set()
+    available = False
+    for line in sdk_list.splitlines():
+        stripped = line.strip()
+        if stripped == "Available Packages:":
+            available = True
+            continue
+        if not available:
+            continue
+        if stripped.endswith(":"):
+            break
+        package = line.split("|", 1)[0].strip()
+        platform = re.fullmatch(r"platforms;android-([0-9]+)", package)
+        image = re.fullmatch(r"system-images;android-([0-9]+);google_apis;x86_64", package)
+        if platform:
+            platforms.add(int(platform.group(1)))
+        if image:
+            images.add(int(image.group(1)))
+    if not platforms:
+        raise ValueError("SDK 稳定通道未返回正式 Android 平台，请检查 SDK 查询结果")
+    latest = max(platforms)
+    if latest not in images:
+        raise ValueError(f"最新稳定 Android API {latest} 暂无 Google APIs x86_64 镜像，请待镜像就绪后重跑")
+    return latest
 
 
 def adb(*args: str, timeout: int = 30) -> str:
@@ -90,11 +124,16 @@ def verify(apk: Path) -> None:
 
 
 def main() -> None:
-    """读取待测 APK 路径并运行模拟器界面检查。"""
+    """选择最新稳定模拟器 API，或安装 APK 并运行界面检查；选择模式仅输出 API。"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--apk", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--apk", type=Path)
+    mode.add_argument("--sdk-list", type=Path)
     args = parser.parse_args()
-    verify(args.apk)
+    if args.sdk_list is not None:
+        print(select_emulator_api(args.sdk_list.read_text(encoding="utf-8")))
+    else:
+        verify(args.apk)
 
 
 if __name__ == "__main__":

@@ -86,11 +86,12 @@ jobs:
                   or run['path'].split('@', 1)[0] != '.github/workflows/android-release.yml'):
               raise SystemExit('候选产物不是发版 PR 工作流生成的')
           required = {'check_source', 'check_title', 'check_notes', 'check_version',
-                      'build_release', 'check_artifact', 'check_update_dialog'}
+                      'build_release', 'build_release (arm64-v8a)', 'build_release (x86_64)',
+                      'check_artifact', 'check_update_dialog'}
           jobs = {job['name']: job['conclusion'] for job in
                   json.loads((temp / 'candidate-jobs.json').read_text())['jobs']}
           if any(jobs.get(name) != 'success' for name in required):
-              raise SystemExit('候选产物所在 CI 的必需检查未全部成功')
+              raise SystemExit('候选产物所在 CI 的必需检查或两个 ABI 构建未全部成功')
           PY
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
             --name "$ARTIFACT_NAME" --dir release-artifacts
