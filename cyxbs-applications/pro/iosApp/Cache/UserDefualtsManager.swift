@@ -82,12 +82,6 @@ extension UserDefaultsManager {
         get { get(key: "REFRESH_TOKEN") as? String }
     }
     
-    /// 在打开app的时候，是否弹起schedule
-    var presentScheduleWhenOpenApp: Bool {
-       set { set(newValue, forKey: "PRSENT_SCHEDULE_WHEN_OPEN_APP") }
-       get { get(key: "PRSENT_SCHEDULE_WHEN_OPEN_APP") as? Bool ?? true }
-    }
-    
     /// 主学生学号（用于一级缓存）
     var mainStudentSno: String? {
         set { set(newValue, forKey: "MAIN_STUDENT_SNO") }

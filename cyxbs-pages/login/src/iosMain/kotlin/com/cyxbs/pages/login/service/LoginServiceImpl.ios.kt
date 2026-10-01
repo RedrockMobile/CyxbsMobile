@@ -21,7 +21,7 @@ actual object LoginServicePlatform : ILoginService {
     // │       ├── 主页（HomeNavEntry）
     // │       ├── 登录页（LoginNavEntry）
     // │       └── ... 其他 CMP 页面
-    // ├── MineSettingViewController ← 原生 VC，push 到 CMP 上面
+    // ├── selfSafeViewController ← 原生账号与安全页，push 到 CMP 上面
     // └── ... 其他原生 VC
     LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
   }

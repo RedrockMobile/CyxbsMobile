@@ -29,8 +29,8 @@ interface MineIosPlatform {
    */
   fun jumpSign()
 
-  /** push 设置页（iOS 原生 MineSettingViewController） */
-  fun jumpSetting()
+  /** push 账号与安全页（iOS 原生 selfSafeViewController）。 */
+  fun jumpAccountSecurity()
 
   /** push 活动中心（iOS 原生 ActivityCenterVC） */
   fun jumpActivityCenter()

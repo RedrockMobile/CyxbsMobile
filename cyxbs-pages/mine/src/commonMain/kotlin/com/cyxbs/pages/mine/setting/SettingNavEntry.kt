@@ -35,7 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +62,7 @@ import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
@@ -71,7 +71,7 @@ import org.jetbrains.compose.resources.painterResource
 @Serializable
 data object SettingNavArgument : AppNavArgument
 
-/** Android 使用的 CMP 设置页；iOS 入口暂时继续跳转原生页面。 */
+/** Android 与 iOS 共用的 CMP 设置页。 */
 @AppNav(route = NAV_SETTING)
 class SettingNavEntry : AppNavEntry<SettingNavArgument>() {
 
@@ -94,22 +94,16 @@ private fun SettingPage(argument: SettingNavArgument) {
   val loginDialogState = rememberLoginDialogState()
   val coroutineScope = rememberCoroutineScope()
   var checkingLogout by remember { mutableStateOf(false) }
-  val showClearDialog = remember { mutableStateOf(false) }
   val showMaxWeekDialog = remember { mutableStateOf(false) }
   val showLogoutDialog = remember { mutableStateOf(false) }
   val showLogoutWarningDialog = remember { mutableStateOf(false) }
-  var clearConfirmArmed by remember { mutableStateOf(false) }
   var maxWeekText by remember { mutableStateOf((platform?.courseMaxWeek ?: 22).toString()) }
   // 条目定义和平台能力在页面生命周期内不变；回调操作的是已 remember 的页面状态。
   val settingItems = remember(platform) {
     platform?.settingItems(
       SettingItemActions(
-        showClearDataDialog = {
-          clearConfirmArmed = false
-          showClearDialog.value = true
-        },
         showCourseMaxWeekDialog = {
-          maxWeekText = (platform?.courseMaxWeek ?: 22).toString()
+          maxWeekText = platform.courseMaxWeek.toString()
           showMaxWeekDialog.value = true
         },
       )
@@ -130,23 +124,41 @@ private fun SettingPage(argument: SettingNavArgument) {
         when (settingItem) {
           is SettingItem.Switch -> {
             var checked by remember(settingItem.key) { mutableStateOf(settingItem.readChecked()) }
+            var changing by remember(settingItem.key) { mutableStateOf(false) }
+            val itemScope = rememberCoroutineScope()
+            val onCheckedChange = settingItem.rememberOnCheckedChange()
             SettingSwitchRow(
               text = settingItem.title,
               checked = checked,
+              enabled = !changing,
               onCheckedChange = { value ->
-                checked = value
-                settingItem.onCheckedChange(value)
+                if (!changing) {
+                  changing = true
+                  itemScope.launch {
+                    try {
+                      // 授权及保存完全由条目处理；只在完成后读取实际状态。
+                      onCheckedChange(value)
+                    } catch (throwable: Throwable) {
+                      if (throwable is CancellationException) throw throwable
+                      toast("设置失败，请重试")
+                    } finally {
+                      checked = settingItem.readChecked()
+                      changing = false
+                    }
+                  }
+                }
               },
             )
           }
           is SettingItem.Action -> {
+            val onClick = settingItem.rememberOnClick()
             SettingArrowRow(text = settingItem.title) {
               if (settingItem.requiresLogin) {
                 loginDialogState.doIfLogin(function = settingItem.title) {
-                  settingItem.onClick()
+                  onClick()
                 }
               } else {
-                settingItem.onClick()
+                onClick()
               }
             }
           }
@@ -186,22 +198,6 @@ private fun SettingPage(argument: SettingNavArgument) {
     }
   }
 
-  ClearApplicationDataDialog(
-    showState = showClearDialog,
-    confirmArmed = clearConfirmArmed,
-    onConfirmArmed = { clearConfirmArmed = true },
-    onClear = {
-      if (platform?.clearApplicationData() != true) {
-        showClearDialog.value = false
-        toast("清理失败，请在应用详情页中手动清理数据")
-        platform?.openApplicationDetails()
-      }
-    },
-    onDismiss = {
-      clearConfirmArmed = false
-      showClearDialog.value = false
-    },
-  )
   CourseMaxWeekDialog(
     showState = showMaxWeekDialog,
     value = maxWeekText,
@@ -264,11 +260,12 @@ private fun SettingTopBar(argument: SettingNavArgument) {
 private fun SettingSwitchRow(
   text: String,
   checked: Boolean,
+  enabled: Boolean,
   onCheckedChange: (Boolean) -> Unit,
 ) {
   Row(
     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-      .clickableNoIndicator { onCheckedChange(!checked) }
+      .clickableNoIndicator { if (enabled) onCheckedChange(!checked) }
       .padding(horizontal = 16.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -280,6 +277,7 @@ private fun SettingSwitchRow(
     )
     Switch(
       checked = checked,
+      enabled = enabled,
       onCheckedChange = onCheckedChange,
       colors = SwitchDefaults.colors(checkedThumbColor = LocalAppColors.current.positive),
     )
@@ -306,35 +304,6 @@ private fun SettingArrowRow(text: String, onClick: () -> Unit) {
       painter = painterResource(Res.drawable.mine_ic_arrow_right),
       contentDescription = null,
       modifier = Modifier.size(width = 8.dp, height = 14.dp),
-    )
-  }
-}
-
-/** 清理数据需要在同一弹窗中连续确认两次，避免误触导致本地数据不可恢复。 */
-@Composable
-private fun ClearApplicationDataDialog(
-  showState: androidx.compose.runtime.MutableState<Boolean>,
-  confirmArmed: Boolean,
-  onConfirmArmed: () -> Unit,
-  onClear: () -> Unit,
-  onDismiss: () -> Unit,
-) {
-  ChooseDialogCompose(
-    showState = showState,
-    positiveBtnText = if (confirmArmed) "再次确定" else "确定",
-    negativeBtnText = "取消",
-    onDismissRequest = onDismiss,
-    onClickNegativeBtn = onDismiss,
-    onClickPositiveBtn = {
-      if (confirmArmed) onClear() else {
-        toast("请再次点击进行确定")
-        onConfirmArmed()
-      }
-    },
-  ) {
-    DialogMessage(
-      title = "清理软件数据",
-      content = "清理后将重新登录并还原所有本地设置，请慎重选择！",
     )
   }
 }
@@ -409,7 +378,7 @@ private fun LogoutDialog(
 
 /** 通用设置弹窗文案区。 */
 @Composable
-private fun DialogMessage(title: String, content: String) {
+internal fun DialogMessage(title: String, content: String) {
   Column(
     modifier = Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 22.dp),
     horizontalAlignment = Alignment.CenterHorizontally,

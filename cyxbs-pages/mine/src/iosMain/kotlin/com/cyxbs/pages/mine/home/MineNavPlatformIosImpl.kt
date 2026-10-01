@@ -32,10 +32,6 @@ object MineNavPlatformIosImpl : MineNavPlatform {
     MineIosPlatform::class.implOrNull()?.jumpFeedbackCenter() ?: toast("暂不支持跳转")
   }
 
-  override fun jumpSetting() {
-    MineIosPlatform::class.implOrNull()?.jumpSetting() ?: toast("暂不支持跳转")
-  }
-
   override fun jumpActivityCenter() {
     MineIosPlatform::class.implOrNull()?.jumpActivityCenter() ?: toast("暂不支持跳转")
   }

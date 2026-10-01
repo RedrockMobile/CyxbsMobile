@@ -329,4 +329,4 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "TestArrangeViewController.h" // 我的考试
 #import "StampCenterVC.h" // 邮票中心
 #import "FeedBackMainPageViewController.h" // 反馈中心
-#import "MineSettingViewController.h" // 设置
+#import "selfSafeViewController.h" // 账号与安全
