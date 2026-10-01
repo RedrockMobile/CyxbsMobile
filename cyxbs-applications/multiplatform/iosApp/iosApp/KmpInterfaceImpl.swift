@@ -19,10 +19,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
     func setToken(token: String) {
     }
 
-    func getDefaultExpandCourse() -> Bool {
-        return false
-    }
-
     func enableUsePlatformToast() -> Bool {
         return false
     }
@@ -66,7 +62,8 @@ class KmpInterfaceImpl: IOSKmpInterface {
     func jumpSign() {
     }
 
-    func jumpSetting() {
+    /// 纯 CMP 示例壳不提供原生账号与安全页。
+    func jumpAccountSecurity() {
     }
 
     func jumpActivityCenter() {

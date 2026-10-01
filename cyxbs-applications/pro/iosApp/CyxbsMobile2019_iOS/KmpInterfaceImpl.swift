@@ -22,10 +22,6 @@ class KmpInterfaceImpl: IOSKmpInterface {
         UserModel.default.setingTokenToOC(token: TokenModel(token: token))
     }
 
-    func getDefaultExpandCourse() -> Bool {
-        return UserDefaultsManager.shared.presentScheduleWhenOpenApp
-    }
-
     func enableUsePlatformToast() -> Bool {
         return true
     }
@@ -124,9 +120,10 @@ class KmpInterfaceImpl: IOSKmpInterface {
         nav.pushViewController(vc, animated: true)
     }
 
-    func jumpSetting() {
+    /// CMP 设置页进入仍由原生承载的账号与安全页面。
+    func jumpAccountSecurity() {
         guard let nav = Self.topNavigationController() else { return }
-        let vc = MineSettingViewController()
+        let vc = selfSafeViewController()
         vc.hidesBottomBarWhenPushed = true
         nav.pushViewController(vc, animated: true)
     }

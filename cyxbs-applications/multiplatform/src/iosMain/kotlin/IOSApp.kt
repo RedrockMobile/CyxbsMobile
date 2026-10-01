@@ -20,7 +20,6 @@ import com.cyxbs.pages.course.service.CourseIosPlatform
 import com.cyxbs.pages.discover.home.DiscoverIosPlatform
 import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
 import com.cyxbs.pages.home.api.HomeNavArgument
-import com.cyxbs.pages.home.mobile.ui.IOSHomeViewPager
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.service.LoginIosPlatform
 import com.cyxbs.pages.mine.home.MineIosPlatform
@@ -170,7 +169,6 @@ internal expect fun initProvider()
 interface IOSKmpInterface {
   fun isDebug(): Boolean
   fun setToken(token: String)
-  fun getDefaultExpandCourse(): Boolean
   fun enableUsePlatformToast(): Boolean
   fun toast(s: String, isLong: Boolean)
 
@@ -207,8 +205,8 @@ interface IOSKmpInterface {
   /** push 我的页签到（iOS 原生 CheckInViewController，与 jumpCheckIn 的 present 不同） */
   fun jumpSign()
 
-  /** push 设置页（iOS 原生 MineSettingViewController） */
-  fun jumpSetting()
+  /** push 账号与安全页（iOS 原生 selfSafeViewController） */
+  fun jumpAccountSecurity()
 
   /** push 活动中心（iOS 原生 ActivityCenterVC） */
   fun jumpActivityCenter()
@@ -248,7 +246,6 @@ interface IOSKmpInterface {
   fun exitApp()
 }
 
-@ImplProvider(IOSHomeViewPager::class)
 @ImplProvider(IOSToast::class)
 @ImplProvider(ConfigApplicationInfo::class)
 @ImplProvider(DiscoverFunctionsIosPlatform::class)
@@ -258,7 +255,6 @@ interface IOSKmpInterface {
 @ImplProvider(CourseIosPlatform::class)
 @ImplProvider(LoginIosPlatform::class)
 internal object IOSKmpInterfaceLink :
-  IOSHomeViewPager,
   IOSToast,
   ConfigApplicationInfo,
   DiscoverFunctionsIosPlatform,
@@ -272,10 +268,6 @@ internal object IOSKmpInterfaceLink :
 
   override fun isDebug(): Boolean {
     return impl.isDebug()
-  }
-
-  override fun getDefaultExpandCourse(): Boolean {
-    return impl.getDefaultExpandCourse()
   }
 
   override fun enableUsePlatformToast(): Boolean {
@@ -330,8 +322,8 @@ internal object IOSKmpInterfaceLink :
     impl.jumpSign()
   }
 
-  override fun jumpSetting() {
-    impl.jumpSetting()
+  override fun jumpAccountSecurity() {
+    impl.jumpAccountSecurity()
   }
 
   override fun jumpActivityCenter() {

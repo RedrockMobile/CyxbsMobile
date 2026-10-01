@@ -19,14 +19,13 @@ import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
-import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
+import com.cyxbs.pages.mine.api.MineSettings
 
 // 长按桌面图标的那个东西，对应 AndroidManifest.xml 中的设置
 private const val DESKTOP_SHORTCUT_COURSE = "com.mredrock.cyxbs.action.COURSE"
@@ -97,7 +96,7 @@ private fun execIntentAction(
       IAppUpdateService.debug() // 测试更新弹窗是否正常
     }
     else -> {
-      if (defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
+      if (MineSettings.isShowCourseFirst()) {
         // 打开应用优先显示课表的设置
         if (!IAccountService::class.impl().isTouristMode()) {
           courseBottomNavViewModel.state.value = true

@@ -28,9 +28,6 @@ interface MineNavPlatform {
   /** 反馈中心 */
   fun jumpFeedbackCenter()
 
-  /** 设置页 */
-  fun jumpSetting()
-
   /** 活动中心 */
   fun jumpActivityCenter()
 }

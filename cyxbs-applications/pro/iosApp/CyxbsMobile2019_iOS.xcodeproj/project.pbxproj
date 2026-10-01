@@ -292,8 +292,6 @@
 		AA49098924F3BF5A007CB3BC /* TransitionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = AA49098824F3BF5A007CB3BC /* TransitionManager.m */; };
 		AA4B0FB324D3E09B00221B5A /* TopBarScrollView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4B0FB224D3E09B00221B5A /* TopBarScrollView.m */; };
 		AA4CD61025EF7E0F002D9394 /* NothingStateView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4CD60F25EF7E0F002D9394 /* NothingStateView.m */; };
-		AA4FF36525879CD500C31286 /* MineSettingViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA4FF36425879CD500C31286 /* MineSettingViewController.m */; };
-		AA5368F02589E28800236CB5 /* QuitTipView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA5368EF2589E28800236CB5 /* QuitTipView.m */; };
 		AA536DDA258C3F7C00F69E73 /* TopBarBasicViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AA536DD9258C3F7C00F69E73 /* TopBarBasicViewController.m */; };
 		AA57588924EE739F002F6F6D /* TimeBtnSelectedBackView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA57588824EE739F002F6F6D /* TimeBtnSelectedBackView.m */; };
 		AA57588C24EF5841002F6F6D /* NoticeWaySelectView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA57588B24EF5841002F6F6D /* NoticeWaySelectView.m */; };
@@ -1069,10 +1067,6 @@
 		AA4B0FB224D3E09B00221B5A /* TopBarScrollView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TopBarScrollView.m; sourceTree = "<group>"; };
 		AA4CD60E25EF7E0F002D9394 /* NothingStateView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NothingStateView.h; sourceTree = "<group>"; };
 		AA4CD60F25EF7E0F002D9394 /* NothingStateView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NothingStateView.m; sourceTree = "<group>"; };
-		AA4FF36325879CD500C31286 /* MineSettingViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MineSettingViewController.h; sourceTree = "<group>"; };
-		AA4FF36425879CD500C31286 /* MineSettingViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MineSettingViewController.m; sourceTree = "<group>"; };
-		AA5368EE2589E28800236CB5 /* QuitTipView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = QuitTipView.h; sourceTree = "<group>"; };
-		AA5368EF2589E28800236CB5 /* QuitTipView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = QuitTipView.m; sourceTree = "<group>"; };
 		AA536DD8258C3F7C00F69E73 /* TopBarBasicViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TopBarBasicViewController.h; sourceTree = "<group>"; };
 		AA536DD9258C3F7C00F69E73 /* TopBarBasicViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TopBarBasicViewController.m; sourceTree = "<group>"; };
 		AA57588724EE739F002F6F6D /* TimeBtnSelectedBackView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TimeBtnSelectedBackView.h; sourceTree = "<group>"; };
@@ -3895,10 +3889,6 @@
 		AA4FF36225879C6E00C31286 /* Setting */ = {
 			isa = PBXGroup;
 			children = (
-				AA4FF36325879CD500C31286 /* MineSettingViewController.h */,
-				AA4FF36425879CD500C31286 /* MineSettingViewController.m */,
-				AA5368EE2589E28800236CB5 /* QuitTipView.h */,
-				AA5368EF2589E28800236CB5 /* QuitTipView.m */,
 				18CDF47F257F8DBD006E8E5C /* Safe */,
 			);
 			path = Setting;
@@ -5618,7 +5608,6 @@
 				B074C03C2AFD20F00086AB07 /* ActivityCenterTopView.swift in Sources */,
 				14B73F81281BED7B00D08ADD /* MessagePresentController.m in Sources */,
 				75B1D7752B9EC71100BBC794 /* NSDictionaryExtension.m in Sources */,
-				AA4FF36525879CD500C31286 /* MineSettingViewController.m in Sources */,
 				14B73F76281BED7B00D08ADD /* SystemMessageCell.m in Sources */,
 				14B73F7B281BED7B00D08ADD /* MineMessageMoreVC.m in Sources */,
 				14B73F7F281BED7B00D08ADD /* DiscoverMineMessageVC.m in Sources */,
@@ -5668,7 +5657,6 @@
 				14FFFBEF2AF8C0F3005A7EBD /* PlaceholderCollectionViewCell.swift in Sources */,
 				AA3F82DA24E8E03C00B65042 /* ClassDetailView.m in Sources */,
 				B0F71C9E2ABC71B200F8B1AC /* PublishPageCell.m in Sources */,
-				AA5368F02589E28800236CB5 /* QuitTipView.m in Sources */,
 				752A03EE2B0796CF003256C1 /* ActivityMessageCell.swift in Sources */,
 				B0F71C922ABC71B200F8B1AC /* ExpressDeclareModel.m in Sources */,
 				B0C9F22F2B0126E1006F4286 /* ActivityRankingListVC.swift in Sources */,
