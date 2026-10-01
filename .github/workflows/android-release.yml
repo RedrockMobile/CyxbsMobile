@@ -347,4 +347,4 @@ jobs:
           script: python .github/scripts/verify_release_update_dialog.py --apk ui-test-artifacts/pro-release.apk
       - name: 提示模拟器检查失败原因
         if: failure()
-        run: echo '::error::模拟器更新弹窗检查失败：请检查 x86_64 临时产物、最新稳定 Android 镜像查询、安装启动和弹窗文案；具体原因见上方日志。'
+        run: echo '::error::模拟器更新检查失败：请检查 x86_64 临时产物、最新稳定 Android 镜像、安装启动、线上版本名与完整文案、下载按钮跳转及 APK 下载地址；具体原因见上方日志。'
