@@ -55,36 +55,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           HEAD_SHA=$(cat "$RUNNER_TEMP/head.sha")
-          ARTIFACT_NAME="android-release-candidate-$HEAD_SHA"
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME&per_page=100" > "$RUNNER_TEMP/artifacts.json"
+          # 产物改用版本名展示，先按 PR 来源 SHA 找到对应工作流，再在该运行内定位正式包。
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=100" > "$RUNNER_TEMP/candidate-runs.json"
           python - <<'PY'
           import json
           import os
           from pathlib import Path
           temp = Path(os.environ['RUNNER_TEMP'])
           head = (temp / 'head.sha').read_text()
-          artifacts = json.loads((temp / 'artifacts.json').read_text())['artifacts']
-          candidates = [artifact for artifact in artifacts
-                        if artifact['name'] == f'android-release-candidate-{head}'
-                        and not artifact['expired'] and artifact.get('workflow_run')]
+          runs = json.loads((temp / 'candidate-runs.json').read_text())['workflow_runs']
+          candidates = [run for run in runs if run['head_sha'] == head
+                        and run['event'] == 'pull_request'
+                        and run['path'].split('@', 1)[0] == '.github/workflows/android-release.yml']
           if not candidates:
-              raise SystemExit('找不到 PR 检查时保存的正式 APK 和 mapping')
-          artifact = max(candidates, key=lambda item: item['created_at'])
-          (temp / 'candidate-run.id').write_text(str(artifact['workflow_run']['id']))
+              raise SystemExit('找不到与合并 PR 来源提交一致的发版检查运行')
+          run = max(candidates, key=lambda item: item['created_at'])
+          (temp / 'candidate-run.id').write_text(str(run['id']))
           PY
           RUN_ID=$(cat "$RUNNER_TEMP/candidate-run.id")
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > "$RUNNER_TEMP/candidate-run.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/candidate-jobs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
           python - <<'PY'
           import json
           import os
+          import re
           from pathlib import Path
           temp = Path(os.environ['RUNNER_TEMP'])
           run = json.loads((temp / 'candidate-run.json').read_text())
           # API 返回仓库相对路径；去掉可选的 @ref 后必须精确匹配候选工作流。
-          if (run['event'] != 'pull_request'
+          if (run['head_sha'] != (temp / 'head.sha').read_text()
+                  or run['event'] != 'pull_request'
                   or run['path'].split('@', 1)[0] != '.github/workflows/android-release.yml'):
               raise SystemExit('候选产物不是发版 PR 工作流生成的')
+          if run['status'] != 'completed' or run['conclusion'] != 'success':
+              raise SystemExit('对应 PR 的最新发版检查尚未全部成功，不能发布候选产物')
           required = {'check_source', 'check_title', 'check_notes', 'check_version',
                       'build_release', 'build_release (arm64-v8a)', 'build_release (x86_64)',
                       'check_artifact', 'check_update_dialog'}
@@ -92,9 +97,26 @@ jobs:
                   json.loads((temp / 'candidate-jobs.json').read_text())['jobs']}
           if any(jobs.get(name) != 'success' for name in required):
               raise SystemExit('候选产物所在 CI 的必需检查或两个 ABI 构建未全部成功')
+          title = json.loads((temp / 'pr.json').read_text())['title'].strip()
+          pattern = re.compile(re.escape(f'CyxbsMobile-{title}-') + r'\d+\.Apk\Z')
+          artifacts = json.loads((temp / 'artifacts.json').read_text())['artifacts']
+          matches = [artifact for artifact in artifacts if pattern.fullmatch(artifact['name'])
+                     and not artifact['expired']]
+          if len(matches) != 1:
+              raise SystemExit('对应发版检查必须保存唯一且未过期的 ARM64 APK 产物')
+          apk_name = matches[0]['name']
+          mapping_name = apk_name.replace('CyxbsMobile-', 'proguardMapping-', 1).removesuffix('.Apk') + '.txt'
+          mappings = [artifact for artifact in artifacts if artifact['name'] == mapping_name
+                      and not artifact['expired']]
+          if len(mappings) != 1:
+              raise SystemExit('对应发版检查必须保存唯一、未过期且与 APK 同版本的 mapping 及发布元数据产物')
+          # 两份正式产物来自同一运行并恢复到原目录，后续继续核对版本、来源提交和文件哈希。
+          (temp / 'artifact-names.txt').write_text(apk_name + '\n' + mapping_name + '\n')
           PY
-          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "$ARTIFACT_NAME" --dir release-artifacts
+          while IFS= read -r ARTIFACT_NAME; do
+            gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "$ARTIFACT_NAME" --dir release-artifacts
+          done < "$RUNNER_TEMP/artifact-names.txt"
       - name: Verify exact PR artifact and merge commit
         run: |
           python .github/scripts/release_verify.py merge \

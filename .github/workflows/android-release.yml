@@ -74,6 +74,9 @@ jobs:
       online_release: ${{ steps.candidate.outputs.online_release }}
       release_metadata: ${{ steps.candidate.outputs.release_metadata }}
       release_base: ${{ steps.candidate.outputs.release_base }}
+      apk_artifact_name: ${{ steps.candidate.outputs.apk_artifact_name }}
+      mapping_artifact_name: ${{ steps.candidate.outputs.mapping_artifact_name }}
+      ui_test_artifact_name: ${{ steps.candidate.outputs.ui_test_artifact_name }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,6 +106,11 @@ jobs:
                   value = json.loads((temp / filename).read_text(encoding='utf-8'))
                   output.write(f'{key}={json.dumps(value)}\n')
               output.write('release_base=' + (temp / 'release-base.sha').read_text().strip() + '\n')
+              metadata = json.loads((temp / 'release-metadata.json').read_text())
+              # 产物名面向发版者展示版本和用途；来源 SHA 仍写入包内并在消费时核对。
+              output.write(f"apk_artifact_name=CyxbsMobile-{metadata['tag']}.Apk\n")
+              output.write(f"mapping_artifact_name=proguardMapping-{metadata['tag']}.txt\n")
+              output.write(f"ui_test_artifact_name=CyxbsMobile-{metadata['tag']}-x86_64.Apk\n")
           PY
       - name: 提示版本检查失败原因
         if: failure()
@@ -198,26 +206,62 @@ jobs:
           cd release-artifacts
           sha256sum *.Apk proguardMapping-*.txt > SHA256SUMS
       - uses: actions/upload-artifact@v4
+        id: apk_artifact
         if: matrix.abi == 'arm64-v8a'
         with:
-          name: android-release-candidate-${{ github.event.pull_request.head.sha }}
-          path: release-artifacts/
+          name: ${{ needs.check_version.outputs.apk_artifact_name }}
+          path: release-artifacts/*.Apk
           if-no-files-found: error
           overwrite: true
+      # 发布元数据随 mapping 保存，正式 APK 单独下载；加上临时测试包共三个下载项。
+      - uses: actions/upload-artifact@v4
+        id: mapping_artifact
+        if: matrix.abi == 'arm64-v8a'
+        with:
+          name: ${{ needs.check_version.outputs.mapping_artifact_name }}
+          path: |
+            release-artifacts/proguardMapping-*.txt
+            release-artifacts/*.json
+            release-artifacts/*.sha
+            release-artifacts/release-notes.txt
+            release-artifacts/SHA256SUMS
+          if-no-files-found: error
+          overwrite: true
+      - name: 展示正式产物文件与下载入口
+        if: matrix.abi == 'arm64-v8a'
+        env:
+          APK_ARTIFACT_URL: ${{ steps.apk_artifact.outputs.artifact-url }}
+          MAPPING_ARTIFACT_URL: ${{ steps.mapping_artifact.outputs.artifact-url }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          metadata = json.loads(Path('release-artifacts/release-metadata.json').read_text())
+          # 两个正式文件分开下载；Actions 仍将每个下载项包装为 ZIP。
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## 正式 ARM64 产物\n\n')
+              summary.write('APK 与 mapping 分开下载，下载后解压 ZIP。内部群测试只需下载 APK。\n\n')
+              summary.write('| 类型 | 下载入口 |\n| --- | --- |\n')
+              summary.write(f"| 安装包 | [CyxbsMobile-{metadata['tag']}.Apk]({os.environ['APK_ARTIFACT_URL']}) |\n")
+              summary.write(f"| 混淆文件及发布元数据 | [proguardMapping-{metadata['tag']}.txt]({os.environ['MAPPING_ARTIFACT_URL']}) |\n")
+          PY
       - name: Stage temporary x86_64 test artifact
         if: matrix.abi == 'x86_64'
+        env:
+          UI_TEST_APK_NAME: ${{ needs.check_version.outputs.ui_test_artifact_name }}
         run: |
           test -s cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk
           mkdir ui-test-artifacts
-          cp cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk ui-test-artifacts/pro-release.apk
+          cp cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk "ui-test-artifacts/$UI_TEST_APK_NAME"
           cp "$RUNNER_TEMP/release-metadata.json" "$RUNNER_TEMP/release-head.sha" ui-test-artifacts/
           cp build-logic/release-notes.txt ui-test-artifacts/release-notes.txt
           cd ui-test-artifacts
-          sha256sum pro-release.apk > SHA256SUMS
+          sha256sum "$UI_TEST_APK_NAME" > SHA256SUMS
       - uses: actions/upload-artifact@v4
         if: matrix.abi == 'x86_64'
         with:
-          name: android-release-ui-test-${{ github.event.pull_request.head.sha }}
+          name: ${{ needs.check_version.outputs.ui_test_artifact_name }}
           path: ui-test-artifacts/
           if-no-files-found: error
           retention-days: 1
@@ -245,7 +289,7 @@ jobs:
           fi
 
   check_artifact:
-    needs: build_release_result
+    needs: [build_release_result, check_version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -253,7 +297,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/download-artifact@v4
         with:
-          name: android-release-candidate-${{ github.event.pull_request.head.sha }}
+          name: ${{ needs.check_version.outputs.apk_artifact_name }}
+          path: release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.check_version.outputs.mapping_artifact_name }}
           path: release-artifacts
       - name: Check APK ABI, mapping and checksums
         run: python .github/scripts/release_verify.py artifact --directory release-artifacts --head '${{ github.event.pull_request.head.sha }}'
@@ -279,7 +327,7 @@ jobs:
           python-version: '3.11'
       - uses: actions/download-artifact@v4
         with:
-          name: android-release-ui-test-${{ github.event.pull_request.head.sha }}
+          name: ${{ needs.check_version.outputs.ui_test_artifact_name }}
           path: ui-test-artifacts
       - name: Verify downloaded x86_64 test artifact
         env:
@@ -302,10 +350,10 @@ jobs:
               raise SystemExit('x86_64 测试包的来源提交与 PR 不一致')
           if (directory / 'release-notes.txt').read_text().strip() != os.environ['PR_BODY'].strip():
               raise SystemExit('x86_64 测试包的更新文案与 PR 不一致')
-          apk = directory / 'pro-release.apk'
+          apk = directory / f"CyxbsMobile-{expected['tag']}-x86_64.Apk"
           if not apk.is_file() or apk.stat().st_size == 0:
               raise SystemExit('x86_64 测试 APK 缺失或为空')
-          if (directory / 'SHA256SUMS').read_text() != sha256_file(apk) + '  pro-release.apk\n':
+          if (directory / 'SHA256SUMS').read_text() != sha256_file(apk) + f'  {apk.name}\n':
               raise SystemExit('x86_64 测试 APK 的 SHA256 不一致')
           PY
       - name: Select latest stable Android emulator API
@@ -344,7 +392,38 @@ jobs:
           channel: stable
           # Action 使用 sh 执行 script；单行命令避免 Bash 专用选项和续行解析问题。
           # Python 检查失败会返回非零状态，Action 会直接将该步骤标记失败。
-          script: python .github/scripts/verify_release_update_dialog.py --apk ui-test-artifacts/pro-release.apk
+          script: python .github/scripts/verify_release_update_dialog.py --apk ui-test-artifacts/${{ needs.check_version.outputs.ui_test_artifact_name }}
       - name: 提示模拟器检查失败原因
         if: failure()
         run: echo '::error::模拟器更新检查失败：请检查 x86_64 临时产物、最新稳定 Android 镜像、安装启动、线上版本名与完整文案、下载按钮跳转及 APK 下载地址；具体原因见上方日志。'
+
+  comment_artifacts:
+    # 评论单独运行，仅检出来源检查已通过的本仓库 develop 提交中的评论脚本。
+    needs: [check_source, check_version, build_release_result, check_artifact, check_update_dialog]
+    if: ${{ always() && !cancelled() && needs.check_source.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/comment_release_artifacts.cjs
+          sparse-checkout-cone-mode: false
+      - name: 更新 PR 产物下载提示
+        uses: actions/github-script@v9
+        env:
+          APK_ARTIFACT_NAME: ${{ needs.check_version.outputs.apk_artifact_name }}
+          MAPPING_ARTIFACT_NAME: ${{ needs.check_version.outputs.mapping_artifact_name }}
+          UI_TEST_ARTIFACT_NAME: ${{ needs.check_version.outputs.ui_test_artifact_name }}
+          VERSION_RESULT: ${{ needs.check_version.result }}
+          BUILD_RESULT: ${{ needs.build_release_result.result }}
+          ARTIFACT_RESULT: ${{ needs.check_artifact.result }}
+          UI_TEST_RESULT: ${{ needs.check_update_dialog.result }}
+        with:
+          script: |
+            const commentReleaseArtifacts = require('./.github/scripts/comment_release_artifacts.cjs');
+            await commentReleaseArtifacts({ github, context, core });
