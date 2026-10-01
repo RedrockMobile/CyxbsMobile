@@ -88,8 +88,8 @@ abstract class AppNavReportTask : DefaultTask() {
       > 打包时由 build-logic/manager/$taskName 自动生成
       > 该文件需要被 git 提交用于后续使用
 
-      - versionCode: ${Config.versionCode}
-      - versionName: ${Config.versionName}
+      - versionCode: ${Config.versionCode(project)}
+      - versionName: ${Config.versionName(project)}
 
       ## 调试方法
 
@@ -176,6 +176,7 @@ abstract class AppNavReportTask : DefaultTask() {
       val generateAppNavReport = project.tasks.register("generateAppNavReport", AppNavReportTask::class.java) {
         group = "cyxbs"
         description = "Aggregate @AppNav deeplink reports from dependency modules into <app>/AppNav.md."
+        notCompatibleWithConfigurationCache("")
         // task 执行时再按 path 解析依赖模块，避免配置阶段 evaluate 顺序差异导致 findProject 返回 null
         val modulePathToDir = project.provider {
           project.collectDependencyProjectPaths().mapNotNull { path ->

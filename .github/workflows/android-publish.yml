@@ -1,0 +1,292 @@
+name: Android Release Publish
+
+on:
+  push:
+    branches: [release]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: android-release-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # 专用 App 的正式版本与下一版本提交不重复触发发布；普通合并提交始终接受检查。
+    if: "${{ github.actor != 'redrockmobile-android-release[bot]' || (!startsWith(github.event.head_commit.message, ':bookmark: 发布') && !startsWith(github.event.head_commit.message, ':bookmark: 预备')) }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests
+      # 只接受由 develop PR 产生的合并提交；通过其源 SHA 找回原 CI 正式包。
+      - name: Locate merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" > "$RUNNER_TEMP/pulls.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          matches = [pr for pr in json.loads((temp / 'pulls.json').read_text())
+                     if pr.get('merge_commit_sha') == os.environ['GITHUB_SHA']
+                     and pr['base']['ref'] == 'release'
+                     and pr['head']['ref'] == 'develop'
+                     and pr.get('merged_at')]
+          if len(matches) != 1:
+              raise SystemExit('release push 必须对应唯一的 develop 合并 PR')
+          pr = matches[0]
+          (temp / 'pr.json').write_text(json.dumps(pr, ensure_ascii=False))
+          (temp / 'head.sha').write_text(pr['head']['sha'])
+          PY
+      - name: Locate successful candidate artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HEAD_SHA=$(cat "$RUNNER_TEMP/head.sha")
+          ARTIFACT_NAME="android-release-candidate-$HEAD_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME&per_page=100" > "$RUNNER_TEMP/artifacts.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          head = (temp / 'head.sha').read_text()
+          artifacts = json.loads((temp / 'artifacts.json').read_text())['artifacts']
+          candidates = [artifact for artifact in artifacts
+                        if artifact['name'] == f'android-release-candidate-{head}'
+                        and not artifact['expired'] and artifact.get('workflow_run')]
+          if not candidates:
+              raise SystemExit('找不到 PR 检查时保存的正式 APK 和 mapping')
+          artifact = max(candidates, key=lambda item: item['created_at'])
+          (temp / 'candidate-run.id').write_text(str(artifact['workflow_run']['id']))
+          PY
+          RUN_ID=$(cat "$RUNNER_TEMP/candidate-run.id")
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > "$RUNNER_TEMP/candidate-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/candidate-jobs.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          run = json.loads((temp / 'candidate-run.json').read_text())
+          # API 返回仓库相对路径；去掉可选的 @ref 后必须精确匹配候选工作流。
+          if (run['event'] != 'pull_request'
+                  or run['path'].split('@', 1)[0] != '.github/workflows/android-release.yml'):
+              raise SystemExit('候选产物不是发版 PR 工作流生成的')
+          required = {'check_source', 'check_title', 'check_notes', 'check_version',
+                      'build_release', 'check_artifact', 'check_update_dialog'}
+          jobs = {job['name']: job['conclusion'] for job in
+                  json.loads((temp / 'candidate-jobs.json').read_text())['jobs']}
+          if any(jobs.get(name) != 'success' for name in required):
+              raise SystemExit('候选产物所在 CI 的必需检查未全部成功')
+          PY
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" --dir release-artifacts
+      - name: Verify exact PR artifact and merge commit
+        run: |
+          python .github/scripts/release_verify.py merge \
+            --pr "$RUNNER_TEMP/pr.json" --artifacts release-artifacts
+      # 仅在 PR 经审批合并且候选产物已核对后，把构建时注入的内容写入 release。
+      - name: Create GitHub App token for release commit
+        id: commit_app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Commit tested version metadata on release
+        env:
+          GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
+          APP_SLUG: ${{ steps.commit_app_token.outputs.app-slug }}
+        run: |
+          gh auth setup-git --hostname github.com
+          git fetch --no-tags origin release
+          CURRENT=$(git rev-parse origin/release)
+          if [ "$CURRENT" = "$GITHUB_SHA" ]; then
+            TITLE=$(python -c 'import json; print("v" + json.load(open("release-artifacts/release-metadata.json"))["versionName"])')
+            VERSION_CODE=$(python -c 'import json; print(json.load(open("release-artifacts/release-metadata.json"))["versionCode"])')
+            python .github/scripts/release_version.py prepare \
+              --online-file release-artifacts/online-release.json --title "$TITLE" \
+              --body-file release-artifacts/release-notes.txt \
+              --output "$RUNNER_TEMP/committed-metadata.json"
+            cmp "$RUNNER_TEMP/committed-metadata.json" release-artifacts/release-metadata.json
+            git diff --exit-code -- . ':(exclude)gradle.properties' ':(exclude)build-logic/release-notes.txt'
+            APP_BOT="$APP_SLUG[bot]"
+            APP_BOT_ID=$(gh api "/users/$APP_BOT" --jq .id)
+            git config user.name "$APP_BOT"
+            git config user.email "$APP_BOT_ID+$APP_BOT@users.noreply.github.com"
+            git add -- gradle.properties build-logic/release-notes.txt
+            git commit -m ":bookmark: 发布${TITLE#v}版本（versionCode $VERSION_CODE）" \
+              -m '- 将经 PR 审批与候选 CI 校验的版本号提交到 release。' \
+              -m '- 将 PR 正文记录为正式更新文案，与候选 APK 的构建输入一致。' \
+              -m '- 正式 arm64 APK、mapping 和模拟器检查已通过；发布任务继续复用同一候选产物。'
+            git push origin HEAD:release
+            RELEASE_COMMIT=$(git rev-parse HEAD)
+          else
+            PARENT=$(git rev-parse "$CURRENT^")
+            if [ "$PARENT" = "$GITHUB_SHA" ]; then
+              git switch --detach "$CURRENT"
+              python .github/scripts/release_verify.py commit \
+                --parent "$GITHUB_SHA" --artifacts release-artifacts
+              RELEASE_COMMIT="$CURRENT"
+            else
+              # 重跑时 release 可能已预增下一版；先核对两次提交的父子关系和内容。
+              git switch --detach "$PARENT"
+              python .github/scripts/release_verify.py commit \
+                --parent "$GITHUB_SHA" --artifacts release-artifacts
+              git switch --detach "$CURRENT"
+              python .github/scripts/release_verify.py next \
+                --published "$PARENT" --artifacts release-artifacts
+              RELEASE_COMMIT="$PARENT"
+            fi
+          fi
+          printf '%s\n' "$RELEASE_COMMIT" > release-artifacts/release-commit.sha
+      - name: Upload APK and update Cyxbs service
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          python .github/scripts/publish_update_service.py \
+            --apk release-artifacts/*.Apk \
+            --metadata release-artifacts/release-metadata.json \
+            --notes release-artifacts/release-notes.txt \
+            --online-file release-artifacts/online-release.json
+      # 官网上传可能耗时较长，因此在上传成功后才签发 App 的短期令牌。
+      - name: Create GitHub App token for publishing and develop sync
+        id: finalize_app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Publish GitHub Release from tested artifact
+        env:
+          GH_TOKEN: ${{ steps.finalize_app_token.outputs.token }}
+        run: |
+          TAG=$(python -c 'import json; print(json.load(open("release-artifacts/release-metadata.json"))["tag"])')
+          TITLE=$(python -c 'import json; print("v" + json.load(open("release-artifacts/release-metadata.json"))["versionName"])')
+          RELEASE_COMMIT=$(cat release-artifacts/release-commit.sha)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$RUNNER_TEMP/existing-release.json"
+            python .github/scripts/release_verify.py github-release \
+              --release "$RUNNER_TEMP/existing-release.json" --artifacts release-artifacts \
+              --target "$RELEASE_COMMIT"
+          else
+            gh release create "$TAG" release-artifacts/*.Apk release-artifacts/proguardMapping-*.txt \
+              --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --notes-file release-artifacts/release-notes.txt --target "$RELEASE_COMMIT"
+          fi
+      # GitHub Release 始终指向正式版本提交；随后在 release 单独提交下一版开发版本。
+      - name: Commit next version on release
+        env:
+          GH_TOKEN: ${{ steps.finalize_app_token.outputs.token }}
+          APP_SLUG: ${{ steps.finalize_app_token.outputs.app-slug }}
+        run: |
+          gh auth setup-git --hostname github.com
+          RELEASE_COMMIT=$(cat release-artifacts/release-commit.sha)
+          git fetch --no-tags origin release
+          CURRENT=$(git rev-parse origin/release)
+          if [ "$CURRENT" = "$RELEASE_COMMIT" ]; then
+            git switch --detach "$RELEASE_COMMIT"
+            python .github/scripts/release_version.py bump \
+              --metadata release-artifacts/release-metadata.json
+            git diff --exit-code -- . ':(exclude)gradle.properties'
+            NEXT_NAME=$(sed -n 's/^cyxbs\.versionName=//p' gradle.properties)
+            NEXT_CODE=$(sed -n 's/^cyxbs\.versionCode=//p' gradle.properties)
+            APP_BOT="$APP_SLUG[bot]"
+            APP_BOT_ID=$(gh api "/users/$APP_BOT" --jq .id)
+            git config user.name "$APP_BOT"
+            git config user.email "$APP_BOT_ID+$APP_BOT@users.noreply.github.com"
+            git add -- gradle.properties
+            git commit -m ":bookmark: 预备${NEXT_NAME}版本（versionCode $NEXT_CODE）" \
+              -m '- 正式版本已发布到掌邮官网和 GitHub Release，发布 tag 指向上一提交。' \
+              -m '- 在 release 分支将 versionCode 预增一位，避免复用已发布的版本号。' \
+              -m '- 将 versionName 的补丁位加一并标记 alpha，供后续 develop 开发使用。' \
+              -m '- 已发布的更新文案和正式 APK、mapping 不随下一版提交改变。'
+            git push origin HEAD:release
+            CURRENT=$(git rev-parse HEAD)
+          else
+            git switch --detach "$CURRENT"
+          fi
+          python .github/scripts/release_verify.py next \
+            --published "$RELEASE_COMMIT" --artifacts release-artifacts
+          printf '%s\n' "$CURRENT" > release-artifacts/next-release-commit.sha
+      - name: Sync both release commits into develop
+        env:
+          GH_TOKEN: ${{ steps.finalize_app_token.outputs.token }}
+          APP_SLUG: ${{ steps.finalize_app_token.outputs.app-slug }}
+        run: |
+          gh auth setup-git --hostname github.com
+          git fetch --no-tags origin release develop
+          NEXT_COMMIT=$(cat release-artifacts/next-release-commit.sha)
+          if [ "$(git rev-parse origin/release)" != "$NEXT_COMMIT" ]; then
+            echo '::error::同步 develop 前 release 已发生其他变更，请检查分支状态。'
+            exit 1
+          fi
+          git switch --detach origin/develop
+          # 已同步时允许安全重跑；尚未同步时合并 release 上的两次版本提交。
+          SYNCED=0
+          FAST_FORWARD=0
+          if git merge-base --is-ancestor "$NEXT_COMMIT" HEAD; then
+            SYNCED=1
+          elif git merge-base --is-ancestor HEAD origin/release; then
+            # develop 没有新增提交时直接快进，不额外制造第三次 CI 提交。
+            git merge --ff-only origin/release
+            FAST_FORWARD=1
+          else
+            git merge --no-ff --no-commit origin/release
+          fi
+          SYNCED="$SYNCED" python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          metadata = json.loads(Path('release-artifacts/release-metadata.json').read_text())
+          properties = Path('gradle.properties').read_text()
+          code_match = re.search(r'^cyxbs\.versionCode=(\d+)$', properties, re.MULTILINE)
+          name_match = re.search(r'^cyxbs\.versionName=(.+)$', properties, re.MULTILINE)
+          major, minor, patch = (int(part) for part in metadata['versionName'].split('.'))
+          expected_name = f'{major}.{minor}.{patch + 1}-alpha'
+          expected_code = metadata['versionCode'] + 1
+          if not code_match or not name_match:
+              raise SystemExit('develop 缺少下一版版本属性')
+          code = int(code_match.group(1))
+          name = name_match.group(1)
+          if os.environ['SYNCED'] == '1':
+              if code < expected_code or (code == expected_code and name != expected_name):
+                  raise SystemExit('release 已合入 develop，但下一版版本号不正确')
+          elif (code, name) != (expected_code, expected_name):
+              raise SystemExit('合并 release 后的 develop 版本号与下一版提交不一致')
+          PY
+          if [ "$SYNCED" = 1 ]; then
+            exit 0
+          fi
+          if [ "$FAST_FORWARD" = 1 ]; then
+            git push origin HEAD:develop
+            exit 0
+          fi
+          APP_BOT="$APP_SLUG[bot]"
+          APP_BOT_ID=$(gh api "/users/$APP_BOT" --jq .id)
+          git config user.name "$APP_BOT"
+          git config user.email "$APP_BOT_ID+$APP_BOT@users.noreply.github.com"
+          TITLE=$(python -c 'import json; print("v" + json.load(open("release-artifacts/release-metadata.json"))["versionName"])')
+          VERSION_CODE=$(python -c 'import json; print(json.load(open("release-artifacts/release-metadata.json"))["versionCode"])')
+          git commit -m ":twisted_rightwards_arrows: 同步已发布的 $TITLE（versionCode $VERSION_CODE）及下一版到 develop" \
+            -m '- 将 release 上的正式版本提交和下一版预增提交一起合入 develop。' \
+            -m '- develop 继承已发布文案，以及预增后的 versionCode 和 alpha 版本名。' \
+            -m '- 发布包与混淆文件已通过候选 CI 校验并完成官网及 GitHub 发布。'
+          git push origin HEAD:develop
+      - name: 提示合并后发布失败原因
+        if: failure()
+        run: echo '::error::合并后发布失败：请查看上方失败步骤，确认候选产物、掌邮服务端、GitHub Release 或 develop 同步状态后重跑。'

@@ -1,0 +1,267 @@
+name: Android Release Candidate
+
+on:
+  pull_request:
+    branches: [release]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check_source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          if [ "$HEAD_REF" != develop ]; then
+            echo '::error::发版 PR 的来源分支必须是 develop，请从 develop 向 release 发起 PR。'
+            exit 1
+          fi
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo '::error::发版 PR 必须来自本仓库的 develop 分支，不接受 fork 仓库。'
+            exit 1
+          fi
+          if [ "$IS_DRAFT" != false ]; then
+            echo '::error::发版 PR 不能是草稿，请先标记为 Ready for review。'
+            exit 1
+          fi
+
+  check_title:
+    needs: check_source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check version title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', os.environ['PR_TITLE']):
+              print('::error::PR 标题必须严格为 vX.Y.Z，例如 v7.0.1。')
+              raise SystemExit(1)
+          PY
+
+  check_notes:
+    needs: check_title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check user-visible release notes
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python - <<'PY'
+          import os
+          notes = os.environ.get('PR_BODY', '').strip()
+          if not 30 <= len(notes) <= 20000:
+              print('::error::PR 正文必须填写至少 30 字、最多 20000 字的用户可见更新内容。')
+              raise SystemExit(1)
+          PY
+
+  check_version:
+    needs: check_notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests
+      - name: Check online version and derive candidate version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          bash .github/scripts/prepare_release_candidate.sh
+          PYTHONPATH=.github/scripts python -m unittest discover -s .github/scripts/tests -p 'test_*.py'
+      - name: 提示版本检查失败原因
+        if: failure()
+        run: echo '::error::版本检查失败：请核对线上 versionName、versionCode、PR 标题及 Gradle 版本属性；具体原因见上方日志。'
+
+  build_release:
+    needs: check_version
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: gradle/actions/setup-gradle@v3
+      - run: python -m pip install requests
+      - name: Prepare candidate release metadata
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          bash .github/scripts/prepare_release_candidate.sh
+          git diff --exit-code -- . ':(exclude)gradle.properties' ':(exclude)build-logic/release-notes.txt'
+      - name: Create signing files
+        env:
+          BUGLY_APP_ID: ${{ secrets.BUGLY_APP_ID }}
+          SOPHIX_APP_ID: ${{ secrets.SOPHIX_APP_ID }}
+          SOPHIX_APP_SECRET: ${{ secrets.SOPHIX_APP_SECRET }}
+          SOPHIX_RSA: ${{ secrets.SOPHIX_RSA }}
+          UM_APP_KEY: ${{ secrets.UM_APP_KEY }}
+          UM_PUSH_SECRET: ${{ secrets.UM_PUSH_SECRET }}
+          UM_SHARE_SINA_APP_KEY: ${{ secrets.UM_SHARE_SINA_APP_KEY }}
+          UM_SHARE_SINA_APP_SECRET: ${{ secrets.UM_SHARE_SINA_APP_SECRET }}
+          UM_SHARE_QQ_ZONE_APP_ID: ${{ secrets.UM_SHARE_QQ_ZONE_APP_ID }}
+          UM_SHARE_QQ_ZONE_APP_SECRET: ${{ secrets.UM_SHARE_QQ_ZONE_APP_SECRET }}
+          amap_apikey: ${{ secrets.AMAP_APIKEY }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_CYXBS_URL: ${{ secrets.KEY_CYXBS_URL }}
+        run: |
+          python .github/scripts/create_secret.py \
+            "$BUGLY_APP_ID" "$SOPHIX_APP_ID" "$SOPHIX_APP_SECRET" "$SOPHIX_RSA" \
+            "$UM_APP_KEY" "$UM_PUSH_SECRET" "$UM_SHARE_SINA_APP_KEY" "$UM_SHARE_SINA_APP_SECRET" \
+            "$UM_SHARE_QQ_ZONE_APP_ID" "$UM_SHARE_QQ_ZONE_APP_SECRET" "$amap_apikey" \
+            "$RELEASE_KEY_ALIAS" "$RELEASE_KEY_PASSWORD" "$RELEASE_STORE_PASSWORD" "$KEY_CYXBS_URL"
+          test -s build-logic/secret/key-cyxbs
+      - name: Build signed arm64 APK and mapping
+        run: ./gradlew :cyxbs-applications:pro:channelRelease --no-configuration-cache
+      - name: Stage candidate artifacts
+        run: |
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          metadata = json.loads(Path('${{ runner.temp }}/release-metadata.json').read_text())
+          apks = list(Path('cyxbs-applications/pro/build/channel').glob('*official*.apk'))
+          mapping = Path('build-logic/manager/proguardMapping.txt')
+          if len(apks) != 1 or not mapping.is_file() or mapping.stat().st_size == 0:
+              raise SystemExit('正式 APK 或混淆映射文件缺失/不唯一')
+          output = Path('release-artifacts')
+          output.mkdir()
+          # 正式分享文件使用 .Apk，避免 QQ 自动改名；Gradle 原始输出仍是 .apk。
+          shutil.copy2(apks[0], output / f"CyxbsMobile-{metadata['tag']}.Apk")
+          shutil.copy2(mapping, output / f"proguardMapping-{metadata['tag']}.txt")
+          for name in ('release-metadata.json', 'release-base.sha', 'release-head.sha', 'online-release.json'):
+              shutil.copy2(Path('${{ runner.temp }}') / name, output / name)
+          shutil.copy2('build-logic/release-notes.txt', output / 'release-notes.txt')
+          PY
+          cd release-artifacts
+          sha256sum *.Apk proguardMapping-*.txt > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-candidate-${{ github.event.pull_request.head.sha }}
+          path: release-artifacts/
+          if-no-files-found: error
+      - name: 提示正式包构建失败原因
+        if: failure()
+        run: echo '::error::正式 arm64 APK 或混淆文件构建失败：请检查签名配置、Gradle 报错和产物路径；具体原因见上方日志。'
+
+  check_artifact:
+    needs: build_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release-candidate-${{ github.event.pull_request.head.sha }}
+          path: release-artifacts
+      - name: Check APK ABI, mapping and checksums
+        run: python .github/scripts/release_verify.py artifact --directory release-artifacts --head '${{ github.event.pull_request.head.sha }}'
+      - name: 提示产物检查失败原因
+        if: failure()
+        run: echo '::error::产物检查失败：正式 APK、混淆文件、SHA256 或 arm64 ABI 不符合要求；具体原因见上方日志。'
+
+  check_update_dialog:
+    needs: check_artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: gradle/actions/setup-gradle@v3
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release-candidate-${{ github.event.pull_request.head.sha }}
+          path: release-artifacts
+      - name: Inject the exact tested release metadata
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.txt"
+          python .github/scripts/release_version.py prepare \
+            --online-file release-artifacts/online-release.json --title "$PR_TITLE" \
+            --body-file "$RUNNER_TEMP/pr-body.txt" --output "$RUNNER_TEMP/ui-metadata.json"
+          cmp "$RUNNER_TEMP/ui-metadata.json" release-artifacts/release-metadata.json
+          cmp build-logic/release-notes.txt release-artifacts/release-notes.txt
+      - name: Create signing files
+        env:
+          BUGLY_APP_ID: ${{ secrets.BUGLY_APP_ID }}
+          SOPHIX_APP_ID: ${{ secrets.SOPHIX_APP_ID }}
+          SOPHIX_APP_SECRET: ${{ secrets.SOPHIX_APP_SECRET }}
+          SOPHIX_RSA: ${{ secrets.SOPHIX_RSA }}
+          UM_APP_KEY: ${{ secrets.UM_APP_KEY }}
+          UM_PUSH_SECRET: ${{ secrets.UM_PUSH_SECRET }}
+          UM_SHARE_SINA_APP_KEY: ${{ secrets.UM_SHARE_SINA_APP_KEY }}
+          UM_SHARE_SINA_APP_SECRET: ${{ secrets.UM_SHARE_SINA_APP_SECRET }}
+          UM_SHARE_QQ_ZONE_APP_ID: ${{ secrets.UM_SHARE_QQ_ZONE_APP_ID }}
+          UM_SHARE_QQ_ZONE_APP_SECRET: ${{ secrets.UM_SHARE_QQ_ZONE_APP_SECRET }}
+          amap_apikey: ${{ secrets.AMAP_APIKEY }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_CYXBS_URL: ${{ secrets.KEY_CYXBS_URL }}
+        run: |
+          python .github/scripts/create_secret.py \
+            "$BUGLY_APP_ID" "$SOPHIX_APP_ID" "$SOPHIX_APP_SECRET" "$SOPHIX_RSA" \
+            "$UM_APP_KEY" "$UM_PUSH_SECRET" "$UM_SHARE_SINA_APP_KEY" "$UM_SHARE_SINA_APP_SECRET" \
+            "$UM_SHARE_QQ_ZONE_APP_ID" "$UM_SHARE_QQ_ZONE_APP_SECRET" "$amap_apikey" \
+            "$RELEASE_KEY_ALIAS" "$RELEASE_KEY_PASSWORD" "$RELEASE_STORE_PASSWORD" "$KEY_CYXBS_URL"
+          test -s build-logic/secret/key-cyxbs
+      - name: Build disposable x86_64 release APK
+        run: ./gradlew :cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true --no-configuration-cache
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify update dialog on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          script: |
+            set -euo pipefail
+            python .github/scripts/verify_release_update_dialog.py \
+              --apk cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk
+      - name: 提示模拟器检查失败原因
+        if: failure()
+        run: echo '::error::模拟器更新弹窗检查失败：请检查 x86_64 release 包构建、安装启动和弹窗文案；具体原因见上方日志。'

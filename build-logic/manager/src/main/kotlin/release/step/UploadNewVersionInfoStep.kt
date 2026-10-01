@@ -1,5 +1,6 @@
 package release.step
 
+import org.gradle.api.Project
 import release.net.ReleaseData
 import release.net.TaskService
 import java.util.Scanner
@@ -10,17 +11,18 @@ import java.util.Scanner
  * @author 985892345
  * @date 2025/9/21
  */
-class UploadNewVersionInfoStep(val netService: TaskService) {
+class UploadNewVersionInfoStep(val project: Project, val netService: TaskService) {
 
+  /** 将 [apkUrl] 和当前工程版本信息写入官网；取消或失败时返回 null。 */
   fun execute(apkUrl: String): ReleaseData? {
     println("\n======================== 发布新版本信息 ========================".purple())
     val releaseData = postUpdateContent(apkUrl)
     if (releaseData != null) {
       println("✅ 发版成功!".green())
-      println("versionName: " + Config.versionName.yellow())
-      println("versionCode: " + Config.versionCode.toString().yellow())
+      println("versionName: " + Config.versionName(project).yellow())
+      println("versionCode: " + Config.versionCode(project).toString().yellow())
       println("updateContent: ")
-      println(Config.updateContent.yellow())
+      println(Config.updateContent(project).yellow())
     }
     return releaseData
   }
@@ -31,9 +33,9 @@ class UploadNewVersionInfoStep(val netService: TaskService) {
   private fun postUpdateContent(apkUrl: String): ReleaseData? {
     val data = ReleaseData(
       apkUrl = apkUrl,
-      updateContent = Config.updateContent,
-      versionCode = Config.versionCode,
-      versionName = Config.versionName
+      updateContent = Config.updateContent(project),
+      versionCode = Config.versionCode(project),
+      versionName = Config.versionName(project)
     )
     while (true) {
       try {

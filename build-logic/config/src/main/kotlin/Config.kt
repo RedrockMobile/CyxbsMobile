@@ -10,24 +10,36 @@ import java.util.regex.Pattern
  * @date 2022/5/26 15:13
  */
 object Config {
-  // 发版有单独的 gradle task，请全局搜索 ReleaseAppTask
-  const val versionCode = 95 // 线上94，开发95
-  const val versionName = "7.0.1-alpha" // 线上7.0.0，开发7.0.1-alpha，自己打包 -alpha，内测 -beta
+  /** 从 [project] 的根工程读取 Android versionCode；缺失或非法时让配置阶段失败。 */
+  fun versionCode(project: Project): Int = project.rootProject.providers
+    .gradleProperty("cyxbs.versionCode").get().toInt()
 
-  val composeDesktopVersion: String // compose desktop 只能是 x.y.z 形式，不能带 -
-    get() = versionName.substringBefore("-")
+  /** 从 [project] 的根工程读取版本名，供各应用模块共用。 */
+  fun versionName(project: Project): String = project.rootProject.providers
+    .gradleProperty("cyxbs.versionName").get()
 
-  val releaseAbiFilters = listOf("arm64-v8a")
+  /** 从 [project] 根目录的独立文本文件读取发布文案，保留 PR 正文中的换行。 */
+  fun updateContent(project: Project): String = project.rootProject.providers
+    .fileContents(project.rootProject.layout.projectDirectory.file("build-logic/release-notes.txt"))
+    .asText.get().trimEnd()
+
+  /** 从 [project] 的版本名去掉预发布后缀，供 Compose Desktop 打包。 */
+  fun composeDesktopVersion(project: Project): String = versionName(project).substringBefore("-")
+
+  /**
+   * 返回 release 包需要携带的 ABI。CI 通过显式参数构建 x86_64 测试包；正常发版始终只携带 arm64-v8a。
+   * 该参数只允许作用于正式应用模块，避免改变其他模块的发布产物。
+   */
+  fun releaseAbiFilters(project: Project): List<String> {
+    val ciX86Release = project.providers.gradleProperty("cyxbs.ciReleaseX86_64")
+      .orNull?.toBooleanStrict() == true
+    return if (ciX86Release && project.path == ":cyxbs-applications:pro") {
+      listOf("x86_64")
+    } else {
+      listOf("arm64-v8a")
+    }
+  }
   val debugAbiFilters = listOf("arm64-v8a","x86_64")
-
-  // 线上版本更新内容，注意缩进统一
-  val updateContent = """
-    掌上重邮7.0.0版本焕新升级！
-    1. 邮子清单升级，新增日历提醒、与课表双向同步、关联系统日历等
-    2. 课表重构，事务支持分钟级粒度以及全天时间段
-    3. 校园地图更新 
-    4. 优化使用体验，修复已知问题
-  """.trimIndent()
 
   val resourcesExclude = listOf(
     "LICENSE.txt",

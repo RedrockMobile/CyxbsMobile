@@ -116,7 +116,7 @@ if (secretGradleFile.exists()) {
     getApkFile.set {
       channel.outputDir.listFiles()!!.single {
         it.name.matches(
-          Regex("掌上重邮-${Config.versionName}-official-release-\\d+-\\d+\\.apk")
+          Regex("掌上重邮-${Config.versionName(project)}-official-release-\\d+-\\d+\\.apk")
         )
       }
     }
