@@ -342,10 +342,9 @@ jobs:
           target: google_apis
           arch: x86_64
           channel: stable
-          script: |
-            set -euo pipefail
-            python .github/scripts/verify_release_update_dialog.py \
-              --apk ui-test-artifacts/pro-release.apk
+          # Action 使用 sh 执行 script；单行命令避免 Bash 专用选项和续行解析问题。
+          # Python 检查失败会返回非零状态，Action 会直接将该步骤标记失败。
+          script: python .github/scripts/verify_release_update_dialog.py --apk ui-test-artifacts/pro-release.apk
       - name: 提示模拟器检查失败原因
         if: failure()
         run: echo '::error::模拟器更新弹窗检查失败：请检查 x86_64 临时产物、最新稳定 Android 镜像查询、安装启动和弹窗文案；具体原因见上方日志。'
