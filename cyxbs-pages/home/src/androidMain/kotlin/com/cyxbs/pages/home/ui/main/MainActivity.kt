@@ -41,7 +41,7 @@ class MainActivity : BaseActivity() {
       AppTheme {
         AppNavDisplay()
         AppSnackbarCompose()
-        DeepLinkHandler()
+        ActivityIntentHandler()
       }
     }
     initUpdate()
@@ -49,28 +49,33 @@ class MainActivity : BaseActivity() {
   }
 
   /**
-   * 在应用根组合中常驻监听页面协议。
+   * 在应用根组合中常驻监听页面协议与更新测试 Intent。
    *
    * [DisposableEffect] 会在 [AppNavDisplay] 完成首次组合后执行，避免冷启动时导航栈尚未就绪；
-   * 同时它不依附具体页面，因此进入清单、课表等子页面后仍能接收新的 Intent。
+   * 同时它不依附具体页面，因此登录页及其协议弹窗出现时也能触发线上更新检查。
    */
   @Composable
-  private fun DeepLinkHandler() {
+  private fun ActivityIntentHandler() {
     DisposableEffect(Unit) {
-      handleDeepLink(intent)
-      val listener = Consumer<Intent>(::handleDeepLink)
+      handleActivityIntent(intent)
+      val listener = Consumer<Intent>(::handleActivityIntent)
       addOnNewIntentListener(listener)
       onDispose { removeOnNewIntentListener(listener) }
     }
   }
 
   /**
-   * 在 Activity 容器层统一处理页面协议。
+   * 在 Activity 容器层统一处理页面协议和更新测试，接收启动或后续传入的 [intent]。
    *
    * MainActivity 会承载主页之外的导航页面，因此不能把监听绑定到主页 Composable 的生命周期；
    * 否则离开主页后 [onNewIntent] 到达时，原监听已经随组合销毁而移除。
    */
-  private fun handleDeepLink(intent: Intent) {
+  private fun handleActivityIntent(intent: Intent) {
+    if (intent.action == "com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG") {
+      // 更新弹窗无需登录；只强制版本判断和跳过频控，数据仍由真实更新服务请求。
+      IAppUpdateService.debug()
+      return
+    }
     val url = intent.data ?: return
     runCatching { AppScheme.jump(url.toString()) }
       .onSuccess { handled ->

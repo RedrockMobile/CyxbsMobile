@@ -49,9 +49,18 @@ PR 检查失败时不会提交版本文件。合并后的任一步失败都会�
 | `check_version` | `prepare_release_candidate.sh` 调用 `release_version.py online` 无令牌读取 `https://app.redrock.team/cyxbsAppUpdate.json`，再调用 `prepare`。线上 `version_code` 必须是正整数；候选 `versionCode = 线上 code + 1`，且不能达到 Android 版本号上限。若线上 `version_name` 是合法 `X.Y.Z`，PR 标题版本必须严格更高；若线上名字非法，发出警告并允许以 PR 标题覆盖。`gradle.properties` 中两个版本键必须各出现一次，但**不比较 develop 当前的数值**。最后运行 `tests/` 中的 Python 回归测试，并输出线上快照、候选元数据和 release 基线供两个构建 job 共用。 |
 | `build_release` | 矩阵并行运行 `arm64-v8a` 和 `x86_64`，共用 `prepare_release_candidate.sh --reuse-checked` 注入的版本快照和 PR 文案；只允许 CI 工作区中的版本号、文案因注入而变化。两个 Runner 分别生成签名文件。arm64 执行 `:cyxbs-applications:pro:channelRelease`，要求唯一 official APK 和非空 mapping，保存正式包、版本元数据、基线、来源 SHA、文案及 SHA256；正式文件为 `CyxbsMobile-vX.Y.Z-code.Apk`、`proguardMapping-vX.Y.Z-code.txt`。x86_64 执行 `:cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true`，上传仅供后续 Runner 使用的 `android-release-ui-test-提交SHA`，保留一天，包含 APK、版本、文案、来源 SHA 和 SHA256，不进入正式候选 artifact 或 GitHub Release。两条命令均加 `--no-configuration-cache`。`build_release_result` 汇总两种 ABI 的结果，显示为分支保护要求的 `build_release` 检查。重跑构建会替换同一运行中的同名 artifact。 |
 | `check_artifact` | `release_verify.py artifact` 要求候选版本名、code、tag 和 PR head SHA 匹配；APK 与 mapping 存在、非空且 SHA256 正确；APK 中的原生 `.so` 只能是 `arm64-v8a`。 |
-| `check_update_dialog` | 构建汇总成功后，在独立 Runner 下载 x86_64 临时 artifact，核对候选版本、PR 提交、更新文案与 APK SHA256，不重新打包或创建签名文件。在最新稳定 Android 模拟器安装下载的 release 包，通过 `cyxbs://dialog/update` 强制打开弹窗，30 秒内检查标题、测试文案和“立即更新”按钮可见。不需要账号，不测试登录、课表或真实更新接口的自动发现。临时 artifact 过期后需先重跑 x86_64 构建，再重跑检测。 |
+| `check_update_dialog` | 构建汇总成功后，在独立 Runner 下载 x86_64 临时 artifact，核对候选版本、PR 提交、更新文案与 APK SHA256，不重新打包或创建签名文件。在最新稳定 Android 模拟器安装下载的 release 包，先正常启动并等待应用界面出现（最多 30 秒），再发送与 `ApkInstallStep` 相同的 `com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG` Intent，避免冷启动导航与弹窗布局争用。测试停留在首次启动的登录页，不操作协议确认框、不进入游客模式。`MainActivity` 在容器层接收 Intent，应用经 `IAppUpdateService.debug()` 使用真实更新请求链路获取版本名、文案和下载地址，仅强制通过新版本判断并跳过弹窗频控；脚本不注入更新数据。触发后在 30 秒内检查更新标题及按钮，并逐字核对线上版本名和完整文案；随后点击“立即更新”，核对前台浏览器的完整下载 URL 及 APK 响应。不需要账号，不测试登录和课表。临时 artifact 过期后需先重跑 x86_64 构建，再重跑检测。 |
 
-`release_version.py` 的 `fetch_online_version`、`read_online_version`、`prepare` 分别负责获取线上快照、检查快照字段、注入候选版本。Gradle 的 `Config.versionCode`、`Config.versionName` 和 `Config.updateContent` 从上述两个文件读取构建输入；正常 release 包只携带 arm64 ABI，显式传入 `cyxbs.ciReleaseX86_64=true` 时只给正式应用模块构建 x86_64 测试包。`verify_release_update_dialog.py` 的 `verify` 负责 APK ABI、安装、deeplink 和 UI 文本断言。
+`release_version.py` 的 `fetch_online_version`、`read_online_version`、`prepare` 分别负责获取线上快照、检查快照字段、注入候选版本。Gradle 的 `Config.versionCode`、`Config.versionName` 和 `Config.updateContent` 从上述两个文件读取构建输入；正常 release 包只携带 arm64 ABI，显式传入 `cyxbs.ciReleaseX86_64=true` 时只给正式应用模块构建 x86_64 测试包。`verify_release_update_dialog.py` 的 `verify` 负责 APK ABI、安装、真实更新 Intent 和 UI 文本断言；应用仍保留官网请求失败后的 GitHub Release 兜底逻辑。
+
+### 更新弹窗与下载检查
+
+- `fetch_online_update` 独立读取公开更新 JSON，使用当前线上 `version_name`、`update_content` 和 `apk_url` 作为期望值。接口不可用或字段缺失时失败，不退化为只检查弹窗结构。
+- `check_dialog_content` 逐字核对版本名和完整正文，包括换行、空格以及弹窗固定说明。例如候选包是 `7.0.1`，线上是 `7.0.0`，弹窗必须显示线上 `7.0.0` 及其文案。弹窗不展示 `versionCode`；候选 code 的线上加一规则由前面的 `check_version` 检查负责。
+- `verify_download` 点击应用中唯一、可用且坐标有效的“立即更新”按钮。最多等待 30 秒，要求前台浏览器的 `ACTION_VIEW` 地址与线上 `apk_url` 完整一致，路径和查询参数均不能省略；不能凭历史浏览器任务判定成功。
+- Chrome 首次启动时，脚本只跳过浏览器账号引导；不操作掌邮协议或登录页。瞬间出现的 `IntentDispatcher` 或浏览器首页不能放行。
+- 浏览器跳转通过后，对该 URL 发出 Range 请求，仅读取前 4 字节并确认 APK/ZIP 文件头。404、连接失败或返回 HTML 都会失败。此检查验证按钮跳转及下载地址可用性，不要求完整下载或安装线上旧版本。
+- 版本名、文案、浏览器目标、下载响应任一异常都会用中文报错；线上数据在测试期间变化也可能导致比对失败，确认后重跑即可。
 
 > 产物检查目前**没有单独解析 APK Manifest 中的版本号，也没有再次独立验签**。它依赖同一 CI 工作区注入的 Gradle 构建输入、正式 release 构建成功，以及之后的产物哈希校验。
 
@@ -84,4 +93,12 @@ PR 检查失败时不会提交版本文件。合并后的任一步失败都会�
 - GitHub Actions Variable `RELEASE_APP_CLIENT_ID` 和 Secret `RELEASE_APP_PRIVATE_KEY` 用于签发组织专用 App 的短期令牌；无需个人 `RELEASE_GITHUB_TOKEN`。`RELEASE_TOKEN` 只供掌邮官网写入。正式包构建还依赖仓库现有的签名、第三方服务相关 Secrets，以及 `KEY_CYXBS_URL`。公开版本 JSON 的读取不需要 token。
 - 模拟器每次运行时通过 `sdkmanager --list --channel=0` 查询稳定通道，自动选择最新正式 Android API，并使用对应的 **Google APIs、x86_64** 镜像；排除 Runner 已安装的预览包、命名预览和扩展 SDK。SDK 查询失败或最新 API 尚无对应镜像时，以中文错误停止检查，不降级到旧版。实际 API 会记录到 Actions 日志和摘要中，新版安装、启动或弹窗不兼容也会阻止检查通过。稳定通道参数见 [SDK 官方文档](https://developer.android.com/tools/sdkmanager)。
 - 本地脚本测试：`PYTHONPATH=.github/scripts python3 -m unittest discover -s .github/scripts/tests -p 'test_*.py'`。有本地签名配置时，可用 `./gradlew :cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true` 复现模拟器测试包构建。
+- 本地可以复用同一弹窗检测脚本。先启动模拟器，通过 `adb devices` 确认序列号，再执行下方命令；Apple Silicon 使用 CI 的 arm64 正式 `.Apk`，Intel/x86_64 模拟器使用临时测试包并省略 `--abi`。本地 ARM 检测与 CI 的 x86_64 检测共用 Intent 和断言，CI 默认 ABI 约束仍为 x86_64。
+
+  ```bash
+  ANDROID_SERIAL=emulator-5556 PATH="$HOME/Library/Android/sdk/platform-tools:$PATH" \
+    python3 .github/scripts/verify_release_update_dialog.py \
+    --apk /path/to/CyxbsMobile-vX.Y.Z-code.Apk --abi arm64-v8a
+  ```
+
 - 正式候选 APK 和 mapping 按仓库的 GitHub Actions artifact 保留策略保存，供合并后的工作流复用。`release_version.py` 负责版本状态转换，`release_verify.py` 负责候选产物和提交核验，`publish_update_service.py` 负责官网上传，`verify_release_update_dialog.py` 负责模拟器检测。

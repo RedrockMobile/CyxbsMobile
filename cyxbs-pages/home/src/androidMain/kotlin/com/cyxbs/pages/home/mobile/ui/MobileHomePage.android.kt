@@ -23,7 +23,6 @@ import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
 import com.cyxbs.components.config.sp.defaultSp
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
@@ -93,9 +92,8 @@ private fun execIntentAction(
     DESKTOP_SHORTCUT_EMPTY_ROOM -> {
       startActivity(DISCOVER_EMPTY_ROOM)
     }
-    ACTION_TEST_UPDATE_DIALOG -> {
-      IAppUpdateService.debug() // 测试更新弹窗是否正常
-    }
+    // 容器已统一处理更新 Intent，主页忽略它，避免落入默认分支而打开课表。
+    ACTION_TEST_UPDATE_DIALOG -> Unit
     else -> {
       if (defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
         // 打开应用优先显示课表的设置
