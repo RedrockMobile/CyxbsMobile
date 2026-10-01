@@ -14,14 +14,16 @@ actual object AppUpdatePlatform {
     return runCatching {
       apiService.getUpdateInfo()
     }.recoverCatching {
-      // 兜底使用 github release 更新，但需要发版时需要遵循格式：vX.X.X-X
+      // 官网不可用时使用 GitHub Release；tag 必须含 versionCode，兼容分享用的 .Apk 附件。
       val githubUpdateInfo = apiService.getUpdateInfoByGithub()
       if (githubUpdateInfo.tag.matches("v\\d+\\.\\d+\\.\\d+-\\d+".toRegex())){
         val strings = githubUpdateInfo.tag.split("-")
         val versionName = strings[0].removeRange(0,1)
         val versionCode = strings[1].toLong()
-        UpdateInfo(
-          apkUrl = githubUpdateInfo.assets.first().downloadUrl,
+        val apk = githubUpdateInfo.assets.firstOrNull { it.downloadUrl.endsWith(".apk", ignoreCase = true) }
+          ?: throw IllegalStateException("GitHub Release 中缺少 APK")
+        return@recoverCatching UpdateInfo(
+          apkUrl = apk.downloadUrl,
           updateContent = githubUpdateInfo.body,
           versionCode = versionCode,
           versionName = versionName,

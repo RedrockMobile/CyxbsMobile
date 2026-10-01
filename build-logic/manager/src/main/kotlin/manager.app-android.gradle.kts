@@ -14,8 +14,8 @@ android {
     applicationId = Config.getApplicationId(project)
     minSdk = libsEx.versions.`android-minSdk`.toInt()
     targetSdk = libsEx.versions.`android-targetSdk`.toInt()
-    versionCode = Config.versionCode
-    versionName = Config.versionName
+    versionCode = Config.versionCode(project)
+    versionName = Config.versionName(project)
   }
   buildTypes {
     release {
@@ -29,7 +29,7 @@ android {
       )
 
       ndk {
-        abiFilters += Config.releaseAbiFilters
+        abiFilters += Config.releaseAbiFilters(project)
       }
     }
     debug {

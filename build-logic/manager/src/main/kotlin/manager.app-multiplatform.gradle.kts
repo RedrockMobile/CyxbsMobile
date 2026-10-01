@@ -48,7 +48,7 @@ if (Multiplatform.enableDesktop(project)) {
       nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
         packageName = Config.getApplicationId(project)
-        packageVersion = Config.composeDesktopVersion
+        packageVersion = Config.composeDesktopVersion(project)
       }
       buildTypes {
         release {

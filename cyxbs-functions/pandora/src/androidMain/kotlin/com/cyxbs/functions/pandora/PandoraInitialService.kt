@@ -42,7 +42,7 @@ object PandoraInitialService: InitialService, SensorDetector.Callback {
           val decorView = activity.window.decorView as FrameLayout
           decorView.addView(
             View(activity).apply {
-              layoutParams = FrameLayout.LayoutParams(160, 160, Gravity.CENTER_HORIZONTAL)
+              layoutParams = FrameLayout.LayoutParams(160, 220, Gravity.CENTER_HORIZONTAL)
               setOnClickListener {
                 val key = 76456823
                 val times = it.getTag(key) as? Int
