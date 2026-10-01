@@ -39,7 +39,7 @@ PR 检查失败时不会提交版本文件。合并后的任一步失败都会�
 
 入口是 `.github/workflows/android-release.yml`。来源、标题、文案、版本四项检查依次执行；版本检查通过后，`build_release` 的矩阵在两个独立 Runner 并行构建 arm64 和 x86_64 release 包。两种 ABI 都成功后，`check_artifact` 与 `check_update_dialog` 在新的 Runner 分别下载正式包和测试包进行检查。仍保留七项必需检查名，另外显示两个 ABI 的具体构建结果；任一构建失败或跳过，名为 `build_release` 的汇总检查会失败，不能合入。工作流中的检查错误会输出中文提示。
 
-完整通过时共执行 9 个 `ubuntu-latest` Runner 任务，最多并发 2 个；同一个 job 内步骤顺序执行。两个构建 Runner 各自安装 `requests`，再生成签名文件，避免独立 Python 环境缺少依赖。模拟器运行在 `check_update_dialog` Runner 内，不额外分配一个 Runner。合并后的 `publish` 使用另一台 Runner 顺序执行发布与同步。
+完整通过时共执行 10 个 `ubuntu-latest` Runner 任务，最多并发 2 个；同一个 job 内步骤顺序执行。两个构建 Runner 各自安装 `requests`，再生成签名文件，避免独立 Python 环境缺少依赖。模拟器运行在 `check_update_dialog` Runner 内，不额外分配一个 Runner。最后由 `comment_artifacts` 在 PR 下更新下载提示与检查结果。合并后的 `publish` 使用另一台 Runner 顺序执行发布与同步。
 
 | Job | 调用与通过条件 |
 | --- | --- |
@@ -47,11 +47,25 @@ PR 检查失败时不会提交版本文件。合并后的任一步失败都会�
 | `check_title` | 标题必须完全符合 `vX.Y.Z`，三个位置均为数字。 |
 | `check_notes` | PR 正文去掉首尾空白后为 30～20000 个字符。 |
 | `check_version` | `prepare_release_candidate.sh` 调用 `release_version.py online` 无令牌读取 `https://app.redrock.team/cyxbsAppUpdate.json`，再调用 `prepare`。线上 `version_code` 必须是正整数；候选 `versionCode = 线上 code + 1`，且不能达到 Android 版本号上限。若线上 `version_name` 是合法 `X.Y.Z`，PR 标题版本必须严格更高；若线上名字非法，发出警告并允许以 PR 标题覆盖。`gradle.properties` 中两个版本键必须各出现一次，但**不比较 develop 当前的数值**。最后运行 `tests/` 中的 Python 回归测试，并输出线上快照、候选元数据和 release 基线供两个构建 job 共用。 |
-| `build_release` | 矩阵并行运行 `arm64-v8a` 和 `x86_64`，共用 `prepare_release_candidate.sh --reuse-checked` 注入的版本快照和 PR 文案；只允许 CI 工作区中的版本号、文案因注入而变化。两个 Runner 分别生成签名文件。arm64 执行 `:cyxbs-applications:pro:channelRelease`，要求唯一 official APK 和非空 mapping，保存正式包、版本元数据、基线、来源 SHA、文案及 SHA256；正式文件为 `CyxbsMobile-vX.Y.Z-code.Apk`、`proguardMapping-vX.Y.Z-code.txt`。x86_64 执行 `:cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true`，上传仅供后续 Runner 使用的 `android-release-ui-test-提交SHA`，保留一天，包含 APK、版本、文案、来源 SHA 和 SHA256，不进入正式候选 artifact 或 GitHub Release。两条命令均加 `--no-configuration-cache`。`build_release_result` 汇总两种 ABI 的结果，显示为分支保护要求的 `build_release` 检查。重跑构建会替换同一运行中的同名 artifact。 |
+| `build_release` | 矩阵并行运行 `arm64-v8a` 和 `x86_64`，共用 `prepare_release_candidate.sh --reuse-checked` 注入的版本快照和 PR 文案；只允许 CI 工作区中的版本号、文案因注入而变化。两个 Runner 分别生成签名文件。arm64 执行 `:cyxbs-applications:pro:channelRelease`，要求唯一 official APK 和非空 mapping，分别上传 `CyxbsMobile-vX.Y.Z-code.Apk` 与 `proguardMapping-vX.Y.Z-code.txt` 两个 artifact；版本元数据、基线、来源 SHA、文案及 SHA256 随 mapping 保存。x86_64 执行 `:cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true`，上传第三个 artifact `CyxbsMobile-vX.Y.Z-code-x86_64.Apk`，保留一天，包含测试 APK、版本、文案、来源 SHA 和 SHA256，不进入 GitHub Release。两条命令均加 `--no-configuration-cache`。`build_release_result` 汇总两种 ABI 的结果，显示为分支保护要求的 `build_release` 检查。重跑构建会替换同一运行中的同名 artifact。 |
 | `check_artifact` | `release_verify.py artifact` 要求候选版本名、code、tag 和 PR head SHA 匹配；APK 与 mapping 存在、非空且 SHA256 正确；APK 中的原生 `.so` 只能是 `arm64-v8a`。 |
 | `check_update_dialog` | 构建汇总成功后，在独立 Runner 下载 x86_64 临时 artifact，核对候选版本、PR 提交、更新文案与 APK SHA256，不重新打包或创建签名文件。在最新稳定 Android 模拟器安装下载的 release 包，先正常启动并等待应用界面出现（最多 30 秒），再发送与 `ApkInstallStep` 相同的 `com.mredrock.cyxbs.action.TEST_UPDATE_DIALOG` Intent，避免冷启动导航与弹窗布局争用。测试停留在首次启动的登录页，不操作协议确认框、不进入游客模式。`MainActivity` 在容器层接收 Intent，应用经 `IAppUpdateService.debug()` 使用真实更新请求链路获取版本名、文案和下载地址，仅强制通过新版本判断并跳过弹窗频控；脚本不注入更新数据。触发后在 30 秒内检查更新标题及按钮，并逐字核对线上版本名和完整文案；随后点击“立即更新”，核对前台浏览器的完整下载 URL 及 APK 响应。不需要账号，不测试登录和课表。临时 artifact 过期后需先重跑 x86_64 构建，再重跑检测。 |
 
 `release_version.py` 的 `fetch_online_version`、`read_online_version`、`prepare` 分别负责获取线上快照、检查快照字段、注入候选版本。Gradle 的 `Config.versionCode`、`Config.versionName` 和 `Config.updateContent` 从上述两个文件读取构建输入；正常 release 包只携带 arm64 ABI，显式传入 `cyxbs.ciReleaseX86_64=true` 时只给正式应用模块构建 x86_64 测试包。`verify_release_update_dialog.py` 的 `verify` 负责 APK ABI、安装、真实更新 Intent 和 UI 文本断言；应用仍保留官网请求失败后的 GitHub Release 兜底逻辑。
+
+### 在哪里下载 APK 和 mapping
+
+CI 完成后，PR 下会出现机器人评论 **Android 发版产物下载**，提供三个产物的独立下载入口和本次检查日志，突出显示内部群测试使用的 ARM64 正式包。后续重跑更新同一条评论；检查失败时显示中文状态，缺失或过期的产物不会提供下载链接。旧提交或旧 PR 文案的运行不会覆盖当前提示。
+
+也可以打开候选 CI 运行页，在 **Summary → 正式 ARM64 产物** 点击 APK 或 mapping 的独立下载入口，或在底部 **Artifacts** 选择以下三个下载项：
+
+- `CyxbsMobile-vX.Y.Z-code.Apk`：ARM64 正式安装包，内部群测试使用这项。
+- `proguardMapping-vX.Y.Z-code.txt`：ARM64 对应的混淆文件，同时保存 CI 发布校验信息（版本号、文案、来源提交和 SHA256），不另设下载项。
+- `CyxbsMobile-vX.Y.Z-code-x86_64.Apk`：模拟器测试包及其校验信息，保留一天，不用于内部群安装测试。
+
+GitHub Actions 会把每个下载项分别包装成 ZIP，下载后解压即可获得文件。GitHub Release 的 APK 与 mapping 则是可以分别下载的原始附件。
+
+`comment_artifacts` 仅接受来源检查通过的本仓库 `develop` PR，通过 sparse checkout 只取同一来源提交的 `.github/scripts/comment_release_artifacts.cjs`，关闭凭据持久化，再由 `github-script` 调用。脚本使用工作流自带的 `GITHUB_TOKEN` 读取本次运行的产物并更新评论，无需新增 Secret；评论 Runner 单独授予 `contents: read`、`actions: read` 和 `pull-requests: write` 权限。七项合并门禁保持原有检查名。
 
 ### 更新弹窗与下载检查
 
@@ -70,7 +84,7 @@ PR 检查失败时不会提交版本文件。合并后的任一步失败都会�
 
 合并产生的 `release` push 触发 `.github/workflows/android-publish.yml`。专用 App 自己推送的正式版本与下一版本提交不会重复触发发布。发布步骤按下列顺序执行：
 
-1. **找回并复核候选产物。**按合并提交找到唯一的 `develop → release` PR，再按 PR head SHA 找回尚未过期的正式候选 artifact。其来源必须是 PR 工作流，七项必需检查及两个 ABI 构建全部成功；发布不读取 x86_64 临时产物。`release_verify.py merge` 继续核对 APK、mapping、PR 标题和正文、仓库与分支、合并提交的两个父节点，以及候选版本相对线上快照的递进关系。
+1. **找回并复核候选产物。**按合并提交找到唯一的 `develop → release` PR，再按 PR head SHA 定位最新候选工作流，在该次运行中分别找回唯一、版本标题匹配且尚未过期的 ARM64 APK 和同版本 mapping 两个 artifact，并恢复到同一个目录。其来源必须是 PR 工作流，七项必需检查及两个 ABI 构建全部成功；发布不读取 x86_64 临时产物。产物展示名不再携带 SHA，包内的来源 SHA 仍由 `release_verify.py merge` 核对，同时继续核对 APK、mapping、PR 标题和正文、仓库与分支、合并提交的两个父节点，以及候选版本相对线上快照的递进关系。
 2. **第一次提交：正式发布版本。**`release_version.py prepare` 用保存的快照和 PR 文案回写 `gradle.properties`、`build-logic/release-notes.txt`，结果必须与候选元数据一致。由专用 App 提交到 `release`，例如 `:bookmark: 发布7.1.1版本（versionCode 95）`。重跑时 `release_verify.py commit` 核对父提交、标题、版本与文案后复用，不再生成另一份正式版本提交。
 3. **发布掌邮官网。**`publish_update_service.py publish` 读取候选 artifact 里的**同一份 arm64 `.Apk`**；为兼容既有官网上传接口，multipart 文件名仍使用小写 `.apk`，文件内容不变，也不会另建一份 APK。上传前，公开版本 JSON 必须仍与候选检查时保存的线上 code/name 一致，且本次 code 恰好连续；上传后重新下载校验 SHA256，再写入 `apk_url`、`update_content`、`version_code`、`version_name`。`RELEASE_TOKEN` 只用于上传和写入。若失败重跑时线上已是同一 code，只有版本名、文案和 APK 内容也完全一致才视为已完成。
 4. **创建 GitHub Release。**tag 为 `vX.Y.Z-versionCode`，目标固定为**第一次正式版本提交**，正文取 PR 文案，附件为同一份 arm64 `.Apk` 和 mapping。若同名 Release 已存在，`release_verify.py github-release` 会核对 tag、目标提交、标题、正文、附件名称和 SHA256；全部一致才复用。应用内的 GitHub Release 更新兜底也识别 `.Apk` 附件。
