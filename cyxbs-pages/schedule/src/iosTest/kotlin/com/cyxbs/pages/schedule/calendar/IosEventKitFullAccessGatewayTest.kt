@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -1459,7 +1460,7 @@ class IosEventKitFullAccessGatewayTest {
   /** #280 设置构造/普通刷新只能读取 fake 状态，不能请求权限或调用任何 EventKit CRUD。 */
   @Test
   fun settingsConstructionAndRefreshNeverRequestOrMutateEventKit() = runTest {
-    val account = FakeSettingsAccount(backgroundScope, session("settings-no-popup", 1))
+    val account = FakeSettingsAccount(session("settings-no-popup", 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.NOT_DETERMINED)
     val controller = IosScheduleCalendarSettingsController(account, { gateway }, FakeSettingsPreferences())
 
@@ -1475,7 +1476,7 @@ class IosEventKitFullAccessGatewayTest {
   /** 只有显式 controller 操作请求权限；取消仅作用于发起请求的冻结会话并保留恢复提示。 */
   @Test
   fun settingsExplicitRequestAndCancellationAreAccountScoped() = runTest {
-    val account = FakeSettingsAccount(backgroundScope, session("settings-request", 1))
+    val account = FakeSettingsAccount(session("settings-request", 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.NOT_DETERMINED).apply {
       suspendRequest = true
     }
@@ -1496,7 +1497,7 @@ class IosEventKitFullAccessGatewayTest {
   @Test
   fun settingsMapsPermissionAndExactCacheFailuresWithoutFallback() = runTest {
     val accountId = "settings-cache-${testScheduler.currentTime}"
-    val account = FakeSettingsAccount(backgroundScope, session(accountId, 1))
+    val account = FakeSettingsAccount(session(accountId, 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.FULL_ACCESS)
     val preferences = FakeSettingsPreferences()
     val controller = IosScheduleCalendarSettingsController(account, { gateway }, preferences)
@@ -1567,7 +1568,7 @@ class IosEventKitFullAccessGatewayTest {
   fun settingsCancellationDoesNotPublishToSessionReadAfterRequestLaunch() = runTest {
     val accountA = session("settings-request-race-a", 1)
     val accountB = session("settings-request-race-b", 2)
-    val service = FakeSettingsAccount(backgroundScope, accountA).apply {
+    val service = FakeSettingsAccount(accountA).apply {
       switchSessionOnRead(readCount = 3, next = accountB)
     }
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.NOT_DETERMINED).apply {
@@ -1588,7 +1589,7 @@ class IosEventKitFullAccessGatewayTest {
   fun settingsIsolatesAccountsGenerationsLogoutAndTourist() = runTest {
     val accountA = "settings-a-${testScheduler.currentTime}"
     val accountB = "settings-b-${testScheduler.currentTime}"
-    val service = FakeSettingsAccount(backgroundScope, session(accountA, 1))
+    val service = FakeSettingsAccount(session(accountA, 1))
     val oldGateway = FakeSettingsGateway(IosEventKitFullAccessStatus.NOT_DETERMINED).apply { suspendRequest = true }
     val newGateway = FakeSettingsGateway(IosEventKitFullAccessStatus.FULL_ACCESS)
     val preferences = FakeSettingsPreferences()
@@ -1610,11 +1611,21 @@ class IosEventKitFullAccessGatewayTest {
     assertEquals(null, preferences.get(accountA).sourceIdentifier)
     assertEquals("source-a", preferences.get(accountB).sourceIdentifier)
 
-    service.switchTo(AccountSession(4, AccountState.Logout(null)))
+    service.switchTo(AccountSession(
+      4,
+      AccountState.Logout(null),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    ))
     controller.refresh()
     runCurrent()
     assertEquals(IosScheduleCalendarSettingsStatus.ACCOUNT_UNAVAILABLE, controller.state.value.status)
-    service.switchTo(AccountSession(5, AccountState.Tourist))
+    service.switchTo(AccountSession(
+      5,
+      AccountState.Tourist,
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    ))
     controller.refresh()
     runCurrent()
     assertEquals(IosScheduleCalendarSettingsStatus.ACCOUNT_UNAVAILABLE, controller.state.value.status)
@@ -1625,7 +1636,7 @@ class IosEventKitFullAccessGatewayTest {
   @Test
   fun sourceSelectionClearsInvalidCalendarCacheAndEnablesOnlyAfterSelection() = runTest {
     val accountId = "settings-order-${testScheduler.currentTime}"
-    val service = FakeSettingsAccount(backgroundScope, session(accountId, 1))
+    val service = FakeSettingsAccount(session(accountId, 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.FULL_ACCESS).apply {
       cachedSelection = IosEventKitCachedSelection.CalendarMovedToOtherSource
     }
@@ -1658,7 +1669,7 @@ class IosEventKitFullAccessGatewayTest {
   @Test
   fun settingsInvalidatesRuntimeBeforeDurableIntentAndSignalsAfterIt() = runTest {
     val accountId = "settings-runtime-order-${testScheduler.currentTime}"
-    val service = FakeSettingsAccount(backgroundScope, session(accountId, 1))
+    val service = FakeSettingsAccount(session(accountId, 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.FULL_ACCESS)
     val preferences = FakeSettingsPreferences()
     val order = mutableListOf<String>()
@@ -1698,7 +1709,7 @@ class IosEventKitFullAccessGatewayTest {
   @Test
   fun overlappingSourceSelectionAndDisableDoNotReleaseEachOthersIntentFence() = runTest {
     val accountId = "settings-intent-transaction-${testScheduler.currentTime}"
-    val service = FakeSettingsAccount(backgroundScope, session(accountId, 1))
+    val service = FakeSettingsAccount(session(accountId, 1))
     val gateway = FakeSettingsGateway(IosEventKitFullAccessStatus.FULL_ACCESS)
     val preferences = FakeSettingsPreferences()
     val order = mutableListOf<String>()
@@ -1838,7 +1849,6 @@ class IosEventKitFullAccessGatewayTest {
 
   /** 最小账户生命周期 fake：每次切换都取消旧 scope，复现同账号新 generation 的迟到回调边界。 */
   private class FakeSettingsAccount(
-    private val parentScope: CoroutineScope,
     initial: AccountSession,
   ) : IAccountService {
     private val sessionDelegate = MutableStateFlow(initial)
@@ -1857,32 +1867,31 @@ class IosEventKitFullAccessGatewayTest {
         }
     }
     override val state = MutableStateFlow(initial.state)
-    private var owner = SupervisorJob(parentScope.coroutineContext[Job])
-    private var scope = CoroutineScope(parentScope.coroutineContext + owner)
-
+    // 不经过带切号钩子的 getter 读取 scope，确保读取次数只由业务身份校验决定。
     override val accountCoroutineScope: CoroutineScope
-      get() = scope
-
-    override fun accountCoroutineScopeFor(expectedSession: AccountSession): CoroutineScope? =
-      scope.takeIf { session.value === expectedSession }
+      get() = sessionDelegate.value.accountCoroutineScope
 
     /** 在指定的权威 session 读取点切号，以固定复现启动后重读 session 的竞态。 */
     fun switchSessionOnRead(readCount: Int, next: AccountSession) {
       scheduledSessionSwitch = readCount to next
     }
 
+    /** 切换前取消旧 session 的任务，新作用域直接由传入的生命周期持有。 */
     fun switchTo(next: AccountSession) {
-      owner.cancel()
-      owner = SupervisorJob(parentScope.coroutineContext[Job])
-      scope = CoroutineScope(parentScope.coroutineContext + owner)
+      sessionDelegate.value.accountCoroutineScope.cancel()
       state.value = next.state
       sessionDelegate.value = next
     }
   }
 
-  /** 生成不可按值复用的 Login state，保证测试覆盖 exact session identity。 */
-  private fun session(accountId: String, generation: Long): AccountSession =
-    AccountSession(generation, AccountState.Login(accountId))
+  /** 为每次登录创建独立作用域，绑定测试调度器并由 backgroundScope 在测试结束时取消。 */
+  private fun TestScope.session(accountId: String, generation: Long): AccountSession =
+    AccountSession(
+      generation,
+      AccountState.Login(accountId),
+      CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])),
+      tokenState = null,
+    )
 
   private companion object {
     val SCOPE = CalendarExportScope("ios_eventkit_gateway")

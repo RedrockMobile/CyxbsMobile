@@ -18,6 +18,8 @@ import com.cyxbs.pages.schedule.data.remote.SyncResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Comparator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +40,12 @@ class ProductionScheduleRepositoryFactoryDesktopTest {
       )
       assertIs<RoomScheduleRepositoryFactory>(factory)
 
-      val session = AccountSession(1, AccountState.Login(ACCOUNT_ID))
+      val session = AccountSession(
+        1,
+        AccountState.Login(ACCOUNT_ID),
+        CoroutineScope(SupervisorJob()),
+        tokenState = null,
+      )
       val repository = factory.create(session)
       assertSame(session, gatewayFactory.receivedSession)
       assertEquals(0, gatewayFactory.gateway.syncCalls)

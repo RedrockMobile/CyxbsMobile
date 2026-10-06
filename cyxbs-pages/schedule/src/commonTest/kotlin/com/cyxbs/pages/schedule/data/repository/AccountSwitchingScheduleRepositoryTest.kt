@@ -18,6 +18,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -25,7 +27,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -82,7 +83,12 @@ class AccountSwitchingScheduleRepositoryTest {
     repository.bindAccounts(sessions)
     runCurrent()
 
-    sessions.value = AccountSession(2, AccountState.Logout(null))
+    sessions.value = AccountSession(
+      2,
+      AccountState.Logout(null),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )
 
     assertEquals(null, repository.snapshot.value.accountId)
     assertEquals(emptyList(), repository.snapshot.value.schedules)
@@ -274,7 +280,12 @@ class AccountSwitchingScheduleRepositoryTest {
 
   /** 构造不可与其他 generation 混用的登录会话。 */
   private fun loginSession(generation: Long, accountId: String): AccountSession =
-    AccountSession(generation, AccountState.Login(accountId))
+    AccountSession(
+      generation,
+      AccountState.Login(accountId),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )
 
   /** 只实现 façade 测试需要的快照、初始化、命令与日历事件边界。 */
   private class FakeRepository(

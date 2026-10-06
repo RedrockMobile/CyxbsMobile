@@ -13,11 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 internal object TouristProvider {
   private const val KEY = "is_tourist"
 
-  private val _stateFlow = MutableStateFlow(defaultSettings.getBoolean(KEY, false))
-  val stateFlow: StateFlow<Boolean> = _stateFlow
+  val stateFlow: StateFlow<Boolean>
+    field = MutableStateFlow(defaultSettings.getBoolean(KEY, false))
 
   fun set(isTourist: Boolean) {
-    _stateFlow.value = isTourist
+    stateFlow.value = isTourist
     defaultSettings.putBoolean(KEY, isTourist)
   }
 }

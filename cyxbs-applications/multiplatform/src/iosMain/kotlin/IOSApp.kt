@@ -3,7 +3,6 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountEditService
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
 import com.cyxbs.components.config.compose.theme.IOSNavigationBarInsets
@@ -35,6 +34,8 @@ import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
@@ -59,17 +60,19 @@ fun doInitApp(impl: IOSKmpInterface) {
   initProvider()
   InitialManager.init(isMainProcess = true)
 
-  // 监听 token 变化，同步到 iOS 原生侧
+  // 账户切换后监听新 session；同一 session 内的 token 刷新也同步到 iOS 原生侧。
+  val accountService = IAccountService::class.impl()
   appCoroutineScope.launch(Dispatchers.Main) {
-    TokenProvider.stateFlow.collect {
-      impl.setToken(it?.token ?: "")
+    accountService.session.collectLatest { session ->
+      (session.tokenState?.tokenFlow ?: flowOf(null)).collect { token ->
+        impl.setToken(token?.token ?: "")
+      }
     }
   }
 
   // 监听账户状态变化，登录成功后同步 iOS 原生数据（待办、用户信息、邮箱绑定等）。
   // drop(1) 跳过初始值：app 启动时有缓存 token 则 state 已经是 Login，
   // 不跳过会误触发 onLoginSuccess 导致重复同步。
-  val accountService = IAccountService::class.impl()
   appCoroutineScope.launch(Dispatchers.Main) {
     accountService.state
       .drop(1)

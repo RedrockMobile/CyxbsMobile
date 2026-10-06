@@ -1,8 +1,9 @@
 package com.cyxbs.components.utils.network.plugin
 
+import com.cyxbs.components.account.api.AccountAuthenticationException
 import com.cyxbs.components.account.api.AccountSession
-import com.cyxbs.components.account.api.ITokenService
-import com.cyxbs.components.account.api.TokenLifecycleLease
+import com.cyxbs.components.account.api.AccountToken
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.network.IApiStatus
 import io.ktor.client.HttpClient
@@ -15,80 +16,50 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.statement.HttpResponsePipeline
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
-import kotlinx.coroutines.CancellationException
-
-/** 请求与响应之间传递的认证 lease key；值只保存在本地 Ktor attribute，不进入 wire DTO。 */
-internal val TokenLifecycleLeaseKey =
-  AttributeKey<TokenLifecycleLease>("TokenLifecycleLease")
 
 /**
- * Ktorfit `@Tag` 与 [TokenPlugin] 共享的严格账号会话 attribute 名称。
+ * 请求预期所属 AccountSession 的本地属性名，不会作为字段发送给服务端。
  *
- * 注解参数必须使用编译期常量，因此需要由网络层统一公开名称；它只用于本地 request attribute，不会进入网络请求。
+ * 普通接口无需设置，默认使用发送请求时当前账户的 token。后台同步、排队、延迟或重试任务
+ * 已基于某次登录读取账户数据时，应携带任务开始时保存的 session；若期间退出或重新登录，
+ * 插件会抛出 [AccountAuthenticationException] 并阻止发送，避免把 A 账户的数据携带 B 账户的 token 发送。
+ *
+ * Ktorfit 使用 @Tag(EXPECTED_ACCOUNT_SESSION_ATTRIBUTE_NAME) 参数传入保存的 session；
+ * 普通 Ktor 调用使用 [requireAccountSession]，无需直接操作此属性名。
  */
 const val EXPECTED_ACCOUNT_SESSION_ATTRIBUTE_NAME = "ExpectedAccountSession"
-
-/** 仅由 [requireAccountSession] 写入的每请求严格账号会话标记。 */
 private val ExpectedAccountSessionKey =
   AttributeKey<AccountSession>(EXPECTED_ACCOUNT_SESSION_ATTRIBUTE_NAME)
+/** 本次发送所用的认证快照；session 中的凭据会刷新，响应必须携带发送时的值。 */
+internal data class AccountRequestAuthentication(
+  val session: AccountSession,
+  val token: AccountToken,
+)
+
+// 保存本次发送实际使用的 session 和 token，供重定向复用生命周期、响应处理匹配旧凭据。
+// 这是请求本地属性，不会发给服务端；自定义 Authorization 和匿名请求不保存此快照。
+private val AuthenticatedRequestKey = AttributeKey<AccountRequestAuthentication>("AuthenticatedRequest")
+// 保存插件自动添加的完整 Authorization 值；重定向会复制 header 和 attributes，
+// 需据此识别继承的默认认证，避免把它误认为调用方自定义认证而跳过 token 更新。
+private val DefaultAuthorizationKey = AttributeKey<String>("DefaultAuthorization")
 
 /**
- * 标记该请求只能以传入的 exact [expectedSession] 发出认证信息。
+ * 将请求绑定到账户生命周期，供日程、资料刷新等后台任务使用。
  *
- * 标记会让 [TokenPlugin] 调用严格 lease 入口；会话引用已经陈旧、被 `copy()`、已登出或 token 缺失时请求会以
- * [CancellationException] 结束，绝不退化为当前账号或匿名请求。若客户端已绑定会话，标记必须与该会话为同一引用；
- * 即使结构相等的 `copy()` 也会在读取 token 前被拒绝。它只是本次请求的 fail-closed 标记，不能也不试图在 lease
- * 返回后对 socket 发包建立 CAS。未调用本函数的请求保持原有“有 token 则附加、无 token 仍可发送”的兼容行为。
+ * 会话失效时抛出 [AccountAuthenticationException]，不发送请求；普通请求默认使用当前登录 token。
  */
 fun HttpRequestBuilder.requireAccountSession(expectedSession: AccountSession) {
   attributes.put(ExpectedAccountSessionKey, expectedSession)
 }
 
-/** 读取每请求严格会话标记，供 Send hook 在实际发出前选择对应的 lease 获取策略。 */
+/** 读取 Ktorfit 或调用方设置的会话标记。 */
 internal fun HttpRequestBuilder.expectedAccountSessionOrNull(): AccountSession? =
   attributes.getOrNull(ExpectedAccountSessionKey)
 
-/**
- * 用新 lease 原子替换 builder 上一次认证信息。
- *
- * redirect 或 Send 重入可能复用、复制已经含 Authorization 的 builder；必须先删除旧值再写 Bearer，保证 wire 上
- * 始终只有一个 Authorization，且它与 request attribute 中最终 lease 一致。
- */
-internal fun HttpRequestBuilder.applyTokenLifecycleLease(lease: TokenLifecycleLease) {
-  headers.remove(HttpHeaders.Authorization)
-  attributes.put(TokenLifecycleLeaseKey, lease)
-  bearerAuth(lease.token)
-}
-
-/**
- * 根据请求是否带有严格会话标记获取 lease。
- *
- * 已标记路径直接传播严格入口的 CancellationException，不得调用无参入口兜底；未标记路径保留原来的可空 lease
- * 行为，以兼容不要求登录的 API。
- */
-internal suspend fun acquireTokenLifecycleLease(
-  tokenService: ITokenService,
-  expectedSession: AccountSession?,
-): TokenLifecycleLease? =
-  if (expectedSession == null) {
-    tokenService.getOrRequestTokenLease()
-  } else {
-    tokenService.getOrRequestTokenLease(expectedSession)
-  }
-
-/**
- * 在 ContentNegotiation 完成 typed body 转换后观察结果。
- *
- * `TransformResponseBody` 只能消费原始 ByteReadChannel，不适合做反序列化后处理；因此使用公开的 After phase，既不
- * 读取或重放 raw body，也不会改变调用方收到的对象。
- */
+/** 反序列化完成后处理业务认证状态，不读取或缓存原始响应字节。 */
 private object AuthenticatedResponseBodyHook :
   ClientHook<suspend (HttpClientCall, Any) -> Unit> {
-
-  override fun install(
-    client: HttpClient,
-    handler: suspend (HttpClientCall, Any) -> Unit,
-  ) {
+  override fun install(client: HttpClient, handler: suspend (HttpClientCall, Any) -> Unit) {
     client.responsePipeline.intercept(HttpResponsePipeline.After) {
       handler(context, subject.response)
     }
@@ -96,84 +67,91 @@ private object AuthenticatedResponseBodyHook :
 }
 
 /**
- * 对 typed 认证响应执行 lease-aware 状态处理。
+ * 处理自动携带当前 token 的响应；过期副作用只属于请求实际使用的生命周期和凭据。
  *
- * no-token 请求没有 [lease]，raw/stream/download 与其他返回类型不是 [IApiStatus]，两者都会 fail-closed。该函数
- * 独立于 Ktor pipeline，便于用轻量 fake service 直接验证 post-convert 分派。
+ * 自定义 Authorization、匿名和非业务响应不操作当前账号；读取 ApiWrapper 本身也没有登出副作用。
  */
 internal fun handleAuthenticatedTypedResponse(
-  tokenService: ITokenService,
-  lease: TokenLifecycleLease?,
+  authentication: AccountRequestAuthentication,
   body: Any,
 ) {
   val status = body as? IApiStatus ?: return
-  if (lease == null) return
-  tokenService.handleAuthenticatedApiStatus(
-    lease = lease,
-    status = status.status,
-    msg = "ApiException, status=${status.status}",
-  )
+  when (status.status) {
+    20002, 20003 -> authentication.session.tokenState?.tryTokenExpired(authentication.token)
+    20004 -> authentication.session.tokenState?.tryRefreshTokenExpired(
+      "ApiException, status=20004", authentication.token,
+    )
+  }
 }
 
 /**
- * 为带认证的 Ktor 请求附加 token lease，并在 typed 响应阶段条件处理认证状态码。
+ * 默认附加当前用户 token；调用方显式设置 Authorization 时完整保留该值。
  *
- * 对 [requireAccountSession] 标记或客户端绑定会话的请求，Send 只调用严格入口并传播其取消结果，不得回退为当前账号或匿名请求。
- * 已绑定客户端的请求标记只能是相同引用；不同引用（包括结构相等的副本）在任何 token service 调用和 engine 前立即取消，
- * 不能覆盖构造时冻结的会话。成功发出后，将同一个 opaque lease 保存到 response 的 [HttpClientCall.attributes]；Ktor 通过
- * `response.call.attributes` 暴露该本地 attribute。这只证明 header 与响应副作用共享同一生命周期上下文，不声称
- * lease 返回后仍能在 socket 层执行 CAS。
+ * accountSession 可注入以便测试。重定向沿用请求生命周期，等待 token 前后检查会话是否仍有效。
  */
 internal fun createTokenPlugin(
-  tokenService: ITokenService,
-  boundSession: AccountSession? = null,
-) = createClientPlugin(
-  "TokenPlugin",
-) {
+  accountSession: () -> AccountSession = { IAccountService::class.impl().session.value },
+) = createClientPlugin("TokenPlugin") {
+  // 每次发送（包括重定向后的发送）都在此确定认证方式和所属账户。
   on(Send) { request ->
-    val requestSession = request.expectedAccountSessionOrNull()
-    if (boundSession != null && requestSession != null && boundSession !== requestSession) {
-      // 绑定客户端的冻结会话是唯一认证来源，结构相等的副本也不能覆盖它。
-      throw CancellationException("绑定账号会话与请求会话不是同一引用")
+    // 读取之前由插件添加的认证值；首次请求通常没有这个标记。
+    val defaultAuthorization = request.attributes.getOrNull(DefaultAuthorizationKey)
+    // 没有 Authorization 时使用默认 token；只有一个值且与插件标记完全一致时，
+    // 也视为默认认证。其余情况按调用方自定义认证处理，保留原有 header。
+    // !useDefaultToken 为调用方显式设置 Authorization 时使用自定义认证的情况，其有效期和刷新由调用方负责。
+    val useDefaultToken = !request.headers.contains(HttpHeaders.Authorization) ||
+        defaultAuthorization != null &&
+        request.headers.getAll(HttpHeaders.Authorization) == listOf(defaultAuthorization)
+    // 默认认证的重定向沿用上次发送的 session，防止跳转途中换成另一账户；
+    // 首次发送及自定义认证则读取当前 session，用于后续生命周期检查。
+    val session = if (useDefaultToken) {
+      request.attributes.getOrNull(AuthenticatedRequestKey)?.session ?: accountSession()
+    } else accountSession()
+    // 后台任务可显式绑定创建任务时的 session；普通接口无需设置。
+    val expected = request.expectedAccountSessionOrNull()
+    // 发送前拒绝已经结束的生命周期；显式绑定的请求还要求身份一致且有账户 ID。
+    if (accountSession() !== session ||
+      expected != null && (expected !== session || expected.accountId == null)
+    ) {
+      throw AccountAuthenticationException("请求所属账户生命周期已结束")
     }
-    val lease = acquireTokenLifecycleLease(
-      tokenService = tokenService,
-      expectedSession = boundSession ?: requestSession,
-    )
-    if (lease != null) {
-      request.applyTokenLifecycleLease(lease)
-      // 未登录时也允许未标记请求继续发送，端上不好判断该请求是否强依赖登录状态。
+    // 默认认证等待获取或刷新 token；自定义认证不读取默认 token，也不触发其刷新。
+    val token = if (useDefaultToken) session.tokenState?.getOrRefreshToken() else null
+    // 获取 token 可能挂起，恢复后再次确认账户未切换，避免发送旧账户请求。
+    if (accountSession() !== session) {
+      throw AccountAuthenticationException("等待 token 时账户已切换")
     }
-    val call = proceed(request)
-    if (lease != null) {
-      // HttpResponse 没有独立 attribute 容器；其 call attribute 可由 response.call 读取。
-      call.attributes.put(TokenLifecycleLeaseKey, lease)
+    // 显式绑定账户的默认认证请求必须有 token；普通未绑定请求允许匿名发送。
+    if (expected != null && token == null && useDefaultToken) {
+      throw AccountAuthenticationException("当前账户没有 token")
     }
-    call
+    // 清除上次发送的认证标记，随后只记录本次实际使用的默认认证。
+    // 自定义认证不会留下默认认证快照，因此其响应不能使当前账户的 token 失效。
+    request.attributes.remove(AuthenticatedRequestKey)
+    request.attributes.remove(DefaultAuthorizationKey)
+    // 仅移除插件负责的默认 header，避免重定向沿用旧 token；自定义 header 保持原值。
+    if (useDefaultToken) request.headers.remove(HttpHeaders.Authorization)
+    if (token != null) {
+      // 写入本次默认 token 的 Bearer header。
+      request.bearerAuth(token.token)
+      // 标记完整 header 值，供下一次发送识别默认认证。
+      request.attributes.put(DefaultAuthorizationKey, "Bearer ${token.token}")
+      // 保存发送时的凭据快照；响应回来时 token 可能已刷新，不能再读取最新值代替它。
+      request.attributes.put(AuthenticatedRequestKey, AccountRequestAuthentication(session, token))
+    }
+    // 完成认证准备后交给后续发送流程。
+    // call 保留最终 request 的 attributes；重定向返回后不能用首次凭据覆盖最终发送的快照。
+    proceed(request)
   }
+  // 在响应反序列化完成后处理业务状态，避免为检查状态重复读取原始响应体。
   on(AuthenticatedResponseBodyHook) { call, body ->
-    handleAuthenticatedTypedResponse(
-      tokenService = tokenService,
-      lease = call.attributes.getOrNull(TokenLifecycleLeaseKey),
-      body = body,
-    )
+    // 从最终请求读取认证快照；自定义认证、匿名请求没有此标记，跳过账户过期处理。
+    val authentication = call.attributes.getOrNull(AuthenticatedRequestKey)
+    if (authentication != null) {
+      // 仅让响应操作它实际使用的 session/token；TokenState 会过滤已刷新凭据的旧响应。
+      handleAuthenticatedTypedResponse(authentication, body)
+    }
   }
 }
 
-/**
- * 在独立客户端中安装绑定 exact [expectedSession] 的 token 插件。
- *
- * 此客户端的每个请求都只调用 [ITokenService.getOrRequestTokenLease] 的严格重载；请求未显式标记时同样不会退化到
- * 无参 lease。显式标记只能复用 [expectedSession] 的同一引用，不同引用（包括结构相等的副本）会在调用 token service
- * 前取消，不能覆盖工厂绑定会话。它只为该客户端绑定冻结会话，不修改全局 [TokenPlugin] 的兼容语义。
- */
-public fun io.ktor.client.HttpClientConfig<*>.installBoundAccountSessionTokenPlugin(
-  tokenService: ITokenService,
-  expectedSession: AccountSession,
-) {
-  install(createTokenPlugin(tokenService, expectedSession))
-}
-
-internal val TokenPlugin by lazy {
-  createTokenPlugin(ITokenService::class.impl())
-}
+internal val TokenPlugin by lazy { createTokenPlugin() }

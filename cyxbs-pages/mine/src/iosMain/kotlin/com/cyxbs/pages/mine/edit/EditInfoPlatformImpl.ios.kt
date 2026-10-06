@@ -34,14 +34,14 @@ object EditInfoPlatformImpl : EditInfoPlatform {
   override val avatarUpdatedEvents = events.asSharedFlow()
   private var busy = false
 
+  /** 在当前 session 的作用域中选择并上传头像，退出登录会取消任务，回写前复核账户身份。 */
   override fun editAvatar() {
     if (busy) return
     val account = IAccountService::class.impl()
     val session = account.session.value
     val studentNumber = session.accountId ?: return
-    val scope = account.accountCoroutineScopeFor(session) ?: return
     busy = true
-    scope.launch(Dispatchers.Main.immediate) {
+    session.accountCoroutineScope.launch(Dispatchers.Main.immediate) {
       val file = runCatchingCoroutine {
         val window = UIApplication.sharedApplication.connectedScenes
           .filterIsInstance<UIWindowScene>()

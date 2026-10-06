@@ -1,20 +1,22 @@
 package com.cyxbs.components.account
 
 import com.cyxbs.components.account.api.AccountState
+import kotlinx.coroutines.CancellationException
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.account.bean.TokenBean
-import com.cyxbs.components.account.provider.TokenProvider
 import com.cyxbs.components.account.provider.UserInfoProvider
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.utils.network.ApiException
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.pages.login.api.ILoginService
 import com.g985892345.provider.api.init.IKtProviderDelegate
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.drop
@@ -36,6 +38,7 @@ import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 /**
  * 账户身份切换时协程作用域的生命周期契约测试。
@@ -84,7 +87,7 @@ class AccountServiceScopeTest {
       refreshToken = "refresh-token-1",
     )
     val loginScope = AccountService.accountCoroutineScope
-    val loginJob = loginScope.launch { kotlinx.coroutines.awaitCancellation() }
+    val loginJob = loginScope.launch(dispatcher) { kotlinx.coroutines.awaitCancellation() }
     dispatcher.scheduler.runCurrent()
     assertTrue(loginJob.isActive)
 
@@ -96,7 +99,7 @@ class AccountServiceScopeTest {
     assertTrue(loginJob.isCancelled)
     assertFalse(touristScope.coroutineContext[Job]!!.isCancelled)
 
-    val touristJob = touristScope.launch { kotlinx.coroutines.awaitCancellation() }
+    val touristJob = touristScope.launch(dispatcher) { kotlinx.coroutines.awaitCancellation() }
     dispatcher.scheduler.runCurrent()
     assertTrue(touristJob.isActive)
 
@@ -111,12 +114,33 @@ class AccountServiceScopeTest {
     assertNotSame(touristScope, nextLoginScope)
     assertTrue(touristJob.isCancelled)
     assertFalse(nextLoginScope.coroutineContext[Job]!!.isCancelled)
-    val nextLoginJob = nextLoginScope.launch { kotlinx.coroutines.awaitCancellation() }
+    val nextLoginJob = nextLoginScope.launch(dispatcher) { kotlinx.coroutines.awaitCancellation() }
     dispatcher.scheduler.runCurrent()
     assertTrue(nextLoginJob.isActive)
     nextLoginJob.cancel()
   }
 
+  /** 游客状态虽为同一对象，每次重新进入仍应结束旧任务并创建新的生命周期。 */
+  @Test
+  fun reenteringTouristModeCancelsOldTasksWithoutChangingBusinessState() = runTest(dispatcher) {
+    AccountService.onTouristMode()
+    val firstSession = AccountService.session.value
+    val oldTask = firstSession.accountCoroutineScope.launch(dispatcher) {
+      kotlinx.coroutines.awaitCancellation()
+    }
+    dispatcher.scheduler.runCurrent()
+
+    AccountService.onTouristMode()
+    val secondSession = AccountService.session.value
+
+    assertSame(firstSession.state, secondSession.state)
+    assertNotSame(firstSession, secondSession)
+    assertTrue(oldTask.isCancelled)
+    assertTrue(firstSession.accountCoroutineScope.coroutineContext[Job]!!.isCancelled)
+    assertFalse(secondSession.accountCoroutineScope.coroutineContext[Job]!!.isCancelled)
+  }
+
+  /** 同学号重新登录仍创建新 session，新旧作用域分别属于各自的生命周期。 */
   @Test
   fun sameAccountReloginPublishesNewSessionGenerationAndStateIdentity() = runTest(dispatcher) {
     loginForTest(
@@ -128,6 +152,7 @@ class AccountServiceScopeTest {
     val firstLogin = assertIs<AccountState.Login>(AccountService.state.value)
     firstLogin.userInfo.value = createUserInfo("20260001", "旧资料")
     val firstScope = AccountService.accountCoroutineScope
+    assertSame(firstScope, firstSession.accountCoroutineScope)
 
     loginForTest(
       stuNum = "20260001",
@@ -137,6 +162,8 @@ class AccountServiceScopeTest {
 
     val secondSession = AccountService.session.value
     val secondLogin = assertIs<AccountState.Login>(AccountService.state.value)
+    assertEquals("refresh-token-1", (firstSession.tokenState as TokenStateImpl).tokenFlow.value?.refreshToken)
+    assertEquals("refresh-token-2", (secondSession.tokenState as TokenStateImpl).tokenFlow.value?.refreshToken)
     assertEquals("20260001", firstSession.accountId)
     assertEquals("20260001", secondSession.accountId)
     assertTrue(secondSession.generation > firstSession.generation)
@@ -144,169 +171,14 @@ class AccountServiceScopeTest {
     assertSame(secondLogin, secondSession.state)
     assertNull(secondLogin.userInfo.value)
     assertNotSame(firstScope, AccountService.accountCoroutineScope)
-    assertNull(AccountService.accountCoroutineScopeFor(firstSession))
-    assertSame(
-      AccountService.accountCoroutineScope,
-      AccountService.accountCoroutineScopeFor(secondSession)
-    )
-  }
-
-  @Test
-  fun strictLeaseRejectsStaleLoggedOutExpectedSession() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-old",
-    )
-    val staleSession = AccountService.session.value
-
-    AccountService.onLogout()
-
-    assertFailsWith<CancellationException> {
-      TokenServiceImpl.getOrRequestTokenLease(staleSession)
+    assertSame(secondSession.accountCoroutineScope, AccountService.accountCoroutineScope)
+    assertTrue(firstSession.accountCoroutineScope.coroutineContext[Job]!!.isCancelled)
+    // 旧 session 即使仍被请求方持有，也只能创建立即取消的任务，不能借到新账户 scope。
+    val staleTask = firstSession.accountCoroutineScope.launch(dispatcher) {
+      error("旧账户任务不应执行")
     }
-  }
-
-  @Test
-  fun strictLeaseRejectsStructurallyCopiedExpectedSession() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-current",
-    )
-    val currentSession = AccountService.session.value
-    val copiedSession = currentSession.copy()
-    assertEquals(currentSession, copiedSession)
-    assertNotSame(currentSession, copiedSession)
-
-    assertFailsWith<CancellationException> {
-      TokenServiceImpl.getOrRequestTokenLease(copiedSession)
-    }
-  }
-
-  @Test
-  fun strictLeaseRejectsSameAccountNewGenerationAndUsesNewSession() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-old",
-    )
-    val oldSession = AccountService.session.value
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-new",
-    )
-    val currentSession = AccountService.session.value
-
-    assertFailsWith<CancellationException> {
-      TokenServiceImpl.getOrRequestTokenLease(oldSession)
-    }
-    assertEquals(tokenFor("20260001"), TokenServiceImpl.getOrRequestTokenLease(currentSession).token)
-  }
-
-  @Test
-  fun strictLeaseReacquiresLeaseForRefreshedSourceToken() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-source",
-    )
-    val expectedSession = AccountService.session.value
-    val initialLease = TokenServiceImpl.getOrRequestTokenLease(expectedSession)
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val refreshedTokenValue = tokenFor("20260001") + ".refreshed"
-    assertTrue(
-      AccountService.commitRefreshedToken(
-        snapshot.session,
-        snapshot.token,
-        TokenBean(refreshedTokenValue, "refresh-token-refreshed"),
-      )
-    )
-
-    val refreshedLease = TokenServiceImpl.getOrRequestTokenLease(expectedSession)
-    assertEquals(tokenFor("20260001"), initialLease.token)
-    assertEquals(refreshedTokenValue, refreshedLease.token)
-    assertNotSame(initialLease, refreshedLease)
-  }
-
-  @Test
-  fun strictLeaseRecoversWhenConcurrentRefreshAdvancesSameSessionToken() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-source",
-    )
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val staleSourceRefresh = CompletableDeferred<String>()
-    val leaseRequest = async {
-      TokenServiceImpl.awaitRefreshLease(
-        expectedSession = snapshot.session,
-        sourceToken = snapshot.token,
-        refreshDeferred = staleSourceRefresh,
-      )
-    }
-    testScheduler.runCurrent()
-    assertTrue(leaseRequest.isActive)
-
-    val refreshedToken = TokenBean(
-      token = tokenFor("20260001") + ".refreshed",
-      refreshToken = "refresh-token-refreshed",
-    )
-    assertTrue(
-      AccountService.commitRefreshedToken(snapshot.session, snapshot.token, refreshedToken)
-    )
-    // 精确模拟旧 source refresh 在新 TokenBean 已提交后命中 commit guard 的交错。
-    staleSourceRefresh.completeExceptionally(TokenLifecycleChangedCancellationException())
-
-    val lease = leaseRequest.await()
-    assertEquals(refreshedToken.token, lease.token)
-    assertSame(refreshedToken, TokenProvider.stateFlow.value)
-  }
-
-  @Test
-  fun strictLeaseRejectsExpectedSessionWhenTokenIsMissing() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-current",
-    )
-    val expectedSession = AccountService.session.value
-    TokenProvider.clear()
-
-    assertFailsWith<CancellationException> {
-      TokenServiceImpl.getOrRequestTokenLease(expectedSession)
-    }
-  }
-
-  @Test
-  fun logoutAndTouristClearCurrentLoginUserInfo() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-1",
-    )
-    val firstLogin = assertIs<AccountState.Login>(AccountService.state.value)
-    firstLogin.userInfo.value = createUserInfo("20260001", "登出前资料")
-
-    AccountService.onLogout()
-    val logout = assertIs<AccountState.Logout>(AccountService.state.value)
-    assertSame(logout, AccountService.session.value.state)
-    assertSame(firstLogin, logout.login)
-    assertNull(AccountService.userInfo)
-
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-2",
-    )
-    assertIs<AccountState.Login>(AccountService.state.value).userInfo.value =
-      createUserInfo("20260001", "游客前资料")
-    AccountService.onTouristMode()
-
-    assertIs<AccountState.Tourist>(AccountService.state.value)
-    assertSame(AccountService.state.value, AccountService.session.value.state)
-    assertNull(AccountService.userInfo)
+    dispatcher.scheduler.runCurrent()
+    assertTrue(staleTask.isCancelled)
   }
 
   @Test
@@ -317,16 +189,19 @@ class AccountServiceScopeTest {
       refreshToken = "refresh-token-1",
     )
     val oldSession = AccountService.session.value
-    val oldScope = requireNotNull(AccountService.accountCoroutineScopeFor(oldSession))
-    val oldJob = oldScope.launch { kotlinx.coroutines.awaitCancellation() }
+    val oldScope = oldSession.accountCoroutineScope
+    val oldJob = oldScope.launch(dispatcher) { kotlinx.coroutines.awaitCancellation() }
     dispatcher.scheduler.runCurrent()
 
     // Unconfined collector 会在 session.value 发布现场同步恢复，精确核验 publication 顺序。
     val bindingAtPublication = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
       val newSession = AccountService.session.drop(1).first()
+      // 在 session 发布现场读取，派生 state 不应等待另一个协程更新缓存。
+      assertSame(newSession.state, AccountService.state.value)
+      assertSame(newSession.state, AccountService.state.replayCache.single())
       Triple(
         newSession,
-        AccountService.accountCoroutineScopeFor(newSession),
+        newSession.accountCoroutineScope,
         oldScope.coroutineContext[Job]!!.isCancelled,
       )
     }
@@ -337,9 +212,9 @@ class AccountServiceScopeTest {
     assertIs<AccountState.Tourist>(newSession.state)
     assertTrue(oldScopeCancelled)
     assertTrue(oldJob.isCancelled)
-    assertNull(AccountService.accountCoroutineScopeFor(oldSession))
     assertSame(AccountService.accountCoroutineScope, newScope)
-    assertFalse(requireNotNull(newScope).coroutineContext[Job]!!.isCancelled)
+    assertSame(newSession.accountCoroutineScope, newScope)
+    assertFalse(newScope.coroutineContext[Job]!!.isCancelled)
   }
 
   @Test
@@ -350,7 +225,7 @@ class AccountServiceScopeTest {
       refreshToken = "refresh-token-1",
     )
     val loginGeneration = AccountService.session.value.generation
-    // Unconfined collector 会在 state.value 发布现场恢复，精确观察两条 StateFlow 之间的线性化顺序。
+    // 派生 state 通知时读取同一份 session，不能出现状态已登出而 session 仍登录的情况。
     val sessionAtLegacyPublication =
       backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
         AccountService.state.drop(1).first { it is AccountState.Logout }
@@ -364,438 +239,296 @@ class AccountServiceScopeTest {
     assertTrue(observed.generation > loginGeneration)
   }
 
+  /** 派生 state 保留相等值合并语义，重复游客不通知，同学号重新登录通知新的 Login。 */
   @Test
-  fun staleRefreshCannotCommitAfterLogoutOrAccountSwitch() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a1",
-    )
-    val logoutSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    AccountService.onLogout()
-
-    val lateAfterLogout = TokenBean(
-      token = tokenFor("20260001"),
-      refreshToken = "late-refresh-after-logout",
-    )
-    assertFalse(
-      AccountService.commitRefreshedToken(
-        logoutSnapshot.session,
-        logoutSnapshot.token,
-        lateAfterLogout,
-      )
-    )
-    assertNull(TokenProvider.stateFlow.value)
-
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a2",
-    )
-    val switchSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b1",
-    )
-    val currentToken = requireNotNull(TokenProvider.stateFlow.value)
-
-    assertFalse(
-      AccountService.commitRefreshedToken(
-        switchSnapshot.session,
-        switchSnapshot.token,
-        TokenBean(tokenFor("20260001"), "late-refresh-after-switch"),
-      )
-    )
-    assertSame(currentToken, TokenProvider.stateFlow.value)
-    assertEquals("20260002", AccountService.session.value.accountId)
-  }
-
-  @Test
-  fun sameAccountReloginRejectsOldRefreshAndUserInfo() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-old",
-    )
-    val oldSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-new",
-    )
-    val currentSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-
-    assertFalse(
-      AccountService.commitRefreshedToken(
-        oldSnapshot.session,
-        oldSnapshot.token,
-        TokenBean(tokenFor("20260001"), "late-refresh-old-generation"),
-      )
-    )
-    assertFalse(
-      AccountService.commitUserInfo(
-        oldSnapshot.session,
-        createUserInfo("20260001", "旧 generation 资料"),
-      )
-    )
-    assertTrue(
-      AccountService.commitUserInfo(
-        currentSnapshot.session,
-        createUserInfo("20260001", "当前 generation 资料"),
-      )
-    )
-    assertEquals("当前 generation 资料", AccountService.userInfo?.nickname)
-    assertSame(currentSnapshot.token, TokenProvider.stateFlow.value)
-  }
-
-  @Test
-  fun staleUserInfoCannotCommitAfterLogoutOrAccountSwitch() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a1",
-    )
-    val logoutSession = AccountService.session.value
-    AccountService.onLogout()
-    assertFalse(
-      AccountService.commitUserInfo(
-        logoutSession,
-        createUserInfo("20260001", "登出后迟到资料"),
-      )
-    )
-    assertNull(AccountService.userInfo)
-
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a2",
-    )
-    val switchSession = AccountService.session.value
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b1",
-    )
-    assertFalse(
-      AccountService.commitUserInfo(
-        switchSession,
-        createUserInfo("20260001", "切号后迟到资料"),
-      )
-    )
-    assertNull(AccountService.userInfo)
-  }
-
-  @Test
-  fun currentRefreshCommitRequiresMatchingAccount() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-source",
-    )
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val wrongAccountToken = TokenBean(tokenFor("20260002"), "refresh-token-wrong-account")
-
-    assertFalse(
-      AccountService.commitRefreshedToken(snapshot.session, snapshot.token, wrongAccountToken)
-    )
-    assertSame(snapshot.token, TokenProvider.stateFlow.value)
-
-    val refreshedToken = TokenBean(tokenFor("20260001"), "refresh-token-committed")
-    assertTrue(
-      AccountService.commitRefreshedToken(snapshot.session, snapshot.token, refreshedToken)
-    )
-    assertSame(refreshedToken, TokenProvider.stateFlow.value)
-  }
-
-  @Test
-  fun refreshTokenFailureLogoutIsConditional() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-old",
-    )
-    val oldSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-current",
-    )
-
-    assertNull(
-      AccountService.logoutIfCurrentTokenLifecycle(oldSnapshot.session, oldSnapshot.token)
-    )
-    assertEquals("20260002", AccountService.session.value.accountId)
-
-    val currentSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val logoutSession = requireNotNull(
-      AccountService.logoutIfCurrentTokenLifecycle(
-        currentSnapshot.session,
-        currentSnapshot.token,
-      )
-    )
-    assertIs<AccountState.Logout>(logoutSession.state)
-    assertSame(logoutSession, AccountService.session.value)
-    assertIs<AccountState.Logout>(AccountService.state.value)
-    assertNull(TokenProvider.stateFlow.value)
-
-    val logoutScope = requireNotNull(AccountService.accountCoroutineScopeFor(logoutSession))
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-after-logout",
-    )
-    assertTrue(requireNotNull(logoutScope.coroutineContext[Job]).isCancelled)
-    assertNull(AccountService.accountCoroutineScopeFor(logoutSession))
-  }
-
-  @Test
-  fun staleSessionCannotRegisterUserInfoRefreshAfterAccountSwitch() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-old",
-    )
-    val oldSession = AccountService.session.value
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-current",
-    )
-    var staleBeginCalled = false
-
-    assertNull(
-      AccountService.beginUserInfoRefresh(oldSession) {
-        staleBeginCalled = true
-        1L
-      }
-    )
-    assertFalse(staleBeginCalled)
-
-    val currentSession = AccountService.session.value
-    assertEquals(
-      2L,
-      AccountService.beginUserInfoRefresh(currentSession) { 2L },
-    )
-  }
-
-  @Test
-  fun staleAuthenticatedStatusCannotExpireNewLifecycleToken() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a",
-    )
-    val switchedLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b",
-    )
-
-    TokenServiceImpl.handleAuthenticatedApiStatus(switchedLease, 20002, "late switch")
-    assertEquals(tokenFor("20260002"), TokenServiceImpl.getToken())
-
-    val sameAccountLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b-relogin",
-    )
-    TokenServiceImpl.handleAuthenticatedApiStatus(sameAccountLease, 20003, "late relogin")
-    assertEquals(tokenFor("20260002"), TokenServiceImpl.getToken())
-
-    val oldTokenLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val refreshedTokenValue = tokenFor("20260002") + ".refreshed"
-    assertTrue(
-      AccountService.commitRefreshedToken(
-        snapshot.session,
-        snapshot.token,
-        TokenBean(refreshedTokenValue, "refresh-token-b-new"),
-      )
-    )
-    TokenServiceImpl.handleAuthenticatedApiStatus(oldTokenLease, 20002, "late old token")
-    assertEquals(refreshedTokenValue, TokenServiceImpl.getToken())
-  }
-
-  @Test
-  fun currentAuthenticatedStatusExpiresExactSourceTokenWithoutCrossLifecycleThrottle() =
-    runTest(dispatcher) {
-      loginForTest(
-        stuNum = "20260001",
-        token = tokenFor("20260001"),
-        refreshToken = "refresh-token-a",
-      )
-      val firstLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-      TokenServiceImpl.handleAuthenticatedApiStatus(firstLease, 20002, "current token")
-      assertNull(TokenServiceImpl.getToken())
-
-      // 新 lifecycle 不得被上一账号的 30 分钟窗口抑制。
-      loginForTest(
-        stuNum = "20260002",
-        token = tokenFor("20260002"),
-        refreshToken = "refresh-token-b",
-      )
-      val secondLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-      TokenServiceImpl.handleAuthenticatedApiStatus(secondLease, 20003, "current verify")
-      assertNull(TokenServiceImpl.getToken())
+  fun derivedStateDeduplicatesTouristButEmitsSameAccountRelogin() = runTest(dispatcher) {
+    val observed = mutableListOf<AccountState>()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      AccountService.state.collect { observed += it }
     }
+    AccountService.onTouristMode()
+    val firstTourist = AccountService.session.value
+    AccountService.onTouristMode()
+    assertNotSame(firstTourist, AccountService.session.value)
+    assertEquals(2, observed.size)
 
+    loginForTest("20260001", tokenFor("20260001"), "first-refresh")
+    val firstLogin = AccountService.session.value.state
+    loginForTest("20260001", tokenFor("20260001"), "second-refresh")
+    assertEquals(4, observed.size)
+    assertSame(firstLogin, observed[2])
+    assertSame(AccountService.session.value.state, observed[3])
+    assertSame(AccountService.session.value.state, AccountService.state.value)
+    AccountService.onLogout()
+    assertEquals(5, observed.size)
+    assertSame(AccountService.session.value.state, observed.last())
+  }
+
+  /** 正常登录过期只跳转一次，随后重新登录立即恢复可用凭据。 */
   @Test
-  fun authenticatedStatus20004LogsOutOnlyExactLifecycle() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a",
-    )
-    val switchedLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b",
-    )
-    TokenServiceImpl.handleAuthenticatedApiStatus(switchedLease, 20004, "late switch")
-    assertEquals("20260002", AccountService.session.value.accountId)
-
-    val sameAccountLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b-relogin",
-    )
-    TokenServiceImpl.handleAuthenticatedApiStatus(sameAccountLease, 20004, "late relogin")
-    assertEquals("20260002", AccountService.session.value.accountId)
-
-    val oldTokenLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val refreshedToken = TokenBean(
-      tokenFor("20260002") + ".refreshed",
-      "refresh-token-b-new",
-    )
-    assertTrue(
-      AccountService.commitRefreshedToken(snapshot.session, snapshot.token, refreshedToken)
-    )
-    TokenServiceImpl.handleAuthenticatedApiStatus(oldTokenLease, 20004, "late old token")
-    assertEquals("20260002", AccountService.session.value.accountId)
-    assertSame(refreshedToken, TokenProvider.stateFlow.value)
-
-    val currentLease = requireNotNull(TokenServiceImpl.getOrRequestTokenLease())
-    TokenServiceImpl.handleAuthenticatedApiStatus(currentLease, 20004, "current lifecycle")
-    assertIs<AccountState.Logout>(AccountService.session.value.state)
+  fun currentExpiryNavigatesOnceAndReloginRestoresToken() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+    val expired = AccountService.session.value
+    expired.tokenState?.tryRefreshTokenExpired("登录过期", requireNotNull((expired.tokenState as TokenStateImpl).tokenFlow.value))
+    expired.tokenState?.tryRefreshTokenExpired("重复过期响应", requireNotNull((expired.tokenState as TokenStateImpl).tokenFlow.value))
     dispatcher.scheduler.runCurrent()
+
+    assertIs<AccountState.Logout>(AccountService.state.value)
+    assertNull(AccountService.session.value.tokenState)
+    assertNull(TokenStateImpl.load())
+    assertEquals(1, TestLoginService.jumpCount)
+
+    loginForTest("20260001", tokenFor("20260001"), "new-refresh")
+    assertFalse(AccountService.session.value.tokenState?.isRefreshTokenExpired() != false)
+    assertEquals(tokenFor("20260001"), AccountService.session.value.tokenState?.getOrRefreshToken()?.token)
+  }
+
+  /** 旧请求的过期响应不能清除重新登录后的 token，也不能跳回登录页。 */
+  @Test
+  fun expiredResponseFromPreviousLoginIsIgnored() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+    val oldSession = AccountService.session.value
+    loginForTest("20260001", tokenFor("20260001"), "new-refresh")
+    val currentToken = (AccountService.session.value.tokenState as TokenStateImpl).tokenFlow.value
+
+    oldSession.tokenState?.tryTokenExpired(requireNotNull((oldSession.tokenState as TokenStateImpl).tokenFlow.value))
+    oldSession.tokenState?.tryRefreshTokenExpired("迟到的过期响应", requireNotNull((oldSession.tokenState as TokenStateImpl).tokenFlow.value))
+    dispatcher.scheduler.runCurrent()
+
+    assertSame(currentToken, AccountService.session.value.tokenState?.token)
+    assertTrue(AccountService.isLogin())
+    assertTrue(currentToken!!.tokenExpiredAtMillis > Clock.System.now().toEpochMilliseconds())
+    assertEquals(0, TestLoginService.jumpCount)
+  }
+
+  /** 同一生命周期更换 access token 或 refresh token 后，旧凭据的过期响应均不得修改新凭据。 */
+  @Test
+  fun expiredResponseFromPreviousCredentialsIsIgnored() = runTest(dispatcher) {
+    for (changeAccessToken in listOf(true, false)) {
+      loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+      val session = AccountService.session.value
+      val previous = requireNotNull((session.tokenState as TokenStateImpl).tokenFlow.value)
+      val refreshed = TokenStateImpl.toAccountToken(
+        bean = TokenBean(
+          if (changeAccessToken) previous.token + ".refreshed" else previous.token,
+          if (changeAccessToken) previous.refreshToken else "new-refresh",
+        ),
+      )
+      TokenStateImpl.save(refreshed)
+      (session.tokenState as TokenStateImpl).tokenFlow.value = refreshed
+
+      session.tokenState?.tryTokenExpired(previous)
+      session.tokenState?.tryRefreshTokenExpired("旧凭据过期", previous)
+      dispatcher.scheduler.runCurrent()
+
+      assertSame(session, AccountService.session.value)
+      assertSame(refreshed, (session.tokenState as TokenStateImpl).tokenFlow.value)
+      assertEquals(refreshed, TokenStateImpl.load())
+      assertTrue(AccountService.isLogin())
+      assertEquals(0, TestLoginService.jumpCount)
+    }
+  }
+
+  /** 只修改本地有效期不代表签发新凭据，随后同一 token 的 refresh 失效仍需正常登出一次。 */
+  @Test
+  fun expiryTimeCopyDoesNotInvalidateRequestOwnership() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "refresh")
+    val session = AccountService.session.value
+    val sent = requireNotNull((session.tokenState as TokenStateImpl).tokenFlow.value)
+    session.tokenState?.tryTokenExpired(sent)
+    val expired = requireNotNull((session.tokenState as TokenStateImpl).tokenFlow.value)
+    assertNotSame(sent, expired)
+    assertEquals(0L, expired.tokenExpiredAtMillis)
+    session.tokenState?.tryTokenExpired(sent)
+    assertSame(expired, (session.tokenState as TokenStateImpl).tokenFlow.value)
+
+    session.tokenState?.tryRefreshTokenExpired("当前凭据过期", sent)
+    session.tokenState?.tryRefreshTokenExpired("重复响应", sent)
+    dispatcher.scheduler.runCurrent()
+
+    assertIs<AccountState.Logout>(AccountService.state.value)
+    assertNull(TokenStateImpl.load())
     assertEquals(1, TestLoginService.jumpCount)
   }
 
+  /** 登出在主线程排队时完成刷新，执行时必须再次校验，不能清除新凭据及其缓存。 */
   @Test
-  fun delayedWrapperAndStatusAccessOnlyThrowsWithoutAccountSideEffects() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-a",
-    )
+  fun queuedExpiryRechecksCredentialsBeforeLogout() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+    val session = AccountService.session.value
+    val sent = requireNotNull((session.tokenState as TokenStateImpl).tokenFlow.value)
+    session.tokenState?.tryRefreshTokenExpired("旧凭据过期", sent)
+    val refreshed = TokenStateImpl.toAccountToken(TokenBean(sent.token + ".refreshed", "new-refresh"))
+    TokenStateImpl.save(refreshed)
+    (session.tokenState as TokenStateImpl).tokenFlow.value = refreshed
+    dispatcher.scheduler.runCurrent()
+
+    assertSame(session, AccountService.session.value)
+    assertSame(refreshed, (session.tokenState as TokenStateImpl).tokenFlow.value)
+    assertEquals(refreshed, TokenStateImpl.load())
+    assertTrue(AccountService.isLogin())
+    assertEquals(0, TestLoginService.jumpCount)
+  }
+
+  /** 过期事件排队后完成新登录，主线程入口校验忽略旧 session 的登出、提示与导航。 */
+  @Test
+  fun reloginCancelsQueuedExpiredNavigation() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+    val session = AccountService.session.value
+    session.tokenState?.tryRefreshTokenExpired("登录过期", requireNotNull((session.tokenState as TokenStateImpl).tokenFlow.value))
+    assertIs<AccountState.Login>(AccountService.state.value)
+    val loginScope = AccountService.accountCoroutineScope
+
+    loginForTest("20260001", tokenFor("20260001"), "new-refresh")
+    dispatcher.scheduler.runCurrent()
+
+    assertTrue(loginScope.coroutineContext[Job]!!.isCancelled)
+    assertTrue(AccountService.isLogin())
+    assertEquals(0, TestLoginService.jumpCount)
+    assertFalse(AccountService.session.value.tokenState?.isRefreshTokenExpired() != false)
+  }
+
+  /** 延迟读取旧响应只抛业务异常，不会使新登录的凭据过期或跳回登录页。 */
+  @Test
+  fun delayedResponseReadDoesNotChangeCurrentLogin() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
     val wrappers = listOf(20002, 20003, 20004).map { status ->
       defaultJson.decodeFromString<ApiWrapper<String>>(
         """{"status":$status,"info":"expired"}""",
       )
     }
-    loginForTest(
-      stuNum = "20260002",
-      token = tokenFor("20260002"),
-      refreshToken = "refresh-token-b",
-    )
+    loginForTest("20260002", tokenFor("20260002"), "new-refresh")
     val currentSession = AccountService.session.value
-    val currentToken = requireNotNull(TokenProvider.stateFlow.value)
+    val currentToken = (currentSession.tokenState as TokenStateImpl).tokenFlow.value
 
-    wrappers.forEach { wrapper ->
-      assertFailsWith<ApiException> { wrapper.data }
-    }
+    wrappers.forEach { assertFailsWith<ApiException> { it.data } }
     listOf(20002, 20003, 20004).forEach { status ->
-      assertFailsWith<ApiException> {
-        ApiStatus(status = status, info = "expired").throwApiExceptionIfFail()
-      }
+      assertFailsWith<ApiException> { ApiStatus(status, "expired").throwApiExceptionIfFail() }
     }
 
     assertSame(currentSession, AccountService.session.value)
-    assertSame(currentToken, TokenProvider.stateFlow.value)
-    assertEquals(tokenFor("20260002"), TokenServiceImpl.getToken())
+    assertSame(currentToken, (currentSession.tokenState as TokenStateImpl).tokenFlow.value)
+    assertEquals(tokenFor("20260002"), AccountService.session.value.tokenState?.token?.token)
+    assertEquals(0, TestLoginService.jumpCount)
   }
 
+  /** 当前凭据可以直接取得字符串，登出和游客状态均不暴露 token。 */
   @Test
-  fun sameSessionRefreshReturnsLatestCommittedTokenInsteadOfCancelling() = runTest(dispatcher) {
-    loginForTest(
-      stuNum = "20260001",
-      token = tokenFor("20260001"),
-      refreshToken = "refresh-token-source",
-    )
-    val snapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-    val refreshedTokenValue = tokenFor("20260001") + ".refreshed"
-    val refreshedToken = TokenBean(refreshedTokenValue, "refresh-token-new")
-    assertTrue(
-      AccountService.commitRefreshedToken(snapshot.session, snapshot.token, refreshedToken)
-    )
-
-    assertEquals(
-      refreshedTokenValue,
-      TokenServiceImpl.currentTokenForSession(snapshot.session),
-    )
+  fun tokenStringsFollowAccountLifecycle() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "refresh")
+    assertEquals(tokenFor("20260001"), AccountService.session.value.tokenState?.getOrRefreshToken()?.token)
+    AccountService.session.value.tokenState?.tryTokenExpired(requireNotNull(AccountService.session.value.tokenState?.token))
+    assertNull(AccountService.session.value.tokenState?.token?.token)
+    AccountService.onTouristMode()
+    assertNull(AccountService.session.value.tokenState?.getOrRefreshToken()?.token)
+    assertNull(AccountService.session.value.tokenState?.token?.token)
   }
 
+  /** 发布生命周期之前必须同步切换凭据与配置分区，不能让观察者读到上一身份的存储。 */
   @Test
-  fun refreshDeferredRegistrySeparatesGenerationAndOldCompletionCannotClearNewSlot() =
-    runTest(dispatcher) {
-      loginForTest(
-        stuNum = "20260001",
-        token = tokenFor("20260001"),
-        refreshToken = "refresh-token-old",
-      )
-      val oldSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-      val registry = TokenRefreshDeferredRegistry()
-      val oldDeferred = CompletableDeferred<String>()
-      assertSame(
-        oldDeferred,
-        registry.getOrCreate(oldSnapshot.session, oldSnapshot.token) { oldDeferred },
-      )
-      assertSame(
-        oldDeferred,
-        registry.getOrCreate(oldSnapshot.session, oldSnapshot.token) {
-          error("同一生命周期不应重复创建 refresh Deferred")
-        },
-      )
-
-      loginForTest(
-        stuNum = "20260001",
-        token = tokenFor("20260001"),
-        refreshToken = "refresh-token-new",
-      )
-      val newSnapshot = requireNotNull(AccountService.freezeTokenLifecycle())
-      val newDeferred = CompletableDeferred<String>()
-      assertSame(
-        newDeferred,
-        registry.getOrCreate(newSnapshot.session, newSnapshot.token) { newDeferred },
-      )
-      assertNotSame(oldDeferred, newDeferred)
-
-      oldDeferred.complete("old-token")
-      assertSame(
-        newDeferred,
-        registry.getOrCreate(newSnapshot.session, newSnapshot.token) {
-          error("旧 Deferred 完成不能清除新 generation 的共享槽")
-        },
-      )
-
-      newDeferred.complete("new-token")
-      val alreadyCompleted = CompletableDeferred<String>().apply { complete("completed") }
-      assertSame(
-        alreadyCompleted,
-        registry.getOrCreate(newSnapshot.session, newSnapshot.token) { alreadyCompleted },
-      )
-      val replacement = CompletableDeferred<String>()
-      assertSame(
-        replacement,
-        registry.getOrCreate(newSnapshot.session, newSnapshot.token) { replacement },
-      )
+  fun accountChangesPublishCredentialsAndSettingsBeforeSession() = runTest(dispatcher) {
+    val loginSettings = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
+      val session = AccountService.session.drop(1).first()
+      assertEquals(session.accountId, (session.tokenState as TokenStateImpl).tokenFlow.value?.stuNum)
+      assertEquals((session.tokenState as TokenStateImpl).tokenFlow.value, TokenStateImpl.load())
+      AccountSettings.now.stuNum
     }
+    loginForTest("20260001", tokenFor("20260001"), "refresh")
+    assertEquals("20260001", loginSettings.await())
+
+    val touristSettings = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
+      val session = AccountService.session.drop(1).first()
+      assertNull(session.tokenState)
+      assertNull(TokenStateImpl.load())
+      AccountSettings.now.stuNum
+    }
+    AccountService.onTouristMode()
+    assertNull(touristSettings.await())
+  }
+
+  /** 缓存写入本身不改变运行态；刷新凭据后，读 token 与观察者使用同一个 session。 */
+  @Test
+  fun refreshedCredentialsStayInSameSessionAndScope() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "old-refresh")
+    val session = AccountService.session.value
+    val scope = session.accountCoroutineScope
+    val oldToken = (session.tokenState as TokenStateImpl).tokenFlow.value
+    val refreshedToken = tokenFor("20260001") + ".refreshed"
+    val refreshed = TokenStateImpl.toAccountToken(TokenBean(refreshedToken, "new-refresh"))
+    TokenStateImpl.save(refreshed)
+
+    assertSame(oldToken, (session.tokenState as TokenStateImpl).tokenFlow.value)
+    assertEquals(tokenFor("20260001"), AccountService.session.value.tokenState?.token?.token)
+    assertEquals(refreshed, TokenStateImpl.load())
+    val observed = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
+      (session.tokenState as TokenStateImpl).tokenFlow.drop(1).first()
+    }
+    (session.tokenState as TokenStateImpl).tokenFlow.value = refreshed
+
+    assertSame(refreshed, observed.await())
+    assertSame(session, AccountService.session.value)
+    assertSame(scope, AccountService.accountCoroutineScope)
+    assertFalse(scope.coroutineContext[Job]!!.isCancelled)
+    assertEquals(refreshedToken, AccountService.session.value.tokenState?.token?.token)
+    assertEquals(refreshedToken, AccountService.session.value.tokenState?.getOrRefreshToken()?.token)
+
+    // 有效期也以 session 为准；缓存里仍是有效凭据，不应覆盖运行态的过期判断。
+    (session.tokenState as TokenStateImpl).tokenFlow.value = refreshed.copy(refreshTokenExpiredAtMillis = 0)
+    assertTrue(AccountService.session.value.tokenState?.isRefreshTokenExpired() == true)
+    assertEquals(refreshed, TokenStateImpl.load())
+  }
+
+  /** 独立凭据状态无需成为全局 session；一个实例过期或结束不影响另一个实例。 */
+  @Test
+  fun tokenStatesOwnCredentialsAndLifetimeWithoutReadingAccountSession() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "refresh")
+    val published = AccountService.session.value
+    val credentials = requireNotNull(published.tokenState?.tokenFlow?.value)
+    val firstScope = CoroutineScope(SupervisorJob() + dispatcher)
+    val secondScope = CoroutineScope(SupervisorJob() + dispatcher)
+    try {
+      val first = TokenStateImpl(firstScope, credentials, onExpired = { _, _ -> })
+      val secondToken = credentials.copy(token = "second-token", refreshToken = "second-refresh")
+      val second = TokenStateImpl(secondScope, secondToken, onExpired = { _, _ -> })
+      assertSame(credentials, first.getOrRefreshToken())
+      assertSame(secondToken, second.getOrRefreshToken())
+      first.tryTokenExpired(credentials)
+      assertEquals(0, first.tokenFlow.value?.tokenExpiredAtMillis)
+      assertSame(secondToken, second.token)
+      assertSame(credentials, published.tokenState?.tokenFlow?.value)
+      firstScope.cancel()
+      assertNull(first.token)
+      assertFailsWith<CancellationException> { first.getOrRefreshToken() }
+      assertSame(secondToken, second.getOrRefreshToken())
+      // 取消只结束异步工作，仍有效的凭据可以正常读取。
+      secondScope.cancel()
+      assertSame(secondToken, second.token)
+      assertSame(secondToken, second.getOrRefreshToken())
+      assertSame(published, AccountService.session.value)
+    } finally {
+      firstScope.cancel()
+      secondScope.cancel()
+    }
+  }
+
+  /** refresh token 失效只通知回调，TokenState 自身不登出或导航，也不处理旧凭据的响应。 */
+  @Test
+  fun standaloneTokenStateReportsExpiryToOwner() = runTest(dispatcher) {
+    loginForTest("20260001", tokenFor("20260001"), "refresh")
+    val published = AccountService.session.value
+    val credentials = requireNotNull(published.tokenState?.tokenFlow?.value)
+    var messages = emptyList<String>()
+    val tokenState = TokenStateImpl(backgroundScope, credentials) { source, msg ->
+      assertSame(credentials, source.tokenFlow.value)
+      messages = messages + msg
+    }
+    tokenState.tryRefreshTokenExpired("old", credentials.copy(refreshToken = "old-refresh"))
+    tokenState.tryRefreshTokenExpired("current", credentials)
+    dispatcher.scheduler.runCurrent()
+    assertEquals(listOf("current"), messages)
+    assertSame(published, AccountService.session.value)
+    assertEquals(0, TestLoginService.jumpCount)
+  }
 
   /** 登录后立即取消真实用户资料请求，保证生命周期单测不依赖外部网络时序。 */
   private fun loginForTest(stuNum: String, token: String, refreshToken: String) {

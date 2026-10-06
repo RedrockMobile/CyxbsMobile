@@ -55,6 +55,8 @@ import com.cyxbs.pages.schedule.domain.sync.TimingInput
 import com.cyxbs.pages.schedule.domain.sync.TimingKind
 import com.cyxbs.pages.schedule.ui.category.ScheduleCategoryColorPresets
 import com.cyxbs.pages.schedule.ui.category.encodeScheduleCategoryColor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -598,7 +600,12 @@ class ScheduleRoomRepositoryDesktopTest {
       gatewayFactory = { gateway },
       nowMillis = { 100L },
       failureRecords = failures,
-    ).create(AccountSession(1, AccountState.Login(ACCOUNT_ID))) as RoomScheduleRepository
+    ).create(AccountSession(
+      1,
+      AccountState.Login(ACCOUNT_ID),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )) as RoomScheduleRepository
     try {
       block(repository, gateway, database, failures)
     } finally {

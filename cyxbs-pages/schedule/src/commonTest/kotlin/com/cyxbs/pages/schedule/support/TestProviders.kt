@@ -12,10 +12,12 @@ import kotlinx.coroutines.flow.StateFlow
 /** 测试用账号：固定发布单次 Login 会话，账号协程作用域独立于生产服务。 */
 class FakeAccountService(stuNum: String) : IAccountService {
   override val state: StateFlow<AccountState> = MutableStateFlow(AccountState.Login(stuNum))
-  override val session: StateFlow<AccountSession> = MutableStateFlow(AccountSession(1, state.value))
-  override val accountCoroutineScope: CoroutineScope = CoroutineScope(SupervisorJob())
-  override fun accountCoroutineScopeFor(expectedSession: AccountSession): CoroutineScope? =
-    accountCoroutineScope.takeIf { session.value === expectedSession }
+  override val session: StateFlow<AccountSession> = MutableStateFlow(AccountSession(
+    1,
+    state.value,
+    CoroutineScope(SupervisorJob()),
+    tokenState = null,
+  ))
 }
 
 /** 测试账号学号常量。 */

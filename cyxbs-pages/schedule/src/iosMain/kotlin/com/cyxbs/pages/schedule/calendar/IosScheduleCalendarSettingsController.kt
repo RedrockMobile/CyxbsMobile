@@ -3,7 +3,6 @@ package com.cyxbs.pages.schedule.calendar
 import com.cyxbs.components.account.api.AccountSession
 import com.cyxbs.components.account.api.IAccountService
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -61,7 +60,7 @@ private val NoOpIosScheduleCalendarIntentMutationBoundary =
 /**
  * 账号会话严格隔离的 iOS 日历设置 controller。
  *
- * 每项操作冻结 [AccountSession] 与 `accountCoroutineScopeFor(session)`；每次 suspend 前后以及每次 StateFlow/偏好
+ * 每项操作冻结 [AccountSession] 与其专属作用域；每次 suspend 前后以及每次 StateFlow/偏好
  * 写入前后都会重新核验 exact session、账号与协程活性。相同账号重新登录也会得到新 session，
  * 所以迟到授权 completion 不能覆盖新一代 UI 或配置。
  */
@@ -300,7 +299,7 @@ internal class IosScheduleCalendarSettingsController(
     }
   }
 
-  /** 从冻结账号 scope 启动工作；登出/游客与 exact-session scope 缺失均 fail-closed。 */
+  /** 从当前 session 的作用域启动工作；登出、游客或已失效生命周期均不执行。 */
   private fun launchForCurrentSession(
     block: suspend (AccountSession, String, IosEventKitSettingsGateway) -> Unit,
   ): Job? {
@@ -318,7 +317,8 @@ internal class IosScheduleCalendarSettingsController(
     block: suspend (AccountSession, String, IosEventKitSettingsGateway) -> Unit,
   ): Job? {
     val frozenAccountId = frozenSession.accountId ?: return null
-    val scope = accountService.accountCoroutineScopeFor(frozenSession) ?: return null
+    if (accountService.session.value !== frozenSession) return null
+    val scope = frozenSession.accountCoroutineScope
     val gateway = gatewayFactory(IosScheduleCalendarExportSettings.scopeForAccount(frozenAccountId))
     return scope.launch {
       try {
@@ -442,7 +442,7 @@ internal class IosScheduleCalendarSettingsController(
   /**
    * 在异步边界确认冻结会话仍是账号服务当前的 exact instance。
    *
-   * scope 在启动时已通过 [IAccountService.accountCoroutineScopeFor] 冻结；此处不维护独立状态机，只防止
+   * scope 由启动时保存的 session 直接持有；此处不维护独立状态机，只防止
    * 同账号重新登录或切号后的迟到 completion 写入旧账号配置和 UI。
    */
   private suspend fun checkExactSession(

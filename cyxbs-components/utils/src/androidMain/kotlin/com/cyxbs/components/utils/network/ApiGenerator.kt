@@ -5,8 +5,6 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.account.api.ITokenService
-import com.cyxbs.components.account.api.TokenLifecycleLease
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.allImpl
@@ -14,13 +12,13 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.network.plugin.handleAuthenticatedTypedResponse
+import com.cyxbs.components.utils.network.plugin.AccountRequestAuthentication
 import com.cyxbs.components.utils.utils.LogLocal
 import com.cyxbs.components.utils.utils.LogUtils
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.rx3.asSingle
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
@@ -285,7 +283,7 @@ object ApiGenerator {
                 })
             }
         }))
-            // 必须位于实际 converter 之前：委托一次反序列化后，才能用同一请求 lease 处理 typed 状态码。
+            // 必须位于实际 converter 之前：反序列化后按请求所属账户生命周期处理业务状态码。
             .addConverterFactory(LifecycleAwareConverterFactory())
             .addConverterFactory(KotlinXSerializationFactory()) // 需要放在 gson 之前
             .addConverterFactory(GsonConverterFactory.create())
@@ -293,13 +291,13 @@ object ApiGenerator {
     }
 
     /**
-     * 携带本次 OkHttp 请求实际附加的认证 lease，不读取、缓存或复制响应字节。
+     * 携带本次 OkHttp 请求实际附加的生命周期与凭据快照，不读取、缓存或复制响应字节。
      *
      * Retrofit converter 最终仍消费 [delegate] 的同一个 source；本包装只把请求上下文带到 typed 转换完成点。
      */
-    private class TokenLifecycleResponseBody(
+    private class AccountResponseBody(
         private val delegate: ResponseBody,
-        val lease: TokenLifecycleLease,
+        val authentication: AccountRequestAuthentication,
     ) : ResponseBody() {
         override fun contentType() = delegate.contentType()
         override fun contentLength(): Long = delegate.contentLength()
@@ -309,12 +307,11 @@ object ApiGenerator {
     /**
      * 委托既有 KotlinX/Gson converter 完成一次反序列化，再处理 typed 认证状态码。
      *
-     * 未携带 lease 的 common/login 响应以及非 [IApiStatus] 结果由公共 helper fail-closed；delegate 抛错时不会执行
+     * 未携带账户生命周期的 common/login 响应以及非 [IApiStatus] 结果由公共 helper 忽略；delegate 抛错时不会执行
      * 任何账号副作用。
      */
     private class LifecycleAwareConverterFactory : Converter.Factory() {
 
-        private val tokenService = ITokenService::class.impl()
 
         override fun responseBodyConverter(
             type: Type,
@@ -324,10 +321,10 @@ object ApiGenerator {
             val delegate = retrofit.nextResponseBodyConverter<Any?>(this, type, annotations)
             return Converter<ResponseBody?, Any?> { body ->
                 val responseBody = requireNotNull(body)
-                val lease = (responseBody as? TokenLifecycleResponseBody)?.lease
+                val authentication = (responseBody as? AccountResponseBody)?.authentication
                 val result = delegate.convert(responseBody)
-                if (result != null) {
-                    handleAuthenticatedTypedResponse(tokenService, lease, result)
+                if (result != null && authentication != null) {
+                    handleAuthenticatedTypedResponse(authentication, result)
                 }
                 result
             }
@@ -435,30 +432,38 @@ object ApiGenerator {
     }
 
     /**
-     * 冻结请求实际附加的 token lease，并把它随 ResponseBody 传播到 Retrofit converter。
+     * 自动附加当前 token，调用方指定 Authorization 时保留原值。
      *
-     * lease 获取结束后即使切号，响应仍携带原 AccountSession 与源 TokenBean identity；converter 只能条件处理原
-     * lifecycle。没有登录或冻结失败时按无认证请求继续，响应不会获得 lease。
+     * 等待 token 前后检查账户生命周期，响应携带实际使用的凭据，忽略刷新或重新登录后的旧过期提示。
      */
-    private fun Interceptor.Chain.proceedWithToken(
-        block: (Request.Builder.() -> Unit)? = null
-    ): Response {
-        val tokenService = ITokenService::class.impl()
-        val lease = tokenService.getOrRequestTokenLease2 {
-            it.asSingle(Dispatchers.IO).blockingGet() // 无奈之举，先使用这种方式转换成 rxjava 在堵塞等待结果
+    private fun Interceptor.Chain.proceedWithToken(): Response {
+        if (request().header("Authorization") != null) return proceed(request())
+        val session = mAccountService.session.value
+        val token = try {
+            session.tokenState?.let {
+                // 优先取无阻塞的 token，如果 token 已过期，再进行阻塞获取新的 token。
+                it.token ?: runBlocking { it.getOrRefreshToken() }
+            }
+        } catch (exception: java.io.IOException) {
+            throw exception
+        } catch (exception: Exception) {
+            // OkHttp 会继续抛出拦截器中的非 IOException；刷新业务失败及账户取消在此转为请求失败。
+            throw java.io.IOException("获取账户 token 失败", exception)
+        }
+        if (mAccountService.session.value !== session) {
+            throw java.io.IOException("等待 token 时账户已切换")
         }
         val response = proceed(
             request()
                 .newBuilder()
-                .apply { if (lease != null) header("Authorization", "Bearer ${lease.token}") }
-                .also { block?.invoke(it) }
+                .apply { if (token != null) header("Authorization", "Bearer ${token.token}") }
                 .build()
         )
-        return if (lease == null) {
+        return if (token == null) {
             response
         } else {
             response.newBuilder()
-                .body(TokenLifecycleResponseBody(response.body, lease))
+                .body(AccountResponseBody(response.body, AccountRequestAuthentication(session, token)))
                 .build()
         }
     }

@@ -51,11 +51,12 @@ internal actual fun rememberScheduleReminderAuthorization(
       val exactSession = currentSession
       val accountId = exactSession?.accountId
       val exactGateway = gateway
-      val scope = exactSession?.let(accountService::accountCoroutineScopeFor)
-      if (exactSession == null || accountId == null || exactGateway == null || scope == null) {
+      // UI 尚未重组时也要拒绝旧 session，避免用旧账号写入导出开关。
+      if (exactSession == null || accountId == null || exactGateway == null ||
+        accountService.session.value !== exactSession) {
         currentOnResult(false)
       } else {
-        scope.launch {
+        exactSession.accountCoroutineScope.launch {
           val granted = when (exactGateway.fullAccessStatus()) {
             IosEventKitFullAccessStatus.FULL_ACCESS -> true
             else -> exactGateway.requestFullAccess() is IosEventKitPermissionResult.Granted

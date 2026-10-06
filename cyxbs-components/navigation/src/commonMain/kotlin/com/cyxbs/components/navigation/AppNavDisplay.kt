@@ -33,7 +33,6 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ILoginDialogContent
-import com.cyxbs.components.account.api.ITokenService
 import com.g985892345.provider.manager.KtProvider
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
@@ -199,9 +198,8 @@ fun rememberAppNavBackStack(): AppNavBackStack {
 
 private fun getFirstAppNavArgument(): List<AppNavArgument> {
   val accountService = KtProvider.impl(IAccountService::class)
-  val tokenService = KtProvider.impl(ITokenService::class)
   val isFirstToLogin = !accountService.isTouristMode() &&
-      (!accountService.isLogin() || tokenService.isRefreshTokenExpired())
+      (!accountService.isLogin() || accountService.session.value.tokenState?.isRefreshTokenExpired() != false)
   if (isFirstToLogin) {
     val login = AppNavArgument.decodeFromRoute(NAV_LOGIN)
     check(login != null) { "未注册 NAV_LOGIN 对应的登录页" }

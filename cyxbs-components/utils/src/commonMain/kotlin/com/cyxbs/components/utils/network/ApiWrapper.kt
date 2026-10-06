@@ -73,7 +73,7 @@ interface IApiStatus {
   /**
    * 仅校验业务状态并抛出 [ApiException]，不执行任何账号或 token 副作用。
    *
-   * 认证状态码由网络层使用请求发起时冻结的 lease 处理；保持本方法纯粹可避免 wrapper 反序列化后切号，再延迟
+   * 认证状态码由网络层按请求所属账户生命周期处理；保持本方法纯粹可避免 wrapper 反序列化后切号，再延迟
    * 访问 `data` 时把旧响应错误施加到新账号。
    */
   @Throws(ApiException::class)

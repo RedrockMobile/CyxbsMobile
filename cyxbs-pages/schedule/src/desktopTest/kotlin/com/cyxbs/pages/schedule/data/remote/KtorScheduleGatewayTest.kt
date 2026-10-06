@@ -8,6 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 
 /** Ktorfit 适配层只验证统一外壳和 exact-session 传递，不复制 HTTP 客户端实现测试。 */
@@ -30,7 +32,12 @@ class KtorScheduleGatewayTest {
 
   @Test
   fun handledResponseKeepsTypedRawDataAndExactSession() = runTest {
-    val session = AccountSession(7, AccountState.Login(ACCOUNT_ID))
+    val session = AccountSession(
+      7,
+      AccountState.Login(ACCOUNT_ID),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )
     val response = emptyResponse()
     val api = FakeApi(ApiWrapper(response, 10000, "success"))
     val gateway = KtorScheduleGateway(api, session)
@@ -46,7 +53,12 @@ class KtorScheduleGatewayTest {
 
   @Test
   fun unsupportedBusinessStatusDoesNotExposeCompletedData() = runTest {
-    val session = AccountSession(8, AccountState.Login(ACCOUNT_ID))
+    val session = AccountSession(
+      8,
+      AccountState.Login(ACCOUNT_ID),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )
     val api = FakeApi(ApiWrapper(emptyResponse(), 20001, "internal"))
     val gateway = KtorScheduleGateway(api, session)
 
