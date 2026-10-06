@@ -24,6 +24,11 @@ internal actual fun createHttpClientEngine(): HttpClientEngine = OkHttp.create {
 internal actual fun HttpClientConfig<*>.platformConfigHttpClient() {
 }
 
+/** 桌面端使用 OkHttp，连接建立失败的分类与 Android 保持一致。 */
+internal actual fun Throwable.isPlatformConnectionFailure(): Boolean =
+  this is java.net.UnknownHostException || this is java.net.ConnectException ||
+    this is java.net.NoRouteToHostException
+
 // 手动创建 okhttp 的线程分发器，规避 协程 + Retrofit 在子线程请求被 cancel 后的异常问题
 private val OkHttpDispatcher = Dispatcher(
   ThreadPoolExecutor(
@@ -38,4 +43,3 @@ private val OkHttpDispatcher = Dispatcher(
 )
 
 private val UncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, _ ->}
-

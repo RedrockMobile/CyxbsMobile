@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -62,7 +63,7 @@ import kotlin.test.assertTrue
 class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun disabledMissingSourceAccessDeniedAndEmptyProjectionHaveNoPlatformOrCacheEffects() = runTest {
-    val account = FakeAccount(backgroundScope, session("runtime-gate"))
+    val account = FakeAccount(session("runtime-gate"))
     val repository = FakeRepository("runtime-gate")
     val gateway = FakeRuntimeGateway()
 
@@ -95,7 +96,7 @@ class IosScheduleCalendarExportRuntimeTest {
 
   @Test
   fun initializedAndCommittedSignalsAreConflatedBeforeAnEmptyFullReconcile() = runTest {
-    val account = FakeAccount(backgroundScope, session("runtime-coalesce"))
+    val account = FakeAccount(session("runtime-coalesce"))
     val repository = FakeRepository("runtime-coalesce")
     val gateway = FakeRuntimeGateway()
     val preferences = FakePreferences(
@@ -126,7 +127,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun remoteCommittedRequestsFullReconcileFromPersistedSnapshot() = runTest {
     val accountId = "runtime-remote-committed"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId)
     val gateway = FakeRuntimeGateway()
     val runtime = IosScheduleCalendarExportRuntime(
@@ -160,7 +161,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun registryHandoffDefersRuntimeAndMergesBaselineWithInitializedReplay() = runTest {
     val accountId = "runtime-post-mutex-handoff"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId, replay = 1).apply {
       replaceSchedules(listOf(schedule()))
       emit(ScheduleCalendarChange.Initialized(accountId))
@@ -216,7 +217,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun replacementBeforeHandoffReleaseStartsOnlyCurrentRuntimeOnce() = runTest {
     val accountId = "runtime-handoff-replacement"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val oldGateway = LedgerGateway()
     val currentGateway = LedgerGateway()
@@ -267,7 +268,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun atomicCreateThenUpdateNoOpAndDeleteUsePersistedVerifiedLedgerHints() = runTest {
     val accountId = "runtime-ledger"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(
@@ -306,7 +307,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun occurrenceFingerprintRebuildsSeriesOnChangeAndPersistsConfirmedEmptyState() = runTest {
     val accountId = "runtime-occurrence-reconcile"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val recurring = schedule().copy(
       recurrence = RecurrenceRule(
         frequency = RecurrenceFrequency.WEEKLY,
@@ -368,7 +369,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     cases.forEachIndexed { index, recovery ->
       val accountId = "runtime-preflight-half-$index"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway()
       val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -398,7 +399,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun noOpAcknowledgesOnlySecondFreshLookupProofWithoutRetiringPreflightProof() = runTest {
     val accountId = "runtime-noop-latest-proof"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -437,7 +438,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     cases.forEach { case ->
       val accountId = "runtime-retire-${case.name}"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply {
         retirement = IosEventKitLocatorEligibilityRetirement.REJECTED
@@ -469,7 +470,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun updateRetiresPreflightEligibilityOnceWhileOrdinaryUpdateAndDeleteSkipRetirement() = runTest {
     val accountId = "runtime-retire-success"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -506,7 +507,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun cachedNoOpDuplicateCanonicalEventStopsGenerationWithoutRefreshingLedger() = runTest {
     val accountId = "runtime-noop-duplicate"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -547,7 +548,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     failures.forEach { failure ->
       val accountId = "runtime-invalid-${failure.name}"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply { failLookup = failure }
       val id = projectionId(accountId)
@@ -629,7 +630,7 @@ class IosScheduleCalendarExportRuntimeTest {
     cases.forEach { case ->
       // CalendarExportScope 只接受规范账号字符，case 名仅用于断言文案，不能直接充当账号 scope。
       val accountId = "runtimeinvalidwrite${case.expectedAttempts.size}"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply { failLookup = IosEventKitGatewayFailure.CALENDAR_DISAPPEARED }
       val id = projectionId(accountId)
@@ -670,7 +671,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun unsupportedManagedMasterPreservesCalendarAndAllLedgerEntries() = runTest {
     val accountId = "runtime-unsupported-master"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val masterId = projectionId(
       accountId,
@@ -714,7 +715,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun missingRefBeforeUnsupportedManagedPreservesEntireLedgerWithoutPlannerEffects() = runTest {
     val accountId = "runtime-mixed-ledger"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val firstId = CalendarProjectionId(
       scope = IosScheduleCalendarExportSettings.scopeForAccount(accountId),
@@ -759,7 +760,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun nullCalendarHintRejectsOrdinaryNonAtomicExistingEventWithoutRecoveryProof() = runTest {
     val accountId = "runtime-provenance"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway().apply {
       ordinaryExistingWithoutProof = true
@@ -788,7 +789,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun productionGatewayOrdinaryNonAtomicExactEventCannotBackfillNullLocator() = runTest {
     val accountId = "runtime-production-ordinary-provenance"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val targetSchedule = schedule()
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(targetSchedule)) }
     val scope = IosScheduleCalendarExportSettings.scopeForAccount(accountId)
@@ -833,7 +834,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun preCommitAtomicFailureCannotMintProofForLaterOrdinaryExactEvent() = runTest {
     val accountId = "runtime-precommit-provenance"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val targetSchedule = schedule()
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(targetSchedule)) }
     val target = ScheduleCalendarProjectionFactory.project(
@@ -887,7 +888,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     invalidBindings.forEachIndexed { index, invalidBinding ->
       val accountId = "runtime-invalid-recovery-binding-$index"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply {
         ordinaryExistingWithoutProof = true
@@ -919,7 +920,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun ambiguousCommittedFirstPairRecoversOnLaterExplicitIntentUsingSameFakeStore() = runTest {
     val accountId = "runtime-ambiguous-canonical-recovery"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val store = AmbiguousCommitRecoveryStore()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -969,7 +970,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun successfulAtomicCommitSurvivesEventKitBoundaryInvalidationAndRecoversLater() = runTest {
     val accountId = "runtime-success-eventkit-invalidation"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val store = AmbiguousCommitRecoveryStore(firstAtomicCompletionLost = false)
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1011,7 +1012,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun lifecycleFailureAfterBothCacheWritesRetainsEligibilityForLaterAcknowledgement() = runTest {
     val accountId = "runtime-post-ledger-lifecycle"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val store = AmbiguousCommitRecoveryStore(firstAtomicCompletionLost = false)
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1064,7 +1065,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun productionGatewayRetiresPendingEligibilityBeforeUpdateAndOrdinaryEventCannotRemintProof() = runTest {
     val accountId = "runtime-production-retire-update"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val original = schedule()
     val updated = schedule(title = "retirement 后更新")
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(original)) }
@@ -1125,7 +1126,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun productionGatewayRetiresPendingEligibilityBeforeDeleteAndLaterOrdinaryEventCannotRemintProof() = runTest {
     val accountId = "runtime-production-retire-delete"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val original = schedule()
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(original)) }
     val scope = IosScheduleCalendarExportSettings.scopeForAccount(accountId)
@@ -1198,7 +1199,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     cases.forEach { case ->
       val accountId = "runtime-production-${case.name}"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val store = AmbiguousCommitRecoveryStore(
         firstAtomicCompletionLost = false,
@@ -1259,7 +1260,7 @@ class IosScheduleCalendarExportRuntimeTest {
 
     for ((failureName, failCalendar) in failurePoints) {
       val accountId = "runtime-success-cache-$failureName"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val store = AmbiguousCommitRecoveryStore(firstAtomicCompletionLost = false)
       val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null)).apply {
@@ -1308,7 +1309,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun recoveryProofIssuedBeforeCacheFailureRemainsEligibleForNextExplicitGeneration() = runTest {
     val accountId = "runtime-proof-cache-failure"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val store = AmbiguousCommitRecoveryStore()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1348,7 +1349,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun durableLocatorAcknowledgementConsumesSuccessfulAtomicEligibilityExactlyOnce() = runTest {
     val accountId = "runtime-success-ack-consumes"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val store = AmbiguousCommitRecoveryStore(firstAtomicCompletionLost = false)
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1386,7 +1387,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun missingLedgerRefNeverDeletesAndIsRemovedBeforeFreshCreatePlan() = runTest {
     val accountId = "runtime-missing-ref"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId)
     val gateway = LedgerGateway()
     val preferences = FakePreferences(
@@ -1414,7 +1415,7 @@ class IosScheduleCalendarExportRuntimeTest {
     val cases = listOf("rejected" to false, "lost-return" to true)
     for ((name, throwAfterAck) in cases) {
       val accountId = "runtime-ack-$name"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply {
         acknowledgement = IosEventKitLocatorAcknowledgement.REJECTED
@@ -1452,7 +1453,7 @@ class IosScheduleCalendarExportRuntimeTest {
     )
     failures.forEach { failure ->
       val accountId = "runtime-terminal-${failure.name}"
-      val account = FakeAccount(backgroundScope, session(accountId))
+      val account = FakeAccount(session(accountId))
       val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
       val gateway = LedgerGateway().apply {
         failUpsert = failure
@@ -1481,7 +1482,7 @@ class IosScheduleCalendarExportRuntimeTest {
     }
 
     val accountId = "runtime-cache-failure"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", "calendar")).apply {
@@ -1504,7 +1505,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun snapshotDriftAbandonsOldPlanBeforeSecondOutboundAction() = runTest {
     val accountId = "runtime-snapshot-drift"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply {
       replaceSchedules(listOf(schedule(), schedule(title = "第二个投影", id = "018f7d5a-5678-7abc-8def-1234567890ac")))
     }
@@ -1536,7 +1537,7 @@ class IosScheduleCalendarExportRuntimeTest {
     for (point in points) {
       for (invalidation in invalidations) {
         val accountId = "runtime-race-${point.name}-${invalidation.name}"
-        val account = FakeAccount(backgroundScope, session(accountId))
+        val account = FakeAccount(session(accountId))
         val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
         val gateway = LedgerGateway()
         val preferences = FakePreferences(
@@ -1615,7 +1616,7 @@ class IosScheduleCalendarExportRuntimeTest {
   fun inheritedExplicitIntentPendingFenceRejectsDefaultDispatcherRepositoryChangeUntilSignal() = runTest {
     val defaultScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val accountId = "runtime-intent-pending-default"
-    val account = FakeAccount(defaultScope, session(accountId))
+    val account = FakeAccount(session(accountId, parentScope = defaultScope))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "old-source", null))
@@ -1660,7 +1661,7 @@ class IosScheduleCalendarExportRuntimeTest {
   fun defaultDispatcherReplacementCancelsRegisteredLazyReconcileBeforeEffects() = runTest {
     val defaultScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val accountId = "runtime-lazy-registration"
-    val account = FakeAccount(defaultScope, session(accountId))
+    val account = FakeAccount(session(accountId, parentScope = defaultScope))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1705,7 +1706,7 @@ class IosScheduleCalendarExportRuntimeTest {
   fun defaultDispatcherReplacementCancelsChildRegisteredBeforeStart() = runTest {
     val defaultScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val accountId = "runtime-registration-window"
-    val account = FakeAccount(defaultScope, session(accountId))
+    val account = FakeAccount(session(accountId, parentScope = defaultScope))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val gateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -1747,7 +1748,7 @@ class IosScheduleCalendarExportRuntimeTest {
   @Test
   fun exactSessionReregistrationInheritsRunningEffectFenceUntilExplicitIntent() = runTest {
     val accountId = "runtime-reregister-running-effect"
-    val account = FakeAccount(backgroundScope, session(accountId))
+    val account = FakeAccount(session(accountId))
     val repository = FakeRepository(accountId).apply { replaceSchedules(listOf(schedule())) }
     val oldGateway = LedgerGateway()
     val preferences = FakePreferences(IosScheduleCalendarExportSettings.Preference(true, "source", null))
@@ -2543,36 +2544,34 @@ class IosScheduleCalendarExportRuntimeTest {
     }
   }
 
+  /** 测试账户直接使用 session 持有的作用域，模拟切号取消与 owner 单独结束。 */
   private class FakeAccount(
-    private val parentScope: CoroutineScope,
     initial: AccountSession,
   ) : IAccountService {
     override val session = MutableStateFlow(initial)
     override val state = MutableStateFlow(initial.state)
-    private var owner = SupervisorJob(parentScope.coroutineContext[Job])
-    private var scopedAccountCoroutineScope = CoroutineScope(parentScope.coroutineContext + owner)
-    override val accountCoroutineScope: CoroutineScope
-      get() = scopedAccountCoroutineScope
-
-    override fun accountCoroutineScopeFor(expectedSession: AccountSession): CoroutineScope? =
-      accountCoroutineScope.takeIf { session.value === expectedSession }
-
-    /** 切换 session 时先失效旧 owner，再建立新 scope，模拟账号服务的 exact-session replacement。 */
+    /** 切换时取消旧 session 的任务，新 session 自带独立作用域。 */
     fun switchTo(next: AccountSession) {
-      owner.cancel()
-      owner = SupervisorJob(parentScope.coroutineContext[Job])
-      scopedAccountCoroutineScope = CoroutineScope(parentScope.coroutineContext + owner)
+      session.value.accountCoroutineScope.cancel()
       state.value = next.state
       session.value = next
     }
 
-    /** 保持同一 session、仅取消 owner，覆盖页面/账号 scope 单独结束的迟到 completion。 */
+    /** 保持同一 session、仅取消其作用域，覆盖 owner 结束后的迟到回调。 */
     fun cancelOwner() {
-      owner.cancel()
+      session.value.accountCoroutineScope.cancel()
     }
   }
 
-  /** 生成不可按值复用的 Login session，确保 runtime 的 identity gate 不退化为 accountId 比较。 */
-  private fun session(accountId: String, generation: Long = 1): AccountSession =
-    AccountSession(generation, AccountState.Login(accountId))
+  /** 生成独立生命周期；默认使用测试调度器，并允许并发用例显式传入 Default 作用域。 */
+  private fun TestScope.session(
+    accountId: String,
+    generation: Long = 1,
+    parentScope: CoroutineScope = backgroundScope,
+  ): AccountSession = AccountSession(
+    generation,
+    AccountState.Login(accountId),
+    CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job])),
+    tokenState = null,
+  )
 }

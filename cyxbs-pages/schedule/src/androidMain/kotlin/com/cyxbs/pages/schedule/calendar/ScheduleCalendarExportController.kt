@@ -90,8 +90,7 @@ internal object ScheduleCalendarExportController {
     val accountId = session.accountId ?: return
     disable(session)
     val accountService = IAccountService::class.impl()
-    val scope = accountService.accountCoroutineScopeFor(session) ?: return
-    scope.launch {
+    session.accountCoroutineScope.launch {
       if (accountService.session.value !== session) return@launch
       AndroidManagedCalendarRegistry(context.applicationContext)
         .clearAndDeleteManagedCalendars(accountId)
@@ -111,7 +110,7 @@ internal object ScheduleCalendarExportController {
   ) {
     val accountId = session.accountId ?: return
     val accountService = IAccountService::class.impl()
-    val scope = accountService.accountCoroutineScopeFor(session) ?: return
+    val scope = session.accountCoroutineScope
     val owner = scope.coroutineContext[Job] ?: return
     if (accountService.session.value !== session || !owner.isActive) return
     val exportScope = ScheduleCalendarExportSettings.scopeForAccount(accountId)

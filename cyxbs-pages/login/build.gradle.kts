@@ -20,6 +20,12 @@ kotlin {
       implementation(projects.cyxbsPages.home.api)
       implementation(libs.compose.lottie)
     }
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+    }
+    desktopTest.dependencies {
+      implementation(libs.kotlinx.coroutines.test)
+    }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)
       implementation(libs.bundles.views)

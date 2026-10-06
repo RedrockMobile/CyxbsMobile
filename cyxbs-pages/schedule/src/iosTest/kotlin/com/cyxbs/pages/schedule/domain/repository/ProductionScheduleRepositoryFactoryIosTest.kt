@@ -21,6 +21,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import platform.Foundation.NSTemporaryDirectory
 import platform.posix.remove
@@ -33,7 +35,12 @@ class ProductionScheduleRepositoryFactoryIosTest {
     val databasePath = temporaryDatabasePath()
     val resources = IosScheduleRoomDatabaseResources(databasePath)
     val gateway = RecordingGateway()
-    val session = AccountSession(1, AccountState.Login("factory-seam-student"))
+    val session = AccountSession(
+      1,
+      AccountState.Login("factory-seam-student"),
+      CoroutineScope(SupervisorJob()),
+      tokenState = null,
+    )
     try {
       val factory = createIosRoomScheduleRepositoryFactory(
         resources = resources,

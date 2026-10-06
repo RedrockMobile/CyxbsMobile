@@ -2,7 +2,6 @@ package com.cyxbs.components.base.webview
 
 import android.webkit.JavascriptInterface
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.account.api.ITokenService
 import com.cyxbs.components.init.appContext
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
@@ -117,13 +116,13 @@ abstract class IAndroidWebView(
     }
 
     /**
-     * 返回当前应用的 token，如果不存在则返回空串 ""
+     * 读取当前 session 的可用 token，同时检查有效期并可触发后台刷新；不等待网络，不可用则返回空串。
      *
      * 使用：`window.AndroidWebView.getToken()`
      */
     @JavascriptInterface
     open fun getToken(): String {
-        return ITokenService::class.impl().getToken().orEmpty()
+        return IAccountService::class.impl().session.value.tokenState?.token?.token.orEmpty()
     }
 
     companion object {

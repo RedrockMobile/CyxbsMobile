@@ -23,6 +23,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 
 /** Android Schedule production factory 的纯 host 组装测试。 */
@@ -55,7 +57,12 @@ class ProductionScheduleRepositoryFactoryAndroidTest {
       )
       assertIs<RoomScheduleRepositoryFactory>(factory)
 
-      val session = AccountSession(7, AccountState.Login(ACCOUNT_ID))
+      val session = AccountSession(
+        7,
+        AccountState.Login(ACCOUNT_ID),
+        CoroutineScope(SupervisorJob()),
+        tokenState = null,
+      )
       val repository = factory.create(session)
       assertSame(session, receivedSession)
       assertEquals(0, gateway.syncCalls)

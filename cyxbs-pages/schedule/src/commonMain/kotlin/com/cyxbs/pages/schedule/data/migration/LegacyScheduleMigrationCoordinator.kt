@@ -66,8 +66,8 @@ internal object LegacyScheduleMigrationCoordinator {
     if (settings.getInt(MIGRATION_VERSION_KEY, 0) >= CURRENT_MIGRATION_VERSION) return
 
     val accountService = IAccountService::class.impl()
-    val scope = accountService.accountCoroutineScopeFor(session) ?: return
-    scope.launch {
+    if (accountService.session.value !== session) return
+    session.accountCoroutineScope.launch {
       runCatching { migrateOnce(repository, session, settings) }
     }
   }

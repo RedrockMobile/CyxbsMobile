@@ -4,6 +4,8 @@ import com.cyxbs.components.account.api.AccountSession
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.pages.schedule.domain.model.CategoryId
 import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -17,7 +19,12 @@ class ProductionScheduleRepositoryFactoryWebTest {
   @Test
   fun webProductionFactoryIsReadOnlyAndNeverAttemptsRemoteWork() = runTest {
     val repository = createProductionScheduleRepositoryFactory(Clock.System)
-      .create(AccountSession(1, AccountState.Login(ACCOUNT_ID)))
+      .create(AccountSession(
+        1,
+        AccountState.Login(ACCOUNT_ID),
+        CoroutineScope(SupervisorJob()),
+        tokenState = null,
+      ))
 
     assertEquals(ScheduleRepositoryMutationMode.READ_ONLY, repository.mutationMode)
     val beforeInitialize = assertIs<ScheduleRepositoryStatus.Unavailable>(repository.snapshot.value.status)

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,13 +100,20 @@ class LoginNavEntry : AppNavEntry<LoginNavArgument>() {
     return false // 登录页允许未登录时打开
   }
 
+  /**
+   * 登录页使用固定 key 复用输入状态，导航参数由 Content 单独同步给 ViewModel。
+   */
   override fun getContentKey(argument: LoginNavArgument): String {
-    return "LoginNavArgument" // Login 属于单例页面，应该返回固定值，多次提交，共享页面状态
+    return "LoginNavArgument"
   }
 
   @Composable
   override fun Content(argument: LoginNavArgument) {
-    viewModel { LoginViewModel(argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+    val model = viewModel { LoginViewModel(argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+    SideEffect {
+      // factory 仅在首次创建时执行；复用单例页面后，需在重组成功时同步当前路由参数。
+      model.updateArgument(argument)
+    }
     LoginPage()
     LaunchedEffect(Unit) {
       logg("backStack = $appNavBackStack")

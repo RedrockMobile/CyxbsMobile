@@ -33,7 +33,7 @@ internal actual suspend fun onScheduleRepositoryInitialized(
 /**
  * 同步登记 iOS EventKit runtime 的 exact-session binding，并返回 post-mutex handoff。
  *
- * 函数只冻结 direct [repository]、完整 [session]、`accountCoroutineScopeFor(session)` 与 owner Job 并注册 entry；不读取
+ * 函数只冻结 direct [repository]、完整 [session]、其专属作用域与 owner Job 并注册 entry；不读取
  * snapshot/偏好、不创建 gateway、不访问 EventKit。若账号、scope 或 owner 不可用就返回 inert handoff。返回值是既有 registry
  * 的 opaque one-shot token，只有同一次 Room `initialize()` 在 operationMutex 释放后调用时才允许 runtime start/reconcile。
  */
@@ -43,8 +43,8 @@ internal fun registerIosScheduleCalendarExportInitialization(
 ): ScheduleRepositoryInitializationHandoff {
   if (session.accountId == null) return NoOpScheduleRepositoryInitializationHandoff
   val accountService = IAccountService::class.impl()
-  val scope = accountService.accountCoroutineScopeFor(session)
-    ?: return NoOpScheduleRepositoryInitializationHandoff
+  if (accountService.session.value !== session) return NoOpScheduleRepositoryInitializationHandoff
+  val scope = session.accountCoroutineScope
   val owner = scope.coroutineContext[Job]
     ?: return NoOpScheduleRepositoryInitializationHandoff
   return IosScheduleCalendarExportRuntimeRegistry.register(

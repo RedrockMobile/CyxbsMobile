@@ -1,7 +1,7 @@
 package com.cyxbs.components.account.provider
 
 import com.cyxbs.components.account.AccountService
-import com.cyxbs.components.account.api.AccountSession
+import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
@@ -11,12 +11,11 @@ import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClient
+import com.cyxbs.components.utils.network.plugin.requireAccountSession
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -38,97 +37,54 @@ internal object UserInfoProvider {
   }
     private set
 
-  private val refreshJobGuard = SynchronizedObject()
-  private var refreshRequestId = 0L
   private var refreshJob: Job? = null
 
-  /** 清除持久化资料、取消当前刷新，并使尚未安装的旧 refresh 调用失效。 */
+  /** 恢复指定学号的缓存资料；历史缓存归属不符时清空，返回 null 供账户层重新请求。 */
+  fun loadForAccount(stuNum: String): UserInfo? {
+    val cached = value ?: return null
+    if (cached.stuNum == stuNum) return cached
+    clear()
+    return null
+  }
+
+  /** 清空持久化资料并取消当前刷新；由账户切换统一调用。 */
   fun clear() {
-    val job = synchronized(refreshJobGuard) {
-      refreshRequestId += 1
-      refreshJob.also { refreshJob = null }
-    }
-    job?.cancel()
+    refreshJob?.cancel()
+    refreshJob = null
     defaultSettings.remove(KEY)
     value = null
   }
 
   /**
-   * 在 AccountService publication guard 已完成生命周期校验后写入资料。
+   * 刷新当前账户资料；同一账户再次刷新时取消前一个请求。
    *
-   * 调用方必须保证资料仍属于当前 session；本方法只负责同步持久化与内存赋值，不自行读取全局账号状态。
+   * 沿用旧实现的直接保存流程，任务归属于当前 session，结束后不再回写旧账户数据。
    */
-  fun set(userInfo: UserInfo) {
-    defaultSettings.putString(
-      KEY,
-      SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(userInfo))
-    )
-    value = userInfo
-  }
-
-  /**
-   * 为冻结的 [expectedSession] 刷新用户资料。
-   *
-   * 请求绑定到对应账号 scope，切号时会主动取消；成功结果仍交由 AccountService 比较 session identity 后条件提交，
-   * 以覆盖网络完成与取消并发发生的边界。同学号新 generation 同样会拒绝旧请求结果。
-   */
-  fun refresh(expectedSession: AccountSession) {
-    // 请求序号与 session 校验在 AccountService publication guard 内登记，旧 generation 不能毒化新账号序号。
-    val requestId = AccountService.beginUserInfoRefresh(expectedSession) {
-      synchronized(refreshJobGuard) {
-        refreshRequestId += 1
-        refreshRequestId
-      }
-    } ?: return
-    val scope = AccountService.accountCoroutineScopeFor(expectedSession) ?: return
-    lateinit var job: Job
-    job = scope.launch(start = CoroutineStart.LAZY) {
+  fun refresh() {
+    val session = AccountService.session.value
+    val login = session.state as? AccountState.Login ?: return
+    refreshJob?.cancel()
+    refreshJob = session.accountCoroutineScope.launch {
       runCatchingCoroutine {
-        HttpClient.get("/magipoke/person/info").body<ApiWrapper<UserInfo>>()
-      }.mapCatching {
-        it.throwApiExceptionIfFail()
-        it.data
+        HttpClient.get("/magipoke/person/info") {
+          requireAccountSession(session)
+        }.body<ApiWrapper<UserInfo>>().data
       }.onFailure {
         if (isDebug()) {
           toast("用户信息请求失败")
           logg("用户信息请求失败: " + it.stackTraceToString())
         }
-      }.onSuccess {
-        AccountService.commitUserInfo(expectedSession, it) {
-          isCurrentRefresh(requestId, job)
-        }
+      }.onSuccess { info ->
+        // 被后续刷新取消或账户已切换时，旧请求不能覆盖当前资料。
+        coroutineContext.ensureActive()
+        if (AccountService.session.value !== session || login.stuNum != info.stuNum) return@onSuccess
+        defaultSettings.putString(
+          KEY,
+          SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(info)),
+        )
+        value = info
+        login.userInfo.value = info
       }
-    }
-    var previousJob: Job? = null
-    val installed = synchronized(refreshJobGuard) {
-      if (requestId != refreshRequestId) {
-        false
-      } else {
-        previousJob = refreshJob
-        refreshJob = job
-        true
-      }
-    }
-    if (!installed) {
-      job.cancel()
-      return
-    }
-    // 先公开新句柄再注册 completion；即使 scope 已取消、回调立即执行，也能准确清除自身。
-    job.invokeOnCompletion { clearRefreshJob(job) }
-    previousJob?.cancel()
-    job.start()
-  }
-
-  /** 在 AccountService publication guard 内调用，只读取 provider 自身状态，不得反向访问账号服务。 */
-  private fun isCurrentRefresh(requestId: Long, job: Job): Boolean =
-    synchronized(refreshJobGuard) {
-      refreshRequestId == requestId && refreshJob === job
-    }
-
-  /** 仅允许完成的任务清除自己的句柄，避免旧任务 completion 覆盖新刷新。 */
-  private fun clearRefreshJob(completedJob: Job?) {
-    synchronized(refreshJobGuard) {
-      if (refreshJob === completedJob) refreshJob = null
     }
   }
 }
