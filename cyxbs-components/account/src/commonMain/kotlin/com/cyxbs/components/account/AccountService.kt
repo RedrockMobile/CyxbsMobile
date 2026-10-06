@@ -52,14 +52,14 @@ object AccountService : IAccountService, IAccountEditService {
     if (login != null && login.userInfo.value == null) refreshInfo()
   }
 
-  /** 保存登录信息并重置 session；资料刷新使用本次登录的新作用域。 */
+  /** 先校验登录凭据，再保存并重置 session；无效凭据不会修改原账户，资料刷新使用新作用域。 */
   override fun onLoginSuccess(stuNum: String, token: String, refreshToken: String) {
-    AccountSettings.now = AccountSettings.get(stuNum)
+    val accountToken = TokenStateImpl.toAccountToken(bean = TokenBean(token = token, refreshToken = refreshToken))
+    AccountSettings.now = AccountSettings.get(accountToken.stuNum)
     UserInfoProvider.clear()
     TouristProvider.set(false)
-    val accountToken = TokenStateImpl.toAccountToken(bean = TokenBean(token = token, refreshToken = refreshToken))
     TokenStateImpl.save(accountToken)
-    resetAccountSession(AccountState.Login(stuNum), accountToken)
+    resetAccountSession(AccountState.Login(accountToken.stuNum), accountToken)
     refreshInfo()
   }
 

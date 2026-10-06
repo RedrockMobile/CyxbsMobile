@@ -33,6 +33,11 @@ internal actual fun HttpClientConfig<*>.platformConfigHttpClient() {
   }
 }
 
+/** OkHttp 的 DNS、连接拒绝及路由不可达均发生在连接建立阶段，不扩大到普通 SocketException。 */
+internal actual fun Throwable.isPlatformConnectionFailure(): Boolean =
+  this is java.net.UnknownHostException || this is java.net.ConnectException ||
+    this is java.net.NoRouteToHostException
+
 // 手动创建 okhttp 的线程分发器，规避 协程 + Retrofit 在子线程请求被 cancel 后的异常问题
 val OkHttpDispatcher = Dispatcher(
   ThreadPoolExecutor(

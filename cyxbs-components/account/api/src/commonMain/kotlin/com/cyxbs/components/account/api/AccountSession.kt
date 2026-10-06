@@ -24,4 +24,3 @@ class AccountSession(
   val accountId: String?
     get() = (state as? AccountState.Login)?.stuNum?.takeIf(String::isNotBlank)
 }
-

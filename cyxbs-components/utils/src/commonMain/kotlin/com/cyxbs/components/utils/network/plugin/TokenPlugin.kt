@@ -13,6 +13,7 @@ import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.host
 import io.ktor.client.statement.HttpResponsePipeline
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
@@ -42,6 +43,27 @@ private val AuthenticatedRequestKey = AttributeKey<AccountRequestAuthentication>
 // 保存插件自动添加的完整 Authorization 值；重定向会复制 header 和 attributes，
 // 需据此识别继承的默认认证，避免把它误认为调用方自定义认证而跳过 token 更新。
 private val DefaultAuthorizationKey = AttributeKey<String>("DefaultAuthorization")
+/** 默认认证允许的来源及首次账户归属；容灾可更新来源，重定向不能改变账户生命周期。 */
+private data class AccountRequestSource(val origin: String, val session: AccountSession)
+private val AccountRequestSourceKey = AttributeKey<AccountRequestSource>("AccountRequestSource")
+
+/**
+ * 切换至已由 BackupPlugin 确认的备用 host，并同步默认认证来源。
+ *
+ * 只更新来源，保留首次账户 session；没有安装 TokenPlugin 的请求只修改 host。
+ * 普通 HTTP 重定向不能调用此入口，避免将任意跳转域名视为可信备用服务。
+ */
+internal fun HttpRequestBuilder.switchToBackupHost(backupHost: String) {
+  host = backupHost
+  val source = attributes.getOrNull(AccountRequestSourceKey) ?: return
+  attributes.put(AccountRequestSourceKey, source.copy(origin = accountAuthenticationOrigin()))
+}
+
+/** 协议、域名及有效端口共同确定允许携带默认认证的来源。 */
+private fun HttpRequestBuilder.accountAuthenticationOrigin(): String {
+  val url = url.build()
+  return "${url.protocol.name}://${url.host}:${url.port}"
+}
 
 /**
  * 将请求绑定到账户生命周期，供日程、资料刷新等后台任务使用。
@@ -94,19 +116,21 @@ internal fun createTokenPlugin(
 ) = createClientPlugin("TokenPlugin") {
   // 每次发送（包括重定向后的发送）都在此确定认证方式和所属账户。
   on(Send) { request ->
+    val origin = request.accountAuthenticationOrigin()
+    // 来源和生命周期贯穿整个重定向链，匿名跨域响应也不能让后续跳转换用新账户。
+    val source = request.attributes.getOrNull(AccountRequestSourceKey)
+      ?: AccountRequestSource(origin, accountSession()).also { request.attributes.put(AccountRequestSourceKey, it) }
     // 读取之前由插件添加的认证值；首次请求通常没有这个标记。
     val defaultAuthorization = request.attributes.getOrNull(DefaultAuthorizationKey)
-    // 没有 Authorization 时使用默认 token；只有一个值且与插件标记完全一致时，
+    // 仅在原来源或容灾明确切换的备用来源使用默认 token；没有 Authorization 或只有一个值且与插件标记完全一致时，
     // 也视为默认认证。其余情况按调用方自定义认证处理，保留原有 header。
-    // !useDefaultToken 为调用方显式设置 Authorization 时使用自定义认证的情况，其有效期和刷新由调用方负责。
-    val useDefaultToken = !request.headers.contains(HttpHeaders.Authorization) ||
+    // 自定义 Authorization 的有效期和刷新由调用方负责；跨来源跳转不获取默认 token。
+    val useDefaultToken = origin == source.origin && (
+        !request.headers.contains(HttpHeaders.Authorization) ||
         defaultAuthorization != null &&
-        request.headers.getAll(HttpHeaders.Authorization) == listOf(defaultAuthorization)
-    // 默认认证的重定向沿用上次发送的 session，防止跳转途中换成另一账户；
-    // 首次发送及自定义认证则读取当前 session，用于后续生命周期检查。
-    val session = if (useDefaultToken) {
-      request.attributes.getOrNull(AuthenticatedRequestKey)?.session ?: accountSession()
-    } else accountSession()
+        request.headers.getAll(HttpHeaders.Authorization) == listOf(defaultAuthorization))
+    // 沿用首次发送的 session，防止多次跳转途中换成另一账户。
+    val session = source.session
     // 后台任务可显式绑定创建任务时的 session；普通接口无需设置。
     val expected = request.expectedAccountSessionOrNull()
     // 发送前拒绝已经结束的生命周期；显式绑定的请求还要求身份一致且有账户 ID。
@@ -130,7 +154,10 @@ internal fun createTokenPlugin(
     request.attributes.remove(AuthenticatedRequestKey)
     request.attributes.remove(DefaultAuthorizationKey)
     // 仅移除插件负责的默认 header，避免重定向沿用旧 token；自定义 header 保持原值。
-    if (useDefaultToken) request.headers.remove(HttpHeaders.Authorization)
+    // 跨来源不携带插件写入的认证，即使重定向处理器保留了 header，也应主动删除。
+    if (useDefaultToken || defaultAuthorization != null &&
+      request.headers.getAll(HttpHeaders.Authorization) == listOf(defaultAuthorization)
+    ) request.headers.remove(HttpHeaders.Authorization)
     if (token != null) {
       // 写入本次默认 token 的 Bearer header。
       request.bearerAuth(token.token)

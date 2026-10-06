@@ -5,6 +5,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.account.api.AccountSession
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.allImpl
@@ -21,6 +22,7 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -392,7 +394,7 @@ object ApiGenerator {
             /**
              * 连接失败时切换备用url的Interceptor
              * 一旦切换，只有重启app才能切回来（因为如果请求得到的url不是原来的@{link getBaseUrl()}，则切换到新的url，而以后访问都用这个新的url了）
-             * 放在tokenInterceptor上游的理由是：因为那里面还有token刷新机制，无法判断是否真正是因为服务器的原因请求失败
+             * 与 Ktor 共用超时、DNS 和连接建立失败的容灾名单。
              */
             interceptors().add(BackupInterceptor)
         }.build()
@@ -401,6 +403,15 @@ object ApiGenerator {
     //带token请求的OkHttp配置
     private fun OkHttpClient.Builder.configureTokenOkHttp(): OkHttpClient {
         return this.apply {
+            // 容灾重试会重新进入认证拦截器；先绑定首次发送的账户，禁止重试改用另一账户。
+            interceptors().add(Interceptor {
+                val request = it.request()
+                it.proceed(if (request.header("Authorization") == null) {
+                    request.newBuilder()
+                        .tag(AccountSession::class.java, mAccountService.session.value)
+                        .build()
+                } else request)
+            })
             /**
              * 发送版本号
              */
@@ -415,17 +426,13 @@ object ApiGenerator {
             /**
              * 连接失败时切换备用url的Interceptor
              * 一旦切换，只有重启app才能切回来（因为如果请求得到的url不是原来的@{link getBaseUrl()}，则切换到新的url，而以后访问都用这个新的url了）
-             * 放在tokenInterceptor上游的理由是：因为那里面还有token刷新机制，无法判断是否真正是因为服务器的原因请求失败
+             * 与 Ktor 共用容灾名单；认证获取和生命周期失败单独标记，不参与域名容灾。
              */
             interceptors().add(BackupInterceptor)
 
 
             interceptors().add(Interceptor {
 
-                if (!mAccountService.isLogin()) {
-                    // 未登录直接请求，有些人对于不需要 token 的请求也使用了这个
-                    return@Interceptor it.proceed(it.request())
-                }
                 it.proceedWithToken()
             })
         }.build()
@@ -438,20 +445,21 @@ object ApiGenerator {
      */
     private fun Interceptor.Chain.proceedWithToken(): Response {
         if (request().header("Authorization") != null) return proceed(request())
-        val session = mAccountService.session.value
+        val session = request().tag(AccountSession::class.java) ?: mAccountService.session.value
+        if (mAccountService.session.value !== session) {
+            throw TokenAcquisitionException("请求所属账户生命周期已结束")
+        }
         val token = try {
             session.tokenState?.let {
                 // 优先取无阻塞的 token，如果 token 已过期，再进行阻塞获取新的 token。
                 it.token ?: runBlocking { it.getOrRefreshToken() }
             }
-        } catch (exception: java.io.IOException) {
-            throw exception
         } catch (exception: Exception) {
-            // OkHttp 会继续抛出拦截器中的非 IOException；刷新业务失败及账户取消在此转为请求失败。
-            throw java.io.IOException("获取账户 token 失败", exception)
+            // 获取阶段的网络失败也不代表业务域名故障，交给刷新逻辑处理，不能重发原业务请求。
+            throw TokenAcquisitionException("获取账户 token 失败", exception)
         }
         if (mAccountService.session.value !== session) {
-            throw java.io.IOException("等待 token 时账户已切换")
+            throw TokenAcquisitionException("等待 token 时账户已切换")
         }
         val response = proceed(
             request()
@@ -468,6 +476,10 @@ object ApiGenerator {
         }
     }
 
+    /** 标识发送前的认证失败；满足 OkHttp 的 IOException 约定，并阻止域名容灾。 */
+    private class TokenAcquisitionException(message: String, cause: Exception? = null) :
+        java.io.IOException(message, cause)
+
     object BackupInterceptor : Interceptor {
 
         @Volatile
@@ -476,6 +488,10 @@ object ApiGenerator {
         private var mLastToastTime = 0L
 
         override fun intercept(chain: Interceptor.Chain): Response {
+            // 仅为当前网校域名容灾，第三方接口不应被替换成网校备用域名。
+            if (chain.request().url.host != getBaseUrl().toHttpUrl().host) {
+                return chain.proceed(chain.request())
+            }
 
             // 如果切换过url，则直接用这个url请求
             val backupUrl = mBackupUrl
@@ -491,8 +507,11 @@ object ApiGenerator {
             try {
                 response = chain.proceed(request)
                 return response // 这里不能检查 code，因为部分老接口会返回 http 状态码 500
-            } catch (e: Exception) {
+            } catch (e: TokenAcquisitionException) {
+                throw e // 本地账户失败不能通过切换服务器恢复。
+            } catch (e: java.io.IOException) {
                 exception = BackupException(request, e)
+                if (!e.shouldTryBackup()) throw exception
             }
 
             // 分不同的环境触发不同的容灾请求
@@ -515,8 +534,8 @@ object ApiGenerator {
 
                 END_POINT_REDROCK_PROD -> {
                     val url = getBackupUrl()
-                    mBackupUrl = url
                     response = useBackupUrl(url, chain)
+                    mBackupUrl = url // 备用请求成功后才进入容灾，与 Ktor 保持一致。
                 }
 
                 else -> throw IllegalStateException("未知请求头！")
@@ -553,7 +572,9 @@ object ApiGenerator {
                         json,
                         object : TypeToken<ApiWrapper<BackupUrlStatus>>() {}.type
                     )
-                    backupUrlStatus.data.baseUrl
+                    // 与 Ktor 一样兼容纯域名和完整 URL，替换时只使用 host。
+                    val address = backupUrlStatus.data.baseUrl
+                    (if ("://" in address) address else "https://$address").toHttpUrl().host
                 }
             }
         }
@@ -573,10 +594,11 @@ object ApiGenerator {
             val baseUrl: String
         )
 
+        /** 保留请求上下文，同时保证异步 OkHttp 将容灾失败作为 onFailure 返回。 */
         private class BackupException(
             request: Request,
             exception: Exception,
-        ) : RuntimeException("BackupInterceptor: url = ${request.url}, method = ${request.method}", exception)
+        ) : java.io.IOException("BackupInterceptor: url = ${request.url}, method = ${request.method}", exception)
     }
 
     //是否是游客模式

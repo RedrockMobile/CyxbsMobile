@@ -12,6 +12,9 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngineBase
 import io.ktor.client.engine.HttpClientEngineConfig
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.api.Send
+import io.ktor.client.plugins.api.createClientPlugin
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.client.request.get
@@ -305,6 +308,91 @@ class TokenPluginTest {
       assertSame(refreshed, service.lastExpiryToken)
       assertEquals(1, service.logoutCount)
     } finally { client.close() }
+  }
+
+  /** 跨域重定向保持 Ktor 的认证剥离，并且目标响应不能影响原账户凭据。 */
+  @Test
+  fun crossOriginRedirectDoesNotAttachDefaultToken() = runSuspendTest {
+    val service = RecordingTokenService()
+    val authorizations = mutableListOf<String?>()
+    val engine = RecordingHttpClientEngine { request ->
+      authorizations += request.headers[HttpHeaders.Authorization]
+      if (request.url.host == "example.test") {
+        HttpResponseData(
+          statusCode = HttpStatusCode.Found,
+          requestTime = GMTDate(),
+          headers = headersOf(HttpHeaders.Location, "https://other.test/expired"),
+          version = HttpProtocolVersion.HTTP_1_1,
+          body = ByteReadChannel(""),
+          callContext = coroutineContext + Job(),
+        )
+      } else jsonResponse("""{"status":20004,"info":"foreign response"}""")
+    }
+    val client = createTestClient(engine, service)
+    try {
+      client.get("https://example.test/redirect").body<ApiStatus>()
+      assertEquals<List<String?>>(listOf("Bearer current-token", null), authorizations)
+      assertEquals(1, service.tokenCalls)
+      assertEquals(0, service.logoutCount)
+      assertNull(service.lastExpiryToken)
+    } finally { client.close() }
+  }
+
+  /** 首次容灾及已缓存的容灾都允许备用域内跳转刷新 token，之后跳到外域仍剥离认证。 */
+  @Test
+  fun backupRedirectKeepsAuthenticationOnlyWithinBackupOrigin() = runSuspendTest {
+    for (cachedBackup in listOf(false, true)) {
+      val service = RecordingTokenService()
+      val refreshed = service.tokenFlow.value.copy(token = "new-token", refreshToken = "new-refresh")
+      val sends = mutableListOf<Pair<String, String?>>()
+      val engine = RecordingHttpClientEngine { request ->
+        sends += request.url.host to request.headers[HttpHeaders.Authorization]
+        if (request.url.host == "example.test") throw ConnectTimeoutException("触发首次容灾")
+        if (request.url.encodedPath == "/start") service.tokenFlow.value = refreshed
+        when (request.url.encodedPath) {
+          "/start", "/next" -> HttpResponseData(
+            statusCode = HttpStatusCode.Found,
+            requestTime = GMTDate(),
+            headers = headersOf(
+              HttpHeaders.Location,
+              if (request.url.encodedPath == "/start") "https://backup.test/next" else "https://other.test/final",
+            ),
+            version = HttpProtocolVersion.HTTP_1_1,
+            body = ByteReadChannel(""),
+            callContext = coroutineContext + Job(),
+          )
+          else -> jsonResponse("""{"status":20004,"info":"foreign response"}""")
+        }
+      }
+      val client = HttpClient(engine) {
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        install(createTokenPlugin { service.session })
+        // 与生产顺序一致，在 TokenPlugin 下游调用真实的容灾切换入口，避免访问备用地址发现服务。
+        install(createClientPlugin("TestBackup") {
+          on(Send) { request ->
+            if (request.url.host != "example.test") return@on proceed(request)
+            if (!cachedBackup) {
+              try { return@on proceed(request) } catch (_: ConnectTimeoutException) { }
+            }
+            request.switchToBackupHost("backup.test")
+            proceed(request)
+          }
+        })
+      }
+      try {
+        client.get("https://example.test/start").body<ApiStatus>()
+        val expected = mutableListOf(
+          "backup.test" to "Bearer current-token",
+          "backup.test" to "Bearer new-token",
+          "other.test" to null,
+        )
+        if (!cachedBackup) expected.add(0, "example.test" to "Bearer current-token")
+        assertEquals(expected, sends)
+        assertEquals(2, service.tokenCalls)
+        assertEquals(0, service.logoutCount)
+        assertNull(service.lastExpiryToken)
+      } finally { client.close() }
+    }
   }
 
   /** 直接 getter 检查有效期但不等待网络；suspend 入口必须等待刷新并返回同一份新快照。 */
