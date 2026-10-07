@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin Multiplatform、Compose Multiplatform、Navigation 3、Kotlin Coroutines、kotlin.test、Gradle
 
-**Spec:** openspec/changes/refactor-map-kmp-page-architecture/design.md
+**Spec:** cyxbs-pages/map/openspec/changes/refactor-map-kmp-page-architecture/design.md
 
 ## Global Constraints
 
@@ -253,7 +253,7 @@ git commit -m "refactor(map): bind screen to image loader"
 ### Task 5: 完成集成验证与 OpenSpec 任务状态
 
 **Files:**
-- Modify: openspec/changes/refactor-map-kmp-page-architecture/tasks.md
+- Modify: cyxbs-pages/map/openspec/changes/refactor-map-kmp-page-architecture/tasks.md
 - Verify: 本计划前四个任务涉及的全部文件
 
 **Interfaces:**
@@ -287,8 +287,8 @@ Expected: 只有计划、OpenSpec 文档、地图 commonMain/commonTest/desktopT
 - [ ] **Step 5: 提交计划与 OpenSpec 状态**
 
 ~~~bash
-git add docs/superpowers/plans/2026-09-30-map-kmp-page-architecture.md \
-  openspec/changes/refactor-map-kmp-page-architecture
+git add cyxbs-pages/map/docs/superpowers/plans/2026-09-30-map-kmp-page-architecture.md \
+  cyxbs-pages/map/openspec/changes/refactor-map-kmp-page-architecture
 git commit -m "docs(map): complete architecture change plan"
 ~~~
 
