@@ -17,6 +17,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,11 +35,12 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.view.ui.bottomsheet.LocalBottomSheetScope
 import com.cyxbs.pages.map.ui.SearchCompose
-import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
 import cyxbsmobile.cyxbs_pages.map.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search_clear
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search_edit_text_icon
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 
@@ -57,20 +59,8 @@ import org.jetbrains.compose.resources.vectorResource
 @Composable
 fun SearchBottomSheetContent() {
   val bottomSheetScope = LocalBottomSheetScope.current
-  val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-  val modifier = when {
-    ratio > 1.5 -> {
-      Modifier.fillMaxWidth()
-    }
-
-    else -> {
-      Modifier
-        .padding(start = 30.dp)
-        .width(getWindowScreenSize().width / 3)
-    }
-  }
   Column(
-    modifier = modifier
+    modifier = Modifier.fillMaxWidth()
       .then(bottomSheetScope.bottomSheetDraggable())
       .shadow(
         elevation = 10.dp,
@@ -78,7 +68,7 @@ fun SearchBottomSheetContent() {
       )
       .background(LocalAppColors.current.topBg)
       .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-      .padding(start = 16.dp, end = 16.dp)
+      .padding(horizontal = 16.dp)
   ) {
     Box(
       modifier = Modifier
@@ -108,7 +98,7 @@ fun SearchBottomSheetContent() {
 
 @Composable
 private fun BottomSearchBar(modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   BasicTextField(
     modifier = modifier
       .background(

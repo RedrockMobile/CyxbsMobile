@@ -1,9 +1,10 @@
 package com.cyxbs.pages.map.model
 
-import com.cyxbs.components.config.isDebug
+import com.cyxbs.components.config.json.JsonSettingsFactory
+import com.cyxbs.components.config.json.getOrNull
+import com.cyxbs.components.config.json.put
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.PreferencesSettings
-import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.model.bean.ButtonInfo
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.model.bean.PlaceDetails
@@ -27,24 +28,17 @@ object MapDataRepository {
   private const val SETTING_KEY_MAP_SEARCH_HISTORY = "map_search_history" // 搜索历史
 
   /**
-   * 保存地图信息
+   * 因为保存地图信息的这个数据过大，在desktop上会超出上限爆红
+   * 故这里迁移为json存储
    */
-  fun saveMapInfo(mapInfo: MapInfo) {
-    mapSettings.putString(SETTING_KEY_MAP_INFO, defaultJson.encodeToString<MapInfo>(mapInfo))
+  private val jsonSettings = JsonSettingsFactory.get("map")
+
+  suspend fun saveMapInfo(mapInfo: MapInfo): Boolean {
+    return jsonSettings.put(SETTING_KEY_MAP_INFO, mapInfo)
   }
 
-  /**
-   * 拿取地图信息
-   */
-  fun getMapInfo(): MapInfo? {
-    return mapSettings.getStringOrNull(SETTING_KEY_MAP_INFO)?.let { json ->
-      runCatching {
-        defaultJson.decodeFromString<MapInfo>(json)
-      }.onFailure {
-        mapSettings.remove(SETTING_KEY_MAP_INFO)
-        if (isDebug()) toast("地图信息转换异常, ${it.message}")
-      }.getOrNull()
-    }
+  suspend fun getMapInfo(): MapInfo? {
+    return jsonSettings.getOrNull(SETTING_KEY_MAP_INFO)
   }
 
   /**

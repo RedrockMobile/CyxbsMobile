@@ -5,9 +5,7 @@ import com.cyxbs.components.utils.extensions.toast
 import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 
-actual class MapComposeViewModel : CommonMapComposeViewModel() {
-
-  override fun jumpToNavigation(endPlace: String) {
+actual fun openMapNavigation(endPlace: String) {
     val navigationUri = Uri.Builder()
       .scheme("baidumap")
       .authority("map")
@@ -48,4 +46,3 @@ actual class MapComposeViewModel : CommonMapComposeViewModel() {
       },
     )
   }
-}

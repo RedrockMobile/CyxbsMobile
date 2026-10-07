@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.view.ui.ChooseDialogCompose
-import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
 
 /**
  * @Desc : 类的描述
@@ -26,7 +26,7 @@ import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 fun ClearAllHistoryDialog(
   showState: MutableState<Boolean>
 ) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   ChooseDialogCompose(
     showState = showState,
     positiveBtnText = "确定",

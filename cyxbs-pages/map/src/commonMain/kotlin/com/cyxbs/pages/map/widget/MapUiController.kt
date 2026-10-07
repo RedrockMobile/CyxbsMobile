@@ -7,14 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
-import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
-import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.map.model.bean.MapInfo
 import com.cyxbs.pages.map.util.calculatePlaceInMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Stable
@@ -22,11 +19,8 @@ class MapUiController(
   val mapWidgetState: MapWidgetState,
   val mainAnchorState: AnchorItemState,
   val anchorItemStateList: SnapshotStateList<AnchorItemState>,
-  val bottomSheetState: BottomSheetState,
-  val searchBottomSheetState: BottomSheetState,
   val mapContainer: MutableState<IntSize>
 ) {
-
   private var mapAnimationJob: Job? = null
   private var anchorListJob: Job? = null
 
@@ -84,10 +78,6 @@ class MapUiController(
     val duration = if (anchorItemStateList.size <= 5) 100 else 50
     anchorListJob?.cancel()
     anchorListJob = scope.launch {
-      if (!isCollectList) {
-        searchBottomSheetState.collapseAsync()
-      }
-      bottomSheetState.collapseAsync()
       if (mainAnchorState.scale != 0f) mainAnchorState.animateClose()
       anchorItemStateList.forEach { anchorItemState ->
         if (anchorItemState.scale != 0f) anchorItemState.animateClose(duration)
@@ -159,14 +149,12 @@ class MapUiController(
     mapInfo: MapInfo?,
     maxScale: Float,
     collectList: List<String>,
-    calculatePlaceOffset: (Float, Float) -> Offset?,
-    clearSearchText: suspend () -> Unit
+    calculatePlaceOffset: (Float, Float) -> Offset?
   ) {
     when (event) {
       is MapUiEvent.SearchToPlace -> {
         val getOffset = calculatePlaceOffset(event.placeCenterX, event.placeCenterY) ?: return
         coroutineScope {
-          searchBottomSheetState.collapseAsync()
           resetMapAnimation(this)
           anchorItemStateList.filter {
             it.visible
@@ -176,14 +164,10 @@ class MapUiController(
               anchorItemState.visible = false
             }
           }
-          bottomSheetState.collapseAsync()
+
           launch {
             mainAnchorState.placeId = event.placeId
             updateMainAnchorState(getOffset, true)
-          }
-          launch {
-            delay(500)
-            clearSearchText()
           }
         }
       }
@@ -191,7 +175,6 @@ class MapUiController(
       is MapUiEvent.FocusOnPlace -> {
         val getOffset = calculatePlaceOffset(event.placeCenterX, event.placeCenterY) ?: return
         coroutineScope {
-          searchBottomSheetState.collapseAsync()
           animateMapToPosition(this, maxScale, getOffset)
           anchorItemStateList.filter {
             it.visible
@@ -205,7 +188,6 @@ class MapUiController(
             mainAnchorState.placeId = event.placeId
             updateMainAnchorState(getOffset, true)
           }
-          bottomSheetState.collapseAsync()
         }
       }
 
@@ -232,7 +214,6 @@ class MapUiController(
           null
         }
         coroutineScope {
-          searchBottomSheetState.collapseAsync()
           if (realOffset != null) {
             animateMapToPosition(this, maxScale, realOffset)
           }
@@ -249,14 +230,10 @@ class MapUiController(
               launch {
                 updateMainAnchorState(realOffset, true)
               }
-              if (bottomSheetState.isSettledAt(BottomSheetAnchor.Hidden)) {
-                bottomSheetState.collapseAsync()
-              }
             } else {
               launch {
                 updateMainAnchorState(visible = false)
               }
-              bottomSheetState.hideAsync()
             }
           }
         }
@@ -267,8 +244,6 @@ class MapUiController(
           launch {
             animateMapToPosition(this, maxScale, Offset(event.anchorPositionX, event.anchorPositionY))
           }
-          searchBottomSheetState.collapseAsync()
-          bottomSheetState.expandAsync()
         }
       }
 
@@ -279,22 +254,6 @@ class MapUiController(
       is MapUiEvent.AnimateMapToPosition -> {
         animateMapToPosition(scope, maxScale, Offset(event.offsetX, event.offsetY))
       }
-
-      MapUiEvent.CollapseSearchSheet -> {
-        searchBottomSheetState.collapseAsync()
-      }
-
-      MapUiEvent.CollapseBottomSheet -> {
-        bottomSheetState.collapseAsync()
-      }
-
-      MapUiEvent.ExpandBottomSheet -> {
-        bottomSheetState.expandAsync()
-      }
-
-      MapUiEvent.HideBottomSheet -> {
-        bottomSheetState.hideAsync()
-      }
     }
   }
 }
@@ -304,24 +263,18 @@ fun rememberMapUiController(
   mapWidgetState: MapWidgetState,
   mainAnchorState: AnchorItemState,
   anchorItemStateList: SnapshotStateList<AnchorItemState>,
-  bottomSheetState: BottomSheetState,
-  searchBottomSheetState: BottomSheetState,
   mapContainer: MutableState<IntSize>
 ): MapUiController {
   return remember(
     mapWidgetState,
     mainAnchorState,
     anchorItemStateList,
-    bottomSheetState,
-    searchBottomSheetState,
     mapContainer
   ) {
     MapUiController(
       mapWidgetState = mapWidgetState,
       mainAnchorState = mainAnchorState,
       anchorItemStateList = anchorItemStateList,
-      bottomSheetState = bottomSheetState,
-      searchBottomSheetState = searchBottomSheetState,
       mapContainer = mapContainer
     )
   }

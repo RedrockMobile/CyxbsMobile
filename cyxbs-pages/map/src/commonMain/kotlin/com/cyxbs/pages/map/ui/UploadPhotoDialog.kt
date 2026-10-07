@@ -38,7 +38,8 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 
 @Composable
 fun UploadPhotoDialog(
-  showState: MutableState<Boolean>
+  showState: MutableState<Boolean>,
+  placeId: String,
 ) {
   val viewmodel = viewModel(MapComposeViewModel::class)
   val mode = FileKitMode.Multiple(maxItems = 9)
@@ -46,7 +47,7 @@ fun UploadPhotoDialog(
     type = FileKitType.Image,
     mode = mode
   ) { imageList ->
-    viewmodel.uploadPhoto(imageList)
+    viewmodel.uploadPhoto(placeId, imageList)
   }
   ChooseDialogCompose(
     showState = showState,

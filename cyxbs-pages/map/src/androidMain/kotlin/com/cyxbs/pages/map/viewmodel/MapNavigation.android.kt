@@ -5,9 +5,7 @@ import androidx.core.net.toUri
 import com.cyxbs.components.init.appTopActivity
 import java.net.URLEncoder
 
-actual class MapComposeViewModel : CommonMapComposeViewModel() {
-
-  override fun jumpToNavigation(endPlace: String) {
+actual fun openMapNavigation(endPlace: String) {
     try {
       val uri = ("baidumap://map/direction?" +
           "destination=name:$endPlace" +
@@ -24,5 +22,3 @@ actual class MapComposeViewModel : CommonMapComposeViewModel() {
       appTopActivity.get()?.startActivity(browserIntent)
     }
   }
-
-}

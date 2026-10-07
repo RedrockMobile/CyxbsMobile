@@ -1,10 +1,10 @@
 package com.cyxbs.pages.map.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +27,6 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,11 +45,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
 import com.cyxbs.components.config.MAP_VR_WEBSITE
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
@@ -66,11 +61,14 @@ import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.map.api.MapNavArgument
-import com.cyxbs.pages.map.model.MapDataRepository
-import com.cyxbs.pages.map.util.MapImageHelper
+import com.cyxbs.pages.map.model.MapImageLoadRequest
+import com.cyxbs.pages.map.model.MapImageLoadResult
+import com.cyxbs.pages.map.model.MapImageLoader
 import com.cyxbs.pages.map.util.clickAnimation
 import com.cyxbs.pages.map.util.clickCompass
-import com.cyxbs.pages.map.util.getImageFile
+import com.cyxbs.pages.map.viewmodel.SearchViewModel
+import com.cyxbs.pages.map.viewmodel.MapNavEvent
+import com.cyxbs.pages.map.widget.MapUiEvent
 import com.cyxbs.pages.map.viewmodel.MapComposeViewModel
 import com.cyxbs.pages.map.widget.MapWidgetCompose
 import com.cyxbs.pages.map.widget.rememberMapUiController
@@ -84,7 +82,6 @@ import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_search_edit_text_i
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_unlock
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr
 import cyxbsmobile.cyxbs_pages.map.generated.resources.map_ic_vr_description
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
@@ -101,6 +98,8 @@ import org.jetbrains.compose.resources.vectorResource
 @AppNav(route = NAV_MAP)
 class MapNavEntry : AppNavEntry<MapNavArgument>() {
 
+  override fun getContentKey(argument: MapNavArgument) = NAV_MAP
+
   override fun isNeedLogin(argument: MapNavArgument): Boolean {
     return false
   }
@@ -108,116 +107,19 @@ class MapNavEntry : AppNavEntry<MapNavArgument>() {
   @Composable
   override fun Content(argument: MapNavArgument) {
     val viewmodel = viewModel { MapComposeViewModel() } // wasm 无法反射 new 对象，这里需要提供 factory
-    // 把当前 Map 的 VM / owner / 跳转参数发布给独立的 sheet NavEntry 复用（见 MapVmHolder）
-    val viewModelStoreOwner = LocalViewModelStoreOwner.current
-    DisposableEffect(viewmodel, viewModelStoreOwner) {
-      if (viewModelStoreOwner != null) {
-        MapVmHolder.publish(viewmodel, viewModelStoreOwner)
-      }
-      onDispose { MapVmHolder.clear(viewmodel) }
-    }
-    MapCompose(argument)
+    MapScreen(argument)
     MapProgressDialog()
     DownloadFailedDialog(argument)
     MapUpdateDialog()
-    val ratio = getWindowScreenSize().height / getWindowScreenSize().width
-    when {
-      ratio > 1.5f -> WH100vInfinityCompose(argument)
-      ratio <= 1.5f -> WH100v150Compose(argument)
-    }
-  }
-}
-
-// 竖屏
-@Composable
-fun WH100vInfinityCompose(argument: MapNavArgument) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  val backState = rememberNavigationEventState(NavigationEventInfo.None)
-  NavigationBackHandler(
-    state = backState,
-    onBackCompleted = {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        popMapAndSheets(argument)
-      }
-    },
-  )
-  AnimatedContent(
-    targetState = viewmodel.mapPagerState.value,
-    transitionSpec = {
-      if (targetState > initialState) {
-        slideInHorizontally { width -> width } togetherWith
-            slideOutHorizontally { width -> -width }
-      } else {
-        slideInHorizontally { width -> -width } togetherWith
-            slideOutHorizontally { width -> width }
-      }
-    },
-  ) { targetPage ->
-    if (targetPage == 1) {
-      AllPictureCompose(Modifier.fillMaxSize())
-    } else {
-      MapContent(argument = argument, modifier = Modifier.fillMaxWidth())
-      // 竖屏：地点详情 sheet 以 NavEntry overlay 形式压栈（搜索仍是整页，由 mapSearchPagerState 控制）
-      MapBottomSheetEntryHost(landscape = false)
-    }
-  }
-}
-
-// desktop/横屏
-@Composable
-fun WH100v150Compose(argument: MapNavArgument) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
-  val backState = rememberNavigationEventState(NavigationEventInfo.None)
-  NavigationBackHandler(
-    state = backState,
-    onBackCompleted = {
-      if (viewmodel.mapPagerState.value == 1) {
-        viewmodel.mapPagerState.value = 0
-      } else {
-        popMapAndSheets(argument)
-      }
-    },
-  )
-  AnimatedContent(
-    targetState = viewmodel.mapPagerState.value,
-    transitionSpec = {
-      if (targetState > initialState) {
-        slideInHorizontally { width -> width } togetherWith
-            slideOutHorizontally { width -> -width }
-      } else {
-        slideInHorizontally { width -> -width } togetherWith
-            slideOutHorizontally { width -> width }
-      }
-    },
-  ) { targetPage ->
-    if (targetPage == 1) {
-      AllPictureCompose(Modifier.fillMaxSize())
-    } else {
-      Column {
-        BackIconCompose(
-          argument = argument,
-          modifier = Modifier
-            .padding(start = 12.dp, top = 12.dp)
-            .width(32.dp)
-            .height(32.dp),
-        )
-        MapFunctionImageCompose(
-          modifier = Modifier
-            .padding(top = 32.dp)
-            .background(Color.Transparent)
-        )
-      }
-      // 横屏：把两个 bottomSheet 以 NavEntry overlay 形式压栈显示（见 MapBottomSheetEntryHost）
-      MapBottomSheetEntryHost(landscape = true)
-    }
+    UploadPhotoDialog(viewmodel.uploadPhotoDialogState, viewmodel.uploadPlaceId.value)
+    UploadPhotoResult(viewmodel.uploadPhotoResultState)
+    UploadingPhotoProgressDialog()
   }
 }
 
 @Composable
 fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   Image(
     modifier = modifier
       .clickableNoIndicator {
@@ -235,7 +137,7 @@ fun BackIconCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
 
 @Composable
 fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   Column(
     modifier = modifier
   ) {
@@ -296,7 +198,7 @@ fun MapContent(argument: MapNavArgument, modifier: Modifier = Modifier) {
 
 @Composable
 fun SearchBar(modifier: Modifier = Modifier) {
-  val viewmodel = viewModel(MapComposeViewModel::class)
+  val viewmodel = viewModel { SearchViewModel() }
   BasicTextField(
     modifier = modifier
       .background(
@@ -580,62 +482,46 @@ fun SymbolListCompose(modifier: Modifier = Modifier) {
 @Composable
 fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   val viewmodel = viewModel(MapComposeViewModel::class)
+  val mapInfo = viewmodel.mapInfo.value
+  val imageLoader = remember { MapImageLoader() }
   val mapUiController = rememberMapUiController(
     mapWidgetState = viewmodel.mapWidgetState,
     mainAnchorState = viewmodel.anchorItemState,
     anchorItemStateList = viewmodel.anchorItemStateList,
-    bottomSheetState = viewmodel.bottomSheetState,
-    searchBottomSheetState = viewmodel.searchBottomSheetState,
     mapContainer = viewmodel.mapContainer
   )
   val imageResult by produceState<ByteArray?>(
     null,
-    viewmodel.mapInfo.value,
+    mapInfo?.mapUrl,
+    mapInfo?.pictureVersion,
     viewmodel.isUpdateStart.value
   ) {
-    try {
-      viewmodel.mapInfo.value?.let { mapInfo ->
-        // 如果不是更新地图，就走正常流程，否则就直接下载地图
-        if (!viewmodel.isUpdateStart.value) {
-          val localMapImage = getImageFile()?.takeIf { it.isNotEmpty() }
-          val localMapVersion = MapDataRepository.getMapVersion()
-          // 本地没有就直接下载,如果本地没有版本号信息也直接走下载
-          if (localMapImage == null || localMapVersion == null) {
-            viewmodel.progressDialogState.value = true
-            val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-              viewmodel.downloadProgress.value =
-                bytesRead.toFloat() / contentLength.toFloat()
-            }
-            value = result.bytes
-            if (result.isCached) {
-              runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
-            }
-            viewmodel.progressDialogState.value = false
-          } else {
-            // 如果有，则先核对版本，版本对就直接拿缓存，不对就走更新
-            value = localMapImage
-            if (mapInfo.pictureVersion != localMapVersion) {
-              viewmodel.updateMapDialogState.value = true
-            }
-          }
-        } else {
-          viewmodel.progressDialogState.value = true
-          val result = MapImageHelper.downloadImage(mapInfo.mapUrl) { bytesRead, contentLength ->
-            viewmodel.downloadProgress.value =
-              bytesRead.toFloat() / contentLength.toFloat()
-          }
-          value = result.bytes
-          if (result.isCached) {
-            runCatching { MapDataRepository.saveMapVersion(mapInfo.pictureVersion) }
-          }
-          viewmodel.progressDialogState.value = false
+    mapInfo ?: return@produceState
+    when (val result = imageLoader.load(
+      request = MapImageLoadRequest(
+        url = mapInfo.mapUrl,
+        version = mapInfo.pictureVersion,
+        forceDownload = viewmodel.isUpdateStart.value,
+      ),
+      onDownloadStart = {
+        viewmodel.downloadProgress.value = 0f
+        viewmodel.progressDialogState.value = true
+      },
+      onProgress = { progress ->
+        viewmodel.downloadProgress.value = progress
+      },
+    )) {
+      is MapImageLoadResult.Success -> {
+        value = result.bytes
+        viewmodel.progressDialogState.value = false
+        if (result.updateAvailable) {
+          viewmodel.updateMapDialogState.value = true
         }
       }
-    } catch (e: CancellationException) {
-      throw e
-    } catch (_: Exception) {
-      viewmodel.progressDialogState.value = false
-      viewmodel.downloadFailedDialogState.value = true
+      is MapImageLoadResult.Failure -> {
+        viewmodel.progressDialogState.value = false
+        viewmodel.downloadFailedDialogState.value = true
+      }
     }
   }
   viewmodel.maxScale =
@@ -661,6 +547,23 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     launch {
       viewmodel.mapUiEvent.collect { event ->
+        when (event) {
+          is MapUiEvent.SearchToPlace -> showPlaceDetail(event.placeId, false)
+          is MapUiEvent.FocusOnPlace -> showPlaceDetail(event.placeId, false)
+          is MapUiEvent.OpenPlaceDetail -> showPlaceDetail(event.placeId, true)
+          is MapUiEvent.ClickMapPlace -> {
+            if (event.placeId != null) showPlaceDetail(event.placeId, null)
+            else MapComposeViewModel.emitNavEvent(MapNavEvent.HidePlaceDetail)
+          }
+          is MapUiEvent.ShowAnchorList, MapUiEvent.ShowCollectAnchors ->
+            MapComposeViewModel.emitNavEvent(MapNavEvent.CollapsePlaceDetail)
+          else -> Unit
+        }
+        if (event is MapUiEvent.SearchToPlace || event is MapUiEvent.FocusOnPlace ||
+          event is MapUiEvent.OpenPlaceDetail || event is MapUiEvent.ClickMapPlace ||
+          event is MapUiEvent.ShowAnchorList) {
+          MapComposeViewModel.emitNavEvent(MapNavEvent.CollapseSearch)
+        }
         mapUiController.handleMapUiEvent(
           event = event,
           scope = this,
@@ -668,11 +571,6 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
           maxScale = viewmodel.maxScale,
           collectList = viewmodel.collectListState.toList(),
           calculatePlaceOffset = viewmodel::calculatePlaceOffset,
-          clearSearchText = {
-            viewmodel.searchTextFieldState.edit {
-              replace(0, length, "")
-            }
-          }
         )
       }
     }
@@ -695,8 +593,8 @@ fun MapCompose(argument: MapNavArgument, modifier: Modifier = Modifier) {
   }
 }
 
-private fun popMapAndSheets(argument: MapNavArgument) {
-  PlaceDetailNavArgument.popBackStack()
+internal fun popMapAndSheets(argument: MapNavArgument) {
+  appNavBackStack.filterIsInstance<PlaceDetailNavArgument>().lastOrNull()?.popBackStack()
   SearchNavArgument.popBackStack()
   if (appNavBackStack.size > 1) {
     argument.popBackStack()
