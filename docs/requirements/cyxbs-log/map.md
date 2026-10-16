@@ -2,7 +2,7 @@
 
 - 类型：map / 新需求
 - 本地标签：wayfinder:map、needs-triage
-- 状态：调研、模块、平台输出、文件引擎与应用代码接入已完成；真机性能验收待办
+- 状态：调研、模块、平台输出、文件引擎与应用代码接入已完成；Android 模拟器集成验收完成，真机性能与 iOS 登录态交互待办
 - 创建日期：2026-10-13
 - 跟踪方式：本地 Markdown；不是 deck 后端票，没有 GitHub issue 编号
 - 来源：用户要求进一步调研独立 log 模块、自有封装与用户侧本地保存，只在本地添加需求
@@ -48,13 +48,13 @@
 | [LOCAL-LOG-02 最小验证](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>) | prototype | in_progress / 全目标源码、Desktop 协议与突发基线完成 | 01 已完成 |
 | [LOCAL-LOG-03 模块与门面](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>) | task | in_progress / 基础门面已完成 | 02（完整能力） |
 | [LOCAL-LOG-04 文件协议](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>) | task | in_progress / noWeb 初版与 Desktop 边界测试完成 | 02、03 |
-| [LOCAL-LOG-05 应用集成与用户导出](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>) | task | in_progress / 代码接入完成，真机验收待办 | 03、04 |
-| [LOCAL-LOG-06 验收](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/06-validation.md>) | task | in_progress / 自动化与源码编译完成，性能验收待办 | 03、04、05 |
+| [LOCAL-LOG-05 应用集成与用户导出](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>) | task | in_progress / 代码接入和 Android 模拟器 UI 链路完成，iOS/真机验收待办 | 03、04 |
+| [LOCAL-LOG-06 验收](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/06-validation.md>) | task | in_progress / 自动化、源码编译和 Android 模拟器验收完成，性能验收待办 | 03、04、05 |
 
 图中的依赖是文档显式关系，没有写入插件原生边。用户已授权先搭建 03 的最小基础框架；完整能力继续按 02 的验证结果推进。
 
 ## 进度
 
-- 已完成：两轮源码/项目边界调研；Kermit 2.2.0 与独立 `log` 模块；等级/惰性/故障隔离门面；Android/iOS/Desktop 有界 JSONL 单 worker、轮转配额、故障恢复与指数退避、清理、manifest 导出和防御性脱敏；Web Unsupported；主进程/隐私/用户开关策略；旧入口单向迁移；Android/iOS/Desktop 用户导出入口；Desktop 边界/并发/时间回拨测试、公开入口突发基线和六目标源码编译。
-- 未完成：产品最终隐私文案与允许字段复核、结构化匿名上下文、Android/iOS 真机分享/锁屏/后台、磁盘满与不可写实机故障、强杀、多进程压力、移动端分配/CPU/能耗和性能阈值定稿。当前没有连接 Android 设备或已启动的 iOS 模拟器。
+- 已完成：两轮源码/项目边界调研；Kermit 2.2.0 与独立 `log` 模块；等级/惰性/故障隔离门面；Android/iOS/Desktop 有界 JSONL 单 worker、轮转配额、故障恢复与指数退避、清理、manifest 导出和防御性脱敏；Web Unsupported；主进程/隐私/用户开关策略；旧入口单向迁移；Android/iOS/Desktop 用户导出入口；Desktop 边界/并发/时间回拨测试、公开入口突发基线和六目标源码编译；Android 登录态下的开关、后台恢复、系统 Chooser、清理和重新导出黑盒验收。
+- 未完成：产品最终隐私文案与允许字段复核、结构化匿名上下文、iOS 登录态下的 Share Sheet/清理交互、Android/iOS 真机分享与锁屏/后台、磁盘满与不可写实机故障、强杀、多进程压力、移动端分配/CPU/能耗和性能阈值定稿。Android 当前仅为模拟器黑盒结果；iOS Simulator 当前没有用户登录态。
 - 统计：1/6 子项完成；02、03、04、05、06 均有已验证结果，但整个需求在真机、产品政策和移动性能验收前不关闭。
