@@ -42,6 +42,7 @@ data class FileLogHealth(
   val droppedOversize: Long,
   val truncatedEntries: Long,
   val droppedClosed: Long,
+  val droppedWriteBackoff: Long,
   val writeFailures: Long,
   val queuedEntries: Int,
   val queuedBytes: Long,

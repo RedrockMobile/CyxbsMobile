@@ -27,6 +27,8 @@ import okio.buffer
 import kotlin.math.min
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 private const val QUEUE_CAPACITY = 1_024
@@ -38,6 +40,8 @@ private const val MAX_FILES = 8
 private const val MAX_EXPORT_BYTES = 32L * 1_024 * 1_024
 private const val MAX_EXPORT_SOURCE_FILES = 3
 private const val MAX_PUBLISHED_EXPORT_FILES = 3
+private const val FILE_RETRY_BASE_MILLIS = 250L
+private const val FILE_RETRY_MAX_MILLIS = 30_000L
 private const val FILE_PREFIX = "cyxbs-log-v1-"
 private const val EXPORT_PREFIX = "cyxbs-log-export-v1-"
 
@@ -69,6 +73,7 @@ internal class FileLogEngine(
   private val droppedOversize = atomic(0L)
   private val truncatedEntries = atomic(0L)
   private val droppedClosed = atomic(0L)
+  private val droppedWriteBackoff = atomic(0L)
   private val writeFailures = atomic(0L)
   private val queuedEntries = atomic(0)
   private val queuedBytes = atomic(0L)
@@ -76,6 +81,8 @@ internal class FileLogEngine(
   private val closeResult = CompletableDeferred<LogStorageResult>()
   private val worker = atomic<Job?>(null)
   private val session = "${nowMillis()}-${Random.nextLong().toULong().toString(16)}"
+  private var fileFailureStreak = 0
+  private var fileRetryAfter: TimeMark? = null
 
   fun accepts(level: LogLevel): Boolean = accepting.value && level >= config.minLevel
 
@@ -177,6 +184,7 @@ internal class FileLogEngine(
     droppedOversize = droppedOversize.value,
     truncatedEntries = truncatedEntries.value,
     droppedClosed = droppedClosed.value,
+    droppedWriteBackoff = droppedWriteBackoff.value,
     writeFailures = writeFailures.value,
     queuedEntries = queuedEntries.value,
     queuedBytes = queuedBytes.value,
@@ -217,7 +225,7 @@ internal class FileLogEngine(
           .coerceAtLeast(1)
         val command = withTimeoutOrNull(remainingMillis) { mailbox.receive() }
         if (command == null) {
-          runFileOperation(files) { flush() }
+          runFileOperation(files, countBackoffDrop = false) { flush() }
           lastFlush = TimeSource.Monotonic.markNow()
           continue
         }
@@ -230,9 +238,9 @@ internal class FileLogEngine(
               droppedOversize.incrementAndGet()
             } else {
               if (encoded.truncated) truncatedEntries.incrementAndGet()
-              runFileOperation(files) { write(encoded.bytes) }
+              runFileOperation(files, countBackoffDrop = true) { write(encoded.bytes) }
               if (lastFlush.elapsedNow().inWholeMilliseconds >= FLUSH_INTERVAL_MILLIS) {
-                runFileOperation(files) { flush() }
+                runFileOperation(files, countBackoffDrop = false) { flush() }
                 lastFlush = TimeSource.Monotonic.markNow()
               }
             }
@@ -245,7 +253,11 @@ internal class FileLogEngine(
                 LogFlushResult.Buffered
               },
             )
-            if (outcome is LogFlushResult.Failure) files.recoverAfterFailure()
+            if (outcome is LogFlushResult.Failure) {
+              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+            } else {
+              resetFileRetry()
+            }
             command.result.complete(outcome)
             lastFlush = TimeSource.Monotonic.markNow()
           }
@@ -257,7 +269,11 @@ internal class FileLogEngine(
                 LogStorageResult.Success
               },
             )
-            if (outcome != LogStorageResult.Success) files.recoverAfterFailure()
+            if (outcome != LogStorageResult.Success) {
+              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+            } else {
+              resetFileRetry()
+            }
             if (state.value == FileLogState.Running &&
               receptionEpoch.value == command.epoch
             ) {
@@ -273,7 +289,11 @@ internal class FileLogEngine(
               failure = { LogExportResult.Failure(it) },
               block = { files.export() },
             )
-            if (outcome is LogExportResult.Failure) files.recoverAfterFailure()
+            if (outcome is LogExportResult.Failure) {
+              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+            } else {
+              resetFileRetry()
+            }
             command.result.complete(outcome)
             lastFlush = TimeSource.Monotonic.markNow()
           }
@@ -344,14 +364,37 @@ internal class FileLogEngine(
     }
   }
 
-  private inline fun runFileOperation(files: WorkerFiles, block: WorkerFiles.() -> Unit) {
-    try {
+  private inline fun runFileOperation(
+    files: WorkerFiles,
+    countBackoffDrop: Boolean,
+    block: WorkerFiles.() -> Unit,
+  ): Boolean {
+    if (fileRetryAfter?.hasPassedNow() == false) {
+      if (countBackoffDrop) droppedWriteBackoff.incrementAndGet()
+      return false
+    }
+    return try {
       files.block()
+      resetFileRetry()
+      true
     } catch (throwable: Throwable) {
       if (throwable is CancellationException) throw throwable
       writeFailures.incrementAndGet()
-      files.recoverAfterFailure()
+      if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+      false
     }
+  }
+
+  private fun scheduleFileRetry() {
+    fileFailureStreak = (fileFailureStreak + 1).coerceAtMost(8)
+    val multiplier = 1L shl (fileFailureStreak - 1)
+    val retryMillis = (FILE_RETRY_BASE_MILLIS * multiplier).coerceAtMost(FILE_RETRY_MAX_MILLIS)
+    fileRetryAfter = TimeSource.Monotonic.markNow() + retryMillis.milliseconds
+  }
+
+  private fun resetFileRetry() {
+    fileFailureStreak = 0
+    fileRetryAfter = null
   }
 
   private fun unavailableStorageResult(): LogStorageResult = when (state.value) {
@@ -520,15 +563,15 @@ private class WorkerFiles(
     }
   }
 
-  fun recoverAfterFailure() {
+  fun recoverAfterFailure(): Boolean {
     runCatching { closeActive(deleteEmpty = true) }
-    if (sink == null) {
-      runCatching {
-        recoverActiveFiles()
-        cleanupLogs(reserveActiveFile = true)
-        openActive()
-      }
-    }
+    if (sink != null) return true
+    return runCatching {
+      recoverActiveFiles()
+      cleanupLogs(reserveActiveFile = true)
+      openActive()
+      flush()
+    }.isSuccess
   }
 
   private fun recoverActiveFiles() {

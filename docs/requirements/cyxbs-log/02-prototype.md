@@ -3,12 +3,12 @@
 Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
 
 - 类型/标签：prototype / wayfinder:prototype、needs-triage
-- 状态：planned，未执行
+- 状态：in_progress，依赖/全目标源码/Desktop 协议与突发延迟已验证；移动真机待执行
 - Blocked by：[01 已完成](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/01-research.md>)
 
 ## 目的
 
-用最小验证确认依赖、目标和存储行为，先消除会改变设计的未知项。此票是未来任务，本次未创建模块或原型代码。
+用最小验证确认依赖、目标和存储行为，先消除会改变设计的未知项。模块与原型已经按后续授权落地；本项继续记录可复现的验证结果与尚未具备设备条件的部分。
 
 ## 范围
 
@@ -28,4 +28,6 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 ## 进度
 
-未开始；当前无验证结果。
+已完成：固定 Kermit 2.2.0；确认独立模块自动发现且依赖图无环；Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译通过；Web 不解析 Okio 文件层；Desktop 已验证有界非阻塞队列、轮转/恢复/导出、持续不可写退避、时间回拨与并发管理。2026-10-16 本机 20,000 次公开 `CyxbsLog` 入口突发回归结果为 p50 47,208 ns、p95 55,791 ns、p99 115,417 ns、约 19,502 calls/s；该测试包含消息构造、脱敏和队列判断，队列饱和后仍不得出现阻塞级 p99。
+
+未完成：Android/iOS 真机目录、锁屏、强杀、系统分享与移动端 p50/p95/p99、分配、内存、CPU/能耗。Desktop 数字仅作为代码回归基线，不作为移动端产品阈值。

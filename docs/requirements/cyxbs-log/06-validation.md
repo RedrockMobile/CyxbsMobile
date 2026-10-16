@@ -25,6 +25,6 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 ## 进度
 
-已完成 Desktop 自动化边界测试：JSONL/manifest 可解析、Unicode 截断、轮转与总预算、静默尾批、崩溃尾条恢复、导出、clear、durable Unsupported、close 取消重试、启动文件数预留、等级复核、导出 seal 故障恢复、消息惰性/异常隔离及常见敏感字段脱敏。Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译和 Android FileProvider manifest 合并纳入最终验证。
+已完成 Desktop 自动化边界测试：JSONL/manifest 可解析、Unicode 截断、轮转与总预算、静默尾批、崩溃尾条恢复、导出、clear、durable Unsupported、close 取消重试、启动文件数预留、等级复核、导出 seal 故障恢复、持续不可写指数退避、时间回拨、多生产者与管理命令并发、消息惰性/异常隔离及常见敏感字段脱敏。Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译和 Android FileProvider manifest 合并纳入最终验证。2026-10-16 本机 20,000 次公开入口突发回归测得 p50 47,208 ns、p95 55,791 ns、p99 115,417 ns、约 19,502 calls/s；此值只用作 Desktop 非阻塞回归基线。
 
-未执行：Android/iOS 真机分享与锁屏后台，磁盘满/文件不可写实机故障，强杀与时间回拨，多进程压力，p50/p95/p99、分配、吞吐、CPU、能耗及长期队列高水位。上述项目完成前本项和地图不得关闭。
+未执行：Android/iOS 真机分享与锁屏后台，磁盘满/文件不可写实机故障，强杀、多进程压力，移动端 p50/p95/p99、分配、吞吐、CPU、能耗及长期队列高水位。当前没有连接 Android 设备或已启动的 iOS 模拟器；上述项目及产品隐私文案/允许字段确认完成前，本项和地图不得关闭。

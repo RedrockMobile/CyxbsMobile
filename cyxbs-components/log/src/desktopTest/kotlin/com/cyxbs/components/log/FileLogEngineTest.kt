@@ -1,6 +1,9 @@
 package com.cyxbs.components.log
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -10,11 +13,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okio.FileSystem
 import okio.ForwardingFileSystem
+import okio.ForwardingSink
 import okio.IOException
 import okio.Path
 import okio.Path.Companion.toPath
 import okio.SYSTEM
+import okio.Sink
 import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -275,6 +281,132 @@ class FileLogEngineTest {
         assertEquals(0, CyxbsLog.fileStorageHealth().acceptedEntries)
       } finally {
         CyxbsLog.setFileStorageCollectionEnabled(true)
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
+  fun persistentWriteFailureEntersBackoffInsteadOfRetryingEveryRecord() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val flushAttempts = AtomicInteger()
+      val failingFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun appendingSink(file: Path, mustExist: Boolean): Sink {
+          return object : ForwardingSink(super.appendingSink(file, mustExist)) {
+            override fun flush() {
+              flushAttempts.incrementAndGet()
+              throw IOException("injected persistent flush failure")
+            }
+          }
+        }
+      }
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), failingFileSystem)
+      assertEquals(LogStorageResult.Success, engine.start())
+
+      repeat(64) { index ->
+        engine.offer(event(message = "$index:${"x".repeat(4_096)}"))
+      }
+      withTimeout(5_000) {
+        while (engine.health().queuedEntries > 0) delay(10)
+      }
+
+      val health = engine.health()
+      assertTrue(health.writeFailures >= 1)
+      assertTrue(health.droppedWriteBackoff > 0)
+      assertTrue(flushAttempts.get() <= 3, "flush retried ${flushAttempts.get()} times before backoff")
+      assertIs<LogStorageResult.Failure>(engine.close())
+    }
+  }
+
+  @Test
+  fun clockRollbackKeepsExportsDistinctAndParseable() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      var currentTimeMillis = 10_000L
+      val engine = FileLogEngine(
+        config(logDirectory, exportDirectory),
+        nowMillis = { currentTimeMillis },
+      )
+      assertEquals(LogStorageResult.Success, engine.start())
+      engine.offer(event(message = "before-rollback"))
+      assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+      val first = assertIs<LogExportResult.Success>(engine.export())
+
+      currentTimeMillis = 1_000L
+      engine.offer(event(message = "after-rollback"))
+      assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+      val second = assertIs<LogExportResult.Success>(engine.export())
+
+      assertTrue(first.filePath != second.filePath)
+      listOf(first, second).forEach { export ->
+        fileSystem.read(export.filePath.toPath()) { readUtf8() }
+          .lineSequence()
+          .filter { it.isNotBlank() }
+          .forEach { Json.parseToJsonElement(it).jsonObject }
+      }
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun concurrentProducersAndManagementCommandsCompleteWithoutHanging() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val engine = FileLogEngine(config(logDirectory, exportDirectory))
+      assertEquals(LogStorageResult.Success, engine.start())
+
+      val producers = List(4) { producer ->
+        launch(Dispatchers.Default) {
+          repeat(500) { index -> engine.offer(event(message = "$producer-$index")) }
+        }
+      }
+      val manager = launch(Dispatchers.Default) {
+        repeat(12) { index ->
+          when (index % 3) {
+            0 -> engine.flush(LogFlushMode.Buffered)
+            1 -> engine.export()
+            else -> engine.clear()
+          }
+        }
+      }
+      withTimeout(10_000) { (producers + manager).joinAll() }
+      assertEquals(LogStorageResult.Success, withTimeout(5_000) { engine.close() })
+      assertEquals(FileLogState.Stopped, engine.health().state)
+      assertEquals(0, engine.health().queuedEntries)
+    }
+  }
+
+  @Test
+  fun burstCallerLatencyRemainsNonBlockingOnDesktop() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(
+        LogStorageResult.Success,
+        CyxbsLog.startFileStorage(config(logDirectory, exportDirectory)),
+      )
+      try {
+        val payload = "x".repeat(128)
+        repeat(1_000) { CyxbsLog.d(tag = "BurstBenchmark") { "warmup-$it-$payload" } }
+
+        val samples = LongArray(20_000)
+        val startedAt = System.nanoTime()
+        samples.indices.forEach { index ->
+          val callStartedAt = System.nanoTime()
+          CyxbsLog.d(tag = "BurstBenchmark") { "burst-$index-$payload" }
+          samples[index] = System.nanoTime() - callStartedAt
+        }
+        val elapsedNanos = System.nanoTime() - startedAt
+        samples.sort()
+        val p50 = samples[samples.size * 50 / 100]
+        val p95 = samples[samples.size * 95 / 100]
+        val p99 = samples[samples.size * 99 / 100]
+        val callsPerSecond = 20_000L * 1_000_000_000L / elapsedNanos.coerceAtLeast(1L)
+        println(
+          "CYXBS_LOG_BURST desktop calls=20000 p50Ns=$p50 p95Ns=$p95 " +
+            "p99Ns=$p99 callsPerSecond=$callsPerSecond"
+        )
+        assertTrue(p99 < 20_000_000L, "desktop burst p99 ${p99 / 1_000_000.0}ms indicates blocking")
+      } finally {
         CyxbsLog.closeFileStorage()
         CyxbsLog.configure(LogConfig())
       }

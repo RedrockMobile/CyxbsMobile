@@ -45,7 +45,7 @@
 | 本地子项 | 类型 | 当前状态 | Blocked by |
 |---|---|---|---|
 | [LOCAL-LOG-01 调研](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/01-research.md>) | research | completed | 无 |
-| [LOCAL-LOG-02 最小验证](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>) | prototype | planned / needs-triage | 01 已完成 |
+| [LOCAL-LOG-02 最小验证](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>) | prototype | in_progress / 全目标源码、Desktop 协议与突发基线完成 | 01 已完成 |
 | [LOCAL-LOG-03 模块与门面](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>) | task | in_progress / 基础门面已完成 | 02（完整能力） |
 | [LOCAL-LOG-04 文件协议](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>) | task | in_progress / noWeb 初版与 Desktop 边界测试完成 | 02、03 |
 | [LOCAL-LOG-05 应用集成与用户导出](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>) | task | in_progress / 代码接入完成，真机验收待办 | 03、04 |
@@ -55,6 +55,6 @@
 
 ## 进度
 
-- 已完成：两轮源码/项目边界调研；Kermit 2.2.0 与独立 `log` 模块；等级/惰性/故障隔离门面；Android/iOS/Desktop 有界 JSONL 单 worker、轮转配额、故障恢复、清理、manifest 导出和防御性脱敏；Web Unsupported；主进程/隐私/用户开关策略；旧入口单向迁移；Android/iOS/Desktop 用户导出入口；Desktop 边界测试和六目标源码编译。
-- 未完成：产品最终隐私文案与允许字段复核、结构化匿名上下文、Android/iOS 真机分享/锁屏/后台、磁盘满与不可写、强杀/时间回拨、多进程压力、能耗和性能阈值定稿。
-- 统计：1/6 子项完成；03、04、05、06 均有已验证代码，但整个需求在真机和性能验收前不关闭。
+- 已完成：两轮源码/项目边界调研；Kermit 2.2.0 与独立 `log` 模块；等级/惰性/故障隔离门面；Android/iOS/Desktop 有界 JSONL 单 worker、轮转配额、故障恢复与指数退避、清理、manifest 导出和防御性脱敏；Web Unsupported；主进程/隐私/用户开关策略；旧入口单向迁移；Android/iOS/Desktop 用户导出入口；Desktop 边界/并发/时间回拨测试、公开入口突发基线和六目标源码编译。
+- 未完成：产品最终隐私文案与允许字段复核、结构化匿名上下文、Android/iOS 真机分享/锁屏/后台、磁盘满与不可写实机故障、强杀、多进程压力、移动端分配/CPU/能耗和性能阈值定稿。当前没有连接 Android 设备或已启动的 iOS 模拟器。
+- 统计：1/6 子项完成；02、03、04、05、06 均有已验证结果，但整个需求在真机、产品政策和移动性能验收前不关闭。

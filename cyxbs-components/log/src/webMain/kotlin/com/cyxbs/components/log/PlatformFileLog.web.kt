@@ -24,6 +24,7 @@ internal actual object PlatformFileLog {
     droppedOversize = 0,
     truncatedEntries = 0,
     droppedClosed = 0,
+    droppedWriteBackoff = 0,
     writeFailures = 0,
     queuedEntries = 0,
     queuedBytes = 0,
