@@ -119,6 +119,8 @@ kotlinx-atomicfu = "0.33.0"
 # https://github.com/ktorio/ktor
 ktor = "3.5.1"
 ########################################### KMP 第三方依赖 ###########################################
+# https://github.com/touchlab/Kermit
+kmp-kermit = "2.2.0"
 # https://github.com/eygraber/uri-kmp
 kmp-uri = "0.0.21"
 # https://github.com/985892345/KtProvider
@@ -304,6 +306,7 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 ########################################### KMP 第三方依赖 ###########################################
+kmp-kermit = { module = "co.touchlab:kermit", version.ref = "kmp-kermit" }
 kmp-uri = { module = "com.eygraber:uri-kmp", version.ref = "kmp-uri" }
 kmp-settings-core = { module = "com.russhwolf:multiplatform-settings", version.ref = "kmp-settings" }
 kmp-settings-noArg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "kmp-settings" }
