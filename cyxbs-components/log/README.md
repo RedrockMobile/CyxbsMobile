@@ -63,3 +63,7 @@ CyxbsLog.closeFileStorage()
 `AppLogManager` 在主进程初始化控制台策略，并仅在用户已同意隐私政策且主动开启“记录诊断日志”后启动文件层。Android 使用 `noBackupFilesDir` 和 cache + FileProvider；iOS 使用 Application Support（排除备份）和 Caches；Desktop 使用 `~/.cyxbs`；JS/WasmJS 不提供文件层。设置页提供开启、清理、导出并交给系统分享，隐私撤回立即停止后续文件写入。
 
 文件日志不捕获原生崩溃，不承诺强杀或断电零丢失。不得记录学号、凭据、完整请求体等敏感信息；真机锁屏、磁盘满、能耗和性能阈值仍由[本地需求地图](docs/requirements/map.md)跟踪。
+
+## 阅读导出日志
+
+导出文件采用 JSONL：首行为 manifest，后续每行是一条独立日志事件。字段含义、标准示例、空导出判断、排障顺序和 `jq` 筛选命令见[导出日志阅读指南](docs/guides/exported-jsonl-reading.md)。
