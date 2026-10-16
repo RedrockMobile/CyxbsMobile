@@ -39,9 +39,13 @@ class FileLogEngineTest {
         .lineSequence()
         .filter { it.isNotBlank() }
         .toList()
-      assertEquals(2, lines.size)
+      assertEquals(3, lines.size)
       lines.forEach { Json.parseToJsonElement(it).jsonObject }
-      assertEquals("课表同步\n完成 \"ok\"", lines.first().let {
+      val manifest = Json.parseToJsonElement(lines.first()).jsonObject
+      assertEquals("manifest", manifest.getValue("recordType").jsonPrimitive.content)
+      assertEquals("1", manifest.getValue("sourceFileCount").jsonPrimitive.content)
+      assertEquals(fileSystem.metadata(export.filePath.toPath()).size, export.exportedBytes)
+      assertEquals("课表同步\n完成 \"ok\"", lines[1].let {
         Json.parseToJsonElement(it).jsonObject.getValue("message").jsonPrimitive.content
       })
       assertFalse(export.truncated)
@@ -113,7 +117,14 @@ class FileLogEngineTest {
       val engine = FileLogEngine(config(logDirectory, exportDirectory))
       assertEquals(LogStorageResult.Success, engine.start())
       val export = assertIs<LogExportResult.Success>(engine.export())
-      assertEquals("{\"ok\":true}\n", fileSystem.read(export.filePath.toPath()) { readUtf8() })
+      val lines = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .toList()
+      assertEquals(2, lines.size)
+      assertEquals("manifest", Json.parseToJsonElement(lines.first()).jsonObject
+        .getValue("recordType").jsonPrimitive.content)
+      assertEquals("{\"ok\":true}", lines.last())
       assertEquals(LogStorageResult.Success, engine.close())
     }
   }
@@ -180,7 +191,9 @@ class FileLogEngineTest {
       val messages = fileSystem.read(export.filePath.toPath()) { readUtf8() }
         .lineSequence()
         .filter { it.isNotBlank() }
-        .map { Json.parseToJsonElement(it).jsonObject.getValue("message").jsonPrimitive.content }
+        .map { Json.parseToJsonElement(it).jsonObject }
+        .filter { it["recordType"]?.jsonPrimitive?.content == "log" }
+        .map { it.getValue("message").jsonPrimitive.content }
         .toList()
       assertEquals(listOf("kept"), messages)
       assertEquals(LogStorageResult.Success, engine.close())
@@ -213,6 +226,58 @@ class FileLogEngineTest {
       assertTrue(text.contains("after-recovery"))
       assertTrue(fileSystem.list(logDirectory.toPath()).count { it.name.endsWith(".active") } <= 1)
       assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun exportLimitsSourceFilesAndReportsTruncation() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val logPath = logDirectory.toPath()
+      fileSystem.createDirectories(logPath)
+      repeat(4) { index ->
+        fileSystem.write(logPath / "cyxbs-log-v1-old-${index.toString().padStart(6, '0')}.jsonl") {
+          writeUtf8("{\"recordType\":\"log\",\"message\":\"$index\"}\n")
+        }
+      }
+
+      val engine = FileLogEngine(config(logDirectory, exportDirectory))
+      assertEquals(LogStorageResult.Success, engine.start())
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val lines = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .toList()
+      val manifest = Json.parseToJsonElement(lines.first()).jsonObject
+      assertEquals("3", manifest.getValue("sourceFileCount").jsonPrimitive.content)
+      assertEquals("true", manifest.getValue("truncated").jsonPrimitive.content)
+      assertEquals(4, lines.size)
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun collectionGateRejectsFileLogImmediately() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(
+        LogStorageResult.Success,
+        CyxbsLog.startFileStorage(config(logDirectory, exportDirectory)),
+      )
+      try {
+        CyxbsLog.setFileStorageCollectionEnabled(false)
+        var evaluated = false
+        CyxbsLog.e {
+          evaluated = true
+          "must-not-be-collected"
+        }
+        assertFalse(evaluated)
+        assertEquals(0, CyxbsLog.fileStorageHealth().acceptedEntries)
+      } finally {
+        CyxbsLog.setFileStorageCollectionEnabled(true)
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
     }
   }
 

@@ -3,7 +3,7 @@
 Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
 
 - 类型/标签：task / wayfinder:task、needs-triage
-- 状态：planned，未执行
+- 状态：in_progress，协议自动化与跨平台源码编译已执行，真机性能未执行
 - Blocked by：[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)、[04](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>)、[05](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>)
 
 ## 需求
@@ -25,4 +25,6 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 ## 进度
 
-未开始；本轮没有测试或性能通过结论。
+已完成 Desktop 自动化边界测试：JSONL/manifest 可解析、Unicode 截断、轮转与总预算、静默尾批、崩溃尾条恢复、导出、clear、durable Unsupported、close 取消重试、启动文件数预留、等级复核、导出 seal 故障恢复、消息惰性/异常隔离及常见敏感字段脱敏。Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译和 Android FileProvider manifest 合并纳入最终验证。
+
+未执行：Android/iOS 真机分享与锁屏后台，磁盘满/文件不可写实机故障，强杀与时间回拨，多进程压力，p50/p95/p99、分配、吞吐、CPU、能耗及长期队列高水位。上述项目完成前本项和地图不得关闭。

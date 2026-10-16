@@ -140,7 +140,7 @@ private fun SettingPage(argument: SettingNavArgument) {
                       onCheckedChange(value)
                     } catch (throwable: Throwable) {
                       if (throwable is CancellationException) throw throwable
-                      toast("设置失败，请重试")
+                      toast(throwable.message ?: "设置失败，请重试")
                     } finally {
                       checked = settingItem.readChecked()
                       changing = false

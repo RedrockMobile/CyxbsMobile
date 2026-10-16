@@ -3,7 +3,7 @@
 Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
 
 - 类型/标签：task / wayfinder:task、needs-triage
-- 状态：planned，未实现
+- 状态：in_progress，代码接入完成，真机验收待执行
 - Blocked by：[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)、[04](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>)
 
 ## 需求
@@ -25,4 +25,12 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 ## 进度
 
-未开始。初始化现状与平台证据见[设计报告](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-module-design.md>)。
+已完成代码接入：
+
+- `InitialManager` 在各平台启动时配置控制台策略；文件层仅主进程、隐私已同意且用户主动开启时运行，撤回隐私后停止写入。
+- Android 使用 `noBackupFilesDir/cyxbs-log` 与 `cacheDir/cyxbs-log-export`，后台 `onStop` flush；iOS 使用 Application Support/Caches，启动后标记日志目录排除备份，并监听进入后台；Desktop 使用 `~/.cyxbs`；Web 明确 Unsupported。
+- 旧 `log`/`logg`/`LogUtils` 单向转发 `CyxbsLog`，旧 `LogLocal` writer 已删除；网络 BODY 仍只在 Debug Logcat，不进入可导出文件。
+- 设置页提供“记录诊断日志”开关、清理和导出；Android FileProvider 临时读授权、iOS Share Sheet、Desktop 打开目录。分享面板弹出仅提示文件已生成，不宣称分享成功。
+- 导出 JSONL 带 manifest；文件入队前做常见凭据/Cookie/邮箱/长数字兜底脱敏，日程诊断移除标题、分类名和服务端 info；不自动上传。
+
+仍需 Android/iOS 真机验证后台/锁屏、权限与系统分享；需要产品复核最终隐私文案和允许采集字段。应用无法撤回用户已分享给外部应用的副本。

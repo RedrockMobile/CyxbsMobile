@@ -1,5 +1,7 @@
 package com.cyxbs.pages.mine.setting
 
+import com.cyxbs.components.config.log.AppLogManager
+import com.cyxbs.components.log.LogStorageResult
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.mine.api.MineSettings
 
@@ -14,31 +16,71 @@ abstract class SettingPlatform {
   /**
    * 提供公共开关项。平台重写时应返回 `super.switchItems() + platformItems`，保持公共顺序稳定。
    */
-  open fun switchItems(): List<SettingItem.Switch> = listOf(
-    SettingItem.Switch(
-      key = "show_course_first",
-      title = "启动 App 优先显示课表",
-      readChecked = MineSettings::isShowCourseFirst,
-      rememberOnCheckedChange = { { enabled -> MineSettings.setShowCourseFirst(enabled) } },
-    ),
-  )
+  open fun switchItems(): List<SettingItem.Switch> = buildList {
+    add(
+      SettingItem.Switch(
+        key = "show_course_first",
+        title = "启动 App 优先显示课表",
+        readChecked = MineSettings::isShowCourseFirst,
+        rememberOnCheckedChange = { { enabled -> MineSettings.setShowCourseFirst(enabled) } },
+      )
+    )
+    if (AppLogManager.isDiagnosticLoggingSupported()) {
+      add(
+        SettingItem.Switch(
+          key = "diagnostic_log_enabled",
+          title = "记录诊断日志",
+          readChecked = AppLogManager::isDiagnosticLoggingEnabled,
+          rememberOnCheckedChange = {
+            { enabled ->
+              when (val result = AppLogManager.setDiagnosticLoggingEnabled(enabled)) {
+                LogStorageResult.Success -> Unit
+                LogStorageResult.Unsupported -> error("当前平台不支持诊断日志")
+                is LogStorageResult.Failure -> error(result.message)
+              }
+            }
+          },
+        )
+      )
+    }
+  }
 
   /**
    * 提供公共点击项。平台重写时应返回 `super.actionItems(actions) + platformItems`。
    */
-  open fun actionItems(actions: SettingItemActions): List<SettingItem.Action> = listOf(
-    SettingItem.Action(
-      key = "account_security",
-      title = "账号与安全",
-      requiresLogin = true,
-      rememberOnClick = { ::openAccountSecurity },
-    ),
-    SettingItem.Action(
-      key = "course_max_week",
-      title = "设置课表最大周数",
-      rememberOnClick = { actions.showCourseMaxWeekDialog },
-    ),
-  )
+  open fun actionItems(actions: SettingItemActions): List<SettingItem.Action> = buildList {
+    add(
+      SettingItem.Action(
+        key = "account_security",
+        title = "账号与安全",
+        requiresLogin = true,
+        rememberOnClick = { ::openAccountSecurity },
+      )
+    )
+    add(
+      SettingItem.Action(
+        key = "course_max_week",
+        title = "设置课表最大周数",
+        rememberOnClick = { actions.showCourseMaxWeekDialog },
+      )
+    )
+    if (AppLogManager.isDiagnosticLoggingSupported()) {
+      add(
+        SettingItem.Action(
+          key = "diagnostic_log_share",
+          title = "导出并分享诊断日志",
+          rememberOnClick = { rememberDiagnosticLogShareAction() },
+        )
+      )
+      add(
+        SettingItem.Action(
+          key = "diagnostic_log_clear",
+          title = "清除诊断日志",
+          rememberOnClick = { rememberDiagnosticLogClearAction() },
+        )
+      )
+    }
+  }
 
   /**
    * 合并最终设置项。类型分组在这里统一完成，平台添加条目不会改变公共项内部的顺序。

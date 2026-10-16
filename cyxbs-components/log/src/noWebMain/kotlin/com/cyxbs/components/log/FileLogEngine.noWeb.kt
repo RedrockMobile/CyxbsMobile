@@ -36,7 +36,8 @@ private const val BATCH_SIZE_BYTES = 64 * 1_024
 private const val FLUSH_INTERVAL_MILLIS = 1_000L
 private const val MAX_FILES = 8
 private const val MAX_EXPORT_BYTES = 32L * 1_024 * 1_024
-private const val MAX_EXPORT_FILES = 3
+private const val MAX_EXPORT_SOURCE_FILES = 3
+private const val MAX_PUBLISHED_EXPORT_FILES = 3
 private const val FILE_PREFIX = "cyxbs-log-v1-"
 private const val EXPORT_PREFIX = "cyxbs-log-export-v1-"
 
@@ -425,7 +426,11 @@ private class WorkerFiles(
     val selected = ArrayList<Path>()
     var selectedBytes = 0L
     var truncated = false
-    for (path in candidates) {
+    for ((index, path) in candidates.withIndex()) {
+      if (index >= MAX_EXPORT_SOURCE_FILES) {
+        truncated = true
+        break
+      }
       val size = fileSystem.metadata(path).size ?: 0L
       if (selectedBytes + size > MAX_EXPORT_BYTES) {
         truncated = true
@@ -437,12 +442,20 @@ private class WorkerFiles(
     selected.reverse()
 
     fileSystem.createDirectories(exportDirectory)
-    val id = "${nowMillis()}-${Random.nextLong().toULong().toString(16)}"
+    val generatedAtMillis = nowMillis()
+    val manifest = encodeExportManifest(
+      generatedAtMillis = generatedAtMillis,
+      sourceFileCount = selected.size,
+      exportedLogBytes = selectedBytes,
+      truncated = truncated,
+    )
+    val id = "$generatedAtMillis-${Random.nextLong().toULong().toString(16)}"
     val partial = exportDirectory / "$EXPORT_PREFIX$id.jsonl.partial"
     val published = exportDirectory / "$EXPORT_PREFIX$id.jsonl"
     try {
       val output = fileSystem.sink(partial).buffer()
       try {
+        output.write(manifest)
         selected.forEach { path ->
           val input = fileSystem.source(path)
           try {
@@ -458,7 +471,7 @@ private class WorkerFiles(
       cleanupExports(except = published)
       return LogExportResult.Success(
         filePath = published.toString(),
-        exportedBytes = selectedBytes,
+        exportedBytes = selectedBytes + manifest.size,
         truncated = truncated,
       )
     } finally {
@@ -582,7 +595,7 @@ private class WorkerFiles(
       val expired = (fileSystem.metadata(path).lastModifiedAtMillis ?: nowMillis()).let {
         nowMillis() >= it && nowMillis() - it > config.maxAgeMillis
       }
-      if (path != except && (index >= MAX_EXPORT_FILES || expired || path.name.endsWith(".partial"))) {
+      if (path != except && (index >= MAX_PUBLISHED_EXPORT_FILES || expired || path.name.endsWith(".partial"))) {
         fileSystem.delete(path, mustExist = false)
       }
     }

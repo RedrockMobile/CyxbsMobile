@@ -14,8 +14,6 @@ import com.cyxbs.components.init.appContext
 import com.cyxbs.components.utils.extensions.defaultGson
 import com.cyxbs.components.utils.network.plugin.handleAuthenticatedTypedResponse
 import com.cyxbs.components.utils.network.plugin.AccountRequestAuthentication
-import com.cyxbs.components.utils.utils.LogLocal
-import com.cyxbs.components.utils.utils.LogUtils
 import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
@@ -255,10 +253,13 @@ object ApiGenerator {
     private fun Retrofit.Builder.configRetrofitBuilder(client: ((OkHttpClient.Builder) -> OkHttpClient)): Retrofit.Builder {
         return this.client(client.invoke(OkHttpClient().newBuilder().apply {
             val logging = HttpLoggingInterceptor { message ->
-                LogUtils.d("OKHTTP", message)
-                LogLocal.log("OKHTTP", "OKHTTP$message")
+                Log.d("OKHTTP", message)
             }
-            logging.level = HttpLoggingInterceptor.Level.BODY
+            logging.level = if (isDebug()) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
             addInterceptor(Interceptor {
                 it.proceed(
                     it.request().newBuilder()

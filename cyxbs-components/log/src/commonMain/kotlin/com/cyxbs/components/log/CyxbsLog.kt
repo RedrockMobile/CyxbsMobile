@@ -12,7 +12,7 @@ import kotlin.time.Clock
  *
  * 每次调用使用同一份配置快照，先过滤再求值一次消息；不采集调用栈。
  * [configure] 可重复调用，原子替换配置，不修改 Kermit 全局 Logger。
- * 消息 lambda 与平台 writer 的异常向调用方传播；此最小版本不提供故障隔离。
+ * 消息构造或平台 writer 失败会被日志边界吞掉，不影响业务控制流。
  */
 object CyxbsLog {
   private class State(val config: LogConfig) {
@@ -23,6 +23,7 @@ object CyxbsLog {
   }
 
   private val state = atomic(State(LogConfig()))
+  private val fileStorageCollectionEnabled = atomic(true)
 
   /**
    * 设置当前进程的日志策略，建议在应用启动时、业务初始化之前调用。
@@ -39,7 +40,8 @@ object CyxbsLog {
    */
   fun isEnabled(level: LogLevel): Boolean {
     val config = state.value.config
-    return config.enabled && (level >= config.minLevel || PlatformFileLog.accepts(level))
+    val fileAccepted = fileStorageCollectionEnabled.value && PlatformFileLog.accepts(level)
+    return config.enabled && (level >= config.minLevel || fileAccepted)
   }
 
   /**
@@ -55,7 +57,7 @@ object CyxbsLog {
    * @param tag 文件名或约定的链路 TAG；null 时使用配置的 defaultTag，不会自动推断文件名。
    * @param throwable 需要记录堆栈的原始异常，可用于任意等级；无需在消息中重复拼接堆栈。
    * @param message 通过等级过滤后同步求值一次；仅构造诊断文本，避免业务副作用，
-   * 不记录 token、密码及未脱敏的个人数据。此版本不会自动脱敏或捕获 lambda 异常。
+   * 不记录 token、密码及未脱敏的个人数据。构造异常会被隔离且本条日志被丢弃。
    */
   fun log(
     level: LogLevel,
@@ -67,38 +69,50 @@ object CyxbsLog {
     if (!snapshot.config.enabled) return
 
     val consoleAccepted = level >= snapshot.config.minLevel
-    val fileAccepted = PlatformFileLog.accepts(level)
+    val fileAccepted = fileStorageCollectionEnabled.value && PlatformFileLog.accepts(level)
     if (!consoleAccepted && !fileAccepted) return
 
     val resolvedTag = tag ?: snapshot.config.defaultTag
-    val renderedMessage = message()
+    val renderedMessage = runCatching(message).getOrNull() ?: return
     if (fileAccepted) {
-      val fileMessage = renderedMessage.takeFileSnapshot()
-      val originalStackTrace = throwable?.stackTraceToString()
+      val sanitizedMessage = renderedMessage.sanitizeForFileLog()
+      val fileMessage = sanitizedMessage.takeFileSnapshot()
+      val originalStackTrace = throwable?.stackTraceToString()?.sanitizeForFileLog()
       val fileStackTrace = originalStackTrace?.takeFileSnapshot()
+      val sanitizedTag = resolvedTag.sanitizeForFileLog()
       PlatformFileLog.offer(
         FileLogEvent(
           timestampMillis = Clock.System.now().toEpochMilliseconds(),
           level = level,
-          tag = resolvedTag.takeFileSnapshot(),
+          tag = sanitizedTag.takeFileSnapshot(),
           message = fileMessage,
           stackTrace = fileStackTrace,
-          snapshotTruncated = fileMessage.length != renderedMessage.length ||
+          snapshotTruncated = fileMessage.length != sanitizedMessage.length ||
             fileStackTrace?.length != originalStackTrace?.length ||
-            resolvedTag.length > MAX_FILE_SNAPSHOT_CHARS,
+            sanitizedTag.length > MAX_FILE_SNAPSHOT_CHARS,
         )
       )
     }
     if (consoleAccepted) {
-      when (level) {
-        LogLevel.Verbose -> snapshot.logger.v(renderedMessage, throwable, resolvedTag)
-        LogLevel.Debug -> snapshot.logger.d(renderedMessage, throwable, resolvedTag)
-        LogLevel.Info -> snapshot.logger.i(renderedMessage, throwable, resolvedTag)
-        LogLevel.Warn -> snapshot.logger.w(renderedMessage, throwable, resolvedTag)
-        LogLevel.Error -> snapshot.logger.e(renderedMessage, throwable, resolvedTag)
-        LogLevel.Assert -> snapshot.logger.a(renderedMessage, throwable, resolvedTag)
+      runCatching {
+        when (level) {
+          LogLevel.Verbose -> snapshot.logger.v(renderedMessage, throwable, resolvedTag)
+          LogLevel.Debug -> snapshot.logger.d(renderedMessage, throwable, resolvedTag)
+          LogLevel.Info -> snapshot.logger.i(renderedMessage, throwable, resolvedTag)
+          LogLevel.Warn -> snapshot.logger.w(renderedMessage, throwable, resolvedTag)
+          LogLevel.Error -> snapshot.logger.e(renderedMessage, throwable, resolvedTag)
+          LogLevel.Assert -> snapshot.logger.a(renderedMessage, throwable, resolvedTag)
+        }
       }
     }
+  }
+
+  /**
+   * 同步控制后续日志是否允许进入文件层，不影响控制台，也不会自行启动或关闭 worker。
+   * 宿主在隐私撤回和用户关闭采集时应先设为 false，再异步调用 [closeFileStorage] 排空旧记录。
+   */
+  fun setFileStorageCollectionEnabled(enabled: Boolean) {
+    fileStorageCollectionEnabled.value = enabled
   }
 
   /**

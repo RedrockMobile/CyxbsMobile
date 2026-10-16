@@ -10,7 +10,18 @@ private val fileLogJson = Json {
 }
 
 @Serializable
+private data class ExportManifest(
+  val recordType: String = "manifest",
+  val schemaVersion: Int = 1,
+  val generatedAtMillis: Long,
+  val sourceFileCount: Int,
+  val exportedLogBytes: Long,
+  val truncated: Boolean,
+)
+
+@Serializable
 private data class PersistedLogRecord(
+  val recordType: String = "log",
   val schemaVersion: Int = 1,
   val session: String,
   val sequence: Long,
@@ -26,6 +37,20 @@ internal data class EncodedLogLine(
   val bytes: ByteArray,
   val truncated: Boolean,
 )
+
+internal fun encodeExportManifest(
+  generatedAtMillis: Long,
+  sourceFileCount: Int,
+  exportedLogBytes: Long,
+  truncated: Boolean,
+): ByteArray = (fileLogJson.encodeToString(
+  ExportManifest(
+    generatedAtMillis = generatedAtMillis,
+    sourceFileCount = sourceFileCount,
+    exportedLogBytes = exportedLogBytes,
+    truncated = truncated,
+  )
+) + "\n").encodeToByteArray()
 
 internal fun encodeLogLine(
   event: FileLogEvent,

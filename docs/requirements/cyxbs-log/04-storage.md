@@ -3,7 +3,7 @@
 Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
 
 - 类型/标签：task / wayfinder:task、needs-triage
-- 状态：in_progress，noWeb 文件引擎与导出初版已实现
+- 状态：in_progress，noWeb 文件引擎、导出协议与平台目录已实现
 - Blocked by：[02](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>)、[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)
 
 ## 需求
@@ -27,6 +27,6 @@ noWebMain 统一单 worker 文件管理；普通记录非阻塞、有界接收�
 
 ## 进度
 
-已完成初版：Android/iOS/Desktop 共用 noWeb 单 worker；普通记录按 1024 条与 2 MiB 估算负载非阻塞接收；16 KiB JSONL 单条上限；64 KiB/约 1 秒 buffered flush；UTF-8 字节轮转、总字节/8 文件/年龄清理；崩溃尾条修复；flush/clear/export/close 可靠控制队列；导出 `.partial` 原子发布；可恢复文件故障后重建 active；健康统计；Web 返回 Unsupported。10 项 Desktop 测试已覆盖 JSONL、Unicode 截断、轮转配额、静默尾批、尾条恢复、导出、clear、durable unsupported、取消后幂等 close、启动文件数预留、等级复核及导出封存故障恢复（部分场景合并在同一测试）。
+已完成：Android/iOS/Desktop 共用 noWeb 单 worker；普通记录按 1024 条与 2 MiB 估算负载非阻塞接收；16 KiB JSONL 单条上限；64 KiB/约 1 秒 buffered flush；UTF-8 字节轮转、总字节/8 文件/年龄清理；崩溃尾条修复；flush/clear/export/close 可靠控制队列；导出 `.partial` 原子发布、manifest、最新 3 个源文件与 32 MiB 上限；可恢复文件故障后重建 active；健康统计；Web 返回 Unsupported。Desktop 自动化覆盖 JSONL、Unicode 截断、轮转配额、静默尾批、尾条恢复、导出 manifest/上限、clear、durable unsupported、取消后幂等 close、启动文件数预留、等级复核、同步采集门及导出封存故障恢复。
 
-仍需完成：真机目录与文件保护接入；磁盘满/权限变化/锁屏写失败的退避与限频；更完整的管理调用并发/取消压力测试；导出副本独立磁盘预算/租约寿命策略；真实吞吐、调用延迟、能耗与参数定稿。当前不承诺断电持久化或强杀零丢失。
+应用已接入 Android `noBackupFilesDir`、iOS Application Support 排除备份、Desktop 用户目录及各平台受控导出目录。仍需完成：磁盘满/权限变化/锁屏写失败的退避与限频；更完整的管理调用并发压力；Android/iOS 真机文件保护和后台行为验证；真实吞吐、调用延迟、能耗与参数定稿。当前不承诺断电持久化或强杀零丢失。

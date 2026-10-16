@@ -7,10 +7,10 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
 /**
- * Schedule 详细业务日志。
+ * Schedule 结构诊断日志。
  *
- * 该日志会包含用户填写的分类名与日程标题，仅用于联调增删改查与服务端合并结果；不记录描述、提醒文案、
- * token、header 或完整请求体。分类配色是受控的业务配置 JSON，可以逐字段往返核对。
+ * 仅记录资源 identity、版本、时间结构、Patch 模式和操作结果；不记录分类名、日程标题、描述、
+ * 提醒文案、服务端 info、token、header 或完整请求体。
  */
 internal const val SCHEDULE_DETAIL_LOG_TAG = "ScheduleDetail"
 
@@ -100,14 +100,14 @@ internal fun SyncResponse.logScheduleResponse(timeZone: TimeZone) {
   logItems(
     label = "RESPONSE SYNC category upsertResult",
     items = categories.upsertResults.map {
-      "result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
   logItems(
     label = "RESPONSE SYNC category deleteResult",
     items = categories.deleteResults.map {
-      "id=${it.id}, result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "id=${it.id}, result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
@@ -125,14 +125,14 @@ internal fun SyncResponse.logScheduleResponse(timeZone: TimeZone) {
   logItems(
     label = "RESPONSE SYNC upsertResult",
     items = schedules.upsertResults.map { result ->
-      "result=${result.result}, reason=${result.reason}, info=${result.info}, " +
+      "result=${result.result}, reason=${result.reason}, " +
         "resource=${result.resource?.diagnosticSummary(timeZone)}"
     },
   )
   logItems(
     label = "RESPONSE SYNC deleteResult",
     items = schedules.deleteResults.map { result ->
-      "id=${result.id}, result=${result.result}, reason=${result.reason}, info=${result.info}, " +
+      "id=${result.id}, result=${result.result}, reason=${result.reason}, " +
         "resource=${result.resource?.diagnosticSummary(timeZone)}"
     },
   )
@@ -149,14 +149,14 @@ internal fun SyncResponse.logScheduleResponse(timeZone: TimeZone) {
   logItems(
     label = "RESPONSE SYNC adjustment upsertResult",
     items = occurrenceAdjustments.upsertResults.map {
-      "result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
   logItems(
     label = "RESPONSE SYNC adjustment deleteResult",
     items = occurrenceAdjustments.deleteResults.map {
-      "id=${it.id}, result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "id=${it.id}, result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
@@ -168,55 +168,55 @@ internal fun MutationResponse.logScheduleResponse(timeZone: TimeZone) {
   logItems(
     label = "RESPONSE MUTATION category upsertResult",
     items = categories.upsertResults.map {
-      "result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
   logItems(
     label = "RESPONSE MUTATION category deleteResult",
     items = categories.deleteResults.map {
-      "id=${it.id}, result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "id=${it.id}, result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
   logItems(
     label = "RESPONSE MUTATION upsertResult",
     items = schedules.upsertResults.map {
-      "result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary(timeZone)}"
     },
   )
   logItems(
     label = "RESPONSE MUTATION deleteResult",
     items = schedules.deleteResults.map {
-      "id=${it.id}, result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "id=${it.id}, result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary(timeZone)}"
     },
   )
   logItems(
     label = "RESPONSE MUTATION adjustment upsertResult",
     items = occurrenceAdjustments.upsertResults.map {
-      "result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
   logItems(
     label = "RESPONSE MUTATION adjustment deleteResult",
     items = occurrenceAdjustments.deleteResults.map {
-      "id=${it.id}, result=${it.result}, reason=${it.reason}, info=${it.info}, " +
+      "id=${it.id}, result=${it.result}, reason=${it.reason}, " +
         "resource=${it.resource?.diagnosticSummary()}"
     },
   )
 }
 
-/** 将分类压缩为 identity、名称、排序与受控配色，便于核对本地到远端的完整往返。 */
+/** 将分类压缩为 identity、版本、排序与受控配色，不记录用户填写的名称。 */
 private fun CategoryInput.diagnosticSummary(): String =
-  "localId=$localId, id=$id, version=$version, name=${name.data.singleLine()}, " +
+  "localId=$localId, id=$id, version=$version, " +
     "sortOrder=${sortOrder.data}, color=${color.data?.singleLine()}"
 
-/** 将 wire 日程压缩为标题、日期时间与周期，不包含描述等额外用户内容。 */
+/** 将 wire 日程压缩为 identity、日期时间与周期，不记录标题或描述。 */
 internal fun ScheduleInput.diagnosticSummary(timeZone: TimeZone): String =
-  "id=$id, version=$version, title=${title.data.singleLine()}, " +
+  "id=$id, version=$version, " +
     "timing=${timing.data.diagnosticSummary(timeZone)}, " +
     "recurrence=${recurrence.data.diagnosticSummary(timeZone)}"
 

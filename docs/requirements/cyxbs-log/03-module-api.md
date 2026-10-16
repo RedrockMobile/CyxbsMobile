@@ -3,7 +3,7 @@
 Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
 
 - 类型/标签：task / wayfinder:task、needs-triage
-- 状态：in_progress，已搭建最小平台输出门面；完整需求未完成
+- 状态：in_progress，门面与管理协议已实现；结构化匿名上下文待设计
 - Blocked by：[02](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>)
 
 ## 需求
@@ -31,8 +31,8 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 已新增 `:cyxbs-components:log`，仅显式依赖 Kermit 2.2.0，使用 `manager.lib`；提供 `LogLevel`、`LogConfig`、`CyxbsLog`，支持等级过滤、惰性消息、原子配置快照及平台控制台输出。Kermit 类型不出现在公开 API 中。
 
-当前输出同步执行，消息 lambda/writer 异常传播；故障隔离、结构化字段/上下文、管理协议和文件引擎尚未实现，因此本任务不标记 completed。
+当前已支持控制台/文件分别过滤、消息单次求值、消息与 writer 异常隔离、同步文件采集策略门，以及结构化管理结果和健康统计；Kermit 类型仍未暴露。普通日志热路径不执行文件 I/O，关闭等级不求值 lambda。尚未提供自动链路/账号会话上下文，跨请求关联仍由调用方使用非敏感稳定 TAG 或消息字段表达，因此本任务保持 in_progress。
 
-构建验证：`compileAndroidMain`、`compileKotlinDesktop`、`compileKotlinJs`、`compileKotlinWasmJs`、`compileKotlinIosArm64`、`compileKotlinIosSimulatorArm64` 全部通过。此结果验证依赖解析与源码编译，不代表 Native 框架链接、Swift 调用、真机输出或性能验证已完成。
+构建验证覆盖 `compileAndroidMain`、`compileKotlinDesktop`、`compileKotlinJs`、`compileKotlinWasmJs`、`compileKotlinIosArm64`、`compileKotlinIosSimulatorArm64`。此结果验证依赖解析与源码编译，不代表 Native 框架链接、Swift 调用、真机输出或性能验证已完成。
 
 依据：[设计报告](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-module-design.md>)。
