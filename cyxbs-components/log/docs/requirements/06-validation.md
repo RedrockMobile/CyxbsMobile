@@ -1,10 +1,10 @@
 # LOCAL-LOG-06：协议回归与真机性能验收
 
-Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
+Part of: [LOCAL-LOG-MAP](./map.md)
 
 - 类型/标签：task / wayfinder:task、needs-triage
 - 状态：in_progress，协议自动化、跨平台源码编译与 Android 模拟器集成验收已执行；真机性能和 iOS 登录态交互未执行
-- Blocked by：[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)、[04](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>)、[05](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>)
+- Blocked by：[03](./03-module-api.md)、[04](./04-storage.md)、[05](./05-integration.md)
 
 ## 需求
 

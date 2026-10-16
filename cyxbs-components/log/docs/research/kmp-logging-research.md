@@ -36,7 +36,7 @@ Kermit、Napier、KmLog 主体为 Apache-2.0；Mars 主体为 MIT，但第三方
 
 接入方式：commonMain 依赖 Kermit 门面；noWebMain 引入 kermit-io；平台初始化传入私有目录和策略。浏览器使用单独 writer。需要验证发布变体和依赖解析，不把整个 IO 模块放进所有目标都依赖的 commonMain。
 
-项目 [依赖目录](</Users/generals/AndroidProject/CyxbsMobile/gradle/libs.versions.toml#L106>) 为 Kotlin 2.4.10、coroutines 1.11.0、datetime 0.8.0、Okio 3.18.1；Kermit 2.2.0 [构建依赖](https://github.com/touchlab/Kermit/blob/774cc1ca81c73b7f14ef2b49b0dcd6dda213d1c6/gradle/libs.versions.toml) 为 Kotlin 2.3.21、coroutines 1.11.0、datetime 0.7.0、kotlinx.io 0.8.0。不存在明显“项目 Kotlin 太旧”的证据，但 datetime 升级解析、Native klib 和各目标兼容性仍需最小工程验证，本轮没有编译。
+项目 [依赖目录](<../../../../gradle/libs.versions.toml#L106>) 为 Kotlin 2.4.10、coroutines 1.11.0、datetime 0.8.0、Okio 3.18.1；Kermit 2.2.0 [构建依赖](https://github.com/touchlab/Kermit/blob/774cc1ca81c73b7f14ef2b49b0dcd6dda213d1c6/gradle/libs.versions.toml) 为 Kotlin 2.3.21、coroutines 1.11.0、datetime 0.7.0、kotlinx.io 0.8.0。不存在明显“项目 Kotlin 太旧”的证据，但 datetime 升级解析、Native klib 和各目标兼容性仍需最小工程验证，本轮没有编译。
 
 Napier 参考 master `50835e2…` 的核验行为：lambda 重载先执行 message()，然后进入过滤；rawLog 中 any 输出启用后，会对所有 Antilog 执行 performLog。需要逐输出目的地过滤时不能只依赖全局判断。此结论限于所读版本，最终依赖必须固定完整 tag/SHA 后再验证，不能推广到全部发行版本。
 
@@ -78,16 +78,16 @@ Flush 主要通知后台；FlushSync 会写出缓冲，但所读路径没有足�
 
 | 源码 | 已核验行为 | 对设计的影响 |
 |---|---|---|
-| [common Log](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/commonMain/kotlin/com/cyxbs/components/utils/extensions/Log.kt>) | 只有 log(msg)、log(tag,msg)、logg(Any?) | 增加等级、异常、惰性消息和上下文 |
-| [Android actual](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/extensions/Log.android.kt>) | 每条构造 Exception 获取位置，再 Log.d | 热路径避免默认堆栈采集 |
-| [iOS actual](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/iosMain/kotlin/com/cyxbs/components/utils/extensions/Log.ios.kt>) | NSLog | 补跨平台文件落盘 |
-| [LogLocal](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/utils/LogLocal.kt>) | 每条 Rx 调度到 IO；共享 helper 无明确单写入者保护；throwable 未使用 | 长寿命单消费者，统一生命周期 |
-| [LogLocalHelper](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/utils/LogLocalHelper.kt>) | 初始化全量 readLines；1/multiple 整数除法在默认 multiple=2 时导致清空；运行中无持续轮转；逐条加密 | 滚动文件替代全量重写；学号派生密钥需废弃 |
-| [LogUtils](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/utils/LogUtils.kt#L23>) | Release 保留 ERROR | 控制台与文件的过滤分别定义 |
-| [ApiGenerator:257](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/network/ApiGenerator.kt#L257>) | HttpLoggingInterceptor BODY 同时送控制台与文件，此处无 release gate | 生产采集必须限范围、限长、脱敏 |
-| [ScheduleDiagnosticLog](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-pages/schedule/src/commonMain/kotlin/com/cyxbs/pages/schedule/data/remote/ScheduleDiagnosticLog.kt>) | 日程标题和分类名进入部分调试日志 | 业务字段也需要允许记录名单 |
+| [common Log](<../../../../cyxbs-components/utils/src/commonMain/kotlin/com/cyxbs/components/utils/extensions/Log.kt>) | 只有 log(msg)、log(tag,msg)、logg(Any?) | 增加等级、异常、惰性消息和上下文 |
+| `Android actual` | 每条构造 Exception 获取位置，再 Log.d | 热路径避免默认堆栈采集 |
+| `iOS actual` | NSLog | 补跨平台文件落盘 |
+| `LogLocal` | 每条 Rx 调度到 IO；共享 helper 无明确单写入者保护；throwable 未使用 | 长寿命单消费者，统一生命周期 |
+| `LogLocalHelper` | 初始化全量 readLines；1/multiple 整数除法在默认 multiple=2 时导致清空；运行中无持续轮转；逐条加密 | 滚动文件替代全量重写；学号派生密钥需废弃 |
+| [LogUtils](<../../../../cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/utils/LogUtils.kt#L23>) | Release 保留 ERROR | 控制台与文件的过滤分别定义 |
+| [ApiGenerator:257](<../../../../cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/network/ApiGenerator.kt#L257>) | HttpLoggingInterceptor BODY 同时送控制台与文件，此处无 release gate | 生产采集必须限范围、限长、脱敏 |
+| [ScheduleDiagnosticLog](<../../../../cyxbs-pages/schedule/src/commonMain/kotlin/com/cyxbs/pages/schedule/data/remote/ScheduleDiagnosticLog.kt>) | 日程标题和分类名进入部分调试日志 | 业务字段也需要允许记录名单 |
 
-[现有 KMP 插件](</Users/generals/AndroidProject/CyxbsMobile/build-logic/plugin/kmp/src/main/kotlin/kmp.base.gradle.kts>) 已有 noWebMain，供 Android/iOS/desktop 共用；webMain 供浏览器 JS/Wasm 共用。建议未来新增低依赖的 cyxbs-components/logging：commonMain 放事件、门面、策略与协议；noWebMain 放文件引擎；平台层提供目录、平台输出、生命周期和存储同步能力；webMain 采用有界内存环，确有需求再加 IndexedDB/下载。
+[现有 KMP 插件](<../../../../build-logic/plugin/kmp/src/main/kotlin/kmp.base.gradle.kts>) 已有 noWebMain，供 Android/iOS/desktop 共用；webMain 供浏览器 JS/Wasm 共用。建议未来新增低依赖的 cyxbs-components/logging：commonMain 放事件、门面、策略与协议；noWebMain 放文件引擎；平台层提供目录、平台输出、生命周期和存储同步能力；webMain 采用有界内存环，确有需求再加 IndexedDB/下载。
 
 底层模块不依赖账号、网络或 utils 大模块。版本、设备和匿名会话信息由应用注入，避免循环依赖。[Okio 官方平台说明](https://lysine.dev/okio/multiplatform/) 的 JS 文件系统要求 Node，不能用于掌邮浏览器目标。
 

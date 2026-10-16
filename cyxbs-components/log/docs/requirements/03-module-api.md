@@ -1,10 +1,10 @@
 # LOCAL-LOG-03：独立 log 模块与 CyxbsLog 门面
 
-Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
+Part of: [LOCAL-LOG-MAP](./map.md)
 
 - 类型/标签：task / wayfinder:task、needs-triage
 - 状态：in_progress，门面与管理协议已实现；结构化匿名上下文待设计
-- Blocked by：[02](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>)
+- Blocked by：[02](./02-prototype.md)
 
 ## 需求
 
@@ -35,4 +35,4 @@ Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requir
 
 构建验证覆盖 `compileAndroidMain`、`compileKotlinDesktop`、`compileKotlinJs`、`compileKotlinWasmJs`、`compileKotlinIosArm64`、`compileKotlinIosSimulatorArm64`。此结果验证依赖解析与源码编译，不代表 Native 框架链接、Swift 调用、真机输出或性能验证已完成。
 
-依据：[设计报告](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-module-design.md>)。
+依据：[设计报告](../research/cyxbs-log-module-design.md)。

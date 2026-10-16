@@ -1,10 +1,10 @@
 # LOCAL-LOG-02：全目标依赖与移动端存储 PoC
 
-Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
+Part of: [LOCAL-LOG-MAP](./map.md)
 
 - 类型/标签：prototype / wayfinder:prototype、needs-triage
 - 状态：in_progress，依赖/全目标源码/Desktop 协议与突发延迟已验证；移动真机待执行
-- Blocked by：[01 已完成](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/01-research.md>)
+- Blocked by：[01 已完成](./01-research.md)
 
 ## 目的
 

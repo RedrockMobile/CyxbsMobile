@@ -15,10 +15,10 @@
 
 ## Notes
 
-- [第一轮源码选型](</Users/generals/AndroidProject/CyxbsMobile/docs/research/kmp-logging-research.md>)：Kermit 适合复用平台输出；kermit-io 的满队列阻塞与生命周期缺口影响长期文件层。
-- [模块与封装调研](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-module-design.md>)：模块依赖、协议、旧入口迁移、初始化风险及验收建议。
-- [平台本地保存调研](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-local-storage-platforms.md>)：存储目录、备份、文件保护和用户导出依据。
-- 按[仓库地图流程](</Users/generals/AndroidProject/CyxbsMobile/docs/agents/issue-tracker.md#L53>)组织本地地图与子项。当前插件 backend 为 GitHub，用户明确只本地，因此未调用其创建/更新功能，未改变后端；标签/依赖/进度是文档元数据。
+- [第一轮源码选型](../research/kmp-logging-research.md)：Kermit 适合复用平台输出；kermit-io 的满队列阻塞与生命周期缺口影响长期文件层。
+- [模块与封装调研](../research/cyxbs-log-module-design.md)：模块依赖、协议、旧入口迁移、初始化风险及验收建议。
+- [平台本地保存调研](../research/cyxbs-log-local-storage-platforms.md)：存储目录、备份、文件保护和用户导出依据。
+- 按[仓库地图流程](../../../../docs/agents/issue-tracker.md#L53)组织本地地图与子项。当前插件 backend 为 GitHub，用户明确只本地，因此未调用其创建/更新功能，未改变后端；标签/依赖/进度是文档元数据。
 
 ## Decisions-so-far
 
@@ -44,12 +44,12 @@
 
 | 本地子项 | 类型 | 当前状态 | Blocked by |
 |---|---|---|---|
-| [LOCAL-LOG-01 调研](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/01-research.md>) | research | completed | 无 |
-| [LOCAL-LOG-02 最小验证](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>) | prototype | in_progress / 全目标源码、Desktop 协议与突发基线完成 | 01 已完成 |
-| [LOCAL-LOG-03 模块与门面](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>) | task | in_progress / 基础门面已完成 | 02（完整能力） |
-| [LOCAL-LOG-04 文件协议](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>) | task | in_progress / noWeb 初版与 Desktop 边界测试完成 | 02、03 |
-| [LOCAL-LOG-05 应用集成与用户导出](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/05-integration.md>) | task | in_progress / 代码接入和 Android 模拟器 UI 链路完成，iOS/真机验收待办 | 03、04 |
-| [LOCAL-LOG-06 验收](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/06-validation.md>) | task | in_progress / 自动化、源码编译和 Android 模拟器验收完成，性能验收待办 | 03、04、05 |
+| [LOCAL-LOG-01 调研](./01-research.md) | research | completed | 无 |
+| [LOCAL-LOG-02 最小验证](./02-prototype.md) | prototype | in_progress / 全目标源码、Desktop 协议与突发基线完成 | 01 已完成 |
+| [LOCAL-LOG-03 模块与门面](./03-module-api.md) | task | in_progress / 基础门面已完成 | 02（完整能力） |
+| [LOCAL-LOG-04 文件协议](./04-storage.md) | task | in_progress / noWeb 初版与 Desktop 边界测试完成 | 02、03 |
+| [LOCAL-LOG-05 应用集成与用户导出](./05-integration.md) | task | in_progress / 代码接入和 Android 模拟器 UI 链路完成，iOS/真机验收待办 | 03、04 |
+| [LOCAL-LOG-06 验收](./06-validation.md) | task | in_progress / 自动化、源码编译和 Android 模拟器验收完成，性能验收待办 | 03、04、05 |
 
 图中的依赖是文档显式关系，没有写入插件原生边。用户已授权先搭建 03 的最小基础框架；完整能力继续按 02 的验证结果推进。
 

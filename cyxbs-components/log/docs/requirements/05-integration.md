@@ -1,10 +1,10 @@
 # LOCAL-LOG-05：应用策略、兼容迁移与用户导出
 
-Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
+Part of: [LOCAL-LOG-MAP](./map.md)
 
 - 类型/标签：task / wayfinder:task、needs-triage
 - 状态：in_progress，代码接入完成，真机验收待执行
-- Blocked by：[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)、[04](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/04-storage.md>)
+- Blocked by：[03](./03-module-api.md)、[04](./04-storage.md)
 
 ## 需求
 

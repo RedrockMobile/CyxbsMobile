@@ -1,6 +1,6 @@
 # CyxbsLog：独立模块、封装边界与用户侧保存调研
 
-日期：2026-10-13。范围：第二轮设计调研与本地需求规划；没有创建 Gradle 模块、接入依赖、修改业务或执行性能测试。延续[第一轮选型报告](</Users/generals/AndroidProject/CyxbsMobile/docs/research/kmp-logging-research.md>)，本轮将模块名称确定为 `cyxbs-components/log`。
+日期：2026-10-13。范围：第二轮设计调研与本地需求规划；没有创建 Gradle 模块、接入依赖、修改业务或执行性能测试。延续[第一轮选型报告](./kmp-logging-research.md)，本轮将模块名称确定为 `cyxbs-components/log`。
 
 ## 1. 结论
 
@@ -18,13 +18,13 @@
 | 独立 log | 独立测试存储故障和性能；调用方只依赖小 API；底层后端可替换 | 需要模块配置、应用集成和兼容桥。推荐，复杂度集中在内部实现 |
 | 立即拆 log-api/log-core/log-file 多模块 | 后端可单独发布 | 当前没有独立发布需求；模块和接口增多，先一个 log 模块、内部按职责分包 |
 
-证据：[utils 构建](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/build.gradle.kts>) 同时使用 manager.lib、kmp.compose、网络及 provider，并依赖 init/config/account；[config 构建](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/config/build.gradle.kts>) 又依赖账号和登录。日志不能为了拿版本或目录直接依赖它们。
+证据：[utils 构建](<../../../../cyxbs-components/utils/build.gradle.kts>) 同时使用 manager.lib、kmp.compose、网络及 provider，并依赖 init/config/account；[config 构建](<../../../../cyxbs-components/config/build.gradle.kts>) 又依赖账号和登录。日志不能为了拿版本或目录直接依赖它们。
 
 推荐依赖方向：业务 → log；utils 兼容桥 → log；应用集成层 → log 和现有初始化设施。log 不反向依赖 utils/config/account/页面。初始化设施若需要自身打日志，必须先检查依赖环，不能让 log 核心依赖 init 再让 init 依赖 log。
 
-构建可从[manager.lib](</Users/generals/AndroidProject/CyxbsMobile/build-logic/manager/src/main/kotlin/manager.lib.gradle.kts>) 起步，不额外使用 kmp.compose。[kmp.base](</Users/generals/AndroidProject/CyxbsMobile/build-logic/plugin/kmp/src/main/kotlin/kmp.base.gradle.kts>) 已有协程、序列化、datetime、atomicfu 与 noWebMain/webMain；仍注入部分基础依赖，所以这里只是避免额外 Compose/业务依赖，并非绝对零依赖。
+构建可从[manager.lib](<../../../../build-logic/manager/src/main/kotlin/manager.lib.gradle.kts>) 起步，不额外使用 kmp.compose。[kmp.base](<../../../../build-logic/plugin/kmp/src/main/kotlin/kmp.base.gradle.kts>) 已有协程、序列化、datetime、atomicfu 与 noWebMain/webMain；仍注入部分基础依赖，所以这里只是避免额外 Compose/业务依赖，并非绝对零依赖。
 
-[settings](</Users/generals/AndroidProject/CyxbsMobile/settings.gradle.kts#L24>) 自动发现含构建脚本的模块；真正实现时需要验证自动纳入和 type-safe accessor，通常不需手工 include。[Multiplatform](</Users/generals/AndroidProject/CyxbsMobile/build-logic/config/src/main/kotlin/Multiplatform.kt#L13>) 根据属性开启 iOS/web/desktop，iOS 还要求 macOS。只做 Android 默认构建不代表其他目标通过。
+[settings](<../../../../settings.gradle.kts#L24>) 自动发现含构建脚本的模块；真正实现时需要验证自动纳入和 type-safe accessor，通常不需手工 include。[Multiplatform](<../../../../build-logic/config/src/main/kotlin/Multiplatform.kt#L13>) 根据属性开启 iOS/web/desktop，iOS 还要求 macOS。只做 Android 默认构建不代表其他目标通过。
 
 源码归属建议：
 
@@ -66,7 +66,7 @@ Kermit 2.2.0 的 [LogWriter 文件实现](https://github.com/touchlab/Kermit/blo
 
 ## 4. 用户侧本地保存与可见性
 
-平台一手资料和目录细节见[平台保存专项报告](</Users/generals/AndroidProject/CyxbsMobile/docs/research/cyxbs-log-local-storage-platforms.md>)，汇总选择如下；实际目录创建和导出还需真机验证。
+平台一手资料和目录细节见[平台保存专项报告](./cyxbs-log-local-storage-platforms.md)，汇总选择如下；实际目录创建和导出还需真机验证。
 
 | 平台 | 首版保存策略 | 用户获取方式与边界 |
 |---|---|---|
@@ -109,17 +109,17 @@ clear 是有序命令：明确等待/取消哪些导出，清空已管理记录�
 
 ## 6. 应用接入与策略
 
-[InitialService](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/init/src/commonMain/kotlin/com/cyxbs/components/init/InitialService.kt#L21>) 提供主/其他进程与隐私同意回调。核验[InitialManager](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/config/src/commonMain/kotlin/com/cyxbs/components/config/init/InitialManager.kt#L51>)：已同意启动分支先设置 hasInvokedPrivacyAgree=true，再调用会在该值为 true 时返回的 tryPrivacyAgree；撤回方法只更新设置。日志不能仅依赖 onPrivacyAgreed 启动，也不能指望此处已有撤回通知。此处只记录接入风险，没有修复现有实现。
+[InitialService](<../../../../cyxbs-components/init/src/commonMain/kotlin/com/cyxbs/components/init/InitialService.kt#L21>) 提供主/其他进程与隐私同意回调。核验[InitialManager](<../../../../cyxbs-components/config/src/commonMain/kotlin/com/cyxbs/components/config/init/InitialManager.kt#L51>)：已同意启动分支先设置 hasInvokedPrivacyAgree=true，再调用会在该值为 true 时返回的 tryPrivacyAgree；撤回方法只更新设置。日志不能仅依赖 onPrivacyAgreed 启动，也不能指望此处已有撤回通知。此处只记录接入风险，没有修复现有实现。
 
 建议应用启动主动读取当前采集政策并 configure；首次同意、用户开关变化、撤回、账号切换显式通知日志管理面。隐私同意与“附加日志到反馈”是两个不同决策，框架不内置它们必然等价的假设。首版建议生产本地日志默认关闭，用户开启诊断后采集；Debug 的开发输出按构建策略配置。若产品需要默认采集最小诊断信息，必须单独定义允许字段、时长和告知，这仍是 Fog。
 
 生产允许名单优先记录事件码、耗时、状态、去标识路由和 requestId；不默认记录学号、姓名、token/cookie、日程标题或完整请求/响应。网络 query、动态 path 段、异常消息也可能含个人信息。[Ktor sanitizeHeader](https://ktor.io/docs/client-logging.html) 不能代替 body/query/业务字段过滤。
 
-旧 [ApiGenerator](</Users/generals/AndroidProject/CyxbsMobile/cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/network/ApiGenerator.kt#L257>) 的 BODY 同时进 LogUtils/LogLocal；迁移时先改采集策略并关闭重复链路，不能只把文件 writer 换掉。旧 LogLocalHelper 的学号派生密钥不复用；如果产品需要额外静态加密，再单独验证平台密钥与导出解码，不把私有目录称为加密。
+旧 [ApiGenerator](<../../../../cyxbs-components/utils/src/androidMain/kotlin/com/cyxbs/components/utils/network/ApiGenerator.kt#L257>) 的 BODY 同时进 LogUtils/LogLocal；迁移时先改采集策略并关闭重复链路，不能只把文件 writer 换掉。旧 LogLocalHelper 的学号派生密钥不复用；如果产品需要额外静态加密，再单独验证平台密钥与导出解码，不把私有目录称为加密。
 
 ## 7. 本地需求与下一步验证
 
-[需求地图](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>) 记录目的地、已定结论、Fog 和进度，关联本地子任务。已完成调研不等于准入实施：模块名称与独立性已确定推荐，平台编译/存储行为、产品采集策略及性能指标仍需验证。所有实现任务保持 planned/needs-triage。
+[需求地图](../requirements/map.md) 记录目的地、已定结论、Fog 和进度，关联本地子任务。已完成调研不等于准入实施：模块名称与独立性已确定推荐，平台编译/存储行为、产品采集策略及性能指标仍需验证。所有实现任务保持 planned/needs-triage。
 
 最小 PoC 应先验证 Kermit 发布变体与 Kotlin 2.4.10/协程 1.11.0 的组合、Android+iOS 真机私有目录、安静时 flush、锁屏后台、强杀尾条、快照清理竞争。每个平台的支持矩阵分别报告，不因 commonMain 编译通过宣称全面可用。
 

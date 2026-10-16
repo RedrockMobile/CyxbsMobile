@@ -1,10 +1,10 @@
 # LOCAL-LOG-04：有界文件引擎与管理协议
 
-Part of: [LOCAL-LOG-MAP](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/map.md>)
+Part of: [LOCAL-LOG-MAP](./map.md)
 
 - 类型/标签：task / wayfinder:task、needs-triage
 - 状态：in_progress，noWeb 文件引擎、导出协议与平台目录已实现
-- Blocked by：[02](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/02-prototype.md>)、[03](</Users/generals/AndroidProject/CyxbsMobile/docs/requirements/cyxbs-log/03-module-api.md>)
+- Blocked by：[02](./02-prototype.md)、[03](./03-module-api.md)
 
 ## 需求
 
