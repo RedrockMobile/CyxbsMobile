@@ -1,4 +1,14 @@
-package com.cyxbs.components.log
+package com.cyxbs.components.log.storage
+
+import com.cyxbs.components.log.CyxbsLog
+import com.cyxbs.components.log.FileLogConfig
+import com.cyxbs.components.log.FileLogState
+import com.cyxbs.components.log.LogConfig
+import com.cyxbs.components.log.LogExportResult
+import com.cyxbs.components.log.LogFlushMode
+import com.cyxbs.components.log.LogFlushResult
+import com.cyxbs.components.log.LogLevel
+import com.cyxbs.components.log.LogStorageResult
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
@@ -11,6 +21,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okio.FileHandle
 import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.ForwardingSink
@@ -20,6 +31,7 @@ import okio.Path.Companion.toPath
 import okio.SYSTEM
 import okio.Sink
 import java.nio.file.Files
+import java.nio.file.attribute.FileTime
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,10 +95,15 @@ class FileLogEngineTest {
       assertTrue(files.size <= 8)
       assertEquals(0, engine.health().queuedEntries)
 
+      val firstExport = assertIs<LogExportResult.Success>(engine.export())
+      assertTrue(fileSystem.exists(firstExport.filePath.toPath()))
+
       assertEquals(LogStorageResult.Success, engine.clear())
       val afterClear = fileSystem.list(logDirectory.toPath())
         .filter { it.name.endsWith(".jsonl") }
       assertTrue(afterClear.isEmpty())
+      assertFalse(fileSystem.exists(firstExport.filePath.toPath()))
+      assertTrue(fileSystem.list(exportDirectory.toPath()).none { it.name.startsWith("cyxbs-log-export-v1-") })
       assertEquals(LogStorageResult.Success, engine.close())
     }
   }
@@ -131,6 +148,77 @@ class FileLogEngineTest {
       assertEquals("manifest", Json.parseToJsonElement(lines.first()).jsonObject
         .getValue("recordType").jsonPrimitive.content)
       assertEquals("{\"ok\":true}", lines.last())
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun recoveryHandlesLegalShortReadsWithoutDroppingCompleteRecords() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val logPath = logDirectory.toPath()
+      fileSystem.createDirectories(logPath)
+      fileSystem.write(logPath / "cyxbs-log-v1-short-read-000001.active") {
+        writeUtf8("{\"ok\":true}\npartial-tail")
+      }
+      val shortReadFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun openReadOnly(file: Path): FileHandle {
+          val delegate = super.openReadOnly(file)
+          return object : FileHandle(readWrite = false) {
+            override fun protectedRead(
+              fileOffset: Long,
+              array: ByteArray,
+              arrayOffset: Int,
+              byteCount: Int,
+            ): Int = delegate.read(fileOffset, array, arrayOffset, minOf(byteCount, 7))
+
+            override fun protectedSize(): Long = delegate.size()
+            override fun protectedClose() = delegate.close()
+            override fun protectedWrite(
+              fileOffset: Long,
+              array: ByteArray,
+              arrayOffset: Int,
+              byteCount: Int,
+            ) = error("只读句柄不支持写入")
+
+            override fun protectedFlush() = Unit
+            override fun protectedResize(size: Long) = error("只读句柄不支持调整大小")
+          }
+        }
+      }
+
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), shortReadFileSystem)
+      assertEquals(LogStorageResult.Success, engine.start())
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val lines = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .toList()
+      assertEquals(2, lines.size)
+      assertEquals("{\"ok\":true}", lines.last())
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun recoveryScansLargeActiveFileTailWithoutKeepingPartialRecord() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val logPath = logDirectory.toPath()
+      fileSystem.createDirectories(logPath)
+      val largeRecord = "{\"payload\":\"${"x".repeat(70 * 1_024)}\"}"
+      fileSystem.write(logPath / "cyxbs-log-v1-large-000001.active") {
+        writeUtf8(largeRecord)
+        writeUtf8("\npartial-tail")
+      }
+
+      val engine = FileLogEngine(config(logDirectory, exportDirectory))
+      assertEquals(LogStorageResult.Success, engine.start())
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val lines = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .toList()
+      assertEquals(2, lines.size)
+      assertEquals(largeRecord, lines.last())
       assertEquals(LogStorageResult.Success, engine.close())
     }
   }
@@ -262,6 +350,37 @@ class FileLogEngineTest {
   }
 
   @Test
+  fun publicApiBoundsAndSanitizesOversizedUnicodeBeforeExport() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(
+        LogStorageResult.Success,
+        CyxbsLog.startFileStorage(config(logDirectory, exportDirectory)),
+      )
+      try {
+        CyxbsLog.i(tag = "超长入口") {
+          "phone=13800138000 " + "中😀".repeat(30_000)
+        }
+        assertEquals(LogFlushResult.Buffered, CyxbsLog.flushFileStorage(LogFlushMode.Buffered))
+        val export = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
+        val records = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+          .lineSequence()
+          .filter { it.isNotBlank() }
+          .map { Json.parseToJsonElement(it).jsonObject }
+          .toList()
+        val record = records.single { it.getValue("recordType").jsonPrimitive.content == "log" }
+
+        assertEquals("true", record.getValue("truncated").jsonPrimitive.content)
+        assertFalse(record.getValue("message").jsonPrimitive.content.contains("13800138000"))
+      } finally {
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
   fun collectionGateRejectsFileLogImmediately() = runTest {
     withTemporaryDirectories { logDirectory, exportDirectory ->
       CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
@@ -320,7 +439,7 @@ class FileLogEngineTest {
   }
 
   @Test
-  fun clockRollbackKeepsExportsDistinctAndParseable() = runTest {
+  fun clockRollbackReplacesPreviousExportAndKeepsLatestParseable() = runTest {
     withTemporaryDirectories { logDirectory, exportDirectory ->
       var currentTimeMillis = 10_000L
       val engine = FileLogEngine(
@@ -331,6 +450,10 @@ class FileLogEngineTest {
       engine.offer(event(message = "before-rollback"))
       assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
       val first = assertIs<LogExportResult.Success>(engine.export())
+      Files.setLastModifiedTime(
+        first.filePath.toPath().toNioPath(),
+        FileTime.fromMillis(20_000L),
+      )
 
       currentTimeMillis = 1_000L
       engine.offer(event(message = "after-rollback"))
@@ -338,12 +461,12 @@ class FileLogEngineTest {
       val second = assertIs<LogExportResult.Success>(engine.export())
 
       assertTrue(first.filePath != second.filePath)
-      listOf(first, second).forEach { export ->
-        fileSystem.read(export.filePath.toPath()) { readUtf8() }
-          .lineSequence()
-          .filter { it.isNotBlank() }
-          .forEach { Json.parseToJsonElement(it).jsonObject }
-      }
+      assertFalse(fileSystem.exists(first.filePath.toPath()))
+      fileSystem.read(second.filePath.toPath()) { readUtf8() }
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .forEach { Json.parseToJsonElement(it).jsonObject }
+      assertEquals(1, fileSystem.list(exportDirectory.toPath()).count { it.name.endsWith(".jsonl") })
       assertEquals(LogStorageResult.Success, engine.close())
     }
   }
@@ -435,7 +558,7 @@ class FileLogEngineTest {
   )
 
   private fun event(
-    level: LogLevel = LogLevel.Debug,
+    level: LogLevel = LogLevel.Info,
     message: String,
     stackTrace: String? = null,
   ) = FileLogEvent(

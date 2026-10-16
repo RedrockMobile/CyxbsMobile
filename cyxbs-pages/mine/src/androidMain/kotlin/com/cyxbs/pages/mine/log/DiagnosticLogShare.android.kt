@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.setting
+package com.cyxbs.pages.mine.log
 
 import android.content.ClipData
 import android.content.Intent

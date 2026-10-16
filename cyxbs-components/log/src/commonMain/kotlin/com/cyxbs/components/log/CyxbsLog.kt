@@ -4,6 +4,9 @@ import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.loggerConfigInit
 import co.touchlab.kermit.platformLogWriter
+import com.cyxbs.components.log.storage.FileLogEvent
+import com.cyxbs.components.log.storage.PlatformFileLog
+import com.cyxbs.components.log.storage.sanitizeForFileLog
 import kotlinx.atomicfu.atomic
 import kotlin.time.Clock
 
@@ -75,11 +78,15 @@ object CyxbsLog {
     val resolvedTag = tag ?: snapshot.config.defaultTag
     val renderedMessage = runCatching(message).getOrNull() ?: return
     if (fileAccepted) {
-      val sanitizedMessage = renderedMessage.sanitizeForFileLog()
+      // 先把调用方返回的任意大字符串裁成固定快照，再执行正则脱敏，避免脱敏链制造多份大对象。
+      val rawMessage = renderedMessage.takeRawFileSnapshot()
+      val sanitizedMessage = rawMessage.value.sanitizeForFileLog()
       val fileMessage = sanitizedMessage.takeFileSnapshot()
-      val originalStackTrace = throwable?.stackTraceToString()?.sanitizeForFileLog()
-      val fileStackTrace = originalStackTrace?.takeFileSnapshot()
-      val sanitizedTag = resolvedTag.sanitizeForFileLog()
+      val rawStackTrace = throwable?.stackTraceToString()?.takeRawFileSnapshot()
+      val sanitizedStackTrace = rawStackTrace?.value?.sanitizeForFileLog()
+      val fileStackTrace = sanitizedStackTrace?.takeFileSnapshot()
+      val rawTag = resolvedTag.takeRawFileSnapshot()
+      val sanitizedTag = rawTag.value.sanitizeForFileLog()
       PlatformFileLog.offer(
         FileLogEvent(
           timestampMillis = Clock.System.now().toEpochMilliseconds(),
@@ -87,8 +94,9 @@ object CyxbsLog {
           tag = sanitizedTag.takeFileSnapshot(),
           message = fileMessage,
           stackTrace = fileStackTrace,
-          snapshotTruncated = fileMessage.length != sanitizedMessage.length ||
-            fileStackTrace?.length != originalStackTrace?.length ||
+          snapshotTruncated = rawMessage.truncated || rawStackTrace?.truncated == true || rawTag.truncated ||
+            fileMessage.length != sanitizedMessage.length ||
+            fileStackTrace?.length != sanitizedStackTrace?.length ||
             sanitizedTag.length > MAX_FILE_SNAPSHOT_CHARS,
         )
       )
@@ -198,17 +206,57 @@ object CyxbsLog {
     log(LogLevel.Assert, tag, throwable, message)
 }
 
+private const val MAX_RAW_FILE_SNAPSHOT_BYTES = 64 * 1_024
 private const val MAX_FILE_SNAPSHOT_CHARS = 16 * 1_024
+
+internal data class FileTextSnapshot(val value: String, val truncated: Boolean)
+
+/**
+ * 在任何正则脱敏前按 UTF-8 字节数截取有界前缀，不编码完整原文，也不会拆开代理对。
+ */
+internal fun String.takeRawFileSnapshot(): FileTextSnapshot {
+  var index = 0
+  var bytes = 0
+  while (index < length) {
+    val current = this[index]
+    val charBytes: Int
+    val charCount: Int
+    when {
+      current.code <= 0x7F -> {
+        charBytes = 1
+        charCount = 1
+      }
+      current.code <= 0x7FF -> {
+        charBytes = 2
+        charCount = 1
+      }
+      current.isHighSurrogate() && index + 1 < length && this[index + 1].isLowSurrogate() -> {
+        charBytes = 4
+        charCount = 2
+      }
+      else -> {
+        charBytes = 3
+        charCount = 1
+      }
+    }
+    if (bytes + charBytes > MAX_RAW_FILE_SNAPSHOT_BYTES) break
+    bytes += charBytes
+    index += charCount
+  }
+  return if (index == length) {
+    FileTextSnapshot(this, truncated = false)
+  } else {
+    FileTextSnapshot(substring(0, index), truncated = true)
+  }
+}
 
 private fun String.takeFileSnapshot(): String {
   if (length <= MAX_FILE_SNAPSHOT_CHARS) return this
-  val end = if (this[MAX_FILE_SNAPSHOT_CHARS - 1].isHighSurrogate()) {
-    MAX_FILE_SNAPSHOT_CHARS - 1
-  } else {
-    MAX_FILE_SNAPSHOT_CHARS
-  }
-  return substring(0, end)
+  return substring(0, safeSnapshotEnd(MAX_FILE_SNAPSHOT_CHARS))
 }
+
+private fun String.safeSnapshotEnd(limit: Int): Int =
+  if (this[limit - 1].isHighSurrogate()) limit - 1 else limit
 
 private fun LogLevel.toSeverity(): Severity = when (this) {
   LogLevel.Verbose -> Severity.Verbose

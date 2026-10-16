@@ -1,4 +1,4 @@
-package com.cyxbs.components.log
+package com.cyxbs.components.log.storage
 
 private const val REDACTED = "[REDACTED]"
 

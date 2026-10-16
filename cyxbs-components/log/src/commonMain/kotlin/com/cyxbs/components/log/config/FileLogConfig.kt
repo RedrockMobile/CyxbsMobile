@@ -9,7 +9,7 @@ package com.cyxbs.components.log
 data class FileLogConfig(
   val directory: String,
   val exportDirectory: String,
-  val minLevel: LogLevel = LogLevel.Debug,
+  val minLevel: LogLevel = LogLevel.Info,
   val maxTotalBytes: Long = 24L * 1_024 * 1_024,
   val maxAgeMillis: Long = 7L * 24 * 60 * 60 * 1_000,
 ) {

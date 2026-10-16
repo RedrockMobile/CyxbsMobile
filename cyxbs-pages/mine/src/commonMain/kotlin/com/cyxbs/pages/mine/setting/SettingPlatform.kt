@@ -1,7 +1,5 @@
 package com.cyxbs.pages.mine.setting
 
-import com.cyxbs.components.config.log.AppLogManager
-import com.cyxbs.components.log.LogStorageResult
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.mine.api.MineSettings
 
@@ -25,24 +23,6 @@ abstract class SettingPlatform {
         rememberOnCheckedChange = { { enabled -> MineSettings.setShowCourseFirst(enabled) } },
       )
     )
-    if (AppLogManager.isDiagnosticLoggingSupported()) {
-      add(
-        SettingItem.Switch(
-          key = "diagnostic_log_enabled",
-          title = "记录诊断日志",
-          readChecked = AppLogManager::isDiagnosticLoggingEnabled,
-          rememberOnCheckedChange = {
-            { enabled ->
-              when (val result = AppLogManager.setDiagnosticLoggingEnabled(enabled)) {
-                LogStorageResult.Success -> Unit
-                LogStorageResult.Unsupported -> error("当前平台不支持诊断日志")
-                is LogStorageResult.Failure -> error(result.message)
-              }
-            }
-          },
-        )
-      )
-    }
   }
 
   /**
@@ -64,22 +44,6 @@ abstract class SettingPlatform {
         rememberOnClick = { actions.showCourseMaxWeekDialog },
       )
     )
-    if (AppLogManager.isDiagnosticLoggingSupported()) {
-      add(
-        SettingItem.Action(
-          key = "diagnostic_log_share",
-          title = "导出并分享诊断日志",
-          rememberOnClick = { rememberDiagnosticLogShareAction() },
-        )
-      )
-      add(
-        SettingItem.Action(
-          key = "diagnostic_log_clear",
-          title = "清除诊断日志",
-          rememberOnClick = { rememberDiagnosticLogClearAction() },
-        )
-      )
-    }
   }
 
   /**

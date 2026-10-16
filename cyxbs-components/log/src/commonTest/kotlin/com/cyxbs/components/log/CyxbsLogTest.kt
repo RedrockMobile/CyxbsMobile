@@ -1,5 +1,7 @@
 package com.cyxbs.components.log
 
+import com.cyxbs.components.log.storage.sanitizeForFileLog
+
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -23,6 +25,18 @@ class CyxbsLogTest {
     CyxbsLog.configure(LogConfig(minLevel = LogLevel.Debug))
 
     CyxbsLog.d { error("message failed") }
+  }
+
+  @Test
+  fun rawFileSnapshotUsesUtf8ByteLimitWithoutSplittingUnicode() {
+    val chinese = "中".repeat(30_000).takeRawFileSnapshot()
+    val emoji = "😀".repeat(20_000).takeRawFileSnapshot()
+
+    assertTrue(chinese.truncated)
+    assertTrue(emoji.truncated)
+    assertTrue(chinese.value.encodeToByteArray().size <= 64 * 1_024)
+    assertTrue(emoji.value.encodeToByteArray().size <= 64 * 1_024)
+    assertFalse(emoji.value.last().isHighSurrogate())
   }
 
   @Test

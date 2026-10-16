@@ -1,4 +1,4 @@
-package com.cyxbs.pages.mine.setting
+package com.cyxbs.pages.mine.log
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

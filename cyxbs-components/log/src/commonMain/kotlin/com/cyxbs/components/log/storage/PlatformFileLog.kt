@@ -1,4 +1,12 @@
-package com.cyxbs.components.log
+package com.cyxbs.components.log.storage
+
+import com.cyxbs.components.log.FileLogConfig
+import com.cyxbs.components.log.FileLogHealth
+import com.cyxbs.components.log.LogExportResult
+import com.cyxbs.components.log.LogFlushMode
+import com.cyxbs.components.log.LogFlushResult
+import com.cyxbs.components.log.LogLevel
+import com.cyxbs.components.log.LogStorageResult
 
 internal data class FileLogEvent(
   val timestampMillis: Long,

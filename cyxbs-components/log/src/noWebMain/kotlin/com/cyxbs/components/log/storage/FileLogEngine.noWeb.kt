@@ -1,4 +1,13 @@
-package com.cyxbs.components.log
+package com.cyxbs.components.log.storage
+
+import com.cyxbs.components.log.FileLogConfig
+import com.cyxbs.components.log.FileLogHealth
+import com.cyxbs.components.log.FileLogState
+import com.cyxbs.components.log.LogExportResult
+import com.cyxbs.components.log.LogFlushMode
+import com.cyxbs.components.log.LogFlushResult
+import com.cyxbs.components.log.LogLevel
+import com.cyxbs.components.log.LogStorageResult
 
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -39,12 +48,17 @@ private const val FLUSH_INTERVAL_MILLIS = 1_000L
 private const val MAX_FILES = 8
 private const val MAX_EXPORT_BYTES = 32L * 1_024 * 1_024
 private const val MAX_EXPORT_SOURCE_FILES = 3
-private const val MAX_PUBLISHED_EXPORT_FILES = 3
+private const val MAX_PUBLISHED_EXPORT_FILES = 1
+private const val RECOVERY_SCAN_CHUNK_BYTES = 64 * 1_024
 private const val FILE_RETRY_BASE_MILLIS = 250L
 private const val FILE_RETRY_MAX_MILLIS = 30_000L
 private const val FILE_PREFIX = "cyxbs-log-v1-"
 private const val EXPORT_PREFIX = "cyxbs-log-export-v1-"
 
+/**
+ * noWeb 平台的有界 JSONL 文件引擎：调用方只入队，单一工作协程负责写盘、轮转、导出和恢复。
+ * 所有磁盘异常都隔离在引擎内，并通过健康统计暴露，不得影响业务线程。
+ */
 internal class FileLogEngine(
   private val config: FileLogConfig,
   private val fileSystem: FileSystem = FileSystem.SYSTEM,
@@ -115,6 +129,7 @@ internal class FileLogEngine(
     }
   }
 
+  /** 启动单一写入协程，先恢复未完成文件，再建立新的 active 文件。 */
   suspend fun start(): LogStorageResult {
     if (worker.value == null) {
       val launched = scope.launch { runWorker() }
@@ -132,6 +147,7 @@ internal class FileLogEngine(
     }
   }
 
+  /** 在工作协程内清除原始日志和导出副本，再重新打开空的 active 文件。 */
   suspend fun clear(): LogStorageResult = managementMutex.withLock {
     val result = CompletableDeferred<LogStorageResult>()
     val accepted = synchronized(gate) {
@@ -144,6 +160,7 @@ internal class FileLogEngine(
     result.await()
   }
 
+  /** 将有界源文件流式合并为带 manifest 的 JSONL 副本，并在完成后清理旧副本。 */
   suspend fun export(): LogExportResult = managementMutex.withLock {
     val result = CompletableDeferred<LogExportResult>()
     if (!enqueueWhileRunning(Command.Export(result))) {
@@ -456,6 +473,7 @@ private class WorkerFiles(
   fun clear() {
     closeActive(deleteEmpty = true)
     managedLogFiles(includeActive = true).forEach { path -> fileSystem.delete(path, mustExist = false) }
+    cleanupExports(deleteAll = true)
     openActive()
   }
 
@@ -583,18 +601,50 @@ private class WorkerFiles(
           fileSystem.delete(path, mustExist = false)
           return@forEach
         }
-        val bytes = fileSystem.read(path) { readByteArray() }
-        val lastNewline = bytes.indexOfLast { it == '\n'.code.toByte() }
-        if (lastNewline < 0) {
+        val lastNewline = findLastNewline(path, size)
+        if (lastNewline < 0L) {
           fileSystem.delete(path, mustExist = false)
         } else {
-          if (lastNewline != bytes.lastIndex) {
-            fileSystem.write(path) { write(bytes, 0, lastNewline + 1) }
+          if (lastNewline != size - 1L) {
+            val handle = fileSystem.openReadWrite(path)
+            try {
+              handle.resize(lastNewline + 1L)
+              handle.flush()
+            } finally {
+              handle.close()
+            }
           }
           val sealed = path.parent!! / "${path.name.removeSuffix(".active")}.jsonl"
           fileSystem.atomicMove(path, sealed)
         }
       }
+  }
+
+  /** 从文件尾部按固定小块查找最后一条完整 JSONL 的换行符，避免恢复时整文件读入内存。 */
+  private fun findLastNewline(path: Path, size: Long): Long {
+    if (size <= 0L) return -1L
+    val chunk = ByteArray(RECOVERY_SCAN_CHUNK_BYTES)
+    val handle = fileSystem.openReadOnly(path)
+    try {
+      var chunkEnd = size
+      while (chunkEnd > 0L) {
+        val chunkStart = (chunkEnd - chunk.size).coerceAtLeast(0L)
+        val requested = (chunkEnd - chunkStart).toInt()
+        var filled = 0
+        while (filled < requested) {
+          val read = handle.read(chunkStart + filled, chunk, filled, requested - filled)
+          if (read <= 0) return -1L
+          filled += read
+        }
+        for (index in requested - 1 downTo 0) {
+          if (chunk[index] == '\n'.code.toByte()) return chunkStart + index
+        }
+        chunkEnd = chunkStart
+      }
+    } finally {
+      handle.close()
+    }
+    return -1L
   }
 
   private fun cleanupLogs(
@@ -629,17 +679,23 @@ private class WorkerFiles(
     }
   }
 
-  private fun cleanupExports(except: Path? = null) {
+  private fun cleanupExports(except: Path? = null, deleteAll: Boolean = false) {
     if (!fileSystem.exists(exportDirectory)) return
     val exports = fileSystem.list(exportDirectory)
       .filter { it.name.startsWith(EXPORT_PREFIX) }
       .sortedByDescending { fileSystem.metadata(it).lastModifiedAtMillis ?: 0L }
-    exports.forEachIndexed { index, path ->
-      val expired = (fileSystem.metadata(path).lastModifiedAtMillis ?: nowMillis()).let {
-        nowMillis() >= it && nowMillis() - it > config.maxAgeMillis
-      }
-      if (path != except && (index >= MAX_PUBLISHED_EXPORT_FILES || expired || path.name.endsWith(".partial"))) {
+    var retainedPublishedFiles = 0
+    exports.forEach { path ->
+      if (path == except) return@forEach
+      val modifiedAt = fileSystem.metadata(path).lastModifiedAtMillis ?: nowMillis()
+      val expired = nowMillis() >= modifiedAt && nowMillis() - modifiedAt > config.maxAgeMillis
+      val partial = path.name.endsWith(".partial")
+      val mustDelete = deleteAll || except != null || expired || partial ||
+        retainedPublishedFiles >= MAX_PUBLISHED_EXPORT_FILES
+      if (mustDelete) {
         fileSystem.delete(path, mustExist = false)
+      } else {
+        retainedPublishedFiles++
       }
     }
   }
