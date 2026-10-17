@@ -49,9 +49,8 @@ private fun reportPreviousProcessExit(expectedPolicyVersion: Long) {
         operation = "android.previous_process_exit",
         eventTimestampMillis = exit.timestamp,
       ),
-    ) {
-      "Previous process exit: reason=${exit.reasonName()}, status=${exit.status}, importance=${exit.importance}"
-    }
+      message = "Previous process exit: reason=${exit.reasonName()}, status=${exit.status}, importance=${exit.importance}",
+    )
     lastReportedExitKey = exitKey
   }
 }

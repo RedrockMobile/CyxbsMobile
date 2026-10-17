@@ -21,8 +21,8 @@ CyxbsLog.configure(
   )
 )
 
-CyxbsLog.d(tag = "Schedule") { "加载课表" }
-CyxbsLog.e(tag = "Schedule", throwable = error) { "课表加载失败" }
+CyxbsLog.d("Schedule", "加载课表")
+CyxbsLog.e("Schedule", "课表加载失败", error)
 CyxbsLog.log(
   level = LogLevel.Info,
   tag = "ScheduleSync",
@@ -34,15 +34,18 @@ CyxbsLog.log(
     result = LogResult.Success,
     correlationId = "schedule-sync-a1b2",
   ),
-) { "课表刷新完成" }
+  message = "课表刷新完成",
+)
 ```
 
-- `v/d/i/w/e/a` 和通用 `log` 使用惰性消息，控制台与文件均不接收时不会调用消息 lambda。
-- 接受输出时消息只求值一次；`configure` 原子替换不可变配置，一次日志调用使用同一份配置快照。
-- 控制台输出同步执行；消息、TAG 与异常堆栈在进入任意 sink 前统一执行 UTF-8 有界快照和防御性脱敏，消息 lambda 和平台 writer 的异常会被日志边界隔离，不改变业务控制流。
+- `v/d/i/w/e/a` 和通用 `log` 直接接收 `String`，参数顺序为 `tag, message, throwable`；无 TAG 时可使用 `message = "..."`。字符串在调用前构造。
+- TAG 保持调用方自定义的值。`showLocation` 控制消息前是否添加真实调用位置，如 `LessonRepository.kt:166 -> 请求课表失败`；只有 `e` 默认 `true`，其他入口（包括 `log`、`eBounded`）默认 `false`。可以用 `CyxbsLog.d(TAG, "消息", showLocation = true)` 开启，或用 `CyxbsLog.e(TAG, "消息", error, showLocation = false)` 关闭。控制台和 JSONL 使用相同前缀，只保留文件名，不记录构建机绝对路径。
+- Android/Desktop 跳过门面和旧日志适配器帧，读取调用方文件和行号；iOS/JS 从运行时堆栈中读取可用的源码位置，JS 可能显示打包后的脚本位置。未保留调试信息、符号被裁剪或 Wasm 无可用调用帧时显示 `Unknown:0`，不会虚构行号。只有 `showLocation=true` 且日志通过输出过滤时才采集位置。
+- `configure` 原子替换不可变配置，一次日志调用使用同一份配置快照。控制台与文件均不接收时，不进行异常格式化和输出。
+- 控制台输出同步执行；消息、TAG 与异常堆栈在进入任意 sink 前统一执行 UTF-8 有界快照和防御性脱敏，异常格式化和平台 writer 的异常会被日志边界隔离，不改变业务控制流。
 - 原始 `Throwable` 不直接交给平台控制台；控制台输出脱敏后的有界堆栈，文件协议仍将消息与堆栈分字段保存。
 - 普通异常在遍历时限制为最多 8 个异常、4 层深度、每个异常 4 个 suppressed、32 帧和总计 16 Ki 字符；不会先展开完整异常树。异常属性或堆栈读取失败时丢弃本条，不向业务抛出格式化异常。Wasm 无公开的有界帧接口，仅输出异常树摘要并标记截断。
-- 旧的 `v/d/i/w/e/a` 与通用 `log` 签名保持兼容；需要机器可读诊断时使用带 `LogContext` 的 `log` 重载。
+- 需要机器可读诊断时，为 `log` 传入可选的 `context: LogContext`。
 - `LogContext` 只提供固定白名单标量，不接受任意 Map。`route` 会移除 query/fragment，`correlationId` 仅允许 1～64 位 ASCII 字母、数字及 `._:-`，两者都不得承载学号、手机号、设备标识或凭据。
 - Kermit 是内部实现，公开 API 不暴露其类型，也不修改其全局 Logger。
 
@@ -75,7 +78,7 @@ CyxbsLog.closeFileStorage()
 - v2 日志行区分 `eventTimestampMillis` 与 `observedTimestampMillis`，并可携带受限结构化上下文；旧文本调用仍生成合法 v2 事件。应用层负责调用系统分享或保存界面。导出不会上传，也不会撤回已经分享出去的副本。
 - 文件入队前会对常见 token、Authorization、Cookie、密码、邮箱和 8-19 位长数字做防御性脱敏；这是兜底，不替代调用方禁止记录个人数据和业务明文。
 - `clear`、`flush`、`export`、`close` 通过可靠控制命令与记录队列排序；管理操作返回结构化结果。瞬态文件操作失败会计入健康状态并尝试重建 active 文件；持续失败时从 250 ms 指数退避到最多 30 s，期间丢弃数由 `droppedWriteBackoff` 暴露，避免逐条 I/O 重试拖累应用。失败中的当前记录可能丢失。
-- 日志在消息求值前取得绑定引擎与清理版本的采集许可，入队时复核；跨越关闭再开启、清理或引擎替换的在途调用不能重新落盘。
+- 日志在异常格式化前取得绑定引擎与清理版本的采集许可，入队时复核；跨越关闭再开启、清理或引擎替换的在途调用不能重新落盘。
 - v2 manifest 额外携带 `collectionPolicy` 和 `health`：说明当前引擎会话的等级/保留策略、各等级丢弃、写失败与最近成功/失败时间。统计只覆盖当前引擎会话，不能重建历史会话缺口；`truncated=false` 仅表示导出未裁剪源文件，不代表采集期间没有丢失。
 - `fileStorageHealth()` 是无 I/O 快照，除队列与丢弃计数外还提供最近成功写入、最近失败时间/异常类型、连续失败数、最近 flush 耗时，以及当前受管文件数/字节数；异常文本和路径不会进入健康状态。
 

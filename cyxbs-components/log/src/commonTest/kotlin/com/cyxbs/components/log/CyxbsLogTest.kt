@@ -9,12 +9,56 @@ import kotlin.test.assertTrue
 
 class CyxbsLogTest {
   @Test
+  fun callSitePrefixKeepsOnlySourceFileAndLine() {
+    assertEquals("Screen.kt:123", sourceLocationFromFrame("at load (/private/work/Screen.kt:123:9)"))
+    assertEquals("app.js:45", sourceLocationFromFrame("load@https://example.com/assets/app.js:45:7"))
+    assertEquals(null, sourceLocationFromFrame("native frame without debug information"))
+    assertEquals("Screen.kt:123 -> message", messageWithCallSite("message", "Screen.kt:123"))
+    assertEquals("Unknown:0 -> message", messageWithCallSite("message", null))
+  }
+
+  @Test
+  fun callSitePrefixPreservesMessageBudgetAndSanitization() {
+    val payload = prepareLogPayload(
+      tag = "Test",
+      message = "token=secret " + "x".repeat(70_000),
+      throwable = null,
+      callSite = "Screen.kt:123",
+    )
+    assertTrue(payload.message.startsWith("Screen.kt:123 -> token=[REDACTED]"))
+    assertTrue(payload.message.length <= 16 * 1_024)
+    assertTrue(payload.truncated)
+    assertFalse(payload.message.contains("secret"))
+  }
+
+  @Test
+  fun disabledLoggingDoesNotRenderThrowable() {
+    var rendered = false
+    val throwable = object : Throwable() {
+      override val message: String get() {
+        rendered = true
+        return "detail"
+      }
+    }
+    CyxbsLog.configure(LogConfig(enabled = false))
+    try {
+      CyxbsLog.e(message = "disabled", throwable = throwable)
+      assertFalse(rendered)
+    } finally {
+      CyxbsLog.configure(LogConfig())
+    }
+  }
+
+  @Test
   fun throwableMessageFailureDoesNotEscapeLoggingBoundary() {
     CyxbsLog.configure(LogConfig(minLevel = LogLevel.Debug))
     try {
-      CyxbsLog.e(throwable = object : Throwable() {
-        override val message: String get() = error("render failed")
-      }) { "operation failed" }
+      CyxbsLog.e(
+        throwable = object : Throwable() {
+          override val message: String get() = error("render failed")
+        },
+        message = "operation failed",
+      )
     } finally {
       CyxbsLog.configure(LogConfig())
     }
@@ -54,26 +98,6 @@ class CyxbsLogTest {
     assertTrue(cyclic.truncated)
     assertTrue(cyclic.value.contains("circular exception"))
     assertEquals(1, Regex("cycle").findAll(cyclic.value).count())
-  }
-
-  @Test
-  fun filteredMessageIsNotEvaluated() {
-    CyxbsLog.configure(LogConfig(minLevel = LogLevel.Error))
-    var evaluated = false
-
-    CyxbsLog.d {
-      evaluated = true
-      "debug"
-    }
-
-    assertFalse(evaluated)
-  }
-
-  @Test
-  fun messageFailureDoesNotEscapeLoggingBoundary() {
-    CyxbsLog.configure(LogConfig(minLevel = LogLevel.Debug))
-
-    CyxbsLog.d { error("message failed") }
   }
 
   @Test

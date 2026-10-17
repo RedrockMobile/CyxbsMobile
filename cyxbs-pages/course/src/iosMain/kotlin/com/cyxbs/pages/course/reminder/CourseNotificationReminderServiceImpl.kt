@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.reminder
 
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.account.api.AccountSession
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
@@ -31,6 +32,8 @@ import platform.Foundation.NSUserDefaults
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationSignificantTimeChangeNotification
 import platform.darwin.NSObjectProtocol
+
+private const val TAG = "CourseNotificationReminderServiceImpl"
 
 /** iOS 独有的账号级提醒设置，兼容旧原生页按 key 是否存在判断开启的行为。 */
 private object CourseNotificationReminderSettings {
@@ -163,13 +166,13 @@ object CourseNotificationReminderServiceImpl : ICourseNotificationReminderServic
                   }
                 } catch (throwable: Throwable) {
                   if (throwable is CancellationException) throw throwable
-                  println("同步 iOS 课前通知失败：${throwable.message}")
+                  CyxbsLog.e(TAG, "同步 iOS 课前通知失败", throwable)
                 }
               }
           } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             // 下一次课程/设置或前台变化会重新订阅，不让通知错误影响课表和应用启动。
-            println("恢复 iOS 课前通知失败：${throwable.message}")
+            CyxbsLog.e(TAG, "恢复 iOS 课前通知失败", throwable)
           }
         }
     }
@@ -184,7 +187,7 @@ object CourseNotificationReminderServiceImpl : ICourseNotificationReminderServic
         }
       } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
-        println("清理 iOS 课前通知失败：${throwable.message}")
+        CyxbsLog.e(TAG, "清理 iOS 课前通知失败", throwable)
       }
     }
   }

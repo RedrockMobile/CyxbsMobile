@@ -17,6 +17,7 @@ useUnitTest(
 kotlin {
   sourceSets {
     commonMain.dependencies {
+      implementation(projects.cyxbsComponents.log)
       subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)
       implementation(projects.cyxbsComponents.config)

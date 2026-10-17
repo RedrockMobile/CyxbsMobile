@@ -2,8 +2,12 @@ package com.cyxbs.components.utils.network
 
 import com.cyxbs.components.utils.extensions.ExceptionResult
 import com.cyxbs.components.config.serializable.defaultJson
+import com.cyxbs.components.log.CyxbsLog
 import io.ktor.client.plugins.ServerResponseException
 import kotlin.reflect.KClass
+
+@PublishedApi
+internal const val API_EXCEPTION_LOG_TAG = "ApiException"
 
 /**
  *
@@ -110,7 +114,7 @@ open class ApiExceptionResult<Emitter>(
       try {
         action.invoke(emitter, defaultJson.decodeFromString(it))
       } catch (e: Exception) {
-        e.printStackTrace()
+        CyxbsLog.w(API_EXCEPTION_LOG_TAG, "错误响应解析或处理失败 type=${e::class.simpleName}")
       }
     }
     return this

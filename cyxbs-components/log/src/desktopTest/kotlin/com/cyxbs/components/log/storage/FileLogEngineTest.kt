@@ -51,6 +51,86 @@ class FileLogEngineTest {
   private val fileSystem = FileSystem.SYSTEM
 
   @Test
+  fun publicApiUsesTheBusinessCallerFileAndExactLine() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(
+        LogStorageResult.Success,
+        CyxbsLog.startFileStorage(config(logDirectory, exportDirectory).copy(minLevel = LogLevel.Debug)),
+      )
+      try {
+        val expected = mutableListOf<String>()
+        // 下一行为日志调用，避免硬编码会随编辑漂移的行号。
+        fun expectedMessage(message: String): String =
+          "FileLogEngineTest.kt:${Throwable().stackTrace[1].lineNumber + 1} -> $message"
+        expected += expectedMessage("debug")
+        CyxbsLog.d("CustomTag", "debug", showLocation = true)
+        expected += expectedMessage("info")
+        CyxbsLog.i("CustomTag", "info", showLocation = true)
+        expected += expectedMessage("error")
+        CyxbsLog.e("CustomTag", "error", IllegalStateException("detail"))
+        expected += expectedMessage("direct")
+        CyxbsLog.log(LogLevel.Info, "CustomTag", "direct", showLocation = true)
+        expected += expectedMessage("structured")
+        CyxbsLog.log(LogLevel.Info, "CustomTag", "structured", context = LogContext(operation = "test"), showLocation = true)
+        expected += expectedMessage("bounded")
+        CyxbsLog.eBounded("CustomTag", "bounded", IllegalStateException("detail"), showLocation = true)
+        val export = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
+        val records = fileSystem.read(export.filePath.toPath()) { readUtf8() }.lineSequence()
+          .filter { it.isNotBlank() }
+          .map { Json.parseToJsonElement(it).jsonObject }
+          .filter { it["recordType"]?.jsonPrimitive?.content == "log" }
+          .toList()
+        assertEquals(expected, records.map { it.getValue("message").jsonPrimitive.content })
+        assertTrue(records.all { it.getValue("tag").jsonPrimitive.content == "CustomTag" })
+      } finally {
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
+  fun locationIsEnabledByDefaultOnlyForErrorAndCanBeDisabled() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(
+        LogStorageResult.Success,
+        CyxbsLog.startFileStorage(config(logDirectory, exportDirectory).copy(minLevel = LogLevel.Verbose)),
+      )
+      try {
+        CyxbsLog.v("Test", "verbose")
+        CyxbsLog.d("Test", "debug")
+        CyxbsLog.i("Test", "info")
+        CyxbsLog.w("Test", "warn")
+        CyxbsLog.e("Test", "error")
+        CyxbsLog.a("Test", "assert")
+        CyxbsLog.log(LogLevel.Error, "Test", "direct")
+        CyxbsLog.eBounded("Test", "bounded", IllegalStateException("detail"))
+        CyxbsLog.e("Test", "error-without-location", showLocation = false)
+
+        val export = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
+        val messages = fileSystem.read(export.filePath.toPath()) { readUtf8() }.lineSequence()
+          .filter { it.isNotBlank() }
+          .map { Json.parseToJsonElement(it).jsonObject }
+          .filter { it["recordType"]?.jsonPrimitive?.content == "log" }
+          .map { it.getValue("message").jsonPrimitive.content }
+          .toList()
+        assertTrue(Regex("""FileLogEngineTest\.kt:\d+ -> error""").matches(messages[4]))
+        assertEquals(
+          listOf("verbose", "debug", "info", "warn", "assert", "direct", "bounded", "error-without-location"),
+          messages.filterIndexed { index, _ -> index != 4 },
+        )
+      } finally {
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
   fun overriddenThrowableRenderersAreNotInvoked() = runBlocking {
     withTemporaryDirectories { logDirectory, exportDirectory ->
       CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
@@ -60,7 +140,7 @@ class FileLogEngineTest {
           override fun toString(): String = error("toString must not be called")
           override fun printStackTrace(writer: java.io.PrintWriter) = error("printStackTrace must not be called")
         }
-        CyxbsLog.e(throwable = error) { "operation-failed" }
+        CyxbsLog.e(throwable = error, message = "operation-failed")
         val exported = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
         val contents = fileSystem.read(exported.filePath.toPath()) { readUtf8() }
         assertTrue(contents.contains("operation-failed"))
@@ -104,11 +184,14 @@ class FileLogEngineTest {
       CyxbsLog.setFileStorageCollectionEnabled(true)
       assertEquals(LogStorageResult.Success, CyxbsLog.startFileStorage(configuration))
       val producer = launch(Dispatchers.Default) {
-        CyxbsLog.i {
-          entered.countDown()
-          check(resume.await(5, TimeUnit.SECONDS))
-          "stale-in-flight-event"
+        val throwable = object : Throwable() {
+          override val message: String get() {
+            entered.countDown()
+            check(resume.await(5, TimeUnit.SECONDS))
+            return "paused-rendering"
+          }
         }
+        CyxbsLog.i(message = "stale-in-flight-event", throwable = throwable)
       }
       try {
         assertTrue(entered.await(5, TimeUnit.SECONDS))
@@ -116,7 +199,7 @@ class FileLogEngineTest {
         resume.countDown()
         withTimeout(5_000) { producer.join() }
         CyxbsLog.setFileStorageCollectionEnabled(true)
-        CyxbsLog.i { "fresh-event" }
+        CyxbsLog.i(message = "fresh-event")
         val exported = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
         val contents = fileSystem.read(exported.filePath.toPath()) { readUtf8() }
         assertFalse(contents.contains("stale-in-flight-event"))
@@ -545,9 +628,7 @@ class FileLogEngineTest {
         CyxbsLog.startFileStorage(config(logDirectory, exportDirectory)),
       )
       try {
-        CyxbsLog.i(tag = "超长入口") {
-          "phone=13800138000 " + "中😀".repeat(30_000)
-        }
+        CyxbsLog.i(tag = "超长入口", message = "phone=13800138000 " + "中😀".repeat(30_000))
         assertEquals(LogFlushResult.Buffered, CyxbsLog.flushFileStorage(LogFlushMode.Buffered))
         val export = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
         val records = fileSystem.read(export.filePath.toPath()) { readUtf8() }
@@ -592,17 +673,20 @@ class FileLogEngineTest {
             correlationId = "request-12:attempt_2",
             eventTimestampMillis = 42,
           ),
-        ) { "structured" }
+          message = "structured",
+        )
         CyxbsLog.log(
           level = LogLevel.Info,
           tag = "StructuredTest",
           context = LogContext(correlationId = "13800138000"),
-        ) { "sensitive-correlation" }
+          message = "sensitive-correlation",
+        )
         CyxbsLog.log(
           level = LogLevel.Info,
           tag = "StructuredTest",
           context = LogContext(route = "/" + "r".repeat(70_000) + "?token=route-secret"),
-        ) { "bounded-route" }
+          message = "bounded-route",
+        )
         assertEquals(LogFlushResult.Buffered, CyxbsLog.flushFileStorage(LogFlushMode.Buffered))
         val export = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
         val records = fileSystem.read(export.filePath.toPath()) { readUtf8() }
@@ -655,12 +739,7 @@ class FileLogEngineTest {
       )
       try {
         CyxbsLog.setFileStorageCollectionEnabled(false)
-        var evaluated = false
-        CyxbsLog.e {
-          evaluated = true
-          "must-not-be-collected"
-        }
-        assertFalse(evaluated)
+        CyxbsLog.e(message = "must-not-be-collected")
         assertEquals(0, CyxbsLog.fileStorageHealth().acceptedEntries)
       } finally {
         CyxbsLog.setFileStorageCollectionEnabled(true)
@@ -950,13 +1029,13 @@ class FileLogEngineTest {
       )
       try {
         val payload = "x".repeat(128)
-        repeat(1_000) { CyxbsLog.i(tag = "BurstBenchmark") { "warmup-$it-$payload" } }
+        repeat(1_000) { CyxbsLog.i(tag = "BurstBenchmark", message = "warmup-$it-$payload") }
 
         val samples = LongArray(20_000)
         val startedAt = System.nanoTime()
         samples.indices.forEach { index ->
           val callStartedAt = System.nanoTime()
-          CyxbsLog.i(tag = "BurstBenchmark") { "burst-$index-$payload" }
+          CyxbsLog.i(tag = "BurstBenchmark", message = "burst-$index-$payload")
           samples[index] = System.nanoTime() - callStartedAt
         }
         val elapsedNanos = System.nanoTime() - startedAt

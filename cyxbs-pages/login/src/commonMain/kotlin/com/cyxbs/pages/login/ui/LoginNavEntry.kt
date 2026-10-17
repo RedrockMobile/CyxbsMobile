@@ -69,7 +69,8 @@ import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
+import com.cyxbs.pages.login.viewmodel.LOGIN_LOG_TAG
 import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.login.viewmodel.LoginViewModel
 import cyxbsmobile.cyxbs_pages.login.generated.resources.Res
@@ -116,7 +117,7 @@ class LoginNavEntry : AppNavEntry<LoginNavArgument>() {
     }
     LoginPage()
     LaunchedEffect(Unit) {
-      logg("backStack = $appNavBackStack")
+      CyxbsLog.d(LOGIN_LOG_TAG, "登录页进入 backStackSize=${appNavBackStack.size}")
     }
   }
 }

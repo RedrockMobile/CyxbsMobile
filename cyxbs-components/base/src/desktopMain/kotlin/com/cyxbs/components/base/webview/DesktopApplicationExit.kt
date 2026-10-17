@@ -7,8 +7,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import java.util.logging.Level
-import java.util.logging.Logger
+import com.cyxbs.components.log.CyxbsLog
+
+private const val TAG = "DesktopApplicationExit"
 
 /** 业务检查通过后，将资源关闭及最终退出交给 MultiWeb。 */
 object DesktopApplicationExit {
@@ -39,7 +40,6 @@ internal class DesktopApplicationExitCoordinator(
   private val lock = Any()
   private val registrations = mutableListOf<Registration>()
   private var state = State.Idle
-  private val logger = Logger.getLogger(DesktopApplicationExitCoordinator::class.java.name)
 
   fun registerInterceptor(interceptor: suspend () -> Boolean): AutoCloseable {
     val registration = Registration(interceptor)
@@ -61,7 +61,7 @@ internal class DesktopApplicationExitCoordinator(
           snapshot.all { it.interceptor() }
         }
       } catch (failure: Throwable) {
-        logger.log(Level.WARNING, "Desktop application exit check failed; keeping application open", failure)
+        CyxbsLog.w(TAG, "Desktop application exit check failed; keeping application open", failure)
         if (failure is CancellationException) throw failure
         false
       }
@@ -71,7 +71,7 @@ internal class DesktopApplicationExitCoordinator(
           shutdown()
         } catch (failure: Throwable) {
           synchronized(lock) { shutdownFailed = true }
-          logger.log(Level.WARNING, "Desktop application shutdown failed; allowing exit retry", failure)
+          CyxbsLog.w(TAG, "Desktop application shutdown failed; allowing exit retry", failure)
           if (failure is CancellationException) throw failure
         }
       }

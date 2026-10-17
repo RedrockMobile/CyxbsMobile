@@ -16,9 +16,9 @@ import kotlin.time.Clock
 /**
  * 掌邮日志入口，当前通过 Kermit 同步输出到平台控制台。
  *
- * 每次调用使用同一份配置快照，先过滤再求值一次消息；不采集调用栈。
+ * 每次调用使用同一份配置快照，按需在过滤后为消息附加调用文件和行号。
  * [configure] 可重复调用，原子替换配置，不修改 Kermit 全局 Logger。
- * 消息构造或平台 writer 失败会被日志边界吞掉，不影响业务控制流。
+ * 异常格式化或平台 writer 失败会被日志边界吞掉，不影响业务控制流。
  */
 object CyxbsLog {
   private class State(val config: LogConfig) {
@@ -44,7 +44,7 @@ object CyxbsLog {
 
   /**
    * 查询当前配置是否允许输出 [level]，用于在日志调用前跳过额外的昂贵诊断工作。
-   * 普通消息拼接直接放进日志 lambda 即可，无需先查询；查询结果不保证后续配置不变。
+   * 查询结果不保证后续配置不变。
    */
   fun isEnabled(level: LogLevel): Boolean {
     val config = state.value.config
@@ -62,31 +62,20 @@ object CyxbsLog {
    * - 同一链路的不同等级复用同一 TAG；TAG 保持稳定，不拼接用户信息或请求 ID。
    *   区分并发请求时可在消息中加入非敏感的关联 ID，TAG 本身不提供自动链路追踪。
    *
-   * @param tag 文件名或约定的链路 TAG；null 时使用配置的 defaultTag，不会自动推断文件名。
+   * @param tag 调用方定义的稳定 TAG 或共享链路 TAG；null 时使用配置的 defaultTag。
    * @param throwable 需要记录堆栈的原始异常，可用于任意等级；无需在消息中重复拼接堆栈。
-   * @param message 通过等级过滤后同步求值一次；仅构造诊断文本，避免业务副作用，
-   * 不记录 token、密码及未脱敏的个人数据。构造异常会被隔离且本条日志被丢弃。
+   * @param message 诊断文本；不记录 token、密码及未脱敏的个人数据。
+   * @param showLocation 是否在消息前展示调用文件和行号；通用入口默认关闭。
    */
   fun log(
     level: LogLevel,
     tag: String? = null,
+    message: String,
     throwable: Throwable? = null,
-    message: () -> String,
+    context: LogContext? = null,
+    showLocation: Boolean = false,
   ) {
-    logInternal(level, tag, throwable, context = null, message)
-  }
-
-  /**
-   * 输出带固定白名单结构化上下文的日志。旧文本 API 保持不变；仅在确有诊断价值时填写 [context]。
-   */
-  fun log(
-    level: LogLevel,
-    tag: String? = null,
-    throwable: Throwable? = null,
-    context: LogContext,
-    message: () -> String,
-  ) {
-    logInternal(level, tag, throwable, context, message)
+    logInternal(level, tag, throwable, context, message, showLocation)
   }
 
   private fun logInternal(
@@ -94,7 +83,8 @@ object CyxbsLog {
     tag: String?,
     throwable: Throwable?,
     context: LogContext?,
-    message: () -> String,
+    message: String,
+    showLocation: Boolean,
     throwableRendering: ThrowableRendering = ThrowableRendering.Full,
   ) {
     val snapshot = state.value
@@ -107,9 +97,14 @@ object CyxbsLog {
     if (!consoleAccepted && admission == null) return
 
     val resolvedTag = tag ?: snapshot.config.defaultTag
-    val renderedMessage = runCatching(message).getOrNull() ?: return
     val payload = runCatching {
-      prepareLogPayload(resolvedTag, renderedMessage, throwable, throwableRendering)
+      prepareLogPayload(
+        resolvedTag,
+        message,
+        throwable,
+        throwableRendering,
+        callSite = if (showLocation) runCatching { logCallSite() }.getOrNull() ?: "Unknown:0" else null,
+      )
     }.getOrNull() ?: return
     val preparedContext = context?.prepareForLog()
     val observedTimestampMillis = Clock.System.now().toEpochMilliseconds()
@@ -196,52 +191,53 @@ object CyxbsLog {
    * 跨文件追踪时使用统一的 `XXX_TAG` 常量，并在消息中注明当前阶段。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun v(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Verbose, tag, throwable, message)
+  fun v(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = false) =
+    log(LogLevel.Verbose, tag, message, throwable, showLocation = showLocation)
 
   /**
    * Debug：开发排错信息，如缓存命中、分支选择、请求开始与结束。
    * 单文件定位推荐以文件名为 TAG；追踪业务链路时复用该链路的 `XXX_TAG` 常量。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun d(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Debug, tag, throwable, message)
+  fun d(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = false) =
+    log(LogLevel.Debug, tag, message, throwable, showLocation = showLocation)
 
   /**
    * Info：正常且有意义的业务或系统事件，如课表同步完成、初始化阶段完成。
    * 优先记录关键结果，避免将频繁执行的细节全部记为 Info。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun i(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Info, tag, throwable, message)
+  fun i(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = false) =
+    log(LogLevel.Info, tag, message, throwable, showLocation = showLocation)
 
   /**
    * Warn：出现异常情况，但仍能恢复或降级，如网络失败后使用缓存、跳过不支持的数据。
    * 消息说明异常及采取的恢复措施；需要定位原因时通过 throwable 传入原始异常。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun w(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Warn, tag, throwable, message)
+  fun w(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = false) =
+    log(LogLevel.Warn, tag, message, throwable, showLocation = showLocation)
 
   /**
    * Error：操作最终失败，需要定位原因，如解析失败、文件写入失败、提交失败。
    * 消息说明失败的操作及必要上下文，原始异常通过 throwable 传入；本方法只记录，不负责恢复。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun e(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Error, tag, throwable, message)
+  fun e(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = true) =
+    log(LogLevel.Error, tag, message, throwable, showLocation = showLocation)
 
   /**
    * Error 紧急路径：仍接收原始 [throwable]，但只记录有界类型与消息摘要，不遍历堆栈、cause 或 suppressed。
    * 仅用于未捕获异常等必须限制同步处理成本的场景；普通错误继续使用 [e] 保留堆栈。
    */
-  fun eBounded(tag: String? = null, throwable: Throwable, message: () -> String) =
+  fun eBounded(tag: String? = null, message: String, throwable: Throwable, showLocation: Boolean = false) =
     logInternal(
       level = LogLevel.Error,
       tag = tag,
       throwable = throwable,
       context = null,
       message = message,
+      showLocation = showLocation,
       throwableRendering = ThrowableRendering.Summary,
     )
 
@@ -250,8 +246,8 @@ object CyxbsLog {
    * 此方法仅输出 Assert 等级日志，不主动抛异常或终止程序；需要阻止继续执行时使用 check/require。
    * 参数及 TAG 命名遵循 [log] 的约定。
    */
-  fun a(tag: String? = null, throwable: Throwable? = null, message: () -> String) =
-    log(LogLevel.Assert, tag, throwable, message)
+  fun a(tag: String? = null, message: String, throwable: Throwable? = null, showLocation: Boolean = false) =
+    log(LogLevel.Assert, tag, message, throwable, showLocation = showLocation)
 }
 
 private const val MAX_RAW_FILE_SNAPSHOT_BYTES = 64 * 1_024
@@ -328,10 +324,12 @@ internal fun prepareLogPayload(
   message: String,
   throwable: Throwable?,
   throwableRendering: ThrowableRendering = ThrowableRendering.Full,
+  callSite: String? = null,
 ): PreparedLogPayload {
   val rawMessage = message.takeRawFileSnapshot()
   val sanitizedMessage = rawMessage.value.sanitizeForFileLog()
-  val boundedMessage = sanitizedMessage.takeFileSnapshot()
+  val locatedMessage = if (callSite == null) sanitizedMessage else messageWithCallSite(sanitizedMessage, callSite)
+  val boundedMessage = locatedMessage.takeFileSnapshot()
   val rawStackTrace = throwable?.toLogSnapshot(throwableRendering)
   val sanitizedStackTrace = rawStackTrace?.value?.sanitizeForFileLog()
   val boundedStackTrace = sanitizedStackTrace?.takeFileSnapshot()
@@ -343,7 +341,7 @@ internal fun prepareLogPayload(
     message = boundedMessage,
     stackTrace = boundedStackTrace,
     truncated = rawMessage.truncated || rawStackTrace?.truncated == true || rawTag.truncated ||
-      boundedMessage.length != sanitizedMessage.length ||
+      boundedMessage.length != locatedMessage.length ||
       boundedStackTrace?.length != sanitizedStackTrace?.length ||
       boundedTag.length != sanitizedTag.length,
   )

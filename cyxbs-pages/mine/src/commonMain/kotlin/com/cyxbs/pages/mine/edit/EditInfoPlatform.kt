@@ -2,6 +2,8 @@ package com.cyxbs.pages.mine.edit
 
 import kotlinx.coroutines.flow.SharedFlow
 
+internal const val AVATAR_UPLOAD_LOG_TAG = "AvatarUpload"
+
 /**
  * 「资料编辑」页平台相关能力，由 Android / iOS 实现。
  *

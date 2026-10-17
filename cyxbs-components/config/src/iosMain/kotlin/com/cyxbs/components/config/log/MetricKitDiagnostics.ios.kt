@@ -79,10 +79,9 @@ private class MetricKitDiagnosticSubscriber(
         level = LogLevel.Info,
         tag = "MetricKitDiagnostics",
         context = LogContext(operation = "ios.metric_kit_diagnostics"),
-      ) {
-        "MetricKit diagnostics: crash=$crashCount, hang=$hangCount, " +
-          "cpu=$cpuCount, disk=$diskCount"
-      }
+        message = "MetricKit diagnostics: crash=$crashCount, hang=$hangCount, " +
+          "cpu=$cpuCount, disk=$diskCount",
+      )
     }
   }
 }

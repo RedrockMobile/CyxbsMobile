@@ -6,7 +6,7 @@ import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.defaultSettings
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiWrapper
@@ -17,6 +17,8 @@ import io.ktor.client.request.get
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+
+private const val TAG = "UserInfoProvider"
 
 /**
  * 用户信息提供
@@ -70,9 +72,9 @@ internal object UserInfoProvider {
           requireAccountSession(session)
         }.body<ApiWrapper<UserInfo>>().data
       }.onFailure {
+        CyxbsLog.w(TAG, "用户信息请求失败 type=${it::class.simpleName}")
         if (isDebug()) {
           toast("用户信息请求失败")
-          logg("用户信息请求失败: " + it.stackTraceToString())
         }
       }.onSuccess { info ->
         // 被后续刷新取消或账户已切换时，旧请求不能覆盖当前资料。

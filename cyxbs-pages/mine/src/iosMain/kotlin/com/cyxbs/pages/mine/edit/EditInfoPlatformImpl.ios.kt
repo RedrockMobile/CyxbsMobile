@@ -6,7 +6,7 @@ import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.pages.mine.edit.network.EditApiService
 import com.g985892345.provider.api.annotation.ImplProvider
 import io.github.vinceglb.filekit.FileKit
@@ -64,7 +64,7 @@ object EditInfoPlatformImpl : EditInfoPlatform {
         )
       }.onFailure {
         "无法打开或读取相册，请重试".toast()
-        logg(it.message)
+        CyxbsLog.w(AVATAR_UPLOAD_LOG_TAG, "头像操作失败 type=${it::class.simpleName}")
       }.getOrNull() ?: return@launch
 
       "正在上传头像...".toast()
@@ -89,7 +89,7 @@ object EditInfoPlatformImpl : EditInfoPlatform {
         "头像更新成功".toast()
       }.onFailure {
         (if (it is IllegalArgumentException) it.message ?: "图片处理失败" else "上传头像失败，请重试").toast()
-        logg(it.message)
+        CyxbsLog.w(AVATAR_UPLOAD_LOG_TAG, "头像操作失败 type=${it::class.simpleName}")
       }
     }.invokeOnCompletion { busy = false }
   }

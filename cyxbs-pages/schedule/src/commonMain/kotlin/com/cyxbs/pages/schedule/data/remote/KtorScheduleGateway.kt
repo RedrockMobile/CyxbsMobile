@@ -2,7 +2,7 @@ package com.cyxbs.pages.schedule.data.remote
 
 import com.cyxbs.components.account.api.AccountSession
 import com.cyxbs.components.account.api.AccountState
-import com.cyxbs.components.utils.extensions.log
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.network.ApiWrapper
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -12,8 +12,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.serialization.JsonConvertException
 import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.TimeZone
-
-private const val MAX_DIAGNOSTIC_RESPONSE_CHARS = 2_000
 
 /** 单次 API 调用结果；失败不会在网关内排队、重试或生成 receipt。 */
 internal sealed interface ScheduleCallResult<out T> {
@@ -92,14 +90,14 @@ internal class KtorScheduleGateway(
     request: suspend () -> ApiWrapper<T>,
   ): ScheduleCallResult<T> {
     require(accountId == boundAccountId) { "accountId must match the gateway's bound AccountSession" }
-    log(NETWORK_LOG_TAG, "$operation started")
+    CyxbsLog.i(NETWORK_LOG_TAG, "$operation started")
     val wrapper = try {
       request()
     } catch (cancelled: CancellationException) {
-      log(NETWORK_LOG_TAG, "$operation cancelled")
+      CyxbsLog.i(NETWORK_LOG_TAG, "$operation cancelled")
       throw cancelled
     } catch (timeout: HttpRequestTimeoutException) {
-      log(NETWORK_LOG_TAG, "$operation timeout")
+      CyxbsLog.w(NETWORK_LOG_TAG, "$operation timeout")
       return ScheduleCallResult.TransportFailure(status = null, cause = timeout)
     } catch (invalid: ClientRequestException) {
       val body = try {
@@ -109,7 +107,7 @@ internal class KtorScheduleGateway(
       } catch (_: Throwable) {
         "HTTP 400"
       }
-      log(
+      CyxbsLog.w(
         NETWORK_LOG_TAG,
         httpFailureLogText(
           operation = operation,
@@ -123,18 +121,18 @@ internal class KtorScheduleGateway(
         ScheduleCallResult.TransportFailure(invalid.response.status.value, invalid)
       }
     } catch (response: ResponseException) {
-      log(NETWORK_LOG_TAG, "$operation HTTP ${response.response.status.value}")
+      CyxbsLog.w(NETWORK_LOG_TAG, "$operation HTTP ${response.response.status.value}")
       return ScheduleCallResult.TransportFailure(response.response.status.value, response)
     } catch (invalidJson: JsonConvertException) {
-      log(NETWORK_LOG_TAG, "$operation decodeFailure type=${invalidJson::class.simpleName}")
+      CyxbsLog.w(NETWORK_LOG_TAG, "$operation decodeFailure type=${invalidJson::class.simpleName}")
       return ScheduleCallResult.TransportFailure(status = 200, cause = invalidJson)
     } catch (failure: Throwable) {
       // 只记录异常类型；异常 message 可能包含 URL、响应片段等，不写入长期诊断日志。
-      log(NETWORK_LOG_TAG, "$operation transportFailure type=${failure::class.simpleName}")
+      CyxbsLog.w(NETWORK_LOG_TAG, "$operation transportFailure type=${failure::class.simpleName}")
       return ScheduleCallResult.TransportFailure(status = null, cause = failure)
     }
 
-    log(NETWORK_LOG_TAG, "$operation completed businessStatus=${wrapper.status}")
+    CyxbsLog.i(NETWORK_LOG_TAG, "$operation completed businessStatus=${wrapper.status}")
     return when (wrapper.status) {
       NORMAL_STATUS -> {
         if (wrapper.rawData == null) {
@@ -147,11 +145,7 @@ internal class KtorScheduleGateway(
         }
       }
       else -> {
-        log(
-          NETWORK_LOG_TAG,
-          "$operation businessFailure status=${wrapper.status} " +
-              "info=${wrapper.info.toDiagnosticLogText()}",
-        )
+        CyxbsLog.w(NETWORK_LOG_TAG, "$operation businessFailure status=${wrapper.status}")
         ScheduleCallResult.ApiFailure(wrapper.status, wrapper.info)
       }
     }
@@ -162,13 +156,6 @@ internal class KtorScheduleGateway(
     const val NORMAL_STATUS = 10000
   }
 }
-
-/**
- * 将服务端错误响应压缩为单行并限制长度，便于在网络日志中直接定位拒绝原因，同时避免异常网关返回无限内容。
- * 该文本只来自响应 body/info，不包含请求 header、Authorization 或 token。
- */
-private fun String.toDiagnosticLogText(): String =
-  replace('\n', ' ').replace('\r', ' ').take(MAX_DIAGNOSTIC_RESPONSE_CHARS)
 
 /**
  * 生成非成功 HTTP 响应的安全日志摘要。

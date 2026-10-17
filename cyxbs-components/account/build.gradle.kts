@@ -8,6 +8,7 @@ useKtProvider() // api 模块服务提供
 kotlin {
   sourceSets {
     commonMain.dependencies {
+      implementation(projects.cyxbsComponents.log)
       subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)

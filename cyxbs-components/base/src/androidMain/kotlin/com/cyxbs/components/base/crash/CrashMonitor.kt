@@ -98,9 +98,11 @@ object CrashMonitor : UncaughtExceptionHandler {
   }
 
   private fun recordCrash(throwable: Throwable, isMainThread: Boolean) {
-    CyxbsLog.eBounded(tag = "CrashMonitor", throwable = throwable) {
-      "Uncaught exception on ${if (isMainThread) "main" else "background"} thread"
-    }
+    CyxbsLog.eBounded(
+      tag = "CrashMonitor",
+      throwable = throwable,
+      message = "Uncaught exception on ${if (isMainThread) "main" else "background"} thread",
+    )
     if (CyxbsLog.fileStorageHealth().state != FileLogState.Running) return
     runCatching {
       runBlocking {

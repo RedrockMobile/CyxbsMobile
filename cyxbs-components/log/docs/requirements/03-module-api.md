@@ -12,26 +12,28 @@ Part of: [LOCAL-LOG-MAP](./map.md)
 
 ## 范围
 
-- commonMain：等级、惰性消息、受控字段、匿名上下文、配置、健康与管理结果。
-- 输出目的地分别过滤，message 仅在有输出接受时求值一次；快照不可变上下文。
-- 热路径不采调用栈定位、不逐条协程、不执行文件 I/O；限制消息、字段与异常对象保留。
+- commonMain：等级、String 消息、受控字段、匿名上下文、配置、健康与管理结果。
+- 输出目的地分别过滤，消息直接接收 String，过滤后再处理输出；快照不可变上下文。
+- `showLocation` 开启且通过等级过滤后采集调用文件和行号，前缀格式为 `文件名:行号 -> 消息`；仅 `e` 默认开启，其他入口默认关闭。不逐条协程、不执行文件 I/O；限制消息、字段与异常对象保留。
 - 定义未初始化、重复 configure、关闭后调用、策略 epoch、故障与取消行为。
 - Kermit 类型只在内部适配出现；公开 Swift 互操作能力以 PoC 为准。
 
 ## 验收
 
 - 各选定目标编译通过且依赖图无环；Web 不解析 Native 文件依赖。
-- 关闭等级不调用 lambda；双输出只求值一次；上下文不串请求/账号会话。
+- 关闭等级不处理异常和输出；双输出复用同一份脱敏快照；上下文不串请求/账号会话。
 - 普通 writer 失败不破坏业务或阻止其他输出；管理取消不会被吞。
 - API 文档说明过滤、接收与丢弃，未承诺未实现的持久性。
 
 ## 进度
 
+按用户最新决定，日志消息直接传入 `String`，不再提供消息 lambda；字符串在调用前构造。
+
 用户于 2026-10-13 授权先引入第三方库并搭建最小框架，先行实施本项的基础部分。
 
-已新增 `:cyxbs-components:log`，仅显式依赖 Kermit 2.2.0，使用 `manager.lib`；提供 `LogLevel`、`LogConfig`、`CyxbsLog`，支持等级过滤、惰性消息、原子配置快照及平台控制台输出。Kermit 类型不出现在公开 API 中。
+已新增 `:cyxbs-components:log`，仅显式依赖 Kermit 2.2.0，使用 `manager.lib`；提供 `LogLevel`、`LogConfig`、`CyxbsLog`，支持等级过滤、String 消息、原子配置快照及平台控制台输出。Kermit 类型不出现在公开 API 中。
 
-当前已支持控制台/文件分别过滤、消息单次求值、消息与 writer 异常隔离、同步文件采集策略门，以及结构化管理结果和健康统计；Kermit 类型仍未暴露。普通日志热路径不执行文件 I/O，关闭等级不求值 lambda。尚未提供自动链路/账号会话上下文，跨请求关联仍由调用方使用非敏感稳定 TAG 或消息字段表达，因此本任务保持 in_progress。
+当前已支持控制台/文件分别过滤、String 消息、异常格式化与 writer 故障隔离、同步文件采集策略门，以及结构化管理结果和健康统计；Kermit 类型仍未暴露。普通日志热路径不执行文件 I/O，关闭等级不处理异常和输出。尚未提供自动链路/账号会话上下文，跨请求关联仍由调用方使用非敏感稳定 TAG 或消息字段表达，因此本任务保持 in_progress。
 
 构建验证覆盖 `compileAndroidMain`、`compileKotlinDesktop`、`compileKotlinJs`、`compileKotlinWasmJs`、`compileKotlinIosArm64`、`compileKotlinIosSimulatorArm64`。此结果验证依赖解析与源码编译，不代表 Native 框架链接、Swift 调用、真机输出或性能验证已完成。
 

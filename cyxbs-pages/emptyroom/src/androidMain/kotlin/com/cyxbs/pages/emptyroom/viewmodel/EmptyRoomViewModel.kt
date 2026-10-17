@@ -53,7 +53,7 @@ class EmptyRoomViewModel : BaseViewModel() {
                     status.value = FINISH
                     val converter = EmptyConverter()
                     converter.setEmptyData(it.data)
-                    CyxbsLog.d("EmptyRoomData") { "empty room response received, count=${it.data.size}" }
+                    CyxbsLog.d("EmptyRoomData", "empty room response received, count=${it.data.size}")
                     rooms.value = converter.convert()
                 },
                 onError = {

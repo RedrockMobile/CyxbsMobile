@@ -18,7 +18,7 @@ import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.doPermissionAction
 import com.cyxbs.components.utils.extensions.launchPickImages
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.extensions.registerForPickSingleImage
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.mine.edit.network.EditApiService
@@ -162,7 +162,7 @@ internal class AvatarPickerActivity : BaseActivity() {
       val fileBytes = try {
         destinationFile.readBytes()
       } catch (e: IOException) {
-        e.printStackTrace()
+        CyxbsLog.e(AVATAR_UPLOAD_LOG_TAG, "读取裁剪图片失败", e)
         toast("图片加载失败")
         finishWithCancel()
         return@launch
@@ -189,7 +189,7 @@ internal class AvatarPickerActivity : BaseActivity() {
         finish()
       }.onFailure {
         toast("上传头像失败")
-        logg(it.message)
+        CyxbsLog.w(AVATAR_UPLOAD_LOG_TAG, "头像上传失败 type=${it::class.simpleName}")
         finishWithCancel()
       }
     }

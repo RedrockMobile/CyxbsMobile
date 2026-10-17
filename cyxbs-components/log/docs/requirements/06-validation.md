@@ -12,7 +12,7 @@ Part of: [LOCAL-LOG-MAP](./map.md)
 
 ## 场景
 
-- 常态、突发并发、静默、超大记录/异常、过滤 lambda 与请求上下文。
+- 常态、突发并发、静默、超大记录/异常、等级过滤 与请求上下文。
 - 队列溢出统计、UTF-8 轮转、时间回拨、多进程文件名与总磁盘预算。
 - 磁盘满、文件不可写、尾条中断、锁屏/后台、强杀恢复与降级。
 - flush 超时/取消、snapshot/clear/close 竞争、撤回及账号切换。
@@ -25,7 +25,7 @@ Part of: [LOCAL-LOG-MAP](./map.md)
 
 ## 进度
 
-已完成 Desktop 自动化边界测试：JSONL/manifest 可解析、Unicode 截断、轮转与总预算、静默尾批、崩溃尾条恢复、导出、clear、durable Unsupported、close 取消重试、启动文件数预留、等级复核、导出 seal 故障恢复、持续不可写指数退避、时间回拨、多生产者与管理命令并发、消息惰性/异常隔离及常见敏感字段脱敏。Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译和 Android FileProvider manifest 合并纳入最终验证。2026-10-16 本机 20,000 次公开入口突发回归测得 p50 47,208 ns、p95 55,791 ns、p99 115,417 ns、约 19,502 calls/s；此值只用作 Desktop 非阻塞回归基线。
+已完成 Desktop 自动化边界测试：JSONL/manifest 可解析、Unicode 截断、轮转与总预算、静默尾批、崩溃尾条恢复、导出、clear、durable Unsupported、close 取消重试、启动文件数预留、等级复核、导出 seal 故障恢复、持续不可写指数退避、时间回拨、多生产者与管理命令并发、等级过滤/异常格式化隔离及常见敏感字段脱敏。Android、Desktop、JS、WasmJS、iOS Arm64 与 iOS Simulator Arm64 源码编译和 Android FileProvider manifest 合并纳入最终验证。2026-10-16 本机 20,000 次公开入口突发回归测得 p50 47,208 ns、p95 55,791 ns、p99 115,417 ns、约 19,502 calls/s；此值只用作 Desktop 非阻塞回归基线。
 
 2026-10-17 在 Android 设备 `127.0.0.1:5555` 上覆盖安装当前 `HEAD` 的 debug APK，并使用用户手动建立的登录态完成黑盒验收：设置页可访问；“记录诊断日志”可关闭后重新开启；应用退到后台再恢复后可导出；系统 `ChooserActivity` 收到 `content://com.mredrock.cyxbs.debug.fileProvider/diagnostic_log_export/...jsonl` 及临时读取授权；清理提示“诊断日志已清除”；清理后再次导出得到不同的新快照 URI。第一次和清理后的文件名分别为 `cyxbs-log-export-v1-1792171265801-e8c13218b4ecbe05.jsonl`、`cyxbs-log-export-v1-1792171306256-84303b79ec21ec23.jsonl`。该设备镜像没有可接收分享的应用，且 `run-as com.mredrock.cyxbs.debug` 被系统拒绝，因此本轮验证的是应用到系统分享边界、清理反馈和重建快照，不声称已读取私有 JSONL 内容或完成接收端传输。
 

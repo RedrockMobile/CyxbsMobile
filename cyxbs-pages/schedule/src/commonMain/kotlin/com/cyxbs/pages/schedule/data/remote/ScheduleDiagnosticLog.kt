@@ -1,6 +1,7 @@
 package com.cyxbs.pages.schedule.data.remote
 
-import com.cyxbs.components.utils.extensions.log
+import com.cyxbs.components.log.CyxbsLog
+import com.cyxbs.components.log.LogLevel
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -16,7 +17,8 @@ internal const val SCHEDULE_DETAIL_LOG_TAG = "ScheduleDetail"
 
 /** 输出完整 Sync 中客户端已持有的 identity，以及三类资源的待提交操作。 */
 internal fun SyncRequest.logScheduleRequest(timeZone: TimeZone) {
-  log(SCHEDULE_DETAIL_LOG_TAG, "REQUEST SYNC")
+  if (!CyxbsLog.isEnabled(LogLevel.Debug)) return
+  CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, "REQUEST SYNC")
   logItems(
     label = "REQUEST SYNC category confirmed",
     items = categories.confirmed.map { "id=${it.id}, version=${it.version}" },
@@ -57,7 +59,8 @@ internal fun SyncRequest.logScheduleRequest(timeZone: TimeZone) {
 
 /** 输出日常请求中三类资源实际新增、修改及删除的内容。 */
 internal fun MutationRequest.logScheduleRequest(operation: String, timeZone: TimeZone) {
-  log(SCHEDULE_DETAIL_LOG_TAG, operation)
+  if (!CyxbsLog.isEnabled(LogLevel.Debug)) return
+  CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, operation)
   logItems(
     label = "$operation category upsert",
     items = categories.upserts.map { it.diagnosticSummary() },
@@ -86,7 +89,8 @@ internal fun MutationRequest.logScheduleRequest(operation: String, timeZone: Tim
 
 /** 输出完整 Sync 返回的 inventory 核对、发现资源和 mutation 结果。 */
 internal fun SyncResponse.logScheduleResponse(timeZone: TimeZone) {
-  log(SCHEDULE_DETAIL_LOG_TAG, "RESPONSE SYNC")
+  if (!CyxbsLog.isEnabled(LogLevel.Debug)) return
+  CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, "RESPONSE SYNC")
   logItems(
     label = "RESPONSE SYNC category confirmedResult",
     items = categories.confirmedResults.map {
@@ -164,7 +168,8 @@ internal fun SyncResponse.logScheduleResponse(timeZone: TimeZone) {
 
 /** 输出日常逐资源结果和服务端合并后的 canonical 日程。 */
 internal fun MutationResponse.logScheduleResponse(timeZone: TimeZone) {
-  log(SCHEDULE_DETAIL_LOG_TAG, "RESPONSE MUTATION")
+  if (!CyxbsLog.isEnabled(LogLevel.Debug)) return
+  CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, "RESPONSE MUTATION")
   logItems(
     label = "RESPONSE MUTATION category upsertResult",
     items = categories.upsertResults.map {
@@ -270,10 +275,10 @@ private fun String.singleLine(): String = replace('\n', ' ').replace('\r', ' ')
 /** 列表为空时也输出 EMPTY，避免无法区分“未打印”和“确实没有返回”。 */
 private fun logItems(label: String, items: List<String>) {
   if (items.isEmpty()) {
-    log(SCHEDULE_DETAIL_LOG_TAG, "$label: EMPTY")
+    CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, "$label: EMPTY")
   } else {
     items.forEachIndexed { index, item ->
-      log(SCHEDULE_DETAIL_LOG_TAG, "$label[$index]: $item")
+      CyxbsLog.d(SCHEDULE_DETAIL_LOG_TAG, "$label[$index]: $item")
     }
   }
 }

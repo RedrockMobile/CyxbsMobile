@@ -7,7 +7,7 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.sp.AccountSettings
 import com.cyxbs.components.config.time.SchoolCalendar
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.ILessonService2
@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Instant
+
+private const val TAG = "LessonRepository"
 
 /**
  * .
@@ -161,9 +163,9 @@ object LessonRepository {
         mLessonObserveFlowMap[dataStuNum]?.tryEmit(it)
       }
     }.onFailure {
+      CyxbsLog.w(TAG, "请求课表失败 type=${it::class.simpleName}")
       if (isDebug()) {
         toast("请求课表数据异常, ${it.message}")
-        logg("请求课表数据异常: ${it.stackTraceToString()}")
       }
     }
   }

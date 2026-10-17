@@ -57,7 +57,7 @@
 | `observedTimestampMillis` | CyxbsLog 收到该事件时的 Unix 毫秒时间戳 |
 | `level` | `Verbose`、`Debug`、`Info`、`Warn`、`Error` 或 `Assert` |
 | `tag` | 稳定的类名、文件名或业务链路名 |
-| `message` | 进入任意 sink 前已执行有界快照和防御性脱敏的诊断文本 |
+| `message` | 进入任意 sink 前已执行有界快照和防御性脱敏的诊断文本；`showLocation=true` 时带 `文件名:行号 -> 消息` 前缀，仅 `e` 默认开启 |
 | `stackTrace` | 可选；调用方传入 `Throwable` 时记录，未传入时字段省略 |
 | `operation` | 可选；固定白名单内的低敏感操作名 |
 | `route` | 可选；已移除 query 与 fragment 的归一化路由模板 |

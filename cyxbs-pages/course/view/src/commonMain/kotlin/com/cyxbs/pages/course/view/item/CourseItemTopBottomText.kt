@@ -26,7 +26,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
+
+private const val TAG = "CourseItemTopBottomText"
 
 /**
  * 根据当前可见片段的真实高度测量并绘制课表 item 的标题和描述。
@@ -235,7 +237,11 @@ private class CourseItemTextMeasurePolicy(
       measureBottomText = false,
     )
     if (topText.startsWith("时间点")) {
-      logg("estimatedCandidate = ${estimatedCandidate.topResult.size}, containerHeight = $containerHeight, lineCount = ${estimatedCandidate.topResult.lineCount}")
+      CyxbsLog.d(
+        TAG,
+        "estimatedCandidate = ${estimatedCandidate.topResult.size}, " +
+          "containerHeight = $containerHeight, lineCount = ${estimatedCandidate.topResult.lineCount}",
+      )
     }
     val estimatedFits = estimatedCandidate.titleFitsWithoutVerticalPadding(containerHeight)
     if (estimatedFits) {
@@ -252,7 +258,10 @@ private class CourseItemTextMeasurePolicy(
           measureBottomText = false,
         )
         if (topText.startsWith("时间点")) {
-          logg("111 topResult = ${nearbyCandidate.topResult.size}, lineCount = ${nearbyCandidate.topResult.lineCount}")
+          CyxbsLog.d(
+            TAG,
+            "nearbyCandidate = ${nearbyCandidate.topResult.size}, lineCount = ${nearbyCandidate.topResult.lineCount}",
+          )
         }
         if (!nearbyCandidate.titleFitsWithoutVerticalPadding(containerHeight)) break
         bestCandidate = nearbyCandidate
@@ -272,7 +281,10 @@ private class CourseItemTextMeasurePolicy(
         measureBottomText = false,
       )
       if (topText.startsWith("时间点")) {
-        logg("111 topResult = ${nearbyCandidate.topResult.size}, lineCount = ${nearbyCandidate.topResult.lineCount}")
+        CyxbsLog.d(
+          TAG,
+          "nearbyCandidate = ${nearbyCandidate.topResult.size}, lineCount = ${nearbyCandidate.topResult.lineCount}",
+        )
       }
       if (nearbyCandidate.titleFitsWithoutVerticalPadding(containerHeight)) {
         return nearbyCandidate

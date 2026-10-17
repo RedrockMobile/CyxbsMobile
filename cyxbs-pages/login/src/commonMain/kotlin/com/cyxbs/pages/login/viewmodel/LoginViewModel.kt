@@ -12,7 +12,7 @@ import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppScheme
 import com.cyxbs.components.navigation.appNavBackStack
-import com.cyxbs.components.utils.extensions.logg
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.extensions.mapCatchingCoroutine
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.network.ApiWrapper
@@ -37,6 +37,7 @@ import kotlinx.serialization.json.put
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
+internal const val LOGIN_LOG_TAG = "AccountLogin"
 
 /**
  * .
@@ -100,7 +101,7 @@ abstract class CommonLoginViewModel(argument: LoginNavArgument) : BaseViewModel(
             completeLogin()
           }
         } catch (e: Exception) {
-          logg("login error: ${e.stackTraceToString()}")
+          CyxbsLog.w(LOGIN_LOG_TAG, "登录流程未完成 type=${e::class.simpleName}")
         } finally {
           isLoginAnim.value = false
         }
@@ -123,7 +124,7 @@ abstract class CommonLoginViewModel(argument: LoginNavArgument) : BaseViewModel(
     } else if (appNavBackStack.isEmpty()) {
       HomeNavArgument().navigate()
     }
-    logg("clickLogin: $appNavBackStack, targetUrl = $targetUrl")
+    CyxbsLog.i(LOGIN_LOG_TAG, "登录导航完成 backStackSize=${appNavBackStack.size}, hasTarget=${targetUrl != null}")
   }
 
   // 触发网络请求
@@ -144,12 +145,12 @@ abstract class CommonLoginViewModel(argument: LoginNavArgument) : BaseViewModel(
       wrapper.throwApiExceptionIfFail() // 如果网络请求返回了异常，则直接抛出
       wrapper.data
     }.onFailure { throwable ->
-      logg("requestLogin, onLoginFailure: $throwable")
+      CyxbsLog.w(LOGIN_LOG_TAG, "登录请求失败 type=${throwable::class.simpleName}")
       runCatchingCoroutine { onLoginFailure(throwable) }.onFailure {
         // TODO 打开 CrashDialog
       }.getOrThrow()
     }.onSuccess {
-      logg("requestLogin, onLoginSuccess")
+      CyxbsLog.i(LOGIN_LOG_TAG, "登录请求成功")
       runCatchingCoroutine { onLoginSuccess(stuNum, it) }.onFailure {
         // TODO 打开 CrashDialog
       }.getOrThrow()
