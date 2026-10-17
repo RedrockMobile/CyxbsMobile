@@ -23,12 +23,26 @@ CyxbsLog.configure(
 
 CyxbsLog.d(tag = "Schedule") { "加载课表" }
 CyxbsLog.e(tag = "Schedule", throwable = error) { "课表加载失败" }
+CyxbsLog.log(
+  level = LogLevel.Info,
+  tag = "ScheduleSync",
+  context = LogContext(
+    operation = "schedule.refresh",
+    route = "/schedule/{week}",
+    method = LogHttpMethod.Get,
+    durationMillis = 320,
+    result = LogResult.Success,
+    correlationId = "schedule-sync-a1b2",
+  ),
+) { "课表刷新完成" }
 ```
 
 - `v/d/i/w/e/a` 和通用 `log` 使用惰性消息，控制台与文件均不接收时不会调用消息 lambda。
 - 接受输出时消息只求值一次；`configure` 原子替换不可变配置，一次日志调用使用同一份配置快照。
 - 控制台输出同步执行；消息、TAG 与异常堆栈在进入任意 sink 前统一执行 UTF-8 有界快照和防御性脱敏，消息 lambda 和平台 writer 的异常会被日志边界隔离，不改变业务控制流。
 - 原始 `Throwable` 不直接交给平台控制台；控制台输出脱敏后的有界堆栈，文件协议仍将消息与堆栈分字段保存。
+- 旧的 `v/d/i/w/e/a` 与通用 `log` 签名保持兼容；需要机器可读诊断时使用带 `LogContext` 的 `log` 重载。
+- `LogContext` 只提供固定白名单标量，不接受任意 Map。`route` 会移除 query/fragment，`correlationId` 仅允许 1～64 位 ASCII 字母、数字及 `._:-`，两者都不得承载学号、手机号、设备标识或凭据。
 - Kermit 是内部实现，公开 API 不暴露其类型，也不修改其全局 Logger。
 
 ## 文件日志
@@ -55,16 +69,18 @@ CyxbsLog.closeFileStorage()
 - 单条记录最多 16 KiB；队列默认最多 1024 条且估算负载不超过 2 MiB。`Verbose/Debug/Info` 最多使用 80% 的条数和字节预算，剩余 20% 为 `Warn/Error/Assert` 保留；高等级可使用低等级未占用的空间，但总预算始终不变。所有路径仍使用非阻塞接收。
 - 超限时直接丢弃；`fileStorageHealth()` 同时提供总原因计数和 `droppedByLevel`，用于区分普通洪峰与高等级事件丢失。
 - 每 64 KiB 或最长约 1 秒执行 buffered flush；这只表示交给操作系统，不承诺断电持久化。`Durable` 当前明确返回 `Unsupported`。
-- 文件按字节轮转，并按总字节、文件数和年龄清理严格命名前缀的本模块文件。默认总量 24 MiB、最长 7 天。
-- 导出先封存当前文件，只选最新 3 个源文件且最多 32 MiB，再发布稳定 JSONL 副本；首行是 `recordType=manifest` 的协议元数据，后续行为 `recordType=log`，被数量或字节预算裁剪时 `truncated=true`。应用层负责调用系统分享或保存界面。导出不会上传，也不会撤回已经分享出去的副本。
+- 文件按字节轮转，并按总字节、文件数和年龄清理严格命名前缀的本模块文件。默认总量 24 MiB、最长 7 天。v2 文件使用持久化单调 generation 排序，系统时间回拨不再改变新文件的导出与配额优先级；历史 v1 文件仍可恢复、导出和清理。
+- 导出先封存当前文件，只选最新 3 个源文件且最多 32 MiB，再发布稳定 JSONL 副本；v2 manifest 记录 payload 原始字节数、日志行数和 SHA-256，后续为 schema v2 日志行。哈希覆盖 manifest 后的精确原始字节并包含换行，只用于检查传输完整性，不是数字签名或真实性证明。被数量或字节预算裁剪时 `truncated=true`。
+- v2 日志行区分 `eventTimestampMillis` 与 `observedTimestampMillis`，并可携带受限结构化上下文；旧文本调用仍生成合法 v2 事件。应用层负责调用系统分享或保存界面。导出不会上传，也不会撤回已经分享出去的副本。
 - 文件入队前会对常见 token、Authorization、Cookie、密码、邮箱和 8-19 位长数字做防御性脱敏；这是兜底，不替代调用方禁止记录个人数据和业务明文。
 - `clear`、`flush`、`export`、`close` 通过可靠控制命令与记录队列排序；管理操作返回结构化结果。瞬态文件操作失败会计入健康状态并尝试重建 active 文件；持续失败时从 250 ms 指数退避到最多 30 s，期间丢弃数由 `droppedWriteBackoff` 暴露，避免逐条 I/O 重试拖累应用。失败中的当前记录可能丢失。
+- `fileStorageHealth()` 是无 I/O 快照，除队列与丢弃计数外还提供最近成功写入、最近失败时间/异常类型、连续失败数、最近 flush 耗时，以及当前受管文件数/字节数；异常文本和路径不会进入健康状态。
 
 ## 应用接入
 
-`AppLogManager` 在主进程初始化控制台策略，并仅在用户已同意隐私政策且主动开启“记录诊断日志”后启动文件层。Android 使用 `noBackupFilesDir` 和 cache + FileProvider；iOS 使用 Application Support（排除备份）和 Caches；Desktop 使用 `~/.cyxbs`；JS/WasmJS 不提供文件层。设置页提供开启、清理、导出并交给系统分享，隐私撤回立即停止后续文件写入。
+`AppLogManager` 在主进程初始化控制台策略，并仅在用户已同意隐私政策且主动开启“记录诊断日志”后启动文件层。Android 使用 `noBackupFilesDir` 和 cache + FileProvider；文件层启动后在 API 30+ 读取最近一次 `ApplicationExitInfo` 的 reason/status/importance/timestamp 元数据，不读取 trace 或 description。现有 `CrashMonitor` 将原始 `Throwable` 交给 `eBounded`，只记录有界的异常类型与消息摘要，不同步展开 stack/cause/suppressed；仅在文件引擎已运行时对 buffered flush 等待最多 250 ms，不会在崩溃线程启动存储。iOS 使用 Application Support（排除备份）和 Caches，平台文件准备与元数据校验在后台 dispatcher 完成，并显式验证 `CompleteUntilFirstUserAuthentication`；任一保护或备份属性设置失败都会回滚启动。用户采集策略生效且文件引擎启动成功后订阅 MetricKit，只写入 crash/hang/cpu/disk 四类诊断数量，不读取调用栈、终止原因或原始 payload，关闭开关或撤回隐私时退订。Desktop 使用 `~/.cyxbs`；JS/WasmJS 不提供文件层。设置页提供开启、清理、导出并交给系统分享，隐私撤回立即停止后续文件写入。
 
-文件日志不捕获原生崩溃，不承诺强杀或断电零丢失。不得记录学号、凭据、完整请求体等敏感信息；真机锁屏、磁盘满、能耗和性能阈值仍由[本地需求地图](docs/requirements/map.md)跟踪。
+文件日志不承诺捕获原生崩溃，也不承诺强杀或断电零丢失；Android 历史退出和 CrashMonitor 只增加诊断线索，不构成崩溃持久化保证。不得记录学号、凭据、完整请求体等敏感信息；iOS 文件保护的首次解锁/锁屏后台行为、真机磁盘满、能耗和性能阈值仍由[本地需求地图](docs/requirements/map.md)跟踪。
 
 ## 阅读导出日志
 

@@ -5,11 +5,11 @@
 ## 标准示例
 
 ```jsonl
-{"recordType":"manifest","schemaVersion":1,"generatedAtMillis":1792182031523,"sourceFileCount":1,"exportedLogBytes":2486,"truncated":false}
-{"recordType":"log","schemaVersion":1,"session":"8f3a1c9e2b7d4f10","sequence":1,"timestampMillis":1792181900123,"level":"Info","tag":"AppLifecycle","message":"application started, platform=Android, version=7.2.0","truncated":false}
-{"recordType":"log","schemaVersion":1,"session":"8f3a1c9e2b7d4f10","sequence":2,"timestampMillis":1792181902517,"level":"Info","tag":"Navigation","message":"navigate: route=mine/setting/log, source=mine","truncated":false}
-{"recordType":"log","schemaVersion":1,"session":"8f3a1c9e2b7d4f10","sequence":3,"timestampMillis":1792181906124,"level":"Warn","tag":"CourseRepository","message":"request retry: route=/magipoke-jwzx/kebiao, attempt=2, reason=timeout","truncated":false}
-{"recordType":"log","schemaVersion":1,"session":"8f3a1c9e2b7d4f10","sequence":4,"timestampMillis":1792181909458,"level":"Error","tag":"CourseRepository","message":"course refresh failed after retries","stackTrace":"java.net.SocketTimeoutException: timeout\n\tat com.cyxbs...CourseRepository.refresh(CourseRepository.kt:86)\n\tat com.cyxbs...CourseViewModel.load(CourseViewModel.kt:42)","truncated":false}
+{"recordType":"manifest","schemaVersion":2,"generatedAtMillis":1792182031523,"sourceFileCount":1,"exportedLogBytes":1659,"exportedRecordCount":4,"payloadSha256":"ac4a990ce4189f5e921a7bbe3ad61aa6a35678b6dc8d3e619438c772110eafd8","truncated":false}
+{"recordType":"log","schemaVersion":2,"session":"8f3a1c9e2b7d4f10","sequence":1,"eventTimestampMillis":1792181900123,"observedTimestampMillis":1792181900123,"level":"Info","tag":"AppLifecycle","message":"application started, platform=Android, version=7.2.0","operation":"app.start","result":"Success","truncated":false}
+{"recordType":"log","schemaVersion":2,"session":"8f3a1c9e2b7d4f10","sequence":2,"eventTimestampMillis":1792181902517,"observedTimestampMillis":1792181902517,"level":"Info","tag":"Navigation","message":"navigate to log settings","operation":"navigation","route":"mine/setting/log","fromState":"mine","toState":"log_settings","correlationId":"nav-a1b2c3","truncated":false}
+{"recordType":"log","schemaVersion":2,"session":"8f3a1c9e2b7d4f10","sequence":3,"eventTimestampMillis":1792181906124,"observedTimestampMillis":1792181906124,"level":"Warn","tag":"CourseRepository","message":"request retry after timeout","operation":"course.refresh","route":"/magipoke-jwzx/kebiao","method":"Get","durationMillis":5000,"result":"Failure","retryCount":2,"correlationId":"course-sync-17","truncated":false}
+{"recordType":"log","schemaVersion":2,"session":"8f3a1c9e2b7d4f10","sequence":4,"eventTimestampMillis":1792181909458,"observedTimestampMillis":1792181909459,"level":"Error","tag":"CourseRepository","message":"course refresh failed after retries","stackTrace":"java.net.SocketTimeoutException: timeout\n\tat com.cyxbs...CourseRepository.refresh(CourseRepository.kt:86)\n\tat com.cyxbs...CourseViewModel.load(CourseViewModel.kt:42)","operation":"course.refresh","result":"Failure","retryCount":3,"correlationId":"course-sync-17","truncated":false}
 ```
 
 示例仅展示协议形态；实际日志必须遵守项目根目录 `AGENTS.md` 的隐私与等级约束。
@@ -20,16 +20,20 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `schemaVersion` | JSONL 协议版本；当前为 `1` |
+| `schemaVersion` | JSONL 协议版本；新导出当前为 `2`，引擎仍可合并历史 v1 源文件 |
 | `generatedAtMillis` | 生成导出文件时的 Unix 毫秒时间戳 |
 | `sourceFileCount` | 本次合并的原始日志文件数 |
 | `exportedLogBytes` | 合并的原始日志字节数，不含 manifest 自身 |
+| `exportedRecordCount` | manifest 后日志行的数量 |
+| `payloadSha256` | manifest 后所有原始字节（包括每行换行符）的 SHA-256 小写十六进制摘要 |
 | `truncated` | 是否因“最多 3 个源文件”或“最多 32 MiB”限制而省略了更早的数据 |
+
+`payloadSha256` 只能检查分享或传输后内容是否变化，不是数字签名，不能证明文件来源或真实性。
 
 以下内容表示导出成功，但当时没有可导出的日志事件：
 
 ```jsonl
-{"recordType":"manifest","schemaVersion":1,"generatedAtMillis":1792182031523,"sourceFileCount":0,"exportedLogBytes":0,"truncated":false}
+{"recordType":"manifest","schemaVersion":2,"generatedAtMillis":1792182031523,"sourceFileCount":0,"exportedLogBytes":0,"exportedRecordCount":0,"payloadSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","truncated":false}
 ```
 
 常见原因包括：刚清理过日志、诊断开关刚开启且尚未产生 `Info` 以上事件，或本次会话没有满足文件等级策略的记录。
@@ -40,27 +44,36 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `schemaVersion` | 日志记录协议版本 |
+| `schemaVersion` | 日志记录协议版本；v1 使用单个 `timestampMillis`，v2 使用下列双时间戳 |
 | `session` | 文件引擎本次运行会话的匿名标识；用于区分重启前后的事件 |
 | `sequence` | 同一 `session` 内单调递增的序号；判断事件顺序时优先使用它 |
-| `timestampMillis` | 事件发生时的 Unix 毫秒时间戳；系统时钟可能被校准或回拨 |
+| `eventTimestampMillis` | 事件实际发生时的 Unix 毫秒时间戳；补记历史事件时可早于观察时间 |
+| `observedTimestampMillis` | CyxbsLog 收到该事件时的 Unix 毫秒时间戳 |
 | `level` | `Verbose`、`Debug`、`Info`、`Warn`、`Error` 或 `Assert` |
 | `tag` | 稳定的类名、文件名或业务链路名 |
-| `message` | 已经过文件层防御性脱敏的诊断文本 |
+| `message` | 进入任意 sink 前已执行有界快照和防御性脱敏的诊断文本 |
 | `stackTrace` | 可选；调用方传入 `Throwable` 时记录，未传入时字段省略 |
+| `operation` | 可选；固定白名单内的低敏感操作名 |
+| `route` | 可选；已移除 query 与 fragment 的归一化路由模板 |
+| `method` / `statusCode` / `durationMillis` | 可选；受范围约束的请求方法、状态码与耗时 |
+| `result` / `retryCount` | 可选；固定结果枚举与重试次数 |
+| `fromState` / `toState` | 可选；低敏感状态迁移名称 |
+| `correlationId` | 可选；仅允许 1～64 位 ASCII 字母、数字及 `._:-` 的匿名关联 ID |
 | `truncated` | 该条记录是否因脱敏前 64 KiB 快照或最终 16 KiB 单条预算而被截断 |
 
-出现 `[REDACTED]` 表示文件层识别并替换了疑似凭据、个人信息或长数字。脱敏是兜底机制；不能据此推断原值，也不应尝试还原。
+出现 `[REDACTED]` 表示日志边界识别并替换了疑似凭据、个人信息或长数字。脱敏是兜底机制；不能据此推断原值，也不应尝试还原。
 
 ## 推荐阅读顺序
 
 ### 1. 先检查 manifest
 
-首先回答三个问题：
+首先回答五个问题：
 
 1. `sourceFileCount` 是否为 `0`？为 `0` 时文件没有日志事件。
 2. `exportedLogBytes` 是否大于 `0`？用于判断导出是否包含原始日志。
-3. `truncated` 是否为 `true`？为 `true` 时最早的部分日志可能未包含在导出文件中，不能据此断言异常链完整。
+3. `exportedRecordCount` 是否等于实际日志行数？
+4. `payloadSha256` 是否与 manifest 后原始字节的摘要一致？
+5. `truncated` 是否为 `true`？为 `true` 时最早的部分日志可能未包含在导出文件中，不能据此断言异常链完整。
 
 ### 2. 定位高等级事件
 
@@ -74,9 +87,9 @@
 
 ### 3. 按 session 和 sequence 串联事件
 
-在同一 `session` 内，使用 `sequence` 还原真实写入顺序。不要只依赖 `timestampMillis`，因为系统时钟可能校准或回拨。
+在同一 `session` 内，使用 `sequence` 还原真实写入顺序。不要只依赖 `eventTimestampMillis`，因为系统时钟可能校准或回拨；`observedTimestampMillis` 用于区分“事件发生”和“稍后观察并记录”。
 
-跨 session 比较时才主要参考 `timestampMillis`。session 改变通常表示文件引擎或应用经历过重启。
+跨 session 比较时可参考 `observedTimestampMillis`，但它仍是 wall clock，不提供全局严格顺序。session 改变通常表示文件引擎或应用经历过重启。历史 v1 行只有 `timestampMillis`，阅读器应按 `schemaVersion` 分支。
 
 ### 4. 通过 tag 缩小业务链路
 
@@ -103,46 +116,58 @@
 
 以下命令假设已安装 `jq`，并将路径替换为实际文件。
 
+### 校验 v2 payload 的摘要和行数
+
+manifest 的摘要覆盖首行之后的**原始字节**，包括每条记录结尾的换行符：
+
+```bash
+tail -n +2 cyxbs-log-export-v2-*.jsonl | shasum -a 256
+tail -n +2 cyxbs-log-export-v2-*.jsonl | wc -l
+jq -c 'select(.recordType == "manifest") | {payloadSha256, exportedRecordCount}' cyxbs-log-export-v2-*.jsonl
+```
+
+前两条结果应分别等于 manifest 的 `payloadSha256` 和 `exportedRecordCount`。一次只校验一个导出文件，避免 shell 通配符把多个文件串接。
+
 ### 格式化查看每一行
 
 ```bash
-jq . cyxbs-log-export-v1-*.jsonl
+jq . cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 只看日志事件
 
 ```bash
-jq -c 'select(.recordType == "log")' cyxbs-log-export-v1-*.jsonl
+jq -c 'select(.recordType == "log")' cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 只看 Warn、Error 和 Assert
 
 ```bash
-jq -c 'select(.recordType == "log" and (.level == "Warn" or .level == "Error" or .level == "Assert"))' cyxbs-log-export-v1-*.jsonl
+jq -c 'select(.recordType == "log" and (.level == "Warn" or .level == "Error" or .level == "Assert"))' cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 按表格输出关键字段
 
 ```bash
-jq -r 'select(.recordType == "log") | [.session, .sequence, .timestampMillis, .level, .tag, .message] | @tsv' cyxbs-log-export-v1-*.jsonl
+jq -r 'select(.recordType == "log") | [.session, .sequence, .eventTimestampMillis, .observedTimestampMillis, .level, .tag, .message] | @tsv' cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 查看某个 tag
 
 ```bash
-jq -c 'select(.recordType == "log" and .tag == "CourseRepository")' cyxbs-log-export-v1-*.jsonl
+jq -c 'select(.recordType == "log" and .tag == "CourseRepository")' cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 查看被截断的记录
 
 ```bash
-jq -c 'select(.truncated == true)' cyxbs-log-export-v1-*.jsonl
+jq -c 'select(.truncated == true)' cyxbs-log-export-v2-*.jsonl
 ```
 
 ### 将毫秒时间戳显示为 UTC 时间
 
 ```bash
-jq -r 'select(.recordType == "log") | [(.timestampMillis / 1000 | strftime("%Y-%m-%dT%H:%M:%SZ")), .level, .tag, .message] | @tsv' cyxbs-log-export-v1-*.jsonl
+jq -r 'select(.recordType == "log") | [(.eventTimestampMillis / 1000 | strftime("%Y-%m-%dT%H:%M:%SZ")), .level, .tag, .message] | @tsv' cyxbs-log-export-v2-*.jsonl
 ```
 
 ## 阅读时的安全边界
