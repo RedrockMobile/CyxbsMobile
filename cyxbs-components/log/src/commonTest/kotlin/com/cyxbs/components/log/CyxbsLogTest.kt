@@ -4,9 +4,58 @@ import com.cyxbs.components.log.storage.sanitizeForFileLog
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CyxbsLogTest {
+  @Test
+  fun throwableMessageFailureDoesNotEscapeLoggingBoundary() {
+    CyxbsLog.configure(LogConfig(minLevel = LogLevel.Debug))
+    try {
+      CyxbsLog.e(throwable = object : Throwable() {
+        override val message: String get() = error("render failed")
+      }) { "operation failed" }
+    } finally {
+      CyxbsLog.configure(LogConfig())
+    }
+  }
+
+  @Test
+  fun throwableTreeTraversalAndMessageRenderingAreBounded() {
+    var visited = 0
+    fun counted(cause: Throwable? = null) = object : Throwable(null, cause) {
+      override val message: String get() {
+        visited += 1
+        return "detail"
+      }
+    }
+    var cause: Throwable? = null
+    repeat(100) { cause = counted(cause) }
+    val root = counted(cause)
+    repeat(100) { root.addSuppressed(counted()) }
+    val tree = root.boundedThrowableSnapshot()
+    assertTrue(tree.truncated)
+    assertTrue(visited <= 8)
+
+    val huge = object : Throwable() {
+      override val message: String = "😀".repeat(100_000)
+      override val cause: Throwable get() = error("must stop before reading cause")
+    }.boundedThrowableSnapshot()
+    assertTrue(huge.truncated)
+    assertTrue(huge.value.length <= 16 * 1_024)
+    assertFalse(huge.value.last().isHighSurrogate())
+  }
+
+  @Test
+  fun throwableCauseCycleStopsWithoutExpandingForever() {
+    val cyclic = object : Throwable("cycle") {
+      override val cause: Throwable get() = this
+    }.boundedThrowableSnapshot()
+    assertTrue(cyclic.truncated)
+    assertTrue(cyclic.value.contains("circular exception"))
+    assertEquals(1, Regex("cycle").findAll(cyclic.value).count())
+  }
+
   @Test
   fun filteredMessageIsNotEvaluated() {
     CyxbsLog.configure(LogConfig(minLevel = LogLevel.Error))

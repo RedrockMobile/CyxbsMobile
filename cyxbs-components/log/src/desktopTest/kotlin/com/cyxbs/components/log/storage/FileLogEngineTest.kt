@@ -51,6 +51,87 @@ class FileLogEngineTest {
   private val fileSystem = FileSystem.SYSTEM
 
   @Test
+  fun overriddenThrowableRenderersAreNotInvoked() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      assertEquals(LogStorageResult.Success, CyxbsLog.startFileStorage(config(logDirectory, exportDirectory)))
+      try {
+        val error = object : Throwable("safe-detail") {
+          override fun toString(): String = error("toString must not be called")
+          override fun printStackTrace(writer: java.io.PrintWriter) = error("printStackTrace must not be called")
+        }
+        CyxbsLog.e(throwable = error) { "operation-failed" }
+        val exported = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
+        val contents = fileSystem.read(exported.filePath.toPath()) { readUtf8() }
+        assertTrue(contents.contains("operation-failed"))
+        assertTrue(contents.contains("safe-detail"))
+        assertEquals(1, exported.exportedRecordCount)
+      } finally {
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
+  fun inFlightLogCannotCrossCollectionDisable() = assertInFlightLogRejected {
+    CyxbsLog.setFileStorageCollectionEnabled(false)
+  }
+
+  @Test
+  fun inFlightLogCannotCrossCollectionDisableAndReenable() = assertInFlightLogRejected {
+    CyxbsLog.setFileStorageCollectionEnabled(false)
+    CyxbsLog.setFileStorageCollectionEnabled(true)
+  }
+
+  @Test
+  fun inFlightLogCannotReappearAfterClear() = assertInFlightLogRejected {
+    assertEquals(LogStorageResult.Success, CyxbsLog.clearFileStorage())
+  }
+
+  @Test
+  fun inFlightLogCannotEnterReplacementEngine() = assertInFlightLogRejected { configuration ->
+    assertEquals(LogStorageResult.Success, CyxbsLog.closeFileStorage())
+    assertEquals(LogStorageResult.Success, CyxbsLog.startFileStorage(configuration))
+  }
+
+  private fun assertInFlightLogRejected(barrier: suspend (FileLogConfig) -> Unit) = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val configuration = config(logDirectory, exportDirectory)
+      val entered = CountDownLatch(1)
+      val resume = CountDownLatch(1)
+      CyxbsLog.configure(LogConfig(minLevel = LogLevel.Assert))
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      assertEquals(LogStorageResult.Success, CyxbsLog.startFileStorage(configuration))
+      val producer = launch(Dispatchers.Default) {
+        CyxbsLog.i {
+          entered.countDown()
+          check(resume.await(5, TimeUnit.SECONDS))
+          "stale-in-flight-event"
+        }
+      }
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        barrier(configuration)
+        resume.countDown()
+        withTimeout(5_000) { producer.join() }
+        CyxbsLog.setFileStorageCollectionEnabled(true)
+        CyxbsLog.i { "fresh-event" }
+        val exported = assertIs<LogExportResult.Success>(CyxbsLog.exportFileStorage())
+        val contents = fileSystem.read(exported.filePath.toPath()) { readUtf8() }
+        assertFalse(contents.contains("stale-in-flight-event"))
+        assertTrue(contents.contains("fresh-event"))
+      } finally {
+        resume.countDown()
+        producer.join()
+        CyxbsLog.closeFileStorage()
+        CyxbsLog.setFileStorageCollectionEnabled(true)
+        CyxbsLog.configure(LogConfig())
+      }
+    }
+  }
+
+  @Test
   fun writesParseableJsonlAndExportsOnlySealedFiles() = runTest {
     withTemporaryDirectories { logDirectory, exportDirectory ->
       val engine = FileLogEngine(config(logDirectory, exportDirectory))
@@ -636,6 +717,13 @@ class FileLogEngineTest {
       assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
       val export = assertIs<LogExportResult.Success>(engine.export())
       val messages = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+      val manifest = Json.parseToJsonElement(messages.substringBefore('\n')).jsonObject
+      val health = manifest.getValue("health").jsonObject
+      assertEquals("currentEngineSession", health.getValue("scope").jsonPrimitive.content)
+      assertEquals("2", health.getValue("droppedQueueFull").jsonPrimitive.content)
+      assertEquals("1", health.getValue("droppedByLevel").jsonObject.getValue("Info").jsonPrimitive.content)
+      assertEquals("1", health.getValue("droppedByLevel").jsonObject.getValue("Error").jsonPrimitive.content)
+      assertEquals("Info", manifest.getValue("collectionPolicy").jsonObject.getValue("minLevel").jsonPrimitive.content)
       repeat(205) { index -> assertTrue(messages.contains("protected-$index")) }
       assertFalse(messages.contains("protected-rejected"))
       assertEquals(LogStorageResult.Success, engine.close())
@@ -780,6 +868,13 @@ class FileLogEngineTest {
       engine.offer(event(message = "recovered-write"))
       assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
       assertEquals(0, engine.health().consecutiveWriteFailures)
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val manifest = fileSystem.read(export.filePath.toPath()) { readUtf8LineStrict() }
+        .let { Json.parseToJsonElement(it).jsonObject }
+      val exportedHealth = manifest.getValue("health").jsonObject
+      assertTrue(exportedHealth.getValue("writeFailures").jsonPrimitive.content.toLong() >= 1)
+      assertTrue(exportedHealth.getValue("droppedWriteBackoff").jsonPrimitive.content.toLong() >= 1)
+      assertEquals("0", exportedHealth.getValue("consecutiveWriteFailures").jsonPrimitive.content)
       assertEquals(LogStorageResult.Success, engine.close())
     }
   }

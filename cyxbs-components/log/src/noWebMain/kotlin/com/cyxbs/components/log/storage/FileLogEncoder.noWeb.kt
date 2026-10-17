@@ -1,5 +1,8 @@
 package com.cyxbs.components.log.storage
 
+import com.cyxbs.components.log.FileLogConfig
+import com.cyxbs.components.log.FileLogHealth
+import com.cyxbs.components.log.LogLevel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,6 +22,34 @@ private data class ExportManifest(
   val exportedRecordCount: Long,
   val payloadSha256: String,
   val truncated: Boolean,
+  val collectionPolicy: ExportCollectionPolicy,
+  val health: ExportHealth,
+)
+
+@Serializable
+private data class ExportCollectionPolicy(
+  val session: String,
+  val minLevel: String,
+  val maxTotalBytes: Long,
+  val maxAgeMillis: Long,
+)
+
+/** 仅描述当前引擎会话；历史文件的采集缺口无法由进程内统计重建。 */
+@Serializable
+private data class ExportHealth(
+  val scope: String = "currentEngineSession",
+  val acceptedEntries: Long,
+  val droppedQueueFull: Long,
+  val droppedByteBudget: Long,
+  val droppedOversize: Long,
+  val droppedClosed: Long,
+  val droppedWriteBackoff: Long,
+  val droppedByLevel: Map<String, Long>,
+  val truncatedEntries: Long,
+  val writeFailures: Long,
+  val consecutiveWriteFailures: Int,
+  val lastSuccessfulWriteAtMillis: Long?,
+  val lastWriteFailureAtMillis: Long?,
 )
 
 @Serializable
@@ -58,6 +89,9 @@ internal fun encodeExportManifest(
   exportedRecordCount: Long,
   payloadSha256: String,
   truncated: Boolean,
+  config: FileLogConfig,
+  session: String,
+  health: FileLogHealth,
 ): ByteArray = (fileLogJson.encodeToString(
   ExportManifest(
     generatedAtMillis = generatedAtMillis,
@@ -66,6 +100,26 @@ internal fun encodeExportManifest(
     exportedRecordCount = exportedRecordCount,
     payloadSha256 = payloadSha256,
     truncated = truncated,
+    collectionPolicy = ExportCollectionPolicy(
+      session = session,
+      minLevel = config.minLevel.name,
+      maxTotalBytes = config.maxTotalBytes,
+      maxAgeMillis = config.maxAgeMillis,
+    ),
+    health = ExportHealth(
+      acceptedEntries = health.acceptedEntries,
+      droppedQueueFull = health.droppedQueueFull,
+      droppedByteBudget = health.droppedByteBudget,
+      droppedOversize = health.droppedOversize,
+      droppedClosed = health.droppedClosed,
+      droppedWriteBackoff = health.droppedWriteBackoff,
+      droppedByLevel = LogLevel.entries.associate { it.name to health.droppedByLevel[it] },
+      truncatedEntries = health.truncatedEntries,
+      writeFailures = health.writeFailures,
+      consecutiveWriteFailures = health.consecutiveWriteFailures,
+      lastSuccessfulWriteAtMillis = health.lastSuccessfulWriteAtMillis,
+      lastWriteFailureAtMillis = health.lastWriteFailureAtMillis,
+    ),
   )
 ) + "\n").encodeToByteArray()
 

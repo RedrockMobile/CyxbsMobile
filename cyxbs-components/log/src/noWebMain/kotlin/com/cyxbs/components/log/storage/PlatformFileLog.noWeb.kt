@@ -22,9 +22,7 @@ internal actual object PlatformFileLog {
 
   actual fun accepts(level: LogLevel): Boolean = engine.value?.accepts(level) == true
 
-  actual fun offer(event: FileLogEvent) {
-    engine.value?.offer(event)
-  }
+  actual fun admission(level: LogLevel): FileLogAdmission? = engine.value?.admission(level)
 
   actual suspend fun start(config: FileLogConfig): LogStorageResult = managementMutex.withLock {
     val previous = engine.value

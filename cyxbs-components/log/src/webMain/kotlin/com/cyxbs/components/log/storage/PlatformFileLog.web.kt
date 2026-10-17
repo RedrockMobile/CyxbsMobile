@@ -12,7 +12,7 @@ import com.cyxbs.components.log.LogStorageResult
 internal actual object PlatformFileLog {
   actual fun accepts(level: LogLevel): Boolean = false
 
-  actual fun offer(event: FileLogEvent) = Unit
+  actual fun admission(level: LogLevel): FileLogAdmission? = null
 
   actual suspend fun start(config: FileLogConfig): LogStorageResult =
     LogStorageResult.Unsupported

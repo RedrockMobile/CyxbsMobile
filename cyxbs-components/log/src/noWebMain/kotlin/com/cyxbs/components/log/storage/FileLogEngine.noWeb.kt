@@ -128,10 +128,18 @@ internal class FileLogEngine(
 
   fun accepts(level: LogLevel): Boolean = accepting.value && level >= config.minLevel
 
-  fun offer(event: FileLogEvent) {
+  fun admission(level: LogLevel): FileLogAdmission? = synchronized(gate) {
+    if (!accepts(level)) return@synchronized null
+    val epoch = receptionEpoch.value
+    FileLogAdmission { event -> offer(event, epoch) }
+  }
+
+  fun offer(event: FileLogEvent) = offer(event, receptionEpoch.value)
+
+  private fun offer(event: FileLogEvent, expectedEpoch: Long) {
     val estimatedBytes = estimatePayloadBytes(event)
     synchronized(gate) {
-      if (!accepting.value) {
+      if (!accepting.value || receptionEpoch.value != expectedEpoch) {
         droppedClosed.incrementAndGet()
         incrementDropped(event.level)
         return
@@ -418,7 +426,7 @@ internal class FileLogEngine(
           is Command.Export -> {
             val outcome = runCommand(
               failure = { LogExportResult.Failure(it) },
-              block = { files.export() },
+              block = { files.export(::health) },
             )
             if (outcome is LogExportResult.Failure) {
               files.recoverAfterFailure()
@@ -612,7 +620,7 @@ private class WorkerFiles(
     openActive()
   }
 
-  fun export(): LogExportResult {
+  fun export(health: () -> FileLogHealth): LogExportResult {
     sealActive()
     cleanupLogs(reserveActiveFile = true)
     openActive()
@@ -647,6 +655,9 @@ private class WorkerFiles(
       exportedRecordCount = payloadIntegrity.recordCount,
       payloadSha256 = payloadIntegrity.sha256,
       truncated = truncated,
+      config = config,
+      session = session,
+      health = health(),
     )
     exportGeneration += 1
     val generationPart = exportGeneration.toString().padStart(GENERATION_WIDTH, '0')

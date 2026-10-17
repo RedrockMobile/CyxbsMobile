@@ -159,7 +159,7 @@ deeplink: cyxbs://food
 - argument: `com.cyxbs.pages.home.api.HomeNavArgument`
 
 ```text
-deeplink: cyxbs://home?page=[String]
+deeplink: cyxbs://home?page=[String]&courseItemId=[String?]&courseOpenId=[Long?]
 ```
 
 ## :cyxbs-pages:login

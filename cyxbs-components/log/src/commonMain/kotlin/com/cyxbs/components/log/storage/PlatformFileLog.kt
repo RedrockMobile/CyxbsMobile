@@ -32,10 +32,15 @@ internal data class PreparedLogContext(
   val correlationId: String?,
 )
 
+/** 绑定到取得许可时的引擎和清理版本，不能转交给后续引擎。 */
+internal fun interface FileLogAdmission {
+  fun offer(event: FileLogEvent)
+}
+
 internal expect object PlatformFileLog {
   fun accepts(level: LogLevel): Boolean
 
-  fun offer(event: FileLogEvent)
+  fun admission(level: LogLevel): FileLogAdmission?
 
   suspend fun start(config: FileLogConfig): LogStorageResult
 

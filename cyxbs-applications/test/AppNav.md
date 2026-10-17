@@ -231,6 +231,15 @@ deeplink: cyxbs://about
 deeplink: cyxbs://mine/edit
 ```
 
+### mine/setting/log
+
+- entry: `com.cyxbs.pages.mine.log.LogSettingNavEntry`
+- argument: `com.cyxbs.pages.mine.log.LogSettingNavArgument`
+
+```text
+deeplink: cyxbs://mine/setting/log
+```
+
 ### mine/setting
 
 - entry: `com.cyxbs.pages.mine.setting.SettingNavEntry`

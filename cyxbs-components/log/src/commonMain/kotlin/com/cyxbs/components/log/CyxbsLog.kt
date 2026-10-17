@@ -9,6 +9,8 @@ import com.cyxbs.components.log.storage.PlatformFileLog
 import com.cyxbs.components.log.storage.PreparedLogContext
 import com.cyxbs.components.log.storage.sanitizeForFileLog
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlin.time.Clock
 
 /**
@@ -28,6 +30,8 @@ object CyxbsLog {
 
   private val state = atomic(State(LogConfig()))
   private val fileStorageCollectionEnabled = atomic(true)
+  private val collectionGate = SynchronizedObject()
+  private var collectionEpoch = 0L
 
   /**
    * 设置当前进程的日志策略，建议在应用启动时、业务初始化之前调用。
@@ -97,30 +101,35 @@ object CyxbsLog {
     if (!snapshot.config.enabled) return
 
     val consoleAccepted = level >= snapshot.config.minLevel
-    val fileAccepted = fileStorageCollectionEnabled.value && PlatformFileLog.accepts(level)
-    if (!consoleAccepted && !fileAccepted) return
+    val (epoch, admission) = synchronized(collectionGate) {
+      collectionEpoch to if (fileStorageCollectionEnabled.value) PlatformFileLog.admission(level) else null
+    }
+    if (!consoleAccepted && admission == null) return
 
     val resolvedTag = tag ?: snapshot.config.defaultTag
     val renderedMessage = runCatching(message).getOrNull() ?: return
-    val payload = prepareLogPayload(resolvedTag, renderedMessage, throwable, throwableRendering)
+    val payload = runCatching {
+      prepareLogPayload(resolvedTag, renderedMessage, throwable, throwableRendering)
+    }.getOrNull() ?: return
     val preparedContext = context?.prepareForLog()
     val observedTimestampMillis = Clock.System.now().toEpochMilliseconds()
 
-    if (fileAccepted) {
-      PlatformFileLog.offer(
-        FileLogEvent(
-          eventTimestampMillis = context?.eventTimestampMillis
-            ?.takeIf { it > 0 }
-            ?: observedTimestampMillis,
-          observedTimestampMillis = observedTimestampMillis,
-          level = level,
-          tag = payload.tag,
-          message = payload.message,
-          stackTrace = payload.stackTrace,
-          context = preparedContext?.value,
-          snapshotTruncated = payload.truncated || preparedContext?.truncated == true,
-        )
+    if (admission != null) {
+      val event = FileLogEvent(
+        eventTimestampMillis = context?.eventTimestampMillis
+          ?.takeIf { it > 0 }
+          ?: observedTimestampMillis,
+        observedTimestampMillis = observedTimestampMillis,
+        level = level,
+        tag = payload.tag,
+        message = payload.message,
+        stackTrace = payload.stackTrace,
+        context = preparedContext?.value,
+        snapshotTruncated = payload.truncated || preparedContext?.truncated == true,
       )
+      synchronized(collectionGate) {
+        if (fileStorageCollectionEnabled.value && collectionEpoch == epoch) admission.offer(event)
+      }
     }
     if (consoleAccepted) {
       val consoleMessage = buildConsoleMessage(payload.message, payload.stackTrace, preparedContext?.value)
@@ -142,7 +151,10 @@ object CyxbsLog {
    * 宿主在隐私撤回和用户关闭采集时应先设为 false，再异步调用 [closeFileStorage] 排空旧记录。
    */
   fun setFileStorageCollectionEnabled(enabled: Boolean) {
-    fileStorageCollectionEnabled.value = enabled
+    synchronized(collectionGate) {
+      if (fileStorageCollectionEnabled.value != enabled) collectionEpoch += 1
+      fileStorageCollectionEnabled.value = enabled
+    }
   }
 
   /**
@@ -338,7 +350,7 @@ internal fun prepareLogPayload(
 }
 
 private fun Throwable.toLogSnapshot(rendering: ThrowableRendering): FileTextSnapshot = when (rendering) {
-  ThrowableRendering.Full -> stackTraceToString().takeRawFileSnapshot()
+  ThrowableRendering.Full -> boundedThrowableSnapshot()
   ThrowableRendering.Summary -> {
     val type = this::class.simpleName ?: "Throwable"
     val detail = runCatching { message }.getOrNull()?.takeRawFileSnapshot()

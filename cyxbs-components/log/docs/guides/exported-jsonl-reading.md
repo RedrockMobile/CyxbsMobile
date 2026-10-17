@@ -27,8 +27,14 @@
 | `exportedRecordCount` | manifest 后日志行的数量 |
 | `payloadSha256` | manifest 后所有原始字节（包括每行换行符）的 SHA-256 小写十六进制摘要 |
 | `truncated` | 是否因“最多 3 个源文件”或“最多 32 MiB”限制而省略了更早的数据 |
+| `collectionPolicy` | 当前引擎的匿名 `session`、`minLevel`、`maxTotalBytes` 和 `maxAgeMillis` |
+| `health` | 当前引擎会话的接收、丢弃、截断、写失败与最近成功/失败时间快照 |
 
 `payloadSha256` 只能检查分享或传输后内容是否变化，不是数字签名，不能证明文件来源或真实性。
+
+`health.scope=currentEngineSession` 表示这些统计只覆盖 `collectionPolicy.session`，不包含重启前或其他历史源文件的完整健康信息。`droppedQueueFull`、`droppedByteBudget`、`droppedOversize`、`droppedClosed`、`droppedWriteBackoff` 是丢弃原因；`droppedByLevel` 按等级汇总同一批丢弃，不能与原因计数重复相加。`writeFailures` 统计文件操作失败次数，不等于丢失条数；`consecutiveWriteFailures` 在成功写入后归零，累计失败仍保留。`truncatedEntries` 说明单条内容缺口。`acceptedEntries` 也不代表持久化条数。
+
+因此 `truncated=false` 不代表采集完整，仍需检查 `health`。较早的 v2 文件可能没有这两个新增字段，此时健康信息为未知。上面的示例省略新增字段，payload 摘要仍只覆盖 manifest 后的原始字节。
 
 以下内容表示导出成功，但当时没有可导出的日志事件：
 
@@ -110,7 +116,7 @@
 - manifest 的 `truncated=true`：整次导出不包含全部候选源文件。
 - log 的 `truncated=true`：该条的 tag、message 或 stackTrace 被截断。
 - `stackTrace` 缺失：只表示调用方没有传入 Throwable，不等价于没有异常。
-- sequence 跳号：可能有事件因队列、编码、写盘失败或故障退避被丢弃；结合应用内文件日志健康统计判断。
+- sequence 跳号：可能有事件因编码、写盘失败或故障退避被丢弃；结合 manifest 的 `health` 判断。入队前丢弃不会产生 sequence，因此序号连续也不能证明采集完整。
 
 ## 命令行阅读
 
