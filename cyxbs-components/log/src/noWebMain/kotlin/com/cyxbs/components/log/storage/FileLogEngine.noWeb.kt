@@ -29,10 +29,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.BufferedSink
 import okio.FileSystem
+import okio.HashingSink
 import okio.IOException
 import okio.Path
 import okio.Path.Companion.toPath
 import okio.SYSTEM
+import okio.blackholeSink
 import okio.buffer
 import kotlin.math.min
 import kotlin.random.Random
@@ -58,8 +60,13 @@ private const val MAX_PUBLISHED_EXPORT_FILES = 1
 private const val RECOVERY_SCAN_CHUNK_BYTES = 64 * 1_024
 private const val FILE_RETRY_BASE_MILLIS = 250L
 private const val FILE_RETRY_MAX_MILLIS = 30_000L
-private const val FILE_PREFIX = "cyxbs-log-v1-"
-private const val EXPORT_PREFIX = "cyxbs-log-export-v1-"
+private const val LEGACY_FILE_PREFIX = "cyxbs-log-v1-"
+private const val FILE_PREFIX = "cyxbs-log-v2-"
+private const val LEGACY_EXPORT_PREFIX = "cyxbs-log-export-v1-"
+private const val EXPORT_PREFIX = "cyxbs-log-export-v2-"
+private const val GENERATION_WIDTH = 20
+private const val FILE_INDEX_WIDTH = 6
+private const val DIGEST_BUFFER_BYTES = 64 * 1_024
 
 /**
  * noWeb 平台的有界 JSONL 文件引擎：调用方只入队，单一工作协程负责写盘、轮转、导出和恢复。
@@ -101,6 +108,13 @@ internal class FileLogEngine(
   private val droppedError = atomic(0L)
   private val droppedAssert = atomic(0L)
   private val writeFailures = atomic(0L)
+  private val lastSuccessfulWriteAtMillis = atomic(0L)
+  private val lastWriteFailureAtMillis = atomic(0L)
+  private val lastWriteFailureType = atomic<String?>(null)
+  private val consecutiveWriteFailures = atomic(0)
+  private val lastFlushDurationMillis = atomic(-1L)
+  private val managedFileCount = atomic(0)
+  private val managedBytes = atomic(0L)
   private val queuedEntries = atomic(0)
   private val queuedBytes = atomic(0L)
   private val queuedLowPriorityEntries = atomic(0)
@@ -240,6 +254,13 @@ internal class FileLogEngine(
       error = droppedError.value,
       assert = droppedAssert.value,
     ),
+    lastSuccessfulWriteAtMillis = lastSuccessfulWriteAtMillis.value.takeIf { it > 0 },
+    lastWriteFailureAtMillis = lastWriteFailureAtMillis.value.takeIf { it > 0 },
+    lastWriteFailureType = lastWriteFailureType.value,
+    consecutiveWriteFailures = consecutiveWriteFailures.value,
+    lastFlushDurationMillis = lastFlushDurationMillis.value.takeIf { it >= 0 },
+    managedFileCount = managedFileCount.value,
+    managedBytes = managedBytes.value,
   )
 
   private fun adjustQueuedRecord(level: LogLevel, estimatedBytes: Int, delta: Int) {
@@ -262,6 +283,29 @@ internal class FileLogEngine(
     }
   }
 
+  private fun updateFileMetrics(metrics: WorkerFileMetrics) {
+    managedFileCount.value = metrics.fileCount
+    managedBytes.value = metrics.totalBytes
+  }
+
+  private fun recordWriteFailure(throwable: Throwable) {
+    writeFailures.incrementAndGet()
+    if (consecutiveWriteFailures.value < Int.MAX_VALUE) {
+      consecutiveWriteFailures.incrementAndGet()
+    }
+    lastWriteFailureAtMillis.value = nowMillis()
+    lastWriteFailureType.value = throwable::class.simpleName ?: "UnknownFailure"
+  }
+
+  private inline fun <T> measureFlushDuration(block: () -> T): T {
+    val startedAt = TimeSource.Monotonic.markNow()
+    return try {
+      block()
+    } finally {
+      lastFlushDurationMillis.value = startedAt.elapsedNow().inWholeMilliseconds.coerceAtLeast(0)
+    }
+  }
+
   private fun enqueueWhileRunning(command: Command): Boolean = synchronized(gate) {
     state.value == FileLogState.Running && mailbox.trySend(command).isSuccess
   }
@@ -279,7 +323,15 @@ internal class FileLogEngine(
   }
 
   private suspend fun runWorker() {
-    val files = WorkerFiles(config, directory, exportDirectory, session, fileSystem, nowMillis)
+    val files = WorkerFiles(
+      config = config,
+      directory = directory,
+      exportDirectory = exportDirectory,
+      session = session,
+      fileSystem = fileSystem,
+      nowMillis = nowMillis,
+      onMetricsChanged = ::updateFileMetrics,
+    )
     try {
       files.initialize()
       synchronized(gate) {
@@ -297,7 +349,9 @@ internal class FileLogEngine(
           .coerceAtLeast(1)
         val command = withTimeoutOrNull(remainingMillis) { mailbox.receive() }
         if (command == null) {
-          runFileOperation(files, countBackoffDrop = false) { flush() }
+          runFileOperation(files, countBackoffDrop = false) {
+            measureFlushDuration { flush() }
+          }
           lastFlush = TimeSource.Monotonic.markNow()
           continue
         }
@@ -312,24 +366,27 @@ internal class FileLogEngine(
               if (encoded.truncated) truncatedEntries.incrementAndGet()
               val written = runFileOperation(files, countBackoffDrop = true) { write(encoded.bytes) }
               if (!written) incrementDropped(command.event.level)
-              if (lastFlush.elapsedNow().inWholeMilliseconds >= FLUSH_INTERVAL_MILLIS) {
-                runFileOperation(files, countBackoffDrop = false) { flush() }
-                lastFlush = TimeSource.Monotonic.markNow()
-              }
+                if (lastFlush.elapsedNow().inWholeMilliseconds >= FLUSH_INTERVAL_MILLIS) {
+                  runFileOperation(files, countBackoffDrop = false) {
+                    measureFlushDuration { flush() }
+                  }
+                  lastFlush = TimeSource.Monotonic.markNow()
+                }
             }
           }
           is Command.Flush -> {
             val outcome = runCommand(
               failure = { LogFlushResult.Failure(it) },
               block = {
-                files.flush()
+                measureFlushDuration { files.flush() }
                 LogFlushResult.Buffered
               },
             )
             if (outcome is LogFlushResult.Failure) {
-              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+              files.recoverAfterFailure()
+              scheduleFileRetry()
             } else {
-              resetFileRetry()
+              resetFileRetryBackoff()
             }
             command.result.complete(outcome)
             lastFlush = TimeSource.Monotonic.markNow()
@@ -343,9 +400,10 @@ internal class FileLogEngine(
               },
             )
             if (outcome != LogStorageResult.Success) {
-              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+              files.recoverAfterFailure()
+              scheduleFileRetry()
             } else {
-              resetFileRetry()
+              resetFileRetryBackoff()
             }
             if (state.value == FileLogState.Running &&
               receptionEpoch.value == command.epoch
@@ -363,9 +421,10 @@ internal class FileLogEngine(
               block = { files.export() },
             )
             if (outcome is LogExportResult.Failure) {
-              if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+              files.recoverAfterFailure()
+              scheduleFileRetry()
             } else {
-              resetFileRetry()
+              resetFileRetryBackoff()
             }
             command.result.complete(outcome)
             lastFlush = TimeSource.Monotonic.markNow()
@@ -396,7 +455,7 @@ internal class FileLogEngine(
       finishFailed("file log worker was cancelled")
       throw cancellation
     } catch (throwable: Throwable) {
-      writeFailures.incrementAndGet()
+      recordWriteFailure(throwable)
       finishFailed(throwable.safeMessage())
     } finally {
       synchronized(gate) {
@@ -417,7 +476,7 @@ internal class FileLogEngine(
       block()
     } catch (throwable: Throwable) {
       if (throwable is CancellationException) throw throwable
-      writeFailures.incrementAndGet()
+      recordWriteFailure(throwable)
       failure(throwable.safeMessage())
     }
   }
@@ -448,12 +507,17 @@ internal class FileLogEngine(
     }
     return try {
       files.block()
-      resetFileRetry()
+      if (countBackoffDrop) {
+        lastSuccessfulWriteAtMillis.value = nowMillis()
+        consecutiveWriteFailures.value = 0
+      }
+      resetFileRetryBackoff()
       true
     } catch (throwable: Throwable) {
       if (throwable is CancellationException) throw throwable
-      writeFailures.incrementAndGet()
-      if (files.recoverAfterFailure()) resetFileRetry() else scheduleFileRetry()
+      recordWriteFailure(throwable)
+      files.recoverAfterFailure()
+      scheduleFileRetry()
       false
     }
   }
@@ -465,7 +529,7 @@ internal class FileLogEngine(
     fileRetryAfter = TimeSource.Monotonic.markNow() + retryMillis.milliseconds
   }
 
-  private fun resetFileRetry() {
+  private fun resetFileRetryBackoff() {
     fileFailureStreak = 0
     fileRetryAfter = null
   }
@@ -481,6 +545,11 @@ internal class FileLogEngine(
   }
 }
 
+private data class WorkerFileMetrics(
+  val fileCount: Int,
+  val totalBytes: Long,
+)
+
 private class WorkerFiles(
   private val config: FileLogConfig,
   private val directory: Path,
@@ -488,20 +557,27 @@ private class WorkerFiles(
   private val session: String,
   private val fileSystem: FileSystem,
   private val nowMillis: () -> Long,
+  private val onMetricsChanged: (WorkerFileMetrics) -> Unit,
 ) {
   private val maxFileBytes = min(4L * 1_024 * 1_024, config.maxTotalBytes)
+  private var generation = 0L
+  private var exportGeneration = 0L
   private var fileIndex = 0
   private var sequence = 0L
   private var sink: BufferedSink? = null
   private var activePath: Path? = null
   private var activeBytes = 0L
   private var pendingBytes = 0
+  private var managedFileCount = 0
+  private var managedBytes = 0L
 
   fun nextSequence(): Long = ++sequence
 
   fun initialize() {
     fileSystem.createDirectories(directory)
     fileSystem.createDirectories(exportDirectory)
+    generation = nextGeneration(managedLogFiles(includeActive = true), FILE_PREFIX)
+    exportGeneration = maxGeneration(managedExportFiles(), EXPORT_PREFIX)
     recoverActiveFiles()
     cleanupExports()
     cleanupLogs(reserveActiveFile = true)
@@ -530,6 +606,9 @@ private class WorkerFiles(
     closeActive(deleteEmpty = true)
     managedLogFiles(includeActive = true).forEach { path -> fileSystem.delete(path, mustExist = false) }
     cleanupExports(deleteAll = true)
+    managedFileCount = 1
+    managedBytes = 0
+    publishMetrics()
     openActive()
   }
 
@@ -539,7 +618,7 @@ private class WorkerFiles(
     openActive()
 
     val candidates = managedLogFiles(includeActive = false)
-      .sortedByDescending { fileSystem.metadata(it).lastModifiedAtMillis ?: 0L }
+      .sortedWith(managedFileComparatorDescending(FILE_PREFIX))
     val selected = ArrayList<Path>()
     var selectedBytes = 0L
     var truncated = false
@@ -560,13 +639,18 @@ private class WorkerFiles(
 
     fileSystem.createDirectories(exportDirectory)
     val generatedAtMillis = nowMillis()
+    val payloadIntegrity = calculatePayloadIntegrity(selected)
     val manifest = encodeExportManifest(
       generatedAtMillis = generatedAtMillis,
       sourceFileCount = selected.size,
       exportedLogBytes = selectedBytes,
+      exportedRecordCount = payloadIntegrity.recordCount,
+      payloadSha256 = payloadIntegrity.sha256,
       truncated = truncated,
     )
-    val id = "$generatedAtMillis-${Random.nextLong().toULong().toString(16)}"
+    exportGeneration += 1
+    val generationPart = exportGeneration.toString().padStart(GENERATION_WIDTH, '0')
+    val id = "$generationPart-$generatedAtMillis-${Random.nextLong().toULong().toString(16)}"
     val partial = exportDirectory / "$EXPORT_PREFIX$id.jsonl.partial"
     val published = exportDirectory / "$EXPORT_PREFIX$id.jsonl"
     try {
@@ -590,10 +674,44 @@ private class WorkerFiles(
         filePath = published.toString(),
         exportedBytes = selectedBytes + manifest.size,
         truncated = truncated,
+        exportedRecordCount = payloadIntegrity.recordCount,
+        payloadSha256 = payloadIntegrity.sha256,
       )
     } finally {
       fileSystem.delete(partial, mustExist = false)
     }
+  }
+
+  private data class PayloadIntegrity(
+    val recordCount: Long,
+    val sha256: String,
+  )
+
+  private fun calculatePayloadIntegrity(paths: List<Path>): PayloadIntegrity {
+    val hashingSink = HashingSink.sha256(blackholeSink())
+    val hashingOutput = hashingSink.buffer()
+    val chunk = ByteArray(DIGEST_BUFFER_BYTES)
+    var recordCount = 0L
+    try {
+      paths.forEach { path ->
+        val input = fileSystem.source(path).buffer()
+        try {
+          while (true) {
+            val read = input.read(chunk)
+            if (read == -1) break
+            for (index in 0 until read) {
+              if (chunk[index] == '\n'.code.toByte()) recordCount += 1
+            }
+            hashingOutput.write(chunk, 0, read)
+          }
+        } finally {
+          input.close()
+        }
+      }
+    } finally {
+      hashingOutput.close()
+    }
+    return PayloadIntegrity(recordCount, hashingSink.hash.hex())
   }
 
   fun close() {
@@ -603,7 +721,9 @@ private class WorkerFiles(
   private fun openActive() {
     check(sink == null) { "active sink is already open" }
     fileIndex += 1
-    activePath = directory / "$FILE_PREFIX$session-${fileIndex.toString().padStart(6, '0')}.active"
+    val generationPart = generation.toString().padStart(GENERATION_WIDTH, '0')
+    val indexPart = fileIndex.toString().padStart(FILE_INDEX_WIDTH, '0')
+    activePath = directory / "$FILE_PREFIX$generationPart-$session-$indexPart.active"
     sink = fileSystem.appendingSink(activePath!!, mustExist = false).buffer()
     activeBytes = fileSystem.metadata(activePath!!).size ?: 0L
     pendingBytes = 0
@@ -633,7 +753,11 @@ private class WorkerFiles(
     }
     if (deleteEmpty && path != null && fileSystem.exists(path)) {
       val size = fileSystem.metadata(path).size ?: 0L
-      if (size == 0L) fileSystem.delete(path, mustExist = false)
+      if (size == 0L) {
+        fileSystem.delete(path, mustExist = false)
+        managedFileCount = (managedFileCount - 1).coerceAtLeast(0)
+        publishMetrics()
+      }
     }
   }
 
@@ -710,7 +834,7 @@ private class WorkerFiles(
     val now = nowMillis()
     val sealed = managedLogFiles(includeActive = false)
       .map { path -> path to fileSystem.metadata(path) }
-      .sortedBy { (_, metadata) -> metadata.lastModifiedAtMillis ?: Long.MIN_VALUE }
+      .sortedWith(Comparator { left, right -> compareManagedLogs(left.first, right.first) })
       .toMutableList()
 
     sealed.removeAll { (path, metadata) ->
@@ -733,13 +857,15 @@ private class WorkerFiles(
       fileSystem.delete(path, mustExist = false)
       totalBytes -= metadata.size ?: 0L
     }
+    managedFileCount = sealed.size + activeFileCount
+    managedBytes = totalBytes.coerceAtLeast(0)
+    publishMetrics()
   }
 
   private fun cleanupExports(except: Path? = null, deleteAll: Boolean = false) {
     if (!fileSystem.exists(exportDirectory)) return
-    val exports = fileSystem.list(exportDirectory)
-      .filter { it.name.startsWith(EXPORT_PREFIX) }
-      .sortedByDescending { fileSystem.metadata(it).lastModifiedAtMillis ?: 0L }
+    val exports = managedExportFiles()
+      .sortedWith(Comparator { left, right -> compareManagedExports(right, left) })
     var retainedPublishedFiles = 0
     exports.forEach { path ->
       if (path == except) return@forEach
@@ -756,19 +882,91 @@ private class WorkerFiles(
     }
   }
 
+  private fun publishMetrics() {
+    onMetricsChanged(WorkerFileMetrics(managedFileCount, managedBytes))
+  }
+
   private fun managedLogFiles(includeActive: Boolean): List<Path> {
     if (!fileSystem.exists(directory)) return emptyList()
     return fileSystem.list(directory).filter { path ->
-      path.name.startsWith(FILE_PREFIX) &&
+      (path.name.startsWith(FILE_PREFIX) || path.name.startsWith(LEGACY_FILE_PREFIX)) &&
         (path.name.endsWith(".jsonl") || includeActive && path.name.endsWith(".active"))
     }
   }
+
+  private fun managedExportFiles(): List<Path> {
+    if (!fileSystem.exists(exportDirectory)) return emptyList()
+    return fileSystem.list(exportDirectory).filter { path ->
+      path.name.startsWith(EXPORT_PREFIX) || path.name.startsWith(LEGACY_EXPORT_PREFIX)
+    }
+  }
+
+  private fun managedFileComparatorDescending(prefix: String): Comparator<Path> = Comparator { left, right ->
+    compareManaged(right, left, prefix)
+  }
+
+  private fun compareManagedLogs(left: Path, right: Path): Int = compareManaged(left, right, FILE_PREFIX)
+
+  private fun compareManagedExports(left: Path, right: Path): Int = compareManaged(left, right, EXPORT_PREFIX)
+
+  private fun compareManaged(left: Path, right: Path, prefix: String): Int {
+    val leftGeneration = parseGeneration(left, prefix)
+    val rightGeneration = parseGeneration(right, prefix)
+    if (leftGeneration != null || rightGeneration != null) {
+      if (leftGeneration == null) return -1
+      if (rightGeneration == null) return 1
+      val generationComparison = leftGeneration.compareTo(rightGeneration)
+      if (generationComparison != 0) return generationComparison
+      val indexComparison = parseFileIndex(left).compareTo(parseFileIndex(right))
+      if (indexComparison != 0) return indexComparison
+    }
+    val modifiedComparison = (fileSystem.metadata(left).lastModifiedAtMillis ?: Long.MIN_VALUE)
+      .compareTo(fileSystem.metadata(right).lastModifiedAtMillis ?: Long.MIN_VALUE)
+    return if (modifiedComparison != 0) modifiedComparison else left.name.compareTo(right.name)
+  }
+
+  private fun nextGeneration(paths: List<Path>, prefix: String): Long {
+    val maximum = maxGeneration(paths, prefix)
+    check(maximum < Long.MAX_VALUE) { "file log generation is exhausted" }
+    return maximum + 1
+  }
+
+  private fun maxGeneration(paths: List<Path>, prefix: String): Long =
+    paths.maxOfOrNull { path -> parseGeneration(path, prefix) ?: 0L } ?: 0L
+
+  private fun parseGeneration(path: Path, prefix: String): Long? = path.name
+    .takeIf { it.startsWith(prefix) }
+    ?.removePrefix(prefix)
+    ?.substringBefore('-')
+    ?.toLongOrNull()
+
+  private fun parseFileIndex(path: Path): Int = path.name
+    .substringBeforeLast('.')
+    .substringAfterLast('-')
+    .toIntOrNull()
+    ?: 0
 }
 
 private fun estimatePayloadBytes(event: FileLogEvent): Int {
   val stackBytes = event.stackTrace?.encodeToByteArray()?.size ?: 0
-  return (event.tag.encodeToByteArray().size + event.message.encodeToByteArray().size + stackBytes + 256)
-    .coerceAtMost(Int.MAX_VALUE)
+  val contextBytes = event.context?.let { context ->
+    listOfNotNull(
+      context.operation,
+      context.route,
+      context.method,
+      context.result,
+      context.fromState,
+      context.toState,
+      context.correlationId,
+    ).sumOf { it.encodeToByteArray().size }
+  } ?: 0
+  return (
+    event.tag.encodeToByteArray().size +
+      event.message.encodeToByteArray().size +
+      stackBytes +
+      contextBytes +
+      256
+    ).coerceAtMost(Int.MAX_VALUE)
 }
 
 private fun Throwable.safeMessage(): String = message?.take(512) ?: this::class.simpleName ?: "unknown error"

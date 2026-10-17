@@ -6,6 +6,7 @@ import co.touchlab.kermit.loggerConfigInit
 import co.touchlab.kermit.platformLogWriter
 import com.cyxbs.components.log.storage.FileLogEvent
 import com.cyxbs.components.log.storage.PlatformFileLog
+import com.cyxbs.components.log.storage.PreparedLogContext
 import com.cyxbs.components.log.storage.sanitizeForFileLog
 import kotlinx.atomicfu.atomic
 import kotlin.time.Clock
@@ -68,6 +69,30 @@ object CyxbsLog {
     throwable: Throwable? = null,
     message: () -> String,
   ) {
+    logInternal(level, tag, throwable, context = null, message)
+  }
+
+  /**
+   * 输出带固定白名单结构化上下文的日志。旧文本 API 保持不变；仅在确有诊断价值时填写 [context]。
+   */
+  fun log(
+    level: LogLevel,
+    tag: String? = null,
+    throwable: Throwable? = null,
+    context: LogContext,
+    message: () -> String,
+  ) {
+    logInternal(level, tag, throwable, context, message)
+  }
+
+  private fun logInternal(
+    level: LogLevel,
+    tag: String?,
+    throwable: Throwable?,
+    context: LogContext?,
+    message: () -> String,
+    throwableRendering: ThrowableRendering = ThrowableRendering.Full,
+  ) {
     val snapshot = state.value
     if (!snapshot.config.enabled) return
 
@@ -77,22 +102,28 @@ object CyxbsLog {
 
     val resolvedTag = tag ?: snapshot.config.defaultTag
     val renderedMessage = runCatching(message).getOrNull() ?: return
-    val payload = prepareLogPayload(resolvedTag, renderedMessage, throwable)
+    val payload = prepareLogPayload(resolvedTag, renderedMessage, throwable, throwableRendering)
+    val preparedContext = context?.prepareForLog()
+    val observedTimestampMillis = Clock.System.now().toEpochMilliseconds()
 
     if (fileAccepted) {
       PlatformFileLog.offer(
         FileLogEvent(
-          timestampMillis = Clock.System.now().toEpochMilliseconds(),
+          eventTimestampMillis = context?.eventTimestampMillis
+            ?.takeIf { it > 0 }
+            ?: observedTimestampMillis,
+          observedTimestampMillis = observedTimestampMillis,
           level = level,
           tag = payload.tag,
           message = payload.message,
           stackTrace = payload.stackTrace,
-          snapshotTruncated = payload.truncated,
+          context = preparedContext?.value,
+          snapshotTruncated = payload.truncated || preparedContext?.truncated == true,
         )
       )
     }
     if (consoleAccepted) {
-      val consoleMessage = buildConsoleMessage(payload.message, payload.stackTrace)
+      val consoleMessage = buildConsoleMessage(payload.message, payload.stackTrace, preparedContext?.value)
       runCatching {
         when (level) {
           LogLevel.Verbose -> snapshot.logger.v(consoleMessage, null, payload.tag)
@@ -189,6 +220,20 @@ object CyxbsLog {
     log(LogLevel.Error, tag, throwable, message)
 
   /**
+   * Error 紧急路径：仍接收原始 [throwable]，但只记录有界类型与消息摘要，不遍历堆栈、cause 或 suppressed。
+   * 仅用于未捕获异常等必须限制同步处理成本的场景；普通错误继续使用 [e] 保留堆栈。
+   */
+  fun eBounded(tag: String? = null, throwable: Throwable, message: () -> String) =
+    logInternal(
+      level = LogLevel.Error,
+      tag = tag,
+      throwable = throwable,
+      context = null,
+      message = message,
+      throwableRendering = ThrowableRendering.Summary,
+    )
+
+  /**
    * Assert：内部不变量被破坏、按设计不应发生的状态；不用于普通网络或业务失败。
    * 此方法仅输出 Assert 等级日志，不主动抛异常或终止程序；需要阻止继续执行时使用 check/require。
    * 参数及 TAG 命名遵循 [log] 的约定。
@@ -199,6 +244,10 @@ object CyxbsLog {
 
 private const val MAX_RAW_FILE_SNAPSHOT_BYTES = 64 * 1_024
 private const val MAX_FILE_SNAPSHOT_CHARS = 16 * 1_024
+private const val MAX_CONTEXT_TEXT_CHARS = 128
+private const val MAX_ROUTE_CHARS = 256
+private const val MAX_CORRELATION_ID_CHARS = 64
+private val safeCorrelationId = Regex("^[A-Za-z0-9._:-]{1,64}$")
 
 internal data class FileTextSnapshot(val value: String, val truncated: Boolean)
 
@@ -249,6 +298,11 @@ private fun String.takeFileSnapshot(): String {
 private fun String.safeSnapshotEnd(limit: Int): Int =
   if (this[limit - 1].isHighSurrogate()) limit - 1 else limit
 
+internal enum class ThrowableRendering {
+  Full,
+  Summary,
+}
+
 internal data class PreparedLogPayload(
   val tag: String,
   val message: String,
@@ -261,11 +315,12 @@ internal fun prepareLogPayload(
   tag: String,
   message: String,
   throwable: Throwable?,
+  throwableRendering: ThrowableRendering = ThrowableRendering.Full,
 ): PreparedLogPayload {
   val rawMessage = message.takeRawFileSnapshot()
   val sanitizedMessage = rawMessage.value.sanitizeForFileLog()
   val boundedMessage = sanitizedMessage.takeFileSnapshot()
-  val rawStackTrace = throwable?.stackTraceToString()?.takeRawFileSnapshot()
+  val rawStackTrace = throwable?.toLogSnapshot(throwableRendering)
   val sanitizedStackTrace = rawStackTrace?.value?.sanitizeForFileLog()
   val boundedStackTrace = sanitizedStackTrace?.takeFileSnapshot()
   val rawTag = tag.takeRawFileSnapshot()
@@ -282,8 +337,95 @@ internal fun prepareLogPayload(
   )
 }
 
-private fun buildConsoleMessage(message: String, stackTrace: String?): String =
-  if (stackTrace.isNullOrEmpty()) message else "$message\n$stackTrace"
+private fun Throwable.toLogSnapshot(rendering: ThrowableRendering): FileTextSnapshot = when (rendering) {
+  ThrowableRendering.Full -> stackTraceToString().takeRawFileSnapshot()
+  ThrowableRendering.Summary -> {
+    val type = this::class.simpleName ?: "Throwable"
+    val detail = runCatching { message }.getOrNull()?.takeRawFileSnapshot()
+    val summary = if (detail == null || detail.value.isBlank()) type else "$type: ${detail.value}"
+    val bounded = summary.takeRawFileSnapshot()
+    FileTextSnapshot(
+      value = bounded.value,
+      truncated = detail?.truncated == true || bounded.truncated,
+    )
+  }
+}
+
+private data class PreparedContextSnapshot(
+  val value: PreparedLogContext,
+  val truncated: Boolean,
+)
+
+private fun LogContext.prepareForLog(): PreparedContextSnapshot {
+  var truncated = false
+  fun bounded(value: String?, maxChars: Int): String? {
+    if (value == null) return null
+    val raw = value.takeRawFileSnapshot()
+    val sanitized = raw.value.sanitizeForFileLog()
+    val result = if (sanitized.length <= maxChars) sanitized else sanitized.substring(
+      0,
+      if (sanitized[maxChars - 1].isHighSurrogate()) maxChars - 1 else maxChars,
+    )
+    truncated = truncated || raw.truncated || result.length != sanitized.length
+    return result.takeIf { it.isNotBlank() }
+  }
+
+  val routeSnapshot = route?.takeRawFileSnapshot()
+  truncated = truncated || routeSnapshot?.truncated == true
+  val normalizedRoute = routeSnapshot
+    ?.value
+    ?.substringBefore('?')
+    ?.substringBefore('#')
+    ?.let { bounded(it, MAX_ROUTE_CHARS) }
+  val safeId = correlationId
+    ?.takeIf(safeCorrelationId::matches)
+    ?.let { bounded(it, MAX_CORRELATION_ID_CHARS) }
+    ?.takeIf(safeCorrelationId::matches)
+  return PreparedContextSnapshot(
+    value = PreparedLogContext(
+      operation = bounded(operation, MAX_CONTEXT_TEXT_CHARS),
+      route = normalizedRoute,
+      method = method?.name,
+      statusCode = statusCode?.takeIf { it in 100..599 },
+      durationMillis = durationMillis?.takeIf { it >= 0 },
+      result = result?.name,
+      retryCount = retryCount?.takeIf { it in 0..1_000 },
+      fromState = bounded(fromState, MAX_CONTEXT_TEXT_CHARS),
+      toState = bounded(toState, MAX_CONTEXT_TEXT_CHARS),
+      correlationId = safeId,
+    ),
+    truncated = truncated,
+  )
+}
+
+private fun buildConsoleMessage(
+  message: String,
+  stackTrace: String?,
+  context: PreparedLogContext?,
+): String = buildString {
+  append(message)
+  context?.toConsoleSuffix()?.takeIf { it.isNotEmpty() }?.let { suffix ->
+    append(" | ")
+    append(suffix)
+  }
+  if (!stackTrace.isNullOrEmpty()) {
+    append('\n')
+    append(stackTrace)
+  }
+}
+
+private fun PreparedLogContext.toConsoleSuffix(): String = buildList {
+  operation?.let { add("operation=$it") }
+  route?.let { add("route=$it") }
+  method?.let { add("method=$it") }
+  statusCode?.let { add("status=$it") }
+  durationMillis?.let { add("durationMs=$it") }
+  result?.let { add("result=$it") }
+  retryCount?.let { add("retry=$it") }
+  fromState?.let { add("from=$it") }
+  toState?.let { add("to=$it") }
+  correlationId?.let { add("correlationId=$it") }
+}.joinToString(" ")
 
 private fun LogLevel.toSeverity(): Severity = when (this) {
   LogLevel.Verbose -> Severity.Verbose

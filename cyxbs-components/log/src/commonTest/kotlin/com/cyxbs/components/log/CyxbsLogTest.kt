@@ -58,6 +58,22 @@ class CyxbsLogTest {
   }
 
   @Test
+  fun boundedThrowableSummaryDoesNotExpandStackOrCauseChain() {
+    val payload = prepareLogPayload(
+      tag = "CrashMonitor",
+      message = "uncaught",
+      throwable = IllegalStateException("detail " + "x".repeat(70_000), RuntimeException("cause-secret")),
+      throwableRendering = ThrowableRendering.Summary,
+    )
+
+    assertTrue(payload.stackTrace.orEmpty().contains("IllegalStateException"))
+    assertFalse(payload.stackTrace.orEmpty().contains("cause-secret"))
+    assertFalse(payload.stackTrace.orEmpty().contains("\n\tat "))
+    assertTrue(payload.stackTrace.orEmpty().encodeToByteArray().size <= 16 * 1_024)
+    assertTrue(payload.truncated)
+  }
+
+  @Test
   fun fileLogSanitizerRemovesCommonSecretsAndIdentifiers() {
     val sanitized = "Authorization: Bearer abc.def token=secret Cookie: sid=abc; user=42 " +
       "email=user@example.com studentId=2020123456 phone=13800138000 " +

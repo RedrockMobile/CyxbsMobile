@@ -29,6 +29,8 @@ sealed interface LogExportResult {
     val filePath: String,
     val exportedBytes: Long,
     val truncated: Boolean,
+    val exportedRecordCount: Long = 0,
+    val payloadSha256: String? = null,
   ) : LogExportResult
   data class Failure(val message: String) : LogExportResult
 }
@@ -66,6 +68,13 @@ data class FileLogHealth(
   val queuedEntries: Int,
   val queuedBytes: Long,
   val droppedByLevel: FileLogLevelCounts = FileLogLevelCounts(),
+  val lastSuccessfulWriteAtMillis: Long? = null,
+  val lastWriteFailureAtMillis: Long? = null,
+  val lastWriteFailureType: String? = null,
+  val consecutiveWriteFailures: Int = 0,
+  val lastFlushDurationMillis: Long? = null,
+  val managedFileCount: Int = 0,
+  val managedBytes: Long = 0,
 )
 
 enum class FileLogState {

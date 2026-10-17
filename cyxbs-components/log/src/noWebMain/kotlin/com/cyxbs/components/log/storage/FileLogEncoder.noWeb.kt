@@ -12,24 +12,37 @@ private val fileLogJson = Json {
 @Serializable
 private data class ExportManifest(
   val recordType: String = "manifest",
-  val schemaVersion: Int = 1,
+  val schemaVersion: Int = 2,
   val generatedAtMillis: Long,
   val sourceFileCount: Int,
   val exportedLogBytes: Long,
+  val exportedRecordCount: Long,
+  val payloadSha256: String,
   val truncated: Boolean,
 )
 
 @Serializable
 private data class PersistedLogRecord(
   val recordType: String = "log",
-  val schemaVersion: Int = 1,
+  val schemaVersion: Int = 2,
   val session: String,
   val sequence: Long,
-  val timestampMillis: Long,
+  val eventTimestampMillis: Long,
+  val observedTimestampMillis: Long,
   val level: String,
   val tag: String,
   val message: String,
   val stackTrace: String? = null,
+  val operation: String? = null,
+  val route: String? = null,
+  val method: String? = null,
+  val statusCode: Int? = null,
+  val durationMillis: Long? = null,
+  val result: String? = null,
+  val retryCount: Int? = null,
+  val fromState: String? = null,
+  val toState: String? = null,
+  val correlationId: String? = null,
   val truncated: Boolean = false,
 )
 
@@ -42,12 +55,16 @@ internal fun encodeExportManifest(
   generatedAtMillis: Long,
   sourceFileCount: Int,
   exportedLogBytes: Long,
+  exportedRecordCount: Long,
+  payloadSha256: String,
   truncated: Boolean,
 ): ByteArray = (fileLogJson.encodeToString(
   ExportManifest(
     generatedAtMillis = generatedAtMillis,
     sourceFileCount = sourceFileCount,
     exportedLogBytes = exportedLogBytes,
+    exportedRecordCount = exportedRecordCount,
+    payloadSha256 = payloadSha256,
     truncated = truncated,
   )
 ) + "\n").encodeToByteArray()
@@ -68,11 +85,22 @@ internal fun encodeLogLine(
     val record = PersistedLogRecord(
       session = session,
       sequence = sequence,
-      timestampMillis = event.timestampMillis,
+      eventTimestampMillis = event.eventTimestampMillis,
+      observedTimestampMillis = event.observedTimestampMillis,
       level = event.level.name,
       tag = tag,
       message = message,
       stackTrace = stackTrace,
+      operation = event.context?.operation,
+      route = event.context?.route,
+      method = event.context?.method,
+      statusCode = event.context?.statusCode,
+      durationMillis = event.context?.durationMillis,
+      result = event.context?.result,
+      retryCount = event.context?.retryCount,
+      fromState = event.context?.fromState,
+      toState = event.context?.toState,
+      correlationId = event.context?.correlationId,
       truncated = truncated,
     )
     val bytes = (fileLogJson.encodeToString(record) + "\n").encodeToByteArray()
