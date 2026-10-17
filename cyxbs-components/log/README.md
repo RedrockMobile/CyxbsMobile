@@ -27,7 +27,8 @@ CyxbsLog.e(tag = "Schedule", throwable = error) { "课表加载失败" }
 
 - `v/d/i/w/e/a` 和通用 `log` 使用惰性消息，控制台与文件均不接收时不会调用消息 lambda。
 - 接受输出时消息只求值一次；`configure` 原子替换不可变配置，一次日志调用使用同一份配置快照。
-- 控制台输出同步执行；消息 lambda 和平台 writer 的异常会被日志边界隔离，不改变业务控制流。
+- 控制台输出同步执行；消息、TAG 与异常堆栈在进入任意 sink 前统一执行 UTF-8 有界快照和防御性脱敏，消息 lambda 和平台 writer 的异常会被日志边界隔离，不改变业务控制流。
+- 原始 `Throwable` 不直接交给平台控制台；控制台输出脱敏后的有界堆栈，文件协议仍将消息与堆栈分字段保存。
 - Kermit 是内部实现，公开 API 不暴露其类型，也不修改其全局 Logger。
 
 ## 文件日志
@@ -51,7 +52,8 @@ CyxbsLog.closeFileStorage()
 
 - Android、iOS、Desktop：普通日志通过条数和估算字节双预算非阻塞接收，由单 worker 写入 UTF-8 JSONL。
 - JS、WasmJS：文件管理 API 返回 `Unsupported`，控制台日志不受影响。
-- 单条记录最多 16 KiB；队列默认最多 1024 条且估算负载不超过 2 MiB。超限时丢弃并可通过 `fileStorageHealth()` 查看计数。
+- 单条记录最多 16 KiB；队列默认最多 1024 条且估算负载不超过 2 MiB。`Verbose/Debug/Info` 最多使用 80% 的条数和字节预算，剩余 20% 为 `Warn/Error/Assert` 保留；高等级可使用低等级未占用的空间，但总预算始终不变。所有路径仍使用非阻塞接收。
+- 超限时直接丢弃；`fileStorageHealth()` 同时提供总原因计数和 `droppedByLevel`，用于区分普通洪峰与高等级事件丢失。
 - 每 64 KiB 或最长约 1 秒执行 buffered flush；这只表示交给操作系统，不承诺断电持久化。`Durable` 当前明确返回 `Unsupported`。
 - 文件按字节轮转，并按总字节、文件数和年龄清理严格命名前缀的本模块文件。默认总量 24 MiB、最长 7 天。
 - 导出先封存当前文件，只选最新 3 个源文件且最多 32 MiB，再发布稳定 JSONL 副本；首行是 `recordType=manifest` 的协议元数据，后续行为 `recordType=log`，被数量或字节预算裁剪时 `truncated=true`。应用层负责调用系统分享或保存界面。导出不会上传，也不会撤回已经分享出去的副本。

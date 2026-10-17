@@ -1,13 +1,13 @@
 package com.cyxbs.pages.emptyroom.viewmodel
 
 import androidx.lifecycle.MutableLiveData
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.pages.emptyroom.bean.EmptyRoom
 import com.cyxbs.pages.emptyroom.network.ApiService
 import com.cyxbs.pages.emptyroom.utils.EmptyConverter
 import com.cyxbs.components.base.ui.BaseViewModel
 import com.cyxbs.components.utils.extensions.setSchedulers
 import com.cyxbs.components.utils.network.ApiGenerator
-import com.cyxbs.components.utils.utils.LogUtils
 import io.reactivex.rxjava3.disposables.Disposable
 import java.util.concurrent.TimeUnit
 
@@ -53,7 +53,7 @@ class EmptyRoomViewModel : BaseViewModel() {
                     status.value = FINISH
                     val converter = EmptyConverter()
                     converter.setEmptyData(it.data)
-                    LogUtils.d("EmptyRoomData",it.data.toString())
+                    CyxbsLog.d("EmptyRoomData") { "empty room response received, count=${it.data.size}" }
                     rooms.value = converter.convert()
                 },
                 onError = {

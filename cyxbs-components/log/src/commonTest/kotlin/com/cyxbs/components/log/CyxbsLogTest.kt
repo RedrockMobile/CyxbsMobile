@@ -40,6 +40,24 @@ class CyxbsLogTest {
   }
 
   @Test
+  fun preparedPayloadSanitizesMessageTagAndThrowableBeforeAnySink() {
+    val payload = prepareLogPayload(
+      tag = "Authorization: Bearer tag-secret",
+      message = "token=message-secret ${"界".repeat(30_000)}",
+      throwable = IllegalStateException("password=throwable-secret"),
+    )
+
+    assertFalse(payload.tag.contains("tag-secret"))
+    assertFalse(payload.message.contains("message-secret"))
+    assertFalse(payload.stackTrace.orEmpty().contains("throwable-secret"))
+    assertTrue(payload.tag.contains("[REDACTED]"))
+    assertTrue(payload.message.contains("[REDACTED]"))
+    assertTrue(payload.stackTrace.orEmpty().contains("[REDACTED]"))
+    assertTrue(payload.truncated)
+    assertTrue(payload.message.length <= 16 * 1_024)
+  }
+
+  @Test
   fun fileLogSanitizerRemovesCommonSecretsAndIdentifiers() {
     val sanitized = "Authorization: Bearer abc.def token=secret Cookie: sid=abc; user=42 " +
       "email=user@example.com studentId=2020123456 phone=13800138000 " +

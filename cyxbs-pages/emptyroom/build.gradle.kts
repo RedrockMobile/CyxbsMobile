@@ -15,6 +15,7 @@ kotlin {
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.log)
     }
     androidMain.dependencies {
       implementation(libs.bundles.views)

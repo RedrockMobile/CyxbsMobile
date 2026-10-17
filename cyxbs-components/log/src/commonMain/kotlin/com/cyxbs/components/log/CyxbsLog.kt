@@ -77,39 +77,30 @@ object CyxbsLog {
 
     val resolvedTag = tag ?: snapshot.config.defaultTag
     val renderedMessage = runCatching(message).getOrNull() ?: return
+    val payload = prepareLogPayload(resolvedTag, renderedMessage, throwable)
+
     if (fileAccepted) {
-      // 先把调用方返回的任意大字符串裁成固定快照，再执行正则脱敏，避免脱敏链制造多份大对象。
-      val rawMessage = renderedMessage.takeRawFileSnapshot()
-      val sanitizedMessage = rawMessage.value.sanitizeForFileLog()
-      val fileMessage = sanitizedMessage.takeFileSnapshot()
-      val rawStackTrace = throwable?.stackTraceToString()?.takeRawFileSnapshot()
-      val sanitizedStackTrace = rawStackTrace?.value?.sanitizeForFileLog()
-      val fileStackTrace = sanitizedStackTrace?.takeFileSnapshot()
-      val rawTag = resolvedTag.takeRawFileSnapshot()
-      val sanitizedTag = rawTag.value.sanitizeForFileLog()
       PlatformFileLog.offer(
         FileLogEvent(
           timestampMillis = Clock.System.now().toEpochMilliseconds(),
           level = level,
-          tag = sanitizedTag.takeFileSnapshot(),
-          message = fileMessage,
-          stackTrace = fileStackTrace,
-          snapshotTruncated = rawMessage.truncated || rawStackTrace?.truncated == true || rawTag.truncated ||
-            fileMessage.length != sanitizedMessage.length ||
-            fileStackTrace?.length != sanitizedStackTrace?.length ||
-            sanitizedTag.length > MAX_FILE_SNAPSHOT_CHARS,
+          tag = payload.tag,
+          message = payload.message,
+          stackTrace = payload.stackTrace,
+          snapshotTruncated = payload.truncated,
         )
       )
     }
     if (consoleAccepted) {
+      val consoleMessage = buildConsoleMessage(payload.message, payload.stackTrace)
       runCatching {
         when (level) {
-          LogLevel.Verbose -> snapshot.logger.v(renderedMessage, throwable, resolvedTag)
-          LogLevel.Debug -> snapshot.logger.d(renderedMessage, throwable, resolvedTag)
-          LogLevel.Info -> snapshot.logger.i(renderedMessage, throwable, resolvedTag)
-          LogLevel.Warn -> snapshot.logger.w(renderedMessage, throwable, resolvedTag)
-          LogLevel.Error -> snapshot.logger.e(renderedMessage, throwable, resolvedTag)
-          LogLevel.Assert -> snapshot.logger.a(renderedMessage, throwable, resolvedTag)
+          LogLevel.Verbose -> snapshot.logger.v(consoleMessage, null, payload.tag)
+          LogLevel.Debug -> snapshot.logger.d(consoleMessage, null, payload.tag)
+          LogLevel.Info -> snapshot.logger.i(consoleMessage, null, payload.tag)
+          LogLevel.Warn -> snapshot.logger.w(consoleMessage, null, payload.tag)
+          LogLevel.Error -> snapshot.logger.e(consoleMessage, null, payload.tag)
+          LogLevel.Assert -> snapshot.logger.a(consoleMessage, null, payload.tag)
         }
       }
     }
@@ -257,6 +248,42 @@ private fun String.takeFileSnapshot(): String {
 
 private fun String.safeSnapshotEnd(limit: Int): Int =
   if (this[limit - 1].isHighSurrogate()) limit - 1 else limit
+
+internal data class PreparedLogPayload(
+  val tag: String,
+  val message: String,
+  val stackTrace: String?,
+  val truncated: Boolean,
+)
+
+/** 在进入任意 sink 前完成 UTF-8 有界快照与脱敏。 */
+internal fun prepareLogPayload(
+  tag: String,
+  message: String,
+  throwable: Throwable?,
+): PreparedLogPayload {
+  val rawMessage = message.takeRawFileSnapshot()
+  val sanitizedMessage = rawMessage.value.sanitizeForFileLog()
+  val boundedMessage = sanitizedMessage.takeFileSnapshot()
+  val rawStackTrace = throwable?.stackTraceToString()?.takeRawFileSnapshot()
+  val sanitizedStackTrace = rawStackTrace?.value?.sanitizeForFileLog()
+  val boundedStackTrace = sanitizedStackTrace?.takeFileSnapshot()
+  val rawTag = tag.takeRawFileSnapshot()
+  val sanitizedTag = rawTag.value.sanitizeForFileLog()
+  val boundedTag = sanitizedTag.takeFileSnapshot()
+  return PreparedLogPayload(
+    tag = boundedTag,
+    message = boundedMessage,
+    stackTrace = boundedStackTrace,
+    truncated = rawMessage.truncated || rawStackTrace?.truncated == true || rawTag.truncated ||
+      boundedMessage.length != sanitizedMessage.length ||
+      boundedStackTrace?.length != sanitizedStackTrace?.length ||
+      boundedTag.length != sanitizedTag.length,
+  )
+}
+
+private fun buildConsoleMessage(message: String, stackTrace: String?): String =
+  if (stackTrace.isNullOrEmpty()) message else "$message\n$stackTrace"
 
 private fun LogLevel.toSeverity(): Severity = when (this) {
   LogLevel.Verbose -> Severity.Verbose

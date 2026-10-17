@@ -2,6 +2,7 @@ package com.cyxbs.components.utils.logger
 
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.logger.bean.TrackingResultBean
 import com.cyxbs.components.utils.logger.event.ClickEvent
@@ -61,7 +62,7 @@ object TrackingUtils {
     }.onFailure {
       // 异常
       // 需求千万条，稳定第一条。错误catch住，debug模式下 toast弹窗 + 堆栈输出
-      it.printStackTrace()
+      CyxbsLog.e(TAG, it) { "tracking event request failed" }
       toastLoggerWhenDebug(null)
       return Result.failure(it)
     }

@@ -32,6 +32,9 @@ import okio.SYSTEM
 import okio.Sink
 import java.nio.file.Files
 import java.nio.file.attribute.FileTime
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -407,6 +410,110 @@ class FileLogEngineTest {
   }
 
   @Test
+  fun infoFloodLeavesQueueCapacityForWarnAndAbove() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val blockNextFlush = AtomicBoolean(false)
+      val flushEntered = CountDownLatch(1)
+      val releaseFlush = CountDownLatch(1)
+      val blockingFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun appendingSink(file: Path, mustExist: Boolean): Sink {
+          return object : ForwardingSink(super.appendingSink(file, mustExist)) {
+            override fun flush() {
+              if (blockNextFlush.compareAndSet(true, false)) {
+                flushEntered.countDown()
+                check(releaseFlush.await(5, TimeUnit.SECONDS)) { "timed out waiting to release flush" }
+              }
+              super.flush()
+            }
+          }
+        }
+      }
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), blockingFileSystem)
+      assertEquals(LogStorageResult.Success, engine.start())
+      engine.offer(event(message = "flush-trigger"))
+      blockNextFlush.set(true)
+      val blockedFlush = launch(Dispatchers.Default) { engine.flush(LogFlushMode.Buffered) }
+      assertTrue(flushEntered.await(5, TimeUnit.SECONDS))
+
+      try {
+        repeat(819) { index -> engine.offer(event(message = "info-$index")) }
+        engine.offer(event(message = "info-rejected"))
+        repeat(205) { index ->
+          engine.offer(event(level = LogLevel.Error, message = "protected-$index"))
+        }
+        engine.offer(event(level = LogLevel.Error, message = "protected-rejected"))
+
+        val health = engine.health()
+        assertEquals(1_024, health.queuedEntries)
+        assertEquals(2, health.droppedQueueFull)
+        assertEquals(1, health.droppedByLevel[LogLevel.Info])
+        assertEquals(1, health.droppedByLevel[LogLevel.Error])
+      } finally {
+        releaseFlush.countDown()
+      }
+
+      withTimeout(5_000) { blockedFlush.join() }
+      assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val messages = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+      repeat(205) { index -> assertTrue(messages.contains("protected-$index")) }
+      assertFalse(messages.contains("protected-rejected"))
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun infoByteFloodLeavesByteCapacityForWarnAndAbove() = runBlocking {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val blockNextFlush = AtomicBoolean(false)
+      val flushEntered = CountDownLatch(1)
+      val releaseFlush = CountDownLatch(1)
+      val blockingFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun appendingSink(file: Path, mustExist: Boolean): Sink {
+          return object : ForwardingSink(super.appendingSink(file, mustExist)) {
+            override fun flush() {
+              if (blockNextFlush.compareAndSet(true, false)) {
+                flushEntered.countDown()
+                check(releaseFlush.await(5, TimeUnit.SECONDS)) { "timed out waiting to release flush" }
+              }
+              super.flush()
+            }
+          }
+        }
+      }
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), blockingFileSystem)
+      assertEquals(LogStorageResult.Success, engine.start())
+      engine.offer(event(message = "flush-trigger"))
+      blockNextFlush.set(true)
+      val blockedFlush = launch(Dispatchers.Default) { engine.flush(LogFlushMode.Buffered) }
+      assertTrue(flushEntered.await(5, TimeUnit.SECONDS))
+
+      try {
+        val largeInfo = "i".repeat(8 * 1_024)
+        repeat(198) { index -> engine.offer(event(message = "$index:$largeInfo")) }
+        engine.offer(event(message = "info-byte-rejected:$largeInfo"))
+        engine.offer(event(level = LogLevel.Error, message = "protected-byte-budget"))
+
+        val health = engine.health()
+        assertTrue(health.queuedEntries < 819)
+        assertEquals(1, health.droppedByteBudget)
+        assertEquals(1, health.droppedByLevel[LogLevel.Info])
+        assertEquals(0, health.droppedByLevel[LogLevel.Error])
+      } finally {
+        releaseFlush.countDown()
+      }
+
+      withTimeout(5_000) { blockedFlush.join() }
+      assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+      val export = assertIs<LogExportResult.Success>(engine.export())
+      val messages = fileSystem.read(export.filePath.toPath()) { readUtf8() }
+      assertTrue(messages.contains("protected-byte-budget"))
+      assertFalse(messages.contains("info-byte-rejected"))
+      assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
   fun persistentWriteFailureEntersBackoffInsteadOfRetryingEveryRecord() = runBlocking {
     withTemporaryDirectories { logDirectory, exportDirectory ->
       val flushAttempts = AtomicInteger()
@@ -509,13 +616,13 @@ class FileLogEngineTest {
       )
       try {
         val payload = "x".repeat(128)
-        repeat(1_000) { CyxbsLog.d(tag = "BurstBenchmark") { "warmup-$it-$payload" } }
+        repeat(1_000) { CyxbsLog.i(tag = "BurstBenchmark") { "warmup-$it-$payload" } }
 
         val samples = LongArray(20_000)
         val startedAt = System.nanoTime()
         samples.indices.forEach { index ->
           val callStartedAt = System.nanoTime()
-          CyxbsLog.d(tag = "BurstBenchmark") { "burst-$index-$payload" }
+          CyxbsLog.i(tag = "BurstBenchmark") { "burst-$index-$payload" }
           samples[index] = System.nanoTime() - callStartedAt
         }
         val elapsedNanos = System.nanoTime() - startedAt

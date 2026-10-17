@@ -2,6 +2,7 @@ package com.cyxbs.components.log.storage
 
 import com.cyxbs.components.log.FileLogConfig
 import com.cyxbs.components.log.FileLogHealth
+import com.cyxbs.components.log.FileLogLevelCounts
 import com.cyxbs.components.log.FileLogState
 import com.cyxbs.components.log.LogExportResult
 import com.cyxbs.components.log.LogFlushMode
@@ -42,6 +43,11 @@ import kotlin.time.TimeSource
 
 private const val QUEUE_CAPACITY = 1_024
 private const val QUEUE_BYTE_CAPACITY = 2L * 1_024 * 1_024
+private const val HIGH_PRIORITY_RESERVED_PERCENT = 20
+private const val LOW_PRIORITY_QUEUE_CAPACITY =
+  QUEUE_CAPACITY * (100 - HIGH_PRIORITY_RESERVED_PERCENT) / 100
+private const val LOW_PRIORITY_QUEUE_BYTE_CAPACITY =
+  QUEUE_BYTE_CAPACITY * (100 - HIGH_PRIORITY_RESERVED_PERCENT) / 100
 private const val MAX_ENTRY_BYTES = 16 * 1_024
 private const val BATCH_SIZE_BYTES = 64 * 1_024
 private const val FLUSH_INTERVAL_MILLIS = 1_000L
@@ -88,9 +94,17 @@ internal class FileLogEngine(
   private val truncatedEntries = atomic(0L)
   private val droppedClosed = atomic(0L)
   private val droppedWriteBackoff = atomic(0L)
+  private val droppedVerbose = atomic(0L)
+  private val droppedDebug = atomic(0L)
+  private val droppedInfo = atomic(0L)
+  private val droppedWarn = atomic(0L)
+  private val droppedError = atomic(0L)
+  private val droppedAssert = atomic(0L)
   private val writeFailures = atomic(0L)
   private val queuedEntries = atomic(0)
   private val queuedBytes = atomic(0L)
+  private val queuedLowPriorityEntries = atomic(0)
+  private val queuedLowPriorityBytes = atomic(0L)
   private val ready = CompletableDeferred<LogStorageResult>()
   private val closeResult = CompletableDeferred<LogStorageResult>()
   private val worker = atomic<Job?>(null)
@@ -105,24 +119,37 @@ internal class FileLogEngine(
     synchronized(gate) {
       if (!accepting.value) {
         droppedClosed.incrementAndGet()
+        incrementDropped(event.level)
         return
       }
       if (event.level < config.minLevel) return
+      val lowPriority = event.level < LogLevel.Warn
       if (queuedEntries.value >= QUEUE_CAPACITY) {
         droppedQueueFull.incrementAndGet()
+        incrementDropped(event.level)
+        return
+      }
+      if (lowPriority && queuedLowPriorityEntries.value >= LOW_PRIORITY_QUEUE_CAPACITY) {
+        droppedQueueFull.incrementAndGet()
+        incrementDropped(event.level)
         return
       }
       if (queuedBytes.value + estimatedBytes > QUEUE_BYTE_CAPACITY) {
         droppedByteBudget.incrementAndGet()
+        incrementDropped(event.level)
         return
       }
-      queuedEntries.incrementAndGet()
-      queuedBytes.addAndGet(estimatedBytes.toLong())
+      if (lowPriority && queuedLowPriorityBytes.value + estimatedBytes > LOW_PRIORITY_QUEUE_BYTE_CAPACITY) {
+        droppedByteBudget.incrementAndGet()
+        incrementDropped(event.level)
+        return
+      }
+      adjustQueuedRecord(event.level, estimatedBytes, delta = 1)
       val result = mailbox.trySend(Command.Record(event, estimatedBytes))
       if (result.isFailure) {
-        queuedEntries.decrementAndGet()
-        queuedBytes.addAndGet(-estimatedBytes.toLong())
+        adjustQueuedRecord(event.level, estimatedBytes, delta = -1)
         droppedClosed.incrementAndGet()
+        incrementDropped(event.level)
       } else {
         acceptedEntries.incrementAndGet()
       }
@@ -205,7 +232,35 @@ internal class FileLogEngine(
     writeFailures = writeFailures.value,
     queuedEntries = queuedEntries.value,
     queuedBytes = queuedBytes.value,
+    droppedByLevel = FileLogLevelCounts(
+      verbose = droppedVerbose.value,
+      debug = droppedDebug.value,
+      info = droppedInfo.value,
+      warn = droppedWarn.value,
+      error = droppedError.value,
+      assert = droppedAssert.value,
+    ),
   )
+
+  private fun adjustQueuedRecord(level: LogLevel, estimatedBytes: Int, delta: Int) {
+    queuedEntries.addAndGet(delta)
+    queuedBytes.addAndGet(estimatedBytes.toLong() * delta)
+    if (level < LogLevel.Warn) {
+      queuedLowPriorityEntries.addAndGet(delta)
+      queuedLowPriorityBytes.addAndGet(estimatedBytes.toLong() * delta)
+    }
+  }
+
+  private fun incrementDropped(level: LogLevel) {
+    when (level) {
+      LogLevel.Verbose -> droppedVerbose.incrementAndGet()
+      LogLevel.Debug -> droppedDebug.incrementAndGet()
+      LogLevel.Info -> droppedInfo.incrementAndGet()
+      LogLevel.Warn -> droppedWarn.incrementAndGet()
+      LogLevel.Error -> droppedError.incrementAndGet()
+      LogLevel.Assert -> droppedAssert.incrementAndGet()
+    }
+  }
 
   private fun enqueueWhileRunning(command: Command): Boolean = synchronized(gate) {
     state.value == FileLogState.Running && mailbox.trySend(command).isSuccess
@@ -248,14 +303,15 @@ internal class FileLogEngine(
         }
         when (command) {
           is Command.Record -> {
-            queuedEntries.decrementAndGet()
-            queuedBytes.addAndGet(-command.estimatedBytes.toLong())
+            adjustQueuedRecord(command.event.level, command.estimatedBytes, delta = -1)
             val encoded = encodeLogLine(command.event, session, files.nextSequence(), MAX_ENTRY_BYTES)
             if (encoded == null) {
               droppedOversize.incrementAndGet()
+              incrementDropped(command.event.level)
             } else {
               if (encoded.truncated) truncatedEntries.incrementAndGet()
-              runFileOperation(files, countBackoffDrop = true) { write(encoded.bytes) }
+              val written = runFileOperation(files, countBackoffDrop = true) { write(encoded.bytes) }
+              if (!written) incrementDropped(command.event.level)
               if (lastFlush.elapsedNow().inWholeMilliseconds >= FLUSH_INTERVAL_MILLIS) {
                 runFileOperation(files, countBackoffDrop = false) { flush() }
                 lastFlush = TimeSource.Monotonic.markNow()
@@ -370,8 +426,8 @@ internal class FileLogEngine(
     while (true) {
       when (val command = mailbox.tryReceive().getOrNull() ?: break) {
         is Command.Record -> {
-          queuedEntries.decrementAndGet()
-          queuedBytes.addAndGet(-command.estimatedBytes.toLong())
+          adjustQueuedRecord(command.event.level, command.estimatedBytes, delta = -1)
+          incrementDropped(command.event.level)
         }
         is Command.Flush -> command.result.complete(LogFlushResult.Failure(throwable.safeMessage()))
         is Command.Clear -> command.result.complete(LogStorageResult.Failure(throwable.safeMessage()))

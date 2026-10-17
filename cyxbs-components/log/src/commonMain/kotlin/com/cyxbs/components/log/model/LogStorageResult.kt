@@ -33,6 +33,25 @@ sealed interface LogExportResult {
   data class Failure(val message: String) : LogExportResult
 }
 
+/** 各日志等级的计数快照，用于定位队列压力下实际丢失的事件。 */
+data class FileLogLevelCounts(
+  val verbose: Long = 0,
+  val debug: Long = 0,
+  val info: Long = 0,
+  val warn: Long = 0,
+  val error: Long = 0,
+  val assert: Long = 0,
+) {
+  operator fun get(level: LogLevel): Long = when (level) {
+    LogLevel.Verbose -> verbose
+    LogLevel.Debug -> debug
+    LogLevel.Info -> info
+    LogLevel.Warn -> warn
+    LogLevel.Error -> error
+    LogLevel.Assert -> assert
+  }
+}
+
 /** 当前进程内文件日志的可观察健康状态。 */
 data class FileLogHealth(
   val state: FileLogState,
@@ -46,6 +65,7 @@ data class FileLogHealth(
   val writeFailures: Long,
   val queuedEntries: Int,
   val queuedBytes: Long,
+  val droppedByLevel: FileLogLevelCounts = FileLogLevelCounts(),
 )
 
 enum class FileLogState {
