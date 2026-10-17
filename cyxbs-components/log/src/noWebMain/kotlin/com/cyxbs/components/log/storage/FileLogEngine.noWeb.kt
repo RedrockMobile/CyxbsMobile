@@ -53,6 +53,7 @@ private const val LOW_PRIORITY_QUEUE_BYTE_CAPACITY =
 private const val MAX_ENTRY_BYTES = 16 * 1_024
 private const val BATCH_SIZE_BYTES = 64 * 1_024
 private const val FLUSH_INTERVAL_MILLIS = 1_000L
+private const val LOG_CLEANUP_INTERVAL_MILLIS = 60_000L
 private const val MAX_FILES = 8
 private const val MAX_EXPORT_BYTES = 32L * 1_024 * 1_024
 private const val MAX_EXPORT_SOURCE_FILES = 3
@@ -578,6 +579,7 @@ private class WorkerFiles(
   private var pendingBytes = 0
   private var managedFileCount = 0
   private var managedBytes = 0L
+  private var lastCleanupAtMillis = 0L
 
   fun nextSequence(): Long = ++sequence
 
@@ -598,9 +600,17 @@ private class WorkerFiles(
       cleanupLogs(reserveActiveFile = true)
       openActive()
     }
-    cleanupLogs(extraActiveBytes = bytes.size.toLong())
+    val now = nowMillis()
+    // 预算逐条检查；目录扫描仅在配额不足或到达年龄检查间隔时执行。
+    if (managedBytes + bytes.size > config.maxTotalBytes ||
+      now < lastCleanupAtMillis || now - lastCleanupAtMillis >= LOG_CLEANUP_INTERVAL_MILLIS
+    ) {
+      cleanupLogs(extraActiveBytes = bytes.size.toLong())
+    }
     sink?.write(bytes) ?: throw IOException("active log sink is unavailable")
     activeBytes += bytes.size
+    managedBytes += bytes.size
+    publishMetrics()
     pendingBytes += bytes.size
     if (pendingBytes >= BATCH_SIZE_BYTES) flush()
   }
@@ -869,7 +879,8 @@ private class WorkerFiles(
       totalBytes -= metadata.size ?: 0L
     }
     managedFileCount = sealed.size + activeFileCount
-    managedBytes = totalBytes.coerceAtLeast(0)
+    managedBytes = (totalBytes - extraActiveBytes).coerceAtLeast(0)
+    lastCleanupAtMillis = now
     publishMetrics()
   }
 

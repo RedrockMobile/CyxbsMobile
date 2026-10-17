@@ -40,6 +40,7 @@ import java.nio.file.attribute.FileTime
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -371,6 +372,136 @@ class FileLogEngineTest {
         it.name.startsWith("cyxbs-log-export-v1-") || it.name.startsWith("cyxbs-log-export-v2-")
       })
       assertEquals(LogStorageResult.Success, engine.close())
+    }
+  }
+
+  @Test
+  fun ordinaryWritesAvoidDirectoryScansAndKeepByteMetricsAccurate() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val scans = AtomicInteger()
+      val countingFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun list(dir: Path): List<Path> {
+          if (dir == logDirectory.toPath()) scans.incrementAndGet()
+          return super.list(dir)
+        }
+      }
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), countingFileSystem, nowMillis = { 1_000L })
+      assertEquals(LogStorageResult.Success, engine.start())
+      try {
+        val initialScans = scans.get()
+        repeat(100) { engine.offer(event(message = "record-$it")) }
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        assertEquals(initialScans, scans.get())
+        val actualBytes = fileSystem.list(logDirectory.toPath()).sumOf { fileSystem.metadata(it).size ?: 0L }
+        assertEquals(actualBytes, engine.health().managedBytes)
+        assertEquals(100, engine.health().acceptedEntries)
+
+        assertEquals(LogStorageResult.Success, engine.clear())
+        engine.offer(event(message = "after-clear"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        val bytesAfterClear = fileSystem.list(logDirectory.toPath()).sumOf { fileSystem.metadata(it).size ?: 0L }
+        assertEquals(bytesAfterClear, engine.health().managedBytes)
+        assertEquals(1, engine.health().managedFileCount)
+      } finally {
+        engine.close()
+      }
+    }
+  }
+
+  @Test
+  fun totalBudgetTriggersCleanupBeforeRotationOrPeriodicScan() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val directory = logDirectory.toPath()
+      val budget = 256L * 1_024
+      fileSystem.createDirectories(directory)
+      val oldFile = directory / "cyxbs-log-v1-old-000001.jsonl"
+      fileSystem.write(oldFile) { writeUtf8("x".repeat(budget.toInt() - 1_024)) }
+      val engine = FileLogEngine(
+        config(logDirectory, exportDirectory).copy(maxTotalBytes = budget),
+        nowMillis = { 1_000L },
+      )
+      assertEquals(LogStorageResult.Success, engine.start())
+      try {
+        assertTrue(fileSystem.exists(oldFile))
+        engine.offer(event(message = "x".repeat(2_000)))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        assertFalse(fileSystem.exists(oldFile))
+        val actualBytes = fileSystem.list(directory).sumOf { fileSystem.metadata(it).size ?: 0L }
+        assertTrue(actualBytes <= budget)
+        assertEquals(actualBytes, engine.health().managedBytes)
+        assertEquals(1, engine.health().managedFileCount)
+        assertEquals(0, engine.health().writeFailures)
+      } finally {
+        engine.close()
+      }
+    }
+  }
+
+  @Test
+  fun periodicCleanupExpiresSealedFilesWithoutWaitingForRotation() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val directory = logDirectory.toPath()
+      fileSystem.createDirectories(directory)
+      val oldFile = directory / "cyxbs-log-v1-old-000001.jsonl"
+      fileSystem.write(oldFile) { writeUtf8("{}\n") }
+      val now = AtomicLong(requireNotNull(fileSystem.metadata(oldFile).lastModifiedAtMillis) + 500)
+      val engine = FileLogEngine(
+        config(logDirectory, exportDirectory).copy(maxAgeMillis = 1_000),
+        nowMillis = now::get,
+      )
+      assertEquals(LogStorageResult.Success, engine.start())
+      try {
+        engine.offer(event(message = "before-expiry"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        assertTrue(fileSystem.exists(oldFile))
+        now.addAndGet(60_000)
+        engine.offer(event(message = "after-expiry"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        assertFalse(fileSystem.exists(oldFile))
+        val actualBytes = fileSystem.list(directory).sumOf { fileSystem.metadata(it).size ?: 0L }
+        assertEquals(actualBytes, engine.health().managedBytes)
+        assertEquals(1, engine.health().managedFileCount)
+      } finally {
+        engine.close()
+      }
+    }
+  }
+
+  @Test
+  fun failedPeriodicScanRecoversByteAccountingForLaterWrites() = runTest {
+    withTemporaryDirectories { logDirectory, exportDirectory ->
+      val failNextScan = AtomicBoolean(false)
+      val now = AtomicLong(1_000L)
+      val failingFileSystem = object : ForwardingFileSystem(fileSystem) {
+        override fun list(dir: Path): List<Path> {
+          if (dir == logDirectory.toPath() && failNextScan.getAndSet(false)) {
+            throw IOException("directory scan failed")
+          }
+          return super.list(dir)
+        }
+      }
+      val engine = FileLogEngine(config(logDirectory, exportDirectory), failingFileSystem, now::get)
+      assertEquals(LogStorageResult.Success, engine.start())
+      try {
+        engine.offer(event(message = "before-failure"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        now.addAndGet(60_000)
+        failNextScan.set(true)
+        engine.offer(event(message = "scan-fails"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        assertEquals(1, engine.health().writeFailures)
+        assertEquals(1, engine.health().droppedByLevel.info)
+
+        engine.offer(event(message = "after-recovery"))
+        assertEquals(LogFlushResult.Buffered, engine.flush(LogFlushMode.Buffered))
+        val files = fileSystem.list(logDirectory.toPath())
+        assertEquals(files.sumOf { fileSystem.metadata(it).size ?: 0L }, engine.health().managedBytes)
+        assertEquals(files.size, engine.health().managedFileCount)
+        val exported = assertIs<LogExportResult.Success>(engine.export())
+        assertEquals(2, exported.exportedRecordCount)
+      } finally {
+        engine.close()
+      }
     }
   }
 
