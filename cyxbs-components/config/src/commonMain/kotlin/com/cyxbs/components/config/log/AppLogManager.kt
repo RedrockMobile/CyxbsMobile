@@ -15,6 +15,8 @@ import com.cyxbs.components.log.LogFlushResult
 import com.cyxbs.components.log.LogLevel
 import com.cyxbs.components.log.LogStorageResult
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -32,6 +34,8 @@ object AppLogManager {
   private val initialized = atomic(false)
   private val isMainProcess = atomic(false)
   private val operations = Mutex()
+  private val policyVersion = atomic(0L)
+  private val policyGate = SynchronizedObject()
 
   fun initialize(mainProcess: Boolean) {
     isMainProcess.value = mainProcess
@@ -48,7 +52,8 @@ object AppLogManager {
       }
     }
     val shouldCollect = shouldRunFileStorage()
-    CyxbsLog.setFileStorageCollectionEnabled(shouldCollect)
+    CyxbsLog.setFileStorageCollectionEnabled(false)
+    setPlatformDiagnosticCollectionEnabled(false)
     if (shouldCollect) {
       appCoroutineScope.launch { ensureStarted() }
     }
@@ -66,26 +71,27 @@ object AppLogManager {
       return@withLock LogStorageResult.Failure("请先同意隐私政策")
     }
     if (!enabled) {
-      CyxbsLog.setFileStorageCollectionEnabled(false)
+      invalidateCollectionPolicy()
+      setPlatformDiagnosticCollectionEnabled(false)
       defaultSettings.putBoolean(SP_DIAGNOSTIC_LOG_ENABLED, false)
       return@withLock CyxbsLog.closeFileStorage()
     }
     if (!isMainProcess.value) {
       return@withLock LogStorageResult.Failure("诊断日志仅支持主进程")
     }
+    val requestedPolicyVersion = advancePolicyVersion()
     defaultSettings.putBoolean(SP_DIAGNOSTIC_LOG_ENABLED, true)
-    CyxbsLog.setFileStorageCollectionEnabled(true)
     try {
       val result = startLocked()
-      if (result != LogStorageResult.Success) {
-        CyxbsLog.setFileStorageCollectionEnabled(false)
-        defaultSettings.putBoolean(SP_DIAGNOSTIC_LOG_ENABLED, false)
+      if (result != LogStorageResult.Success && rollbackEnableIfCurrent(requestedPolicyVersion)) {
+        setPlatformDiagnosticCollectionEnabled(false)
       }
       result
     } catch (cancellation: CancellationException) {
-      CyxbsLog.setFileStorageCollectionEnabled(false)
+      if (rollbackEnableIfCurrent(requestedPolicyVersion)) {
+        setPlatformDiagnosticCollectionEnabled(false)
+      }
       withContext(NonCancellable) {
-        defaultSettings.putBoolean(SP_DIAGNOSTIC_LOG_ENABLED, false)
         CyxbsLog.closeFileStorage()
       }
       throw cancellation
@@ -107,8 +113,16 @@ object AppLogManager {
       }
       CyxbsLog.clearFileStorage()
     } finally {
-      if (startedForOperation && !shouldRunFileStorage()) {
-        withContext(NonCancellable) { CyxbsLog.closeFileStorage() }
+      if (startedForOperation) {
+        withContext(NonCancellable) {
+          if (shouldRunFileStorage()) {
+            startLocked()
+          } else {
+            CyxbsLog.setFileStorageCollectionEnabled(false)
+            setPlatformDiagnosticCollectionEnabled(false)
+            CyxbsLog.closeFileStorage()
+          }
+        }
       }
     }
   }
@@ -127,19 +141,64 @@ object AppLogManager {
   suspend fun flush(): LogFlushResult = CyxbsLog.flushFileStorage()
 
   fun onPrivacyAgreed() {
+    advancePolicyVersion()
     if (shouldRunFileStorage()) {
-      CyxbsLog.setFileStorageCollectionEnabled(true)
       appCoroutineScope.launch { ensureStarted() }
     }
   }
 
   fun onPrivacyWithdrawn() {
-    CyxbsLog.setFileStorageCollectionEnabled(false)
+    invalidateCollectionPolicy()
+    setPlatformDiagnosticCollectionEnabled(false)
     appCoroutineScope.launch {
       operations.withLock {
-        if (!shouldRunFileStorage()) CyxbsLog.closeFileStorage()
+        if (shouldRunFileStorage()) {
+          startLocked()
+        } else {
+          CyxbsLog.setFileStorageCollectionEnabled(false)
+          setPlatformDiagnosticCollectionEnabled(false)
+          CyxbsLog.closeFileStorage()
+        }
       }
     }
+  }
+
+  private fun advancePolicyVersion(): Long = synchronized(policyGate) {
+    policyVersion.incrementAndGet()
+  }
+
+  private fun invalidateCollectionPolicy() {
+    synchronized(policyGate) {
+      policyVersion.incrementAndGet()
+      CyxbsLog.setFileStorageCollectionEnabled(false)
+    }
+  }
+
+  private fun rollbackEnableIfCurrent(expectedVersion: Long): Boolean = synchronized(policyGate) {
+    if (policyVersion.value != expectedVersion) {
+      false
+    } else {
+      policyVersion.incrementAndGet()
+      CyxbsLog.setFileStorageCollectionEnabled(false)
+      defaultSettings.putBoolean(SP_DIAGNOSTIC_LOG_ENABLED, false)
+      true
+    }
+  }
+
+  private fun tryEnableCollection(expectedVersion: Long): Boolean = synchronized(policyGate) {
+    if (policyVersion.value != expectedVersion || !shouldRunFileStorage()) {
+      false
+    } else {
+      CyxbsLog.setFileStorageCollectionEnabled(true)
+      true
+    }
+  }
+
+  internal fun <T> withCurrentDiagnosticCollectionPolicy(
+    expectedVersion: Long,
+    block: () -> T,
+  ): T? = synchronized(policyGate) {
+    if (policyVersion.value == expectedVersion && shouldRunFileStorage()) block() else null
   }
 
   private fun shouldRunFileStorage(): Boolean =
@@ -148,26 +207,56 @@ object AppLogManager {
       isDiagnosticLoggingEnabled()
 
   private suspend fun ensureStarted(): LogStorageResult = operations.withLock {
-    val result = startLocked()
-    if (result != LogStorageResult.Success) {
-      CyxbsLog.setFileStorageCollectionEnabled(false)
-    }
-    result
+    startLocked()
   }
 
   private suspend fun startLocked(): LogStorageResult {
+    val expectedPolicyVersion = policyVersion.value
     if (!shouldRunFileStorage()) return LogStorageResult.Failure("诊断日志当前不可用")
     val current = CyxbsLog.fileStorageHealth().state
-    if (current == FileLogState.Running || current == FileLogState.Starting) {
-      return LogStorageResult.Success
+    val result = if (current == FileLogState.Running || current == FileLogState.Starting) {
+      LogStorageResult.Success
+    } else {
+      val config = platformFileLogConfig() ?: return LogStorageResult.Unsupported
+      startFileStorage(config)
     }
-    val config = platformFileLogConfig() ?: return LogStorageResult.Unsupported
-    return startFileStorage(config)
+    if (result == LogStorageResult.Success) {
+      if (!tryEnableCollection(expectedPolicyVersion)) {
+        setPlatformDiagnosticCollectionEnabled(false)
+        CyxbsLog.closeFileStorage()
+        return LogStorageResult.Failure("诊断日志当前不可用")
+      }
+      setPlatformDiagnosticCollectionEnabled(
+        enabled = true,
+        expectedPolicyVersion = expectedPolicyVersion,
+      )
+      if (withCurrentDiagnosticCollectionPolicy(expectedPolicyVersion) { true } != true) {
+        return LogStorageResult.Failure("诊断日志当前不可用")
+      }
+    }
+    return result
   }
 
   private suspend fun startFileStorage(config: FileLogConfig): LogStorageResult {
+    try {
+      preparePlatformFileLog(config)
+    } catch (cancellation: CancellationException) {
+      throw cancellation
+    } catch (_: Throwable) {
+      return LogStorageResult.Failure("日志存储平台准备失败")
+    }
+
     val result = CyxbsLog.startFileStorage(config)
-    if (result == LogStorageResult.Success) onPlatformFileLogStarted(config)
-    return result
+    if (result != LogStorageResult.Success) return result
+    try {
+      onPlatformFileLogStarted(config)
+    } catch (cancellation: CancellationException) {
+      withContext(NonCancellable) { CyxbsLog.closeFileStorage() }
+      throw cancellation
+    } catch (_: Throwable) {
+      CyxbsLog.closeFileStorage()
+      return LogStorageResult.Failure("日志存储平台校验失败")
+    }
+    return LogStorageResult.Success
   }
 }
