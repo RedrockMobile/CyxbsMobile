@@ -211,6 +211,15 @@ deeplink: cyxbs://edit_info
 
 ## :cyxbs-pages:noclass
 
+### no_class_batch_add
+
+- entry: `com.cyxbs.pages.noclass.ui.BatchAddNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.BatchAddNavArgument`
+
+```text
+deeplink: cyxbs://no_class_batch_add
+```
+
 ### no_class_group_detail
 
 - entry: `com.cyxbs.pages.noclass.ui.GroupDetailNavEntry`

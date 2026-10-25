@@ -2,6 +2,7 @@ package com.cyxbs.pages.noclass.network
 
 import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo
 import com.cyxbs.pages.noclass.bean.NoClassGroups
 import com.cyxbs.pages.noclass.bean.NoClassTemporarySearchs
 import com.cyxbs.pages.noclass.bean.NoclassGroupIds
@@ -15,9 +16,10 @@ import de.jensklingenberg.ktorfit.http.PUT
 import de.jensklingenberg.ktorfit.http.Query
 
 /**
- * 没课约 API 接口（commonMain / Ktorfit 版本）
- *
- *
+ * description ： TODO:没课约 API 接口（commonMain / Ktorfit 版本）
+ * author : summer_palace2
+ * email : 2992203079qq.com
+ * date : 2026/5/18 16:20
  */
 interface NoclassApiService {
 
@@ -75,4 +77,11 @@ interface NoclassApiService {
     suspend fun searchAll(
         @Query("key") key: String
     ): ApiWrapper<NoClassTemporarySearchs>
+
+    /** 批量添加信息检查 */
+    @FormUrlEncoded
+    @POST("magipoke-jwzx/no_class/member/check")
+    suspend fun checkUploadInfo(
+        @Field("content") content: List<String>
+    ): ApiWrapper<NoClassBatchResponseInfo>
 }

@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cyxbs.components.utils.extensions.string
 import com.cyxbs.pages.noclass.R
-import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.Student
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent
 
 /**
  * ...
@@ -20,16 +20,16 @@ import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.Student
  * @Description:
  *
  */
-class SameNameStudentsAdapter(val setDoneStatus: (isChooseAny: Boolean, selectedList: List<Student>) -> Unit) :
-    ListAdapter<Student, SameNameStudentsAdapter.ViewHolder>(diffUtil) {
+class SameNameStudentsAdapter(val setDoneStatus: (isChooseAny: Boolean, selectedList: List<BatchStudent>) -> Unit) :
+    ListAdapter<BatchStudent, SameNameStudentsAdapter.ViewHolder>(diffUtil) {
     companion object {
-        private val diffUtil: DiffUtil.ItemCallback<Student> =
-            object : DiffUtil.ItemCallback<Student>() {
-                override fun areItemsTheSame(oldItem: Student, newItem: Student): Boolean {
+        private val diffUtil: DiffUtil.ItemCallback<BatchStudent> =
+            object : DiffUtil.ItemCallback<BatchStudent>() {
+                override fun areItemsTheSame(oldItem: BatchStudent, newItem: BatchStudent): Boolean {
                     return oldItem.id == newItem.id
                 }
 
-                override fun areContentsTheSame(oldItem: Student, newItem: Student): Boolean {
+                override fun areContentsTheSame(oldItem: BatchStudent, newItem: BatchStudent): Boolean {
                     return oldItem.id == newItem.id &&
                             oldItem.name == newItem.name &&
                             oldItem.major == newItem.major
@@ -40,7 +40,7 @@ class SameNameStudentsAdapter(val setDoneStatus: (isChooseAny: Boolean, selected
     /**
      * 已选择的重名学生的 暂存集合
      */
-    private val hasSelected by lazy { ArrayList<Student>() }
+    private val hasSelected by lazy { ArrayList<BatchStudent>() }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val studentName: TextView = itemView.findViewById(R.id.noclass_batch_tv_student_name)

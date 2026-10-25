@@ -13,7 +13,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.cyxbs.components.utils.extensions.drawable
 import com.cyxbs.pages.noclass.R
-import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.Student
+import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent
 import com.cyxbs.pages.noclass.page.adapter.SameNameStudentsAdapter
 import com.cyxbs.pages.noclass.page.viewmodel.activity.BatchAdditionViewModel
 
@@ -26,8 +26,8 @@ import com.cyxbs.pages.noclass.page.viewmodel.activity.BatchAdditionViewModel
  *
  */
 class SameNameSelectionDialog : BottomSheetDialogFragment {
-    private val sameNameData: List<Student>
-    constructor(sameNameData: List<Student>) : super() {
+    private val sameNameData: List<BatchStudent>
+    constructor(sameNameData: List<BatchStudent>) : super() {
         this.sameNameData = sameNameData
     }
     // 无参构造器是为了给 Activity重建（如配置更新时、夜间模式等）后恢复 该BottomSheetDialogFragment用（防止APP崩溃）
@@ -39,7 +39,7 @@ class SameNameSelectionDialog : BottomSheetDialogFragment {
     private val batchAdditionViewModel by activityViewModels<BatchAdditionViewModel>()
 
     // 选中的重名学生
-    private var selectedStudents : List<Student> = emptyList()
+    private var selectedStudents : List<BatchStudent> = emptyList()
 
     // 确认（已经选好了重名学生）的按钮
     private lateinit var mBtnDone : Button
@@ -98,7 +98,7 @@ class SameNameSelectionDialog : BottomSheetDialogFragment {
                     mBtnDone.isEnabled = false
                 }
             }.apply {
-                val noRepeatIdMap = mutableMapOf<String, Student>()
+                val noRepeatIdMap = mutableMapOf<String, BatchStudent>()
                 // 这里对返回的学号相同的数据去重
                 sameNameData.forEach {
                     noRepeatIdMap[it.id] = it

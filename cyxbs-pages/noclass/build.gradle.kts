@@ -19,6 +19,7 @@ kotlin {
       implementation(projects.cyxbsPages.store.api)
       implementation(projects.cyxbsPages.affair.api)
       implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.course.view)
       implementation(projects.cyxbsPages.course.widget)
     }
     androidMain.dependencies {
