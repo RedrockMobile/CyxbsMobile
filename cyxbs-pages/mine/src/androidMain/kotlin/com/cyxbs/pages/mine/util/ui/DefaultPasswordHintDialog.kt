@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import android.widget.Button
+import com.cyxbs.pages.home.api.HomeNavArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
 import com.cyxbs.pages.mine.R
 
 /**
@@ -20,10 +22,13 @@ class DefaultPasswordHintDialog(context: Context, them: Int) : Dialog(context, t
             defaultPasswordHintDialog.setContentView(R.layout.mine_dialog_default_password_hint)
             val relogin = defaultPasswordHintDialog.findViewById<Button>(R.id.mine_security_bt_relogin)
             relogin.setOnClickListener {
-                defaultPasswordHintDialog.hide()
+                defaultPasswordHintDialog.dismiss()
+                // 跳转到登录页
+                LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
+                activity.finish()
             }
-            //修改：将原本的只在按钮监听事件中finish activity变更为在cancel的监听事件中finish activity
             defaultPasswordHintDialog.setOnCancelListener {
+                LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
                 activity.finish()
             }
             defaultPasswordHintDialog.show()

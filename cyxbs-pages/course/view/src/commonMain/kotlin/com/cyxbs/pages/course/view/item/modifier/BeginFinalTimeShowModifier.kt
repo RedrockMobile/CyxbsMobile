@@ -143,48 +143,65 @@ private fun Modifier.drawBeginFinalTimeline(
     )
   }
   return drawWithCache {
+    val isTimePoint = timePair.value.first == timePair.value.second
     val beginTextLayoutResult = beginTextLayoutResultState.value
-    val finalTextLayoutResult = finalTextLayoutResultState.value
-    val durationTextLayoutResult = durationTextLayoutResultState.value
-    onDrawWithContent {
-      drawContent()
-      if (alpha.floatValue == 0F) return@onDrawWithContent
-      drawText(
-        textLayoutResult = beginTextLayoutResult,
-        topLeft = Offset(
-          -beginTextLayoutResult.size.width / 2F,
-          -beginTextLayoutResult.size.height / 2F
-        ),
-        alpha = alpha.floatValue,
-      )
-      drawText(
-        textLayoutResult = finalTextLayoutResult,
-        topLeft = Offset(
-          -finalTextLayoutResult.size.width / 2F,
-          size.height - finalTextLayoutResult.size.height / 2F
-        ),
-        alpha = alpha.floatValue,
-      )
-      drawText(
-        textLayoutResult = durationTextLayoutResult,
-        topLeft = Offset(
-          -durationTextLayoutResult.size.width / 2F,
-          (size.height - durationTextLayoutResult.size.height) / 2
-        ),
-        alpha = alpha.floatValue,
-      )
-      drawLine(
-        color = localAppColor.tvLv4,
-        start = Offset(0F, beginTextLayoutResult.size.height / 2F),
-        end = Offset(0F, (size.height - durationTextLayoutResult.size.height) / 2),
-        alpha = alpha.floatValue,
-      )
-      drawLine(
-        color = localAppColor.tvLv4,
-        start = Offset(0F, (size.height + durationTextLayoutResult.size.height) / 2),
-        end = Offset(0F, size.height - finalTextLayoutResult.size.height / 2F),
-        alpha = alpha.floatValue,
-      )
+    if (isTimePoint) {
+      onDrawWithContent {
+        drawContent()
+        if (alpha.floatValue == 0F) return@onDrawWithContent
+        // 零时长 Item 只展示一个居中的时间点，不再重复绘制起止时间与无意义的“0”分钟。
+        drawText(
+          textLayoutResult = beginTextLayoutResult,
+          topLeft = Offset(
+            -beginTextLayoutResult.size.width / 2F,
+            (size.height - beginTextLayoutResult.size.height) / 2F,
+          ),
+          alpha = alpha.floatValue,
+        )
+      }
+    } else {
+      val finalTextLayoutResult = finalTextLayoutResultState.value
+      val durationTextLayoutResult = durationTextLayoutResultState.value
+      onDrawWithContent {
+        drawContent()
+        if (alpha.floatValue == 0F) return@onDrawWithContent
+        drawText(
+          textLayoutResult = beginTextLayoutResult,
+          topLeft = Offset(
+            -beginTextLayoutResult.size.width / 2F,
+            -beginTextLayoutResult.size.height / 2F
+          ),
+          alpha = alpha.floatValue,
+        )
+        drawText(
+          textLayoutResult = finalTextLayoutResult,
+          topLeft = Offset(
+            -finalTextLayoutResult.size.width / 2F,
+            size.height - finalTextLayoutResult.size.height / 2F
+          ),
+          alpha = alpha.floatValue,
+        )
+        drawText(
+          textLayoutResult = durationTextLayoutResult,
+          topLeft = Offset(
+            -durationTextLayoutResult.size.width / 2F,
+            (size.height - durationTextLayoutResult.size.height) / 2
+          ),
+          alpha = alpha.floatValue,
+        )
+        drawLine(
+          color = localAppColor.tvLv4,
+          start = Offset(0F, beginTextLayoutResult.size.height / 2F),
+          end = Offset(0F, (size.height - durationTextLayoutResult.size.height) / 2),
+          alpha = alpha.floatValue,
+        )
+        drawLine(
+          color = localAppColor.tvLv4,
+          start = Offset(0F, (size.height + durationTextLayoutResult.size.height) / 2),
+          end = Offset(0F, size.height - finalTextLayoutResult.size.height / 2F),
+          alpha = alpha.floatValue,
+        )
+      }
     }
   }
 }

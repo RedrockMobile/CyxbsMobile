@@ -240,6 +240,28 @@
 -keepattributes Signature
 -keepattributes Exceptions
 -keepattributes SourceFile,LineNumberTable
+
+# 仅保留业务 Composable 方法名，方便崩溃截图中能快速找到位置
+-keepclassmembers,allowshrinking,allowoptimization class com.cyxbs.** {
+    @androidx.compose.runtime.Composable <methods>;
+}
+
+# 仅保留上述类的嵌套类名，覆盖 LaunchedEffect 等协程生成类；方法名和字段名仍可混淆。
+# allowrepackage 放开包路径变化，不放开简单类名的混淆。
+# <1> 引用条件中 ** 匹配的类名（包含相对于 com.cyxbs 的包路径）。
+# 匹配范围以宿主类为单位，同文件普通函数生成的嵌套类也会覆盖，无法精确关联单个 Composable。
+# 允许优化意味着生成类仍可能被合并或消除；源码行号仍需对应构建的 mapping 还原。
+-if class com.cyxbs.** {
+    @androidx.compose.runtime.Composable <methods>;
+}
+-keep,allowshrinking,allowoptimization,allowrepackage class com.cyxbs.<1>$** {}
+
+# 保留新版 BaseViewModel 直接及间接子类的简单类名和方法名，便于从崩溃堆栈识别业务调用。
+# allowrepackage 允许调整包名；字段名仍可混淆，未使用代码可裁剪，仍允许内联等优化。
+-keep,allowshrinking,allowoptimization,allowrepackage class * extends com.cyxbs.components.base.ui.BaseViewModel {
+    <methods>;
+}
+
 #----------------------------------------------------------------------------
 
 #---------------------------------默认保留区---------------------------------

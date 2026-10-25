@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.DelegatableNode
-import androidx.compose.ui.text.font.FontFamily
 
 @Composable
 internal actual fun ConfigAppThemeBefore(
@@ -25,11 +24,6 @@ internal actual fun ConfigAppThemeAfter(
   ) {
     content()
   }
-}
-
-@Composable
-internal actual fun getFontFamily(): FontFamily {
-  return FontFamily.Default
 }
 
 private data object NoIndicationNodeFactory : IndicationNodeFactory {

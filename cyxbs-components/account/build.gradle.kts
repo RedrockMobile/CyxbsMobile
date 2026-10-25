@@ -13,5 +13,9 @@ kotlin {
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsPages.login.api)
     }
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+      implementation(libs.kotlinx.coroutines.test)
+    }
   }
 }

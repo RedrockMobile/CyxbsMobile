@@ -3,6 +3,7 @@ package com.cyxbs.pages.sport.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+
 @Serializable
 data class SportDetailBean(
   @SerialName("award")

@@ -6,12 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,7 +31,7 @@ import androidx.constraintlayout.compose.ConstraintSet
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.getWindowScreenSize
-import com.cyxbs.components.view.ui.BottomSheetCompose
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetCompose
 import com.cyxbs.pages.schoolcar.bean.CarLine
 import com.cyxbs.pages.schoolcar.viewmodel.CommonSchoolCarViewModel
 import com.cyxbs.pages.schoolcar.widget.CarInfoBtsDisplayMode.Empty
@@ -65,15 +60,13 @@ fun CarInfoButtonSheet(
 	val selectedId by state.selectedLineId
 	val peekHeight = state.peekHeight
 	val list by state.lineSelectorItem
-	val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-	val realPeekHeight = peekHeight + navBarHeight
 
 	// UI实际渲染内容，线路模式切换到Empty后，先维持显示内容不变完成关闭动画后在清空内容
 	val render = remember { mutableStateOf(state.displayMode.value) }
 
 	BottomSheetCompose(
 		bottomSheetState = state.bottomSheetState,
-		peekHeight = realPeekHeight,
+		peekHeight = peekHeight,
 		dismissOnBackPress = false,
 		dismissOnClickOutside = false,
 		scrimColor = Color.Transparent
@@ -81,14 +74,12 @@ fun CarInfoButtonSheet(
 		ConstraintLayout(
 			modifier = Modifier
 				.then(bottomSheetDraggable())
-				.heightIn(min = realPeekHeight + 2.dp)
 				.shadow(
 					elevation = 10.dp,
 					shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
 				)
 				.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-				.background(LocalAppColors.current.topBg)
-				.navigationBarsPadding(),
+				.background(LocalAppColors.current.topBg),
 			constraintSet = createConstraintSet()
 		) {
 			ShapeTipCompose(modifier = Modifier.layoutId(CarInfoBtsElement.ShapeTip))
@@ -170,7 +161,7 @@ fun CarInfoButtonSheet(
 	// 监听当用户处于Empty模式的时候上滑选择最近的站点
 	LaunchedEffect(Unit) {
 		var lastFraction = 0f
-		snapshotFlow { state.bottomSheetState.fraction }
+		snapshotFlow { state.bottomSheetState.expansionFraction }
 			.collect { currentFraction ->
 				val isPullingUp = currentFraction > lastFraction
 				if (state.displayMode.value is Empty) {

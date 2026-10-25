@@ -16,28 +16,10 @@ struct ScheduleWidget: Widget {
     var body: some WidgetConfiguration {
         
         IntentConfiguration(kind: kind, intent: ScheduleWidgetConfiguration.self, provider: ScheduleProvider()) { entry in
-            
             ScheduleWidgetEntryView(entry: entry)
-                .widgetBackground(Color(UIColor.systemBackground))
         }
         .configurationDisplayName("掌邮课表")
-        .description("快来添加你的课表小组件吧！")
-        .supportedFamilies(supportedFamilies)
-    }
-}
-
-extension ScheduleWidget {
-    var supportedFamilies: Array<WidgetFamily> {
-        return [.systemLarge]
-//        var ary: Array<WidgetFamily> = [.systemSmall, .systemMedium, .systemLarge]
-//        if #available(iOS 15.0, *) {
-//            ary.append(.systemExtraLarge)
-//        }
-//        if #available(iOS 16.0, *) {
-//            ary.append(.accessoryCircular)
-//            ary.append(.accessoryRectangular)
-//            ary.append(.accessoryInline)
-//        }
-//        return ary
+        .description("小号看下一节，中号看今日时间条，大号看七天课表")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

@@ -6,6 +6,7 @@ plugins {
 useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
 useNavigation() // navigation 跳转
+useUnitTest()
 
 kotlin {
   sourceSets {
@@ -22,6 +23,7 @@ kotlin {
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.notification.api)
       implementation(projects.cyxbsPages.home.api)
+      implementation(projects.cyxbsPages.widget.api)
     }
     androidMain.dependencies {
       implementation(projects.libCommon) // TODO common 模块不再使用，新模块请依赖 base 和 utils 模块
@@ -37,6 +39,10 @@ kotlin {
       implementation("com.contrarywind:Android-PickerView:4.1.9")
       // https://github.com/kyleduo/SwitchButton
       implementation("com.kyleduo.switchbutton:library:2.1.0")
+    }
+    iosMain.dependencies {
+      implementation(libs.filekit.core)
+      implementation(libs.filekit.dialogs.compose)
     }
   }
 }

@@ -11,16 +11,13 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import com.cyxbs.components.base.ui.BaseActivity
 import com.cyxbs.components.base.ui.viewModelBy
-import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.components.config.route.UFIELD_DETAIL_ENTRY
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.gone
 import com.cyxbs.components.utils.extensions.setImageFromUrl
-import com.cyxbs.components.config.service.impl
-import com.cyxbs.components.config.service.startActivity
+import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.store.api.IStoreService
 import com.cyxbs.pages.ufield.R
-import com.cyxbs.pages.ufield.bean.RemindMode
-import com.cyxbs.pages.ufield.bean.Todo
 import com.cyxbs.pages.ufield.viewmodel.DetailViewModel
 import com.g985892345.provider.api.annotation.KClassProvider
 import java.text.SimpleDateFormat
@@ -112,13 +109,18 @@ class DetailActivity : BaseActivity() {
             }
         }
         viewModel.isAdd.observe(this) {
-            tvAddTodo.setTextColor(
-                ContextCompat.getColor(
-                    this@DetailActivity,
-                    R.color.uField_text_haveadd
+            if (it) {
+                tvAddTodo.setTextColor(
+                    ContextCompat.getColor(
+                        this@DetailActivity,
+                        R.color.uField_text_haveadd
+                    )
                 )
-            )
-            tvAddTodo.setBackgroundResource(R.drawable.ufield_shape_haveadd)
+                tvAddTodo.setBackgroundResource(R.drawable.ufield_shape_haveadd)
+                tvAddTodo.setOnClickListener(null)
+            } else {
+                toast("添加失败")
+            }
         }
     }
 
@@ -201,16 +203,9 @@ class DetailActivity : BaseActivity() {
                 )
                 tvAddTodo.setBackgroundResource(R.drawable.ufield_shape_haveadd)
             } else {
+                val activity = it
                 tvAddTodo.setOnClickListener {
-                    tvAddTodo.setTextColor(
-                        ContextCompat.getColor(
-                            this@DetailActivity,
-                            R.color.uField_text_haveadd
-                        )
-                    )
-                    tvAddTodo.setBackgroundResource(R.drawable.ufield_shape_haveadd)
-                    viewModel.addTodo(createTodo())
-                    viewModel.isAdd(id)
+                    viewModel.addActivityToSchedule(activity)
                 }
             }
         }
@@ -286,22 +281,6 @@ class DetailActivity : BaseActivity() {
         layout.gone()
     }
 
-    private fun createTodo(): Todo {
-        val notifyDatetime = viewModel.detailData.value?.let { otherTrans(it.activityStartAt) }?:""
-        val todo = Todo(
-            System.currentTimeMillis() / 1000,
-            tvTitle.text.toString(),
-            tvPlace.text.toString(),
-            0,
-            RemindMode(0, arrayListOf(), arrayListOf(), arrayListOf(), notifyDatetime),
-            System.currentTimeMillis(),
-            "other",
-            0,
-            notifyDatetime
-        )
-        return todo
-    }
-
     private fun trans(timestampInSeconds: Long): String {
         val date = Date(timestampInSeconds * 1000L)
 
@@ -309,10 +288,4 @@ class DetailActivity : BaseActivity() {
         return format.format(date)
     }
 
-    private fun otherTrans(timestampInSeconds: Long): String {
-        val date = Date(timestampInSeconds * 1000L)
-        val format = SimpleDateFormat("yyyy年MM月dd日HH:mm", Locale.getDefault())
-        return format.format(date)
-    }
 }
-

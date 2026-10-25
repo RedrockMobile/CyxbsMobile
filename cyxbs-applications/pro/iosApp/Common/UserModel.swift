@@ -22,7 +22,6 @@ struct UserModel: Codable {
         didSet {
             if let token {
                 CacheManager.shared.cache(codable: token, in: .token)
-                SessionManager.shared.token = token.token
             }
         }
     }
@@ -72,7 +71,7 @@ struct UserModel: Codable {
     
     mutating func logout() {
         token = nil
+        // 删缓存即可，SessionManager 下次发请求读缓存自然取不到 token（同上，不向其同步）。
         CacheManager.shared.delete(path: .token)
-        SessionManager.shared.token = nil
     }
 }

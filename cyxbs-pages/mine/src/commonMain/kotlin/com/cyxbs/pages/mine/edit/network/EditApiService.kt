@@ -10,6 +10,11 @@ import de.jensklingenberg.ktorfit.http.Headers
 import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.PUT
 import io.ktor.client.request.forms.MultiPartFormDataContent
+import com.cyxbs.components.account.api.AccountSession
+import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.utils.network.plugin.EXPECTED_ACCOUNT_SESSION_ATTRIBUTE_NAME
+import de.jensklingenberg.ktorfit.http.Tag
 
 /**
  * .
@@ -33,10 +38,13 @@ interface EditApiService {
    * 上传头像，返回新的 photo_src URL
    *
    * form-data 字段：stunum + fold（图片文件）。
-   * 拿到 [UploadAvatarBean.photoSrc] 后需要再调一次 [updatePersonInfo] 把 URL 写回个人信息。
+   * 接口内部写回 photo_src；成功后更新页面头像并刷新账户信息。
    */
   @PUT("magipoke/person/upload/avatar")
-  suspend fun uploadAvatar(@Body body: MultiPartFormDataContent): ApiWrapper<UploadAvatarBean>
+  suspend fun uploadAvatar(
+    @Body body: MultiPartFormDataContent,
+    @Tag(EXPECTED_ACCOUNT_SESSION_ATTRIBUTE_NAME) session: AccountSession = IAccountService::class.impl().session.value,
+  ): ApiWrapper<UploadAvatarBean>
 
   /**
    * 通用下发文本（headers 必须显式指定 application/json）。

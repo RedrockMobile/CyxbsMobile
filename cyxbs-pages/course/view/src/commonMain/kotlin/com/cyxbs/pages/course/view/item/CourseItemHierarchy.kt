@@ -326,7 +326,7 @@ class CourseItemHierarchy<Item : CourseItem> {
     val decorationManager: CoursePageDecorationManager,
   ) {
 
-    // 绑定在 viewModelScope 之下的子协程作用域
+    // 绑定在 Manager 数据作用域下的子作用域；不含 Compose 帧时钟，不能用于 UI 动画
     private val coroutineScope = CoroutineScope(
       decorationManager.courseCoroutineScope.coroutineContext
           + SupervisorJob(decorationManager.courseCoroutineScope.coroutineContext[Job])
@@ -378,6 +378,9 @@ abstract class ItemHierarchyWhatTime<Item : CourseItem> : CourseItemWhatTime {
       -it.now.value.dayOfWeek.ordinal // dayOfWeek 越小越在上
     }.compareBy(other) {
       it.now.value.beginTime.value // beginTime 越大越在上
+    }.compareBy(other) {
+      // 开始时间相同时，零时长时间点必须位于时间段上层，才能作为锚点切割下层时间段。
+      if (it.now.value.beginTime == it.now.value.finalTime) 1 else 0
     }.compareBy(other) {
       it.now.value.finalTime.value // finalTime 越大越在上
     }

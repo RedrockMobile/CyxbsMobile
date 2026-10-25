@@ -7,20 +7,30 @@ import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.pages.course.api.courseItemWeekOrNull
 import com.cyxbs.pages.course.view.AbstractCourseFrame
+import com.cyxbs.pages.course.view.item.CourseItemIdProvider
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.overlay.OverlapCover
+import com.cyxbs.pages.course.view.widget.CourseWidgetManager
+import com.cyxbs.pages.widget.api.CourseWidgetSnapshot
+import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.isActive
@@ -38,11 +48,22 @@ import kotlin.time.Duration.Companion.seconds
  * @author 985892345
  * @date 2026/4/19
  */
-class CoursePageDecorationManager(
+class CoursePageDecorationManager internal constructor(
   val courseFrame: AbstractCourseFrame,
-  val courseCoroutineScope: CoroutineScope, // 当前课表组件的协程作用域
-  vararg val decorations: CoursePageDecoration<*>
-) {
+  val decorations: List<CoursePageDecoration<*>>,
+  /** 仅主页传入；具体小组件协议和持久化由顶层 course 模块适配。 */
+  private val widgetSnapshotPublisher: (suspend (CourseWidgetSnapshot) -> Unit)? = null,
+) : AutoCloseable {
+
+  /**
+   * Manager 自己拥有 Frame 根任务下的数据作用域，调用方无需创建或传递 CoroutineScope。
+   *
+   * 该作用域不包含 Compose 的 `MonotonicFrameClock`，只能用于数据订阅、刷新和资源生命周期管理，
+   * 禁止执行 `Animatable.animateTo`、`animate`、滚动动画等需要 UI 帧时钟的操作。
+   */
+  internal val courseCoroutineScope = CoroutineScope(
+    Dispatchers.Main.immediate + SupervisorJob(courseFrame.courseFrameJob)
+  )
 
   companion object {
     val Local = compositionLocalOf<CoursePageDecorationManager> { error("未提供") }
@@ -63,11 +84,57 @@ class CoursePageDecorationManager(
   // value 为 hierarchyIndex，表示需要刷新的层级
   private val refreshDateSet = HashSet<Int>()
   private val refreshDateMapSynchronized = SynchronizedObject()
+  private val isClosed = atomic(false)
+  private var courseWidgetManager: CourseWidgetManager? = null
 
   init {
-    decorations.forEach {
-      it.itemHierarchy.bindCourseItemViewModel(this)
+    try {
+      decorations.forEach {
+        it.itemHierarchy.bindCourseItemViewModel(this)
+        it.attach(this)
+      }
+      runCatching {
+        courseWidgetManager = widgetSnapshotPublisher?.let { publisher ->
+          CourseWidgetManager(
+            courseFrame = courseFrame,
+            decorations = decorations,
+            coroutineScope = courseCoroutineScope,
+            snapshotPublisher = publisher,
+          )
+        }
+      }.onFailure {
+        toast("widgetSnapshotPublisher: ${it.message}")
+      }
+    } catch (throwable: Throwable) {
+      try {
+        close()
+      } catch (closeThrowable: Throwable) {
+        throwable.addSuppressed(closeThrowable)
+      }
+      toast("CoursePageDecorationManager: ${throwable.message}")
     }
+  }
+
+  /**
+   * 取消当前 Manager、Decoration 和 CourseItem 的全部任务，并逆序通知 Decoration 解除挂载。
+   *
+   * 该方法幂等；单个 [CoursePageDecoration.onDetached] 失败不会阻断其他 Decoration 的清理。
+   */
+  override fun close() {
+    if (!isClosed.compareAndSet(expect = false, update = true)) return
+    courseWidgetManager?.close()
+    courseWidgetManager = null
+    courseCoroutineScope.cancel()
+    var failure: Throwable? = null
+    for (index in decorations.lastIndex downTo 0) {
+      val decoration = decorations[index]
+      try {
+        decoration.detach(this)
+      } catch (throwable: Throwable) {
+        if (failure == null) failure = throwable else failure.addSuppressed(throwable)
+      }
+    }
+    failure?.let { throw it }
   }
 
   fun tryRefresh(dateKey: Int) {
@@ -91,6 +158,32 @@ class CoursePageDecorationManager(
         }
       }
       refreshDateSet.clear()
+    }
+    courseWidgetManager?.requestSnapshotPublish()
+  }
+
+  /**
+   * 等待同一批重叠刷新稳定后再发布一次快照，避免把不同层级的中间裁剪状态持久化给 Widget。
+   * 背景型 Decoration 可通过此入口在非 Hierarchy 数据变化后复用同一套防抖发布流程。
+   */
+  internal fun requestWidgetSnapshotPublish() {
+    courseWidgetManager?.requestSnapshotPublish()
+  }
+
+  /**
+   * 根据通用课表 Item ID 观察对应 ItemState，供主页等外部入口模拟用户点击原课表条目。
+   *
+   * 教学周已包含在 [itemId] 中；条目尚未载入、已删除或 ID 非法时发出 null。同一 Item 被裁剪出的
+   * 多个可见区间不会生成额外 ItemState，因此无需向调用方暴露绘制片段身份。
+   */
+  fun observeItemStateById(itemId: String): Flow<CourseItemState?> {
+    val week = courseItemWeekOrNull(itemId) ?: return flowOf(null)
+    val weeklyItems = decorations.map { it.itemHierarchy.observeWeek(week) }
+    if (weeklyItems.isEmpty()) return flowOf(null)
+    return combine(weeklyItems) { itemLists ->
+      itemLists.asSequence()
+        .flatMap { it.asSequence() }
+        .firstOrNull { state -> (state.item as? CourseItemIdProvider)?.courseItemId == itemId }
     }
   }
 

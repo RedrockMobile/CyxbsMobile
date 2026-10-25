@@ -1,0 +1,429 @@
+name: Android Release Candidate
+
+on:
+  pull_request:
+    branches: [release]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check_source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          if [ "$HEAD_REF" != develop ]; then
+            echo '::error::发版 PR 的来源分支必须是 develop，请从 develop 向 release 发起 PR。'
+            exit 1
+          fi
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo '::error::发版 PR 必须来自本仓库的 develop 分支，不接受 fork 仓库。'
+            exit 1
+          fi
+          if [ "$IS_DRAFT" != false ]; then
+            echo '::error::发版 PR 不能是草稿，请先标记为 Ready for review。'
+            exit 1
+          fi
+
+  check_title:
+    needs: check_source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check version title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', os.environ['PR_TITLE']):
+              print('::error::PR 标题必须严格为 vX.Y.Z，例如 v7.0.1。')
+              raise SystemExit(1)
+          PY
+
+  check_notes:
+    needs: check_title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check user-visible release notes
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python - <<'PY'
+          import os
+          notes = os.environ.get('PR_BODY', '').strip()
+          if not 30 <= len(notes) <= 20000:
+              print('::error::PR 正文必须填写至少 30 字、最多 20000 字的用户可见更新内容。')
+              raise SystemExit(1)
+          PY
+
+  check_version:
+    needs: check_notes
+    runs-on: ubuntu-latest
+    outputs:
+      online_release: ${{ steps.candidate.outputs.online_release }}
+      release_metadata: ${{ steps.candidate.outputs.release_metadata }}
+      release_base: ${{ steps.candidate.outputs.release_base }}
+      apk_artifact_name: ${{ steps.candidate.outputs.apk_artifact_name }}
+      mapping_artifact_name: ${{ steps.candidate.outputs.mapping_artifact_name }}
+      ui_test_artifact_name: ${{ steps.candidate.outputs.ui_test_artifact_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests
+      - name: Check online version and derive candidate version
+        id: candidate
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          bash .github/scripts/prepare_release_candidate.sh
+          PYTHONPATH=.github/scripts python -m unittest discover -s .github/scripts/tests -p 'test_*.py'
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          # 两个 ABI 共用本次检查的线上快照和基线，避免并行时各自读取到不同版本。
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, filename in (('online_release', 'online-release.json'),
+                                    ('release_metadata', 'release-metadata.json')):
+                  value = json.loads((temp / filename).read_text(encoding='utf-8'))
+                  output.write(f'{key}={json.dumps(value)}\n')
+              output.write('release_base=' + (temp / 'release-base.sha').read_text().strip() + '\n')
+              metadata = json.loads((temp / 'release-metadata.json').read_text())
+              # 产物名面向发版者展示版本和用途；来源 SHA 仍写入包内并在消费时核对。
+              output.write(f"apk_artifact_name=CyxbsMobile-{metadata['tag']}.Apk\n")
+              output.write(f"mapping_artifact_name=proguardMapping-{metadata['tag']}.txt\n")
+              output.write(f"ui_test_artifact_name=CyxbsMobile-{metadata['tag']}-x86_64.Apk\n")
+          PY
+      - name: 提示版本检查失败原因
+        if: failure()
+        run: echo '::error::版本检查失败：请核对线上 versionName、versionCode、PR 标题及 Gradle 版本属性；具体原因见上方日志。'
+
+  build_release:
+    name: build_release (${{ matrix.abi }})
+    needs: check_version
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    # 矩阵在独立 Runner 同时构建两种 ABI，不共享 Gradle 输出目录。
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: gradle/actions/setup-gradle@v3
+      # 每个矩阵 Runner 都必须安装依赖，不能继承版本检查 Runner 的 Python 环境。
+      - name: Install version and signing dependencies
+        run: python -m pip install requests
+      - name: Prepare candidate release metadata
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          CHECKED_ONLINE_RELEASE: ${{ needs.check_version.outputs.online_release }}
+          CHECKED_RELEASE_METADATA: ${{ needs.check_version.outputs.release_metadata }}
+          CHECKED_RELEASE_BASE: ${{ needs.check_version.outputs.release_base }}
+        run: |
+          bash .github/scripts/prepare_release_candidate.sh --reuse-checked
+          git diff --exit-code -- . ':(exclude)gradle.properties' ':(exclude)build-logic/release-notes.txt'
+      - name: Create signing files
+        env:
+          BUGLY_APP_ID: ${{ secrets.BUGLY_APP_ID }}
+          SOPHIX_APP_ID: ${{ secrets.SOPHIX_APP_ID }}
+          SOPHIX_APP_SECRET: ${{ secrets.SOPHIX_APP_SECRET }}
+          SOPHIX_RSA: ${{ secrets.SOPHIX_RSA }}
+          UM_APP_KEY: ${{ secrets.UM_APP_KEY }}
+          UM_PUSH_SECRET: ${{ secrets.UM_PUSH_SECRET }}
+          UM_SHARE_SINA_APP_KEY: ${{ secrets.UM_SHARE_SINA_APP_KEY }}
+          UM_SHARE_SINA_APP_SECRET: ${{ secrets.UM_SHARE_SINA_APP_SECRET }}
+          UM_SHARE_QQ_ZONE_APP_ID: ${{ secrets.UM_SHARE_QQ_ZONE_APP_ID }}
+          UM_SHARE_QQ_ZONE_APP_SECRET: ${{ secrets.UM_SHARE_QQ_ZONE_APP_SECRET }}
+          amap_apikey: ${{ secrets.AMAP_APIKEY }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_CYXBS_URL: ${{ secrets.KEY_CYXBS_URL }}
+        run: |
+          python .github/scripts/create_secret.py \
+            "$BUGLY_APP_ID" "$SOPHIX_APP_ID" "$SOPHIX_APP_SECRET" "$SOPHIX_RSA" \
+            "$UM_APP_KEY" "$UM_PUSH_SECRET" "$UM_SHARE_SINA_APP_KEY" "$UM_SHARE_SINA_APP_SECRET" \
+            "$UM_SHARE_QQ_ZONE_APP_ID" "$UM_SHARE_QQ_ZONE_APP_SECRET" "$amap_apikey" \
+            "$RELEASE_KEY_ALIAS" "$RELEASE_KEY_PASSWORD" "$RELEASE_STORE_PASSWORD" "$KEY_CYXBS_URL"
+          test -s build-logic/secret/key-cyxbs
+      - name: Build signed arm64 APK and mapping
+        if: matrix.abi == 'arm64-v8a'
+        run: ./gradlew :cyxbs-applications:pro:channelRelease --no-configuration-cache
+      - name: Build disposable x86_64 release APK
+        if: matrix.abi == 'x86_64'
+        run: ./gradlew :cyxbs-applications:pro:assembleRelease -Pcyxbs.ciReleaseX86_64=true --no-configuration-cache
+      - name: Stage candidate artifacts
+        if: matrix.abi == 'arm64-v8a'
+        run: |
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          metadata = json.loads(Path('${{ runner.temp }}/release-metadata.json').read_text())
+          apks = list(Path('cyxbs-applications/pro/build/channel').glob('*official*.apk'))
+          mapping = Path('build-logic/manager/proguardMapping.txt')
+          if len(apks) != 1 or not mapping.is_file() or mapping.stat().st_size == 0:
+              raise SystemExit('正式 APK 或混淆映射文件缺失/不唯一')
+          output = Path('release-artifacts')
+          output.mkdir()
+          # 正式分享文件使用 .Apk，避免 QQ 自动改名；Gradle 原始输出仍是 .apk。
+          shutil.copy2(apks[0], output / f"CyxbsMobile-{metadata['tag']}.Apk")
+          shutil.copy2(mapping, output / f"proguardMapping-{metadata['tag']}.txt")
+          for name in ('release-metadata.json', 'release-base.sha', 'release-head.sha', 'online-release.json'):
+              shutil.copy2(Path('${{ runner.temp }}') / name, output / name)
+          shutil.copy2('build-logic/release-notes.txt', output / 'release-notes.txt')
+          PY
+          cd release-artifacts
+          sha256sum *.Apk proguardMapping-*.txt > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        id: apk_artifact
+        if: matrix.abi == 'arm64-v8a'
+        with:
+          name: ${{ needs.check_version.outputs.apk_artifact_name }}
+          path: release-artifacts/*.Apk
+          if-no-files-found: error
+          overwrite: true
+      # 发布元数据随 mapping 保存，正式 APK 单独下载；加上临时测试包共三个下载项。
+      - uses: actions/upload-artifact@v4
+        id: mapping_artifact
+        if: matrix.abi == 'arm64-v8a'
+        with:
+          name: ${{ needs.check_version.outputs.mapping_artifact_name }}
+          path: |
+            release-artifacts/proguardMapping-*.txt
+            release-artifacts/*.json
+            release-artifacts/*.sha
+            release-artifacts/release-notes.txt
+            release-artifacts/SHA256SUMS
+          if-no-files-found: error
+          overwrite: true
+      - name: 展示正式产物文件与下载入口
+        if: matrix.abi == 'arm64-v8a'
+        env:
+          APK_ARTIFACT_URL: ${{ steps.apk_artifact.outputs.artifact-url }}
+          MAPPING_ARTIFACT_URL: ${{ steps.mapping_artifact.outputs.artifact-url }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          metadata = json.loads(Path('release-artifacts/release-metadata.json').read_text())
+          # 两个正式文件分开下载；Actions 仍将每个下载项包装为 ZIP。
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## 正式 ARM64 产物\n\n')
+              summary.write('APK 与 mapping 分开下载，下载后解压 ZIP。内部群测试只需下载 APK。\n\n')
+              summary.write('| 类型 | 下载入口 |\n| --- | --- |\n')
+              summary.write(f"| 安装包 | [CyxbsMobile-{metadata['tag']}.Apk]({os.environ['APK_ARTIFACT_URL']}) |\n")
+              summary.write(f"| 混淆文件及发布元数据 | [proguardMapping-{metadata['tag']}.txt]({os.environ['MAPPING_ARTIFACT_URL']}) |\n")
+          PY
+      - name: Stage temporary x86_64 test artifact
+        if: matrix.abi == 'x86_64'
+        env:
+          UI_TEST_APK_NAME: ${{ needs.check_version.outputs.ui_test_artifact_name }}
+        run: |
+          test -s cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk
+          mkdir ui-test-artifacts
+          cp cyxbs-applications/pro/build/outputs/apk/release/pro-release.apk "ui-test-artifacts/$UI_TEST_APK_NAME"
+          cp "$RUNNER_TEMP/release-metadata.json" "$RUNNER_TEMP/release-head.sha" ui-test-artifacts/
+          cp build-logic/release-notes.txt ui-test-artifacts/release-notes.txt
+          cd ui-test-artifacts
+          sha256sum "$UI_TEST_APK_NAME" > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: matrix.abi == 'x86_64'
+        with:
+          name: ${{ needs.check_version.outputs.ui_test_artifact_name }}
+          path: ui-test-artifacts/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+      - name: 提示构建失败原因
+        if: failure()
+        env:
+          BUILD_ABI: ${{ matrix.abi }}
+        run: echo "::error::$BUILD_ABI release 包构建失败：请检查 Python 依赖安装、签名配置、Gradle 报错和产物路径；具体原因见上方日志。"
+
+  build_release_result:
+    # 保留分支保护要求的 build_release 检查名；任一矩阵构建失败或跳过都不能放行。
+    name: build_release
+    if: always()
+    needs: build_release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check both ABI builds completed
+        env:
+          BUILD_RESULT: ${{ needs.build_release.result }}
+        run: |
+          if [ "$BUILD_RESULT" != success ]; then
+            echo '::error::arm64 和 x86_64 release 包必须都构建并上传成功，请检查对应构建任务。'
+            exit 1
+          fi
+
+  check_artifact:
+    needs: [build_release_result, check_version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.check_version.outputs.apk_artifact_name }}
+          path: release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.check_version.outputs.mapping_artifact_name }}
+          path: release-artifacts
+      - name: Check APK ABI, mapping and checksums
+        run: python .github/scripts/release_verify.py artifact --directory release-artifacts --head '${{ github.event.pull_request.head.sha }}'
+      - name: 提示产物检查失败原因
+        if: failure()
+        run: echo '::error::产物检查失败：正式 APK、混淆文件、SHA256 或 arm64 ABI 不符合要求；具体原因见上方日志。'
+
+  check_update_dialog:
+    # 测试 Runner 只消费 x86_64 临时产物，不重新构建或创建签名文件。
+    needs: [build_release_result, check_version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.check_version.outputs.ui_test_artifact_name }}
+          path: ui-test-artifacts
+      - name: Verify downloaded x86_64 test artifact
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          CHECKED_RELEASE_METADATA: ${{ needs.check_version.outputs.release_metadata }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, '.github/scripts')
+          from release_verify import sha256_file
+          directory = Path('ui-test-artifacts')
+          expected = json.loads(os.environ['CHECKED_RELEASE_METADATA'])
+          if json.loads((directory / 'release-metadata.json').read_text()) != expected:
+              raise SystemExit('x86_64 测试包的版本元数据与版本检查结果不一致')
+          if (directory / 'release-head.sha').read_text().strip() != os.environ['PR_HEAD_SHA']:
+              raise SystemExit('x86_64 测试包的来源提交与 PR 不一致')
+          if (directory / 'release-notes.txt').read_text().strip() != os.environ['PR_BODY'].strip():
+              raise SystemExit('x86_64 测试包的更新文案与 PR 不一致')
+          apk = directory / f"CyxbsMobile-{expected['tag']}-x86_64.Apk"
+          if not apk.is_file() or apk.stat().st_size == 0:
+              raise SystemExit('x86_64 测试 APK 缺失或为空')
+          if (directory / 'SHA256SUMS').read_text() != sha256_file(apk) + f'  {apk.name}\n':
+              raise SystemExit('x86_64 测试 APK 的 SHA256 不一致')
+          PY
+      - name: Select latest stable Android emulator API
+        id: emulator_api
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          SDK_MANAGER=$(command -v sdkmanager || true)
+          if [ -z "$SDK_MANAGER" ]; then
+            SDK_MANAGER="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDK_MANAGER" ]; then
+            echo '::error::未找到 sdkmanager，无法查询最新稳定 Android 镜像。'
+            exit 1
+          fi
+          if ! "$SDK_MANAGER" --list --channel=0 > "$RUNNER_TEMP/android-sdk-packages.txt"; then
+            echo '::error::查询 Android SDK 稳定通道失败，请检查网络和 SDK 工具后重跑。'
+            exit 1
+          fi
+          API_LEVEL=$(python .github/scripts/verify_release_update_dialog.py \
+            --sdk-list "$RUNNER_TEMP/android-sdk-packages.txt")
+          echo "api-level=$API_LEVEL" >> "$GITHUB_OUTPUT"
+          echo "本次更新弹窗检测使用最新稳定 Android API $API_LEVEL（Google APIs / x86_64）。"
+          echo "更新弹窗模拟器：Android API $API_LEVEL（最新稳定版，Google APIs / x86_64）" >> "$GITHUB_STEP_SUMMARY"
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify update dialog on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ steps.emulator_api.outputs.api-level }}
+          target: google_apis
+          arch: x86_64
+          channel: stable
+          # Action 使用 sh 执行 script；单行命令避免 Bash 专用选项和续行解析问题。
+          # Python 检查失败会返回非零状态，Action 会直接将该步骤标记失败。
+          script: python .github/scripts/verify_release_update_dialog.py --apk ui-test-artifacts/${{ needs.check_version.outputs.ui_test_artifact_name }}
+      - name: 提示模拟器检查失败原因
+        if: failure()
+        run: echo '::error::模拟器更新检查失败：请检查 x86_64 临时产物、最新稳定 Android 镜像、安装启动、线上版本名与完整文案、下载按钮跳转及 APK 下载地址；具体原因见上方日志。'
+
+  comment_artifacts:
+    # 评论单独运行，仅检出来源检查已通过的本仓库 develop 提交中的评论脚本。
+    needs: [check_source, check_version, build_release_result, check_artifact, check_update_dialog]
+    if: ${{ always() && !cancelled() && needs.check_source.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/comment_release_artifacts.cjs
+          sparse-checkout-cone-mode: false
+      - name: 更新 PR 产物下载提示
+        uses: actions/github-script@v9
+        env:
+          APK_ARTIFACT_NAME: ${{ needs.check_version.outputs.apk_artifact_name }}
+          MAPPING_ARTIFACT_NAME: ${{ needs.check_version.outputs.mapping_artifact_name }}
+          UI_TEST_ARTIFACT_NAME: ${{ needs.check_version.outputs.ui_test_artifact_name }}
+          VERSION_RESULT: ${{ needs.check_version.result }}
+          BUILD_RESULT: ${{ needs.build_release_result.result }}
+          ARTIFACT_RESULT: ${{ needs.check_artifact.result }}
+          UI_TEST_RESULT: ${{ needs.check_update_dialog.result }}
+        with:
+          script: |
+            const commentReleaseArtifacts = require('./.github/scripts/comment_release_artifacts.cjs');
+            await commentReleaseArtifacts({ github, context, core });

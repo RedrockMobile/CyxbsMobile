@@ -3,8 +3,9 @@ package com.cyxbs.pages.sport.service
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.cyxbs.pages.sport.api.ISportService
-import com.cyxbs.pages.sport.ui.SportFeed as SportFeedComposable
+import com.cyxbs.pages.sport.api.SportNavArgument
 import com.g985892345.provider.api.annotation.ImplProvider
+import com.cyxbs.pages.sport.ui.SportFeed as SportFeedComposable
 
 /**
  * [ISportService] 的具体实现，注册到 KtProvider。
@@ -15,13 +16,11 @@ import com.g985892345.provider.api.annotation.ImplProvider
 @ImplProvider
 object SportServiceImpl : ISportService {
 
-  @Composable
-  override fun SportFeed(modifier: Modifier) {
-    SportFeedComposable(
-      modifier = modifier,
-      onJumpDetail = { jumpSportDetail() },
-    )
-  }
+    @Composable
+    override fun SportFeed(modifier: Modifier) {
+        SportFeedComposable(
+            modifier = modifier,
+            onJumpDetail = { SportNavArgument.navigate() },
+        )
+    }
 }
-
-internal expect fun jumpSportDetail()

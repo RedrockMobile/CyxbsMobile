@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -26,12 +28,20 @@ import com.cyxbs.components.config.time.Today
 import com.cyxbs.components.config.time.TodayNoEffect
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
+import com.cyxbs.pages.course.view.decoration.CoursePageDecoration
 import com.cyxbs.pages.course.view.decoration.CoursePageDecorationManager
 import com.cyxbs.pages.course.view.page.CoursePageCompose
 import com.cyxbs.pages.course.view.page.CourseWeekCompose
 import com.cyxbs.pages.course.view.timeline.CourseTimeline
+import com.cyxbs.pages.widget.api.CourseWidgetSnapshot
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 
 /**
@@ -41,7 +51,7 @@ import kotlinx.datetime.DayOfWeek
  * @date 2025/9/22
  */
 @Stable
-abstract class AbstractCourseFrame {
+abstract class AbstractCourseFrame : AutoCloseable {
 
   companion object {
 
@@ -51,6 +61,28 @@ abstract class AbstractCourseFrame {
     val current: AbstractCourseFrame
       get() = Local.current
   }
+
+  /** Frame 的根协程任务；页面临时离开 Composition 时不会停止，真正销毁 Frame 时统一取消。 */
+  internal val courseFrameJob = SupervisorJob()
+
+  /**
+   * Frame 内部数据生命周期，不向外部调用方暴露，避免 ViewModel 或 Composable 传递 CoroutineScope。
+   * 该作用域不包含 Compose 帧时钟，不得执行 UI 动画。
+   */
+  private val courseFrameScope = CoroutineScope(Dispatchers.Main.immediate + courseFrameJob)
+
+  /**
+   * 启动与整个 Frame 同生命周期的数据任务，适合账号观察、主页 Header 等跨 Manager 数据。
+   * 需要 Compose 帧时钟的动画必须由当前 Composition 启动。
+   */
+  protected fun launchInCourseFrameScope(block: suspend CoroutineScope.() -> Unit): Job =
+    courseFrameScope.launch(block = block)
+
+  private val decorationManagerState = mutableStateOf<CoursePageDecorationManager?>(null)
+
+  /** 当前课表的数据与绘制层级管理器，由 [updateCoursePageDecorations] 统一创建。 */
+  val decorationManager: CoursePageDecorationManager
+    get() = checkNotNull(decorationManagerState.value) { "尚未配置课表 Decoration" }
 
   // 课表时间轴
   open val timeline: CourseTimeline = CourseTimeline()
@@ -101,6 +133,48 @@ abstract class AbstractCourseFrame {
   // 获取指定页面是第几周，如果非周数时返回 null，比如整学期
   fun getWeekNumByPage(page: Int): Int? {
     return if (page in 1 ..maxWeek) page else null
+  }
+
+  /**
+   * 为主页和独立课表统一提供 Frame、Manager CompositionLocal。
+   *
+   * 读取 [decorationManagerState] 会在 Manager 被替换后自动触发内容重组。
+   */
+  @Composable
+  protected fun CourseFrameComposition(content: @Composable () -> Unit) {
+    val manager = decorationManager
+    CompositionLocalProvider(
+      Local provides this,
+      CoursePageDecorationManager.Local provides manager,
+      content = content,
+    )
+  }
+
+  /**
+   * 替换当前课表的全部 Decoration。
+   *
+   * 新 Manager 使用 Frame 根任务下的独立 SupervisorJob；替换时旧数据订阅会立即取消，而 Frame 级任务继续运行。
+   */
+  protected fun updateCoursePageDecorations(
+    vararg decorations: CoursePageDecoration<*>,
+    widgetSnapshotPublisher: (suspend (CourseWidgetSnapshot) -> Unit)? = null,
+  ) {
+    decorationManagerState.value?.close()
+    decorationManagerState.value = CoursePageDecorationManager(
+      courseFrame = this,
+      decorations.toList(),
+      widgetSnapshotPublisher = widgetSnapshotPublisher,
+    )
+  }
+
+  /** 真正销毁课表 Frame，并取消它持有的全部数据订阅；重复调用是安全的。 */
+  override fun close() {
+    try {
+      decorationManagerState.value?.close()
+    } finally {
+      // 即使某个 Decoration 的自定义清理抛出异常，也必须取消 Frame 级任务。
+      courseFrameScope.cancel()
+    }
   }
 }
 

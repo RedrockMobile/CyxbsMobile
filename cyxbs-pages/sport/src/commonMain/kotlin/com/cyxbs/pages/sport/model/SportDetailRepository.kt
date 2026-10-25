@@ -4,7 +4,6 @@ import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.sport.model.network.SportApiService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,27 +29,25 @@ object SportDetailRepository {
    * - null：未登录 / 已退出登录
    * - Result：一次请求的成功或失败结果
    */
-  val sportData: StateFlow<Result<SportDetailBean>?> get() = _sportData
-  private val _sportData = MutableStateFlow<Result<SportDetailBean>?>(null)
+  val sportData: StateFlow<Result<SportDetailBean>?>
+    field = MutableStateFlow<Result<SportDetailBean>?>(null)
 
-  private var isRefreshing = false
+  val isRefreshing: StateFlow<Boolean>
+    field = MutableStateFlow(false)
 
   /**
    * 刷新数据，如果返回 false，则说明正在刷新中
    */
   fun refresh(): Boolean {
-    if (isRefreshing) return false
-    isRefreshing = true
+    if (isRefreshing.value) return false
+    isRefreshing.value = true
     appCoroutineScope.launch {
       runCatchingCoroutine {
         SportApiService::class.impl().getSportDetail()
       }.mapCatching { it.data }
-        .onSuccess { _sportData.value = Result.success(it) }
-        .onFailure { _sportData.value = Result.failure(it) }
-        .onFailure {
-          logg("${it.stackTraceToString()}")
-        }
-      isRefreshing = false
+        .onSuccess { sportData.value = Result.success(it) }
+        .onFailure { sportData.value = Result.failure(it) }
+      isRefreshing.value = false
     }
     return true
   }
@@ -60,7 +57,7 @@ object SportDetailRepository {
       .onEach {
         when (it) {
           is AccountState.Login -> refresh()
-          is AccountState.Logout -> _sportData.value = null
+          is AccountState.Logout -> sportData.value = null
           else -> Unit
         }
       }.launchIn(appCoroutineScope)

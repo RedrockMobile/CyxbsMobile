@@ -37,7 +37,7 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="HardcodedText" />
 
-    <com.cyxbs.components.base.webView.LiteJsWebView
+    <com.cyxbs.components.base.webview.LiteJsWebView
         android:id="@+id/notification_wv"
         android:layout_width="match_parent"
         android:layout_marginTop="100dp"

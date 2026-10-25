@@ -181,8 +181,9 @@ extension ForgotViewController {
         case .email:
             ForgotViewController.requestEmail(sno: sno) { email in
                 if let email {
+                    // 完整邮箱保留给 verify 接口使用；界面仍展示打码后的邮箱（与 Android 行为一致）
                     self.email = email
-                    self.questionLab.text = "\(email)"
+                    self.questionLab.text = Self.maskEmail(email: email)
                 } else {
                     self.questionLab.text = "您的网络出现了问题。"
                 }
@@ -234,10 +235,10 @@ extension ForgotViewController {
                     let expired_date = Date(timeIntervalSince1970: TimeInterval(expired_time))
                     ProgressHUD.showSuccess("验证码已发送到邮箱，过期时间: \(expired_date.string(locale: .cn, format: "hh:mm"))")
                 } else {
-                    fallthrough
+                    ProgressHUD.showFailed(self.userSecretTip(status: status, info: model["info"].stringValue, fallback: "验证码发送失败"))
                 }
             case .failure(_):
-                ProgressHUD.showFailed("验证码发送失败")
+                ProgressHUD.showFailed("网络异常，验证码发送失败")
             }
         }
     }
@@ -289,15 +290,16 @@ extension ForgotViewController {
         HttpManager.shared.user_secret_user_valid_email(code: code, email: email, stu_num: stu_num).ry_JSON { response in
             switch response {
             case .success(let model):
-                if model["status"].intValue == 10000 {
+                let status = model["status"].intValue
+                if status == 10000 {
                     self.code = model["data"]["code"].stringValue
                     ProgressHUD.showSuccess("验证成功")
                     self.successVerify()
                 } else {
-                    fallthrough
+                    ProgressHUD.showError(self.userSecretTip(status: status, info: model["info"].stringValue, fallback: "验证邮箱失败"))
                 }
             case .failure(_):
-                ProgressHUD.showError("验证邮箱失败")
+                ProgressHUD.showError("网络异常，验证邮箱失败")
             }
         }
     }
@@ -322,6 +324,20 @@ extension ForgotViewController {
         }
     }
     
+    // 把 user-secret 业务状态码翻译成用户可读文案；未知码优先取后端 info，否则用兜底文案
+    private func userSecretTip(status: Int, info: String, fallback: String) -> String {
+        switch status {
+        case 10005: return "回答错误，请重新输入"
+        case 10006: return "尝试次数已达上限，请十分钟后再试"
+        case 10007: return "验证码错误，请重新输入"
+        case 10008: return "邮箱信息错误"
+        case 10009: return "发送次数已达上限，请十分钟后再试"
+        case 10022: return "邮箱格式错误"
+        default:
+            return info.isEmpty ? fallback : info
+        }
+    }
+
     func successVerify() {
         changeBtn.isHidden = true
         codeTextField.isEnabled = false
@@ -383,47 +399,48 @@ extension ForgotViewController {
 
 extension ForgotViewController {
     
+    // 获取用户绑定的邮箱，返回完整地址。完整地址仅用于验证接口；展示请用 maskEmail(email:)
     static func requestEmail(sno: String?, handle: @escaping (String?) -> ()) {
         HttpManager.shared.user_secret_user_bind_email_detail(stu_num: sno ?? "").ry_JSON { response in
             switch response {
             case .success(let model):
                 if model["status"].intValue == 10000 {
-                    let email = model["data"]["email"].stringValue
-                    let maskEmail = maskEmail(email: email)
-                    handle(maskEmail)
+                    handle(model["data"]["email"].stringValue)
                 } else {
-                    fallthrough
+                    handle(nil)
                 }
             case .failure(_):
                 handle(nil)
             }
         }
-        
-        func maskEmail(email: String) -> String {
-            let emailComponents = email.components(separatedBy: "@")
-            guard emailComponents.count == 2 else {
-                return email
-            }
+    }
 
-            let username = emailComponents[0]
-            let domain = emailComponents[1]
-
-            var maskedUsername = ""
-            if username.count > 2 {
-                let startIndex = username.index(username.startIndex, offsetBy: 2)
-                if username.count > 7 {
-                    let endIndex = username.index(username.startIndex, offsetBy: 7)
-                    maskedUsername = String(username.prefix(upTo: startIndex)) + String(repeating: "*", count: username.distance(from: startIndex, to: endIndex)) + String(username.suffix(from: endIndex))
-                } else {
-                    maskedUsername = String(username.prefix(upTo: startIndex)) + String(repeating: "*", count: username.distance(from: startIndex, to: username.endIndex))
-                }
-            } else if username.count == 2 {
-                maskedUsername = String(username.prefix(1)) + "*"
-            } else if username.count == 1 {
-                maskedUsername = "*"
-            }
-
-            return maskedUsername + "@" + domain
+    // 打码邮箱，仅用于界面展示。不要把打码结果回传给验证接口——
+    // 后端会校验邮箱格式（状态码 10022 "the email pattern is wrong"）
+    static func maskEmail(email: String) -> String {
+        let emailComponents = email.components(separatedBy: "@")
+        guard emailComponents.count == 2 else {
+            return email
         }
+
+        let username = emailComponents[0]
+        let domain = emailComponents[1]
+
+        var maskedUsername = ""
+        if username.count > 2 {
+            let startIndex = username.index(username.startIndex, offsetBy: 2)
+            if username.count > 7 {
+                let endIndex = username.index(username.startIndex, offsetBy: 7)
+                maskedUsername = String(username.prefix(upTo: startIndex)) + String(repeating: "*", count: username.distance(from: startIndex, to: endIndex)) + String(username.suffix(from: endIndex))
+            } else {
+                maskedUsername = String(username.prefix(upTo: startIndex)) + String(repeating: "*", count: username.distance(from: startIndex, to: username.endIndex))
+            }
+        } else if username.count == 2 {
+            maskedUsername = String(username.prefix(1)) + "*"
+        } else if username.count == 1 {
+            maskedUsername = "*"
+        }
+
+        return maskedUsername + "@" + domain
     }
 }

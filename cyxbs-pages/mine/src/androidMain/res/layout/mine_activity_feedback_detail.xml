@@ -16,7 +16,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <com.cyxbs.components.base.webView.LiteJsWebView
+    <com.cyxbs.components.base.webview.LiteJsWebView
         android:id="@+id/web_detail_content"
         android:layout_width="0dp"
         android:layout_height="0dp"

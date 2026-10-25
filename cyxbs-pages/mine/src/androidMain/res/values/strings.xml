@@ -12,8 +12,6 @@
 
     <!--    首页-->
     <!--TODO: 删除无用String-->
-    <string name="mine_sign_name">签到</string>
-    <string name="mine_sing_successive_default">已连续签到 天</string>
     <string name="mine_question">提问</string>
     <string name="mine_answer">回答</string>
     <string name="mine_reply_to_comment">评论</string>
@@ -49,30 +47,6 @@
     <string name="mine_exit_edit">退出编辑</string>
     <string name="mine_exit_edit_quest">你的资料还未保存，是否退出？</string>
     <string name="mine_dialog_edit_ensure">确定</string>
-    <!--    签到-->
-    <string name="mine_sign_to_sign">签到</string>
-    <string name="mine_sign_mon">周一</string>
-    <string name="mine_sign_tue">周二</string>
-    <string name="mine_sign_wed">周三</string>
-    <string name="mine_sign_thurs">周四</string>
-    <string name="mine_sign_fri">周五</string>
-    <string name="mine_sign_sat">周六</string>
-    <string name="mine_sign_sun">周日</string>
-    <string name="mine_sign_year_default">2019-2020</string>
-    <string name="mine_sign_week_default">上学期第--周</string>
-    <string name="mine_sign_serialDays_default">已连续打卡--天</string>
-    <string name="mine_sign_ranking_default">还没有打卡哦</string>
-    <string name="mine_sign_ranking_percentage_default">超过--%的邮子</string>
-    <string name="mine_sign_week_integral">10积分</string>
-    <string name="mine_sign_store_integral_default">--</string>
-    <string name="mine_sign_store_title">积分商城</string>
-    <string name="mine_sign_store_my_product">我的商品</string>
-    <string name="mine_sign_store_item_name_default">redrock限量手环</string>
-    <string name="mine_sign_store_item_count_default">仅剩555件</string>
-    <string name="mine_sign_store_item_integral_default">13</string>
-    <string name="mine_sign_store_item_exchange">兑换</string>
-    <string name="mine_sign_store_item_exchange_for_sure">商品兑换</string>
-
     <string name="mine_my_product_time_pre">兑换时间：</string>
     <string name="mine_my_product">商品领取</string>
     <string name="mine_my_product_unclaimed">如果是实体商品，请携带有效证件前往红岩网校工作站B区领取奖品</string>
@@ -99,8 +73,6 @@
     <string name="mine_about_1">红岩网校工作站出品</string>
     <string name="mine_about_copyright">CopyRight © 2015&#8211;2021 All Rights Reserved</string>
     <string name="mine_about_icp_info">ICP备案号: 渝ICP备17002788号-7A</string>
-    <string name="mine_sign_store_back">store back</string>
-
     <!--密码与安全-->
 
     <string name="mine_security_change_pass_word_hint">重设密码</string>

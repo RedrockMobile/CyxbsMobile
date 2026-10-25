@@ -3,10 +3,10 @@ package com.cyxbs.pages.mine.edit
 import kotlinx.coroutines.flow.SharedFlow
 
 /**
- * 「资料编辑」页平台相关能力（commonMain 声明，androidMain 实现）。
+ * 「资料编辑」页平台相关能力，由 Android / iOS 实现。
  *
- * 头像选取依赖 Activity 上下文 + UCrop 裁剪，无法直接在 commonMain 完成，
- * 故抽到平台层。其它平台无实现时可优雅降级（toast 提示暂不支持）。
+ * Android 使用 Activity + UCrop，iOS 使用 FileKit 选图并转换为方形 JPEG。
+ * 其它平台无实现时提示暂不支持。
  */
 interface EditInfoPlatform {
 
@@ -20,7 +20,7 @@ interface EditInfoPlatform {
   val avatarUpdatedEvents: SharedFlow<String>
 
   /**
-   * 触发「拍照 / 相册选择 → 裁剪 → 上传到服务器」流程。
+   * 触发平台支持的选图、图片处理和上传流程。
    * 成功后会向 [avatarUpdatedEvents] 发射一个 photo_src URL。
    */
   fun editAvatar()

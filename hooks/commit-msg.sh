@@ -25,81 +25,85 @@ if ! [ "$merge" == "" ]; then
 fi
 
 # 来源于该网址：https://gitmoji.dev/
-declare -A commitMap=(
-  ["art"]="改进代码的结构"
-  ["zap"]="提高性能"
-  ["fire"]="删除代码或文件"
-  ["bug"]="修复bug"
-  ["ambulance"]="关键的热修复补丁"
-  ["sparkles"]="引入新功能"
-  ["memo"]="添加或更新文档"
-  ["rocket"]="部署内容"
-  ["lipstick"]="添加或更新 UI 和样式文件"
-  ["tada"]="开始一个项目"
-  ["white_check_mark"]="添加、更新或通过测试"
-  ["lock"]="修复安全问题"
-  ["closed_lock_with_key"]="添加或更新机密"
-  ["bookmark"]="发布新版的标签"
-  ["rotating_light"]="修复编译器警告"
-  ["construction"]="工作正在进行中"
-  ["green_heart"]="修复 CI 构建"
-  ["arrow_down"]="降级依赖版本"
-  ["arrow_up"]="升级依赖版本"
-  ["pushpin"]="将依赖项固定到特定版本"
-  ["construction_worker"]="添加或更新 CI 构建"
-  ["chart_with_upwards_trend"]="添加或更新对代码的分析"
-  ["recycle"]="重构代码"
-  ["heavy_plus_sign"]="添加依赖"
-  ["heavy_minus_sign"]="移除依赖"
-  ["wrench"]="添加或更新配置文件"
-  ["hammer"]="添加或更新开发脚本"
-  ["globe_with_meridians"]="本地化或国际化处理"
-  ["pencil2"]="修复拼写错误"
-  ["poop"]="重构屎山"
-  ["rewind"]="还原更改"
-  ["twisted_rightwards_arrows"]="合并分支"
-  ["package"]="添加或更新已编译的文件或包"
-  ["alien"]="由于外部 API 更改而更新代码"
-  ["truck"]="移动或重命名资源"
-  ["page_facing_up"]="添加或更新许可证"
-  ["boom"]="引入重大更改"
-  ["bento"]="添加或更新资产"
-  ["wheelchair"]="提高可访问性"
-  ["bulb"]="在源代码中添加或更新注释"
-  ["beers"]="醉醺醺地编写代码"
-  ["speech_balloon"]="添加或更新文本和文字"
-  ["card_file_box"]="数据库相关的更改"
-  ["loud_sound"]="添加或更新日志"
-  ["mute"]="删除日志"
-  ["busts_in_silhouette"]="添加或更新参与者"
-  ["children_crossing"]="改善用户体验"
-  ["building_construction"]="进行体系结构更改"
-  ["iphone"]="完善响应式设计"
-  ["clown_face"]="嘲讽某人代码"
-  ["egg"]="添加或更新彩蛋"
-  ["see_no_evil"]="添加或更新 .gitignore 文件"
-  ["camera_flash"]="添加或更新快照"
-  ["alembic"]="执行实验"
-  ["mag"]="提升知名度"
-  ["label"]="添加或更新类型"
-  ["seedling"]="添加或更新种子文件"
-  ["triangular_flag_on_post"]="添加、更新或删除功能标志"
-  ["goal_net"]="捕获异常"
-  ["dizzy"]="添加动画，优化过渡"
-  ["wastebasket"]="删除废弃代码"
-  ["passport_control"]="处理与授权、角色和权限相关的代码"
-  ["adhesive_bandage"]="非关键问题的简单修复"
-  ["monocle_face"]="数据探索/检查"
-  ["coffin"]="删除废弃代码"
-  ["test_tube"]="添加失败的测试"
-  ["necktie"]="添加或更新业务逻辑"
-  ["stethoscope"]="添加或更新测试"
-  ["bricks"]="与基础结构相关的更改"
-  ["technologist"]="改善开发人员体验"
-  ["money_with_wings"]="添加赞助或与资金相关的基础设施"
-  ["thread"]="添加或更新与多线程或并发相关的代码"
-  ["safety_vest"]="添加或更新与验证相关的代码"
-)
+# macOS 自带 Bash 3.2 不支持关联数组，因此使用 case 保持同一份 type → 描述映射。
+function getCommitDescription() {
+  case "$1" in
+    art) echo "改进代码的结构" ;;
+    zap) echo "提高性能" ;;
+    fire) echo "删除代码或文件" ;;
+    bug) echo "修复bug" ;;
+    ambulance) echo "关键的热修复补丁" ;;
+    sparkles) echo "引入新功能" ;;
+    memo) echo "添加或更新文档" ;;
+    rocket) echo "部署内容" ;;
+    lipstick) echo "添加或更新 UI 和样式文件" ;;
+    tada) echo "开始一个项目" ;;
+    white_check_mark) echo "添加、更新或通过测试" ;;
+    lock) echo "修复安全问题" ;;
+    closed_lock_with_key) echo "添加或更新机密" ;;
+    bookmark) echo "发布新版的标签" ;;
+    rotating_light) echo "修复编译器警告" ;;
+    construction) echo "工作正在进行中" ;;
+    green_heart) echo "修复 CI 构建" ;;
+    arrow_down) echo "降级依赖版本" ;;
+    arrow_up) echo "升级依赖版本" ;;
+    pushpin) echo "将依赖项固定到特定版本" ;;
+    construction_worker) echo "添加或更新 CI 构建" ;;
+    chart_with_upwards_trend) echo "添加或更新对代码的分析" ;;
+    recycle) echo "重构代码" ;;
+    heavy_plus_sign) echo "添加依赖" ;;
+    heavy_minus_sign) echo "移除依赖" ;;
+    wrench) echo "添加或更新配置文件" ;;
+    hammer) echo "添加或更新开发脚本" ;;
+    globe_with_meridians) echo "本地化或国际化处理" ;;
+    pencil2) echo "修复拼写错误" ;;
+    poop) echo "重构屎山" ;;
+    rewind) echo "还原更改" ;;
+    twisted_rightwards_arrows) echo "合并分支" ;;
+    package) echo "添加或更新已编译的文件或包" ;;
+    alien) echo "由于外部 API 更改而更新代码" ;;
+    truck) echo "移动或重命名资源" ;;
+    page_facing_up) echo "添加或更新许可证" ;;
+    boom) echo "引入重大更改" ;;
+    bento) echo "添加或更新资产" ;;
+    wheelchair) echo "提高可访问性" ;;
+    bulb) echo "在源代码中添加或更新注释" ;;
+    beers) echo "醉醺醺地编写代码" ;;
+    speech_balloon) echo "添加或更新文本和文字" ;;
+    card_file_box) echo "数据库相关的更改" ;;
+    loud_sound) echo "添加或更新日志" ;;
+    mute) echo "删除日志" ;;
+    busts_in_silhouette) echo "添加或更新参与者" ;;
+    children_crossing) echo "改善用户体验" ;;
+    building_construction) echo "进行体系结构更改" ;;
+    iphone) echo "完善响应式设计" ;;
+    clown_face) echo "嘲讽某人代码" ;;
+    egg) echo "添加或更新彩蛋" ;;
+    see_no_evil) echo "添加或更新 .gitignore 文件" ;;
+    camera_flash) echo "添加或更新快照" ;;
+    alembic) echo "执行实验" ;;
+    mag) echo "提升知名度" ;;
+    label) echo "添加或更新类型" ;;
+    seedling) echo "添加或更新种子文件" ;;
+    triangular_flag_on_post) echo "添加、更新或删除功能标志" ;;
+    goal_net) echo "捕获异常" ;;
+    dizzy) echo "添加动画，优化过渡" ;;
+    wastebasket) echo "删除废弃代码" ;;
+    passport_control) echo "处理与授权、角色和权限相关的代码" ;;
+    adhesive_bandage) echo "非关键问题的简单修复" ;;
+    monocle_face) echo "数据探索/检查" ;;
+    coffin) echo "删除废弃代码" ;;
+    test_tube) echo "添加失败的测试" ;;
+    necktie) echo "添加或更新业务逻辑" ;;
+    stethoscope) echo "添加或更新测试" ;;
+    bricks) echo "与基础结构相关的更改" ;;
+    technologist) echo "改善开发人员体验" ;;
+    money_with_wings) echo "添加赞助或与资金相关的基础设施" ;;
+    thread) echo "添加或更新与多线程或并发相关的代码" ;;
+    safety_vest) echo "添加或更新与验证相关的代码" ;;
+    *) return 1 ;;
+  esac
+}
 
 result=$(echo "$commitMsg" | grep ":[a-z0-9_]\+: .\+")
 
@@ -122,7 +126,7 @@ if [ "$result" == "" ]; then
 else
   head=${commitMsg#*:}
   type=${head%%:*}
-  value=${commitMap["$type"]}
+  value=$(getCommitDescription "$type")
   if [ "$value" == "" ]; then
     echo "type = $type"
     echo "未找到对应 type，请使用该网址上的 commit 头 https://gitmoji.dev/ "

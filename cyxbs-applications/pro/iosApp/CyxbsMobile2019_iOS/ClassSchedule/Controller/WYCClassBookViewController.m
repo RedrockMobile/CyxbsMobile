@@ -322,12 +322,6 @@
     //编辑备忘
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(editNoteWithNoti:) name:@"DLReminderSetTimeVCShouldEditNote" object:nil];
     
-    //课前提醒开关打开时，MineViewController发送通知
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(remindBeforeClass) name:@"remindBeforeClass" object:nil];
-    
-    //课前提醒开关关闭时，MineViewController发送通知
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(notRemindBeforeClass) name:@"notRemindBeforeClass" object:nil];
-    
     //收到通知后，课表会present通知里面的VC，ClassDetailView发通知
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(shouldPresentVC:) name:@"WYCClassBookVCShouldPresentVC" object:nil];
     
@@ -338,22 +332,6 @@
 - (void)shouldPresentVC:(NSNotification*)noti{
     UIViewController *VC = noti.object;
     [self presentViewController:VC animated:YES completion:nil];
-}
-
-/// 课前提醒
-- (void)remindBeforeClass{
-    //刷新tabar的数据，tabbar会根据偏好设置缓存决定是否添加课前提醒或者移除提醒
-    [self.schedulTabBar updateSchedulTabBarViewWithDic:[self getNextLessonData]];
-    //fakeBar不会对本地通知做出改动，只是刷新数据
-    [self.fakeBar updateSchedulTabBarViewWithDic:[self getNextLessonData]];
-}
-
-/// 移除课前提醒
-- (void)notRemindBeforeClass{
-    //刷新tabar的数据，tabbar会根据偏好设置缓存决定是否提醒或者移除提醒
-    [self.schedulTabBar updateSchedulTabBarViewWithDic:[self getNextLessonData]];
-    //fakeBar不会对本地通知做出改动，只是刷新数据
-    [self.fakeBar updateSchedulTabBarViewWithDic:[self getNextLessonData]];
 }
 
 /// DLReminderSetTimeVC发送通知后调用

@@ -20,7 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.base.ui.BaseActivity
-import com.cyxbs.components.base.webView.LiteJsWebView
+import com.cyxbs.components.base.webview.LiteJsWebView
 import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.utils.extensions.gone

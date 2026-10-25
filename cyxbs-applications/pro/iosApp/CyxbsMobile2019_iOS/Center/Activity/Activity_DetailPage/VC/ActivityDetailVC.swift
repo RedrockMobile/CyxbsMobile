@@ -9,6 +9,7 @@
 import UIKit
 import MBProgressHUD
 import Alamofire
+import CyxbsApplicationsMultiplatform
 
 protocol ActivityDetailVCDelegate: AnyObject {
     func updateModel(indexPathNum: Int, wantToWatch: Bool)
@@ -353,24 +354,32 @@ class ActivityDetailVC: UIViewController {
     }
     
     @objc func addToDoButtonTapped() {
+        // 本地日程创建期间禁止重复点击；Schedule 会使用活动 ID 做幂等去重。
+        detailView.addTodoButton.isEnabled = false
+        IOSAppKt.createUfieldActivitySchedule(
+            activityId: Int64(activity.activityId),
+            title: activity.activityTitle,
+            place: activity.activityPlace,
+            startAtEpochSeconds: Int64(activity.activityStartAt)
+        ) { [weak self] failureReason in
+            guard let self else { return }
+            if let failureReason {
+                self.detailView.addTodoButton.isEnabled = true
+                RemindHUD.shared().showDefaultHUD(withText: failureReason)
+                return
+            }
+
+            RemindHUD.shared().showDefaultHUD(withText: "添加待办成功")
+            self.delegate?.updateModel(indexPathNum: self.numOfIndexPath, addToDo: true)
+            self.markActivityAdded()
+        }
+    }
+
+    /// 回写活动中心自身的“已添加”标记；失败不撤销 Schedule 已完成的本地日程创建。
+    private func markActivityAdded() {
         HttpManager.shared.magipoke_ufield_activity_addTodo(activity_id: activity.activityId).ry_JSON { response in
-            switch response {
-            case.success(let jsonData):
-                let responseData = StandardResponse(from: jsonData)
-                if responseData.status == 10000 {
-                    RemindHUD.shared().showDefaultHUD(withText: "添加待办成功")
-                    self.detailView.addTodoButton.isEnabled = false
-                    self.delegate?.updateModel(indexPathNum: self.numOfIndexPath, addToDo: true)
-                } else if responseData.status == 50003 {
-                    RemindHUD.shared().showDefaultHUD(withText: "已经添加待办，请勿重复添加")
-                    self.detailView.addTodoButton.isEnabled = false
-                } else {
-                    RemindHUD.shared().showDefaultHUD(withText: responseData.info)
-                }
-                break
-            case.failure(_):
-                RemindHUD.shared().showDefaultHUD(withText: "网络错误")
-                break
+            if case .failure(let error) = response {
+                print("Failed to mark ufield activity as added: \(error)")
             }
         }
     }
@@ -553,4 +562,3 @@ class ActivityDetailVC: UIViewController {
         }
     }
 }
-

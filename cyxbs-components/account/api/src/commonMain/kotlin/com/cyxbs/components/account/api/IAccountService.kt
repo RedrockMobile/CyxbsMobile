@@ -22,9 +22,10 @@ import kotlinx.serialization.Serializable
  */
 interface IAccountService {
 
-  /**
-   * 当前账户状态
-   */
+  /** 当前账户生命周期；每次登录、登出和游客切换都会发布新会话。 */
+  val session: StateFlow<AccountSession>
+
+  /** 当前 session.state 的只读投影，供 UI 和旧调用方使用；同步读取应与 session 保持一致。 */
   val state: StateFlow<AccountState>
 
   val stuNum: String?
@@ -37,9 +38,9 @@ interface IAccountService {
   val userInfo: UserInfo?
     get() = (state.value as? AccountState.Login)?.userInfo?.value
 
-  // 跟账号状态进行绑定的协程作用域
-  // 登陆、登出都会触发协程作用域的 cancel
+  /** 当前 session 的作用域；身份切换会取消旧实例，需绑定任务时优先保存 session。 */
   val accountCoroutineScope: CoroutineScope
+    get() = session.value.accountCoroutineScope
 
   /**
    * 是否处于登录状态
@@ -68,8 +69,10 @@ interface IAccountService {
   }
 }
 
+/** 登录状态的业务分类；一次状态可以出现在多次独立的账户生命周期中。 */
 sealed interface AccountState {
-  data class Login(
+  /** 每次登录创建新对象，确保 StateFlow 能通知同学号重新登录并清空旧资料。 */
+  class Login(
     val stuNum: String,
   ) : AccountState {
     // 用户信息

@@ -9,6 +9,16 @@ useNavigation() // navigation 跳转
 
 kotlin {
   sourceSets {
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+      implementation(libs.kotlinx.coroutines.test)
+    }
+    if (Multiplatform.enableDesktop(project)) {
+      val desktopTest by getting
+      desktopTest.dependencies {
+        implementation(compose.desktop.uiTestJUnit4)
+      }
+    }
     commonMain.dependencies {
       subprojects.forEach { implementation(it) }
       implementation(projects.cyxbsComponents.base)

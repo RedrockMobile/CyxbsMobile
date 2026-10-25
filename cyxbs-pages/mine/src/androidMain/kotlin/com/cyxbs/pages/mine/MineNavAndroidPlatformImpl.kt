@@ -9,8 +9,6 @@ import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
 import com.cyxbs.pages.mine.home.MineNavPlatform
 import com.cyxbs.pages.mine.page.feedback.center.ui.FeedbackCenterActivity
-import com.cyxbs.pages.mine.page.setting.SettingActivity
-import com.cyxbs.pages.mine.page.sign.DailySignActivity
 import com.cyxbs.pages.notification.api.ILaunchNotificationService
 import com.cyxbs.pages.notification.api.INotificationService
 import com.g985892345.provider.api.annotation.ImplProvider
@@ -44,14 +42,6 @@ object MineNavAndroidPlatformImpl : MineNavPlatform {
     // “反馈中心”点击埋点
     TrackingUtils.trackClickEvent2(ClickEvent.CLICK_YLC_FKZX_ENTRY)
     startActivity(FeedbackCenterActivity::class)
-  }
-
-  override fun jumpSign() {
-    startActivity(DailySignActivity::class)
-  }
-
-  override fun jumpSetting() {
-    startActivity(SettingActivity::class)
   }
 
   override fun jumpActivityCenter() {

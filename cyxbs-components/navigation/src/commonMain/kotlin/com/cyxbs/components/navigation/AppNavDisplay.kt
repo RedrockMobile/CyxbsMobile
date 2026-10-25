@@ -33,7 +33,6 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.account.api.ILoginDialogContent
-import com.cyxbs.components.account.api.ITokenService
 import com.g985892345.provider.manager.KtProvider
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
@@ -66,17 +65,13 @@ fun AppNavDisplay() {
     backStack = appNavBackStack,
     onBack = { appNavBackStack.lastOrNull()?.popBackStack() },
     entryDecorators = listOf(
-      // 添加 view model store 装饰器
-      rememberViewModelStoreNavEntryDecorator(),
-      // 添加状态保存的默认装饰器
+      // ViewModel 装饰器依赖 NavEntry 的 SavedStateRegistryOwner，状态保存装饰器必须在前。
       rememberSaveableStateHolderNavEntryDecorator(),
+      // 为每个 NavEntry 提供独立且可随保存状态恢复的 ViewModelStoreOwner。
+      rememberViewModelStoreNavEntryDecorator(),
     ),
     sceneStrategies = appNavCollector.values.mapNotNull {
-      key(it) {
-        remember {
-          it.navEntry.getSceneStrategy() as SceneStrategy<AppNavArgument>?
-        }
-      }
+      key(it) { remember { it.navEntry.getSceneStrategy() } }
     } + listOf(
       rememberAppListDetailSceneStrategy(),     // 宽屏下的列表与详细页处理
       remember { DialogSceneStrategy() },       // 支持 Dialog 栈处理
@@ -203,9 +198,8 @@ fun rememberAppNavBackStack(): AppNavBackStack {
 
 private fun getFirstAppNavArgument(): List<AppNavArgument> {
   val accountService = KtProvider.impl(IAccountService::class)
-  val tokenService = KtProvider.impl(ITokenService::class)
   val isFirstToLogin = !accountService.isTouristMode() &&
-      (!accountService.isLogin() || tokenService.isRefreshTokenExpired())
+      (!accountService.isLogin() || accountService.session.value.tokenState?.isRefreshTokenExpired() != false)
   if (isFirstToLogin) {
     val login = AppNavArgument.decodeFromRoute(NAV_LOGIN)
     check(login != null) { "未注册 NAV_LOGIN 对应的登录页" }

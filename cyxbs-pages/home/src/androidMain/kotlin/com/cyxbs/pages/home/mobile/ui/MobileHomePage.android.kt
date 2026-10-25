@@ -5,6 +5,10 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.account.api.IAccountService
@@ -15,16 +19,12 @@ import com.cyxbs.components.config.route.DISCOVER_GRADES
 import com.cyxbs.components.config.route.DISCOVER_SCHOOL_CAR
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.startActivity
-import com.cyxbs.components.config.sp.SP_COURSE_SHOW_STATE
-import com.cyxbs.components.config.sp.defaultSp
-import com.cyxbs.components.navigation.AppScheme
-import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.logger.TrackingUtils
 import com.cyxbs.components.utils.logger.event.ClickEvent
-import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.mobile.viewmodel.BottomNavViewModel
 import com.cyxbs.pages.home.mobile.viewmodel.CourseBottomSheetViewModel
+import com.cyxbs.pages.mine.api.MineSettings
 
 // 长按桌面图标的那个东西，对应 AndroidManifest.xml 中的设置
 private const val DESKTOP_SHORTCUT_COURSE = "com.mredrock.cyxbs.action.COURSE"
@@ -42,11 +42,15 @@ internal actual fun PlatformMobileHomePage(
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseBottomNavViewModel = viewModel(CourseBottomSheetViewModel::class)
   val activity = LocalActivity.current as BaseActivity
+  var initialIntentHandled by rememberSaveable { mutableStateOf(false) }
   DisposableEffect(Unit) {
-    // 处理 intent.action
-    execIntentAction(activity.intent, false, courseBottomNavViewModel)
+    // 导航返回会重新进入组合，保存一次性标记以免重复执行 Activity 的启动 Intent。
+    if (!initialIntentHandled) {
+      initialIntentHandled = true
+      execIntentAction(activity.intent, courseBottomNavViewModel)
+    }
     val onNewIntentListener = Consumer<Intent> { intent ->
-      execIntentAction(intent, true, courseBottomNavViewModel)
+      execIntentAction(intent, courseBottomNavViewModel)
     }
     activity.addOnNewIntentListener(onNewIntentListener)
     onDispose {
@@ -70,7 +74,6 @@ internal actual fun PlatformMobileHomePage(
 
 private fun execIntentAction(
   intent: Intent,
-  isNewIntent: Boolean,
   courseBottomNavViewModel: CourseBottomSheetViewModel,
 ) {
   when (intent.action) {
@@ -88,25 +91,14 @@ private fun execIntentAction(
     DESKTOP_SHORTCUT_EMPTY_ROOM -> {
       startActivity(DISCOVER_EMPTY_ROOM)
     }
-    ACTION_TEST_UPDATE_DIALOG -> {
-      IAppUpdateService.debug() // 测试更新弹窗是否正常
-    }
+    // 容器已统一处理更新 Intent，主页忽略它，避免落入默认分支而打开课表。
+    ACTION_TEST_UPDATE_DIALOG -> Unit
     else -> {
-      if (defaultSp.getBoolean(SP_COURSE_SHOW_STATE, false)) {
+      if (MineSettings.isShowCourseFirst()) {
         // 打开应用优先显示课表的设置
         if (!IAccountService::class.impl().isTouristMode()) {
           courseBottomNavViewModel.state.value = true
         }
-      }
-    }
-  }
-  if (isNewIntent) {
-    val url = intent.data
-    if (url != null) {
-      runCatching {
-        AppScheme.jump(url.toString())
-      }.onFailure {
-        logg(it.stackTraceToString())
       }
     }
   }

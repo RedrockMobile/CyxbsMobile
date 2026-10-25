@@ -1,16 +1,9 @@
 package com.cyxbs.pages.notification.network
 
 import com.cyxbs.components.utils.network.ApiStatus
-import com.cyxbs.components.utils.network.ApiWrapper
-import com.cyxbs.pages.notification.bean.ReceivedItineraryMsgBean
-import com.cyxbs.pages.notification.bean.SentItineraryMsgBean
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
-import de.jensklingenberg.ktorfit.http.GET
-import de.jensklingenberg.ktorfit.http.Headers
-import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.PUT
-import de.jensklingenberg.ktorfit.http.Query
 
 /**
  * .
@@ -49,28 +42,5 @@ interface ItineraryApiService {
   suspend fun changeItineraryAddStatus(
     @Field("id") id: Int,
     @Field("status") status: Boolean = true,
-  ): ApiStatus
-
-  /**
-   * 添加进日程
-   *
-   * @param time          提前提醒时间
-   * @param title         事务标题
-   * @param content       事务内容
-   * @param dateJson      事务json
-   * @return
-   */
-  @POST("magipoke-reminder/Person/addTransaction")
-  @FormUrlEncoded
-  @Headers("App-Version:74")
-  suspend fun addAffair(
-    @Field("time")
-    time: Int,
-    @Field("title")
-    title: String,
-    @Field("content")
-    content: String,
-    @Field("date")
-    dateJson: String // 为 json 序列化后的 string
   ): ApiStatus
 }

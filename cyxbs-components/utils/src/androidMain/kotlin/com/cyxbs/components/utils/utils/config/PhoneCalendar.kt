@@ -39,7 +39,6 @@ import kotlin.coroutines.resume
  * RFC5545 规范中英对照文档：http://rfc2cn.com/rfc5545.html（如果你想详细研究一下怎么写规则，强烈推荐看下这篇文档）
  *               对应章节
  * RERIOD    规则: 3.3.9
- * RDATE     规则：3.8.5.2
  * RRULE     规则：3.8.5.3、3.3.10
  * DURATION  规则：3.3.6、3.8.2.5
  * DATE      规则：3.3.4
@@ -124,15 +123,16 @@ object PhoneCalendar {
   ///////////////////////////////
   
   /**
-   * 添加事件，成功就返回事件 Id，失败返回 null
+   * 添加重复事件，成功就返回事件 Id，失败返回 null。
    *
-   * 该方法自带了权限申请，所以使用协程
+   * 该方法自带了权限申请，所以使用协程。
    *
+   * @param event 要写入系统日历的重复事件
    * @param accountType 账户类型。这个不同可以生成不同的日历账号
    */
   suspend fun add(
     activity: FragmentActivity,
-    event: Event,
+    event: FrequencyEvent,
     accountType: String = ACCOUNT_TYPE
   ): Long? = suspendCancellableCoroutine { continuation ->
     val dispose = applyForPermission(activity)
@@ -150,20 +150,18 @@ object PhoneCalendar {
   }
   
   /**
-   * 添加事件，成功就返回事件 Id，失败返回 null
+   * 添加重复事件，成功就返回事件 Id，失败返回 null。
    *
-   * 注意：如果没有申请读写日历权限，那么将添加失败。要么你自己申请权限，要么使用另一个 [add] 方法
+   * 注意：如果没有申请读写日历权限，那么将添加失败。要么你自己申请权限，要么使用另一个 [add] 方法。
    *
+   * @param event 要写入系统日历的重复事件
    * @param accountType 账户类型。这个不同可以生成不同的日历账号
    */
-  fun add(event: Event, accountType: String = ACCOUNT_TYPE): Long? {
+  fun add(event: FrequencyEvent, accountType: String = ACCOUNT_TYPE): Long? {
     if (!checkPermission()) return null
     val calendarId = checkOrAddCalendarAccounts(accountType) ?: return null
     if (calendarId < 0) return null // 获取日历失败直接返回
-    val value = when (event) {
-      is CommonEvent -> getCommonEventContent(event, calendarId)
-      is FrequencyEvent -> getFrequencyEventContent(event, calendarId)
-    } ?: return null
+    val value = getFrequencyEventContent(event, calendarId)
     try {
       val eventId = context.contentResolver.insert(Events.CONTENT_URI, value)
         ?.lastPathSegment
@@ -212,22 +210,17 @@ object PhoneCalendar {
   }
   
   /**
-   * 更新事件,成功返回 true,失败返回 false
+   * 更新重复事件，成功返回 true，失败返回 false。
+   *
+   * @param eventId 需要更新的系统日历事件 ID
+   * @param event 更新后的重复事件内容
+   * @param accountType 事件所属的日历账户类型
    */
-  fun update(eventId: Long, event: Event, accountType: String = ACCOUNT_TYPE): Boolean {
+  fun update(eventId: Long, event: FrequencyEvent, accountType: String = ACCOUNT_TYPE): Boolean {
     if (!checkPermission()) return false
     val calendarId = getCalendarAccount(accountType = accountType) ?: return false
     if (calendarId < 1) return false
-    val value = when (event) {
-      is CommonEvent -> {
-        getCommonEventContent(event, calendarId) {
-          putNull(Events.RRULE) // 删除 RRULE，防止之前是 FrequencyEvent
-        }
-      }
-      is FrequencyEvent -> getFrequencyEventContent(event, calendarId) {
-        putNull(Events.RDATE) // 删除 RDATE，防止之前是 CommonEvent
-      }
-    } ?: return false
+    val value = getFrequencyEventContent(event, calendarId)
     val updateUri = ContentUris.withAppendedId(Events.CONTENT_URI, eventId)
     try {
       if (context.contentResolver.update(updateUri, value, null, null) > 0) {
@@ -449,38 +442,9 @@ object PhoneCalendar {
       "${if (second < 10) "0$second" else second}"
   }
   
-  private fun getCommonEventContent(
-    event: CommonEvent,
-    calendarId: Long,
-    block: (ContentValues.() -> Unit)? = null
-  ): ContentValues? {
-    if (event.startTime.isEmpty()) return null
-    val zone = TimeZone.getDefault()
-    return ContentValues().apply {
-      put(Events.TITLE, event.title)
-      put(Events.DESCRIPTION, event.description)
-      put(Events.CALENDAR_ID, calendarId)
-      // 在使用了 RDATE 后，DTSTART 会失效，但又必须填上，所以写个 0 用于区分 CommonEvent 和 FrequencyEvent
-      put(Events.DTSTART, 0)
-      put(Events.DURATION, event.duration.toDuration())
-      put(Events.RDATE, event.startTime.joinToString(separator = ",") {
-        (it.clone() as Calendar).run {
-          // 不知道什么原因，这个日历写进去的时间有一个时区的时间偏移量，所以这里需要单独减掉
-          // 即使 Date-Time 后面添加了 Z 也是一样
-          timeInMillis -= zone.rawOffset
-          toDateTime()
-        }
-      })
-      put(Events.HAS_ALARM, if (event.remind >= 0) 1 else 0) //设置有提醒
-      put(Events.EVENT_TIMEZONE, zone.id) //设置时区
-      block?.invoke(this)
-    }
-  }
-  
   private fun getFrequencyEventContent(
     event: FrequencyEvent,
     calendarId: Long,
-    block: (ContentValues.() -> Unit)? = null
   ): ContentValues {
     return ContentValues().apply {
       put(Events.TITLE, event.title)
@@ -491,7 +455,6 @@ object PhoneCalendar {
       put(Events.RRULE, event.toRRule())
       put(Events.HAS_ALARM, if (event.remind >= 0) 1 else 0) //设置有提醒
       put(Events.EVENT_TIMEZONE, TimeZone.getDefault().id) //设置时区
-      block?.invoke(this)
     }
   }
   
@@ -530,18 +493,6 @@ object PhoneCalendar {
       }
     }
   }
-  
-  /**
-   * 在某几天内重复的事件
-   * @param startTime 开始的时间
-   */
-  data class CommonEvent(
-    override val title: String,
-    override val description: String,
-    override val remind: Int,
-    override val duration: Event.Duration,
-    val startTime: List<Calendar>
-  ) : Event
   
   /**
    * 带有一定频率的事件，更多参考的例子请查看：http://rfc2cn.com/rfc5545.html 中的 3.8.5.3

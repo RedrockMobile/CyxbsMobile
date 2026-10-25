@@ -6,6 +6,7 @@ plugins {
 useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
 useNavigation() // navigation 跳转
+useUnitTest()
 
 kotlin {
   sourceSets {
@@ -16,7 +17,8 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(projects.cyxbsPages.affair.api)
+      implementation(projects.cyxbsPages.course.api)
+      implementation(projects.cyxbsPages.schedule.api)
     }
     androidMain.dependencies {
       implementation(libs.bundles.projectBase)

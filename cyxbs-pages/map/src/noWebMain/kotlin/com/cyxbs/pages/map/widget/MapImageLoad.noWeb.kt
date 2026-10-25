@@ -50,7 +50,7 @@ actual fun MapImageLoad(
             /*
             计算当前区域原本大小下的位置,screen=center+offset+scale*(local-center)
             故反推就是:local=(screen-center-offset) / scale + center
-            因为当前需要高清切片的矩形位置是(0,0,weight,height),根据这个计算而来
+            高清切片范围取整个容器，再映射到图片坐标
              */
             val leftTopOrigin = calculateOriginPosition(
               center,
@@ -64,7 +64,7 @@ actual fun MapImageLoad(
             val rightBottomOrigin = calculateOriginPosition(
               center,
               mapWidgetState.offset,
-              Offset(weight, height),
+              Offset(weight, mapWidgetState.container.height.toFloat()),
               mapWidgetState.scale
             ) - Offset(
               0f,

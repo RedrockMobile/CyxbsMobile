@@ -45,13 +45,20 @@ class APIConfig {
     
     var ipToHost: [String: String] = [:]
     
-    var environment: Environment = {
+    private(set) var environment: Environment = {
         #if DEBUG
         return .BE_DEV
         #else
         return .BE_PROD
         #endif
     }()
+
+    /// 统一应用网络环境，并同步仍由 Objective-C 模块读取的 baseURL。
+    /// 所有环境切换都必须经过此入口，避免新旧网络栈分别使用不同服务地址。
+    func apply(_ environment: Environment) {
+        self.environment = environment
+        UserDefaults.standard.set(environment.url + "/", forKey: "baseURL")
+    }
     
     static func askHost(success: @escaping (Environment) -> Void) {
         AF.request("https://be-prod.redrock.team/cloud-manager/check").ry_JSON { response in

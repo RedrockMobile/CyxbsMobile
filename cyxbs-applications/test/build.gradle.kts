@@ -77,7 +77,9 @@ tasks.register("buildReleaseAndInstall") {
     val apkFile = channel.outputDir.listFiles()!!.first {
       it.name.contains("official") // 找到第一个 official 的渠道包
     }
-    val adb = project.localProperties["sdk.dir"].toString() + File.separator + "platform-tools" + File.separator + "adb"
+    // Windows 的 platform-tools 中可执行文件名为 adb.exe，macOS/Linux 为 adb
+    val adb = project.localProperties["sdk.dir"].toString() + File.separator + "platform-tools" + File.separator +
+      if (System.getProperty("os.name").lowercase().contains("windows")) "adb.exe" else "adb"
     val installResult = providers.exec {
       // adb install 安装
       commandLine(

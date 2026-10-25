@@ -56,17 +56,11 @@
 
 #import "MineMessageHeader.h"
 
-#import "SchoolCalendarHeader.h"
-
-#import "SchoolBusHeader.h"
-
 #import "ADHeader.h"
 
 #import "ScorePageHeader.h"
 
 #import "TestArrangeHeader.h"
-
-#import "ToDoHeader.h"
 
 #import "MapHeader.h"
 
@@ -82,11 +76,7 @@
 
 #import "NewQAHeader.h"
 
-#import "MineMainPageHeader.h"
-
 #import "RisingScheduleHeader.h"
-
-#import "ElectricHeader.h"
 
 #import "AttitudeHeader.h"
 

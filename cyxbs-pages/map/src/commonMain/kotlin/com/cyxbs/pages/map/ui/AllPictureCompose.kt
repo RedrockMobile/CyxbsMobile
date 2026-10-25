@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +39,13 @@ import org.jetbrains.compose.resources.painterResource
  */
 
 @Composable
-fun AllPictureCompose(modifier: Modifier = Modifier) {
+fun AllPictureCompose(
+  modifier: Modifier = Modifier,
+  images: List<String>,
+  placeId: String,
+  onBack: () -> Unit,
+) {
   val viewmodel = viewModel(MapComposeViewModel::class)
-  val showState = remember { mutableStateOf(false) }
   val loginDialogState = rememberLoginDialogState()
   Column(
     modifier = modifier.background(LocalAppColors.current.topBg)
@@ -52,7 +54,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
       modifier = Modifier
         .padding(start = 6.dp, top = 35.dp)
         .clickableSingle {
-          viewmodel.mapPagerState.value = 0
+          onBack()
         }
         .size(30.dp)
         .padding(start = 10.dp, end = 10.dp),
@@ -77,7 +79,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
             loginDialogState.doIfLogin(
               function = "上传图片"
             ) {
-              showState.value = true
+              viewmodel.requestPhotoUpload(placeId)
             }
           }
           .padding(top = 10.dp, bottom = 10.dp),
@@ -95,7 +97,7 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
         )
       }
     }
-    viewmodel.placeDetails.value?.images?.let { images ->
+    images.let { images ->
       LazyVerticalGrid(
         modifier = modifier.padding(10.dp),
         columns = GridCells.Fixed(2),
@@ -120,7 +122,4 @@ fun AllPictureCompose(modifier: Modifier = Modifier) {
       }
     }
   }
-  UploadPhotoDialog(showState)
-  UploadPhotoResult(viewmodel.uploadPhotoResultState)
-  UploadingPhotoProgressDialog()
 }

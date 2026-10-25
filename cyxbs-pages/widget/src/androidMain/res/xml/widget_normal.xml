@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:initialKeyguardLayout="@layout/widget_normal"
-    android:initialLayout="@layout/widget_normal"
+    android:initialKeyguardLayout="@layout/glance_default_loading_layout"
+    android:initialLayout="@layout/glance_default_loading_layout"
     android:minHeight="40dp"
     android:minWidth="250dp"
-    android:minResizeHeight="40dp"
     android:previewImage="@drawable/widget_ic_normal_example"
-    android:resizeMode="horizontal|vertical"
+    android:resizeMode="horizontal"
     android:updatePeriodMillis="@integer/widget_update_period_millis"
     android:widgetCategory="home_screen" />

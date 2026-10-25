@@ -2,15 +2,18 @@ package com.cyxbs.pages.notification.model
 
 import com.cyxbs.components.account.api.AccountState
 import com.cyxbs.components.account.api.IAccountService
-import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.pages.notification.bean.ReceivedItineraryMsgBean
 import com.cyxbs.pages.notification.bean.SentItineraryMsgBean
-import com.cyxbs.pages.notification.bean.toAffairDateBean
 import com.cyxbs.pages.notification.network.ItineraryApiService
 import com.cyxbs.pages.notification.network.NotificationApiService
+import com.cyxbs.pages.schedule.api.IScheduleOccurrenceService
+import com.cyxbs.pages.schedule.api.ScheduleExternalCreateRequest
+import com.cyxbs.pages.schedule.api.ScheduleExternalCreateResult
+import com.cyxbs.pages.schedule.api.ScheduleExternalSource
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -128,19 +131,33 @@ object ItineraryRepository {
   }
 
   /**
-   * 添加行程到事务中
-   * todo 这里后续改成直接调用 affair 模块暴露的方法，否则需要下次打开课表才会生效
+   * 将收到的没课约行程创建为 Schedule 原生事务。
+   *
+   * 没课约只提供一组节次：指定周创建单次事务，week=0 创建覆盖当前学期的每周重复事务。旧接口中
+   * remindTime=0 表示不提醒，因此这里只把正数映射为提前分钟数。
    */
-  suspend fun addAffair(remindTime: Int, info: ReceivedItineraryMsgBean): Result<Unit> {
+  suspend fun addScheduleAffair(remindTime: Int, info: ReceivedItineraryMsgBean): Result<Unit> {
     return runCatchingCoroutine {
-      ItineraryApiService::class.impl().addAffair(
-        remindTime,
-        info.title,
-        info.content,
-        defaultJson.encodeToString(listOf(info.dateJson).toAffairDateBean())
-      )
-    }.mapCatching {
-      it.throwApiExceptionIfFail()
+      val scheduleTiming = info.dateJson.toScheduleTiming()
+        ?: error("行程缺少可用的学期或节次信息")
+      when (val result = IScheduleOccurrenceService::class.impl().createExternalSchedule(
+        ScheduleExternalCreateRequest(
+          source = ScheduleExternalSource.ITINERARY,
+          sourceId = info.id.toString(),
+          title = info.title,
+          description = info.content,
+          timing = scheduleTiming.timing,
+          recurrence = scheduleTiming.recurrence,
+          reminderOffsetMinutes = remindTime.takeIf { it > 0 },
+          kind = ScheduleOccurrenceKind.AFFAIR,
+          isInTodoList = false,
+          linkedToCourse = true,
+          category = null,
+        ),
+      )) {
+        is ScheduleExternalCreateResult.Success -> Unit
+        is ScheduleExternalCreateResult.Failure -> error("创建日程失败：${result.reason}")
+      }
     }
   }
 }

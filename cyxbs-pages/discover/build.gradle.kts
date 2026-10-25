@@ -15,7 +15,7 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
-      implementation(projects.cyxbsPages.todo.api)
+      implementation(projects.cyxbsPages.schedule.api)
       implementation(projects.cyxbsPages.sport.api)
       implementation(projects.cyxbsPages.volunteer.api)
       implementation(projects.cyxbsPages.electricity.api)
@@ -26,12 +26,11 @@ kotlin {
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.home.api)
       implementation(projects.cyxbsPages.noclass.api)
+      // 校历页直接通过 ImageRequest.Builder 配置图片缓存身份。
+      implementation(libs.coil.compose)
     }
-    androidMain.dependencies {
-      implementation(libs.bundles.projectBase)
-      implementation(libs.bundles.views)
-      implementation(libs.glide)
+    commonTest.dependencies {
+      implementation(kotlin("test"))
     }
   }
 }
-

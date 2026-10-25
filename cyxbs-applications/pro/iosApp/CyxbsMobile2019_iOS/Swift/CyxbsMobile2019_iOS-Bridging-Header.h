@@ -19,12 +19,10 @@
 #import "NSDate+Timestamp.h"
 #import "URLController.h"
 #import "SDMask.h"
-#import "CQUPTMapPlaceRect.h"   // 重邮地图里用的，很多文件都要导入这个，太麻烦了，直接写这里好了
 #import "AESCipher.h"           // AES加密算法
 #import "UserProtocolViewController.h"
 #import "ByWordViewController.h"
 #import "ByPasswordViewController.h"
-#import "TodoSyncTool.h"
 #import "UIColor+Color.h"
 #import "HttpTool.h"
 #import "NoteDataModel.h"
@@ -224,9 +222,6 @@ for(NSString *fontFamilyName in [UIFont familyNames]){
 /// 考试安排接口
 #define Discover_POST_examArrange_API @"https://cyxbsmobile.redrock.team/api/examSchedule"
 
-/// 校车位置
-#define Discover_POST_schoolBus_API @"https://cyxbsmobile.redrock.team/wxapi/schoolbus/status"
-
 /// banner
 //#define Discover_GET_bannerView_API @"http://api-234.redrock.team/magipoke-text/banner/get"
 
@@ -329,18 +324,9 @@ typedef NS_ENUM(NSInteger, ScheduleType) {
 #import "UserItem.h"
 #import "MineMessageVC.h"
 #import "CheckInViewController.h"
-#import "ScheduleInquiryViewController.h"
-#import "SchoolBusVC.h"
-#import "CalendarViewController.h"
-#import "CQUPTMapViewController.h"
 #import "ClassDetailModel.h"
-#import "FinderToolViewController.h"
-#import "FoodVC.h"
-#import "MineViewController.h"
-#import "ElectricViewController.h"
 #import "AttitudeMainPageVC.h"
-#import "DiscoverSAVC.h" // 主页体育打卡
-#import "EmptyClassViewController.h" // 空教室
-#import "SportAttendanceViewController.h" // 体育打卡
 #import "TestArrangeViewController.h" // 我的考试
-#import "TodoDateTool.h"
+#import "StampCenterVC.h" // 邮票中心
+#import "FeedBackMainPageViewController.h" // 反馈中心
+#import "selfSafeViewController.h" // 账号与安全

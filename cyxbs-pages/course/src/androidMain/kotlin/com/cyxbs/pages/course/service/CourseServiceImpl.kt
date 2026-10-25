@@ -2,7 +2,6 @@ package com.cyxbs.pages.course.service
 
 import android.app.Dialog
 import android.content.Context
-import androidx.fragment.app.Fragment
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cyxbs.pages.affair.api.IAffairService
@@ -12,7 +11,6 @@ import com.cyxbs.pages.course.page.course.data.AffairData
 import com.cyxbs.pages.course.page.course.data.LessonData
 import com.cyxbs.pages.course.page.course.data.StuLessonData
 import com.cyxbs.pages.course.page.course.ui.dialog.CourseBottomDialog
-import com.cyxbs.pages.course.page.course.ui.home.HomeCourseVpFragment
 import com.g985892345.provider.api.annotation.ImplProvider
 
 /**
@@ -23,10 +21,6 @@ import com.g985892345.provider.api.annotation.ImplProvider
  */
 @ImplProvider
 object CourseServiceImpl : ICourseService {
-
-  override fun createHomeCourseFragment(): Fragment {
-    return HomeCourseVpFragment()
-  }
 
   override fun setHeaderAlpha(alpha: Float) {
     _headerAlphaState.value = alpha

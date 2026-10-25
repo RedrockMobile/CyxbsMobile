@@ -31,7 +31,7 @@ data class ItineraryAllMsg(
  * @property updateTime     该行程通知的上次更新时间
  * @property publishTime    该消息通知的产生时间
  * @property peopleCount    该消息通知到的人数
- * @property dateJson       该行程消息的日期信息，可用于本地的事务接口 和 开始状态判断
+ * @property dateJson       该行程消息的一组学期节次，可转换为原生日程时间并用于开始状态判断
  */
 @Serializable
 data class SentItineraryMsgBean(
@@ -75,7 +75,7 @@ data class SentItineraryMsgBean(
  * @property hasCancel      行程是否已取消提醒
  * @property updateTime     该行程通知的上次更新时间
  * @property publishTime    该消息通知的产生时间
- * @property dateJson       该行程消息的日期信息，可用于本地的事务接口 和 开始状态判断
+ * @property dateJson       该行程消息的一组学期节次，可转换为原生日程时间并用于开始状态判断
  */
 @Serializable
 data class ReceivedItineraryMsgBean(
@@ -173,36 +173,5 @@ fun ItineraryDateBean.judgeCurrentIsOver(): Boolean {
         return false
     } else { // 处理正常课程时间段开始的行程
         return nowLesson > (beginLesson + period - 1)
-    }
-}
-
-/**
- * 转 Json的dataBean，转为Json后作为添加事务的dateJson参数使用
- *
- * @property beginLesson
- * @property day
- * @property period
- * @property week
- */
-@Serializable
-data class AffairDateBean(
-    @SerialName("begin_lesson")
-    val beginLesson: Int,       // 开始节数，如：1、2 节课以 1 开始；2、3 节课以 2 开始，注意：中午是以 -1 开始，傍晚是以 -2 开始
-    @SerialName("day")
-    val day: Int,               // 星期数，这里的星期一为 0，星期日为 6
-    @SerialName("period")
-    val period: Int,            // 长度，事务的跨度为几节课，占用了几节课的时间长度就为几
-    @SerialName("week")
-    val week: List<Int>         // 第几周，整学期为0
-)
-
-fun List<ItineraryDateBean>.toAffairDateBean(): List<AffairDateBean> {
-    return map {
-        AffairDateBean(
-            it.beginLesson,
-            (it.day - 1) % 7,
-            it.period,
-            listOf(it.week)
-        )
     }
 }

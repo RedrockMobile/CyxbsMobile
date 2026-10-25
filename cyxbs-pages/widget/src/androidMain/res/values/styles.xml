@@ -1,24 +1,16 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
 
-    <!-- Base application theme. -->
-    <style name="widget_Theme" parent="Theme.MaterialComponents.Dialog" >
-        <item name="android:windowAnimationStyle">@style/Animation.Design.BottomSheetDialog</item>
-        <item name="android:windowFrame">@null</item>
-        <!-- 边框 -->
-        <item name="android:windowNoTitle">true</item>
-        <!-- 无标题 -->
+    <!--
+      Widget 详情仅提供透明窗口承载 Compose BottomSheet；系统栏必须透出桌面，避免 Activity
+      创建到 enableEdgeToEdge 生效之间短暂显示平台主题的黑色底色。
+    -->
+    <style name="CourseWidgetDialogTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowBackground">@android:color/transparent</item>
-        <!-- 背景透明 -->
-    </style>
-
-    <style name="WidgetDialogTheme" parent="Theme.AppCompat.DayNight.Dialog">
-        <item name="background">@color/widget_transparent_background</item>
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowIsFloating">true</item>
-        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
     </style>
 
 </resources>

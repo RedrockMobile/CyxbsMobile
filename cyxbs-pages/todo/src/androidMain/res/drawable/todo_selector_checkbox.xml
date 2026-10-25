@@ -1,4 +1,0 @@
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/todo_ic_rv_item_ischeck" android:state_checked="true" />
-    <item android:drawable="@drawable/todo_ic_rv_item_check" android:state_checked="false" />
-</selector>

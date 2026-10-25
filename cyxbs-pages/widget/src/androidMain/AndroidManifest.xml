@@ -1,26 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <application>
-        <activity
-            android:name=".widget.page.normal.NormalSelectActivity"
-            android:theme="@style/widget_Theme"/>
-        <activity android:name=".widget.page.normal.NormalConfigActivity" />
-        <activity
-            android:name=".widget.page.oversized.OversizedAppWidgetConfigureActivity"
-            android:theme="@style/widget_Theme"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
+    <!-- 部分 MIUI 桌面会在接收固定小组件请求后再次检查该权限；缺失时确认页立即关闭。 -->
+    <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
 
+    <application>
+        <!-- 系统固定成功时在桌面上显示确认提示，不启动应用页面。 -->
+        <receiver
+            android:name=".page.CourseWidgetPinSuccessReceiver"
+            android:exported="false" />
+        <!-- Widget 详情只借用透明 Activity 承载弹窗，不得复用或拉起主应用任务栈。 -->
+        <activity
+            android:name=".widget.glance.CourseWidgetEntryActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity="${applicationId}.course_widget"
+            android:theme="@style/CourseWidgetDialogTheme" />
         <receiver
             android:name=".widget.normal.NormalWidget"
-            android:label="课程显示(大)"
+            android:enabled="@bool/glance_appwidget_available"
+            android:label="横向课程显示"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.cyxbs.pages.widget.action.REFRESH" />
+                <action android:name="flush" />
             </intent-filter>
 
             <meta-data
@@ -28,30 +33,37 @@
                 android:resource="@xml/widget_normal" />
         </receiver>
 
-        <service
-            android:name=".service.GridWidgetService"
-            android:permission="android.permission.BIND_REMOTEVIEWS"/>
-
         <receiver
-            android:name=".widget.oversize.OversizedAppWidget"
-            android:label="超大小部件"
+            android:name=".widget.single.SingleWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:label="当前课程"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.cyxbs.pages.widget.action.REFRESH" />
+                <action android:name="flush" />
             </intent-filter>
 
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_oversized_app_widget_info" />
+                android:resource="@xml/widget_single" />
         </receiver>
 
-        <activity
-            android:name=".activity.InfoActivity"
-            android:configChanges="keyboardHidden|orientation"
-            android:screenOrientation="portrait"
-            android:theme="@style/WidgetDialogTheme"
-            android:launchMode="singleInstance"
-            />
+        <receiver
+            android:name=".widget.oversize.OversizedAppWidget"
+            android:enabled="@bool/glance_appwidget_available"
+            android:label="竖向课程显示"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.cyxbs.pages.widget.action.REFRESH" />
+                <action android:name="flush" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_oversized" />
+        </receiver>
 
     </application>
 

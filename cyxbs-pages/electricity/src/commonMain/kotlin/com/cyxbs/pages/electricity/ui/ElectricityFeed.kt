@@ -153,9 +153,8 @@ private fun ElectricityDataRow(elecInf: ElecInf) {
   val kwUnit = stringResource(Res.string.electricity_unit_kilowatt)
   val feeText = remember(feeValue, yuanUnit) { buildValueAnnotated(feeValue, yuanUnit) }
   val kwText = remember(kilowattValue, kwUnit) { buildValueAnnotated(kilowattValue, kwUnit) }
-  // 旧 XML 数字用 @font/impact，仅 Android 提供；其它平台为 null 时回退默认字体并加粗
-  // todo 待后续把字体迁移到 commonMain 中，目前因为存在 xml 引用所以不进行迁移
-  val numberFontFamily = remember { ConfigRes.impactFontFamily() }
+  // 旧 XML 数字用 @font/impact，desktop/web 为 null 时回退默认字体并加粗
+  val numberFontFamily = ConfigRes.impactFontFamily()
   BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
     val width = this.maxWidth
     Row(

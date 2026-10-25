@@ -21,12 +21,14 @@ actual fun Window(
   Dialog(
     onDismissRequest = { dismissOnBackPress?.invoke() },
     properties = DialogProperties(
-      dismissOnBackPress = true,
+      // null 表示由窗口内容自己的 BackHandler / Esc 处理。
+      dismissOnBackPress = dismissOnBackPress != null,
       dismissOnClickOutside = false,
       usePlatformDefaultWidth = false,
       usePlatformInsets = false,
       useSoftwareKeyboardInset = false,
       scrimColor = Color.Transparent,
+      animateTransition = false,
     ),
     content = content
   )

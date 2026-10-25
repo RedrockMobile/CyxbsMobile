@@ -1,0 +1,3 @@
+interface:
+  display_name: "编译 KMP 混合 iOS"
+  short_description: "构建并部署掌邮 KMP/CMP 混合 iOS 壳"

@@ -8,7 +8,8 @@ useNavigation() // navigation 跳转
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.cyxbsPages.course.view) // 装饰物工厂返回类型 CoursePageDecoration/AbstractCourseFrame
+      implementation(libs.kotlinx.datetime)
+      implementation(projects.cyxbsComponents.config)
     }
   }
 }

@@ -1,6 +1,8 @@
 package com.cyxbs.pages.course.view.timeline.data
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +40,17 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlin.math.roundToInt
+
+/**
+ * 时间轴折叠状态变化使用的统一动画。
+ *
+ * 中低刚度让课表 Item 的位移能与 BottomSheet 弹起同时被观察到；权重本身通常小于 10，
+ * 因此使用较小的可见阈值，避免被过早判定为到达目标。
+ */
+private val TimelineExpandAnimationSpec = spring(
+  stiffness = Spring.StiffnessMediumLow,
+  visibilityThreshold = 0.001F,
+)
 
 /**
  * .
@@ -87,7 +100,11 @@ data class MutableTimelineData(
         try {
           supervisorScope {
             launch {
-              animate(nowWeight, targetWeight) { value, _ ->
+              animate(
+                initialValue = nowWeight,
+                targetValue = targetWeight,
+                animationSpec = TimelineExpandAnimationSpec,
+              ) { value, _ ->
                 nowWeightState.value = value
               }
             }
@@ -104,40 +121,57 @@ data class MutableTimelineData(
     }
   }
 
+  /**
+   * 在权重动画期间按 [scrollMode] 同步课表滚轴。
+   *
+   * BottomSheet 等外部容器需要独立控制避让时应选择 [ScrollMode.DoNotScroll]，避免两个滚动控制器
+   * 同时修改同一个 ScrollState；直接点击时间轴时默认使用 [ScrollMode.Auto]。
+   */
   private fun CoroutineScope.scrollExpand(
     scrollContext: LocalCourseScrollContext,
     targetWeight: Float
   ) {
-    val upOrDown = scrollUpOrDown ?: let {
-      // 最后一个展开时需要向上滚动
-      (scrollContext.timeline.data.last() === this@MutableTimelineData
-          && scrollContext.scrollState.value == scrollContext.scrollState.maxValue)
+    val shouldScroll = when (scrollMode) {
+      ScrollMode.Auto -> {
+        // 最后一个时间段在滚轴底部展开时，保持用户距离底部的位置不变。
+        scrollContext.timeline.data.last() === this@MutableTimelineData &&
+            scrollContext.scrollState.value == scrollContext.scrollState.maxValue
+      }
+
+      ScrollMode.KeepBottomDistance -> true
+      ScrollMode.DoNotScroll -> false
     }
-    if (upOrDown) {
-      launch {
-        val initialBottomRemainValue =
-          scrollContext.scrollState.maxValue - scrollContext.scrollState.value
-        scrollContext.scrollState.scroll {
-          // 这里要使用跟展开一样的动画
-          animate(nowWeight, targetWeight) { _, _ ->
-            val scrollTo = scrollContext.scrollState.maxValue - initialBottomRemainValue
-            scrollBy((scrollTo - scrollContext.scrollState.value).toFloat())
-          }
+    if (!shouldScroll) return
+    launch {
+      val initialBottomRemainValue =
+        scrollContext.scrollState.maxValue - scrollContext.scrollState.value
+      scrollContext.scrollState.scroll {
+        animate(
+          initialValue = nowWeight,
+          targetValue = targetWeight,
+          animationSpec = TimelineExpandAnimationSpec,
+        ) { _, _ ->
+          val scrollTo = scrollContext.scrollState.maxValue - initialBottomRemainValue
+          scrollBy((scrollTo - scrollContext.scrollState.value).toFloat())
         }
       }
     }
   }
 
   /**
-   * @param scrollUpOrDown true：滚轴向上展开；false：滚轴向下展开；null：根据当前情况进行判断
+   * 切换当前时间轴区间的展开状态。
+   *
+   * @param scrollMode 权重变化期间的滚轴跟随方式。调用方已有自己的滚动避让逻辑时必须使用
+   * [ScrollMode.DoNotScroll]，避免两个控制器竞争。
+   * @return 剩余的点击锁数量；大于 0 表示本次切换未执行。
    */
-  fun click(scrollUpOrDown: Boolean? = null): Int {
+  fun click(scrollMode: ScrollMode = ScrollMode.Auto): Int {
     if (clickLockCount > 0) return clickLockCount
     if (_state.value == State.Expand) {
-      this.scrollUpOrDown = scrollUpOrDown
+      this.scrollMode = scrollMode
       _state.value = State.ExpandToCollapseAnim
     } else if (_state.value == State.Collapse) {
-      this.scrollUpOrDown = scrollUpOrDown
+      this.scrollMode = scrollMode
       _state.value = State.CollapseToExpandAnim
     }
     return 0
@@ -161,7 +195,20 @@ data class MutableTimelineData(
   private var clickLockCount = 0
 
   @Transient
-  private var scrollUpOrDown: Boolean? = null
+  private var scrollMode: ScrollMode = ScrollMode.Auto
+
+  /**
+   * 时间轴权重变化时的滚轴处理方式。
+   *
+   * [Auto] 仅在末段且用户已位于底部时保持底部距离；
+   * [KeepBottomDistance] 强制保持当前底部距离；
+   * [DoNotScroll] 只改变时间轴高度，由 BottomSheet 等外部容器负责滚动避让。
+   */
+  enum class ScrollMode {
+    Auto,
+    KeepBottomDistance,
+    DoNotScroll,
+  }
 
   @Transient
   private val _state =

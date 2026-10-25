@@ -4,8 +4,12 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.navigation.AppNav
 import com.cyxbs.components.navigation.AppNavEntry
 import com.cyxbs.components.navigation.NAV_COURSE
@@ -25,9 +29,11 @@ class CourseNavEntry : AppNavEntry<CourseNavArgument>() {
     return true
   }
 
-  // 当 argument.stableKey != null 时，复用同一个 NavEntry（仅 stuNum 变更不重建 ViewModel）
+  // stableKey 非空时复用同一个查找详情；裸 deeplink 使用固定的 self key。
   override fun getContentKey(argument: CourseNavArgument): String {
-    return argument.stableKey ?: "course:${argument.stuNum}"
+    return argument.stableKey
+      ?: argument.stuNum?.takeIf(String::isNotBlank)?.let { "course:$it" }
+      ?: "course:self"
   }
 
   @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -42,11 +48,17 @@ class CourseNavEntry : AppNavEntry<CourseNavArgument>() {
 
   @Composable
   override fun Content(argument: CourseNavArgument) {
-    val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel(argument.stuNum) }
-    // 当复用同一个 NavEntry 但 argument.stuNum 变化时，触发 frame 内部 stuNum 更新，
-    // CoursePageDecorationManager 会重建以订阅新学号的课表数据
-    LaunchedEffect(argument.stuNum) {
-      courseFrameViewModel.frame.updateStuNum(argument.stuNum)
+    val accountService = remember { IAccountService::class.impl() }
+    val currentStuNum = accountService.stuNumFlow.collectAsState(accountService.stuNum).value
+    // 裸课表 deeplink 表示“我的课表”；显式学号继续保留查看他人课表的原有行为。
+    val resolvedStuNum = argument.stuNum?.takeIf(String::isNotBlank) ?: currentStuNum.orEmpty()
+    if (resolvedStuNum.isBlank()) return
+
+    val courseFrameViewModel = viewModel { AdaptiveCourseFrameViewModel(resolvedStuNum) }
+    // 当复用同一个 NavEntry 但目标学号变化时，触发 frame 内部学号更新，
+    // CoursePageDecorationManager 会重建并订阅新的课表数据。
+    LaunchedEffect(resolvedStuNum) {
+      courseFrameViewModel.frame.updateStuNum(resolvedStuNum)
     }
     courseFrameViewModel.frame.HomeCourseContent(modifier = Modifier)
   }

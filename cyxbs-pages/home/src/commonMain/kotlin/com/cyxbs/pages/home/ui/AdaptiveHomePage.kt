@@ -33,6 +33,9 @@ import com.cyxbs.components.navigation.NAV_EMPTY_ROOM
 import com.cyxbs.components.navigation.NAV_FOOD
 import com.cyxbs.components.navigation.NAV_MAP
 import com.cyxbs.components.navigation.NAV_SCHOOL_CAR
+import com.cyxbs.components.navigation.NAV_SPORT
+import com.cyxbs.components.navigation.NAV_SCHOOL_CALENDAR
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.CourseNavArgument
@@ -69,6 +72,9 @@ private val itemList = listOf(
   ActionItem("空教室查询") {
     AppScheme.jump("cyxbs://$NAV_EMPTY_ROOM")
   },
+  ActionItem("校历") {
+    AppScheme.jump("cyxbs://$NAV_SCHOOL_CALENDAR")
+  },
   ActionItem("校车查询", Platform.Web){
     AppScheme.jump("cyxbs://$NAV_SCHOOL_CAR")
   },
@@ -78,10 +84,19 @@ private val itemList = listOf(
   ActionItem("资料编辑") {
     AppScheme.jump("cyxbs://$NAV_EDIT_INFO")
   },
-  ActionItem("日程编辑") {
-    AppScheme.jump("cyxbs://schedule/edit")
+  ActionItem("邮子清单") {
+    AppScheme.jump("cyxbs://schedule")
   },
-
+  // 开发预览使用 Schedule 模块内的纯内存 mock，不写真实 Room，也不请求后端。
+  ActionItem("日程 Mock") {
+    AppScheme.jump("cyxbs://schedule/preview")
+  },
+  ActionItem("签到") {
+    AppScheme.jump("cyxbs://$NAV_SIGN")
+  },
+  ActionItem("体育打卡") {
+    AppScheme.jump("cyxbs://$NAV_SPORT")
+  },
 
 
   // 退出登陆放到最后，其他测试页面放到上面👆

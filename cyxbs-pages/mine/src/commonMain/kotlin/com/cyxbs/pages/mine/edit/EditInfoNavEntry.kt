@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -447,6 +448,12 @@ private fun EditableSection(viewModel: EditInfoComposeViewModel, isEditing: Bool
   }
 }
 
+/**
+ * 标签统一宽度。汉字与拉丁字母的字符宽度不同（「QQ」比「昵称」窄），
+ * 不固定宽度会导致各行的输入区左边缘参差不齐。按两个汉字（15.sp）留出余量。
+ */
+private val FieldLabelWidth = 36.dp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FieldRow(
@@ -474,7 +481,8 @@ private fun FieldRow(
       lineHeight = 22.sp,
       color = LocalAppColors.current.tvLv2,
       fontWeight = FontWeight.Bold,
-      modifier = Modifier.padding(end = 16.dp),
+      // padding 在外、width 在内：先把标签撑到统一宽度，再加间距，保证输入区左对齐
+      modifier = Modifier.padding(end = 16.dp).width(FieldLabelWidth),
     )
     Box(modifier = Modifier.fillMaxWidth()) {
       BasicTextField(

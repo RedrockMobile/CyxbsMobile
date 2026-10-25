@@ -35,11 +35,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cyxbs.components.account.api.AccountState
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.compose.theme.LocalAppColors
+import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.utils.compose.dark
-import com.cyxbs.components.utils.extensions.toastLong
-import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.home.api.IHomeDiscoverTab
 import com.cyxbs.pages.home.api.IHomeFairgroundTab
@@ -52,7 +54,6 @@ import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -79,7 +80,7 @@ class MobileHomePage : PlatformHomePage {
         modifier = Modifier.fillMaxSize()
       ) {
         HomeViewPagerCompose(argument)
-        HomeCourseCompose()
+        HomeCourseCompose(argument)
         HomeNavCompose(modifier = Modifier.align(Alignment.BottomCenter))
       }
     }
@@ -154,32 +155,28 @@ internal fun HomeViewPagerCompose(
   }
 }
 
-// 旧版课表
-interface IOldHomeCourse {
-  val enable: Boolean
-  val content: @Composable (modifier: Modifier) -> Unit
-}
-
 @Composable
-private fun HomeCourseCompose(modifier: Modifier = Modifier) {
-  val oldHomeCourse = IOldHomeCourse::class.implOrNull()
-  if (oldHomeCourse?.enable == true) {
-    // 使用旧版课表进行展示
-    oldHomeCourse.content.invoke(modifier)
-    return
-  }
+private fun HomeCourseCompose(argument: HomeNavArgument, modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
   // CourseBottomSheetViewModel 提供对外控制课表展示和监听当前展示状态
   val courseBottomSheetViewModel = viewModel(CourseBottomSheetViewModel::class)
+  LaunchedEffect(argument.courseOpenId) {
+    val itemId = argument.courseItemId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
+    if (argument.courseOpenId != null) {
+      // 主页只负责展开课表并调用通用定位入口；ID 解析、切页和原 item 弹窗由 Frame 封装。
+      courseBottomSheetViewModel.state.value = true
+      courseFrameViewModel.frame.showCourseItemDetail(itemId)
+    }
+  }
   courseFrameViewModel.frame.HomeCourseContent(
     modifier = modifier,
-    bottomBarHeight = bottomNavViewModel.height
+    bottomBarHeight = bottomNavViewModel.height,
   )
   LaunchedEffect(Unit) {
     val bottomSheetState = courseFrameViewModel.frame.bottomSheetState
     snapshotFlow {
-      bottomSheetState.fraction.coerceIn(0F, 1F)
+      bottomSheetState.expansionFraction.coerceIn(0F, 1F)
     }.onEach {
       // 底部按钮跟随课表展开而变化
       bottomNavViewModel.offsetYRadio.floatValue = it
@@ -205,31 +202,31 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
     }
   }
   LaunchedEffect(Unit) {
-    courseFrameViewModel.frame.bottomSheetState.stateFlow.collect {
+    // 初始 Collapsed 只是 BottomSheetState 的默认值，不能覆盖启动页刚写入的展开请求。
+    courseFrameViewModel.frame.bottomSheetState.settledAnchorFlow.drop(1).collect {
       when (it) {
-        BottomSheetValueState.Hide -> {
+        BottomSheetAnchor.Hidden -> {
           if (courseBottomSheetViewModel.state.value != null) {
             courseBottomSheetViewModel.state.value = null
           }
         }
-        BottomSheetValueState.Collapsed -> {
+        BottomSheetAnchor.Collapsed -> {
           if (courseBottomSheetViewModel.state.value != false) {
             courseBottomSheetViewModel.state.value = false
           }
         }
-        BottomSheetValueState.Expanded -> {
+        BottomSheetAnchor.Expanded -> {
           if (courseBottomSheetViewModel.state.value != true) {
             courseBottomSheetViewModel.state.value = true
           }
         }
-        BottomSheetValueState.Scrolling -> {}
       }
     }
   }
   LaunchedEffect(Unit) {
-    courseFrameViewModel.frame.bottomSheetState.stateFlow
-      .first { it == BottomSheetValueState.Expanded }
-    toastLong("注意：新版课表在开发中，可能存在bug\n设置中可回退旧版课表")
+    IAccountService::class.impl().state.collectLatest {
+      courseFrameViewModel.frame.bottomSheetState.userScrollEnabled.value = it is AccountState.Login
+    }
   }
 }
 
@@ -237,8 +234,8 @@ private fun HomeCourseCompose(modifier: Modifier = Modifier) {
 private fun HomeNavCompose(modifier: Modifier = Modifier) {
   val bottomNavViewModel = viewModel(BottomNavViewModel::class)
   val courseFrameViewModel = viewModel(MobileCourseFrameViewModel::class)
-  val shadowElevation by courseFrameViewModel.frame.bottomSheetState.stateFlow.map {
-    if (it == BottomSheetValueState.Hide) 4.dp else 0.dp // 如果课表不展示了则添加阴影
+  val shadowElevation by courseFrameViewModel.frame.bottomSheetState.settledAnchorFlow.map {
+    if (it == BottomSheetAnchor.Hidden) 4.dp else 0.dp // 如果课表不展示了则添加阴影
   }.collectAsState(0.dp)
   Row(
     modifier = modifier

@@ -10,3 +10,6 @@ import io.ktor.client.HttpClientConfig
  */
 internal actual fun HttpClientConfig<*>.platformConfigHttpClient() {
 }
+
+/** 浏览器隐藏 DNS、连接及 CORS 的具体原因，不依据模糊的 fetch 错误触发域名切换。 */
+internal actual fun Throwable.isPlatformConnectionFailure(): Boolean = false

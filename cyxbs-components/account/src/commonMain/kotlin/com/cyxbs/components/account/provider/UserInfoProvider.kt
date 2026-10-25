@@ -6,15 +6,16 @@ import com.cyxbs.components.account.api.UserInfo
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.config.serializable.defaultJson
 import com.cyxbs.components.config.sp.defaultSettings
-import com.cyxbs.components.init.appCoroutineScope
 import com.cyxbs.components.utils.extensions.logg
 import com.cyxbs.components.utils.extensions.runCatchingCoroutine
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.HttpClient
+import com.cyxbs.components.utils.network.plugin.requireAccountSession
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -32,12 +33,21 @@ internal object UserInfoProvider {
       defaultJson.decodeFromString<UserInfo>(SecretTransformer.impl.secretDecrypt(it))
     }.onFailure {
       defaultSettings.remove(KEY)
-    }.onFailure {
-      refresh() // 本地保存的数据有误时触发一次刷新
     }.getOrNull()
   }
     private set
 
+  private var refreshJob: Job? = null
+
+  /** 恢复指定学号的缓存资料；历史缓存归属不符时清空，返回 null 供账户层重新请求。 */
+  fun loadForAccount(stuNum: String): UserInfo? {
+    val cached = value ?: return null
+    if (cached.stuNum == stuNum) return cached
+    clear()
+    return null
+  }
+
+  /** 清空持久化资料并取消当前刷新；由账户切换统一调用。 */
   fun clear() {
     refreshJob?.cancel()
     refreshJob = null
@@ -45,33 +55,36 @@ internal object UserInfoProvider {
     value = null
   }
 
-  private var refreshJob: Job? = null
-
+  /**
+   * 刷新当前账户资料；同一账户再次刷新时取消前一个请求。
+   *
+   * 沿用旧实现的直接保存流程，任务归属于当前 session，结束后不再回写旧账户数据。
+   */
   fun refresh() {
+    val session = AccountService.session.value
+    val login = session.state as? AccountState.Login ?: return
     refreshJob?.cancel()
-    refreshJob = appCoroutineScope.launch {
+    refreshJob = session.accountCoroutineScope.launch {
       runCatchingCoroutine {
-        HttpClient.get("/magipoke/person/info").body<ApiWrapper<UserInfo>>()
-      }.mapCatching {
-        it.throwApiExceptionIfFail()
-        it.data
+        HttpClient.get("/magipoke/person/info") {
+          requireAccountSession(session)
+        }.body<ApiWrapper<UserInfo>>().data
       }.onFailure {
         if (isDebug()) {
           toast("用户信息请求失败")
           logg("用户信息请求失败: " + it.stackTraceToString())
         }
-      }.onSuccess {
+      }.onSuccess { info ->
+        // 被后续刷新取消或账户已切换时，旧请求不能覆盖当前资料。
+        coroutineContext.ensureActive()
+        if (AccountService.session.value !== session || login.stuNum != info.stuNum) return@onSuccess
         defaultSettings.putString(
           KEY,
-          SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(it))
+          SecretTransformer.impl.secretEncrypt(defaultJson.encodeToString(info)),
         )
-        value = it
-        val state = AccountService.state.value
-        if (state is AccountState.Login && state.stuNum == it.stuNum) {
-          state.userInfo.value = it
-        }
+        value = info
+        login.userInfo.value = info
       }
-      refreshJob = null
     }
   }
 }

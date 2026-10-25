@@ -41,7 +41,7 @@ object InitialManager {
     }
   }
 
-  //主进程
+  /** 主进程启动时恢复已保存的隐私授权，并让相关 SDK 在本次进程中初始化一次。 */
   private fun onMainProcess() {
     //不管是否同意隐私策略都调用
     initialServices.forEach {
@@ -49,16 +49,15 @@ object InitialManager {
     }
     //同意了隐私策略
     if (defaultSettings.getBoolean(SP_PRIVACY_AGREED, false)) {
-      hasInvokedPrivacyAgree = true
       tryPrivacyAgree()
     }
   }
 
-  // 隐私策略同意了，在登录后调用
+  /** 恢复历史授权或登录成功后分发隐私回调；在当前进程中最多执行一次。 */
   fun tryPrivacyAgree() {
+    defaultSettings.putBoolean(SP_PRIVACY_AGREED, true)
     if (hasInvokedPrivacyAgree) return
     hasInvokedPrivacyAgree = true
-    defaultSettings.putBoolean(SP_PRIVACY_AGREED, true)
     initialServices.forEach {
       it.onPrivacyAgreed()
     }

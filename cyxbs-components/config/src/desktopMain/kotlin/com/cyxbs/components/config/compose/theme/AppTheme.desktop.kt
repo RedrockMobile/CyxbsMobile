@@ -5,7 +5,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.LocalSystemTheme
 import androidx.compose.ui.SystemTheme
-import androidx.compose.ui.text.font.FontFamily
 
 @OptIn(InternalComposeUiApi::class)
 @Composable
@@ -25,9 +24,4 @@ internal actual fun ConfigAppThemeAfter(
   content: @Composable () -> Unit
 ) {
   content()
-}
-
-@Composable
-internal actual fun getFontFamily(): FontFamily {
-  return FontFamily.Default
 }

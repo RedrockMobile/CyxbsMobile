@@ -52,11 +52,4 @@ sealed class MapUiEvent {
 
   object ResetMap : MapUiEvent()
 
-  object CollapseSearchSheet : MapUiEvent()
-
-  object CollapseBottomSheet : MapUiEvent()
-
-  object ExpandBottomSheet : MapUiEvent()
-
-  object HideBottomSheet : MapUiEvent()
 }

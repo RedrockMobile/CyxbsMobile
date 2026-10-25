@@ -1,9 +1,10 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.schedule.recurrence.Freq
-import com.cyxbs.pages.schedule.recurrence.RRule
-import com.cyxbs.pages.schedule.recurrence.Recurrence
+import com.cyxbs.pages.schedule.domain.model.IsoWeekDay
+import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
+import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -45,11 +46,12 @@ class ScheduleInfoRowTest {
     assertNull(weekOfTerm(firstMonday, firstMonday.plusWeeks(25)))
   }
 
-  /** 日期缩写「月.日」。 */
+  /** 日期：今年不显示年份，非今年显示年份后两位。 */
   @Test
   fun info_date_format() {
-    assertEquals("1.1", formatInfoDate(Date(2024, 1, 1)))
-    assertEquals("6.28", formatInfoDate(Date(2026, 6, 28)))
+    val today = Date(2026, 7, 8)
+    assertEquals("7月4日", formatInfoDate(Date(2026, 7, 4), today))
+    assertEquals("25年7月4日", formatInfoDate(Date(2025, 7, 4), today))
   }
 
   /** 星期中文（2024-01-01 为周一）。 */
@@ -79,16 +81,37 @@ class ScheduleInfoRowTest {
   fun remind_ahead_format() {
     assertNull(formatRemindAhead(-1))
     assertEquals("准时", formatRemindAhead(0))
-    assertEquals("提前10分", formatRemindAhead(10))
+    assertEquals("提前10分钟", formatRemindAhead(10))
     assertEquals("提前1小时", formatRemindAhead(60))
     assertEquals("提前2小时", formatRemindAhead(120))
   }
 
-  /** 重复缩写：每周单日用紧凑「每周一」；不重复为 null。 */
+  /** 重复缩写：保留紧凑规则，并补充次数或截止日期；不重复为 null。 */
   @Test
   fun recurrence_row_label() {
-    assertEquals("每周一", recurrenceRowLabel(Recurrence(rrule = RRule(freq = Freq.WEEKLY, byDay = listOf(1)))))
-    assertEquals("每2天", recurrenceRowLabel(Recurrence(rrule = RRule(freq = Freq.DAILY, interval = 2))))
+    assertEquals("每周一", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.MONDAY))))
+    assertEquals("每2天", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.DAILY, interval = 2)))
+    assertEquals(
+      "每周一 · 共5次",
+      recurrenceRowLabel(
+        RecurrenceRule(
+          frequency = RecurrenceFrequency.WEEKLY,
+          byWeekDays = setOf(IsoWeekDay.MONDAY),
+          end = RecurrenceEnd.Count(5),
+        ),
+      ),
+    )
+    assertEquals(
+      "每2天 · 至9月30日",
+      recurrenceRowLabel(
+        recurrence = RecurrenceRule(
+          frequency = RecurrenceFrequency.DAILY,
+          interval = 2,
+          end = RecurrenceEnd.Until(Date(2026, 9, 30)),
+        ),
+        today = Date(2026, 9, 5),
+      ),
+    )
     assertNull(recurrenceRowLabel(null))
   }
 
@@ -97,6 +120,6 @@ class ScheduleInfoRowTest {
   fun remind_option_label() {
     assertEquals("不提醒", remindOptionLabel(-1))
     assertEquals("准时", remindOptionLabel(0))
-    assertEquals("提前30分", remindOptionLabel(30))
+    assertEquals("提前30分钟", remindOptionLabel(30))
   }
 }

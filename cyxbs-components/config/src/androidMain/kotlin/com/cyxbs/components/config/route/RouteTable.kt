@@ -20,27 +20,19 @@ const val MAIN_ENTRY = "/main/entry"
 
 const val DISCOVER_OTHER_COURSE = "/other_course/discover/entry"
 const val DISCOVER_NO_CLASS = "/no_class/discover/entry"
-const val DISCOVER_CALENDAR = "/calendar/discover/entry"
 const val DISCOVER_EMPTY_ROOM = "/empty_room/discover/entry"
 const val DISCOVER_GRADES = "/grades/discover/entry"
 const val DISCOVER_VOLUNTEER = "/volunteer/discover/entry"
 const val DISCOVER_VOLUNTEER_RECORD = "/volunteer/discover/record"
 const val DISCOVER_SCHOOL_CAR = "/school_car/discover/entry"
 const val DISCOVER_NEWS = "/news/discover/entry"
-const val DISCOVER_TODO_MAIN = "/todo/discover/entry"
 const val DISCOVER_SPORT = "/sport/discover/entry"
 
 //教务新闻子项入口
 const val DISCOVER_NEWS_ITEM = "/news/discover/item"
 
-//签到页
-const val MINE_CHECK_IN = "/check_in/mine/entry"
-
 // 个人界面的确认密码模块
 const val MINE_FORGET_PASSWORD = "/forget_password/mine/entry"
-
-//小组件用，增加todo
-const val TODO_ADD_TODO_BY_WIDGET = "/widget/todo/entry"
 
 // module_store 邮票中心页
 const val STORE_ENTRY = "/store/entry"

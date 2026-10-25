@@ -138,7 +138,8 @@ class ScheduleFact: NSObject {
 extension ScheduleFact {
     
     var currentPage: Int {
-        let pageShows = CGFloat(collectionView.ry_layout?.pageShows ?? 1)
+        let layout = collectionView.collectionViewLayout as? ScheduleCollectionViewLayout
+        let pageShows = CGFloat(layout?.pageShows ?? 1)
         let rawPage = Int(collectionView.contentOffset.x / collectionView.bounds.width / pageShows + 0.5)
         let maxPage = max(collectionView.numberOfSections - 1, 0)
         return min(max(rawPage, 0), maxPage)

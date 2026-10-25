@@ -7,8 +7,6 @@
 //显示某课详情的弹窗view
 
 #import "ClassDetailView.h"
-#import "ClassDetailModel.h"
-#import "CQUPTMapViewController.h"
 
 @interface ClassDetailView()
 
@@ -247,19 +245,9 @@
 }
 
 //MARK:-点击某按钮后调用的方法
-/// 点击课程详情旁的右箭头按钮后调用，弹出一个地图控制器
+/// 点击课程详情旁的右箭头按钮后调用，旧 iOS 课表已迁移到 CMP，这里先禁用地图跳转。
 - (void)rightArrowBtnClicked {
-    [ClassDetailModel requestPlaceIDWithPlaceName:self.classroomNameLabel.text success:^(NSDictionary * _Nonnull responseObject) {
-        CQUPTMapViewController *mapVC = [[CQUPTMapViewController alloc] initWithInitialPlace:[responseObject[@"data"][@"place_id"] stringValue]];
-        mapVC.isPresent = YES;
-        
-        UINavigationController *naVC = [[UINavigationController alloc] initWithRootViewController:mapVC];
-        naVC.modalPresentationStyle = UIModalPresentationFormSheet;
-        mapVC.modalPresentationStyle = UIModalPresentationFormSheet;
-        
-        //发送通知，让课表控制器present控制器
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"WYCClassBookVCShouldPresentVC" object:naVC];
-    }];
+    return;
 }
 
 //MARK:-其他方法

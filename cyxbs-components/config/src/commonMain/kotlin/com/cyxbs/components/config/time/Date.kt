@@ -1,11 +1,6 @@
 package com.cyxbs.components.config.time
 
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import com.cyxbs.components.init.appCoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -13,7 +8,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -23,8 +17,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 使用 value class 压缩存储日期，可以用来代替 LocalDate
@@ -304,6 +296,11 @@ fun LocalDate.toDate(): Date {
   return Date(year, month.number, day)
 }
 
+/** 转换为 kotlinx-datetime 日期，供时区、协议和平台边界使用。 */
+fun Date.toLocalDate(): LocalDate {
+  return LocalDate(year, monthNumber, dayOfMonth)
+}
+
 object DateSerializer : KSerializer<Date> {
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Date", PrimitiveKind.STRING)
 
@@ -327,27 +324,5 @@ fun DayOfWeek.toChinese(prefix: String = "周"): String {
     DayOfWeek.FRIDAY -> "五"
     DayOfWeek.SATURDAY -> "六"
     DayOfWeek.SUNDAY -> "日"
-  }
-}
-
-var TodayNoEffect: Date = Clock.System.todayIn(TimeZone.currentSystemDefault()).toDate()
-  private set
-
-/**
- * 获取当前时间
- *
- * 注意使用了 mutableStateOf，存在有副作用
- * 若想取消副作用，请使用 [TodayNoEffect]
- */
-val Today by mutableStateOf(TodayNoEffect).apply {
-  appCoroutineScope.launch {
-    while (true) {
-      val now = Clock.System.now()
-        .toLocalDateTime(TimeZone.currentSystemDefault())
-        .time.toMillisecondOfDay().milliseconds
-      delay(1.days - now)
-      value = TodayNoEffect.plusDays(1)
-      TodayNoEffect = value
-    }
   }
 }

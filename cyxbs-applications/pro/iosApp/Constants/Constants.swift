@@ -135,6 +135,6 @@ extension _constants {
     var cleanInNextVersion: Bool { true }
     
     var widgetGroupID: String {
-        "group.com.mredrock.cyxbs.widget"
+        "group.com.mredrock.cyxbs.widget.3m9757c25s"
     }
 }

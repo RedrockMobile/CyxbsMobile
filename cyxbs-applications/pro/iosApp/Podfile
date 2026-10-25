@@ -28,8 +28,6 @@ target 'CyxbsMobile2019_iOS' do
   pod 'TOCropViewController'  # 图片裁剪库
   pod 'Masonry'  # 自动布局库
   pod 'MJRefresh'  # 下拉刷新库
-  pod 'AMapLocation-NO-IDFA'  # 高德地图定位库
-  pod 'AMap3DMap-NO-IDFA'  # 高德地图3D库
   pod 'MJExtension'  # 字典和模型之间的转换库
   pod 'SDCycleScrollView'  # 轮播图库
   pod 'FSCalendar'  # iOS日历库，兼容Objective-C和Swift
@@ -82,7 +80,7 @@ post_install do |installer|
       # inhibit_all_warnings! 的 -w 压不住"默认 error"级诊断；老 pod(如 YYKit)需显式关闭。
       config.build_settings['OTHER_CFLAGS'] = "#{config.build_settings['OTHER_CFLAGS'] || '$(inherited)'} -Wno-parentheses"
 
-      # Apple Silicon 模拟器只有 arm64，而 CocoaPods 为 AMap 等不含 arm64-sim slice 的 pod
+      # Apple Silicon 模拟器只有 arm64，而 CocoaPods 为 Bugly 等不含 arm64-sim slice 的 pod
       # 在聚合 target(Pods-CyxbsMobile2019_iOS)的 xcconfig 里自动写入
       # EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64，导致该 target 啥都不产出，链接失败。
       # 这里强制清除，让聚合 target 能在 arm64 模拟器上正常构建。
@@ -92,7 +90,7 @@ post_install do |installer|
     end
   end
   
-  # AMap / Bugly 官方预编译 fat framework 只有 arm64-device + x86_64-simulator，
+  # Bugly 官方预编译 fat framework 只有 arm64-device + x86_64-simulator，
   # 没有 arm64-simulator slice，在 Apple Silicon 模拟器上链接报 "built for iOS" 错误。
   #
   # 方案：解包 arm64-device 静态库 → vtool 改平台标记 → 重打包为 arm64-sim → 替换。
@@ -101,10 +99,7 @@ post_install do |installer|
   require 'tmpdir'
   restore_mode = !IS_SIMULATOR
   [
-    ['AMapFoundation-NO-IDFA', 'AMapFoundationKit'],
-    ['AMap3DMap-NO-IDFA',      'MAMapKit'],
-    ['AMapLocation-NO-IDFA',   'AMapLocationKit'],
-    ['Bugly',                  'Bugly'],
+    ['Bugly', 'Bugly'],
   ].each do |pod_dir, fw_name|
     fw_bin = File.join(installer.sandbox.root, pod_dir, "#{fw_name}.framework", fw_name)
     next unless File.exist?(fw_bin)

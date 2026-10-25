@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="@color/todo_inner_add_thing_nf_tv_click_color" android:state_checked="true" />
-    <item android:color="@color/todo_inner_add_thing_nf_tv_unclick_color" android:state_checked="false" />
-</selector>

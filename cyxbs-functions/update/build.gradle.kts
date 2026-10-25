@@ -6,6 +6,7 @@ plugins {
 useNetwork() // 网络请求
 useKtProvider() // api 模块服务提供
 useNavigation() // navigation 跳转
+useUnitTest()
 
 kotlin {
   sourceSets {
@@ -18,4 +19,3 @@ kotlin {
     }
   }
 }
-

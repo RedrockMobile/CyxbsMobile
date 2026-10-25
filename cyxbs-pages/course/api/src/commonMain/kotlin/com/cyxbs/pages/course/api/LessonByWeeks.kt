@@ -25,10 +25,11 @@ data class LessonByWeeks(
   val beginTime: MinuteTime = CourseUtils.getStartMinuteTime(beginLesson)
   val finalTime: MinuteTime = CourseUtils.getEndMinuteTime(beginLesson + period - 1)
 
-  // 简化课表名称，比如：B411/B412
+  /** 简化教室名称（如 B411/B412）；长度不超过 7 的名称保持原样。 */
   val classroomSimplify: String by lazy {
     if (classroom.length <= 7) classroom else {
-      Regex("[^[a-zA-Z0-9]]*([a-zA-Z0-9|/]{3,})").findAll(classroom)
+      // 使用普通否定字符类，避免嵌套字符类在 Kotlin/Native 上吞掉编号，仅留下末尾三位。
+      Regex("[^a-zA-Z0-9]*([a-zA-Z0-9|/]{3,})").findAll(classroom)
         .mapNotNull {
           it.groups[1]?.value
         }.joinToString("/")

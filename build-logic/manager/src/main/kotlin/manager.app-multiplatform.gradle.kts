@@ -42,13 +42,28 @@ if (Multiplatform.enableWeb(project)) {
 }
 
 if (Multiplatform.enableDesktop(project)) {
+  // JCEF 原生窗口访问 AWT peer；JBR 21 需要显式导出这些内部包。
+  val jcefJvmArgs = buildList {
+    add("--add-exports=java.desktop/sun.awt=ALL-UNNAMED")
+    if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
+      add("--add-exports=java.desktop/sun.lwawt=ALL-UNNAMED")
+      add("--add-exports=java.desktop/sun.lwawt.macosx=ALL-UNNAMED")
+    }
+  }
+  // Hot Reload 的 JavaExec 任务不继承 compose.desktop.application 的启动参数。
+  tasks.withType<JavaExec>().matching {
+    it.name.startsWith("hotRun") || it.name.startsWith("hotDevRun")
+  }.configureEach {
+    jvmArgs(jcefJvmArgs)
+  }
   compose.desktop {
     application {
       mainClass = "CyxbsDesktopAppKt"
+      jvmArgs += jcefJvmArgs
       nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
         packageName = Config.getApplicationId(project)
-        packageVersion = Config.composeDesktopVersion
+        packageVersion = Config.composeDesktopVersion(project)
       }
       buildTypes {
         release {

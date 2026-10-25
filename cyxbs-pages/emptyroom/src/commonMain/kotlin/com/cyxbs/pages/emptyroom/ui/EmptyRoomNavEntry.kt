@@ -15,12 +15,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -208,8 +205,6 @@ private fun EmptyRoomPage(argument: EmptyRoomNavArgument) {
                 color = LocalAppColors.current.topBg,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             ) {
-                val navBarHeight =
-                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 Box(
                     modifier = Modifier.padding(top = 20.dp, bottom = 105.dp)
                         .navigationBarsPadding()

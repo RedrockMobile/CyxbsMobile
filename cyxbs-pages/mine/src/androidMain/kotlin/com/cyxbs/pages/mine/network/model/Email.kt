@@ -1,13 +1,12 @@
 package com.cyxbs.pages.mine.network.model
 
-import com.google.gson.annotations.SerializedName
-import java.io.Serializable
+import kotlinx.serialization.Serializable
 
 /**
  * Author: RayleighZ
  * Time: 2020-11-30 21:29
  */
+@Serializable
 data class Email(
-        @SerializedName("email")
-        val email: String
-) : Serializable
+        val email: String,
+)

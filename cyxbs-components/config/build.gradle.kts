@@ -1,6 +1,7 @@
 plugins {
   id("manager.lib")
   id("kmp.compose")
+  alias(libs.plugins.buildconfig)
 }
 
 useKtProvider() // api 模块服务提供
@@ -21,8 +22,20 @@ kotlin {
       implementation(libs.dialog) // 因为要设置 MaterialDialog 主题所以依赖
       implementation(libs.rxjava)
     }
+    noWebMain.dependencies {
+      implementation(libs.filekit.core)
+      implementation(libs.okio)
+    }
   }
 }
 
-
-
+if (Multiplatform.enableIOS(project)) {
+  buildConfig {
+    packageName("com.cyxbs.components.config")
+    useKotlinOutput()
+    sourceSets.named("iosMain") {
+      // 仅从主 App 的 entitlement 生成，不读取小组件扩展的配置。
+      buildConfigField("APP_GROUP_ID", IosAppGroup.mainAppId(project))
+    }
+  }
+}

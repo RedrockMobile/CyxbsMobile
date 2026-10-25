@@ -2,11 +2,13 @@ package com.cyxbs.components.view.calendar
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.LocalContentColor
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,13 +66,15 @@ import kotlinx.coroutines.launch
 fun CalendarCompose(
   modifier: Modifier = Modifier,
   state: CalendarState = rememberCalendarState(),
+  /** 返回 true 时在对应日期格底部绘制圆点；调用方负责提供自己的业务日期集合。 */
+  dateHasIndicator: (Date) -> Boolean = { false },
   calendar: @Composable ColumnScope.() -> Unit = {
     Row {
       state.MonthTextCompose(modifier = Modifier.width(36.dp))
       Column(modifier = Modifier.weight(1F)) {
         state.WeekTextCompose()
         state.CalendarMonthCompose { date, show ->
-          state.CalendarDateCompose(date, show)
+          state.CalendarDateCompose(date, show, hasIndicator = dateHasIndicator(date))
         }
       }
     }
@@ -183,8 +190,21 @@ fun CalendarState.CalendarDateCompose(
   dayFontSize: TextUnit = 19.sp,
   lunarFontSize: TextUnit = 9.sp,
   maxCellHeight: Dp = 56.dp,
+  /** 是否在日期内容下方显示事件提示圆点。 */
+  hasIndicator: Boolean = false,
 ) {
   val today = today.invoke()
+  val contentColor = LocalContentColor.current
+  // 普通选中态使用中性内容色；今天单独使用强调色，避免深色模式下两个状态混成同一灰度。
+  val selectedBackgroundColor = contentColor.copy(alpha = 0.12F)
+  val todayAccentColor = if (MaterialTheme.colors.isLight) {
+    Color(0xFF1C71FF)
+  } else {
+    MaterialTheme.colors.secondary
+  }
+  val todayBackgroundColor = todayAccentColor.copy(
+    alpha = if (MaterialTheme.colors.isLight) 0.14F else 0.28F,
+  )
   Layout(
     modifier = Modifier.graphicsLayer {
       alpha = if (date !in startDateState.value..endDateState.value) 0.3F else {
@@ -197,9 +217,9 @@ fun CalendarState.CalendarDateCompose(
     }.drawBehind {
       // 画正圆高亮：直径取格子较小边，避免格子被压扁(宽>高)时 CircleShape 变成椭圆。
       val bg = when {
-        date == today && show == CalendarDateShowValue.Clicked -> Color(0xFF1C71FF)
-        show == CalendarDateShowValue.Clicked -> Color.LightGray
-        date == today -> Color.White
+        date == today && show == CalendarDateShowValue.Clicked -> todayAccentColor
+        show == CalendarDateShowValue.Clicked -> selectedBackgroundColor
+        date == today -> todayBackgroundColor
         else -> Color.Transparent
       }
       if (bg != Color.Transparent) {
@@ -211,9 +231,21 @@ fun CalendarState.CalendarDateCompose(
       }
     },
     content = {
-      CalendarDateDayCompose(date, today, show, dayFontSize)
+      CalendarDateDayCompose(date, today, show, dayFontSize, todayAccentColor)
       CalendarDateLunarCompose(date, today, show, lunarFontSize)
       CalendarDateRestCompose(date, today, show)
+      if (hasIndicator) {
+        Spacer(
+          modifier = Modifier.background(
+            color = if (date == today && show == CalendarDateShowValue.Clicked) {
+              Color.White.copy(alpha = 0.9F)
+            } else {
+              contentColor.copy(alpha = 0.42F)
+            },
+            shape = CircleShape,
+          ),
+        )
+      }
     },
     measurePolicy = remember(maxCellHeight) {
       { measurables, constraints ->
@@ -223,6 +255,8 @@ fun CalendarState.CalendarDateCompose(
         val dayPlaceable = measurables[0].measure(newConstraints)
         val lunarPlaceable = measurables[1].measure(newConstraints)
         val restPlaceable = measurables[2].measure(newConstraints)
+        val indicatorPlaceable = measurables.getOrNull(3)
+          ?.measure(Constraints.fixed(2.dp.roundToPx(), 2.dp.roundToPx()))
         layout(width, height) {
           val dayTop = (height - dayPlaceable.height - lunarPlaceable.height) / 2
           dayPlaceable.placeRelative(
@@ -237,6 +271,10 @@ fun CalendarState.CalendarDateCompose(
             x = (width + dayPlaceable.measuredWidth) / 2 - 2.dp.roundToPx(),
             y = dayTop - 2.dp.roundToPx(),
           )
+          indicatorPlaceable?.place(
+            x = (width - indicatorPlaceable.measuredWidth) / 2,
+            y = dayTop + dayPlaceable.height + lunarPlaceable.height,
+          )
         }
       }
     }
@@ -249,14 +287,16 @@ private fun CalendarDateDayCompose(
   today: Date,
   show: CalendarDateShowValue,
   fontSize: TextUnit = 19.sp,
+  todayAccentColor: Color,
 ) {
+  val contentColor = LocalContentColor.current
   Text(
     modifier = Modifier,
     text = date.dayOfMonth.toString(),
     color = when {
       date == today && show == CalendarDateShowValue.Clicked -> Color.White
-      date == today -> Color(0xFF1C71FF)
-      else -> Color.Black
+      date == today -> todayAccentColor
+      else -> contentColor
     },
     fontSize = fontSize,
     fontWeight = FontWeight.Bold,
@@ -270,6 +310,7 @@ private fun CalendarDateLunarCompose(
   show: CalendarDateShowValue,
   fontSize: TextUnit = 9.sp,
 ) {
+  val contentColor = LocalContentColor.current
   val specialDay = remember(date) { Festival.get(date) ?: SolarTerms.get(date)?.chinese }
   Text(
     modifier = Modifier,
@@ -279,7 +320,7 @@ private fun CalendarDateLunarCompose(
     color = when {
       date == today && show == CalendarDateShowValue.Clicked -> Color.White
       specialDay != null -> Color(0xFF1C71FF)
-      else -> Color.Gray
+      else -> contentColor.copy(alpha = 0.55F)
     },
     fontSize = fontSize,
   )

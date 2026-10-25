@@ -14,6 +14,11 @@ import java.util.Scanner
  */
 class NewVersionInfoCheckStep(val project: Project, val netService: TaskService) {
 
+  private val versionName: String get() = Config.versionName(project)
+  private val versionCode: Int get() = Config.versionCode(project)
+  private val updateContent: String get() = Config.updateContent(project)
+
+  /** 校验 [apk] 与线上版本的连续性；用户取消时返回 false。 */
   fun execute(apk: File): Boolean {
     println("\n======================== 发版信息检查 ========================".purple())
     if (!apk.exists()) {
@@ -30,19 +35,19 @@ class NewVersionInfoCheckStep(val project: Project, val netService: TaskService)
     println("线上 updateContent: ")
     println(lastVersion.updateContent.blue())
     println()
-    println("versionName: " + lastVersion.versionName.blue() + "  ->  " + Config.versionName.yellow())
-    println("versionCode: " + lastVersion.versionCode.toString().blue() + "  ->  " + Config.versionCode.toString().yellow())
+    println("versionName: " + lastVersion.versionName.blue() + "  ->  " + versionName.yellow())
+    println("versionCode: " + lastVersion.versionCode.toString().blue() + "  ->  " + versionCode.toString().yellow())
     println("updateContent: ")
-    println(Config.updateContent.yellow())
+    println(updateContent.yellow())
     return checkVersion(lastVersion)
   }
 
   private fun checkVersion(lastVersion: ReleaseData): Boolean {
     //忘记改updateContent和versionName的情况
-    if (lastVersion.versionCode > Config.versionCode) {
+    if (lastVersion.versionCode > versionCode) {
       throw IllegalArgumentException("没改版本号 versionCode，线上为 " + lastVersion.versionCode.toString().blue()
-          + ", 即将发布的新版为 " + Config.versionCode.toString().yellow())
-    } else if (lastVersion.versionCode == Config.versionCode) {
+          + ", 即将发布的新版为 " + versionCode.toString().yellow())
+    } else if (lastVersion.versionCode == versionCode) {
       if (project.findProperty("force") == "TRUE") {
         val sc = Scanner(System.`in`)
         println("\n是否确定 强制 发布相同版本以覆盖线上（更推荐发布新版来解决）? (y/n)".red())
@@ -56,18 +61,18 @@ class NewVersionInfoCheckStep(val project: Project, val netService: TaskService)
         throw IllegalArgumentException("当前版本已发布，如果是因为发布错误或者需要重新覆盖安装包，" +
             "请在终端中手动执行: ./gradlew cyxbs-application:pro:cyxbsRelease -P force=\"TRUE\"")
       }
-    } else if (lastVersion.versionCode + 1 != Config.versionCode) {
+    } else if (lastVersion.versionCode + 1 != versionCode) {
       throw IllegalArgumentException("versionCode 存在跳跃，线上为 " + lastVersion.versionCode.toString().blue()
-          + ", 即将发布的新版为 " + Config.versionCode.toString().yellow())
+          + ", 即将发布的新版为 " + versionCode.toString().yellow())
     } else {
-      if (lastVersion.versionName == Config.versionName) {
+      if (lastVersion.versionName == versionName) {
         throw IllegalArgumentException("改了 versionCode 却没改 versionName, 线上为 " + lastVersion.versionName.blue()
-            + ", 即将发布的新版为 " + Config.versionName.yellow())
-      } else if (lastVersion.updateContent == Config.updateContent) {
-        throw IllegalArgumentException("没改更新的文案，请更改 Config#updateContent")
+            + ", 即将发布的新版为 " + versionName.yellow())
+      } else if (lastVersion.updateContent == updateContent) {
+        throw IllegalArgumentException("没改更新的文案，请更改 build-logic/release-notes.txt")
       } else if (!lastVersion.versionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
         throw IllegalArgumentException("versionName 不符合规则，只能为 x.y.z")
-      } else if (compareVersion(lastVersion.versionName, Config.versionName) >= 0) {
+      } else if (compareVersion(lastVersion.versionName, versionName) >= 0) {
         throw IllegalArgumentException("versionName 版本号低于或等于线上版本号")
       } else {
         val sc = Scanner(System.`in`)

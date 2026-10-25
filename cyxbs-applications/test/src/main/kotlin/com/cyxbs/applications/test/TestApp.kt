@@ -2,6 +2,8 @@ package com.cyxbs.applications.test
 
 import com.cyxbs.components.base.BaseApp
 import com.cyxbs.components.config.ConfigApplicationInfo
+import com.cyxbs.components.init.appHandler
+import com.cyxbs.components.navigation.AppScheme
 import com.g985892345.provider.api.annotation.ImplProvider
 import com.g985892345.provider.cyxbsmobile.cyxbsapplications.test.TestKtProviderInitializer
 

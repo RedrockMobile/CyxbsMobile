@@ -3,6 +3,7 @@ package com.cyxbs.components.utils.extensions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -14,11 +15,11 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 /**
- * @Desc : 使用Coil实现网络图片加载
- * @Author : zzx
- * @Date : 2025/11/30 21:27
+ * 使用 Coil 加载跨平台网络图片。
+ *
+ * [block] 用于配置缓存键、尺寸等高级 [ImageRequest] 参数；[colorFilter] 仅在绘制阶段生效，
+ * 不会污染原始图片缓存。
  */
-
 @Composable
 fun ImageFromUrlCompose(
   url: String,
@@ -27,6 +28,7 @@ fun ImageFromUrlCompose(
   placeholder: DrawableResource = ConfigRes.configIcPlaceHolder(),
   error: DrawableResource = ConfigRes.configIcPlaceHolder(),
   contentScale: ContentScale = ContentScale.Crop,
+  colorFilter: ColorFilter? = null,
   block: (ImageRequest.Builder.() -> Unit)? = null
 ) {
   ImageFromUrlCompose(
@@ -36,6 +38,7 @@ fun ImageFromUrlCompose(
     modifier = modifier,
     contentDescription = contentDescription,
     contentScale = contentScale,
+    colorFilter = colorFilter,
     block = block,
   )
 }
@@ -52,6 +55,7 @@ fun ImageFromUrlCompose(
   modifier: Modifier = Modifier,
   contentDescription: String? = null,
   contentScale: ContentScale = ContentScale.Crop,
+  colorFilter: ColorFilter? = null,
   block: (ImageRequest.Builder.() -> Unit)? = null
 ) {
   val realUrl = remember(url) {
@@ -69,7 +73,8 @@ fun ImageFromUrlCompose(
     contentDescription = contentDescription,
     placeholder = placeholder,
     error = error,
-    contentScale = contentScale
+    contentScale = contentScale,
+    colorFilter = colorFilter,
   )
 }
 

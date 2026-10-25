@@ -18,20 +18,51 @@ class LoginDialogState {
 
   val showParamsState = mutableStateOf<Params?>(null)
 
-  fun doIfLogin(
+  fun isLogin(): Boolean {
+    return IAccountService::class.impl().isLogin()
+  }
+
+  fun showDialog(function: String = "此功能", onDismissRequest: (() -> Unit)? = null) {
+    showParamsState.value = Params(
+      function = function,
+      onDismissRequest = onDismissRequest,
+    )
+  }
+
+  inline fun doIfLogin(
     function: String = "此功能",
-    onDismissRequest: (() -> Unit)? = null,
-    next: (() -> Unit)? = null
-  ): Boolean {
-    return if (IAccountService::class.impl().isLogin()) {
-      next?.invoke()
-      true
+    noinline onDismissRequest: (() -> Unit)? = null,
+    next: () -> Unit = {}
+  ): LoginDialogState {
+    if (isLogin()) {
+      next.invoke()
     } else {
-      showParamsState.value = Params(
-        function = function,
-        onDismissRequest = onDismissRequest,
-      )
-      false
+      showDialog(function, onDismissRequest)
+    }
+    return this
+  }
+
+  /**
+   * 链式调用:
+   * ```
+   * val loginDialog = rememberLoginDialogState()
+   * loginDaiglog.doIfLoginNotShowDialog {
+   *     Text("...")
+   * }.doIfNotLogin {
+   *     Button("...", onClick = { showDialog() })
+   * }
+   * ```
+   */
+  inline fun doIfLoginNotShowDialog(action: LoginDialogState.() -> Unit = {}): LoginDialogState {
+    if (isLogin()) {
+      action.invoke(this)
+    }
+    return this
+  }
+
+  inline fun doIfNotLogin(action: LoginDialogState.() -> Unit) {
+    if (!isLogin()) {
+      action.invoke(this)
     }
   }
 

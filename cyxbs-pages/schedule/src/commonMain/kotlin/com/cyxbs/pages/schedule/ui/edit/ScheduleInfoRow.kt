@@ -1,8 +1,11 @@
 package com.cyxbs.pages.schedule.ui.edit
 
 import com.cyxbs.components.config.time.Date
-import com.cyxbs.pages.schedule.recurrence.Freq
-import com.cyxbs.pages.schedule.recurrence.Recurrence
+import com.cyxbs.components.config.time.TodayNoEffect
+import com.cyxbs.pages.course.api.CourseUtils
+import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
+import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 
 /**
  * 查看/编辑弹窗「信息行」（日期·第N周·周几·时间段·重复·提醒 同一行展示）的纯文案格式化函数。
@@ -11,15 +14,12 @@ import com.cyxbs.pages.schedule.recurrence.Recurrence
  * 文案缩写规则见各函数；不适用的段返回 null，由 UI 跳过不显示。
  */
 
-/** 一学期最多按 25 周算；超出即视作「不在当前学期」，只显示日期、不显示第N周。 */
-const val MAX_WEEK_OF_TERM = 25
-
 /**
  * 由开学第一天（周一）推导 [date] 的学期周数；不在学期内（开学前 / 超过 [maxWeek] / 未知开学日）返回 null。
  *
  * 与 [com.cyxbs.components.config.time.SchoolCalendar.getWeekOfTerm] 同口径：第1周从开学第一天起。
  */
-fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = MAX_WEEK_OF_TERM): Int? {
+fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = 25): Int? {
   if (firstMonday == null) return null
   val diff = firstMonday.daysUntil(date)
   if (diff < 0) return null
@@ -27,8 +27,13 @@ fun weekOfTerm(firstMonday: Date?, date: Date, maxWeek: Int = MAX_WEEK_OF_TERM):
   return if (week in 1..maxWeek) week else null
 }
 
-/** 日期：`6月28日`。 */
-fun formatInfoDate(date: Date): String = "${date.monthNumber}月${date.dayOfMonth}日"
+/** 日期：今年显示 `7月4日`，非今年显示年份后两位，如 `25年7月4日`。 */
+fun formatInfoDate(date: Date, today: Date = TodayNoEffect): String = buildString {
+  if (date.year != today.year) {
+    append((date.year % 100).toString().padStart(2, '0')).append('年')
+  }
+  append(date.monthNumber).append('月').append(date.dayOfMonth).append('日')
+}
 
 /** 第N周：在学期内返回「第13周」，否则 null（不显示）。 */
 fun formatWeekOfTerm(firstMonday: Date?, date: Date): String? =
@@ -52,7 +57,7 @@ fun formatClock(minuteOfDay: Int): String {
  */
 fun formatTimeRange(startMin: Int?, endMin: Int?): String? = when {
   startMin != null && endMin != null -> "${formatClock(startMin)}-${formatClock(endMin)}"
-  startMin != null -> "截止${formatClock(startMin)}"
+  startMin != null -> formatClock(startMin)
   endMin != null -> "截止${formatClock(endMin)}"
   else -> null
 }
@@ -64,7 +69,7 @@ fun formatRemindAhead(remindMinutes: Int): String? = when {
   remindMinutes < 0 -> null
   remindMinutes == 0 -> "准时"
   remindMinutes % 60 == 0 -> "提前${remindMinutes / 60}小时"
-  else -> "提前${remindMinutes}分种"
+  else -> "提前${remindMinutes}分钟"
 }
 
 /** 提前提醒选项的菜单文案（含「不提醒」）。 */
@@ -74,12 +79,25 @@ fun remindOptionLabel(remindMinutes: Int): String =
 /**
  * 信息行里的重复摘要（紧凑版）：
  * - 每周单日、间隔1：`每周一`（比 [buildRecurrenceLabels] 的「每周 周一」更短）；
- * - 其余沿用 [buildRecurrenceLabels] 的首段；不重复返回 null。
+ * - 按次数结束：在规则后追加 `共N次`；按日期结束：追加格式化后的截止日期；
+ * - 永不结束不追加文案，避免信息栏过长；不重复返回 null。
  */
-fun recurrenceRowLabel(recurrence: Recurrence?): String? {
-  val r = recurrence?.rrule ?: return null
-  if (r.freq == Freq.WEEKLY && r.interval == 1 && r.byDay.size == 1) {
-    return "每周${weekNumberToChinese(r.byDay.first())}"
+fun recurrenceRowLabel(
+  recurrence: RecurrenceRule?,
+  today: Date = TodayNoEffect,
+): String? {
+  val r = recurrence ?: return null
+  val ruleLabel = if (
+    r.frequency == RecurrenceFrequency.WEEKLY && r.interval == 1 && r.byWeekDays.size == 1
+  ) {
+    "每周${weekNumberToChinese(r.byWeekDays.first().isoNumber)}"
+  } else {
+    buildRecurrenceLabels(recurrence).first()
   }
-  return buildRecurrenceLabels(recurrence).firstOrNull()
+  val endLabel = when (val end = r.end) {
+    RecurrenceEnd.Never -> null
+    is RecurrenceEnd.Count -> "共${end.value}次"
+    is RecurrenceEnd.Until -> "至${formatInfoDate(end.date, today)}"
+  }
+  return if (endLabel == null) ruleLabel else "$ruleLabel · $endLabel"
 }

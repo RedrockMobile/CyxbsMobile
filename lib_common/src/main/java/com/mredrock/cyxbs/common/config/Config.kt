@@ -40,10 +40,8 @@ const val ICP_WEBSITE = "https://beian.miit.gov.cn/"
 
 const val ABOUT_US_WEBSITE = "https://redrock.team"
 
-//小控件课表及事务
-const val WIDGET_COURSE = "course_widget"
+//小控件事务
 const val WIDGET_AFFAIR = "course_affair"
-const val SP_WIDGET_NEED_FRESH = "sharepreference_widget_need_fresh"
 
 //课表辨别是查同学课表的key
 const val OTHERS_STU_NUM = "others_stu_num"

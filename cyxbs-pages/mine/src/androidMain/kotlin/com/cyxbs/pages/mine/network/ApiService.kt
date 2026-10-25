@@ -4,14 +4,15 @@ import com.cyxbs.components.utils.network.ApiStatus
 import com.cyxbs.components.utils.network.ApiWrapper
 import com.cyxbs.components.utils.network.IApi
 import com.cyxbs.pages.mine.network.model.BindingResponse
+import com.cyxbs.pages.mine.network.model.BindingCheckResponse
+import com.cyxbs.pages.mine.network.model.DefaultPasswordCheckResponse
+import com.cyxbs.pages.mine.network.model.PasswordOperationResponse
 import com.cyxbs.pages.mine.network.model.ConfirmCode
 import com.cyxbs.pages.mine.network.model.ConfirmQuestion
 import com.cyxbs.pages.mine.network.model.Email
 import com.cyxbs.pages.mine.network.model.EmailCode
 import com.cyxbs.pages.mine.network.model.IdsGetCode
-import com.cyxbs.pages.mine.network.model.ScoreStatus
 import com.cyxbs.pages.mine.network.model.SecurityQuestion
-import com.mredrock.cyxbs.common.bean.RedrockApiStatus
 import com.mredrock.cyxbs.common.bean.RedrockApiWrapper
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.core.Single
@@ -26,17 +27,6 @@ import retrofit2.http.POST
  * Created by zia on 2018/8/15.
  */
 interface ApiService:IApi {
-
-    /**
-     * 签到部分
-     */
-    @POST("/magipoke-intergral/QA/Integral/checkIn")
-    fun checkIn(): Observable<RedrockApiStatus>
-
-    //获取积分
-    @POST("/magipoke-intergral/QA/User/getScoreStatus")
-    fun getScoreStatus(): Observable<RedrockApiWrapper<ScoreStatus>>
-
 
     /**
      * 说明：修改密码模块的接口存在两种情况
@@ -55,7 +45,7 @@ interface ApiService:IApi {
     fun resetPassword(
         @Field("origin_password") origin_password: String,
         @Field("new_password") new_password: String
-    ): Observable<RedrockApiStatus>
+    ): Observable<PasswordOperationResponse>
 
     /**
      * 修改密码
@@ -67,7 +57,7 @@ interface ApiService:IApi {
         @Field("stu_num") stu_num: String,
         @Field("new_password") new_password: String,
         @Field("code") code: Int
-    ): Observable<RedrockApiStatus>
+    ): Observable<PasswordOperationResponse>
 
     /**
      * 设置密保问题答案
@@ -78,13 +68,13 @@ interface ApiService:IApi {
     fun setSecurityQuestionAnswer(
         @Field("id") id: Int, //问题的id
         @Field("content") content: String
-    ): Observable<RedrockApiStatus>//答案的主体内容
+    ): Observable<PasswordOperationResponse>//答案的主体内容
 
     /**
      * 获取所有的密保问题
      */
     @GET("/user-secret/user/question")
-    fun getAllSecurityQuestions(): Observable<RedrockApiWrapper<List<SecurityQuestion>>>
+    fun getAllSecurityQuestions(): Observable<ApiWrapper<List<SecurityQuestion>>>
 
     /**
      * 获取Email验证码
@@ -94,7 +84,7 @@ interface ApiService:IApi {
     @POST("/user-secret/user/bind/email/code")
     fun getEmailCode(
         @Field("email") email: String
-    ): Observable<RedrockApiWrapper<EmailCode>>
+    ): Observable<ApiWrapper<EmailCode>>
 
     /**
      * 验证Email验证码
@@ -105,7 +95,7 @@ interface ApiService:IApi {
     fun confirmEmailCode(
         @Field("email") email: String, //问题的id
         @Field("code") code: String
-    ): Observable<RedrockApiStatus>
+    ): Observable<PasswordOperationResponse>
 
     /**
      * 向绑定的邮箱发送找回密码用的验证码
@@ -115,7 +105,7 @@ interface ApiService:IApi {
     @POST("/user-secret/user/valid/email/code")
     fun getEmailFindPasswordCode(
         @Field("stu_num") stu_num: String
-    ): Observable<RedrockApiWrapper<ConfirmCode>>
+    ): Observable<ApiWrapper<ConfirmCode>>
 
     /**
      * 验证邮箱验证码是否正确
@@ -130,7 +120,7 @@ interface ApiService:IApi {
         @Field("stu_num") stu_num: String,
         @Field("email") email: String,
         @Field("code") code: Int
-    ): Observable<RedrockApiWrapper<ConfirmQuestion>>
+    ): Observable<ApiWrapper<ConfirmQuestion>>
 
     /**
      * 获取用户邮箱地址
@@ -141,7 +131,7 @@ interface ApiService:IApi {
     @POST("/user-secret/user/bind/email/detail")
     fun getUserEmail(
         @Field("stu_num") stu_num: String
-    ): Observable<RedrockApiWrapper<Email>>
+    ): Observable<ApiWrapper<Email>>
 
     /**
      * 获取学生的密保问题
@@ -150,7 +140,7 @@ interface ApiService:IApi {
     @POST("/user-secret/user/bind/question/detail")
     fun getUserQuestion(
         @Field("stu_num") stu_num: String
-    ): Observable<RedrockApiWrapper<List<SecurityQuestion>>>
+    ): Observable<ApiWrapper<List<SecurityQuestion>>>
 
     /**
      * 验证密保问题的回答是否正确
@@ -161,7 +151,7 @@ interface ApiService:IApi {
         @Field("stu_num") stu_num: String,
         @Field("question_id") question_id: Int,
         @Field("content") content: String
-    ): Observable<RedrockApiWrapper<ConfirmQuestion>>
+    ): Observable<ApiWrapper<ConfirmQuestion>>
 
     /**
      * 获取通过ids改密所需的验证码 上传参数为json类型
@@ -190,7 +180,7 @@ interface ApiService:IApi {
     @POST("/user-secret/user/judge/password")
     fun originPassWordCheck(
         @Field("password") password: String
-    ): Observable<RedrockApiStatus>
+    ): Observable<PasswordOperationResponse>
 
     /**
      * 检查是否绑定信息
@@ -199,11 +189,18 @@ interface ApiService:IApi {
     @POST("/user-secret/user/bind/is")
     fun checkBinding(@Field("stu_num") stu_num: String): Observable<RedrockApiWrapper<BindingResponse>>
 
+    @FormUrlEncoded
+    @POST("/user-secret/user/bind/is")
+    suspend fun checkBindingDirect(
+        @Field("stu_num") stuNum: String
+    ): BindingCheckResponse
+
     /**
      * 检查是否为默认密码
      */
     @FormUrlEncoded
     @POST("/user-secret/user/judge/origin")
-    fun checkDefaultPassword(@Field("stu_num") stu_num: String): Observable<RedrockApiStatus>
+    suspend fun checkDefaultPasswordDirect(
+        @Field("stu_num") stuNum: String
+    ): DefaultPasswordCheckResponse
 }
-

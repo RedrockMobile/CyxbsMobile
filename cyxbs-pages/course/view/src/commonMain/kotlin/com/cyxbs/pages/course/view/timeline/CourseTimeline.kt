@@ -95,9 +95,19 @@ data class CourseTimeline(
   val totalShowWeight: Float
     get() = linkNodeList.last().totalShowWeightState.value
 
+  /**
+   * 将 [time] 换算为当前时间轴展开状态下的累计权重。
+   *
+   * 时间位于时间轴首尾之外时固定到对应边界，避免自定义时间轴未覆盖完整一天时，
+   * 二分查找的插入位置落到 [linkNodeList] 尾部之外。
+   */
   fun calculateWeight(
     time: MinuteTime
   ): Float {
+    val first = linkNodeList.first()
+    val last = linkNodeList.last()
+    if (time <= first.startTime) return 0F
+    if (time >= last.endTime) return totalShowWeight
     val index = linkNodeList.binarySearchBy(time) { it.endTime }
     val weight = if (index >= 0) {
       linkNodeList[index].totalShowWeightState.value
@@ -118,6 +128,29 @@ data class CourseTimeline(
     time: MinuteTime
   ): Float {
     return calculateWeight(time) / totalShowWeight
+  }
+
+  /**
+   * 以固定 [CourseTimelineData.initialWeight] 计算时间轴比例。
+   *
+   * 该方法专用于 Widget 等外部稳定快照，避免用户展开早晨/中午/夜间导致 `nowWeight` 瞬时变化并被错误持久化。
+   */
+  fun calculateInitialWeightRatio(time: MinuteTime): Float {
+    val first = linkNodeList.first()
+    val last = linkNodeList.last()
+    if (time <= first.startTime) return 0F
+    if (time >= last.endTime) return 1F
+    val index = linkNodeList.binarySearchBy(time) { it.endTime }
+    val weight = if (index >= 0) {
+      linkNodeList[index].totalInitialWeight
+    } else {
+      val start = linkNodeList.getOrNull(-index - 2)
+      val end = linkNodeList[-index - 1]
+      (start?.totalInitialWeight ?: 0F) +
+        end.startTime.minutesUntil(time) /
+          end.startTime.minutesUntil(end.endTime).toFloat() * end.value.initialWeight
+    }
+    return weight / totalInitialWeight
   }
 
   /**
@@ -142,11 +175,15 @@ data class CourseTimeline(
   }
 
   /**
-   * 计算 [height] 在时间轴上的 [MinuteTime]
-   * @param height 相对于
+   * 根据相对于课表内容顶部的 [height] 反算对应的 [MinuteTime]。
+   *
+   * 长按拖动期间指针允许短暂移出课表边界，因此越过顶部或底部时分别固定为时间轴首尾时间；
+   * 区间内继续按当前展开权重插值，调用方无需预先裁剪触摸坐标。
    */
   fun calculateMinuteTime(coursePage: LocalCoursePageContext, height: Float): MinuteTime {
-    val totalHeight = coursePage.layoutCoordinates.size.height
+    val totalHeight = coursePage.layoutCoordinates.size.height.toFloat()
+    if (height <= 0F) return linkNodeList.first().startTime
+    if (height >= totalHeight) return linkNodeList.last().endTime
     val index = linkNodeList.binarySearchBy(height.roundToInt()) {
       (it.totalShowWeightState.value / totalShowWeight * totalHeight).roundToInt()
     }
@@ -157,7 +194,8 @@ data class CourseTimeline(
       val end = linkNodeList[-index - 1]
       val startHeight = (start?.totalShowWeightState?.value ?: 0F) / totalShowWeight * totalHeight
       val endHeight = end.totalShowWeightState.value / totalShowWeight * totalHeight
-      val diffMinute = ((height - startHeight) / (endHeight - startHeight) * end.startTime.minutesUntil(end.endTime)).roundToInt()
+      val diffMinute = ((height - startHeight) / (endHeight - startHeight) *
+          end.startTime.minutesUntil(end.endTime)).roundToInt()
       end.startTime.plusMinutes(diffMinute)
     }
   }
@@ -231,4 +269,3 @@ private fun Modifier.drawNowTimeLine(
     )
   }
 }
-

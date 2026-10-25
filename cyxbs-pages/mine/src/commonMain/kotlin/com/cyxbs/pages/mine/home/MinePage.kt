@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,6 +38,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.service.implOrNull
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.ImageAvatarCompose
@@ -44,6 +47,7 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.mine.about.ui.AboutNavArgument
 import com.cyxbs.pages.mine.edit.EditInfoNavArgument
 import com.cyxbs.pages.mine.home.viewmodel.MineComposeViewModel
+import com.cyxbs.pages.mine.setting.SettingNavArgument
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_activity_center
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
@@ -105,8 +109,8 @@ fun MinePage() {
         isChecked = viewModel.isChecked.value,
       )
 
-      SettingItem(text = "关于我们", topPadding = 32.dp)
-      SettingItem(text = "设置", topPadding = 32.dp)
+      SettingItem(text = "关于我们", topPadding = 32.dp) { AboutNavArgument.navigate() }
+      SettingItem(text = "设置", topPadding = 32.dp) { SettingNavArgument.navigate() }
 
       // 空出课表头的 70dp 以便能完全展示页面
     }
@@ -174,7 +178,7 @@ private fun InfoHeader(
         text = introduction ?: "快来红岩网校和我一起玩吧~",
         color = IntroduceColor,
         fontSize = 18.sp,
-        modifier = Modifier.padding(start = 50.dp, top = 30.dp),
+        modifier = Modifier.padding(horizontal = 50.dp, vertical = 30.dp),
       )
     }
   }
@@ -316,7 +320,7 @@ private fun SignArea(
       .background(color = LocalAppColors.current.topBg, shape = shape)
       .clickableNoIndicator {
         loginDialogState.doIfLogin(function = "签到") {
-          platform?.jumpSign() ?: toast("暂不支持跳转")
+          AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
         }
       }
   ) {
@@ -368,20 +372,17 @@ private fun SignButton(
 @Composable
 private fun SettingItem(
   text: String,
-  topPadding: androidx.compose.ui.unit.Dp,
+  topPadding: Dp,
+  onClick: () -> Unit,
 ) {
   val loginDialogState = rememberLoginDialogState()
-  val platform = rememberMinePlatform()
   Box(
     modifier = Modifier
       .fillMaxWidth()
       .padding(top = topPadding)
       .clickableNoIndicator {
         loginDialogState.doIfLogin(function = text) {
-          when (text) {
-            "关于我们" -> AboutNavArgument.navigate()
-            else -> platform?.jumpSetting() ?: toast("暂不支持跳转")
-          }
+          onClick.invoke()
         }
       }
   ) {

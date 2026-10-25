@@ -4,3 +4,11 @@ plugins {
 }
 
 useNavigation() // navigation 跳转
+
+kotlin {
+  sourceSets {
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+    }
+  }
+}

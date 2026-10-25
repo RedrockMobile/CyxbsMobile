@@ -126,10 +126,11 @@ private fun Modifier.pointerInputClearItem(
       } while (!change.changedToUpIgnoreConsumed())
       // 等待 down 手指抬起
       if (
+        !change.isConsumed &&
         change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
         && (change.position - down.position).getDistance() < viewConfiguration.touchSlop
       ) {
-        // 抬起时间较小时取消所有 items
+        // 只有真正点击课表空白处才触发；上层事项消费抬手后不能再生成一小时事务。
         onTap.invoke(change.position, size)
       }
     }

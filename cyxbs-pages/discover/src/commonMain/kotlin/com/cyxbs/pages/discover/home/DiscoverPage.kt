@@ -44,30 +44,34 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cyxbs.components.account.api.IAccountService
+import com.cyxbs.components.base.webview.WebViewNavArgument
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.config.login.rememberLoginDialogState
 import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.service.implOrNull
 import com.cyxbs.components.config.time.SchoolCalendar
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SIGN
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.compose.rememberDerivedStateOfStructure
 import com.cyxbs.components.utils.extensions.ImageFromUrlCompose
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.components.utils.utils.get.Num2CN
+import com.eygraber.uri.Uri
 import com.cyxbs.pages.discover.home.functions.PlatformDiscoverFunctions
 import com.cyxbs.pages.discover.home.viewmodel.DiscoverComposeViewModel
 import com.cyxbs.pages.discover.home.widget.BannerConfig
 import com.cyxbs.pages.discover.home.widget.CheckInImageVector
 import com.cyxbs.pages.discover.home.widget.FunctionIndicator
+import com.cyxbs.pages.discover.home.widget.FunctionsRow
 import com.cyxbs.pages.discover.home.widget.InfiniteBanner
 import com.cyxbs.pages.discover.home.widget.JwNewsFlipper
 import com.cyxbs.pages.discover.home.widget.MsgImageVector
-import com.cyxbs.pages.discover.home.widget.FunctionsRow
-import com.cyxbs.pages.discover.home.widget.rememberCyxbsV6BannerPainter
+import com.cyxbs.pages.discover.home.widget.rememberCyxbsBannerPainter
 import com.cyxbs.pages.electricity.api.IElectricityService
+import com.cyxbs.pages.schedule.api.IScheduleService
 import com.cyxbs.pages.sport.api.ISportService
-import com.cyxbs.pages.todo.api.ITodoService
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_news_jwzx
@@ -77,8 +81,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 
 /* ---------------- 颜色（对齐 discover 模块原 light/dark） ---------------- */
 private val JwLabelBgColor @Composable get() = 0xFFAFD2FB.dark(0xFF5A5A5A) // discover_academic_online_colors_background
@@ -160,7 +164,7 @@ private fun Header() {
           .size(22.5.dp)
           .clickableNoIndicator {
             loginDialogState.doIfLogin(function = "签到") {
-              platform?.jumpCheckIn() ?: toast("暂不支持跳转")
+              AppScheme.jump("${AppScheme.SCHEME}://${NAV_SIGN}")
             }
           },
       )
@@ -186,6 +190,7 @@ private fun greetingText(): String {
       val dayText = if (dow == 7) "日" else Num2CN.number2ChineseNumber(dow)
       "第${Num2CN.number2ChineseNumber(nowWeek)}周 周$dayText"
     }
+
     monthNumber == 8 || monthNumber == 9 -> "欢迎新同学～"
     nowWeek !in 1..21 && isSummerVacationMonth -> "暑假快乐鸭"
     nowWeek !in 1..21 && !isSummerVacationMonth -> "寒假快乐鸭"
@@ -194,6 +199,20 @@ private fun greetingText(): String {
 }
 
 /* ----------------------------- Banner ------------------------------ */
+
+private fun onBannerClick(pictureGotoUrl: String, keyword: String) {
+  val finalUrl = if (pictureGotoUrl.startsWith("http")) {
+    val uri = Uri.parse(pictureGotoUrl)
+    if (uri.getQueryParameter(WebViewNavArgument.DEFAULT_TITLE_QUERY_PARAMETER) == null) {
+      // Banner 关键词作为 WebView 路由的兜底标题。
+      uri.buildUpon()
+        .appendQueryParameter(WebViewNavArgument.DEFAULT_TITLE_QUERY_PARAMETER, keyword)
+        .build()
+        .toString()
+    } else pictureGotoUrl
+  } else pictureGotoUrl
+  AppScheme.jump(finalUrl)
+}
 
 @Composable
 private fun Banner(
@@ -204,7 +223,7 @@ private fun Banner(
   val cornerShape = RoundedCornerShape(8.dp)
   // 纯 Compose 绘制的兜底图：同时作为外层渐隐层，以及内层单张图的 placeholder / error，
   // 替代已废弃的 discover_ic_cyxbsv6.webp。圆角由 Painter 自绘，无需再 clip。
-  val placeholderPainter = rememberCyxbsV6BannerPainter(cornerRadius = 8.dp)
+  val placeholderPainter = rememberCyxbsBannerPainter(cornerRadius = 8.dp)
 
   // 进入页面后从 0 → 1 的整页淡入（对应原 SlideShow alpha 600ms 动画）
   val ssAlpha = remember { Animatable(0F) }
@@ -251,8 +270,8 @@ private fun Banner(
               .fillMaxSize()
               .clip(cornerShape)
               .clickableNoIndicator {
-                platform?.onBannerClick(data.pictureGotoUrl, data.keyword)
-                  ?: toast("暂不支持跳转")
+                platform?.trackBannerClick()
+                onBannerClick(data.pictureGotoUrl, data.keyword)
               },
             contentScale = ContentScale.Crop,
           )
@@ -389,32 +408,41 @@ private fun FunctionsSection(
 private fun FeedSection() {
   val cornerShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
   val containerColor = LocalAppColors.current.middleBg
+  val scheduleService = remember { IScheduleService::class.impl() }
 
   Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(top = 18.dp)
-      .clip(cornerShape)
-      .background(color = containerColor),
+    modifier = Modifier.fillMaxWidth(),
   ) {
-    // 体育打卡
-    ISportService::class.impl().SportFeed(Modifier.fillMaxWidth())
-    Spacer(
-      modifier = Modifier.fillMaxWidth().height(1.dp)
-        .alpha(0.1F)
-        .background(color = LocalAppColors.current.tvLv4)
+    scheduleService.ScheduleUrgentBanner(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(start = 16.dp, top = 18.dp, end = 16.dp),
     )
-    // 邮子清单
-    ITodoService::class.impl().TodoFeed(Modifier.fillMaxWidth())
-    Spacer(
-      modifier = Modifier.fillMaxWidth().height(1.dp)
-        .alpha(0.1F)
-        .background(color = LocalAppColors.current.tvLv4)
-    )
-    // 电费查询
-    IElectricityService::class.impl().ElectricityFeed(Modifier.fillMaxWidth())
-    // 80dp 顶起来课表与底部按钮
-    Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 8.dp)
+        .clip(cornerShape)
+        .background(color = containerColor),
+    ) {
+      // 体育打卡
+      ISportService::class.impl().SportFeed(Modifier.fillMaxWidth())
+      Spacer(
+        modifier = Modifier.fillMaxWidth().height(1.dp)
+          .alpha(0.1F)
+          .background(color = LocalAppColors.current.tvLv4)
+      )
+      // 邮子清单
+      scheduleService.ScheduleFeed(Modifier.fillMaxWidth())
+      Spacer(
+        modifier = Modifier.fillMaxWidth().height(1.dp)
+          .alpha(0.1F)
+          .background(color = LocalAppColors.current.tvLv4)
+      )
+      // 电费查询
+      IElectricityService::class.impl().ElectricityFeed(Modifier.fillMaxWidth())
+      // 80dp 顶起来课表与底部按钮
+      Spacer(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp))
+    }
   }
 }
-

@@ -144,4 +144,24 @@
     ];
 }
 
+///显示较长的 HUD
+- (void)showDefaultHUDLongWithText:(nonnull NSString *)text completion:(void (^)(void))completion {
+    UIFont *defaultFont = [UIFont fontWithName:PingFangSCSemibold size:13];
+    UIColor *defaultTextColor = [UIColor whiteColor];
+    UIColor *defaultBackGroundColor = [UIColor colorWithHexString:@"#2A4E84"];
+    CGFloat defaultDelay = 3;
+    CGFloat defaultCornerRadius = 18;
+    CGFloat defaultYOffset = (CGFloat)(-SCREEN_HEIGHT * 0.368 + STATUSBARHEIGHT);
+    
+    [self addProgressHUDViewWithText:text
+                                font:defaultFont
+                           textColor:defaultTextColor
+                               delay:defaultDelay
+                     backGroundColor:defaultBackGroundColor
+                        cornerRadius:defaultCornerRadius
+                             yOffset:defaultYOffset
+                          completion:completion
+    ];
+}
+
 @end

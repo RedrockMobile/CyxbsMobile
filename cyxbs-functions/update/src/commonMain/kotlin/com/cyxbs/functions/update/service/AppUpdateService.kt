@@ -1,21 +1,14 @@
 package com.cyxbs.functions.update.service
 
-import com.cyxbs.components.config.service.impl
 import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.init.appCoroutineScope
-import com.cyxbs.components.utils.utils.get.getAppVersionCode
-import com.cyxbs.components.utils.utils.get.getAppVersionName
 import com.cyxbs.functions.update.api.AppUpdateStatus
 import com.cyxbs.functions.update.api.IAppUpdateService
 import com.cyxbs.functions.update.api.UpdateInfo
 import com.cyxbs.functions.update.dialog.UpdateInfoNavArgument
-import com.cyxbs.functions.update.network.AppUpdateApiService
 import com.g985892345.provider.api.annotation.ImplProvider
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
@@ -30,28 +23,29 @@ import kotlin.time.Duration.Companion.milliseconds
 @ImplProvider
 object AppUpdateService : IAppUpdateService {
 
-  private val stateFlow: MutableStateFlow<AppUpdateStatus> = MutableStateFlow(AppUpdateStatus.Checking)
+  // 是否用于 mock 更新数据用于测试
+  // 这将控制版本的判断逻辑，最后显示为线上的更新信息的弹窗
+  private var isMockTestUpdate = false
 
-  // 用于 mock 当前处于过期状态，检测能否正常触发更新弹窗
-  private var mockDated = false
+  private val checker = AppUpdateChecker(
+    scope = appCoroutineScope,
+    requestInfo = {
+      AppUpdatePlatform.requestUpdateInfo()
+    },
+    isNewVersion = { remoteInfo ->
+      AppUpdatePlatform.isNewVersion(remoteInfo) || isMockTestUpdate
+    },
+  )
 
   init {
     appCoroutineScope.launch {
-      checkUpdateInternal()
+      checkUpdate()
     }
   }
 
-  override fun getUpdateStatus(): StateFlow<AppUpdateStatus> {
-    return stateFlow
-  }
-
-  override suspend fun checkUpdate(): AppUpdateStatus.Result {
-    if (stateFlow.value == AppUpdateStatus.Checking) {
-      // 当前状态处于 CHECKING 状态，则等待请求结果
-      return stateFlow.filterIsInstance<AppUpdateStatus.Result>().first()
-    }
-    return checkUpdateInternal()
-  }
+  override fun getUpdateStatus(): StateFlow<AppUpdateStatus> = checker.status
+  override fun getUpdateInfo(): StateFlow<UpdateInfo?> = checker.info
+  override suspend fun checkUpdate(): AppUpdateStatus.Result = checker.checkUpdate()
 
   override fun noticeUpdate(newVersion: UpdateInfo) {
     UpdateInfoNavArgument(
@@ -71,54 +65,12 @@ object AppUpdateService : IAppUpdateService {
       val status = checkUpdate() as? AppUpdateStatus.Result.Dated ?: return@launch
       noticeUpdate(status.newVersion)
       defaultSettings.putLong("上次提醒更新时间", nowTime.inWholeMilliseconds)
+      isMockTestUpdate = false
     }
   }
 
   override fun debug() {
-    mockDated = true
+    isMockTestUpdate = true
     tryNoticeUpdate(needFrequency = false)
-  }
-
-  private suspend fun checkUpdateInternal(): AppUpdateStatus.Result {
-    stateFlow.value = AppUpdateStatus.Checking
-    val apiService = AppUpdateApiService::class.impl()
-    return runCatching {
-      apiService.getUpdateInfo()
-    }.recoverCatching {
-      // 兜底使用 github release 更新，但需要发版时需要遵循格式：vX.X.X-X
-      val githubUpdateInfo = apiService.getUpdateInfoByGithub()
-      if (githubUpdateInfo.tag.matches("v\\d+\\.\\d+\\.\\d+-\\d+".toRegex())){
-        val strings = githubUpdateInfo.tag.split("-")
-        val versionName = strings[0].removeRange(0,1)
-        val versionCode = strings[1].toLong()
-        UpdateInfo(
-          apkUrl = githubUpdateInfo.assets.first().downloadUrl,
-          updateContent = githubUpdateInfo.body,
-          versionCode = versionCode,
-          versionName = versionName,
-        )
-      }
-      throw it
-    }.map {
-      val appVersionCode = getAppVersionCode()
-      when {
-        mockDated -> AppUpdateStatus.Result.Dated(it)
-        it.versionCode == appVersionCode -> {
-          val name = getAppVersionName()
-          if (name != it.versionName) {
-            // 名字不相等，说明安装的版本有问题，可能是测试版
-            AppUpdateStatus.Result.Dated(it)
-          } else AppUpdateStatus.Result.Valid
-        }
-        it.versionCode < appVersionCode -> {
-          AppUpdateStatus.Result.Valid
-        }
-        else -> AppUpdateStatus.Result.Dated(it)
-      }
-    }.getOrElse {
-      AppUpdateStatus.Result.Error(it)
-    }.also {
-      stateFlow.value = it
-    }
   }
 }

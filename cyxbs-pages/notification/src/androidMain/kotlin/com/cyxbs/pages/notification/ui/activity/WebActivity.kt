@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.RelativeLayout
-import com.cyxbs.components.base.webView.LiteJsWebView
+import com.cyxbs.components.base.webview.LiteJsWebView
 import com.cyxbs.pages.notification.R
 import com.cyxbs.components.base.ui.BaseActivity
 

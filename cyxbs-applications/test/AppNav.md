@@ -3,8 +3,8 @@
 > 打包时由 build-logic/manager/nav.AppNavReportTask 自动生成
 > 该文件需要被 git 提交用于后续使用
 
-- versionCode: 94
-- versionName: 6.10.6-alpha
+- versionCode: 95
+- versionName: 7.0.1-alpha
 
 ## 调试方法
 
@@ -76,6 +76,17 @@ object fields:
 
 解读：`title` / `content` 必填；`map` 可省略，若提供则为 `Map<String, TextInfo>` 的 JSON；`button` 可省略且允许为 null。`TextInfo` 中只有 `text` 必填，其它字段可省略。
 
+## :cyxbs-components:base
+
+### webview
+
+- entry: `com.cyxbs.components.base.webview.WebViewNavEntry`
+- argument: `com.cyxbs.components.base.webview.WebViewNavArgument`
+
+```text
+deeplink: cyxbs://webview?url={String}&hideTitle=[Boolean]&title=[String?]&defaultTitle=[String]
+```
+
 ## :cyxbs-functions:update
 
 ### dialog/update
@@ -95,16 +106,27 @@ deeplink: cyxbs://dialog/update?versionName={String}&updateContent={String}&down
 - argument: `com.cyxbs.pages.course.api.CourseNavArgument`
 
 ```text
-deeplink: cyxbs://course?stuNum={String}&stableKey=[String?]
+deeplink: cyxbs://course?stuNum=[String?]&stableKey=[String?]
 ```
 
-### course_find
+### course/find
 
 - entry: `com.cyxbs.pages.course.find.FindCourseNavEntry`
 - argument: `com.cyxbs.pages.course.api.FindCourseNavArgument`
 
 ```text
-deeplink: cyxbs://course_find?initialQuery=[String]
+deeplink: cyxbs://course/find?initialQuery=[String]
+```
+
+## :cyxbs-pages:discover
+
+### school/calendar
+
+- entry: `com.cyxbs.pages.discover.pages.calendar.SchoolCalendarNavEntry`
+- argument: `com.cyxbs.pages.discover.pages.calendar.SchoolCalendarNavArgument`
+
+```text
+deeplink: cyxbs://school/calendar
 ```
 
 ## :cyxbs-pages:emptyroom
@@ -137,7 +159,7 @@ deeplink: cyxbs://food
 - argument: `com.cyxbs.pages.home.api.HomeNavArgument`
 
 ```text
-deeplink: cyxbs://home?page=[String]
+deeplink: cyxbs://home?page=[String]&courseItemId=[String?]&courseOpenId=[Long?]
 ```
 
 ## :cyxbs-pages:login
@@ -162,31 +184,31 @@ deeplink: cyxbs://login?targetUrl=[String?]
 deeplink: cyxbs://map?placeSearch=[String?]
 ```
 
-### map_show_picture
+### map/picture
 
 - entry: `com.cyxbs.pages.map.ui.MapShowPictureNavEntry`
 - argument: `com.cyxbs.pages.map.ui.MapShowPictureNavArgument`
 
 ```text
-deeplink: cyxbs://map_show_picture?imageList={List<String>}&currentIndex={Int}
+deeplink: cyxbs://map/picture?imageList={List<String>}&currentIndex={Int}
 ```
 
-### map_place_detail
+### map/detail
 
 - entry: `com.cyxbs.pages.map.ui.PlaceDetailNavEntry`
 - argument: `com.cyxbs.pages.map.ui.PlaceDetailNavArgument`
 
 ```text
-deeplink: cyxbs://map_place_detail
+deeplink: cyxbs://map/detail?placeId={String}&expanded=[Boolean?]
 ```
 
-### map_search
+### map/search
 
 - entry: `com.cyxbs.pages.map.ui.SearchNavEntry`
 - argument: `com.cyxbs.pages.map.ui.SearchNavArgument`
 
 ```text
-deeplink: cyxbs://map_search
+deeplink: cyxbs://map/search
 ```
 
 ## :cyxbs-pages:mine
@@ -200,13 +222,31 @@ deeplink: cyxbs://map_search
 deeplink: cyxbs://about
 ```
 
-### edit_info
+### mine/edit
 
 - entry: `com.cyxbs.pages.mine.edit.EditInfoNavEntry`
 - argument: `com.cyxbs.pages.mine.edit.EditInfoNavArgument`
 
 ```text
-deeplink: cyxbs://edit_info
+deeplink: cyxbs://mine/edit
+```
+
+### mine/setting
+
+- entry: `com.cyxbs.pages.mine.setting.SettingNavEntry`
+- argument: `com.cyxbs.pages.mine.setting.SettingNavArgument`
+
+```text
+deeplink: cyxbs://mine/setting
+```
+
+### sign
+
+- entry: `com.cyxbs.pages.mine.sign.ui.SignNavEntry`
+- argument: `com.cyxbs.pages.mine.sign.ui.SignNavArgument`
+
+```text
+deeplink: cyxbs://sign
 ```
 
 ## :cyxbs-pages:noclass
@@ -265,13 +305,22 @@ object fields:
 
 ## :cyxbs-pages:schedule
 
-### schedule/edit
+### schedule/category/items
 
-- entry: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogPreview`
-- argument: `com.cyxbs.pages.schedule.ui.edit.EditScheduleDialogNavArgument`
+- entry: `com.cyxbs.pages.schedule.ui.category.ScheduleCategoryItemsNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.category.ScheduleCategoryItemsNavArgument`
 
 ```text
-deeplink: cyxbs://schedule/edit
+deeplink: cyxbs://schedule/category/items?categoryId={String?}&categoryName={String}
+```
+
+### schedule/category
+
+- entry: `com.cyxbs.pages.schedule.ui.category.ScheduleCategoryManageNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.category.ScheduleCategoryManageNavArgument`
+
+```text
+deeplink: cyxbs://schedule/category
 ```
 
 ### schedule
@@ -280,16 +329,76 @@ deeplink: cyxbs://schedule/edit
 - argument: `com.cyxbs.pages.schedule.api.ScheduleMainNavArgument`
 
 ```text
-deeplink: cyxbs://schedule
+deeplink: cyxbs://schedule?scheduleId=[ScheduleId?]&recurrenceId=[RecurrenceId?]
+object fields:
+  [scheduleId]: ScheduleId? {
+    value: String
+  }
+  [recurrenceId]: RecurrenceId? {
+    originalDateTime: MinuteTimeDate {
+      value: Int
+    }
+    timeZoneId: String?
+    allDay: Boolean
+  }
+```
+
+### schedule/preview
+
+- entry: `com.cyxbs.pages.schedule.ui.main.SchedulePreviewNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.main.SchedulePreviewNavArgument`
+
+```text
+deeplink: cyxbs://schedule/preview
+```
+
+### schedule/settings
+
+- entry: `com.cyxbs.pages.schedule.ui.settings.ScheduleSettingsNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.settings.ScheduleSettingsNavArgument`
+
+```text
+deeplink: cyxbs://schedule/settings
+```
+
+### schedule/failures
+
+- entry: `com.cyxbs.pages.schedule.ui.todo.failure.ScheduleFailureNavEntry`
+- argument: `com.cyxbs.pages.schedule.ui.todo.failure.ScheduleFailureNavArgument`
+
+```text
+deeplink: cyxbs://schedule/failures
 ```
 
 ## :cyxbs-pages:schoolcar
 
-### school_car
+### school/car
 
 - entry: `com.cyxbs.pages.schoolcar.ui.SchoolCarNavDestination`
 - argument: `com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument`
 
 ```text
-deeplink: cyxbs://school_car
+deeplink: cyxbs://school/car
+```
+
+## :cyxbs-pages:sport
+
+### sport
+
+- entry: `com.cyxbs.pages.sport.ui.SportNavEntry`
+- argument: `com.cyxbs.pages.sport.api.SportNavArgument`
+
+```text
+deeplink: cyxbs://sport
+```
+
+## :cyxbs-pages:widget
+
+### widget
+
+- entry: `com.cyxbs.pages.widget.page.CourseWidgetNavEntry`
+- argument: `com.cyxbs.pages.widget.page.CourseWidgetNavArgument`
+
+```text
+deeplink: cyxbs://widget
 ```

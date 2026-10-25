@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -95,13 +100,20 @@ class LoginNavEntry : AppNavEntry<LoginNavArgument>() {
     return false // 登录页允许未登录时打开
   }
 
+  /**
+   * 登录页使用固定 key 复用输入状态，导航参数由 Content 单独同步给 ViewModel。
+   */
   override fun getContentKey(argument: LoginNavArgument): String {
-    return "LoginNavArgument" // Login 属于单例页面，应该返回固定值，多次提交，共享页面状态
+    return "LoginNavArgument"
   }
 
   @Composable
   override fun Content(argument: LoginNavArgument) {
-    viewModel { LoginViewModel(argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+    val model = viewModel { LoginViewModel(argument) } // wasm 无法反射 new 对象，这里需要提供 factory
+    SideEffect {
+      // factory 仅在首次创建时执行；复用单例页面后，需在重组成功时同步当前路由参数。
+      model.updateArgument(argument)
+    }
     LoginPage()
     LaunchedEffect(Unit) {
       logg("backStack = $appNavBackStack")
@@ -109,12 +121,27 @@ class LoginNavEntry : AppNavEntry<LoginNavArgument>() {
   }
 }
 
+/**
+ * 登录页主体，同时统一管理输入框焦点和软键盘的收起行为。
+ */
 @Composable
 private fun LoginPage() {
+  val focusManager = LocalFocusManager.current
+  val keyboardController = LocalSoftwareKeyboardController.current
+  val dismissKeyboard: () -> Unit = remember(focusManager, keyboardController) {
+    {
+      // iOS 隐藏键盘后仍可能保留输入焦点，因此先清焦点再显式隐藏键盘。
+      focusManager.clearFocus(force = true)
+      keyboardController?.hide()
+    }
+  }
   ConstraintLayout(
     constraintSet = createConstraintSet(),
     modifier = Modifier.fillMaxSize()
       .background(LocalAppColors.current.whiteBlack)
+      .pointerInput(focusManager, keyboardController) {
+        detectTapGestures(onTap = { dismissKeyboard() })
+      }
       .systemBarsPadding(),
     animateChangesSpec = spring(
       stiffness = Spring.StiffnessMediumLow,
@@ -122,10 +149,16 @@ private fun LoginPage() {
   ) {
     TitleCompose(modifier = Modifier.layoutId(Element.Title))
     SubTitleCompose(modifier = Modifier.layoutId(Element.SubTitle))
-    StuNumPasswordCompose(modifier = Modifier.layoutId(Element.StuNumPassword))
+    StuNumPasswordCompose(
+      modifier = Modifier.layoutId(Element.StuNumPassword),
+      onDismissKeyboard = dismissKeyboard,
+    )
     UserAgreementCompose(modifier = Modifier.layoutId(Element.UserAgreement))
     ForgetPasswordCompose(modifier = Modifier.layoutId(Element.ForgetPassword))
-    LoginBtnCompose(modifier = Modifier.layoutId(Element.LoginBtn))
+    LoginBtnCompose(
+      modifier = Modifier.layoutId(Element.LoginBtn),
+      onDismissKeyboard = dismissKeyboard,
+    )
     TouristModeCompose(modifier = Modifier.layoutId(Element.TouristMode))
     LoginAnimCompose(modifier = Modifier.layoutId(Element.LoginAnim))
   }
@@ -165,8 +198,16 @@ private fun SubTitleCompose(modifier: Modifier = Modifier) {
   )
 }
 
+/**
+ * 学号与密码输入区域。
+ *
+ * @param onDismissKeyboard 密码提交前用于释放输入焦点并隐藏软键盘。
+ */
 @Composable
-private fun StuNumPasswordCompose(modifier: Modifier = Modifier) {
+private fun StuNumPasswordCompose(
+  modifier: Modifier = Modifier,
+  onDismissKeyboard: () -> Unit,
+) {
   MaterialTheme(
     typography = MaterialTheme.typography.copy( // OutlinedTextField 的 label 需要通过这个才能修改字体大小
       caption = MaterialTheme.typography.caption.copy(fontSize = 12.sp),
@@ -175,7 +216,7 @@ private fun StuNumPasswordCompose(modifier: Modifier = Modifier) {
   ) {
     Column(modifier = modifier) {
       StuNumCompose()
-      PasswordCompose()
+      PasswordCompose(onDismissKeyboard = onDismissKeyboard)
     }
   }
 }
@@ -230,8 +271,16 @@ private fun getHideText(password: String, cursorPosition: Int) : String {
   val afterText = if (currentInputPosition + 1 > password.length) "" else '\u2022'.toString().repeat(password.length - (currentInputPosition + 1))
   return beforeText + password[currentInputPosition].toString() + afterText
 }
+/**
+ * 密码输入框，负责密码可见性以及键盘 Go 操作的登录提交。
+ *
+ * @param onDismissKeyboard 登录提交前用于释放输入焦点并隐藏软键盘。
+ */
 @Composable
-private fun PasswordCompose(modifier: Modifier = Modifier) {
+private fun PasswordCompose(
+  modifier: Modifier = Modifier,
+  onDismissKeyboard: () -> Unit,
+) {
   val viewModel = viewModel(LoginViewModel::class)
   val oldText = remember { mutableStateOf("") }
   val currentCursorPosition = remember { mutableStateOf(0) }
@@ -302,9 +351,12 @@ private fun PasswordCompose(modifier: Modifier = Modifier) {
           contentDescription = null,
         )
       },
-      keyboardActions = KeyboardActions {
-        viewModel.clickLogin()
-      },
+      keyboardActions = KeyboardActions(
+        onGo = {
+          onDismissKeyboard()
+          viewModel.clickLogin()
+        },
+      ),
       keyboardOptions = KeyboardOptions(
         keyboardType = KeyboardType.Password,
         imeAction = ImeAction.Go,
@@ -423,8 +475,16 @@ private fun ForgetPasswordCompose(modifier: Modifier = Modifier) {
   )
 }
 
+/**
+ * 登录按钮；点击时先收起软键盘，再向 ViewModel 提交登录。
+ *
+ * @param onDismissKeyboard 登录提交前用于释放输入焦点并隐藏软键盘。
+ */
 @Composable
-private fun LoginBtnCompose(modifier: Modifier = Modifier) {
+private fun LoginBtnCompose(
+  modifier: Modifier = Modifier,
+  onDismissKeyboard: () -> Unit,
+) {
   val viewModel = viewModel(LoginViewModel::class)
   val isClicked = remember { mutableStateOf(false) }
   Box(
@@ -442,6 +502,7 @@ private fun LoginBtnCompose(modifier: Modifier = Modifier) {
         ) {
           Box(
             modifier = Modifier.clickable {
+              onDismissKeyboard()
               viewModel.clickLogin()
             },
             contentAlignment = Alignment.Center

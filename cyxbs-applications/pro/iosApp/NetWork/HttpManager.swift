@@ -270,12 +270,6 @@ extension HttpManager {
         return SessionManager.shared.ry_request(APIConfig.current.api("/user-secret/user/password/valid"), method: .post, parameters: parameters)
     }
     
-    /// 获取全部todo
-    @discardableResult
-    func magipoke_todo_list() -> DataRequest {
-        return SessionManager.shared.ry_request(APIConfig.current.api("/magipoke-todo/list"), method: .get)
-    }
-    
     /// 查询电表
     @discardableResult
     func magipoke_elecquery_getElectric(building: String, room: String) -> DataRequest {

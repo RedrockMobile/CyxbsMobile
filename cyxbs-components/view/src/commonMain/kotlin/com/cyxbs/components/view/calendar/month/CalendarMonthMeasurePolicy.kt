@@ -75,9 +75,21 @@ internal class CalendarMonthMeasurePolicy(
   private fun LazyLayoutMeasureScope.measureWeekLine(
     date: Date,
     parentConstraints: Constraints,
+    restrictToSelectableWeeks: Boolean = false,
   ): Array<Placeable>? {
-    if (date < startDateState.value.firstDate.weekBeginDate) return null
-    if (date > endDateState.value.lastDate.weekFinalDate) return null
+    // 折叠态额外预布局左右周时必须以实际可选周为边界；当前月主体仍允许测量月首/月末补位，
+    // 否则 startDate 位于月中时无法为随后的展开动画准备完整月网格。
+    val firstVisibleDate = if (restrictToSelectableWeeks) {
+      startDateState.value.weekBeginDate
+    } else {
+      startDateState.value.firstDate.weekBeginDate
+    }
+    val lastVisibleDate = if (restrictToSelectableWeeks) {
+      endDateState.value.weekFinalDate
+    } else {
+      endDateState.value.lastDate.weekFinalDate
+    }
+    if (date < firstVisibleDate || date > lastVisibleDate) return null
     val beginDate = date.weekBeginDate
     return Array(7) {
       val nowDate = beginDate.plusDays(it)
@@ -137,21 +149,25 @@ internal class CalendarMonthMeasurePolicy(
     var lineLeft: Array<Placeable>? = emptyArray()
     var lineRight: Array<Placeable>? = emptyArray()
     when (showLine) {
-      0 -> lineLeft = measureWeekLine(clickDateState.value.minusWeeks(1), constraints)
+      0 -> lineLeft = measureWeekLine(
+        clickDateState.value.minusWeeks(1), constraints, restrictToSelectableWeeks = true,
+      )
       1 -> clickDateState.value.minusWeeks(1).let {
         if (it.monthNumber != clickDateState.value.monthNumber) {
-          lineLeft = measureWeekLine(it, constraints)
+          lineLeft = measureWeekLine(it, constraints, restrictToSelectableWeeks = true)
         }
       }
 
       monthArray.lastIndex - 1 -> clickDateState.value.plusWeeks(1).let {
         if (it.monthNumber != clickDateState.value.monthNumber) {
-          lineRight = measureWeekLine(it, constraints)
+          lineRight = measureWeekLine(it, constraints, restrictToSelectableWeeks = true)
         }
       }
 
       monthArray.lastIndex -> lineRight =
-        measureWeekLine(clickDateState.value.plusWeeks(1), constraints)
+        measureWeekLine(
+          clickDateState.value.plusWeeks(1), constraints, restrictToSelectableWeeks = true,
+        )
     }
     // null 表示有但超过范围了，emptyArray 表示没有
     if (lineLeft?.isEmpty() == true) {
@@ -408,4 +424,3 @@ internal class CalendarMonthMeasurePolicy(
     }
   }
 }
-

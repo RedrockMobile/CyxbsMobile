@@ -1,9 +1,10 @@
 package com.cyxbs.components.view.wheel
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.layout.LazyLayoutItemProvider
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
@@ -32,11 +33,16 @@ class WheelScrollItemProvider(
 
   @Composable
   override fun Item(index: Int, key: Any) {
+    if (index !in items.indices) {
+      // 外界可能因为重组导致 items 触发改变，所以需要兜底
+      Spacer(modifier = Modifier.fillMaxSize())
+      return
+    }
     Box(
       modifier = Modifier.fillMaxSize(),
       contentAlignment = Alignment.Center,
     ) {
-      BasicText(
+      Text(
         text = items[index],
         style = rememberDerivedStateOfStructure(index) {
           val unselected = textStyle.value

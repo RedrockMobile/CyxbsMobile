@@ -1,10 +1,51 @@
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.ComposeUIViewController
+import com.cyxbs.components.account.api.AccountState
+import com.cyxbs.components.account.api.IAccountEditService
+import com.cyxbs.components.account.api.IAccountService
 import com.cyxbs.components.config.ConfigApplicationInfo
 import com.cyxbs.components.config.compose.theme.AppTheme
+import com.cyxbs.components.config.compose.theme.IOSNavigationBarInsets
 import com.cyxbs.components.config.init.InitialManager
+import com.cyxbs.components.config.service.impl
+import com.cyxbs.components.config.time.toMinuteTimeDate
+import com.cyxbs.components.init.appCoroutineScope
+import com.cyxbs.components.navigation.AppNavArgument
 import com.cyxbs.components.navigation.AppNavDisplay
+import com.cyxbs.components.navigation.AppSnackbarCompose
+import com.cyxbs.components.utils.extensions.IOSToast
+import com.cyxbs.components.utils.extensions.PlatformToastCompose
+import com.cyxbs.pages.course.service.CourseIosPlatform
+import com.cyxbs.pages.discover.home.DiscoverIosPlatform
+import com.cyxbs.pages.discover.home.functions.DiscoverFunctionsIosPlatform
+import com.cyxbs.pages.home.api.HomeNavArgument
+import com.cyxbs.pages.login.api.LoginNavArgument
+import com.cyxbs.pages.login.service.LoginIosPlatform
+import com.cyxbs.pages.mine.home.MineIosPlatform
+import com.cyxbs.pages.schedule.api.IScheduleOccurrenceService
+import com.cyxbs.pages.schedule.api.ScheduleExternalCategory
+import com.cyxbs.pages.schedule.api.ScheduleExternalCreateFailureReason
+import com.cyxbs.pages.schedule.api.ScheduleExternalCreateRequest
+import com.cyxbs.pages.schedule.api.ScheduleExternalCreateResult
+import com.cyxbs.pages.schedule.api.ScheduleExternalSource
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceKind
+import com.cyxbs.pages.schedule.api.ScheduleOccurrenceTiming
+import com.cyxbs.pages.ufield.fairground.FairgroundIosPlatform
 import com.g985892345.provider.api.annotation.ImplProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import platform.UIKit.UIViewController
+import kotlin.time.Instant
+
+/** 系统 URL 可能早于首帧到达；先排队，等 CMP 导航栈完成 Composition 后再消费。 */
+private val externalNavigationRequests = Channel<AppNavArgument>(capacity = 8)
 
 /**
  * .
@@ -14,17 +55,111 @@ import platform.UIKit.UIViewController
  */
 
 // 在 iOS 项目 AppDelegate#application 调用
-fun doInitApp(isDebug: Boolean) {
-  IOSConfigApplicationInfo.isDebug = isDebug
+fun doInitApp(impl: IOSKmpInterface) {
+  IOSKmpInterfaceLink.impl = impl
   initProvider()
   InitialManager.init(isMainProcess = true)
+
+  // 账户切换后监听新 session；同一 session 内的 token 刷新也同步到 iOS 原生侧。
+  val accountService = IAccountService::class.impl()
+  appCoroutineScope.launch(Dispatchers.Main) {
+    accountService.session.collectLatest { session ->
+      (session.tokenState?.tokenFlow ?: flowOf(null)).collect { token ->
+        impl.setToken(token?.token ?: "")
+      }
+    }
+  }
+
+  // 监听账户状态变化，登录成功后同步 iOS 原生数据（待办、用户信息、邮箱绑定等）。
+  // drop(1) 跳过初始值：app 启动时有缓存 token 则 state 已经是 Login，
+  // 不跳过会误触发 onLoginSuccess 导致重复同步。
+  appCoroutineScope.launch(Dispatchers.Main) {
+    accountService.state
+      .drop(1)
+      .filterIsInstance<AccountState.Login>()
+      .collect { login ->
+        impl.onLoginSuccess(login.stuNum)
+      }
+  }
 }
 
 fun MainViewController(): UIViewController {
   return ComposeUIViewController {
-    AppTheme {
-      AppNavDisplay()
-//      PlatformToastCompose()
+    IOSNavigationBarInsets {
+      AppTheme {
+        AppNavDisplay()
+        LaunchedEffect(Unit) {
+          for (argument in externalNavigationRequests) {
+            argument.navigate()
+          }
+        }
+        AppSnackbarCompose()
+        if (!IOSKmpInterfaceLink.enableUsePlatformToast()) {
+          PlatformToastCompose()
+        }
+      }
+    }
+  }
+}
+
+/**
+ * iOS SceneDelegate 收到系统 URL 时调用；返回 false 表示协议不属于已注册 CMP 页面。
+ *
+ * 只排队导航参数，不直接操作尚未创建的 Compose 导航栈；各页面自行处理重复打开语义。
+ */
+fun openExternalAppUrl(url: String): Boolean {
+  val argument = AppNavArgument.decodeFromUrl(url) ?: return false
+  return externalNavigationRequests.trySend(argument).isSuccess
+}
+
+fun onLogout() {
+  IAccountEditService::class.impl().onLogout()
+  // 退出登录后跳转到 CMP 登录页，登录成功后回到主页
+  LoginNavArgument.navigate(HomeNavArgument(), clearStack = true)
+}
+
+/**
+ * 将 iOS 原生活动详情中的活动创建为 Schedule 原生清单。
+ *
+ * 参数映射与 Android 邮子活动保持一致：活动开始时间作为截止时间、提前 10 分钟提醒、归入“其他”分类，
+ * 进入清单但不投射到课表。[onResult] 在主线程回调；null 表示本地保存成功，非 null 为可直接展示的失败原因。
+ */
+fun createUfieldActivitySchedule(
+  activityId: Long,
+  title: String,
+  place: String,
+  startAtEpochSeconds: Long,
+  onResult: (String?) -> Unit,
+) {
+  appCoroutineScope.launch(Dispatchers.Main) {
+    val result = runCatching {
+      val timeZone = TimeZone.currentSystemDefault()
+      val start = Instant.fromEpochSeconds(startAtEpochSeconds)
+        .toLocalDateTime(timeZone)
+        .toMinuteTimeDate()
+      IScheduleOccurrenceService::class.impl().createExternalSchedule(
+        ScheduleExternalCreateRequest(
+          source = ScheduleExternalSource.UFIELD_ACTIVITY,
+          sourceId = activityId.toString(),
+          title = title,
+          description = place,
+          timing = ScheduleOccurrenceTiming.Deadline(
+            due = start,
+            timeZoneId = timeZone.id,
+          ),
+          reminderOffsetMinutes = 10,
+          kind = ScheduleOccurrenceKind.TODO,
+          isInTodoList = true,
+          linkedToCourse = false,
+          category = ScheduleExternalCategory.OTHER,
+        ),
+      )
+    }.getOrNull()
+
+    when (result) {
+      is ScheduleExternalCreateResult.Success -> onResult(null)
+      is ScheduleExternalCreateResult.Failure -> onResult(result.reason)
+      null -> onResult(ScheduleExternalCreateFailureReason.LOCAL_SAVE_FAILED)
     }
   }
 }
@@ -34,12 +169,187 @@ fun MainViewController(): UIViewController {
 // 所以这里需要在最底层源集初始化 KtProvider
 internal expect fun initProvider()
 
-@ImplProvider
-object IOSConfigApplicationInfo : ConfigApplicationInfo {
+interface IOSKmpInterface {
+  fun isDebug(): Boolean
+  fun setToken(token: String)
+  fun enableUsePlatformToast(): Boolean
+  fun toast(s: String, isLong: Boolean)
 
-  var isDebug = false
+  /** push 没课约（iOS 原生 WeDateVC） */
+  fun jumpWeDate()
+
+  /** push 我的考试（iOS 原生 TestArrangeViewController） */
+  fun jumpTestArrange()
+
+  /** push 消息中心（iOS 原生 MineMessageVC） */
+  fun launchNotification()
+
+  /** present 签到页（iOS 原生 CheckInViewController，全屏 modal） */
+  fun jumpCheckIn()
+
+  /** 跳转教务在线新闻列表（iOS 原版功能已停服，toast 兜底） */
+  fun jumpJwNewsList()
+
+  /** 跳转教务在线某条新闻详情（iOS 原版功能已停服，toast 兜底） */
+  fun jumpJwNewsItem(newId: String)
+
+  /** push 答疑广场（iOS 原生 QAMainVC） */
+  fun jumpQaEntry()
+
+  /** push 活动布告栏（iOS 原生 ActivityMainViewController） */
+  fun jumpUfieldMainEntry()
+
+  /** push 邮票中心（iOS 原生 StampCenterVC） */
+  fun jumpStore()
+
+  /** push 反馈中心（iOS 原生 FeedBackMainPageViewController） */
+  fun jumpFeedbackCenter()
+
+  /** push 我的页签到（iOS 原生 CheckInViewController，与 jumpCheckIn 的 present 不同） */
+  fun jumpSign()
+
+  /** push 账号与安全页（iOS 原生 selfSafeViewController） */
+  fun jumpAccountSecurity()
+
+  /** push 活动中心（iOS 原生 ActivityCenterVC） */
+  fun jumpActivityCenter()
+
+  /**
+   * 课表数据更新成功回调。
+   * Swift 端把 [stuLessonBeanJson] 解析为旧 ScheduleModel / CurriculumModel，
+   * 写入 App Group 共享缓存供 CyxbsWidgetExtension 课表小组件读取。
+   */
+  fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String)
+
+  /**
+   * 登录成功后同步 iOS 原生数据。
+   * Swift 端执行：获取用户信息、更新 Person 模型、检查邮箱绑定、记录登录时间。
+   */
+  fun onLoginSuccess(stuNum: String)
+
+  /**
+   * 跳转找回密码页面。
+   * [stuNum] 当前输入的学号（可能为空），Swift 端用于预填充和查询绑定状态。
+   */
+  fun jumpForgotPassword(stuNum: String)
+
+  /**
+   * 打开用户协议页面
+   */
+  fun jumpUserAgreement()
+
+  /**
+   * 打开隐私政策页面
+   */
+  fun jumpPrivacyPolicy()
+
+  /**
+   * 退出应用（用户不同意用户协议时调用）
+   */
+  fun exitApp()
+}
+
+@ImplProvider(IOSToast::class)
+@ImplProvider(ConfigApplicationInfo::class)
+@ImplProvider(DiscoverFunctionsIosPlatform::class)
+@ImplProvider(DiscoverIosPlatform::class)
+@ImplProvider(FairgroundIosPlatform::class)
+@ImplProvider(MineIosPlatform::class)
+@ImplProvider(CourseIosPlatform::class)
+@ImplProvider(LoginIosPlatform::class)
+internal object IOSKmpInterfaceLink :
+  IOSToast,
+  ConfigApplicationInfo,
+  DiscoverFunctionsIosPlatform,
+  DiscoverIosPlatform,
+  FairgroundIosPlatform,
+  MineIosPlatform,
+  CourseIosPlatform,
+  LoginIosPlatform {
+
+  lateinit var impl: IOSKmpInterface
 
   override fun isDebug(): Boolean {
-    return isDebug
+    return impl.isDebug()
+  }
+
+  override fun enableUsePlatformToast(): Boolean {
+    return impl.enableUsePlatformToast()
+  }
+
+  override fun toast(s: String, isLong: Boolean) {
+    impl.toast(s, isLong)
+  }
+
+  override fun jumpWeDate() {
+    impl.jumpWeDate()
+  }
+
+  override fun jumpTestArrange() {
+    impl.jumpTestArrange()
+  }
+
+  override fun launchNotification() {
+    impl.launchNotification()
+  }
+
+  override fun jumpCheckIn() {
+    impl.jumpCheckIn()
+  }
+
+  override fun jumpJwNewsList() {
+    impl.jumpJwNewsList()
+  }
+
+  override fun jumpJwNewsItem(newId: String) {
+    impl.jumpJwNewsItem(newId)
+  }
+
+  override fun jumpQaEntry() {
+    impl.jumpQaEntry()
+  }
+
+  override fun jumpUfieldMainEntry() {
+    impl.jumpUfieldMainEntry()
+  }
+
+  override fun jumpStore() {
+    impl.jumpStore()
+  }
+
+  override fun jumpFeedbackCenter() {
+    impl.jumpFeedbackCenter()
+  }
+
+  override fun jumpSign() {
+    impl.jumpSign()
+  }
+
+  override fun jumpAccountSecurity() {
+    impl.jumpAccountSecurity()
+  }
+
+  override fun jumpActivityCenter() {
+    impl.jumpActivityCenter()
+  }
+
+  override fun onLessonUpdated(stuNum: String, nowWeek: Int, stuLessonBeanJson: String) {
+    impl.onLessonUpdated(stuNum, nowWeek, stuLessonBeanJson)
+  }
+
+  override fun jumpForgotPassword(stuNum: String) {
+    impl.jumpForgotPassword(stuNum)
+  }
+
+  override fun jumpUserAgreement() {
+    impl.jumpUserAgreement()
+  }
+
+  override fun jumpPrivacyPolicy() {
+    impl.jumpPrivacyPolicy()
+  }
+
+  override fun exitApp() {
+    impl.exitApp()
   }
 }

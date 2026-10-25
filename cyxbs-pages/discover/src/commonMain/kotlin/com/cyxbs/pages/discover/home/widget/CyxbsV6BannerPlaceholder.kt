@@ -31,24 +31,25 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cyxbs.components.utils.utils.get.getAppVersionName
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 「掌上重邮 v6」Banner 兜底图，纯 Compose 绘制，替代 discover_ic_cyxbsv6.webp。
+ * Banner 兜底图，纯 Compose 绘制，替代 discover_ic_cyxbsv6.webp。
  *
  * 由蓝紫渐变背景 + 文案 + 简化手机插画 + 星点 / 虚线 / 纸飞机 / 行星轨道
  * 等装饰组成。原图右侧人物在此版中省略，仅保留手机。
  *
- * 以 [Painter] 形式提供（[rememberCyxbsV6BannerPainter]），便于直接交给 Coil `AsyncImage`
+ * 以 [Painter] 形式提供（[rememberCyxbsBannerPainter]），便于直接交给 Coil `AsyncImage`
  * 当 placeholder / error，也可直接用 `Image(painter = ..., contentScale = FillBounds)` 铺到布局里。
  */
 @Preview
 @Composable
-fun CyxbsV6BannerPlaceholderPreview() {
+fun CyxbsBannerPlaceholderPreview() {
   Image(
-    painter = rememberCyxbsV6BannerPainter(),
+    painter = rememberCyxbsBannerPainter(version = "7"),
     contentDescription = null,
     modifier = Modifier.aspectRatio(2.56f),
     contentScale = ContentScale.FillBounds,
@@ -56,24 +57,25 @@ fun CyxbsV6BannerPlaceholderPreview() {
 }
 
 /**
- * 记忆一个 [CyxbsV6BannerPainter]，可直接用作 Coil `AsyncImage` 的 placeholder / error。
+ * 记忆一个 [CyxbsBannerPainter]，可直接用作 Coil `AsyncImage` 的 placeholder / error。
  *
  * 由于 [TextMeasurer] 依赖 `LocalDensity` / `LocalFontFamilyResolver`，必须在 Composition
  * 中创建并带入 Painter；其余尺寸单位（dp / sp）都在 `DrawScope.onDraw()` 里转换，
  * 因为 `DrawScope` 本身就实现了 `Density`。
  */
 @Composable
-fun rememberCyxbsV6BannerPainter(
+fun rememberCyxbsBannerPainter(
   cornerRadius: Dp = 8.dp,
+  version: String = getAppVersionName().substringBefore("."), // 仅预览使用
 ): Painter {
   val textMeasurer = rememberTextMeasurer()
   return remember(textMeasurer, cornerRadius) {
-    CyxbsV6BannerPainter(textMeasurer = textMeasurer, cornerRadius = cornerRadius)
+    CyxbsBannerPainter(textMeasurer = textMeasurer, cornerRadius = cornerRadius, version = version)
   }
 }
 
 /**
- * 「掌上重邮 v6」Banner 兜底图的 [Painter] 实现。
+ * Banner 兜底图的 [Painter] 实现。
  *
  * - 圆角通过自绘 clipPath 完成，所以使用方无需再 `Modifier.clip(...)`。
  * - 文字由外部传入的 [TextMeasurer] 在 `onDraw` 里现场测量；动画帧间的测量开销
@@ -81,7 +83,8 @@ fun rememberCyxbsV6BannerPainter(
  * - [intrinsicSize] 故意保持 [Size.Unspecified]，让画面完全跟随布局尺寸，
  *   作为 `AsyncImage` 的 placeholder 时能自然铺满。
  */
-class CyxbsV6BannerPainter(
+class CyxbsBannerPainter(
+  private val version: String,
   private val textMeasurer: TextMeasurer,
   private val cornerRadius: Dp = 8.dp,
 ) : Painter() {
@@ -130,7 +133,7 @@ class CyxbsV6BannerPainter(
       fontSize = 12.sp,
       fontWeight = FontWeight.SemiBold,
     )
-    val title = textMeasurer.measure(AnnotatedString("掌上重邮v6"), titleStyle)
+    val title = textMeasurer.measure(AnnotatedString("掌上重邮v${version}"), titleStyle)
     val sub = textMeasurer.measure(AnnotatedString("完美整合校园生活的APP"), subStyle)
 
     val gap = 6.dp.toPx()

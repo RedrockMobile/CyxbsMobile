@@ -1,11 +1,13 @@
 package com.cyxbs.pages.schedule.ui.dialog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -13,74 +15,92 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
-import com.cyxbs.components.view.ui.BottomSheetCompose
-import com.cyxbs.components.view.ui.BottomSheetState
-import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.components.utils.compose.LocalImePaddingTargetState
+import com.cyxbs.components.utils.compose.imePaddingWithTarget
+import com.cyxbs.components.utils.compose.rememberImePaddingTargetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetCompose
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 
 /**
  * todo 模块内部复用的底部弹窗包装。
  *
  * 复刻老端 [com.google.android.material.bottomsheet.BottomSheetDialog] 的底部弹出语义：
  * - [show] 为 true 时组合 [BottomSheetCompose] 并自动展开。
- * - 用户下滑到底 / 点击 scrim / 按返回键均会触发 [onDismiss]，外层把 [show] 置 false
+ * - 用户下滑到底 / 点击 scrim / 按返回键均会在动画完成后触发 [onDismiss]，外层把 [show] 置 false
  *   即可从组合中移除。
  *
  * @param onDismissRequest 关闭请求拦截：点击 scrim / 按返回键触发关闭前回调，返回 true 放行（执行
  *   收起动画并最终回调 [onDismiss]），返回 false 则拦截本次关闭（弹窗保持展开，由调用方自行处理，
  *   如弹出「未保存确认」）。默认 null 表示不拦截，任何关闭请求都直接放行。
- * @param content 弹窗内容。内部自动包裹一层圆角白色 Column 并挂 [bottomSheetDraggable]。
+ * @param content 弹窗内容，参数为带动画的关闭函数。内部自动包裹主题背景的圆角 Column 并挂
+ *   [bottomSheetDraggable]。
+ * @param overlayContent 绘制在 BottomSheet 上方的同窗口弹层，同样可以使用带动画的关闭函数。
  */
 @Composable
 internal fun ScheduleBottomSheet(
   show: Boolean,
+  /** 隐藏动画结束后的通知；调用方应在这里把 [show] 置为 false 并移除弹窗。 */
   onDismiss: () -> Unit,
-  scrimColor: Color = Color.Black.copy(alpha = 0.4f),
-  onDismissRequest: (() -> Boolean)? = null,
-  content: @Composable () -> Unit,
+  scrimColor: Color? = null,
+  onDismissRequest: (suspend () -> Boolean)? = null,
+  overlayContent: @Composable (requestDismiss: () -> Unit) -> Unit = {},
+  content: @Composable (requestDismiss: () -> Unit) -> Unit,
 ) {
   if (!show) return
   val colors = LocalAppColors.current
+  // 深色主题的 onSurface 接近白色，作为蒙层会把弹窗上方页面洗灰；默认统一使用黑色蒙层。
+  val resolvedScrimColor = scrimColor ?: Color.Black.copy(alpha = 0.4F)
   // 用 rememberUpdatedState 保证 BottomSheetState 内捕获的始终是最新一帧的拦截回调（避免闭包过期）。
   val dismissGate = rememberUpdatedState(onDismissRequest)
-  val state = remember {
-    BottomSheetState(onDismissRequest = {
-      val gate = dismissGate.value
-      if (gate == null || gate()) hideSuspend()
-    })
+  // 与编辑内容的 imePaddingTarget 配对，只把标题、信息区和描述区完整抬到键盘上方。
+  val imePaddingTargetState = rememberImePaddingTargetState()
+  val bottomSheetState = remember { BottomSheetState() }
+  val requestDismiss = remember(bottomSheetState) {
+    // 业务内容只发起关闭请求；外层内容要等 Hidden 锚点真正到达后才会被移除。
+    { bottomSheetState.hideAsync() }
+  }
+  bottomSheetState.onDismissRequest = {
+    val gate = dismissGate.value
+    if (gate == null || gate()) hideSuspend() else expandSuspend()
   }
 
   // 等测量完成后展开（BottomSheetCompose 通过 onSizeChanged 设置 showMaxHeight）。
   LaunchedEffect(Unit) {
     delay(100)
-    state.expandAsync()
+    bottomSheetState.expandAsync()
   }
 
   // hide 动画结束后通知外层移除组合。
-  LaunchedEffect(state) {
-    state.stateFlow.first { it == BottomSheetValueState.Hide }
+  LaunchedEffect(bottomSheetState) {
+    bottomSheetState.awaitSettledAnchor(BottomSheetAnchor.Hidden)
     onDismiss()
   }
 
-  BottomSheetCompose(
-    bottomSheetState = state,
-    peekHeight = 0.dp,
-    scrimColor = scrimColor,
-    dismissOnBackPress = true,
-    dismissOnClickOutside = true,
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .then(bottomSheetDraggable())
-        .background(
-          color = colors.topBg,
-          shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        )
-        .navigationBarsPadding(),
-    ) {
-      content()
+  CompositionLocalProvider(LocalImePaddingTargetState provides imePaddingTargetState) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      BottomSheetCompose(
+        modifier = Modifier.imePaddingWithTarget(imePaddingTargetState),
+        bottomSheetState = bottomSheetState,
+        peekHeight = 0.dp,
+        scrimColor = resolvedScrimColor,
+        dismissOnBackPress = true,
+        dismissOnClickOutside = true,
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .then(bottomSheetDraggable())
+            .background(
+              color = colors.topBg,
+              shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            ),
+        ) {
+          content(requestDismiss)
+        }
+      }
+      overlayContent(requestDismiss)
     }
   }
 }

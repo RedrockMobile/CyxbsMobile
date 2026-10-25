@@ -5,14 +5,13 @@ import com.cyxbs.components.utils.network.BASE_NORMAL_BACKUP_GET
 import com.cyxbs.components.utils.network.END_POINT_REDROCK_DEV
 import com.cyxbs.components.utils.network.HttpClientNoToken
 import com.cyxbs.components.utils.network.getBaseUrl
+import com.cyxbs.components.utils.network.shouldTryBackup
 import io.ktor.client.call.body
-import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.get
 import io.ktor.client.request.host
-import io.ktor.client.request.url
+import io.ktor.http.Url
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,7 +20,8 @@ import kotlinx.serialization.Serializable
 import kotlin.concurrent.Volatile
 
 /**
- * .
+ * 仅对网校正式域名的指定网络故障尝试一次备用域名，成功后沿用到本次应用退出。
+ * 保留原请求的协议、路径和参数；开发环境及第三方接口不进行容灾。
  *
  * @author 985892345
  * @date 2025/1/19
@@ -31,10 +31,13 @@ internal val BackupPlugin = createClientPlugin(
 ) {
   on(Send) { request ->
     val baseUrl = getBaseUrl()
+    if (baseUrl == END_POINT_REDROCK_DEV || request.host != Url(baseUrl).host) {
+      return@on proceed(request)
+    }
     var backupUrl = BackupUrl.get()
-    if (backupUrl != null && baseUrl.endsWith(request.host)) {
+    if (backupUrl != null) {
       // 如果已经处于 backup，则直接使用 backupUrl
-      request.host = backupUrl
+      request.switchToBackupHost(backupUrl)
       return@on proceed(request)
     }
 
@@ -42,13 +45,11 @@ internal val BackupPlugin = createClientPlugin(
       // 第一次正常请求
       return@on proceed(request)
     } catch (e: Exception) {
-      if (!baseUrl.endsWith(request.host)) throw e
-      if (backupUrl == END_POINT_REDROCK_DEV) throw e // dev 环境直接抛出异常
-      if (e is ConnectTimeoutException || e is HttpRequestTimeoutException) {
-        // 第一次出现请求超时，尝试切换为 backup
+      if (e.shouldTryBackup()) {
+        // 只在白名单故障下尝试一次；替换 host，保留业务接口路径及查询参数。
         backupUrl = BackupUrl.request()
         if (backupUrl != null) {
-          request.url(backupUrl)
+          request.switchToBackupHost(backupUrl)
           val call = proceed(request)
           BackupUrl.enterBackup() // 在 proceed 成功后才记录 backupUrl，后续所有请求都进行切换
           return@on call
@@ -100,7 +101,9 @@ private object BackupUrl {
   private val backupUrlDeferred = appCoroutineScope.async {
     try {
       // 这里使用单独的 HttpClient
-      HttpClientNoToken.get(BASE_NORMAL_BACKUP_GET).body<BackupUrlStatus>().baseUrl
+      val address = HttpClientNoToken.get(BASE_NORMAL_BACKUP_GET).body<BackupUrlStatus>().baseUrl
+      // 兼容旧接口返回纯域名及完整 URL，运行态统一只保存 host。
+      Url(if ("://" in address) address else "https://$address").host
     } catch (e: Exception) {
       return@async null
     }

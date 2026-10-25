@@ -6,16 +6,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.cyxbs.components.config.time.MinuteTime
 import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.pages.course.view.item.CourseItemState
 import com.cyxbs.pages.course.view.page.LocalCoursePage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -23,7 +27,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlin.math.roundToInt
@@ -36,8 +39,28 @@ import kotlin.math.roundToInt
  */
 object LayoutItemModifier : CourseItemModifier {
 
+  /** 所有课表 Item 共用的最小视觉高度，避免时间轴折叠后内容与点击区域完全消失。 */
+  val DefaultMinimumVisualHeight = 20.dp
+
   // 是否启动时间信息改变后的动画，默认开启
   val animLock = CourseItemState.ValueKey { Lock() }
+
+  /**
+   * Item 的最小视觉高度，默认对所有课表 Item 生效。
+   *
+   * 它以业务区间中心向上下两侧扩展绘制区域，不修改
+   * [com.cyxbs.pages.course.view.item.CourseItemWhatTime] 的业务时间范围。零时长 Item 与被时间轴
+   * 压缩的时间段因此能保留一致的可读、可点击区域；特殊 Item 仍可按需覆盖该值。
+   */
+  val minimumVisualHeight = CourseItemState.ValueKey<Dp> { DefaultMinimumVisualHeight }
+
+  /**
+   * item 的固定视觉优先级，最终会与 [CourseItemState.zIndexState] 的临时层级相加。
+   *
+   * 默认值为 0，不改变现有课程与事务；需要始终浮在普通时段之上的时间点可设置更高值，且不会覆盖
+   * 长按、弹窗等交互对临时 zIndex 的增减。
+   */
+  val visualPriority = CourseItemState.ValueKey { 0F }
 
   @Composable
   override fun createModifier(): Modifier {
@@ -126,13 +149,21 @@ private fun courseItemLayout(itemState: CourseItemState): Modifier {
     val beginWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(beginTimeAnimatable.value))
     val finalWeightRatio = timeline.calculateWeightRatio(MinuteTime.new(finalTimeAnimatable.value))
     val width = constraints.maxWidth / 7
-    val height = (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(1)
+    val naturalHeight =
+      (constraints.maxHeight * (finalWeightRatio - beginWeightRatio)).roundToInt().coerceAtLeast(0)
+    val height = maxOf(naturalHeight, LayoutItemModifier.minimumVisualHeight.get(itemState).roundToPx())
+      .coerceAtLeast(1)
+      .coerceAtMost(constraints.maxHeight)
     val placeable = measurable.measure(Constraints.fixed(width, height))
+    val naturalY = (beginWeightRatio * constraints.maxHeight).roundToInt()
+    val extraVisualHeight = height - naturalHeight
+    val y = (naturalY - extraVisualHeight / 2)
+      .coerceIn(0, (constraints.maxHeight - height).coerceAtLeast(0))
     layout(width, height) {
       placeable.placeRelative(
         x = (indexAnimatable.value * constraints.maxWidth / 7 + (width - placeable.width) / 2F).roundToInt(),
-        y = (beginWeightRatio * constraints.maxHeight + (height - placeable.height) / 2F).roundToInt(),
-        zIndex = itemState.zIndexState.floatValue,
+        y = y,
+        zIndex = itemState.zIndexState.floatValue + LayoutItemModifier.visualPriority.get(itemState),
       )
     }
   }
@@ -145,36 +176,40 @@ private fun calculateIndex(itemState: CourseItemState,): Int {
 }
 
 /**
- * 获取 item 在屏幕中的坐标
- * 会跟随 item 的位置移动而实时改变
- * @param forceCalculate 是否强制实时计算 item 的坐标位置，一般用于当前 item 还未完全变成对应时间的情况
+ * 获取 Item 在屏幕中的坐标，并在 Item 布局位置变化时持续更新。
+ *
+ * @param forceCalculate 为 true 时不依赖 Item 自身是否存在可用坐标，而是依据课表页面坐标、时间范围和
+ * 时间轴权重计算完整 Item 的位置。时间轴展开动画会逐帧改变权重，因此这里使用 [snapshotFlow] 继续
+ * 发出新的矩形；调用方若会同时滚动课表，需要剔除自身滚动造成的屏幕坐标变化，避免形成反馈循环。
  */
-fun CourseItemState.observeItemRectInWindow(forceCalculate: Boolean = false): Flow<Rect> {
+@OptIn(ExperimentalCoroutinesApi::class)
+fun CourseItemState.observeItemRectOnScreen(forceCalculate: Boolean = false): Flow<Rect> {
   return layoutCoordinatesFlow.flatMapLatest { itemCoordinates ->
     if (itemCoordinates != null && itemCoordinates.isAttached && !forceCalculate) {
-      flowOf(Rect(itemCoordinates.positionInWindow(), itemCoordinates.size.toSize()))
+      flowOf(Rect(itemCoordinates.positionOnScreen(), itemCoordinates.size.toSize()))
     } else {
-      // 此时 item 可能已经不可见，比如被上方重叠的 item 遮挡完了
-      // 使用 coursePage.layoutCoordinatesFlow 进行计算
+      // Item 可能已被上层重叠项完全遮挡，因此使用 CoursePage 坐标计算其完整业务区间。
       coursePageFlow.filterNotNull()
         .flatMapLatest { it.layoutCoordinatesFlow }
-        .filter { it.isAttached } // 需要确保 isAttached，防止 page 已经不可见
-        .map { pageCoordinates ->
-          // 手动计算 item 的位置，跟 courseItemLayout 计算逻辑保持一致
-          val beginWeightRatio = coursePage.timeline.calculateWeightRatio(item.whatTime.beginTime)
-          val finalWeightRatio = coursePage.timeline.calculateWeightRatio(item.whatTime.finalTime)
-          val width = pageCoordinates.size.width / 7
-          val height =
-            (pageCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt()
-          val x = calculateIndex(this) * pageCoordinates.size.width / 7F
-          val y = beginWeightRatio * pageCoordinates.size.height
-          val offsetInWindow = pageCoordinates.positionInWindow()
-          Rect(
-            left = x + offsetInWindow.x,
-            top = y + offsetInWindow.y,
-            right = x + width + offsetInWindow.x,
-            bottom = y + height + offsetInWindow.y,
-          )
+        .filter { it.isAttached }
+        .flatMapLatest { pageCoordinates ->
+          snapshotFlow {
+            // 与 courseItemLayout 保持相同的时间轴权重换算；权重变化会驱动新的坐标结果。
+            val beginWeightRatio = coursePage.timeline.calculateWeightRatio(item.whatTime.beginTime)
+            val finalWeightRatio = coursePage.timeline.calculateWeightRatio(item.whatTime.finalTime)
+            val width = pageCoordinates.size.width / 7
+            val height =
+              (pageCoordinates.size.height * (finalWeightRatio - beginWeightRatio)).roundToInt()
+            val x = calculateIndex(this) * pageCoordinates.size.width / 7F
+            val y = beginWeightRatio * pageCoordinates.size.height
+            val offsetOnScreen = pageCoordinates.positionOnScreen()
+            Rect(
+              left = x + offsetOnScreen.x,
+              top = y + offsetOnScreen.y,
+              right = x + width + offsetOnScreen.x,
+              bottom = y + height + offsetOnScreen.y,
+            )
+          }
         }
     }
   }

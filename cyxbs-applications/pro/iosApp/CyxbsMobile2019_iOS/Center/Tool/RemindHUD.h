@@ -36,6 +36,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)showDefaultHUDWithText:(NSString *)text completion:(void (^ __nullable)(void))completion;
 
+- (void)showDefaultHUDLongWithText:(NSString *)text completion:(void (^ __nullable)(void))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -22,9 +22,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// 该token什么时候过期（Unix时间戳）
 @property (nonatomic, copy) NSString *exp;
 
-/// 用来刷新token的凭证，有效时间45天，且只可以使用一次
-@property (nonatomic, copy) NSString *refreshToken;
-
 /// 真实姓名
 @property (nonatomic, copy) NSString *realName;
 

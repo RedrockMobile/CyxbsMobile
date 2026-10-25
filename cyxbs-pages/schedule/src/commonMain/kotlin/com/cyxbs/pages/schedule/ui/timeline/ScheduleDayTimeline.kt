@@ -13,8 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,7 +36,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableNoIndicator
-import com.cyxbs.pages.schedule.data.model.ScheduleEntity
+import com.cyxbs.pages.schedule.domain.model.CategoryId
+import com.cyxbs.pages.schedule.domain.model.ScheduleCategory
+import com.cyxbs.pages.schedule.ui.category.ScheduleDefaultCategoryColorValue
+import com.cyxbs.pages.schedule.ui.category.backgroundColor
+import com.cyxbs.pages.schedule.ui.category.contentColor
+import com.cyxbs.pages.schedule.ui.category.decodeScheduleCategoryColor
+import com.cyxbs.pages.schedule.ui.model.ScheduleUiOccurrence
 
 /** 每小时对应的像素高度，外部计算默认滚动位置时复用。 */
 internal val HourHeight: Dp = 64.dp
@@ -51,12 +59,10 @@ private val EventGap: Dp = 4.dp
 /** 整日块（当日/未排期，跨 0-24 点）单块的最大宽度。 */
 private val FullDayBlockMaxWidth: Dp = 96.dp
 
-/** 整日块整条（最右侧）占用的最大宽度上限——不占满事件区，给左侧有时刻事件留空间。 */
-private val FullDayStripMax: Dp = 132.dp
-
-/** N 个整日块占用的右侧条总宽：单块封顶 [FullDayBlockMaxWidth]，整条封顶 [FullDayStripMax]，块多则缩。 */
-private fun fullDayStripWidth(n: Int): Dp =
-  if (n <= 0) 0.dp else minOf(FullDayBlockMaxWidth * n, FullDayStripMax)
+/** N 个整日块占用的右侧条总宽：单块封顶 [FullDayBlockMaxWidth]，整条最多占总宽一半，块多则缩。 */
+private fun fullDayStripWidth(n: Int, totalWidth: Dp): Dp {
+  return if (n <= 0) 0.dp else minOf(FullDayBlockMaxWidth * n, totalWidth * 0.5F)
+}
 
 /**
  * 第三层时间轴的「当天」视图：左侧 00..24 灰色小时刻度，右侧按分钟摆放事件。
@@ -64,6 +70,7 @@ private fun fullDayStripWidth(n: Int): Dp =
  * - 时间段类型：圆角区间块，块内显示标题与时间段。
  * - 截止类型：一条粗线 + 标题。
  * - 重叠事件并列分列展示（[layoutTimedSchedules]）。
+ * - 每个事件使用 [categories] 中对应分组的背景/文字配色，无效或缺失分组回退默认灰。
  *
  * 左侧时间刻度与右侧事件区共用一个 [scrollState] 竖向**同步滚动**；右侧事件区的 middleBg 圆角卡片
  * **固定为视口大小、不随内容滚动**，内容在卡片内部滚动并被圆角裁剪，因此无论滚到哪，卡片圆角始终
@@ -75,12 +82,29 @@ private fun fullDayStripWidth(n: Int): Dp =
 @Composable
 fun ScheduleTimelinePane(
   timed: List<DayTimedSchedule>,
+  categories: List<ScheduleCategory>,
   scrollState: ScrollState,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = LocalAppColors.current
+  val isLight = MaterialTheme.colors.isLight
   val fullDay = remember(timed) { timed.filter { it.isFullDay() } }
+  val defaultScheduleColors = remember(isLight) {
+    ScheduleTimelineColors(
+      background = ScheduleDefaultCategoryColorValue.backgroundColor(isLight),
+      content = ScheduleDefaultCategoryColorValue.contentColor(isLight),
+    )
+  }
+  val categoryColors = remember(categories, isLight) {
+    categories.associate { category ->
+      val value = decodeScheduleCategoryColor(category.color) ?: ScheduleDefaultCategoryColorValue
+      category.id to ScheduleTimelineColors(
+        background = value.backgroundColor(isLight),
+        content = value.contentColor(isLight),
+      )
+    }
+  }
   Box(modifier = modifier.fillMaxSize().padding(horizontal = 8.dp)) {
     Row(modifier = Modifier.fillMaxSize().padding(vertical = 8.dp)) {
       // 左侧时间刻度：独立滚动容器，与右侧共享 scrollState 保持同步。
@@ -108,18 +132,24 @@ fun ScheduleTimelinePane(
         ) {
           EventArea(
             timed = timed,
+            categoryColors = categoryColors,
+            defaultScheduleColors = defaultScheduleColors,
             onScheduleClick = onScheduleClick,
             modifier = Modifier.fillMaxWidth().height(TimelineHeight),
           )
         }
+        if (fullDay.isNotEmpty()) {
+          // 标题层必须与事件区共享同一坐标系。放在固定视口内既能保持标题 sticky，
+          // 又能让全天条和标题使用完全相同的可用宽度，避免多条全天日程时列中心错位。
+          FullDayTitleOverlay(
+            fullDay = fullDay,
+            categoryColors = categoryColors,
+            defaultScheduleColors = defaultScheduleColors,
+            onScheduleClick = onScheduleClick,
+            modifier = Modifier.align(Alignment.CenterEnd),
+          )
+        }
       }
-    }
-    if (fullDay.isNotEmpty()) {
-      FullDayTitleOverlay(
-        fullDay = fullDay,
-        onScheduleClick = onScheduleClick,
-        modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = 8.dp),
-      )
     }
   }
 }
@@ -152,7 +182,9 @@ private fun TimeAxis(modifier: Modifier) {
 @Composable
 private fun EventArea(
   timed: List<DayTimedSchedule>,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  categoryColors: Map<CategoryId, ScheduleTimelineColors>,
+  defaultScheduleColors: ScheduleTimelineColors,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier,
 ) {
   val colors = LocalAppColors.current
@@ -160,7 +192,6 @@ private fun EventArea(
   val fullDay = remember(timed) { timed.filter { it.isFullDay() } }
   val timedOnly = remember(timed) { timed.filterNot { it.isFullDay() } }
   val positions = remember(timedOnly) { layoutTimedSchedules(timedOnly) }
-  val stripWidth = fullDayStripWidth(fullDay.size)
 
   // middleBg + 8dp 圆角由父级固定卡片承载（不随滚动）；这里只画每小时一条淡参考线（随内容滚动），
   // 参考线只画在左侧有时刻区域（不穿过右侧整日条）。
@@ -171,6 +202,7 @@ private fun EventArea(
         val strokeWidth = 1.dp.toPx()
         val hourPx = HourHeight.toPx()
         val inset = EventGap.toPx()
+        val stripWidth = fullDayStripWidth(fullDay.size, size.width.toDp())
         val leftWidth = size.width - stripWidth.toPx()
         for (h in 1..23) {
           val y = hourPx * h
@@ -186,29 +218,36 @@ private fun EventArea(
       // [0 until positions.size] 有时刻事件，按 positions 顺序。
       positions.forEach { pos ->
         val e = pos.event
+        val eventColors = e.occurrence.timelineColors(categoryColors, defaultScheduleColors)
         if (e.isInterval) {
           IntervalBlock(
-            todo = e.todo,
+            occurrence = e.occurrence,
+            colors = eventColors,
             startMin = e.startMin,
             endMin = e.endMin,
-            onClick = { onScheduleClick(e.todo) },
+            onClick = { onScheduleClick(e.occurrence) },
           )
         } else {
           DeadlineLine(
-            todo = e.todo,
-            onClick = { onScheduleClick(e.todo) },
+            occurrence = e.occurrence,
+            colors = eventColors,
+            onClick = { onScheduleClick(e.occurrence) },
           )
         }
       }
       // [positions.size ..] 整日块彩色条（无标题，标题在 overlay 层）。
       fullDay.forEach { e ->
-        FullDayBar(todo = e.todo, onClick = { onScheduleClick(e.todo) })
+        FullDayBar(
+          colors = e.occurrence.timelineColors(categoryColors, defaultScheduleColors),
+          onClick = { onScheduleClick(e.occurrence) },
+        )
       }
     },
   ) { measurables, constraints ->
     val width = constraints.maxWidth
     val totalHeightPx = TimelineHeight.roundToPx()
     val gapPx = EventGap.roundToPx()
+    val stripWidth = fullDayStripWidth(fullDay.size, width.toDp())
     val stripPx = stripWidth.roundToPx()
     val leftWidth = (width - stripPx).coerceAtLeast(0)
     val n = fullDay.size
@@ -260,15 +299,14 @@ private fun EventArea(
 /** 整日块的彩色条（无标题）：跨 0-24 点全高，圆角纯色底。标题由 overlay 层渲染。 */
 @Composable
 private fun FullDayBar(
-  todo: ScheduleEntity,
+  colors: ScheduleTimelineColors,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
   Box(
     modifier = Modifier
       .fillMaxHeight()
       .clip(RoundedCornerShape(6.dp))
-      .background(accent.copy(alpha = 0.14f))
+      .background(colors.background)
       .clickableNoIndicator(onClick = onClick),
   )
 }
@@ -281,28 +319,41 @@ private fun FullDayBar(
 @Composable
 private fun FullDayTitleOverlay(
   fullDay: List<DayTimedSchedule>,
-  onScheduleClick: (ScheduleEntity) -> Unit,
+  categoryColors: Map<CategoryId, ScheduleTimelineColors>,
+  defaultScheduleColors: ScheduleTimelineColors,
+  onScheduleClick: (ScheduleUiOccurrence) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier
-      .width(fullDayStripWidth(fullDay.size))
+      .layout { measurables, constraints ->
+        // 仅占有一半的宽度
+        val width = constraints.maxWidth
+        val stripWidth = fullDayStripWidth(fullDay.size, width.toDp()).roundToPx()
+        val placeable = measurables.measure(constraints.copy(maxWidth = stripWidth))
+        layout(placeable.width, placeable.height) {
+          placeable.place(x = 0, y = 0)
+        }
+      }
       .padding(horizontal = EventGap),
     horizontalArrangement = Arrangement.spacedBy(EventGap),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
     fullDay.forEach { e ->
-      val accent = todoAccent(e.todo)
+      val eventColors = e.occurrence.timelineColors(categoryColors, defaultScheduleColors)
       Box(
         modifier = Modifier
           .weight(1f)
-          .clickableNoIndicator(onClick = { onScheduleClick(e.todo) }),
+          // 标题与底层全天彩色条分层绘制，必须复用同一圆角边界，避免窄列中的长文本画到相邻条外。
+          .clip(RoundedCornerShape(6.dp))
+          .clickableNoIndicator(onClick = { onScheduleClick(e.occurrence) }),
         contentAlignment = Alignment.Center,
       ) {
         Text(
-          text = e.todo.title,
+          text = e.occurrence.title,
           fontSize = 13.sp,
           fontWeight = FontWeight.Medium,
-          color = accent,
+          color = eventColors.content,
           textAlign = TextAlign.Center,
           maxLines = 4,
           overflow = TextOverflow.Ellipsis,
@@ -315,33 +366,33 @@ private fun FullDayTitleOverlay(
 
 @Composable
 private fun IntervalBlock(
-  todo: ScheduleEntity,
+  occurrence: ScheduleUiOccurrence,
+  colors: ScheduleTimelineColors,
   startMin: Int,
   endMin: Int,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
   Box(
     modifier = Modifier
       .clip(RoundedCornerShape(6.dp))
-      .background(accent.copy(alpha = 0.14f))
+      .background(colors.background)
       .clickableNoIndicator(onClick = onClick),
   ) {
     Column(
       modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
       Text(
-        text = todo.title,
+        text = occurrence.title,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
-        color = accent,
+        color = colors.content,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
       Text(
         text = "${minuteToHHmm(startMin)}-${minuteToHHmm(endMin)}",
         fontSize = 10.sp,
-        color = accent.copy(alpha = 0.7f),
+        color = colors.content.copy(alpha = 0.72f),
         maxLines = 1,
       )
     }
@@ -350,18 +401,18 @@ private fun IntervalBlock(
 
 @Composable
 private fun DeadlineLine(
-  todo: ScheduleEntity,
+  occurrence: ScheduleUiOccurrence,
+  colors: ScheduleTimelineColors,
   onClick: () -> Unit,
 ) {
-  val accent = todoAccent(todo)
   Box(
     modifier = Modifier.clickableNoIndicator(onClick = onClick),
   ) {
     Text(
-      text = todo.title,
+      text = occurrence.title,
       fontSize = 12.sp,
       fontWeight = FontWeight.Medium,
-      color = accent,
+      color = colors.content,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
       modifier = Modifier
@@ -374,18 +425,26 @@ private fun DeadlineLine(
         .fillMaxWidth()
         .height(3.dp)
         .clip(RoundedCornerShape(2.dp))
-        .background(accent),
+        .background(colors.background),
     )
   }
 }
 
-/** 按分类 / 过期态取强调色。 */
-private fun todoAccent(todo: ScheduleEntity): Color = when {
-  todo.isOvered == 1 -> Color(0xFFFF6262)
-  todo.type == ScheduleEntity.TYPE_STUDY -> Color(0xFF4A6FE3)
-  todo.type == ScheduleEntity.TYPE_LIFE -> Color(0xFF38B6A6)
-  else -> Color(0xFFF2994A)
-}
+/** 时间轴块使用的完整分组配色；背景和文字必须成对切换，避免只换强调色后对比度失效。 */
+private data class ScheduleTimelineColors(
+  val background: Color,
+  val content: Color,
+)
+
+/**
+ * 按稳定分类 identity 解析时间轴配色。
+ *
+ * 无分组、分组已删除或旧版颜色 JSON 无效时统一回退到默认灰，保证时间轴与分组管理的第一项一致。
+ */
+private fun ScheduleUiOccurrence.timelineColors(
+  categoryColors: Map<CategoryId, ScheduleTimelineColors>,
+  defaultColors: ScheduleTimelineColors,
+): ScheduleTimelineColors = categoryId?.let(categoryColors::get) ?: defaultColors
 
 private fun minuteToHHmm(min: Int): String {
   val h = (min / 60).coerceIn(0, 24)

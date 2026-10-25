@@ -1,13 +1,13 @@
 package com.cyxbs.pages.mine.network.model
 
-import com.google.gson.annotations.SerializedName
-import java.io.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
- * Created by wangtianqi on 2020/10/31
- * 接收的邮箱验证码
+ * 接收的邮箱验证码。
  */
+@Serializable
 data class EmailCode(
-        @SerializedName("expired_time")
-        val expiredTime: Int
-) : Serializable
+        @SerialName("expired_time")
+        val expiredTime: Int,
+)

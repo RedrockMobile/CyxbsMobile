@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +24,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cyxbs.components.config.compose.theme.LocalAppColors
 import com.cyxbs.components.utils.compose.clickableSingle
 import com.cyxbs.pages.sport.model.SportNoticeRepository
@@ -60,7 +60,7 @@ fun SportNoticeDialog(onDismiss: () -> Unit) {
         fontWeight = FontWeight.Bold,
       )
       AnimatedContent(
-        targetState = SportNoticeRepository.noticeData.collectAsStateWithLifecycle().value,
+        targetState = SportNoticeRepository.noticeData.collectAsState().value,
       ) { result ->
         val notices = result?.getOrNull()
         when {

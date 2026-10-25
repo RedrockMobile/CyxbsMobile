@@ -1,8 +1,12 @@
 package com.cyxbs.components.utils.extensions
 
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
@@ -104,3 +108,38 @@ fun <T> Flow<T>.interceptException(
 fun <T> Flow<T>.interceptExceptionByResult(
   action: suspend ExceptionResult<FlowCollector<Result<T>>>.(Throwable) -> Unit
 ) : Flow<Result<T>> = map { Result.success(it) }.interceptException(action)
+
+/**
+ * 将 StateFlow 同步映射为只读 StateFlow，不创建额外的状态缓存或后台作用域。
+ *
+ * value 和 replayCache 每次读取都直接转换上游当前值；收集时转换上游发射值，按转换结果的 equals 合并相邻相等值。
+ * 每次读取和每个订阅者都会独立执行转换，适合 `session.mapState { it.state }` 这样的简单属性投影。
+ *
+ * 官方未提供这类通用转换的讨论：
+ * - [StateFlow 专用 map 的提议 #2081](https://github.com/Kotlin/kotlinx.coroutines/issues/2081)。
+ *   维护者指出：挂起转换无法用于同步 value；即使不挂起，随机数等非确定转换也会使 value 与订阅结果不一致；
+ *   filter 等操作还需要保存之前的结果，无法统一实现为当前值的直接投影。
+ * - [StateFlow 操作符讨论 #2008](https://github.com/Kotlin/kotlinx.coroutines/issues/2008)。
+ *   官方提供的通用方案是 `map { ... }.stateIn(scope, ...)`，通过共享协程计算并缓存派生结果。
+ *   本方法仅覆盖确定的同步映射，不代替需要挂起、昂贵计算或共享计算结果的 stateIn。
+ *
+ * [StateFlow 官方文档](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-state-flow/)
+ * 说明该接口不保证第三方继承稳定性，升级协程库时需复核此适配。
+ *
+ * @param transform 快速、非阻塞、无副作用的同步纯函数；结果只能依赖输入，不得读取随机数、当前时间或外部可变状态。
+ * @return 从上游实时派生的只读状态流；转换异常向读取者或订阅者传播，取消订阅会取消对应的上游收集。
+ */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+fun <T, R> StateFlow<T>.mapState(transform: (T) -> R): StateFlow<R> = object : StateFlow<R> {
+  override val value: R
+    get() = transform(this@mapState.value)
+
+  override val replayCache: List<R>
+    get() = listOf(value)
+
+  override suspend fun collect(collector: FlowCollector<R>): Nothing {
+    this@mapState.map { transform(it) }.distinctUntilChanged().collect(collector)
+    // 上游 StateFlow 不会正常结束；此处补足 Nothing 返回类型，取消仍从上游 collect 直接传播。
+    awaitCancellation()
+  }
+}

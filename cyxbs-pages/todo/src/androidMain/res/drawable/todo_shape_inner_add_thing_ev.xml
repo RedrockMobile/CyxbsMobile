@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:tools="http://schemas.android.com/tools"
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    tools:ignore="MissingDefaultResource">
-    <corners android:radius="22dp" />
-    <solid android:color="@color/todo_inner_add_thing_et_shape_color" />
-</shape>

@@ -13,6 +13,10 @@ kotlin {
     namespace = ModuleNamespaceCheckRule.getCorrectNamespace(project)
     compileSdk = libsEx.versions.`android-compileSdk`.toInt()
     minSdk = libsEx.versions.`android-minSdk`.toInt()
+    // AGP 新 KMP Android 插件固定创建 androidDeviceTest 源集；通用依赖由 kmp.base 统一注入。
+    withDeviceTest {
+      instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compilerOptions {
       jvmTarget.set(JvmTarget.fromTarget(libsEx.versions.kotlinJvmTarget))
     }
@@ -36,6 +40,14 @@ kotlin {
       } else {
         resourcePrefix = paths[paths.size - 2] + "_" + paths.last()
       }
+    }
+  }
+  sourceSets {
+    // withDeviceTest 创建固定的 androidDeviceTest 源集；统一注入所有 KMP Android 模块可复用的依赖。
+    val androidDeviceTest by getting
+    androidDeviceTest.dependencies {
+      implementation(kotlin("test"))
+      libsEx.bundles.`androidx-test`.forEach { implementation(it) }
     }
   }
 }

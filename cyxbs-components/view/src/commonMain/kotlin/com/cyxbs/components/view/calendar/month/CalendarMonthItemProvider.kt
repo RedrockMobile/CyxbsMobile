@@ -7,11 +7,11 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import com.cyxbs.components.config.time.Date
+import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import com.cyxbs.components.view.calendar.CalendarDateShowValue
 import com.cyxbs.components.view.calendar.scroll.HorizontalScrollState
 import com.cyxbs.components.view.calendar.scroll.VerticalScrollState
-import com.cyxbs.components.config.time.Date
-import com.cyxbs.components.utils.compose.derivedStateOfStructure
 import kotlin.math.abs
 
 /**
@@ -27,7 +27,8 @@ internal class CalendarMonthItemProvider(
   private val startDateState: State<Date>,
   private val endDateState: State<Date>,
   private val clickDateState: State<Date>,
-  private val itemContent: @Composable (date: Date, showState: CalendarDateShowValue) -> Unit,
+  /** 始终指向调用方最新内容，确保日程圆点集合变化后已缓存的日期 item 也会刷新。 */
+  private val itemContentState: State<@Composable (date: Date, showState: CalendarDateShowValue) -> Unit>,
 ) : LazyLayoutItemProvider {
 
   override val itemCount: Int
@@ -45,7 +46,7 @@ internal class CalendarMonthItemProvider(
         getDateShowState(date, dateKey > 0)
       }
     }
-    itemContent(date, show)
+    itemContentState.value(date, show)
   }
 
   override fun getIndex(key: Any): Int {

@@ -70,9 +70,30 @@ RisingSingleClass_IMPLEMENTATION(Tool)
        progress:(nullable void (^)(NSProgress * _Nonnull))progress
         success:(nullable void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
         failure:(nullable void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure {
-    
+
+    // 旧原生接口会通过 NSUserDefaults 拼接 baseURL。全新安装或启动时序异常时，
+    // 宏可能生成空地址；在公共入口转成普通网络失败，避免 AFNetworking 直接抛异常。
+    NSURL *url = [NSURL URLWithString:URLString];
+    NSString *scheme = url.scheme.lowercaseString;
+    BOOL isHTTPURL = ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"])
+        && url.host.length > 0;
+    if (!isHTTPURL) {
+        if (failure) {
+            NSMutableDictionary *userInfo = [@{
+                NSLocalizedDescriptionKey: @"请求地址缺失或格式非法"
+            } mutableCopy];
+            if (URLString.length > 0) {
+                userInfo[NSURLErrorFailingURLStringErrorKey] = URLString;
+            }
+            NSError *error = [NSError errorWithDomain:NSURLErrorDomain
+                                                 code:NSURLErrorBadURL
+                                             userInfo:userInfo];
+            failure(nil, error);
+        }
+        return;
+    }
+
     NSString *originalUrl = URLString;
-    NSURL* url = [NSURL URLWithString:originalUrl];
     // 异步接口获取IP
     NSString* ip = [AliyunConfig ipByHost:url.host];
     if (ip) {

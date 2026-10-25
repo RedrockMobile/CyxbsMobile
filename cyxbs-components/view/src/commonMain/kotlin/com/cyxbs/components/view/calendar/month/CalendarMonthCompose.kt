@@ -13,14 +13,15 @@ import androidx.compose.foundation.lazy.layout.LazyLayoutPrefetchState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.view.calendar.CalendarDateShowValue
 import com.cyxbs.components.view.calendar.scroll.HorizontalScrollState
 import com.cyxbs.components.view.calendar.scroll.VerticalScrollState
-import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.view.calendar.state.CalendarState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -40,6 +41,7 @@ fun CalendarState.CalendarMonthCompose(
   itemContent: @Composable (date: Date, show: CalendarDateShowValue) -> Unit,
 ) {
   val prefetchState = remember { LazyLayoutPrefetchState() }
+  val itemContentState = rememberUpdatedState(itemContent)
   val itemProvider = remember(this) {
     CalendarMonthItemProvider(
       verticalScrollState = verticalScrollState,
@@ -47,7 +49,7 @@ fun CalendarState.CalendarMonthCompose(
       startDateState = startDateState,
       endDateState = endDateState,
       clickDateState = clickDateState,
-      itemContent = itemContent,
+      itemContentState = itemContentState,
     )
   }
   val measurePolicy = remember(this) {
@@ -201,4 +203,3 @@ internal fun Date.indexUntil(date: Date): Int {
   return ((date.year - year) * 12 + date.monthNumber - monthNumber) * 6 +
       (date.firstDate.dayOfWeekOrdinal + date.dayOfMonth - 1) / 7
 }
-

@@ -69,7 +69,7 @@ class ItineraryViewModel : BaseViewModel() {
         info: ReceivedItineraryMsgBean
     ) {
         launchByViewModelScope {
-            ItineraryRepository.addAffair(remindTime, info).onFailure {
+            ItineraryRepository.addScheduleAffair(remindTime, info).onFailure {
                 "添加失败".toast()
                 _add2scheduleIsSuccessfulState.postValue(Pair(index, false))
             }.onSuccess {

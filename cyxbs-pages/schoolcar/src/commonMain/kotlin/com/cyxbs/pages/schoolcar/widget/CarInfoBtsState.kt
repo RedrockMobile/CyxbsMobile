@@ -6,7 +6,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.Dp
-import com.cyxbs.components.view.ui.BottomSheetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.schoolcar.bean.CarLineJson
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.schoolcar.generated.resources.schoolcar_ic_car_icon_1

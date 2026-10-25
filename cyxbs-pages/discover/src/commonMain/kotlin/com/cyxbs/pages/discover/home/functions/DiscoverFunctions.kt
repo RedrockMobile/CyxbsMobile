@@ -3,12 +3,17 @@ package com.cyxbs.pages.discover.home.functions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.painter.Painter
+import com.cyxbs.components.navigation.AppScheme
+import com.cyxbs.components.navigation.NAV_SPORT
 import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
 import com.cyxbs.pages.map.api.MapNavArgument
 import com.cyxbs.pages.noclass.api.NoClassNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
+import com.cyxbs.pages.discover.pages.calendar.SchoolCalendarNavArgument
+import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
+import com.cyxbs.pages.sport.api.SportNavArgument
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_bus_track
 import cyxbsmobile.cyxbs_pages.discover.generated.resources.discover_ic_empty_classroom
@@ -137,15 +142,15 @@ abstract class DiscoverFunctions {
   }
 
   open fun clickSchoolCalendar() {
-    toast("该平台未实现")
+    SchoolCalendarNavArgument.navigate()
   }
 
   open fun clickTodo() {
-    toast("该平台未实现")
+    ScheduleMainNavArgument().navigate()
   }
 
   open fun clickSport() {
-    toast("该平台未实现")
+    SportNavArgument.navigate()
   }
 
   open fun clickExam() {

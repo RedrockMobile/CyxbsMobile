@@ -1,3 +1,4 @@
+import androidx.room3.gradle.RoomExtension
 import com.g985892345.provider.plugin.gradle.extensions.KtProviderExtensions
 import com.google.devtools.ksp.gradle.KspExtension
 import org.gradle.api.Project
@@ -65,6 +66,41 @@ fun Project.useRoom(
   }
   dependencies {
     "kspAndroid"(libsEx.`androidx-room-compiler`)
+  }
+}
+
+/**
+ * 使用 Room3 KMP 数据库，仅向非 Web target 注入运行时与 KSP 编译器。
+ *
+ * Room3 的 Gradle 插件负责以类型安全方式输出 schema；JS、Wasm、metadata
+ * 均不配置 Room3 compiler，避免其进入 Web 依赖图。
+ *
+ * @param schemaDirectory schema 输出目录，默认使用模块内 `schemas/room3`。
+ * @param includeBundledSqlite 是否为非 Web target 引入 bundled SQLite driver。
+ */
+fun Project.useRoom3(
+  schemaDirectory: String = "${projectDir}/schemas/room3",
+  includeBundledSqlite: Boolean = true,
+) {
+  apply(plugin = libsEx.plugins.ksp)
+  apply(plugin = libsEx.plugins.androidxRoom3)
+  extensions.configure<RoomExtension> {
+    schemaDirectory(schemaDirectory)
+  }
+  extensions.configure<KotlinMultiplatformExtension> {
+    sourceSets.getByName("noWebMain").dependencies {
+      implementation(libsEx.`androidx-room3-runtime`)
+      if (includeBundledSqlite) {
+        implementation(libsEx.`androidx-sqlite-bundled`)
+      }
+    }
+  }
+  dependencies {
+    listOf("kspAndroid", "kspDesktop", "kspIosArm64", "kspIosSimulatorArm64").forEach { configurationName ->
+      if (configurations.findByName(configurationName) != null) {
+        add(configurationName, libsEx.`androidx-room3-compiler`)
+      }
+    }
   }
 }
 

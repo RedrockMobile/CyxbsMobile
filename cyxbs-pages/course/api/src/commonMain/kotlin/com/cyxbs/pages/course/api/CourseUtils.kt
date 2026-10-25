@@ -1,5 +1,6 @@
 package com.cyxbs.pages.course.api
 
+import com.cyxbs.components.config.sp.defaultSettings
 import com.cyxbs.components.config.time.MinuteTime
 
 /**
@@ -9,6 +10,17 @@ import com.cyxbs.components.config.time.MinuteTime
  * @date 2025/1/28
  */
 object CourseUtils {
+
+  /**
+   * 课表能显示的最大周数
+   */
+  var maxWeek: Int = defaultSettings.getInt("课表最大周数", 21)
+    private set
+
+  fun setMaxWeek(maxWeek: Int) {
+    defaultSettings.putInt("课表最大周数", maxWeek)
+    this.maxWeek = maxWeek
+  }
 
   fun getStartMinuteTime(lesson: Int): MinuteTime {
     return when (lesson) {

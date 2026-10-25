@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,10 +35,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -61,12 +66,22 @@ import com.cyxbs.pages.course.find.viewmodel.FindCourseViewModel
 
 private const val FIND_DETAIL_STABLE_KEY = "course-find-detail"
 
+/** 查课表页面，统一处理搜索输入、页面返回与键盘收起。 */
 @Composable
 internal fun FindCourseScreen(
   argument: FindCourseNavArgument,
   modifier: Modifier = Modifier,
 ) {
   val vm = viewModel<FindCourseViewModel>()
+  val focusManager = LocalFocusManager.current
+  val keyboardController = LocalSoftwareKeyboardController.current
+  val dismissKeyboard: () -> Unit = remember(focusManager, keyboardController) {
+    {
+      // iOS 隐藏键盘后可能保留输入焦点，先清除焦点，确保再次点击搜索框能重新唤起键盘。
+      focusManager.clearFocus(force = true)
+      keyboardController?.hide()
+    }
+  }
   // 处理路由初始参数
   // 每次 NavEntry 进后台后都会被摧毁，返回时重建，所以需要判断是否已经处理了初始化的参数
   val hasInitArgument = rememberSavableWrapper { false }
@@ -79,9 +94,15 @@ internal fun FindCourseScreen(
 
   val searchState by vm.searchState.collectAsState()
 
+  // 搜索异常是一次性提示事件，不参与内容状态切换，因此页面可以继续保留请求前的结果。
+  LaunchedEffect(vm) {
+    vm.toastEvent.collect { message -> toast(message) }
+  }
+
   // 统一返回逻辑：搜索状态非 Idle 时先清空输入回到 Idle，否则真正退出页面。
   // 由顶部栏返回按钮、系统返回键 / 手势 / ESC 共用
   val onBack: () -> Unit = {
+    dismissKeyboard()
     if (searchState !is FindCourseViewModel.SearchState.Idle) {
       vm.setQuery("")
     } else {
@@ -92,26 +113,32 @@ internal fun FindCourseScreen(
   NavigationBackHandler(
     state = backEventState,
     isBackEnabled = searchState !is FindCourseViewModel.SearchState.Idle,
-    onBackCompleted = { vm.setQuery("") },
+    onBackCompleted = onBack,
   )
 
   Column(
     modifier = modifier
       .fillMaxSize()
       .background(LocalAppColors.current.bottomBg)
+      .pointerInput(dismissKeyboard) {
+        // 输入框会消费自己的点击；未被子控件消费的页面空白点击在这里收起键盘。
+        detectTapGestures(onTap = { dismissKeyboard() })
+      }
       .systemBarsPadding(),
   ) {
     FindCourseTopBar(onBack = onBack)
     SearchField(
       state = vm.queryTextFieldState,
       onClear = { vm.setQuery("") },
+      onDismissKeyboard = dismissKeyboard,
     )
-    SearchBottomContent()
+    SearchBottomContent(onDismissKeyboard = dismissKeyboard)
   }
 }
 
+/** 展示搜索状态；可点击内容自行收起键盘，避免子控件消费点击后漏掉页面处理。 */
 @Composable
-private fun SearchBottomContent() {
+private fun SearchBottomContent(onDismissKeyboard: () -> Unit) {
   val vm = viewModel<FindCourseViewModel>()
   val searchState by vm.searchState.collectAsState()
   val history by vm.history.collectAsState()
@@ -123,6 +150,7 @@ private fun SearchBottomContent() {
     negativeBtnText = "取消",
   )
   fun linkStuAction(stuNum: String, name: String) {
+    onDismissKeyboard()
     val isLinked = stuNum == linkState.linkNum && linkState.isNotNull()
     val (msg, onConfirm) = when {
       isLinked -> "确定要取消关联吗？" to { vm.deleteLink(); toast("已取消关联") }
@@ -152,11 +180,21 @@ private fun SearchBottomContent() {
       FindCourseViewModel.SearchState.Idle -> IdleContent(
         history = history,
         linkState = linkState,
-        onHistoryClick = { entity -> navigateToCourse(entity.stuNum) },
+        onHistoryClick = { entity ->
+          onDismissKeyboard()
+          navigateToCourse(entity.stuNum)
+        },
         onHistoryLongClick = { entity -> linkStuAction(entity.stuNum, entity.name) },
-        onHistoryDelete = { entity -> vm.deleteHistory(entity.stuNum) },
-        onLinkCardClick = { stuNum -> navigateToCourse(stuNum) },
+        onHistoryDelete = { entity ->
+          onDismissKeyboard()
+          vm.deleteHistory(entity.stuNum)
+        },
+        onLinkCardClick = { stuNum ->
+          onDismissKeyboard()
+          navigateToCourse(stuNum)
+        },
         onLinkCardDelete = {
+          onDismissKeyboard()
           linkDialog.showAndCover(
             textProxy = "确定要取消关联吗？",
             onClickPositiveBtnProxy = {
@@ -176,14 +214,11 @@ private fun SearchBottomContent() {
         Text("查无此人", color = LocalAppColors.current.tvLv2, fontSize = 14.sp)
       }
 
-      is FindCourseViewModel.SearchState.Error -> TopHintStatus {
-        Text(state.message, color = LocalAppColors.current.tvLv2, fontSize = 14.sp)
-      }
-
       is FindCourseViewModel.SearchState.Success -> SearchResultList(
         list = state.list,
         linkedStuNum = linkState.linkNum.takeIf { linkState.isNotNull() },
         onItemClick = { bean ->
+          onDismissKeyboard()
           vm.rememberSelection(bean)
           navigateToCourse(bean.stuNum)
         },
@@ -228,10 +263,12 @@ internal val SearchBgDark = Color(0xB32C2C2C)
 private val SearchHintLight = Color(0xFF94A6C4)
 private val SearchHintDark = Color(0x85F0F0F2)
 
+/** 单行搜索框；键盘搜索 action 仅收起键盘，查询继续由输入状态的响应式流驱动。 */
 @Composable
 private fun SearchField(
   state: TextFieldState,
   onClear: () -> Unit,
+  onDismissKeyboard: () -> Unit,
 ) {
   val colors = LocalAppColors.current
   val isDark = LocalAppDark.current
@@ -252,6 +289,7 @@ private fun SearchField(
       modifier = Modifier.fillMaxWidth(),
       textStyle = TextStyle(color = colors.tvLv2, fontSize = 18.sp),
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+      onKeyboardAction = { onDismissKeyboard() },
       cursorBrush = SolidColor(MaterialTheme.colors.primary),
       decorator = { inner ->
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -280,7 +318,7 @@ private fun SearchField(
 
 // IdleContent / LinkCard 已拆至同包 IdleContent.kt / LinkCard.kt
 
-/** 搜索框正下方一定距离的提示位（Loading / Empty / Error 共用），不再撑满剩余空间居中 */
+/** 搜索框正下方一定距离的提示位（Loading / Empty 共用），不再撑满剩余空间居中 */
 @Composable
 private fun TopHintStatus(content: @Composable () -> Unit) {
   Box(
@@ -297,8 +335,7 @@ private fun FindCourseViewModel.SearchState.contentKey(): Int = when (this) {
   FindCourseViewModel.SearchState.Idle -> 0
   FindCourseViewModel.SearchState.Loading -> 1
   FindCourseViewModel.SearchState.Empty -> 2
-  is FindCourseViewModel.SearchState.Error -> 3
-  is FindCourseViewModel.SearchState.Success -> 4
+  is FindCourseViewModel.SearchState.Success -> 3
 }
 
 /* ---------- 跳转 ---------- */

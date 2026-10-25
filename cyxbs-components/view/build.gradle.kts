@@ -12,6 +12,9 @@ kotlin {
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
     }
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+    }
     androidMain.dependencies {
       implementation(libs.androidx.appcompat)
       implementation(libs.androidx.constraintlayout)
@@ -19,6 +22,5 @@ kotlin {
     }
   }
 }
-
 
 

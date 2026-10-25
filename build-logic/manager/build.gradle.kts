@@ -10,6 +10,7 @@ dependencies {
   implementation(libs.android.gradlePlugin)
   implementation(libs.kotlin.gradlePlugin)
   implementation(libs.ksp.gradlePlugin)
+  implementation(libs.androidx.room3.gradlePlugin)
   implementation(libs.kmp.ktProvider.gradlePlugin)
   implementation(libs.kmp.ktorfit.gradlePlugin)
 

@@ -1,16 +1,14 @@
 package com.cyxbs.pages.mine.network.model
 
-import com.google.gson.annotations.SerializedName
-import java.io.Serializable
+import kotlinx.serialization.Serializable
 
 /**
  * Author: RayleighZ
  * Time: 2020-11-03 21:54
  * Describe: 邮箱验证时返回的认证码
  */
-class ConfirmCode(
-        @SerializedName("code")
+@Serializable
+data class ConfirmCode(
         val code: Int,
-        @SerializedName("expired_time")
-        val expired_time: Int
-) : Serializable
+        val expired_time: Int,
+)

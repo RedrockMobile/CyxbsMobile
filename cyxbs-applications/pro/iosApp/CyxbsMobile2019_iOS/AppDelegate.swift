@@ -8,65 +8,73 @@
 
 import UIKit
 import XBSBugly
-// import CyxbsApplicationsPro
+import CyxbsApplicationsMultiplatform
+import WidgetKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-    
-    var window: UIWindow?
-    
+
     // 应用程序启动时调用的方法
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
-        setupWindow() // 设置应用程序窗口
-        setupAlicloudSDK() // 设置阿里云SDK
+
+        // 版本迁移会清空整个 UserDefaults，必须在写入网络环境前完成。
+        // 提前初始化也避免首次登录才触发清理，导致旧原生模块丢失 baseURL。
+        _ = CacheManager.shared
+        // 网络环境必须先于 CMP 初始化，避免恢复登录态时旧原生模块读取不到 baseURL。
+        setupAlicloudSDK() // 设置网络环境和阿里云SDK
+        IOSAppKt.doInitApp(impl: KmpInterfaceImpl()) // Kotlin Multiplatform 工程初始化
         XBSBugly.buglyInit() // 设置bugly
-        // IOSAppKt.doInitApp() // Kotlin Multiplatform 工程初始化
-        
+
+        // KMP 发布快照后由应用进程请求 WidgetKit 重载；扩展本身只读取 App Group 文件。
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(courseWidgetSnapshotDidChange),
+            name: Notification.Name("CourseWidgetSnapshotDidChange"),
+            object: nil
+        )
+
         return true
     }
-    
-    // 当应用程序从后台进入前台时调用的方法
-    func applicationWillEnterForeground(_ application: UIApplication) {
-        //检查token是否过期
-        RYLoginViewController.checkToken(rootVC: window?.rootViewController)
-        //更新Tabbar上方的课表topView显示的课程信息
-        if let vc = window?.rootViewController as? TabBarController {
-            vc.reloadData()
-        }
+
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(
+            name: "Default Configuration",
+            sessionRole: connectingSceneSession.role
+        )
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
     }
-    
+
     // 当应用程序进入后台时调用的方法
     func applicationDidEnterBackground(_ application: UIApplication) {
         setupEnd() // 设置结束操作
     }
-    
+
     // 当应用程序终止时调用的方法
     func applicationWillTerminate(_ application: UIApplication) {
         setupEnd() // 设置结束操作
+    }
+
+    /// 收到课表最终快照提交事件后请求刷新所有本应用的小组件；实际刷新时机由系统决定。
+    @objc private func courseWidgetSnapshotDidChange() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 
 // MARK: - 设置
 
 extension AppDelegate {
-    
-    // 设置应用程序窗口
-    func setupWindow() {
-        let rootVC = TabBarController()
-        
-        window = UIWindow()
-        window?.rootViewController = rootVC
-        window?.makeKeyAndVisible()
-    }
-    
+
     // 设置阿里云SDK
     func setupAlicloudSDK() {
+        APIConfig.current.apply(APIConfig.current.environment)
         AliyunConfig.ip(byHost: APIConfig.current.environment.host)
-        let baseURL = APIConfig.current.environment.url + "/"
-        UserDefaultsManager.shared.set(baseURL, forKey: "baseURL")
     }
-    
+
     // 设置结束操作
     func setupEnd() {
         UserDefaultsManager.shared.latestOpenApp = Date()

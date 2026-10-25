@@ -12,9 +12,7 @@ fun getAppVersionCode(): Long {
   return BuildConfig.VERSION_CODE
 }
 
-fun getAppVersionName(): String {
-  return BuildConfig.VERSION_NAME
-}
+expect fun getAppVersionName(): String
 
 fun getAppUpdateContent(): String {
   return BuildConfig.VERSION_UPDATE_CONTENT
