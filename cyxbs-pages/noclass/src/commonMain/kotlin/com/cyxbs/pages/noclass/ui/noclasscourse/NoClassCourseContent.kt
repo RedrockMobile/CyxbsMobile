@@ -7,8 +7,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,6 +76,10 @@ class NoClassCourseFrame : AbstractCourseFrame() {
 
     val decoration = NoClassPageDecoration()
 
+    init {
+        updateCoursePageDecorations(decoration)
+    }
+
     fun setAllData(data: HashMap<Int, NoClassSpareTime>) {
         decoration.setAllData(data)
     }
@@ -102,14 +104,7 @@ fun NoClassCourseContent(
     modifier: Modifier = Modifier,
     onItemClick: ((NoClassLessonItem) -> Unit)? = null,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val decorationManager = remember {
-        CoursePageDecorationManager(
-            courseFrame = noClassCourseFrame,
-            courseCoroutineScope = coroutineScope,
-            noClassCourseFrame.decoration,
-        )
-    }
+    val decorationManager = noClassCourseFrame.decorationManager
 
     LaunchedEffect(noclassData) {
         noClassCourseFrame.decoration.onItemClick = onItemClick
