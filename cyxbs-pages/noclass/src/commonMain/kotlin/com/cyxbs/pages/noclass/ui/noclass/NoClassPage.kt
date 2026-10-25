@@ -24,7 +24,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
-import com.cyxbs.components.view.ui.BottomSheetValueState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
@@ -57,8 +57,8 @@ import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.compose.dark
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.view.ui.BottomSheetCompose
-import com.cyxbs.components.view.ui.BottomSheetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetCompose
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetState
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.noclass.api.BatchAddNavArgument
 import com.cyxbs.pages.noclass.api.NoClassNavArgument
@@ -149,8 +149,8 @@ internal fun NoClassPage(argument: NoClassNavArgument) {
     }
 
     //监听到 Sheet 收起后同步重置 ViewModel 状态，确保下次查询可再次触发
-    LaunchedEffect(sheetState.state) {
-        if (sheetState.state == BottomSheetValueState.Collapsed) {
+    LaunchedEffect(sheetState.settledAnchor) {
+        if (sheetState.settledAnchor == BottomSheetAnchor.Collapsed) {
             tempViewModel.dismissQuerySheet()
         }
     }
@@ -178,7 +178,7 @@ internal fun NoClassPage(argument: NoClassNavArgument) {
                 .background(if (LocalAppDark.current) Color(0xFF000101) else Color.White) // �[�^ XML background
                 .statusBarsPadding()
                 .backHandler(enabled = true) {
-                    if (sheetState.state == BottomSheetValueState.Expanded)
+                    if (sheetState.settledAnchor == BottomSheetAnchor.Expanded)
                         coroutineScope.launch { sheetState.collapseSuspend() }
                     else argument.popBackStack()
                 }

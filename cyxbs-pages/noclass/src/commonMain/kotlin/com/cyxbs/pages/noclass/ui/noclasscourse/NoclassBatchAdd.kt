@@ -55,9 +55,9 @@ import com.cyxbs.components.navigation.appNavBackStack
 import com.cyxbs.components.utils.compose.backHandler
 import com.cyxbs.components.utils.compose.clickableNoIndicator
 import com.cyxbs.components.utils.extensions.toast
-import com.cyxbs.components.view.ui.BottomSheetCompose
-import com.cyxbs.components.view.ui.BottomSheetValueState
-import com.cyxbs.components.view.ui.rememberBottomSheetState
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetCompose
+import com.cyxbs.components.view.ui.bottomsheet.BottomSheetAnchor
+import com.cyxbs.components.view.ui.bottomsheet.rememberBottomSheetState
 import com.cyxbs.pages.course.api.CourseUtils
 import com.cyxbs.pages.noclass.bean.NoClassBatchResponseInfo.BatchStudent
 import com.cyxbs.pages.noclass.ui.dialog.BatchQueryErrorDialog
@@ -139,7 +139,7 @@ fun NoclassBatchAddPage() {
         modifier = Modifier.fillMaxSize().backHandler(
         enabled = true,
         onBack = {
-            if (bottomSheetState.state == BottomSheetValueState.Expanded) {
+            if (bottomSheetState.settledAnchor == BottomSheetAnchor.Expanded) {
                 coroutineScope.launch { bottomSheetState.collapseSuspend() }
             } else {
                 appNavBackStack.lastOrNull()?.popBackStack()
