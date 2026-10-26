@@ -1,4 +1,4 @@
-source 'https://github.com/CocoaPods/specs'
+source 'https://cdn.cocoapods.org/'
 source 'https://github.com/aliyun/aliyun-specs.git'
 
 platform :ios, '26.0'

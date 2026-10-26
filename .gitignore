@@ -42,4 +42,3 @@ node_modules/
 !/.idea/xcode.xml
 
 *.local.json
-cyxbs-applications/pro/iosApp/Podfile.lock

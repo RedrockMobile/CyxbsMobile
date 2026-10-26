@@ -20,6 +20,10 @@
 
 ## 环境配置 & pod install 说明
 
+### Xcode Cloud / TestFlight / App Store
+
+云端构建脚本、首次连接步骤及发布工作流见 [Xcode Cloud 发布配置](XCODE_CLOUD.md)。
+
 ### 模拟器开发（默认）
 
 ```bash
