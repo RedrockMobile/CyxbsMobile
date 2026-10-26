@@ -20,7 +20,7 @@
 1. `ci_post_clone.sh` 安装 JDK 21，必要时安装 CocoaPods，以 `IS_SIMULATOR=0 pod install --deployment` 安装真机依赖，并检查 Gradle Wrapper。
 2. Kotlin 的 Xcode Build Phase 在 Cloud 中重新 source `xcode_cloud_environment.sh`，使 `JAVA_HOME` 在实际 Gradle 进程生效。脚本之间的环境变量不会自动继承。
 3. 保留现有的 `embedAndSignAppleFrameworkForXcode` 与 `syncComposeResourcesForIos`，不跳过 Kotlin 编译。
-4. 提交 `Podfile.lock`，升级依赖时在本地执行 `IS_SIMULATOR=0 pod install` 并一起提交锁文件；云端不运行 `pod update`。
+4. 提交 `Podfile.lock`，升级依赖时在本地执行 `IS_SIMULATOR=0 pod install` 并一起提交锁文件；云端不运行 `pod update`。安装失败最多重试 3 次，每次间隔 10 秒，以处理 GitHub clone 的临时 502 等下载失败；持续失败仍会终止构建。
 
 CocoaPods 公共 Specs 使用 CDN，避免在每次全新 Cloud 环境克隆整个 Specs 仓库。保留阿里云 Specs 源以解析 HTTPDNS 依赖。
 
@@ -71,6 +71,9 @@ Xcode Cloud 管理递增构建号。在产品 Settings 设置 **Next Build Numbe
 Manual Start 的 Any Branches 仍允许手动误选 `master`。
 重新开始构建时明确选择含正式工程和 `ci_scripts` 的分支，不要对旧 `master`
 构建点击 Rebuild（它会继续使用错误的源码）。首次配置脚本也必须先提交并推送。
+
+当前 Default 工作流的手动启动已限定为 `develop` 与 `codex/xcode-cloud-ios`，
+避免再次选择旧 `master`。修复合入后可移除临时修复分支入口。
 
 ### 验证编译与归档
 

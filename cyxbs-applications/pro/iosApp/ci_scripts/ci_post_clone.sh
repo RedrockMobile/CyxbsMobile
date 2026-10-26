@@ -16,7 +16,16 @@ java -version
 pod --version
 cd "$IOS_APP_DIR"
 # Never patch Bugly into a simulator binary in a distribution build.
-IS_SIMULATOR=0 pod install --deployment
+pod_attempt=1
+until IS_SIMULATOR=0 pod install --deployment; do
+  if [ "$pod_attempt" -ge 3 ]; then
+    echo 'error: CocoaPods installation failed after 3 attempts.' >&2
+    exit 1
+  fi
+  pod_attempt=$((pod_attempt + 1))
+  echo "CocoaPods download failed; retrying locked dependencies (attempt $pod_attempt/3)."
+  sleep 10
+done
 
 cd "$REPOSITORY_DIR"
 # Download and check the repository's Gradle wrapper before xcodebuild starts.
