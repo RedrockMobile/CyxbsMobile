@@ -89,8 +89,10 @@ class ScheduleInfoRowTest {
   /** 重复缩写：保留紧凑规则，并补充次数或截止日期；不重复为 null。 */
   @Test
   fun recurrence_row_label() {
-    assertEquals("每周一", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.MONDAY))))
-    assertEquals("每2天", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.DAILY, interval = 2)))
+    // 注入固定日期，使 Host 测试不依赖全局日期状态和 Android 主线程。
+    val today = Date(2026, 9, 5)
+    assertEquals("每周一", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.MONDAY)), today))
+    assertEquals("每2天", recurrenceRowLabel(RecurrenceRule(RecurrenceFrequency.DAILY, interval = 2), today))
     assertEquals(
       "每周一 · 共5次",
       recurrenceRowLabel(
@@ -99,6 +101,7 @@ class ScheduleInfoRowTest {
           byWeekDays = setOf(IsoWeekDay.MONDAY),
           end = RecurrenceEnd.Count(5),
         ),
+        today = today,
       ),
     )
     assertEquals(
@@ -112,7 +115,7 @@ class ScheduleInfoRowTest {
         today = Date(2026, 9, 5),
       ),
     )
-    assertNull(recurrenceRowLabel(null))
+    assertNull(recurrenceRowLabel(null, today))
   }
 
   /** 提醒选项菜单文案含「不提醒」。 */
