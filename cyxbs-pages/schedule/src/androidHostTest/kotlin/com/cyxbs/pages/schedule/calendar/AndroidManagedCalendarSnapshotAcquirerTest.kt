@@ -22,6 +22,30 @@ import kotlin.test.assertTrue
  * 用户数据库或网络；它锁定采集算法的 Provider 行复制语义，而不是验证设备 Provider。
  */
 class AndroidManagedCalendarSnapshotAcquirerTest {
+  /** Provider 回读合法文本的前后空白时正常返回快照，不应要求重建受管日历。 */
+  @Test
+  fun providerWhitespaceIsPreservedDuringSnapshotRead() {
+    val scope = hostScope()
+    val projectionId = hostProjectionId(scope)
+    val title = " host title "
+    val description = "\n host description \n"
+    val fake = SnapshotReadHostFake(
+      calendarId = 77L,
+      events = listOf(hostEventRow(projectionId, eventId = 91L).copy(title = title, description = description)),
+      remindersByEventId = emptyMap(),
+    )
+    val snapshot = assertIs<AndroidManagedCalendarSnapshot.Present>(
+      AndroidManagedCalendarSnapshotAcquirer(fake, HOST_ACCOUNT).acquire(scope) {},
+    )
+    val event = snapshot.events.single()
+    assertEquals(title, event.canonicalFields.title)
+    assertEquals(description, event.canonicalFields.description)
+    assertEquals(CalendarProjectionFingerprint.compute(
+      CalendarProjectionUriCodec.encode(projectionId), title, description, event.canonicalFields.timing,
+      null, emptyList(),
+    ), event.providerFingerprint)
+  }
+
   /** 单一采集器必须返回 canonical 字段、稳定 fingerprint、排序去重 reminder 与独立 ordinary snapshot。 */
   @Test
   fun acquiresCanonicalCopiedSnapshotFromHostRows() {

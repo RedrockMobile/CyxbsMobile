@@ -72,9 +72,9 @@ private object CanonicalCalendarFieldsValidator {
     recurrenceRule: String?,
     deviceReminderMinutes: List<Int>,
   ) {
-    require(title.isNotBlank() && title == title.trim()) { "title must be trimmed non-blank text" }
+    // 写入侧保留用户文本，回读也按原值比较；前后空白不代表受管事件损坏，不能因此触发重建。
+    require(title.isNotBlank()) { "title must not be blank" }
     requireWellFormedUtf16(title, "title")
-    require(description == description.trim()) { "description must be trimmed" }
     requireWellFormedUtf16(description, "description")
     validateTiming(timing)
     recurrenceRule?.let { rule ->
