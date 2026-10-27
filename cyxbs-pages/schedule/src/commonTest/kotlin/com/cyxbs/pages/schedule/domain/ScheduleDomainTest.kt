@@ -94,9 +94,9 @@ class ScheduleDomainTest {
     })
   }
 
-  /** 纯事务没有完成态，因此不能伪造 COMPLETED occurrence；关联清单后才允许。 */
+  /** 历史完成记录不依赖当前清单归属，解除关联后仍需通过关系校验供读取和后续编辑使用。 */
   @Test
-  fun completedOccurrenceRequiresParentTodoMembership() {
+  fun completedOccurrenceRemainsValidWithoutParentTodoMembership() {
     val parent = validSchedule().copy(
       timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 7, 12, 9, 0), 60, "Asia/Shanghai"),
       recurrence = RecurrenceRule(RecurrenceFrequency.DAILY),
@@ -114,9 +114,7 @@ class ScheduleDomainTest {
       updatedAt = Instant.fromEpochMilliseconds(2),
     )
 
-    assertFailsWith<IllegalArgumentException> {
-      ScheduleOccurrenceRelationValidator.requireValid(parent, exception, setOf("work"))
-    }
+    ScheduleOccurrenceRelationValidator.requireValid(parent, exception, setOf("work"))
     ScheduleOccurrenceRelationValidator.requireValid(
       parent.copy(todoState = ScheduleTodoState.PENDING),
       exception,
@@ -222,8 +220,9 @@ class ScheduleDomainTest {
     )
   }
 
+  /** 日期、时间和标题仍禁止 CLEAR；备注的空白 REPLACE 则是合法的显式覆盖。 */
   @Test
-  fun occurrencePatchRejectsClearTitleAndTimingAndBlankReplacement() {
+  fun occurrencePatchRejectsClearTitleAndTimingButAllowsBlankDescription() {
     val issues = ScheduleValidator.validate(
       OccurrencePatch(
         date = FieldPatch.Clear,
@@ -236,7 +235,7 @@ class ScheduleDomainTest {
     assertTrue(issues.any { it.field == "patch.date" })
     assertTrue(issues.any { it.field == "patch.time" })
     assertTrue(issues.any { it.field == "patch.title" })
-    assertTrue(issues.any { it.field == "patch.description" })
+    assertTrue(issues.none { it.field == "patch.description" })
   }
 
   @Test

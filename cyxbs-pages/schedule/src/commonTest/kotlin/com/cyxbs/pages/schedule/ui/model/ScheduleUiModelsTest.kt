@@ -1,11 +1,13 @@
 package com.cyxbs.pages.schedule.ui.model
 
+import com.cyxbs.components.config.time.Date
 import com.cyxbs.components.config.time.MinuteTimeDate
 import com.cyxbs.pages.schedule.domain.model.FieldPatch
 import com.cyxbs.pages.schedule.domain.model.OccurrencePatch
 import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.model.OccurrenceTime
 import com.cyxbs.pages.schedule.domain.model.RecurrenceFrequency
+import com.cyxbs.pages.schedule.domain.model.RecurrenceEnd
 import com.cyxbs.pages.schedule.domain.model.RecurrenceId
 import com.cyxbs.pages.schedule.domain.model.RecurrenceRule
 import com.cyxbs.pages.schedule.domain.model.Schedule
@@ -16,11 +18,31 @@ import com.cyxbs.pages.schedule.domain.model.ScheduleTodoState
 import com.cyxbs.pages.schedule.domain.repository.ScheduleSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /** 详情按稳定 identity 重新解析当前 occurrence 的回归测试。 */
 class ScheduleUiModelsTest {
+
+  /** 同步改变规则、时分或时间类型后，详情持有的旧 identity 应返回空供 UI 关闭，而不是抛异常。 */
+  @Test
+  fun staleOccurrenceIdentityReturnsNullAfterSeriesUpdates() {
+    val parent = parentSchedule()
+    val id = RecurrenceId(MinuteTimeDate(2026, 9, 4, 15, 0), "Asia/Shanghai", false)
+    assertNotNull(ScheduleSnapshot(schedules = listOf(parent)).occurrenceByIdentity(parent.id, id))
+    val updatedParents = listOf(
+      parent.copy(recurrence = parent.recurrence!!.copy(end = RecurrenceEnd.Count(1))),
+      parent.copy(recurrence = parent.recurrence!!.copy(end = RecurrenceEnd.Until(Date(2026, 9, 3)))),
+      parent.copy(timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 9, 2, 10, 0), 60, "Asia/Shanghai")),
+      parent.copy(timing = ScheduleTiming.Timed(MinuteTimeDate(2026, 9, 2, 15, 0), 60, "UTC")),
+      parent.copy(timing = ScheduleTiming.AllDay(Date(2026, 9, 2))),
+      parent.copy(recurrence = null),
+    )
+    updatedParents.forEach { updated ->
+      assertNull(ScheduleSnapshot(schedules = listOf(updated)).occurrenceByIdentity(parent.id, id))
+    }
+  }
 
   /** 单次调整被还原后，同一 identity 必须立即回到父系列字段，不能继续展示点击时的旧快照。 */
   @Test
