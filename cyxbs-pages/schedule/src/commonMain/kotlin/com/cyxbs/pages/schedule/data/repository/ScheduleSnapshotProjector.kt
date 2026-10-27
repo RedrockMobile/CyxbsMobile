@@ -232,22 +232,18 @@ class ScheduleSnapshotProjector {
     return schedule
   }
 
-  /** wire 只保留绝对毫秒，恢复本地墙上时间时必须显式使用 repository 选择的时区。 */
+  /** wire 保留绝对毫秒，展示时使用明确时区并忽略秒；客户端时间模型仍保持分钟精度。 */
   private fun TimingInput.toUi(timeZone: TimeZone): ScheduleTiming = when (kind) {
     TimingKind.TIMED -> {
       val start = startAt ?: abortProjection("TIMED startAt is required")
       val end = endAt ?: abortProjection("TIMED endAt is required")
       requireProjection(dueAt == null && date == null, "invalid TIMED extra fields")
       requireProjection(start >= 0 && end > start, "TIMED duration must be positive")
-      requireProjection(
-        start % MINUTE_MILLIS == 0L && end % MINUTE_MILLIS == 0L,
-        "TIMED bounds must align to whole minutes",
-      )
       val duration = end - start
-      requireProjection(duration % MINUTE_MILLIS == 0L, "TIMED duration must be whole minutes")
       ScheduleTiming.Timed(
         start = Instant.fromEpochMilliseconds(start).toLocalDateTime(timeZone).toMinuteTimeDate(),
-        durationMinutes = (duration / MINUTE_MILLIS).toIntExact("TIMED durationMinutes"),
+        // 秒和毫秒只在展示投影中省略；不足一分钟的正区间按一分钟显示，不能构造非法零时长。
+        durationMinutes = (duration / MINUTE_MILLIS).coerceAtLeast(1).toIntExact("TIMED durationMinutes"),
         timeZoneId = timeZone.id,
       )
     }
@@ -255,7 +251,6 @@ class ScheduleSnapshotProjector {
       val due = dueAt ?: abortProjection("DEADLINE dueAt is required")
       requireProjection(startAt == null && endAt == null && date == null, "invalid DEADLINE extra fields")
       requireProjection(due >= 0, "DEADLINE dueAt must not be negative")
-      requireProjection(due % MINUTE_MILLIS == 0L, "DEADLINE dueAt must align to a whole minute")
       ScheduleTiming.Deadline(
         due = Instant.fromEpochMilliseconds(due).toLocalDateTime(timeZone).toMinuteTimeDate(),
         timeZoneId = timeZone.id,
@@ -322,6 +317,7 @@ class ScheduleSnapshotProjector {
     return ScheduleReminder(offsetMinutes = minutesBefore)
   }
 
+  /** 构造单次调整并在发布或落库前复用展开器的单体校验，避免到界面读取时才发现坏 patch。 */
   private fun OccurrenceAdjustmentSyncState.toUi(
     resource: OccurrenceAdjustmentResource,
     parent: Schedule,
@@ -338,7 +334,7 @@ class ScheduleSnapshotProjector {
     )
     val (createdAt, updatedAt) = timestamps(atomTimes)
     val recurrenceId = parent.toRecurrenceId(resource.identity.originalOccurrenceDate)
-    return ScheduleOccurrenceAdjustment(
+    val adjustment = ScheduleOccurrenceAdjustment(
       scheduleId = parent.id,
       recurrenceId = recurrenceId,
       revision = resource.version,
@@ -354,6 +350,12 @@ class ScheduleSnapshotProjector {
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
+    val issues = ScheduleValidator.validate(adjustment)
+    requireProjection(
+      issues.isEmpty(),
+      issues.joinToString(prefix = "invalid OccurrenceAdjustment: ") { "${it.field} ${it.message}" },
+    )
+    return adjustment
   }
 
   /** 单次日期 REPLACE 必须是 UTC 午夜槽；原始槽仍使用 originalOccurrenceDate，不取该显示日期。 */
