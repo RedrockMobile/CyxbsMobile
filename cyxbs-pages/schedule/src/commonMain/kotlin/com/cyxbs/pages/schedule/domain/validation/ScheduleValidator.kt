@@ -169,9 +169,7 @@ object ScheduleValidator {
       FieldPatch.Inherit -> Unit
       is FieldPatch.Replace -> if (title.value.isBlank()) issue("patch.title", "must not be blank")
     }
-    if (patch.description is FieldPatch.Replace && patch.description.value.isBlank()) {
-      issue("patch.description", "use CLEAR instead of a blank replacement")
-    }
+    // 备注允许显式覆盖为空串或空白；REPLACE 与 CLEAR 都不继承父值，不能将编码偏好当作非法数据。
     if (patch.reminder is FieldPatch.Replace) {
       val reminder = patch.reminder.value
       if (reminder.offsetMinutes < 0) issue("patch.reminder.offsetMinutes", "must be non-negative")

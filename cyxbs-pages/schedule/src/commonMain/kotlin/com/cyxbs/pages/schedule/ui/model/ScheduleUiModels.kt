@@ -142,7 +142,7 @@ fun ScheduleSnapshot.occurrencesInRange(
  *
  * 详情页只能持有 identity，不能长期保存点击瞬间的 [ScheduleUiOccurrence]：单次调整保存、还原或远端合并后，
  * 同一 identity 的标题、时间与完成态都可能变化。每次快照更新后重新调用本方法，才能让仍打开的详情展示
- * canonical 最新状态；被取消或已删除的实例返回 `null`，调用方应关闭详情。
+ * canonical 最新状态；被取消、已删除或因规则/时间变更而失效的实例返回 `null`，调用方应关闭详情。
  */
 internal fun ScheduleSnapshot.occurrenceByIdentity(
   scheduleId: ScheduleId,

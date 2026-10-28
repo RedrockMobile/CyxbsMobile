@@ -6,13 +6,111 @@ import com.cyxbs.components.config.time.toLocalDateTime
 import com.cyxbs.pages.schedule.domain.model.*
 import com.cyxbs.pages.schedule.domain.recurrence.RecurrenceEngine
 import com.cyxbs.pages.schedule.domain.recurrence.SeriesSplitter
+import com.cyxbs.pages.schedule.domain.validation.ScheduleOccurrenceRelationValidator
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+/** 重复规则展开、单次调整及清单关联变化的领域回归测试。 */
 class RecurrenceEngineTest {
+  /** 最后实例检查只需找到第二个未取消成员，超大 COUNT/UNTIL 不应先完整展开后触发上限。 */
+  @Test
+  fun remainingOccurrenceCheckStopsBeforeExpandingLargeSeries() {
+    listOf(RecurrenceEnd.Count(100_001), RecurrenceEnd.Until(Date(3000, 1, 1))).forEach { end ->
+      val parent = schedule(rule(RecurrenceFrequency.DAILY, end = end))
+      val id = RecurrenceId(dt(31), "Asia/Shanghai", false)
+      assertFalse(RecurrenceEngine.isOnlyRemainingOccurrence(parent, emptyList(), id))
+    }
+  }
+
+  /** 跳过取消项后仍能识别最后一个实例；COUNT 已满足时不需要计算超远的后续周期。 */
+  @Test
+  fun remainingOccurrenceCheckHonorsCancellationAndFiniteEnd() {
+    val parent = schedule(rule(RecurrenceFrequency.DAILY, count = 3))
+    val id = RecurrenceId(dt(31), "Asia/Shanghai", false)
+    val cancelled = listOf(1, 2).map { days ->
+      exception(parent, id.copy(originalDateTime = dt(31).plusDays(days)), OccurrenceStatus.CANCELLED)
+    }
+    assertTrue(RecurrenceEngine.isOnlyRemainingOccurrence(parent, cancelled, id))
+    val singleton = parent.copy(recurrence = parent.recurrence!!.copy(interval = Int.MAX_VALUE, end = RecurrenceEnd.Count(1)))
+    assertTrue(RecurrenceEngine.isOnlyRemainingOccurrence(singleton, emptyList(), id))
+  }
+
+  /** 无合法候选日期的 YEARLY 规则按窗口或 UNTIL 结束，不能空转到安全上限再抛异常。 */
+  @Test
+  fun impossibleYearlyRuleReturnsEmptyWithinWindowAndUntil() {
+    val neverMatches = rule(RecurrenceFrequency.YEARLY, count = 1, monthDays = setOf(30), months = setOf(2))
+    val anchor = MinuteTimeDate(2024, 1, 1, 9, 0)
+    val end = MinuteTimeDate(2025, 1, 1, 0, 0)
+    assertTrue(expand(neverMatches, anchor, end).isEmpty())
+    assertTrue(expand(
+      neverMatches.copy(end = RecurrenceEnd.Until(Date(2024, 12, 31))),
+      anchor, MinuteTimeDate(2030, 1, 1, 0, 0),
+    ).isEmpty())
+    assertFalse(RecurrenceEngine.containsRecurrenceDate(schedule(neverMatches, anchor), Date(2024, 2, 29)))
+  }
+
+  /** 没有 31 日的月份可以为空，后续有候选的月份仍正常生成，不能以空周期判断整个系列结束。 */
+  @Test
+  fun emptyMonthlyPeriodDoesNotHideLaterOccurrences() {
+    val parent = schedule(rule(RecurrenceFrequency.MONTHLY, count = 3, monthDays = setOf(31)))
+    assertTrue(RecurrenceEngine.expandInRange(
+      parent, emptyList(), MinuteTimeDate(2024, 2, 1, 0, 0), MinuteTimeDate(2024, 3, 1, 0, 0),
+    ).isEmpty())
+    assertDates(RecurrenceEngine.expandInRange(
+      parent, emptyList(), MinuteTimeDate(2024, 2, 1, 0, 0), MinuteTimeDate(2024, 4, 1, 0, 0),
+    ), "2024-03-31")
+    assertDates(expand(
+      rule(RecurrenceFrequency.YEARLY, count = 1, monthDays = setOf(29), months = setOf(2)),
+      MinuteTimeDate(2025, 1, 1, 9, 0), MinuteTimeDate(2029, 1, 1, 0, 0),
+    ), "2028-02-29")
+  }
+
+  /** 窗口外的大 interval 不应先做日期运算，COUNT 已满足时也不应再计算下一周期。 */
+  @Test
+  fun distantPeriodDoesNotOverflowBeforeWindowTermination() {
+    val rule = rule(RecurrenceFrequency.DAILY, count = 2).copy(interval = Int.MAX_VALUE)
+    assertDates(expand(rule, dt(31), MinuteTimeDate(2025, 1, 1, 0, 0)), "2024-01-31")
+    assertDates(expand(rule.copy(end = RecurrenceEnd.Count(1)), dt(31)), "2024-01-31")
+  }
+
+  /** 解除清单关联只休眠完成态，保留内容覆盖和取消态；重新关联后恢复原完成记录。 */
+  @Test
+  fun affairCompletionIsDormantWhileUnlinkedFromTodo() {
+    val linked = schedule(rule(RecurrenceFrequency.DAILY, count = 3)).copy(
+      kind = ScheduleKind.AFFAIR,
+      linkedToCourse = true,
+    )
+    val end = MinuteTimeDate(2024, 2, 10, 0, 0)
+    val base = RecurrenceEngine.expandInRange(linked, emptyList(), dt(31), end)
+    val completed = exception(linked, base[0].recurrenceId!!, OccurrenceStatus.COMPLETED, OccurrencePatch(
+      title = FieldPatch.Replace("单次标题"),
+      date = FieldPatch.Replace(Date(2024, 2, 5)),
+      time = FieldPatch.Replace(OccurrenceTime.TimeRange(15 * 60, 90, "Asia/Shanghai")),
+    ))
+    val cancelled = exception(linked, base[1].recurrenceId!!, OccurrenceStatus.CANCELLED)
+    val adjustments = listOf(completed, cancelled)
+    val unlinked = linked.copy(todoState = null)
+
+    ScheduleOccurrenceRelationValidator.requireValid(unlinked, completed, emptySet())
+    val visible = RecurrenceEngine.expandInRange(unlinked, adjustments, dt(31), end)
+    assertEquals(2, visible.size)
+    assertTrue(visible.all { it.status == OccurrenceStatus.ACTIVE })
+    val resolved = assertNotNull(RecurrenceEngine.resolveOccurrenceByIdentity(
+      unlinked, adjustments, completed.recurrenceId,
+    ))
+    assertEquals(resolved, visible.first { it.recurrenceId == completed.recurrenceId })
+    assertEquals("单次标题", resolved.title)
+    assertEquals(ScheduleTiming.Timed(MinuteTimeDate(2024, 2, 5, 15, 0), 90, "Asia/Shanghai"), resolved.timing)
+    assertNull(RecurrenceEngine.resolveOccurrenceByIdentity(unlinked, adjustments, cancelled.recurrenceId))
+    assertEquals(OccurrenceStatus.COMPLETED, completed.status)
+    assertEquals(OccurrenceStatus.COMPLETED, RecurrenceEngine.resolveOccurrenceByIdentity(
+      linked, adjustments, completed.recurrenceId,
+    )?.status)
+  }
+
   @Test fun dailyWeeklyMonthlyYearlyAndCount() {
     assertDates(expand(rule(RecurrenceFrequency.DAILY, count = 3)), "2024-01-31", "2024-02-01", "2024-02-02")
     assertDates(expand(rule(RecurrenceFrequency.WEEKLY, count = 3, days = setOf(IsoWeekDay.WEDNESDAY, IsoWeekDay.FRIDAY))), "2024-01-31", "2024-02-02", "2024-02-07")
@@ -441,13 +539,13 @@ class RecurrenceEngineTest {
     assertEquals(MinuteTimeDate(2024, 2, 10, 9, 0), (later?.timing as ScheduleTiming.Timed).start)
 
     assertNull(RecurrenceEngine.resolveOccurrenceByIdentity(schedule, listOf(exception(schedule, ids[0], OccurrenceStatus.CANCELLED)), ids[0]))
-    assertFailsWith<IllegalArgumentException> {
+    assertNull(
       RecurrenceEngine.resolveOccurrenceByIdentity(
         schedule,
         emptyList(),
         RecurrenceId(MinuteTimeDate(2024, 2, 20, 9, 0), "Asia/Shanghai", false),
-      )
-    }
+      ),
+    )
   }
 
   @Test fun splitTruncatesOldSeriesStartsNewSeriesAndPartitionsExceptions() {

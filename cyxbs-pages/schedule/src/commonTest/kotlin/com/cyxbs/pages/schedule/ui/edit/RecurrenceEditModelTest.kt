@@ -70,9 +70,10 @@ class RecurrenceEditModelTest {
     )
     assertEquals(rule, rule.toDraft().toRecurrenceRule(anchor))
   }
+  /** 显式注入日期，避免文案单测为求默认“今天”而初始化依赖 Android 主线程的全局日期状态。 */
   @Test fun labels_are_stable() {
     val rule = RecurrenceRule(RecurrenceFrequency.WEEKLY, byWeekDays = setOf(IsoWeekDay.MONDAY))
-    assertEquals("每周一", recurrenceRowLabel(rule))
+    assertEquals("每周一", recurrenceRowLabel(rule, today = anchor))
     assertTrue(buildRecurrenceLabels(rule).first().contains("周一"))
   }
   @Test fun previews_are_bounded() {

@@ -3,7 +3,6 @@ package com.cyxbs.pages.schedule.domain.validation
 import com.cyxbs.pages.schedule.domain.model.FieldPatch
 import com.cyxbs.pages.schedule.domain.model.Schedule
 import com.cyxbs.pages.schedule.domain.model.ScheduleOccurrenceAdjustment
-import com.cyxbs.pages.schedule.domain.model.OccurrenceStatus
 import com.cyxbs.pages.schedule.domain.recurrence.RecurrenceEngine
 
 /**
@@ -25,9 +24,7 @@ object ScheduleOccurrenceRelationValidator {
   ) {
     require(parent.id == adjustment.scheduleId) { "occurrence adjustment parent does not match scheduleId" }
     require(parent.recurrence != null) { "occurrence adjustment requires recurring schedule" }
-    require(adjustment.status != OccurrenceStatus.COMPLETED || parent.todoState != null) {
-      "an occurrence can be completed only when its parent belongs to todo"
-    }
+    // 清单归属变化不影响历史完成记录的合法性；是否展示完成态由 occurrence 投影决定。
     require(parent.categoryId == null || parent.categoryId.value in categoryIds) { "schedule category not found" }
     if (adjustment.patch?.categoryId is FieldPatch.Replace) {
       require(adjustment.patch.categoryId.value.value in categoryIds) { "patch category not found" }
