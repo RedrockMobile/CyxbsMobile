@@ -249,6 +249,35 @@ deeplink: cyxbs://mine/setting
 deeplink: cyxbs://sign
 ```
 
+## :cyxbs-pages:noclass
+
+### no_class_batch_add
+
+- entry: `com.cyxbs.pages.noclass.ui.BatchAddNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.BatchAddNavArgument`
+
+```text
+deeplink: cyxbs://no_class_batch_add
+```
+
+### no_class_group_detail
+
+- entry: `com.cyxbs.pages.noclass.ui.GroupDetailNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.GroupDetailNavArgument`
+
+```text
+deeplink: cyxbs://no_class_group_detail?groupId=[String]&groupName=[String]
+```
+
+### no_class
+
+- entry: `com.cyxbs.pages.noclass.ui.NoClassNavEntry`
+- argument: `com.cyxbs.pages.noclass.api.NoClassNavArgument`
+
+```text
+deeplink: cyxbs://no_class
+```
+
 ## :cyxbs-pages:notification
 
 ### dialog/notice

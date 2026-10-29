@@ -9,6 +9,7 @@ import com.cyxbs.components.utils.extensions.toast
 import com.cyxbs.pages.course.api.FindCourseNavArgument
 import com.cyxbs.pages.emptyroom.api.EmptyRoomNavArgument
 import com.cyxbs.pages.map.api.MapNavArgument
+import com.cyxbs.pages.noclass.api.NoClassNavArgument
 import com.cyxbs.pages.schoolcar.api.SchoolCarNavArgument
 import com.cyxbs.pages.discover.pages.calendar.SchoolCalendarNavArgument
 import com.cyxbs.pages.schedule.api.ScheduleMainNavArgument
@@ -129,7 +130,7 @@ abstract class DiscoverFunctions {
   }
 
   open fun clickNoClass() {
-    toast("该平台未实现")
+    NoClassNavArgument.navigate()
   }
 
   open fun clickSchoolCar() {

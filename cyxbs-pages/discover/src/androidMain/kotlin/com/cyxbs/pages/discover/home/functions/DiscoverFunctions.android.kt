@@ -20,7 +20,7 @@ actual object PlatformDiscoverFunctions : DiscoverFunctions() {
   }
 
   override fun clickNoClass() {
-    startActivity(DISCOVER_NO_CLASS)
+    super.clickNoClass()
     TrackingUtils.trackClickEvent2(ClickEvent.CLICK_MKY_ENTRY)
   }
 

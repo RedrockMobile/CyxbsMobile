@@ -25,6 +25,7 @@ kotlin {
       implementation(projects.cyxbsPages.schoolcar.api)
       implementation(projects.cyxbsPages.course.api)
       implementation(projects.cyxbsPages.home.api)
+      implementation(projects.cyxbsPages.noclass.api)
       // 校历页直接通过 ImageRequest.Builder 配置图片缓存身份。
       implementation(libs.coil.compose)
     }

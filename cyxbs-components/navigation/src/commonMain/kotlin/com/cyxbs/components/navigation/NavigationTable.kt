@@ -85,6 +85,13 @@ const val NAV_MAP_SEARCH = "map/search"
 // 校车轨迹
 const val NAV_SCHOOL_CAR = "school/car"
 
+const val NAV_NO_CLASS_GROUP_DETAIL = "no_class_group_detail"
+
+const val NAV_NO_CLASS = "no_class"
+
+// 没课约-批量添加
+const val NAV_NO_CLASS_BATCH_ADD = "no_class_batch_add"
+
 // 空教室
 const val NAV_EMPTY_ROOM = "emptyroom"
 
