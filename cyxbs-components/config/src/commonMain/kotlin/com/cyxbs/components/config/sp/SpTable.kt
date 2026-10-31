@@ -23,3 +23,6 @@ val accountSettings: AccountSettings
 
 // 隐私条例是否同意
 const val SP_PRIVACY_AGREED = "privacy_agreed"
+
+// 本地诊断日志开关，未设置时默认开启；只有隐私条例已同意时才会实际启动
+const val SP_DIAGNOSTIC_LOG_ENABLED = "diagnostic_log_enabled"

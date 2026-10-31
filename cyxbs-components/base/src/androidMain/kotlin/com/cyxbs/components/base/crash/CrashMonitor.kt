@@ -13,12 +13,19 @@ import com.cyxbs.components.base.pages.SecretActivity
 import com.cyxbs.components.config.isDebug
 import com.cyxbs.components.init.appTopActivity
 import com.cyxbs.components.utils.extensions.toast
+import com.cyxbs.components.log.CyxbsLog
+import com.cyxbs.components.log.FileLogState
+import com.cyxbs.components.log.LogFlushMode
 import com.cyxbs.components.utils.extensions.toastLong
 import com.g985892345.provider.api.annotation.ImplProvider
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
 import java.lang.Thread.UncaughtExceptionHandler
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+
+private const val CRASH_FLUSH_TIMEOUT_MILLIS = 250L
 
 /**
  * 统一处理线程崩溃与 Compose 协程异常；effects 异常独立展示，不进入 Looper 恢复循环。
@@ -113,13 +120,6 @@ object CrashMonitor : UncaughtExceptionHandler {
     }
   }
 
-  private fun handleOtherThread(throwable: Throwable) {
-    // 其他线程不处理
-    if (isDebug()) {
-      Log.d("crash", throwable.stackTraceToString())
-    }
-  }
-
   private fun handleMainThread(throwable: Throwable) {
     CrashDialog.Builder(
       RuntimeException(
@@ -136,7 +136,7 @@ object CrashMonitor : UncaughtExceptionHandler {
     try {
       Looper.loop()
     } catch (e: Throwable) {
-      e.printStackTrace()
+      recordCrash(e, isMainThread = true)
       if (SystemClock.elapsedRealtime() - lastThrowableTime < 1000) {
         // 短时间内再次崩溃，则直接打开 CrashActivity
         startCrashActivity(originThrowable)
@@ -149,15 +149,30 @@ object CrashMonitor : UncaughtExceptionHandler {
   }
 
   override fun uncaughtException(t: Thread, e: Throwable) {
-    if (t === mainThread) {
+    val isMainThread = t === mainThread
+    recordCrash(e, isMainThread)
+    if (isMainThread) {
       if (isDebug()) {
-        Log.d("crash", e.stackTraceToString())
-        toastLong("触发异常，日志筛选 tag:crash 查看")
+        toastLong("触发异常，日志筛选 tag:CrashMonitor 查看")
       }
+      runCatching { crashReport?.invoke(e) }
       handleMainThread(e)
-      crashReport?.invoke(e)
-    } else {
-      handleOtherThread(e)
+    }
+  }
+
+  private fun recordCrash(throwable: Throwable, isMainThread: Boolean) {
+    CyxbsLog.eBounded(
+      tag = "CrashMonitor",
+      throwable = throwable,
+      message = "Uncaught exception on ${if (isMainThread) "main" else "background"} thread",
+    )
+    if (CyxbsLog.fileStorageHealth().state != FileLogState.Running) return
+    runCatching {
+      runBlocking {
+        withTimeoutOrNull(CRASH_FLUSH_TIMEOUT_MILLIS) {
+          CyxbsLog.flushFileStorage(LogFlushMode.Buffered)
+        }
+      }
     }
   }
 

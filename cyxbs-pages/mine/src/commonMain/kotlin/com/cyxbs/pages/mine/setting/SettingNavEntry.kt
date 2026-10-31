@@ -60,6 +60,7 @@ import com.cyxbs.components.utils.utils.judge.RedrockNetwork
 import com.cyxbs.components.view.ui.ChooseDialogCompose
 import com.cyxbs.pages.home.api.HomeNavArgument
 import com.cyxbs.pages.login.api.LoginNavArgument
+import com.cyxbs.pages.mine.log.LogSettingNavArgument
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.Res
 import cyxbsmobile.cyxbs_pages.mine.generated.resources.mine_ic_arrow_right
 import kotlinx.coroutines.CancellationException
@@ -140,7 +141,7 @@ private fun SettingPage(argument: SettingNavArgument) {
                       onCheckedChange(value)
                     } catch (throwable: Throwable) {
                       if (throwable is CancellationException) throw throwable
-                      toast("设置失败，请重试")
+                      toast(throwable.message ?: "设置失败，请重试")
                     } finally {
                       checked = settingItem.readChecked()
                       changing = false
@@ -163,6 +164,9 @@ private fun SettingPage(argument: SettingNavArgument) {
             }
           }
         }
+      }
+      item(key = "diagnostic_log_setting") {
+        SettingArrowRow(text = "诊断日志") { LogSettingNavArgument.navigate() }
       }
       item {
         Spacer(Modifier.height(110.dp))

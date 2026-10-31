@@ -11,6 +11,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.cyxbsComponents.init)
+      api(projects.cyxbsComponents.log)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.account.api)
       implementation(libs.coil.compose)

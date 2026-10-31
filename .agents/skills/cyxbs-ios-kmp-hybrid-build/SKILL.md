@@ -25,59 +25,86 @@ description: 编译、签名、安装并启动掌上重邮的 KMP/CMP 混合 iOS
 
 ## 设备选择
 
-用户明确真机或模拟器时直接继续。未说明时，先问一句：`要部署到真机还是 iOS 模拟器？`
+用户明确真机或模拟器时直接完成对应分支，不在构建前重复确认。未说明时只问一句：`要部署到真机还是 iOS 模拟器？`
 
-- 真机：用 `xcrun devicectl list devices` 查找已连接或已配对设备；沿用当前会话已选设备，尚未选择且有多个候选时让用户指定。
-- 模拟器：用 `xcrun simctl list devices available` 查找；选择可用 iPhone，并在需要时 boot。
+- 真机：用 `xcrun devicectl list devices` 查找 `available (paired)` 的设备。当前会话已有目标则沿用；仅有一台可用真机时直接选择；多台时让用户指定。
+- 模拟器：用 `xcrun simctl list devices available` 查找 iPhone。优先已 boot 的设备；否则仅有一个合理候选时直接 boot，多台候选无法判断时让用户指定，并用 `xcrun simctl bootstatus <UDID> -b` 等待启动完成。
 
-不要因为设备未连接而改为其他目标，也不要擅自删除现有 App。
+选定目标后持续执行到构建、安装、启动和进程核验完成。目标不可用时报告阻塞，不切换到另一类设备，也不擅自删除现有 App。
 
 ## 构建前检查
 
 1. 在仓库根目录记录 `git rev-parse HEAD` 和 `git status --short`。构建当前 checkout；除非用户明确要求同步或合入，不执行 `pull`、`merge`、`rebase` 或切分支。
-2. 在 `cyxbs-applications/pro/iosApp` 下确认存在 `Podfile` 与 `CyxbsMobile2019_iOS.xcworkspace`。
-3. 确认 CocoaPods 可用。缺失时安装 CocoaPods；首次使用或 Pods 缺失时执行 `pod install`。
-4. 依赖二进制架构必须与目标一致：
+2. 在 `cyxbs-applications/pro/iosApp` 下确认 `Podfile`、`CyxbsMobile2019_iOS.xcworkspace` 和 scheme `CyxbsMobile2019_iOS` 存在。始终构建 workspace，不构建 `.xcodeproj`。
+3. 确认 Xcode、Gradle 和 CocoaPods 可用。每次部署都在 `cyxbs-applications/pro/iosApp` 执行与目标匹配的 Pod 安装，而不是根据旧 Pods 或 DerivedData 猜测当前 slice：
    - 真机：`IS_SIMULATOR=0 pod install`
-   - 模拟器：`pod install`（默认 `IS_SIMULATOR=1`）
-
-每次在真机和模拟器间切换都重新执行对应的 `pod install`。高德地图、Bugly 等预编译库的 arm64 device/simulator slice 互斥。
+   - 模拟器：`IS_SIMULATOR=1 pod install`
+4. Pod 安装成功后再构建。高德地图、Bugly 等预编译库的 arm64 device/simulator slice 互斥；切换目标时必须重新执行对应命令。
+5. 若 Xcode/Clang 报 YYKit 的 `Chained comparison 'X < Y < Z'`，先确认 `Podfile` 的 `post_install` 已给 Pods 追加 `-Wno-parentheses`，再重新执行对应 Pod 安装。只修 Podfile，禁止直接编辑 `Pods/YYKit`，因为生成源码会被覆盖。
 
 ## 签名与 App Groups
 
-真机前读取主应用和 Widget 的 `Signing & Capabilities` / `.entitlements`：
+仓库当前 checkout 的 Xcode build settings、主应用/Widget entitlements 和共享容器常量是唯一配置来源。真机部署前用 `xcodebuild ... -showBuildSettings` 读取实际解析值，并交叉核对：
 
-- 两个 target 必须属于同一开发团队，并启用自动签名。
-- Widget 的 Bundle ID 必须以主应用 Bundle ID 为前缀；若当前团队无法注册仓库原有 Widget ID，使用当前团队下唯一的后缀。
-- 主应用与 Widget 必须使用同一个 App Group，且 Swift 共享容器常量和两个 entitlements 完全一致。
-- 若 Apple 拒绝仓库原有 group，不能反复重试该标识。创建当前团队唯一的新 `group.*` 标识，并仅替换共享容器的全部实际引用。
+- 主应用和 Widget 使用同一 `DEVELOPMENT_TEAM`，且 `CODE_SIGN_STYLE = Automatic`。
+- Widget Bundle ID 以主应用 Bundle ID 为前缀。
+- 主应用、Widget entitlements 与 Swift 共享容器常量使用同一个 App Group。当前仓库基线为 `group.com.mredrock.cyxbs.widget.3m9757c25s`；若 checkout 已有一致的正式变更，以该 checkout 为准。
 
-真机构建可使用 `xcodebuild -allowProvisioningUpdates` 让 Xcode 创建或更新 profile。若 profile 仍不支持 group，说明 App Group 未属于该团队或未关联 App ID，应报告具体标识和阻塞原因。
+**禁止自动改写** `DEVELOPMENT_TEAM`、主/Widget Bundle ID 或 App Group。不得从旧 DerivedData、历史安装包或 `security find-identity` 显示名推断这些值；证书名称括号内的标识也不等于 App 的 `TeamIdentifier`。若自动签名或 profile 拒绝仓库配置，保留原值，报告 Apple 返回的具体错误、target 和标识；只有用户明确授权修改签名配置后才能改。
+
+真机构建使用 `-allowProvisioningUpdates -allowProvisioningDeviceRegistration`。构建后以产物为准：`codesign -dvvv` 的 `TeamIdentifier`，以及 `codesign -d --entitlements :-` 解析出的 `application-identifier` 和 `com.apple.security.application-groups` 必须在主应用与 Widget 间一致。必要时再解析各自 `embedded.mobileprovision` 交叉验证。
 
 ## 构建、安装与启动
 
-从 `cyxbs-applications/pro/iosApp` 运行，scheme 固定为 `CyxbsMobile2019_iOS`。每轮验证用 `mktemp -d` 创建独立的临时 `-derivedDataPath`，该轮修复失败后的重试可复用此目录。独立目录不能代替 Kotlin 构建阶段：仍需确认当前源码的编译、framework 组装与 Compose 资源同步实际执行。
+所有命令从 `cyxbs-applications/pro/iosApp` 运行，scheme 固定为 `CyxbsMobile2019_iOS`。每次调用用 `mktemp -d` 创建独立 DerivedData；同一轮故障修复后可复用。长时间的 Pod/Gradle/Xcode 命令必须持续报告进度。
 
-真机构建示例：
+### 真机分支
 
 ```bash
-xcodebuild -allowProvisioningUpdates \
+DERIVED_DATA="$(mktemp -d /tmp/cyxbs-ios-hybrid-device.XXXXXX)"
+xcodebuild \
   -workspace CyxbsMobile2019_iOS.xcworkspace \
   -scheme CyxbsMobile2019_iOS \
   -configuration Debug \
-  -destination 'id=<UDID>' \
-  -derivedDataPath /tmp/cyxbs-ios-hybrid-device \
+  -destination "id=<UDID>" \
+  -derivedDataPath "$DERIVED_DATA" \
+  -allowProvisioningUpdates \
+  -allowProvisioningDeviceRegistration \
   build
+APP="$DERIVED_DATA/Build/Products/Debug-iphoneos/掌上重邮.app"
 ```
 
-构建成功后：
+构建成功后按顺序完成：
 
-1. 确认 `.app` 存在，并用 `codesign -dvv` 核对 Bundle ID 与 TeamIdentifier。
-2. 若配置了 App Group，解析主 App 与 `PlugIns/CyxbsWidgetExtension.appex` 的 `embedded.mobileprovision`，确认二者都包含同一 group。
-3. 真机通过 `xcrun devicectl device install app` 安装，再用 `xcrun devicectl device process launch --terminate-existing <bundle-id>` 启动。
-4. 模拟器通过 `xcrun simctl install booted <app>`，再用 `xcrun simctl launch booted <bundle-id>` 启动。
+1. 确认完整 Xcode 构建以 `BUILD SUCCEEDED` / exit code 0 结束；Gradle 的 `BUILD SUCCESSFUL` 不能代替该判断。
+2. 确认 `APP` 存在，读取主应用和 `PlugIns/CyxbsWidgetExtension.appex` 的 Bundle ID、`codesign -dvvv` 与 `codesign -d --entitlements :-`。两者 `TeamIdentifier` 和 App Group 必须匹配仓库配置。
+3. 用 `xcrun devicectl device install app --device <UDID> "$APP"` 安装。
+4. 用 `xcrun devicectl device process launch --device <UDID> --terminate-existing <bundle-id>` 启动。
+5. 用 `xcrun devicectl device info processes --device <UDID>` 确认主应用进程未立即退出；不要使用当前 `devicectl` 不支持的 `--hide-default-apps`。
 
-若安装提示同 Bundle ID 的已安装 App 来自另一团队签名，iOS 不允许覆盖升级。说明必须卸载旧 App，明确提示会清除该 App 本地数据；取得用户明确确认后才执行卸载。
+### 模拟器分支
+
+```bash
+DERIVED_DATA="$(mktemp -d /tmp/cyxbs-ios-hybrid-simulator.XXXXXX)"
+xcodebuild \
+  -workspace CyxbsMobile2019_iOS.xcworkspace \
+  -scheme CyxbsMobile2019_iOS \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=<UDID>" \
+  -derivedDataPath "$DERIVED_DATA" \
+  build
+APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/掌上重邮.app"
+xcrun simctl install <UDID> "$APP"
+xcrun simctl launch --terminate-running-process <UDID> <bundle-id>
+```
+
+以 `simctl launch` 返回的 PID 和模拟器中的存活进程确认拉起成功。模拟器不执行真机 provisioning profile 校验，但仍须核对 Bundle ID、KMP framework 架构和 Compose 资源。
+
+### KMP 产物判定
+
+本项目的 `CyxbsApplicationsMultiplatform.framework` 是静态 framework。它应由本轮对应平台的 `compileKotlin*`、`linkDebugFramework*`、`assembleDebugAppleFrameworkForXcode*` 和 `syncComposeResourcesForIos` 生成并参与 Xcode 链接；用 `file`、`lipo -archs` 和本轮链接日志核对架构。**不要要求它出现在最终 App 的 `Frameworks` 目录**，也不要因 `embedAndSignAppleFrameworkForXcode SKIPPED` 单独出现就判定失败。详细判定见 [构建配置排查](references/build-troubleshooting.md)。
+
+若安装提示同 Bundle ID 的旧 App 来自另一团队，iOS 不允许覆盖升级。说明卸载会清除该 App 本地数据，只有取得用户明确确认后才执行卸载；不得通过改 Bundle ID 绕过。
 
 ## 验证与报告
 

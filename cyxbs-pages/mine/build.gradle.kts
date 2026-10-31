@@ -16,6 +16,7 @@ kotlin {
       implementation(projects.cyxbsComponents.view)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
+      implementation(projects.cyxbsComponents.log)
       implementation(projects.cyxbsFunctions.update.api)
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.login.api)

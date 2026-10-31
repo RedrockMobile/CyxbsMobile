@@ -21,5 +21,8 @@
         path="cyxbs/" />
     <files-path
         name="log"
-        path="cyxbs/log/"/>
+        path="cyxbs/log/" />
+    <cache-path
+        name="diagnostic_log_export"
+        path="cyxbs-log-export/" />
 </paths>

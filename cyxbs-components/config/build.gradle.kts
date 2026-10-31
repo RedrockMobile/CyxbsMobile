@@ -11,6 +11,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.cyxbsComponents.init)
+      api(projects.cyxbsComponents.log)
       implementation(projects.cyxbsComponents.account.api)
       implementation(projects.cyxbsPages.login.api)
       implementation(libs.kmp.ktProvider.manager) // config 私有，其他模块通过 ::class.impl() 获取

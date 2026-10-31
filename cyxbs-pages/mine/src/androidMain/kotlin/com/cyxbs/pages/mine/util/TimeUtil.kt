@@ -1,6 +1,6 @@
 package com.cyxbs.pages.mine.util
 
-import com.mredrock.cyxbs.common.utils.LogUtils
+import com.cyxbs.components.log.CyxbsLog
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.*
@@ -20,7 +20,7 @@ object TimeUtil {
             val date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(time)
             return wrapTime(date)
         }catch (e: ParseException){
-            LogUtils.e("Mine -- TimeUtil",e.toString())
+            CyxbsLog.e("Mine -- TimeUtil",e.toString())
             return "null"
         }
     }

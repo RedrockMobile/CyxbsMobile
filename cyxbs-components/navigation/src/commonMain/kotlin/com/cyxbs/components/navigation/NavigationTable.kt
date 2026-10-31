@@ -52,6 +52,9 @@ const val NAV_EDIT_INFO = "mine/edit"
 // 设置
 const val NAV_SETTING = "mine/setting"
 
+// 诊断日志设置
+const val NAV_LOG_SETTING = "mine/setting/log"
+
 // 桌面小组件
 const val NAV_WIDGET = "widget"
 

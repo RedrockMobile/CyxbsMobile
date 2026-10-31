@@ -1,15 +1,19 @@
 package com.cyxbs.components.utils.extensions
 
-/**
- * .
- *
- * @author 985892345
- * @date 2024/1/23 10:22
- */
+import com.cyxbs.components.log.CyxbsLog
+import com.cyxbs.components.log.LogLevel
 
-expect fun log(msg: String)
+fun log(msg: String) {
+  CyxbsLog.d("ggg", msg, showLocation = true)
+}
 
-expect fun log(tag: String, msg: String)
+fun log(tag: String, msg: String) {
+  CyxbsLog.d(tag, msg, showLocation = true)
+}
+
+fun log(level: LogLevel, tag: String, msg: String) {
+  CyxbsLog.log(level, tag, msg, showLocation = true)
+}
 
 fun logg(msg: Any?) {
   log(msg.toString())

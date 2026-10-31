@@ -1,10 +1,13 @@
 package com.cyxbs.pages.notification.api
 
 import androidx.compose.ui.graphics.Color
+import com.cyxbs.components.log.CyxbsLog
 import com.cyxbs.components.navigation.AppNavArgument
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+
+private const val TAG = "NoticeNavArgument"
 
 /**
  * 通知弹窗，支持对文本字体、颜色自定义，使用 [navigate] 打开
@@ -59,7 +62,7 @@ class NoticeNavArgument(
       runCatching {
         Color(it.substringAfter("#").substringBefore("-").toLong(16))
       }.onFailure {
-        it.printStackTrace()
+        CyxbsLog.e(TAG, "", it)
       }.getOrNull()
     }
 

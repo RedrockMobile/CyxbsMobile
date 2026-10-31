@@ -14,31 +14,37 @@ abstract class SettingPlatform {
   /**
    * 提供公共开关项。平台重写时应返回 `super.switchItems() + platformItems`，保持公共顺序稳定。
    */
-  open fun switchItems(): List<SettingItem.Switch> = listOf(
-    SettingItem.Switch(
-      key = "show_course_first",
-      title = "启动 App 优先显示课表",
-      readChecked = MineSettings::isShowCourseFirst,
-      rememberOnCheckedChange = { { enabled -> MineSettings.setShowCourseFirst(enabled) } },
-    ),
-  )
+  open fun switchItems(): List<SettingItem.Switch> = buildList {
+    add(
+      SettingItem.Switch(
+        key = "show_course_first",
+        title = "启动 App 优先显示课表",
+        readChecked = MineSettings::isShowCourseFirst,
+        rememberOnCheckedChange = { { enabled -> MineSettings.setShowCourseFirst(enabled) } },
+      )
+    )
+  }
 
   /**
    * 提供公共点击项。平台重写时应返回 `super.actionItems(actions) + platformItems`。
    */
-  open fun actionItems(actions: SettingItemActions): List<SettingItem.Action> = listOf(
-    SettingItem.Action(
-      key = "account_security",
-      title = "账号与安全",
-      requiresLogin = true,
-      rememberOnClick = { ::openAccountSecurity },
-    ),
-    SettingItem.Action(
-      key = "course_max_week",
-      title = "设置课表最大周数",
-      rememberOnClick = { actions.showCourseMaxWeekDialog },
-    ),
-  )
+  open fun actionItems(actions: SettingItemActions): List<SettingItem.Action> = buildList {
+    add(
+      SettingItem.Action(
+        key = "account_security",
+        title = "账号与安全",
+        requiresLogin = true,
+        rememberOnClick = { ::openAccountSecurity },
+      )
+    )
+    add(
+      SettingItem.Action(
+        key = "course_max_week",
+        title = "设置课表最大周数",
+        rememberOnClick = { actions.showCourseMaxWeekDialog },
+      )
+    )
+  }
 
   /**
    * 合并最终设置项。类型分组在这里统一完成，平台添加条目不会改变公共项内部的顺序。

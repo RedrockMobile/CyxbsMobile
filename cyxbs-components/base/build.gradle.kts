@@ -12,6 +12,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.cyxbsComponents.init)
+      implementation(projects.cyxbsComponents.log)
       implementation(projects.cyxbsComponents.utils)
       implementation(projects.cyxbsComponents.config)
       implementation(projects.cyxbsComponents.view)
